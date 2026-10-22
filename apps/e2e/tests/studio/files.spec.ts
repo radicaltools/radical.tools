@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function openModels(page: Page): Promise<void> {
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByRole('menuitem', { name: /Manage models/ }).click()
   await expect(page.getByRole('dialog', { name: 'Models' })).toBeVisible()
 }

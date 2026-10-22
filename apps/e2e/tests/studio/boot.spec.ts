@@ -17,7 +17,7 @@ test.describe('first visit', () => {
   test('New model asks for the metamodel and storage, Open for the source', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'New model' }).click()
-    await expect(page.getByLabel('Metamodel')).toHaveValue('c4-ddd-governance-builtin')
+    await expect(page.getByRole('combobox', { name: 'Metamodel' })).toHaveValue('c4-ddd-governance-builtin')
     await expect(page.getByRole('radio', { name: /In this browser/ })).toBeChecked()
     // Forge needs an AI provider, and none is set up on a first visit.
     await expect(page.getByRole('button', { name: 'Create with Radical Forge' })).toHaveCount(0)
@@ -104,7 +104,7 @@ test.describe('Models dialog', () => {
   test('lists every model, filters them, and creates one with the welcome steps', async ({ page, studio }) => {
     await studio.seed()
     await studio.open('v-context')
-    await page.getByTitle('Menu', { exact: true }).click()
+    await page.getByRole('button', { name: 'Models', exact: true }).click()
     await page.getByRole('menuitem', { name: /Manage models/ }).click()
     const models = page.getByRole('dialog', { name: 'Models' })
     await expect(models.locator('.docmgr-item')).toHaveCount(1)
@@ -116,7 +116,7 @@ test.describe('Models dialog', () => {
     await expect(models).toBeHidden()
     await expect(studio.nodes).toHaveCount(0)
 
-    await page.getByTitle('Menu', { exact: true }).click()
+    await page.getByRole('button', { name: 'Models', exact: true }).click()
     await page.getByRole('menuitem', { name: /Manage models/ }).click()
     await expect(models.locator('.docmgr-item')).toHaveCount(2)
     await models.getByRole('searchbox', { name: 'Search models' }).fill('e2e')
@@ -135,7 +135,7 @@ test.describe('Models dialog', () => {
     await studio.open('v-context')
     const models = page.getByRole('dialog', { name: 'Models' })
     const open = async (): Promise<void> => {
-      await page.getByTitle('Menu', { exact: true }).click()
+      await page.getByRole('button', { name: 'Models', exact: true }).click()
       await page.getByRole('menuitem', { name: /Manage models/ }).click()
       await expect(models).toBeVisible()
     }

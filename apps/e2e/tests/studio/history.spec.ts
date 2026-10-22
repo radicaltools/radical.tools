@@ -62,9 +62,10 @@ test('the history lists the places and goes to the one picked', async ({ page, s
   await page.getByRole('button', { name: 'History' }).click()
   const menu = page.getByRole('menu', { name: 'History' })
   const rows = menu.getByRole('menuitem')
-  // Over the canvas, its name included: the list is on top where they meet.
-  const caption = (await page.locator('.canvas-view-caption').boundingBox())!
-  const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.nav-menu'), [caption.x + caption.width / 2, caption.y + caption.height / 2])
+  // Over the canvas: the list is on top where they meet.
+  await expect(menu).toBeVisible()
+  const box = (await menu.boundingBox())!
+  const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.nav-menu'), [box.x + box.width / 2, box.y + box.height - 12])
   expect(onTop).toBe(true)
   // Newest first: the place ahead (Viewer), the current one, then those before.
   await expect(rows).toHaveCount(4)

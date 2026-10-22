@@ -335,7 +335,7 @@ test('in a milestone, the name of the first element added stays open through the
   // the focus from the new process's name, which closed: what was typed
   // then was lost, and Enter added a second "New process".
   await studio.openSample('view-processes')
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v4' }).click()
   await expect(page).toHaveURL(/\/s\//)
   const diagram = page.getByLabel('Warnier diagram')

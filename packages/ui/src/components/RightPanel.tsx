@@ -1,5 +1,6 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { create } from 'zustand'
 import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
@@ -18,7 +19,7 @@ import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from
 import { isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
-import { showNodeInView } from '../store/showInView'
+import { showNodeInView, useCardOpen } from '../store/showInView'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
@@ -149,42 +150,105 @@ function viewKindBadge(v: DiagramView): string {
   }
 }
 
-function AccordionSection({
-  title, icon, preview, defaultOpen = true, children, count, open: openProp, onToggle,
-}: {
-  title: string
-  icon?: keyof typeof SECTION_ICONS
-  /** What a folded section shows under its name. */
-  preview?: string
-  defaultOpen?: boolean
-  children: React.ReactNode
-  count?: number
-  open?: boolean
-  onToggle?: () => void
-}) {
-  const [openState, setOpenState] = useState(defaultOpen)
-  const controlled = openProp !== undefined
-  const open = controlled ? openProp : openState
-  const toggle = controlled ? onToggle! : () => setOpenState((o) => !o)
+type PanelSectionId = keyof typeof SECTION_ICONS
+
+function SectionIcon({ id }: { id: PanelSectionId }) {
   return (
-    <div className={`lp-section${open ? ' open' : ''}`} style={icon ? { ['--sec-color' as string]: SECTION_COLORS[icon] } : undefined}>
-      <button className="lp-section-header" onClick={toggle} aria-expanded={open}>
-        {icon && (
-          <span className="lp-section-icon" aria-hidden>
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={SECTION_ICONS[icon]} /></svg>
-          </span>
-        )}
-        <span className="lp-section-text">
-          <span className="lp-section-title">{title}</span>
-          {!open && preview && <span className="lp-section-preview">{preview}</span>}
-        </span>
-        {count != null && count > 0 && <span className="lp-section-count">{count}</span>}
-        <svg className={`lp-section-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10" aria-hidden>
-          <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {/* A folded section keeps its content (its state, its menus), unseen. */}
-      <div className={`lp-section-body${open ? ' open' : ''}`} hidden={!open}>
+    <span className="lp-section-icon" aria-hidden>
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={SECTION_ICONS[id]} /></svg>
+    </span>
+  )
+}
+
+/** The left panel's open section, picked on the activity rail. */
+export const useLeftPanelSection = create<{ open: PanelSectionId }>()(() => ({ open: 'views' }))
+/** Where the app puts its own actions at the foot of the activity rail
+ *  (Studio's models, metamodel, AI, export and settings). */
+export const useRailSlot = create<{ el: HTMLElement | null }>()(() => ({ el: null }))
+
+/** The activity rail along the window's left edge, as in VS Code: the left
+ *  panel's sections at the top as tabs, each its icon and count, its name
+ *  and what it holds on hover; the app's actions at the foot. A click on
+ *  the open section folds the panel away and back, on another opens the
+ *  panel on it. ↑/↓ move between the tabs. Without a left panel (the
+ *  metamodel editor, the Inspector) it has the actions only. */
+export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }: {
+  sections: boolean
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
+}) {
+  const open = useLeftPanelSection((s) => s.open)
+  const railViews = useDiagramStore((s) => Object.keys(s.views).length)
+  const railMilestones = useDiagramStore((s) => s.snapshots.length)
+  const railSequences = useDiagramStore((s) => Object.keys(s.sequences).length)
+  const activeViewName = useDiagramStore((s) => viewById(s, s.activeViewId)?.name)
+  const latestMilestone = useDiagramStore((s) => s.snapshots[s.snapshots.length - 1]?.name)
+  const sequenceNames = useDiagramStore(useCallback((s: { sequences: Record<string, { name: string }> }) =>
+    Object.values(s.sequences).map((q) => q.name).join(', '), []))
+  const tabs: Array<{ id: PanelSectionId; title: string; count: number; preview: string }> = [
+    { id: 'views', title: 'Views', count: railViews, preview: `Open: ${activeViewName ?? 'All elements'}` },
+    { id: 'milestones', title: 'Milestones', count: railMilestones, preview: latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet' },
+    { id: 'sequences', title: 'Sequences', count: railSequences, preview: sequenceNames || 'None yet' },
+  ]
+  const pick = (id: PanelSectionId) => {
+    if (id === open && !collapsed) { onToggleCollapsed?.(); return }
+    useLeftPanelSection.setState({ open: id })
+    if (collapsed) onToggleCollapsed?.()
+  }
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    const at = tabs.findIndex((x) => x.id === open)
+    const next = tabs[(at + (e.key === 'ArrowDown' ? 1 : tabs.length - 1)) % tabs.length]
+    useLeftPanelSection.setState({ open: next.id })
+    if (collapsed) onToggleCollapsed?.()
+    e.currentTarget.querySelector<HTMLElement>(`#lp-tab-${next.id}`)?.focus()
+  }
+  const slot = useCallback((el: HTMLDivElement | null) => { useRailSlot.setState({ el }) }, [])
+  return (
+    <nav className="activity-rail" aria-label="Activity bar">
+      {sections && (
+        <div className="lp-rail" role="tablist" aria-orientation="vertical" aria-label="Panel sections" onKeyDown={onKeyDown}>
+          {tabs.map((x) => {
+            const shown = x.id === open && !collapsed
+            return (
+              <button key={x.id} id={`lp-tab-${x.id}`} type="button" role="tab"
+                className={`lp-rail-tab${shown ? ' active' : ''}`}
+                style={{ ['--sec-color' as string]: SECTION_COLORS[x.id] }}
+                aria-selected={shown} aria-controls={`lp-sec-${x.id}`} aria-label={x.title}
+                tabIndex={x.id === open ? 0 : -1}
+                title={`${x.title} · ${x.preview}`}
+                onClick={() => pick(x.id)}>
+                <SectionIcon id={x.id} />
+                <span className="lp-rail-count">{x.count}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <div className="activity-rail-actions" ref={slot} />
+    </nav>
+  )
+}
+
+/** The open section of the left panel: its name and count, and what it
+ *  holds. A section not open keeps its content (its state, its menus),
+ *  unseen. */
+function PanelSection({ id, title, count, open, children }: {
+  id: PanelSectionId
+  title: string
+  count: number
+  open: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div id={`lp-sec-${id}`} className="lp-section" role="tabpanel" aria-labelledby={`lp-tab-${id}`} hidden={!open}
+      style={{ ['--sec-color' as string]: SECTION_COLORS[id] }}>
+      <div className="lp-section-head">
+        <span className="lp-section-title">{title}</span>
+        <span className="lp-section-count">{count}</span>
+      </div>
+      <div className="lp-section-body">
         <div className="lp-section-body-pad">{children}</div>
       </div>
     </div>
@@ -831,7 +895,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             value={view.edgeStyle ?? ''}
             disabled={readOnly}
             onChange={(e) => setViewEdgeStyle(view.id, (e.target.value || null) as 'curved' | 'orthogonal' | null)}
-            title="How this view draws relations; the model's setting is in the Radical menu"
+            title="How this view draws relations; the model's setting is under Settings on the activity rail"
           >
             <option value="">Model's ({defaultEdgeStyle === 'orthogonal' ? 'orthogonal' : 'curved'})</option>
             <option value="curved">Curved</option>
@@ -1375,6 +1439,18 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     if (next.has(path)) next.delete(path); else next.add(path)
     return next
   })
+  // The view opened from elsewhere (the card's Views, Quick Search, a link)
+  // is scrolled into sight in the list, once its folder or group is open.
+  const listRef = useRef<HTMLDivElement>(null)
+  const toReveal = useRef(true)
+  useEffect(() => { toReveal.current = true }, [activeViewId])
+  useEffect(() => {
+    if (!toReveal.current) return
+    const card = listRef.current?.querySelector('.lp-view-card.active')
+    if (!card) return
+    toReveal.current = false
+    card.scrollIntoView?.({ block: 'nearest' })
+  })
 
   const renderView = (v: DiagramView) => {
     const isActive = activeViewId === v.id
@@ -1474,7 +1550,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   }
 
   return (
-    <div className="lp-view-list">
+    <div className="lp-view-list" ref={listRef}>
       {/* The exploration (Explore from here): first while it is open, and
           none of the model's views. */}
       {exploration && (
@@ -1677,6 +1753,9 @@ function PanelToggle({ side, collapsed, onToggle }: {
   )
 }
 
+/** The left panel: the section open on the activity rail (ActivityRail),
+ *  folded away by the rail's open section or the chevron on its edge, and
+ *  opened again from the rail. */
 export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = false, onToggleCollapsed }: {
   mode?: 'designer' | 'viewer' | 'presenter'
   readOnly?: boolean
@@ -1687,14 +1766,10 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   const viewsCount = useDiagramStore((s) => Object.keys(s.views).length)
   const snapshotsCount = useDiagramStore((s) => s.snapshots.length)
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
-  // What each folded section says it holds.
-  const activeViewName = useDiagramStore((s) => viewById(s, s.activeViewId)?.name)
-  const latestMilestone = useDiagramStore((s) => s.snapshots[s.snapshots.length - 1]?.name)
-  const sequenceNames = useDiagramStore(useCallback((s: { sequences: Record<string, { name: string }> }) =>
-    Object.values(s.sequences).map((q) => q.name).join(', '), []))
   // The element types are in the palette on the canvas (ElementPalette).
-  // One section open at a time; a click on the open one folds it.
-  const [openSection, setOpenSection] = useState<'views' | 'milestones' | 'sequences' | null>('views')
+  // One section open at a time, picked on the activity rail.
+  const openSection = useLeftPanelSection((s) => s.open)
+  const setOpenSection = (open: PanelSectionId) => useLeftPanelSection.setState({ open })
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   const hasPaneContent = !!paneContent
@@ -1716,9 +1791,12 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
     return !Object.values(s.views).some((v) => v.folder === folder || v.folder?.startsWith(`${folder}/`))
   })
   useEffect(() => { if (paneGone) setPaneContent(null) }, [paneGone])
+  // Another section picked on the rail shows its list, not the properties.
+  useEffect(() => { setPaneContent(null) }, [openSection])
 
-  const toggle = onToggleCollapsed && (
-    <PanelToggle side="left" collapsed={collapsed} onToggle={onToggleCollapsed} />
+  // Only folds: a folded panel opens from the activity rail's sections.
+  const toggle = onToggleCollapsed && !collapsed && (
+    <PanelToggle side="left" collapsed={false} onToggle={onToggleCollapsed} />
   )
 
   return (
@@ -1726,26 +1804,21 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
       <div className="panel-content">
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
-          {/* Pane 1 — accordion */}
+          {/* Pane 1 — the open section */}
           <div className="rp-pane lp-sections" ref={listPane}>
-            <AccordionSection title="Views" icon="views" count={viewsCount} preview={`Open: ${activeViewName ?? 'All elements'}`}
-              open={openSection === 'views'} onToggle={() => setOpenSection((o) => (o === 'views' ? null : 'views'))}>
+            <PanelSection id="views" title="Views" count={viewsCount} open={openSection === 'views'}>
               <ViewList
                 readOnly={isReadOnly}
                 onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'view', id }); setOpenSection('views') } : undefined}
                 onOpenFolder={!isReadOnly ? (path) => { setPaneContent({ kind: 'folder', id: path }); setOpenSection('views') } : undefined}
               />
-            </AccordionSection>
-            <AccordionSection title="Milestones" icon="milestones" count={snapshotsCount}
-              preview={latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet'}
-              open={openSection === 'milestones'} onToggle={() => setOpenSection((o) => (o === 'milestones' ? null : 'milestones'))}>
+            </PanelSection>
+            <PanelSection id="milestones" title="Milestones" count={snapshotsCount} open={openSection === 'milestones'}>
               <SnapshotList readOnly={isReadOnly} onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'milestone', id }); setOpenSection('milestones') } : undefined} />
-            </AccordionSection>
-            <AccordionSection title="Sequences" icon="sequences" count={sequencesCount}
-              preview={sequenceNames || 'None yet'}
-              open={openSection === 'sequences'} onToggle={() => setOpenSection((o) => (o === 'sequences' ? null : 'sequences'))}>
+            </PanelSection>
+            <PanelSection id="sequences" title="Sequences" count={sequencesCount} open={openSection === 'sequences'}>
               <SequenceList readOnly={isReadOnly} compact={true} />
-            </AccordionSection>
+            </PanelSection>
           </div>
 
           {/* Pane 2 — view / milestone properties */}
@@ -2780,6 +2853,10 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   const [dismissed, setDismissed] = useState<string | null>(null)
   const open = !!subject && dismissed !== subject
   const close = useCallback(() => setDismissed(subject), [subject])
+  useEffect(() => {
+    useCardOpen.setState({ open })
+    return () => useCardOpen.setState({ open: false })
+  }, [open])
   // Anything else selected, or nothing, ends it: the element picked again
   // has its card. Kept until another ✕, the card never opened for it again.
   useEffect(() => {

@@ -4,8 +4,7 @@ import { builtInC4Metamodel } from '@radical/common/metamodel'
 // The list side of the metamodel editor (the Diagram tab has its own spec).
 
 async function openEditor(page: import('@playwright/test').Page): Promise<void> {
-  await page.getByTitle('Menu', { exact: true }).click()
-  await page.getByText(/Metamodel editor/).first().click()
+  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
 }
 

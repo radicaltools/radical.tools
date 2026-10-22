@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { useShowRequest } from '../store/showInView'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { TYPE_LABELS, nodeTypeSize, type C4ElementType, type C4Node } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
@@ -296,6 +297,13 @@ export function WarnierView(): React.ReactElement {
     const el = root.current?.querySelector<HTMLElement>(`.wn-label[data-node-id="${CSS.escape(selectedId)}"]`)
     if (el && active !== el) el.focus()
   }, [selectedId, renaming, repeatOpen, items])
+  // And is in sight, also when the keyboard stays where it was (the card's
+  // Views, Quick Search).
+  const showSeq = useShowRequest((r) => r.seq)
+  useEffect(() => {
+    if (!selectedId) return
+    root.current?.querySelector<HTMLElement>(`.wn-label[data-node-id="${CSS.escape(selectedId)}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [selectedId, activeView?.id, showSeq])
 
   /** Writes the orders that differ from the model's. */
   const writeOrders = (orders: Record<string, number>) => {

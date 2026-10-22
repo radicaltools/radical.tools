@@ -222,7 +222,7 @@ test('a milestone without the treemap\'s drill element leaves the view\'s drill 
   const focus = async (): Promise<string | undefined> =>
     (await studio.storedDoc(docId) as unknown as { views: Array<{ id: string; treemapFocusId?: string }> }).views.find((v) => v.id === 'view-treemap')?.treemapFocusId
   await expect.poll(focus).toBe('ctn-payments')
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await page.waitForTimeout(1500) // the autosave

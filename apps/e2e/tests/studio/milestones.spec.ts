@@ -7,7 +7,7 @@ import { test, expect, fixture } from '../../support/fixtures'
 async function sampleTableIn(page: import('@playwright/test').Page, studio: import('../../support/fixtures').Studio, name: string): Promise<void> {
   await studio.openSample()
   await studio.open('canvas', 'designer', studio.activeDocId())
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: name }).first().click()
   await expect(page).toHaveURL(/\/s\//)
 }
@@ -76,7 +76,7 @@ test('the diff of a flow view finds a step removed whose relation is another ste
   await studio.open('v-context')
   await page.locator('.lp-view-card', { hasText: 'Order Flow' }).first().click()
   await expect(page.locator('.seq-diagram-step')).toHaveCount(4)
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'Target' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await page.getByRole('button', { name: '⊙ diff' }).first().click()
@@ -97,7 +97,7 @@ test('opening a milestone and going back to the live model writes nothing', asyn
   await expect.poll(stored).not.toBeNull()
   await page.waitForTimeout(1500)
   const before = await stored()
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await studio.settle()
@@ -114,7 +114,7 @@ test('a name typed in a milestone before and after the question is one undo step
   // The question took the focus from the field and gave it back: what was
   // typed before it and after it were two steps.
   await studio.openSample('view-core')
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await studio.settle()
@@ -141,7 +141,7 @@ test('leaving the page with a milestone shown and nothing edited in it asks noth
   await studio.openSample('view-core')
   const asked: string[] = []
   page.on('dialog', (d) => { asked.push(d.type()); void d.dismiss() })
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await studio.settle()
@@ -155,7 +155,7 @@ test('leaving the page with unsaved edits of a milestone asks, and staying keeps
   await studio.openSample('view-core')
   const asked: string[] = []
   page.on('dialog', (d) => { asked.push(d.type()); void d.dismiss() })
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
   await expect(page).toHaveURL(/\/s\//)
   await studio.settle()

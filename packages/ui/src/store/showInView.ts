@@ -4,13 +4,26 @@
 // card's Views, the Inspector): the view, the element's page on it, its
 // containers open, the selection and the camera.
 
+import { create } from 'zustand'
 import { useDiagramStore } from './diagramStore'
 
-/** Puts `nodeId` in sight on a wiki or hierarchy view picked for it: the
- *  wiki shows its page, the hierarchy the level that draws it. A pick there
- *  selected the element and stayed on the Overview, or on a level that did
- *  not draw it. */
+/** The last time an element was asked to be shown: the views that are lists
+ *  (table, wiki, Warnier) scroll it into sight on each ask, also when the
+ *  view and the selection stay as they were (a second click on the open
+ *  view in the card's Views). */
+export const useShowRequest = create<{ nodeId: string | null; seq: number }>()(() => ({ nodeId: null, seq: 0 }))
+
+/** Whether the properties card is open over the view (RightPanel says): a
+ *  wiki takes an open card along to the page read, and leaves a closed one
+ *  closed. */
+export const useCardOpen = create<{ open: boolean }>()(() => ({ open: false }))
+
+/** Puts `nodeId` in sight on a view picked for it: the wiki shows its page,
+ *  the hierarchy the level that draws it, a table or Warnier scrolls to it.
+ *  A pick there selected the element and stayed on the Overview, or on a
+ *  level that did not draw it. */
 export function showOnPage(viewId: string | null, nodeId: string): void {
+  useShowRequest.setState((r) => ({ nodeId, seq: r.seq + 1 }))
   const store = useDiagramStore.getState()
   const view = viewId ? store.views[viewId] : undefined
   if (!view) return

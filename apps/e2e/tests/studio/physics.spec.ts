@@ -226,6 +226,11 @@ test('a drag moves only the dragged node, and the drop pins it', async ({ page, 
 })
 
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
+  // The canvas as wide as before the activity rail took 44 px of it, from
+  // the first frame: at the zoom a narrower canvas fits the grid at, the
+  // drop pushes n8_8 too (docs/IMPROVEMENTS.md).
+  const size = page.viewportSize()!
+  await page.setViewportSize({ width: size.width + 44, height: size.height })
   await studio.seedDocument(gridDocument())
   await studio.open(WHOLE)
   const previous = await untilStill(page, studio)
@@ -435,7 +440,7 @@ test.describe('a canvas of the whole model keeps its own layout', () => {
     await studio.open(WHOLE)
     const all = await studio.positions()
     await studio.open('v-context')
-    await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+    await page.getByRole('tab', { name: 'Milestones' }).click()
     await page.getByRole('button', { name: 'New milestone' }).click()
     await page.getByPlaceholder('Milestone name…').fill('M1')
     await page.keyboard.press('Enter')
@@ -447,7 +452,7 @@ test.describe('a canvas of the whole model keeps its own layout', () => {
     await page.waitForTimeout(1000)
     await page.reload()
     await studio.ready()
-    await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+    await page.getByRole('tab', { name: 'Milestones' }).click()
     await page.locator('.lp-snap-current').click()
     await studio.open(WHOLE)
     expect(await studio.positions()).toEqual(all)
@@ -529,7 +534,7 @@ test('a milestone picked in Viewer is not the one Designer edits', async ({ page
   // name, and a drag followed by "Propagate" copied it over every milestone.
   await studio.seedWhole()
   await studio.open(WHOLE)
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.getByRole('button', { name: 'New milestone' }).click()
   await page.getByPlaceholder('Milestone name…').fill('Before')
   await page.keyboard.press('Enter')
@@ -543,7 +548,8 @@ test('a milestone picked in Viewer is not the one Designer edits', async ({ page
 
   await page.getByRole('button', { name: 'Viewer', exact: true }).click()
   await studio.settle()
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  // The section open on the rail stays open in another perspective.
+  await expect(page.getByRole('tab', { name: 'Milestones' })).toHaveAttribute('aria-selected', 'true')
   await page.locator('.lp-snap-card', { hasText: 'Before' }).click()
   await expect(studio.nodes).toHaveCount(6)
 

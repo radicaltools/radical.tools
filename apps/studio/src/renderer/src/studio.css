@@ -7,11 +7,14 @@
   grid-template-rows: 48px 1fr auto;
   /* The left panel's width; its edge handle drags it (LeftPanel). */
   --left-panel-w: 260px;
-  grid-template-columns: var(--left-panel-w) 1fr;
+  /* The activity rail (ActivityRail) is the first column in every
+     perspective but a slide show. */
+  --rail-w: 44px;
+  grid-template-columns: var(--rail-w) var(--left-panel-w) 1fr;
   grid-template-areas:
-    "toolbar    toolbar"
-    "leftpanel  canvas"
-    "timetravel timetravel";
+    "toolbar    toolbar    toolbar"
+    "rail       leftpanel  canvas"
+    "timetravel timetravel timetravel";
   height: 100vh;
   /* The properties card waits beyond the right edge: nothing may scroll
      the page sideways to it. */
@@ -19,32 +22,32 @@
   transition: grid-template-columns 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .app-layout.lp-resizing { transition: none; cursor: col-resize; }
-/* Collapsed panel rails */
-.app-layout.lp-collapsed { grid-template-columns: 18px 1fr; }
+/* A folded left panel leaves the rail. */
+.app-layout.lp-collapsed { grid-template-columns: var(--rail-w) 0 1fr; }
 /* Presentation mode — same layout as modelling (left panel + canvas; the
    properties card lies over the canvas) */
 .app-layout.mode-presentation {
-  grid-template-columns: var(--left-panel-w) 1fr;
+  grid-template-columns: var(--rail-w) var(--left-panel-w) 1fr;
   grid-template-rows: 48px 1fr auto;
   grid-template-areas:
-    "toolbar    toolbar"
-    "leftpanel  canvas"
-    "timetravel timetravel";
+    "toolbar    toolbar    toolbar"
+    "rail       leftpanel  canvas"
+    "timetravel timetravel timetravel";
 }
-.app-layout.mode-presentation.lp-collapsed { grid-template-columns: 18px 1fr; }
+.app-layout.mode-presentation.lp-collapsed { grid-template-columns: var(--rail-w) 0 1fr; }
 /* Active presenting — canvas only, HUD is a fixed overlay */
 .app-layout.mode-presenting {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
   grid-template-areas: "canvas";
 }
-/* Metamodel mode — full-width editor takes the canvas area */
+/* Metamodel mode — full-width editor takes the canvas area, beside the rail */
 .app-layout.mode-metamodel {
-  grid-template-columns: 1fr;
+  grid-template-columns: var(--rail-w) 1fr;
   grid-template-rows: 48px 1fr;
   grid-template-areas:
-    "toolbar"
-    "canvas";
+    "toolbar toolbar"
+    "rail    canvas";
 }
 /* ─── Presenter Dock (bottom slides bar in presenter mode) ─────────── */
 .pres-dock {
@@ -139,6 +142,30 @@
 }
 /* ─── App menu (hamburger popover) ──────────────────────────────────── */
 .app-menu-wrap { position: relative; display: inline-flex; }
+/* ─── The activity rail's foot: Studio's menus (AppMenu) ──────────────── */
+.rail-menu { position: relative; display: flex; }
+.rail-action {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 42px;
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: var(--text-secondary);
+  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+.rail-action svg { width: 21px; height: 21px; }
+.rail-action:hover, .rail-action.open { color: var(--text-primary); background: var(--hover-bg-faint); }
+.rail-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rail-action.active { color: var(--accent); }
+.rail-action.active::after {
+  content: ''; position: absolute; top: 7px; bottom: 7px; right: -1px;
+  width: 3px; border-radius: 2px 0 0 2px; background: var(--accent);
+}
+/* Beside the rail, its foot level with the button, as VS Code's menus. */
+.app-menu-popover.rail-flyout {
+  top: auto; bottom: 0; left: calc(100% + 6px);
+  min-width: 260px;
+}
+
 .app-menu-popover {
   position: absolute;
   top: calc(100% + 8px);
@@ -1960,7 +1987,7 @@ div.milestone-option { cursor: default; }
 .mmi-prop-key { font-family: ui-monospace, monospace; }
 .mmi-prop-type { color: var(--text-muted); margin-left: 6px; }
 .mmi-prop-sub { color: var(--text-muted); font-size: 10px; margin-top: 1px; }
-/* Why a Radical menu item is disabled (Radical Forge without an AI provider). */
+/* Why a menu item of the activity rail is disabled (Radical Forge without an AI provider). */
 .app-menu-hint {
   display: block;
   font-size: 10.5px;
@@ -2144,7 +2171,7 @@ div.milestone-option { cursor: default; }
   border-color: var(--accent);
 }
 /* ─── Quick search · AI agent additions ───────────────────────────── */
-.quick-search-bar { width: min(520px, 46vw); }
+.quick-search-bar { width: var(--qs-w); }
 .quick-search-bar.ai-mode {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   box-shadow:
@@ -3366,11 +3393,11 @@ div.milestone-option { cursor: default; }
 
 /* ─── Inspector perspective (what radical check says) ─────────────────── */
 .app-layout.mode-inspector {
-  grid-template-columns: 1fr;
+  grid-template-columns: var(--rail-w) 1fr;
   grid-template-rows: 48px 1fr;
   grid-template-areas:
-    "toolbar"
-    "canvas";
+    "toolbar toolbar"
+    "rail    canvas";
 }
 .insp { grid-area: canvas; position: relative; min-height: 0; overflow: hidden; display: flex; background: var(--bg-app); color: var(--text-primary); }
 .insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 60px; display: grid; gap: 24px; align-content: start; max-width: 1640px; margin: 0 auto; font-size: 13px; }
@@ -3643,6 +3670,28 @@ div.milestone-option { cursor: default; }
 .insp-show .insp-show-menu button:hover, .insp-show .insp-show-menu button:focus-visible { background: var(--bg-app); }
 
 /* ─── Back, forward and History (NavHistory.tsx) ─── */
+/* Toolbar groups: buttons that belong together in one pill. */
+.toolbar-group {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  border: 1px solid var(--border-color); border-radius: 9px;
+  background: var(--hover-bg-faint);
+}
+.toolbar-group .toolbar-btn { height: 26px; background: transparent; }
+.toolbar-group .toolbar-btn:hover { background: var(--hover-bg); border-color: transparent; }
+.toolbar-icon-btn { padding: 0 7px; min-width: 30px; justify-content: center; }
+.toolbar-icon-btn svg { width: 15px; height: 15px; }
+/* Quick Search's width (.quick-search-bar): narrower in a window that has
+   less room between the toolbar's two sides. */
+:root { --qs-w: clamp(300px, calc(100vw - 920px), 520px); }
+/* Navigation either side of Quick Search, measured from the toolbar's middle,
+   where it stands. */
+.toolbar-center { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.toolbar-center > .toolbar-group { position: absolute; top: 0; transform: translateY(-50%); }
+.toolbar-center > .toolbar-group:first-child { right: calc(var(--qs-w) / 2 + 8px); }
+.toolbar-center > .toolbar-group:last-child { left: calc(var(--qs-w) / 2 + 8px); }
+.toolbar-center.no-search > .toolbar-group:first-child { right: 3px; }
+.toolbar-center.no-search > .toolbar-group:last-child { left: 3px; }
+.nav-history-list .nav-menu { left: auto; right: 0; }
 .nav-history { position: relative; display: inline-flex; align-items: center; gap: 2px; }
 .nav-btn-wrap { position: relative; }
 .nav-btn { padding: 0 7px; min-width: 30px; justify-content: center; }

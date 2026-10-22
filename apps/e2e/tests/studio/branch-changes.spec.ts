@@ -255,7 +255,7 @@ test('with a milestone open, the Inspector lists the changes of the model as it 
     relations: {},
   }
   await openFolder(page, studio, { ...ARCH, snapshots: [milestone] }, { '.radical/base.json': ARCH_BASE })
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).click()
   await expect(page).toHaveURL(/\/s\/m-v1/)
   await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
@@ -389,7 +389,7 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   await expect(button).toHaveClass(/unavailable/)
 
-  await page.getByTitle('Menu').click()
+  await page.getByRole('button', { name: 'AI', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Card payments\n\nShoppers pay by card.')
   await page.getByRole('button', { name: 'Start →' }).click()

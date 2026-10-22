@@ -70,6 +70,7 @@ show one. Still open:
 28. **Compact / spread toggle** — global "layout density" slider.
 29. **Snap-to-grid + guides** — for manual dragging (already on the technical pending list).
 30. **Layout per view** — different views, different algorithms / parameters.
+31. **A drop's push depends on the zoom** (2026-10-22) — in `physics.spec.ts` › "a drop onto a node pushes that node clear and nothing else", the same drop (offset by the nodes' size) pushes only `n7_8` on a canvas 1020 px wide but `n8_8` too at the zoom a 976 px canvas fits the grid at (the activity rail took 44 px). The test now widens the window by the rail's 44 px; a drop should push the same nodes at any zoom.
 
 ### General UX
 

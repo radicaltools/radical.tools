@@ -1035,6 +1035,8 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   opacity: 0;
   pointer-events: none;
 }
+/* Folded: no width; the activity rail opens it again. */
+.left-panel.collapsed { border-right: none; overflow: hidden; }
 
 /* Drag handle on the left panel's inner edge: drag to widen, double-click
    for the default width. */
@@ -1085,10 +1087,6 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   border-radius: 6px 0 0 6px;
   border-right: none;
 }
-.left-panel.collapsed .panel-toggle-left {
-  /* keep the tab visible inside the collapsed rail */
-  top: 14px;
-}
 
 /* Two-column layout inside left panel (presentation mode) */
 .left-panel.lp-two-col {
@@ -1096,47 +1094,67 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   overflow: hidden;
 }
 
-/* ── Left panel accordion ─────────────────────────────────────────── */
-/* The open section takes the free height and scrolls; folded ones are a
-   header each, with a line on what they hold. */
-.lp-sections { overflow: hidden; }
-.lp-section { border-bottom: 1px solid var(--border-color); flex: 0 0 auto; display: flex; flex-direction: column; min-height: 0; }
-.lp-section:last-child { border-bottom: none; }
-.lp-section.open { flex: 1 1 auto; }
-.lp-section-header {
-  width: 100%; display: flex; align-items: center; gap: 10px;
-  padding: 10px 24px 10px 14px; min-height: 44px;
-  background: none; border: none; cursor: pointer; text-align: left;
-  color: var(--text-primary); font: inherit;
-  user-select: none;
+/* ── Activity rail (as in VS Code): the left panel's sections at the top,
+   the app's actions at the foot, along the window's left edge ──────────── */
+.activity-rail {
+  grid-area: rail;
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 0; width: 44px;
+  border-right: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--text-primary) 2.5%, var(--bg-panel));
+  position: relative; z-index: 7;
+}
+.lp-rail {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 2px; padding: 8px 0;
+}
+.activity-rail-actions {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 2px; padding: 8px 0;
+}
+.activity-rail-actions:empty { padding: 0; }
+.lp-rail-tab {
+  --sec-color: var(--accent);
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 0 6px;
+  background: none; border: none; cursor: pointer; font: inherit;
+  color: var(--text-muted);
   transition: background 0.15s var(--ease-out);
 }
-.lp-section-header:hover { background: var(--hover-bg-faint); }
-.lp-section { --sec-color: var(--accent); }
-.lp-section.open > .lp-section-header {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--sec-color) 10%, transparent), transparent 85%);
-  box-shadow: inset 3px 0 0 var(--sec-color);
+.lp-rail-tab:hover { background: var(--hover-bg-faint); }
+.lp-rail-tab:focus-visible { outline: 2px solid var(--sec-color); outline-offset: -2px; }
+/* The open section: its colour, and a bar on the rail's inner edge. */
+.lp-rail-tab.active::after {
+  content: ''; position: absolute; top: 6px; bottom: 6px; right: -1px;
+  width: 3px; border-radius: 2px 0 0 2px; background: var(--sec-color);
 }
+.lp-rail-count {
+  font-size: 10.5px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lp-rail-tab.active .lp-rail-count { color: var(--sec-color); }
 .lp-section-icon {
   width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px;
   display: inline-flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--sec-color) 14%, transparent); color: var(--sec-color);
   transition: background 0.15s, color 0.15s;
 }
-.lp-section.open .lp-section-icon { background: var(--sec-color); color: #fff; }
-.lp-section-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.lp-section-title { font-size: 13px; font-weight: 600; line-height: 1.25; }
-.lp-section-preview {
-  font-size: 11.5px; color: var(--text-muted); line-height: 1.3;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.lp-rail-tab.active .lp-section-icon { background: var(--sec-color); color: #fff; }
+
+.lp-sections { overflow: hidden; }
+.lp-section { --sec-color: var(--accent); flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.lp-section[hidden] { display: none; }
+.lp-section-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; height: 40px;
+  border-bottom: 1px solid var(--border-color);
 }
-.lp-section-chevron {
-  color: var(--text-muted);
-  transition: transform 0.22s var(--ease-spring);
-  transform: rotate(0deg);
-  flex-shrink: 0;
+.lp-section-title {
+  flex: 1; min-width: 0;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
 }
-.lp-section-chevron.open { transform: rotate(90deg); }
 .lp-section-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 20px; height: 18px; padding: 0 6px; flex-shrink: 0;
@@ -1146,8 +1164,7 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   color: var(--sec-color);
 }
 .lp-section-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.lp-section-body[hidden] { display: none; }
-.lp-section-body-pad { padding: 2px 8px 12px; }
+.lp-section-body-pad { padding: 6px 8px 12px; min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
 
 /* ── Modern card primitives (snapshots + views) ───────────────────── */
 .lp-card {
@@ -1407,7 +1424,18 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 }
 
 /* ── View list ───────────────────────────────────────────────────── */
-.lp-view-list { display: flex; flex-direction: column; gap: 4px; }
+.lp-view-list { display: flex; flex-direction: column; gap: 4px; flex: 1 0 auto; }
+/* New view keeps to the bottom edge of the section, under a short list
+   and over a long one as it scrolls. */
+.lp-view-list > .lp-add-view {
+  position: sticky; bottom: -12px; z-index: 2;
+  margin-top: auto; margin-bottom: -12px;
+  padding: 8px 0 17px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-color);
+}
+/* A view scrolled into sight is not left under it. */
+.lp-view-list .lp-view-card { scroll-margin-bottom: 64px; }
 .lp-view-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px;
@@ -2321,6 +2349,7 @@ h4.wiki-heading { font-size: 16px; }
 .wiki-tool::before { content: '['; color: var(--text-muted); margin-right: 1px; }
 .wiki-tool::after { content: ']'; color: var(--text-muted); margin-left: 1px; }
 .wiki-tool:hover { text-decoration: underline; }
+.wiki-tool.active { color: var(--text-secondary); }
 .wiki-tool.danger { color: #dc2626; }
 /* Byline: what the element is and where it sits, in one quiet line under
    the title. */

@@ -30,7 +30,7 @@ test.beforeEach(async ({ page, studio }) => {
 })
 
 async function openModels(page: Page): Promise<void> {
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByRole('menuitem', { name: /Manage models/ }).click()
   await expect(page.getByRole('dialog', { name: 'Models' })).toBeVisible()
 }
@@ -255,7 +255,7 @@ test('Undo after an outside edit takes back the user\'s edit and keeps the outsi
 test('an agent\'s write leaves the sequence card open', async ({ page, studio }) => {
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
-  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
   await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
   const file = (await folder.files())['nodes/customer.md']

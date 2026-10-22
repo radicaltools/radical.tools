@@ -25,7 +25,7 @@ test.beforeEach(async ({ studio }) => {
 })
 
 async function exportAs(page: import('@playwright/test').Page, item: string): Promise<{ name: string; data: Buffer }> {
-  await page.getByRole('button', { name: 'Radical', exact: true }).click()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
   const download = page.waitForEvent('download')
   await page.getByText(item, { exact: true }).click()
   const file = await download

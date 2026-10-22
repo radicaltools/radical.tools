@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { useShowRequest } from '../store/showInView'
 import type { C4Node, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
 import { addChoices, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
@@ -81,7 +82,23 @@ function useTableWindow(kinds: ReadonlyArray<'row' | 'add'>, wrap: React.RefObje
     return out
   }, [on, kinds, heights])
 
-  if (!on) return { on, start: 0, end: kinds.length, before: 0, after: 0, reveal: (_i: number) => {} }
+  // A short table draws every line: where one is, the drawn row says.
+  const scrollTo = (top: number, bottom: number) => {
+    const el = wrap.current
+    if (!el) return
+    const head = el.querySelector('thead')?.getBoundingClientRect().height ?? 0
+    if (top < el.scrollTop || bottom + head > el.scrollTop + el.clientHeight) el.scrollTop = Math.max(0, top - el.clientHeight / 3)
+  }
+  if (!on) {
+    const reveal = (i: number) => {
+      const row = body.current?.children[i]
+      if (!row || !body.current) return
+      const at = body.current.getBoundingClientRect().top
+      const r = row.getBoundingClientRect()
+      scrollTo(r.top - at, r.bottom - at)
+    }
+    return { on, start: 0, end: kinds.length, before: 0, after: 0, reveal }
+  }
   const firstAt = (y: number) => {
     let lo = 0, hi = kinds.length
     while (lo < hi) { const mid = (lo + hi) >> 1; if (offsets[mid + 1] <= y) lo = mid + 1; else hi = mid }
@@ -89,13 +106,7 @@ function useTableWindow(kinds: ReadonlyArray<'row' | 'add'>, wrap: React.RefObje
   }
   const start = firstAt(Math.max(0, scroll.top - OVERSCAN_PX))
   const end = Math.min(kinds.length, firstAt(scroll.top + scroll.height + OVERSCAN_PX) + 1)
-  const reveal = (i: number) => {
-    const el = wrap.current
-    if (!el || i < 0) return
-    const head = el.querySelector('thead')?.getBoundingClientRect().height ?? 0
-    const top = offsets[i], bottom = offsets[i + 1]
-    if (top < el.scrollTop || bottom + head > el.scrollTop + el.clientHeight) el.scrollTop = Math.max(0, top - el.clientHeight / 3)
-  }
+  const reveal = (i: number) => { if (i >= 0) scrollTo(offsets[i], offsets[i + 1]) }
   return { on, start, end, before: offsets[start], after: offsets[kinds.length] - offsets[end], reveal }
 }
 
@@ -167,7 +178,8 @@ export function TableView(): React.ReactElement {
 
   // A long table draws only the lines near what is scrolled into sight; a
   // row the user goes to from elsewhere (a new element's name to write, the
-  // element selected in Structure) is scrolled to.
+  // element selected in Structure, the view opened for it from the card's
+  // Views or Quick Search) is scrolled to, the rows it is under unfolded.
   const wrapRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
   const kinds = useMemo(() => lines.map((l) => l.kind), [lines])
@@ -176,7 +188,27 @@ export function TableView(): React.ReactElement {
   const lineOf = useCallback((id: string) => lines.findIndex((l) => l.kind === 'row' && l.row.node.id === id), [lines])
   const editRowId = editCell?.rowId
   useEffect(() => { if (editRowId) revealNode(lineOf(editRowId)) }, [editRowId, lineOf]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (selectedNodeId) revealNode(lineOf(selectedNodeId)) }, [selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const showSeq = useShowRequest((r) => r.seq)
+  const toReveal = useRef<string | null>(null)
+  useEffect(() => {
+    const row = selectedNodeId ? allRows.find((r) => r.node.id === selectedNodeId) : undefined
+    toReveal.current = row ? row.node.id : null
+    if (row) setFoldedRows((prev) => {
+      const over = [...prev].filter((p) => row.path.startsWith(p + '/'))
+      if (!over.length) return prev
+      const next = new Set(prev)
+      for (const p of over) next.delete(p)
+      return next
+    })
+  }, [selectedNodeId, activeView?.id, showSeq]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Once the row is drawn (after the unfolding).
+  useEffect(() => {
+    const id = toReveal.current
+    const i = id ? lineOf(id) : -1
+    if (i < 0) return
+    toReveal.current = null
+    revealNode(i)
+  }, [selectedNodeId, activeView?.id, showSeq, lines]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // What a choice gets besides its type, in words: where it goes, the values
   // the filter asks for, and whether the filter will show it.

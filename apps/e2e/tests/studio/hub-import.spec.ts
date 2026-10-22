@@ -82,7 +82,7 @@ test('a concept added with its related concepts is one undo step', async ({ page
   await studio.seed('order-machine')
   await studio.open('v-order')
   const before = (await studio.storedDoc()).nodes.length
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Response Time')
@@ -104,7 +104,7 @@ test('a blueprint leaves no {{KEY}} placeholder in the model', async ({ page, st
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(withWhole(JSON.stringify(doc)))
   await studio.open(WHOLE)
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concepts…').pressSequentially('Fintech')
@@ -136,7 +136,7 @@ test('a concept imported into a selected container lands beside what it holds', 
   for (let i = 0; i < 2; i++) {
     const bookstore = studio.node('bookstore')
     if (!/selected/.test((await bookstore.getAttribute('class')) ?? '')) await bookstore.click({ position: { x: 30, y: 12 } })
-    await page.getByTitle('Menu', { exact: true }).click()
+    await page.getByRole('button', { name: 'Models', exact: true }).click()
     await page.getByText(/Import from Hub/).first().click()
     const dialog = page.locator('[aria-label="Import from Hub"]')
     await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
@@ -168,7 +168,7 @@ test('a concept added in Viewer with a container selected goes into it, as the c
   await studio.open('v-containers', 'viewer')
   await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
   await expect(studio.node('bookstore')).toHaveClass(/selected/)
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
@@ -196,7 +196,7 @@ test("a blueprint's views keep the Hub's layout, also after a reload", async ({ 
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-containers')
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concepts…').pressSequentially('Fintech')

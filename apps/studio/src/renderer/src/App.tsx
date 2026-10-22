@@ -10,7 +10,7 @@ import { WarnierView } from '@radical/ui/components/WarnierView'
 import { MatrixView } from './components/MatrixView'
 import { WikiView } from '@radical/ui/components/WikiView'
 import { PresentationBar, PresenterDock } from './components/PresentationBar'
-import { RightPanel, LeftPanel } from '@radical/ui/components/RightPanel'
+import { RightPanel, LeftPanel, ActivityRail } from '@radical/ui/components/RightPanel'
 import { MetamodelEditor } from './components/MetamodelEditor'
 import { Inspector } from './components/Inspector'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
@@ -88,6 +88,9 @@ function AppInner(): React.ReactElement {
   return (
     <div className={layoutClass}>
       {!isPresenting && <Toolbar />}
+      {/* As in VS Code: the left panel's sections and the app's actions
+          (the Toolbar puts them there) along the left edge. */}
+      {!isPresenting && <ActivityRail sections={isDesigner || isViewer || isPresenter} collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
