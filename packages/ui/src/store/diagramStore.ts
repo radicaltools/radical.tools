@@ -87,10 +87,12 @@ export { computeViewCollapsedSet, isEffectivelyCollapsed }
 import { LiveColaLayout, type DragMode } from '../layout/liveColaLayout'
 import { LIVE_CHILD_TOP_MIN } from '@radical/layout/liveColaEngine'
 import { documentBackend } from './documentBackend'
+import { type Exploration, type ExploreChoice, EXPLORATION_ID, drawnAt, explorationLines, explorationLinks, flatNodes, foldable, folded, grown, isExplorationId, laidOut as layExploration, linkCounts, listedIds, newExploration, prunedExploration, viewPlaces, withoutExpansions } from './exploration'
+export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
-import { type EdgeStyle, type ViewPipeline, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -159,6 +161,10 @@ interface HistoryEntry {
    *  rebased on an outside change has neither and leaves them as they are. */
   snapshots?: DiagramSnapshot[]
   slideMilestones?: Record<string, string>
+  /** Taken while the exploration of this id was shown. No step keeps an
+   *  exploration (Explore from here): the entry holds All elements' places
+   *  and canvas, and goes back to the exploration while it is open. */
+  explorationId?: string
 }
 
 /**
@@ -173,9 +179,26 @@ interface StepChange {
   to: HistoryEntry
 }
 
-type HistoryItem = HistoryEntry | StepChange
+/**
+ * A step of the exploration's own (Explore from here): a +, a −, a drag on
+ * it, in Designer. It holds the exploration as it was (`explored`, its
+ * places included): Undo puts it back, on its canvas. Never saved; gone
+ * with the exploration (_dropExplorationSteps). An outside change leaves
+ * it as it is: it changes nothing of the model.
+ */
+interface ExplorationStep {
+  explored: Exploration
+  /** A +: the expansion it made, and the exploration it made. Undone on an
+   *  exploration that changed since outside the history (in Viewer), it
+   *  takes out what that expansion added, not the changes made since. */
+  expansion?: string
+  after?: Exploration
+}
+
+type HistoryItem = HistoryEntry | StepChange | ExplorationStep
 
 const isStepChange = (item: HistoryItem): item is StepChange => 'from' in item
+const isExplorationStep = (item: HistoryItem): item is ExplorationStep => 'explored' in item
 
 const MAX_HISTORY = 100
 const _undoStack: HistoryItem[] = []
@@ -258,6 +281,7 @@ function _historyRebased(now: HistoryEntry, stacks: HistoryItem[][] = [_undoStac
     for (let i = stack.length - 1; i >= 0; i--) {
       const item = stack[i]
       if (isStepChange(item)) { next = item.to; continue }
+      if (isExplorationStep(item)) continue
       stack[i] = { from: next, to: item }
       // What is typed after the change goes on the same step (_typing).
       if (_typing?.step === item) _typing.step = stack[i]
@@ -469,6 +493,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = fals
       hubTemplates: (merged.hubTemplates ?? {}) as Record<string, HubImportRecord>,
       metamodel: (merged.metamodel ?? now.metamodel) as Metamodel,
       milestoneDirty: change.to.milestoneDirty,
+      ...(change.to.explorationId ? { explorationId: change.to.explorationId } : {}),
       ...(_rebasedMilestones(change, now)),
     },
     conflicts,
@@ -625,7 +650,7 @@ function _historyKeepsTypes(metamodel: Metamodel): void {
   const fitsEntry = (entry: HistoryEntry): boolean =>
     Object.values(entry.c4Nodes).every((n) => !!metamodel.nodeTypes[n.type]) &&
     Object.values(entry.c4Relations).every((r) => !r.relationType || !!metamodel.relationTypes[r.relationType])
-  const fits = (item: HistoryItem): boolean => isStepChange(item) ? fitsEntry(item.from) && fitsEntry(item.to) : fitsEntry(item)
+  const fits = (item: HistoryItem): boolean => isExplorationStep(item) || (isStepChange(item) ? fitsEntry(item.from) && fitsEntry(item.to) : fitsEntry(item))
   const trim = (stack: HistoryItem[]): void => {
     // Both stacks are taken from their end: the nearest step is the last.
     for (let i = stack.length - 1; i >= 0; i--) {
@@ -642,7 +667,7 @@ function _captureState(state: DiagramStore): HistoryEntry {
   // never mutated in place — future edits produce new objects for the
   // changed paths only, leaving this reference (and everything reachable
   // from it) untouched. Retaining it is Immer's own documented undo pattern.
-  return {
+  const entry: HistoryEntry = {
     c4Nodes: state.c4Nodes,
     c4Relations: state.c4Relations,
     views: state.views,
@@ -657,6 +682,10 @@ function _captureState(state: DiagramStore): HistoryEntry {
     snapshots: state.snapshots,
     slideMilestones: slideMilestonesOf(state.presentations),
   }
+  // On the exploration the nodes hold its places, which are no step's: the
+  // entry is taken as All elements has the model, and names the exploration.
+  if (onExploration(state)) return { ..._entryOnCanvas(entry, null), explorationId: state.activeViewId! }
+  return entry
 }
 
 /** What the live model shares with the milestone shown, as it is on the
@@ -750,6 +779,28 @@ function _pushUndoEntry(entry: HistoryEntry): void {
   _redoStack.length = 0 // clear redo on new change
 }
 
+/** Two states of one exploration list the same elements from the same
+ *  expansions (their places aside). */
+function sameExplorationShape(a: Exploration, b: Exploration): boolean {
+  return a.nodeIds.join('\n') === b.nodeIds.join('\n') && Object.keys(a.expansions).sort().join('\n') === Object.keys(b.expansions).sort().join('\n')
+}
+
+/** An undo step of the exploration's (ExplorationStep). Not counted by
+ *  historyMark: nothing to save. */
+function _pushExplorationStep(step: ExplorationStep): void {
+  _undoStack.push(step)
+  if (_undoStack.length > MAX_HISTORY) _undoStack.shift()
+  _redoStack.length = 0
+}
+
+/** The exploration is gone (closed, replaced, saved as a view): its steps
+ *  go too; the model's steps made on it stay. */
+function _dropExplorationSteps(): void {
+  for (const stack of [_undoStack, _redoStack]) {
+    for (let i = stack.length - 1; i >= 0; i--) if (isExplorationStep(stack[i])) stack.splice(i, 1)
+  }
+}
+
 /** A text field has focus (beginTyping): what is typed into it until it
  *  loses focus (endTyping) is one undo step, the one its first letter
  *  pushed (`step`), as long as that step is still the last and the edits
@@ -784,6 +835,8 @@ function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.Mod
  *  moved (React Flow reports a click as a drag): the undo step is made
  *  then, from this. */
 let _beforeDrag: HistoryEntry | null = null
+/** The exploration as it was when a drag on it began: its step (liveRelease). */
+let _explorationBeforeDrag: Exploration | null = null
 
 /**
  * What Designer showed when it was left for Viewer or Presenter
@@ -975,6 +1028,7 @@ function _historyKeepsFirstLayout(viewId: string, positions: Record<string, Node
   for (const stack of [_undoStack, _redoStack, ...(_liveHistory ? [_liveHistory.undo, _liveHistory.redo] : [])]) {
     for (let i = 0; i < stack.length; i++) {
       const item = stack[i]
+      if (isExplorationStep(item)) continue
       stack[i] = isStepChange(item) ? { from: laidOut(item.from), to: laidOut(item.to) } : laidOut(item)
     }
   }
@@ -1118,7 +1172,7 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
   const relations = state.c4Relations as Record<string, C4Relation>
   const fresh = new Set(added)
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
-  const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+  const view = viewById(state, state.activeViewId)
   const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
   placeUnplaced(nodes, known, shown)
   const rootOf = (id: string): C4Node => {
@@ -1157,7 +1211,7 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
  * measured as its expand opens it. Returns the nodes, settled (a copy).
  */
 function settleMoveOnShownCanvas(
-  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>,
+  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'exploration' | 'c4Nodes' | 'c4Relations'>,
   ids: readonly string[],
   oldParentIds: readonly string[],
 ): Record<string, C4Node> {
@@ -1248,6 +1302,9 @@ function showCanvasPositions(
     for (const id of own) delete positions[id]
   }
   applyPositions(nodes, positions)
+  // An exploration is flat: its places are where it draws its elements,
+  // and it gives every element one when it grows.
+  if (isExplorationId(view?.id)) return []
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
@@ -1723,9 +1780,9 @@ const NO_CONSTRAINTS: LayoutConstraint[] = []
 /** The layout constraints of the active canvas: the view's own, or All
  *  elements' when no view is active. */
 export function activeLayoutConstraints(
-  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'defaultLayoutConstraints'>,
+  state: Pick<DiagramStore, 'activeViewId' | 'views' | 'exploration' | 'defaultLayoutConstraints'>,
 ): LayoutConstraint[] {
-  return (state.activeViewId ? state.views[state.activeViewId]?.layoutConstraints : state.defaultLayoutConstraints) ?? NO_CONSTRAINTS
+  return (state.activeViewId ? viewById(state, state.activeViewId)?.layoutConstraints : state.defaultLayoutConstraints) ?? NO_CONSTRAINTS
 }
 
 /** Direct children of `parentId` in the active view, with their boxes in
@@ -1743,8 +1800,63 @@ export function childrenInView(
 
 /** The layout input for the store's active view. */
 function layoutInputForView(state: DiagramStore): LayoutInput {
-  const view = state.activeViewId ? state.views[state.activeViewId] : undefined
-  return viewLayoutInput(view, state.c4Nodes, state.c4Relations, activeLayoutConstraints(state))
+  // The exploration draws its elements flat, and only the lines it draws.
+  if (state.exploration && onExploration(state)) {
+    const x = state.exploration
+    const lines = new Set(explorationLines(x, state.c4Nodes, state.c4Relations).relations)
+    const relations = Object.fromEntries(Object.entries(state.c4Relations).filter(([id]) => lines.has(id)))
+    return viewLayoutInput(x, flatNodes(x, state.c4Nodes), relations, NO_CONSTRAINTS)
+  }
+  return viewLayoutInput(viewById(state, state.activeViewId), state.c4Nodes, state.c4Relations, activeLayoutConstraints(state))
+}
+
+// ─── Explore from here ──────────────────────────────────────────────────────
+//
+// An exploration is a structure view grown from one element, drawn like any
+// view while it is shown and kept in the store's `exploration`, never in
+// `views`: what saves, undoes, merges, puts in a milestone or lists the
+// document's views never sees it. Code that draws the canvas shown reads it
+// through viewById.
+
+/** The view `id` names: one of the document's, or the exploration. */
+export function viewById(s: Pick<DiagramStore, 'views' | 'exploration'>, id: string | null | undefined): DiagramView | undefined {
+  if (!id) return undefined
+  return s.views[id] ?? (s.exploration?.id === id ? s.exploration : undefined)
+}
+
+/** The canvas shown is the exploration. */
+export function onExploration(s: Pick<DiagramStore, 'activeViewId' | 'exploration'>): boolean {
+  return !!s.activeViewId && s.exploration?.id === s.activeViewId
+}
+
+/** The canvas shown when the exploration was opened: closing it goes back
+ *  there. */
+let _exploredFrom: string | null = null
+
+/** The exploration as it is now, its places included (on the nodes while
+ *  it is shown): for its undo steps. */
+function explorationNow(s: Pick<DiagramStore, 'activeViewId' | 'exploration' | 'c4Nodes'>): Exploration | null {
+  const x = s.exploration
+  if (!x) return null
+  if (!onExploration(s)) return x
+  const positions: Record<string, NodePosition> = {}
+  for (const id of listedIds(x, s.c4Nodes)) {
+    const n = s.c4Nodes[id]
+    positions[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+  }
+  return { ...x, positions }
+}
+
+/** Adds the node as model.insertNode does, and lists it on the exploration
+ *  when that is the canvas shown: it draws only what it lists, and an
+ *  element added there was not drawn. Mutates `state` (inside immer set). */
+function insertNodeShown(state: DiagramStore, id: string, node: Omit<C4Node, 'id'>): void {
+  model.insertNode(state as unknown as model.ModelState, id, node)
+  if (state.exploration && onExploration(state)) {
+    addToViewList(state.exploration, [id])
+    // Under the rest: no + added it.
+    state.exploration.levels[id] ??= Math.max(0, ...Object.values(state.exploration.levels)) + 1
+  }
 }
 
 /**
@@ -1999,10 +2111,10 @@ function separateSiblings(
 /** The sets the canvas shown draws by (as _sync derives them): what the
  *  active view draws, what it folds, what it opens over a fold. None for
  *  All elements. */
-function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>): {
+function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | 'exploration' | 'c4Nodes' | 'c4Relations'>): {
   viewFilter?: Set<string>; viewCollapsedSet?: Set<string>; expandedSet?: Set<string>
 } {
-  const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+  const view = viewById(state, state.activeViewId)
   if (!view) return {}
   const viewFilter = computeViewNodeSet(view, state.c4Nodes, state.c4Relations)
   const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
@@ -2454,6 +2566,43 @@ interface DiagramStore {
   defaultLayoutConstraints: LayoutConstraint[]
   /** How All elements and views without their own draw relations. */
   defaultEdgeStyle: EdgeStyle
+
+  // ── Explore from here ──
+  /** A structure view grown from one element (exploration.ts), shown while
+   *  `activeViewId` is its id. Never in `views`: it is not saved, merged or
+   *  put in a milestone, and code that draws the canvas reads it with
+   *  viewById. Its own undo steps (Designer's +, −, drags) go when it does.
+   *  null: none open. */
+  exploration: Exploration | null
+  /** On the exploration shown in Designer or Viewer: for each element it
+   *  lists, how many neighbours it does not show yet (its +). null else. */
+  exploreMore: Record<string, number> | null
+  /** On the exploration shown: the elements whose + added something still
+   *  shown (their −). null else. */
+  exploreFoldable: Record<string, true> | null
+  /** The element whose + menu is open (what to add), or null. */
+  exploreMenuFor: string | null
+  openExploreMenu: (nodeId: string | null) => void
+  /** Opens an exploration of `nodeId` alone, in place of the one open:
+   *  Designer's on the live model, not while a milestone is shown; Viewer's
+   *  on the model it shows. */
+  exploreFrom: (nodeId: string) => void
+  /** The + of an element of the exploration shown: the neighbours it does
+   *  not show yet that `choice` takes (all of them when omitted: All) join
+   *  it one level below, each on its own, and it is laid out again
+   *  (exploration.laidOut). An undo step of the exploration's in Designer. */
+  exploreNeighbours: (nodeId: string, choice?: ExploreChoice) => void
+  /** The − of an element: what its + added, and all added from those
+   *  since, leave the exploration. An undo step of the exploration's in
+   *  Designer. */
+  foldExploration: (nodeId: string) => void
+  /** Keeps the exploration as a structure view named `name` in `folder`,
+   *  with its places, as one undo step, shown in its place. Designer only.
+   *  Returns the view's id, or null when there is none to keep. */
+  saveExploration: (name: string, folder: string | null) => string | null
+  /** Drops the exploration without a question, and its undo steps, back on
+   *  the canvas it was opened from when it is shown. */
+  closeExploration: () => void
 
   // ── derived React Flow state ──
   rfNodes: Node<C4NodeRFData>[]
@@ -3051,7 +3200,8 @@ function layoutMissedItsCanvas(push: DiagramStore['pushNotification']): void {
  *  delay, so a reload straight after it shows the layout. Designer only:
  *  Viewer and Presenter save nothing of what is arranged there. */
 function saveLayoutNow(appMode: DiagramStore['appMode']): void {
-  if (appMode !== 'designer' || typeof window === 'undefined') return
+  // Nor the exploration's: it is not saved.
+  if (appMode !== 'designer' || typeof window === 'undefined' || onExploration(useDiagramStore.getState())) return
   const flush = (window as any).__radicalFlushPersist as (() => Promise<void>) | undefined
   void flush?.()
 }
@@ -3249,7 +3399,12 @@ export const useDiagramStore = create<DiagramStore>()(
     // Puts the model back as a history entry has it, on the canvas the
     // entry was taken on (undo and redo).
     const _restoreHistoryEntry = (entry: HistoryEntry): void => {
-      const canvasChanged = entry.activeViewId !== get().activeViewId
+      // The exploration keeps its places through a step (no step holds
+      // them), and a step taken on it goes back to it while it is open.
+      const exploration = get().exploration
+      if (onExploration(get())) get()._saveShownCanvas()
+      const backOnExploration = !!exploration && entry.explorationId === exploration.id
+      const canvasChanged = (backOnExploration ? exploration!.id : entry.activeViewId) !== get().activeViewId
       set((state) => {
         state.c4Nodes = entry.c4Nodes as any
         state.c4Relations = entry.c4Relations as any
@@ -3299,6 +3454,13 @@ export const useDiagramStore = create<DiagramStore>()(
         state.canUndo = _undoStack.length > 0
         state.canRedo = _redoStack.length > 0
       })
+      // On drafts of the nodes: above they are the entry's own, frozen.
+      if (backOnExploration) set((state) => {
+        if (!state.exploration) return
+        state.activeViewId = state.exploration.id
+        const places = state.exploration.positions as Record<string, NodePosition>
+        if (Object.keys(places).length) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, places, state.exploration as DiagramView, state.c4Relations as Record<string, C4Relation>)
+      })
       // A view of a viewpoint follows the metamodel as the step has it. On
       // drafts of the views: in the pass above they are the entry's own,
       // frozen, and changing them threw once the step was off the stack
@@ -3307,7 +3469,7 @@ export const useDiagramStore = create<DiagramStore>()(
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
         const viewId = get().activeViewId
-        const camera = (viewId ? get().views[viewId]?.viewport : get().defaultViewport) ?? null
+        const camera = (viewId ? viewById(get(), viewId)?.viewport : get().defaultViewport) ?? null
         const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
         ;(window as any).__rfPlaceCamera?.(camera, shown)
       }
@@ -3317,6 +3479,7 @@ export const useDiagramStore = create<DiagramStore>()(
     // An entry is put back as it is; a step from before an outside change
     // is made on the model as it is now (`now`), keeping that change.
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
+      if (isExplorationStep(item)) return
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
       const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now, !!get().activeSnapshotId)
       _restoreHistoryEntry(entry)
@@ -3345,16 +3508,61 @@ export const useDiagramStore = create<DiagramStore>()(
      * it is kept below the header and right of the side padding.
      */
     const _placeNewChild = <T extends Omit<C4Node, 'id'>>(node: T): T => {
-      const { c4Nodes, activeViewId, views } = get()
+      const { c4Nodes, activeViewId } = get()
       const parent = node.parentId ? c4Nodes[node.parentId] : undefined
       if (!parent) return node
-      const view = activeViewId ? views[activeViewId] : undefined
+      const view = viewById(get(), activeViewId)
       if (nodeEffectivelyCollapsedInView(parent, activeViewId, view)) {
         const shown = view ? computeViewNodeSet(view, c4Nodes, get().c4Relations) : null
         return { ...node, ...placeBesideSiblings(c4Nodes, parent.id, (s) => !shown || shown.has(s.id)) }
       }
       const pad = compoundPadding(parent.type)
       return { ...node, x: Math.max(node.x, pad.side), y: Math.max(node.y, pad.top) }
+    }
+
+    /** An undo step of the exploration's undone or redone: it is as it was
+     *  (`x`, its places included), shown. */
+    const _restoreExploration = (x: Exploration): void => {
+      if (get().exploration?.id !== x.id) return
+      if (!onExploration(get())) {
+        set((state) => { state.exploration = x as any })
+        get().setActiveView(x.id)
+      } else {
+        set((state) => {
+          state.exploration = x as any
+          applyPositions(state.c4Nodes as Record<string, C4Node>, x.positions as Record<string, NodePosition>)
+        })
+        get()._sync()
+        _liveLayout?.reset()
+      }
+      set((state) => { state.canUndo = _undoStack.length > 0; state.canRedo = _redoStack.length > 0; state.exploreMenuFor = null })
+    }
+
+    /** The exploration shown becomes `next` (grown by a +, folded by a −),
+     *  laid out again as a whole (exploration.laidOut) with its start where
+     *  it is drawn; in Designer an undo step of the exploration's. The
+     *  camera then shows `show`, with `from` in view. */
+    const _reshapeExploration = (next: Exploration, show: string[], from: string[], record = true, expansion?: string): void => {
+      const s = get()
+      if (!s.exploration || !onExploration(s)) return
+      const step: ExplorationStep | null = record && s.appMode === 'designer' ? { explored: explorationNow(s)!, ...(expansion ? { expansion } : {}) } : null
+      if (step) _pushExplorationStep(step)
+      const start = next.nodeIds[0]
+      const at = s.c4Nodes[start] ? { x: s.c4Nodes[start].x, y: s.c4Nodes[start].y } : undefined
+      const places = layExploration(next, s.c4Nodes, s.c4Relations, at)
+      const hidden = explorationLines(next, s.c4Nodes, s.c4Relations).hidden
+      set((state) => {
+        state.exploration = { ...next, positions: places, hiddenRelationIds: hidden } as any
+        state.exploreMenuFor = null
+        applyPositions(state.c4Nodes as Record<string, C4Node>, places)
+        state.canUndo = _undoStack.length > 0
+        state.canRedo = _redoStack.length > 0
+      })
+      if (step && expansion) step.after = explorationNow(get())!
+      get()._sync()
+      // Taken as they are: the physics moves nothing.
+      _liveLayout?.reset()
+      if (show.length) (window as any).__rfShowAdded?.(show.filter((id) => !!get().c4Nodes[id]), from)
     }
 
     /** The arguments of checkRemoveNodeType / checkRemoveRelationType: the
@@ -3404,7 +3612,7 @@ export const useDiagramStore = create<DiagramStore>()(
       if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
       else get()._markMilestoneEdit()
       set((state) => {
-        model.insertNode(state, id, node)
+        insertNodeShown(state as DiagramStore, id, node)
         _insertWizardLinks(state, id, links)
       })
       if (node.parentId) get().fitParentToChildren(node.parentId)
@@ -3427,6 +3635,10 @@ export const useDiagramStore = create<DiagramStore>()(
       defaultViewport: persisted?.defaultViewport ?? null,
       defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
       defaultEdgeStyle: persisted?.defaultEdgeStyle ?? 'curved',
+      exploration: null,
+      exploreMore: null,
+      exploreFoldable: null,
+      exploreMenuFor: null,
       rfNodes: deriveRFNodes(initNodes),
       rfEdges: deriveRFEdges(initNodes, initRelations),
       selectedNodeId: null,
@@ -3485,8 +3697,20 @@ export const useDiagramStore = create<DiagramStore>()(
             set((state) => { model.syncViewGroups(state as unknown as model.ModelState, uid) })
           }
         }
+        // The exploration shown: flat, its lines only, each element's + and −.
+        const s0 = get()
+        const x = s0.exploration && onExploration(s0) ? s0.exploration : null
+        const xActive = !!x && (s0.appMode === 'designer' || s0.appMode === 'viewer') && !s0.presentationActive
+        const xLines = x ? explorationLines(x, s0.c4Nodes, s0.c4Relations) : null
+        const xNodes = x ? flatNodes(x, s0.c4Nodes) : null
+        const xRels = xLines ? Object.fromEntries(xLines.relations.map((id) => [id, s0.c4Relations[id]])) : null
+        const more = x && xActive ? linkCounts(explorationLinks(x, s0.c4Nodes, s0.c4Relations)) : null
+        const foldables = x && xActive ? foldable(x, s0.c4Nodes) : null
         set((state) => {
-          const view = state.activeViewId ? state.views[state.activeViewId] : undefined
+          state.exploreMore = more
+          state.exploreFoldable = foldables
+          if (!xActive) state.exploreMenuFor = null
+          const view = viewById(state as DiagramStore, state.activeViewId)
           // Merge diff ghosts (items removed in the active milestone but
           // present in the diff base) so the user can see what's gone.
           // The ghosts are kept in a separate map so they never end up in
@@ -3496,10 +3720,11 @@ export const useDiagramStore = create<DiagramStore>()(
           const hasGhosts = state.showDiff && (Object.keys(ghostNodes).length > 0 || Object.keys(ghostRels).length > 0)
           const liveNodes = state.c4Nodes as Record<string, C4Node>
           const liveRels = state.c4Relations as Record<string, C4Relation>
-          const mergedNodes: Record<string, C4Node> = hasGhosts ? { ...ghostNodes, ...liveNodes } : liveNodes
-          const mergedRels: Record<string, C4Relation> = hasGhosts ? { ...ghostRels, ...liveRels } : liveRels
-          // A canvas view with a chain in its steps draws what the chain gives.
-          const filter = computeViewNodeSet(view as DiagramView | undefined, mergedNodes, mergedRels)
+          const mergedNodes: Record<string, C4Node> = xNodes ?? (hasGhosts ? { ...ghostNodes, ...liveNodes } : liveNodes)
+          const mergedRels: Record<string, C4Relation> = xRels ?? (hasGhosts ? { ...ghostRels, ...liveRels } : liveRels)
+          // A canvas view with a chain in its steps draws what the chain
+          // gives; the exploration what it lists, flat.
+          const filter = x ? new Set(listedIds(x, mergedNodes)) : computeViewNodeSet(view as DiagramView | undefined, mergedNodes, mergedRels)
           const vcs = computeViewCollapsedSet(filter, mergedNodes)
           // Also include nodes the user explicitly collapsed in this named view
           if (view?.collapsedNodeIds?.length) {
@@ -3508,9 +3733,9 @@ export const useDiagramStore = create<DiagramStore>()(
           // Nodes explicitly expanded in this view override model-level
           // collapse, and so do its frames: it draws them only to hold what
           // it shows.
-          const frames = viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
-          const expandedSet = viewExpandedSet(view as DiagramView | undefined, mergedNodes, mergedRels, frames)
-          const ghostIdSet = hasGhosts ? new Set(Object.keys(ghostNodes)) : undefined
+          const frames = x ? new Set<string>() : viewFrames(view as DiagramView | undefined, mergedNodes, mergedRels)
+          const expandedSet = x ? undefined : viewExpandedSet(view as DiagramView | undefined, mergedNodes, mergedRels, frames)
+          const ghostIdSet = hasGhosts && !x ? new Set(Object.keys(ghostNodes)) : undefined
           // A ghost has the base's place, laid out for All elements: on this
           // canvas it goes inside its container's frame, clear of the rest.
           const drawnNodes = ghostIdSet ? placeGhosts(mergedNodes, ghostIdSet, filter) : mergedNodes
@@ -3522,6 +3747,9 @@ export const useDiagramStore = create<DiagramStore>()(
           // static and must not drift from accidental drags.
           const locked = state.appMode === 'metamodel' || state.presentationActive
           state.rfNodes = deriveRFNodes(drawnNodes, filter, vcs, ghostIdSet, locked, expandedSet, frames) as any
+          // The exploration is flat: its elements, and their + and −, lie
+          // over its lines.
+          if (x) for (const n of state.rfNodes) n.zIndex = 10
           const chainHidden = chainHiddenRelations(view as DiagramView | undefined, mergedNodes, mergedRels)
           const hiddenRels = view?.hiddenRelationIds?.length || chainHidden.length
             ? new Set([...(view?.hiddenRelationIds ?? []), ...chainHidden])
@@ -3529,6 +3757,26 @@ export const useDiagramStore = create<DiagramStore>()(
           // Lines end only at elements the view shows, not at its frames.
           const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
           const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet)
+          // The exploration's containment lines: a child and its parent on
+          // the next level, joined (it draws them apart). Not relations of
+          // the model: drawn only.
+          for (const { parent, child } of xLines?.containment ?? []) {
+            derivedEdges.push({
+              id: `contains:${parent}:${child}`,
+              source: parent,
+              target: child,
+              type: 'c4relation',
+              animated: false,
+              deletable: false,
+              focusable: false,
+              className: 'rf-edge-flow',
+              zIndex: 5,
+              // From the parent, which contains the child.
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
+              label: 'Contains',
+              data: { originalSourceId: parent, originalTargetId: child, label: 'Contains', isVirtual: true },
+            } as Edge<C4EdgeRFData>)
+          }
           // Annotate edges with step numbers:
           // 1. When actively editing a sequence (activeSequenceId set) — always show numbers
           // 2. When view is dynamic and linked to a sequence — show numbers in view mode
@@ -3629,7 +3877,7 @@ export const useDiagramStore = create<DiagramStore>()(
         else get()._markMilestoneEdit()
         const id = uid()
         node = _placeNewChild(node)
-        set((state) => { model.insertNode(state, id, node) })
+        set((state) => { insertNodeShown(state as DiagramStore, id, node) })
         // Expand parent to fit the new child
         if (node.parentId) {
           get().fitParentToChildren(node.parentId)
@@ -3661,7 +3909,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           const id = uid()
           set((state) => {
-            model.insertNode(state, id, node)
+            insertNodeShown(state as DiagramStore, id, node)
             _insertWizardLinks(state, id, links)
           })
           ids.push(id)
@@ -3857,7 +4105,7 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const id of chain.reverse()) {
             const { c4Nodes, activeViewId, views } = get()
             const node = c4Nodes[id]
-            if (node && nodeEffectivelyCollapsedInView(node, activeViewId, activeViewId ? views[activeViewId] : undefined)) {
+            if (node && nodeEffectivelyCollapsedInView(node, activeViewId, viewById({ views, exploration: get().exploration }, activeViewId))) {
               get().toggleCollapse(id)
             }
           }
@@ -3875,7 +4123,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // subscriber is gated on appMode === 'designer' so nothing reaches
         // disk. We therefore only push to undo history while editing.
         const inDesigner = get().appMode === 'designer'
-        if (inDesigner) get()._pushUndo()
+        // A fold of the exploration is none of the model's steps.
+        if (inDesigner && !onExploration(get())) get()._pushUndo()
         // In a milestone, an edit of it (a view's folds are the live view's).
         if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
         else get()._markMilestoneEdit()
@@ -3884,8 +4133,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // Effective collapsed: model-level OR per-view collapse for named views.
         // A model-collapsed node can be view-expanded via view.expandedNodeIds.
         const prevCollapsed = activeViewId
-          ? ((modelCollapsed && !(get().views[activeViewId]?.expandedNodeIds?.includes(id) ?? false))
-              || (get().views[activeViewId]?.collapsedNodeIds?.includes(id) ?? false))
+          ? ((modelCollapsed && !(viewById(get(), activeViewId)?.expandedNodeIds?.includes(id) ?? false))
+              || (viewById(get(), activeViewId)?.collapsedNodeIds?.includes(id) ?? false))
           : modelCollapsed
         // An element the view shown does not draw (one an agent added,
         // folded from the search or the Nodes tree) only changes the fold
@@ -3947,7 +4196,7 @@ export const useDiagramStore = create<DiagramStore>()(
               // pushed the diagram below and beside it away; centring the
               // children's bounds instead (lower than the frame's middle by
               // the header) walked the frame up on every cycle.
-              const shownView = activeViewId ? get().views[activeViewId] : undefined
+              const shownView = viewById(get(), activeViewId)
               const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
               const placedKids = children.filter((c) => (!shownHere || shownHere.has(c.id)) && (Math.abs(c.x) >= 1 || Math.abs(c.y) >= 1)) // the rest placed below
               if (placedKids.length > 0) {
@@ -4043,7 +4292,7 @@ export const useDiagramStore = create<DiagramStore>()(
         let loopVcs: Set<string> | undefined
         let loopExpandedSet: Set<string> | undefined
         if (activeViewId) {
-          const view = get().views[activeViewId]
+          const view = viewById(get(), activeViewId)
           if (view) {
             loopViewFilter = computeViewNodeSet(view as any, get().c4Nodes, get().c4Relations)
             loopVcs = computeViewCollapsedSet(loopViewFilter, get().c4Nodes)
@@ -4134,7 +4383,7 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             const node = state.c4Nodes[id]
             if (node) node.collapsed = modelCollapsed  // restore original model state
-            const v = state.views[activeViewId]
+            const v = viewById(state as DiagramStore, activeViewId)
             if (!v) return
             if (!v.collapsedNodeIds) v.collapsedNodeIds = []
             if (!v.expandedNodeIds) v.expandedNodeIds = []
@@ -4658,17 +4907,20 @@ export const useDiagramStore = create<DiagramStore>()(
         // are for exploring only, and the pre-mode snapshot in setAppMode
         // restores the designer layout on the way back.
         if (appMode !== 'designer') {
+          // Viewer's exploration keeps its places (they are its own).
+          if (onExploration(get())) get()._saveShownCanvas()
           // Read outside the producer: a draft taken out of set() is revoked
           // when it returns, and placeCamera threw on reading it (no fit).
-          const incomingViewport = (newId === null ? get().defaultViewport : get().views[newId]?.viewport) ?? null
+          const incomingViewport = (newId === null ? get().defaultViewport : viewById(get(), newId)?.viewport) ?? null
           let placed: string[] = []
           set((state) => {
+            const view = viewById(state as DiagramStore, newId)
             const incoming = newId === null
               ? state.defaultPositions as Record<string, NodePosition>
-              : firstCanvasPositions(state.views[newId] as DiagramView | undefined, state.defaultPositions as Record<string, NodePosition>, null)
-                ?? state.views[newId]?.positions as Record<string, NodePosition> | undefined
+              : firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, null)
+                ?? view?.positions as Record<string, NodePosition> | undefined
             if (incoming && Object.keys(incoming).length > 0) {
-              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
+              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
             }
             state.activeViewId = newId
             if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
@@ -4703,8 +4955,9 @@ export const useDiagramStore = create<DiagramStore>()(
             state.defaultPositions = currentPos as any
             const camera = allElementsCamera(currentViewport)
             if (camera) state.defaultViewport = camera
-          } else if (state.views[activeViewId]) {
-            const view = state.views[activeViewId]
+          } else if (viewById(state as DiagramStore, activeViewId)) {
+            // A view of the document's, or the exploration.
+            const view = viewById(state as DiagramStore, activeViewId)!
             if (activeViewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
             if (currentViewport) view.viewport = currentViewport
           }
@@ -4716,7 +4969,7 @@ export const useDiagramStore = create<DiagramStore>()(
             incoming = (inMilestone && _milestoneAllPositions) || state.defaultPositions as Record<string, NodePosition>
             incomingViewport = state.defaultViewport as typeof incomingViewport
           } else {
-            const view = state.views[newId]
+            const view = viewById(state as DiagramStore, newId)
             if (view && Object.keys(view.positions ?? {}).length > 0) {
               incoming = view.positions as Record<string, NodePosition>
             }
@@ -4726,7 +4979,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
 
           if (incoming) {
-            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, newId === null ? undefined : state.views[newId] as DiagramView, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, viewById(state as DiagramStore, newId), state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
           }
 
           state.activeViewId = newId
@@ -4755,6 +5008,119 @@ export const useDiagramStore = create<DiagramStore>()(
         // given a place just now settles there, with its surroundings.
         _liveLayout?.reset(placed)
       },
+      // ── Explore from here ──────────────────────────────────────────────
+      // Nothing here is saved or a milestone edit: the exploration is never
+      // in `views` (see viewById). In Designer its +, − and drags are undo
+      // steps of its own (ExplorationStep), gone with it.
+      exploreFrom(nodeId) {
+        const s = get()
+        const node = s.c4Nodes[nodeId]
+        // Designer's on the live model (a milestone shown there is edited, and
+        // closes it), and Viewer's on the model it shows. Not Presenter's.
+        const here = (s.appMode === 'designer' && !s.activeSnapshotId) || s.appMode === 'viewer'
+        if (!node || !here || s.presentationActive) return
+        // The one open goes without a question, with its steps; the way
+        // back stays the canvas the first was opened from.
+        if (!onExploration(s)) _exploredFrom = s.activeViewId && s.views[s.activeViewId] ? s.activeViewId : null
+        _dropExplorationSteps()
+        // The element alone, where it is drawn now.
+        const x = newExploration(uid(), node)
+        const positions = layExploration(x, s.c4Nodes, s.c4Relations, drawnAt(nodeId, s.c4Nodes))
+        // Its + menu opens at once, to choose the next level (none when
+        // there is nothing to add).
+        const menu = (explorationLinks(x, s.c4Nodes, s.c4Relations).get(nodeId)?.length ?? 0) > 0 ? nodeId : null
+        set((state) => {
+          state.exploration = { ...x, positions } as any
+          state.exploreMenuFor = null
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
+        })
+        get().setActiveView(x.id)
+        if (menu) set((state) => { state.exploreMenuFor = menu })
+        ;(window as any).__rfShowAdded?.([nodeId], [])
+      },
+
+      openExploreMenu(nodeId) {
+        if (get().exploreMenuFor !== nodeId) set((state) => { state.exploreMenuFor = nodeId })
+      },
+
+      exploreNeighbours(nodeId, choice) {
+        const s = get()
+        const x = s.exploration
+        if (!x || !onExploration(s) || (s.appMode !== 'designer' && s.appMode !== 'viewer') || !x.nodeIds.includes(nodeId)) return
+        const links = explorationLinks(x, s.c4Nodes, s.c4Relations).get(nodeId) ?? []
+        const expansion = uid()
+        const next = grown(x, nodeId, links, choice, expansion)
+        if (!next) return
+        _reshapeExploration(next, next.nodeIds.filter((id) => !x.nodeIds.includes(id)), [nodeId], true, expansion)
+      },
+
+      foldExploration(nodeId) {
+        const s = get()
+        const x = s.exploration
+        if (!x || !onExploration(s) || (s.appMode !== 'designer' && s.appMode !== 'viewer')) return
+        const next = folded(x, nodeId)
+        if (next.nodeIds.length === x.nodeIds.length) return
+        _reshapeExploration(next, [nodeId], [])
+      },
+
+      saveExploration(name, folder) {
+        const s = get()
+        if (!s.exploration || !name.trim() || s.appMode !== 'designer' || s.activeSnapshotId) return null
+        // Its places are on the nodes while it is shown.
+        if (!onExploration(s)) get().setActiveView(s.exploration.id)
+        const kept = explorationNow(get())!
+        const id = uid()
+        // Its own steps go with it; then one step: Undo takes the view away
+        // (no step keeps an exploration), Redo brings it back.
+        _dropExplorationSteps()
+        get()._pushUndo()
+        set((state) => {
+          model.insertView(state as unknown as model.ModelState, id, name.trim())
+          const view = state.views[id]
+          view.nodeIds = listedIds(kept, state.c4Nodes as Record<string, C4Node>)
+          // As a structure view keeps them: relative to the parents, its
+          // containers round what they hold (a child listed with its
+          // parent goes in it).
+          view.positions = viewPlaces(kept, kept.positions as Record<string, NodePosition>, state.c4Nodes as Record<string, C4Node>) as any
+          if (kept.viewport) view.viewport = { ...kept.viewport }
+          // What it draws: the relations it does not draw stay hidden.
+          const hidden = explorationLines(kept, state.c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>).hidden
+          if (hidden.length) view.hiddenRelationIds = hidden
+          model.setViewFolder(state as unknown as model.ModelState, id, folder)
+          state.exploration = null
+          state.exploreMenuFor = null
+          state.activeViewId = id
+          showCanvasPositions(state.c4Nodes as Record<string, C4Node>, view.positions as Record<string, NodePosition>, view as DiagramView, state.c4Relations as Record<string, C4Relation>)
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
+        })
+        _exploredFrom = null
+        get()._sync()
+        _liveLayout?.reset()
+        return id
+      },
+
+      closeExploration() {
+        const s = get()
+        if (!s.exploration) return
+        const shown = onExploration(s)
+        const back = _exploredFrom && s.views[_exploredFrom] ? _exploredFrom : null
+        _exploredFrom = null
+        // Gone first, with its steps: leaving it saves nothing of it.
+        _dropExplorationSteps()
+        set((state) => {
+          state.exploration = null
+          state.exploreMore = null
+          state.exploreFoldable = null
+          state.exploreMenuFor = null
+          state.canUndo = _undoStack.length > 0
+          state.canRedo = _redoStack.length > 0
+        })
+        if (shown) get().setActiveView(back)
+        else get()._sync()
+      },
+
       addNodeToView(viewId, nodeId) {
         const view = get().views[viewId]
         // A group's views show what their element holds: nothing is picked by hand.
@@ -4858,7 +5224,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       _showLiveCanvasPositions() {
         set((state) => {
-          const view = state.activeViewId ? state.views[state.activeViewId] as DiagramView | undefined : undefined
+          const view = viewById(state as DiagramStore, state.activeViewId)
           const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
           if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
         })
@@ -4890,8 +5256,9 @@ export const useDiagramStore = create<DiagramStore>()(
             state.defaultPositions = currentPos as any
             const shown = allElementsCamera(camera)
             if (shown) state.defaultViewport = shown
-          } else if (state.views[viewId]) {
-            const view = state.views[viewId]
+          } else if (viewById(state as DiagramStore, viewId)) {
+            // A view of the document's, or the exploration.
+            const view = viewById(state as DiagramStore, viewId)!
             if (viewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, get().c4Nodes, currentPos, viewDrawnIds(view as DiagramView, get().c4Nodes, get().c4Relations)) as any
             if (camera) view.viewport = camera
           }
@@ -5767,8 +6134,9 @@ export const useDiagramStore = create<DiagramStore>()(
             layoutMissedItsCanvas(get().pushNotification)
             return
           }
-          // One undo step for the whole layout. Viewer reverts positions on exit anyway.
-          if (get().appMode === 'designer') get()._pushUndo()
+          // One undo step for the whole layout. Viewer reverts positions on
+          // exit anyway; the exploration's places are no step's.
+          if (get().appMode === 'designer' && !onExploration(get())) get()._pushUndo()
           get()._milestoneViewEdit(get().activeViewId)
           // Added or moved into another parent by an outside write meanwhile.
           const added = layoutChangedMeanwhile(present, get().c4Nodes)
@@ -5871,7 +6239,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           // One undo step for the whole layout. Viewer reverts positions on
           // exit anyway; a view's first layout is none (_firstLayoutOf).
-          if (get().appMode === 'designer' && !firstOpen) get()._pushUndo()
+          if (get().appMode === 'designer' && !firstOpen && !onExploration(get())) get()._pushUndo()
           get()._milestoneViewEdit(get().activeViewId)
           // Added while the layout ran: its drop point was a place in the
           // layout this one replaces (893 px from anything on 300
@@ -6088,7 +6456,10 @@ export const useDiagramStore = create<DiagramStore>()(
       liveGrab(nodeId, x, y, mode = 'calm', abs, withIds) {
         // Viewer and Presenter have no undo: what is moved there is put back
         // on the way out.
-        _beforeDrag = get().appMode === 'designer' ? _captureState(get()) : null
+        // A drag on the exploration is a step of its own (ExplorationStep).
+        const designer = get().appMode === 'designer'
+        _beforeDrag = designer && !onExploration(get()) ? _captureState(get()) : null
+        _explorationBeforeDrag = designer && onExploration(get()) ? explorationNow(get()) : null
         _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
       },
 
@@ -6108,9 +6479,15 @@ export const useDiagramStore = create<DiagramStore>()(
           _pushUndoEntry(before)
           set((state) => { state.canUndo = true; state.canRedo = false })
         }
+        const explored = _explorationBeforeDrag
+        _explorationBeforeDrag = null
+        if (moved && explored && get().exploration?.id === explored.id && get().appMode === 'designer') {
+          _pushExplorationStep({ explored })
+          set((state) => { state.canUndo = true; state.canRedo = false })
+        }
         // The physics already holds it (release); the rule keeps it held
         // after a rebuild and in the saved file.
-        if (moved && get().appMode === 'designer') {
+        if (moved && get().appMode === 'designer' && !onExploration(get())) {
           get()._milestoneViewEdit(get().activeViewId)
           set((state) => { model.setPinned(state, state.activeViewId, [nodeId, ...withIds], true, uid) })
         }
@@ -6141,6 +6518,20 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
         const item = _undoStack.pop()!
+        // A step of the exploration's: it is put back as it was, the way it
+        // is now going to Redo.
+        if (isExplorationStep(item)) {
+          const now = explorationNow(get())
+          if (!now || now.id !== item.explored.id) return
+          _redoStack.push({ explored: now })
+          const changedSince = !!item.after && !sameExplorationShape(now, item.after)
+          if (item.expansion && changedSince) {
+            if (!onExploration(get())) get().setActiveView(now.id)
+            _reshapeExploration(withoutExpansions(now, [item.expansion]), [], [], false)
+          }
+          else _restoreExploration(item.explored)
+          return
+        }
         _historyMark++
         // push current state to redo, on the step's canvas, where Undo goes
         const now = _captureState(get())
@@ -6155,12 +6546,15 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       clearModel() {
+        _dropExplorationSteps()
         _pushUndo(get())
         get()._markMilestoneEdit()
         set((state) => {
           state.c4Nodes = {} as any
           state.c4Relations = {} as any
           state.views = {} as any
+          state.exploration = null
+          state.exploreMenuFor = null
           state.defaultLayoutConstraints = []
           state.defaultEdgeStyle = 'curved'
           state.sequences = {} as any
@@ -6179,6 +6573,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
         const item = _redoStack.pop()!
+        if (isExplorationStep(item)) {
+          const now = explorationNow(get())
+          if (now) _undoStack.push({ explored: now })
+          _restoreExploration(item.explored)
+          return
+        }
         _historyMark++
         // push current state to undo, on the step's canvas, where Redo goes
         const now = _captureState(get())
@@ -6291,6 +6691,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── Milestone editing workflow ───────────────────────────────────────
       selectMilestone(id) {
+        // Designer's exploration is the live model's: a milestone shown
+        // closes it. Viewer's follows the model shown, at its places.
+        if (get().appMode === 'designer' && get().snapshots.some((m) => m.id === id)) get().closeExploration()
+        if (onExploration(get())) get()._saveShownCanvas()
         const { snapshots, activeSnapshotId, milestoneDirty, c4Nodes, c4Relations, sequences } = get()
         // If selecting the already-active milestone, just close any open prompt.
         if (activeSnapshotId === id) {
@@ -6421,6 +6825,10 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!preserveLayout) {
           _milestoneAllPositions = snapshotPositions(snap.nodes as Record<string, C4Node>)
           get()._showLiveCanvasPositions()
+        } else if (onExploration(get())) {
+          // Viewer's exploration: what this milestone has and it had no place
+          // for gets one (showCanvasPositions).
+          get()._showLiveCanvasPositions()
         }
         get()._sync()
         // Reseed cola from the freshly-loaded milestone positions so the        // Reseed cola from the freshly-loaded milestone positions so the
@@ -6435,6 +6843,8 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       discardMilestoneChanges() {
+        // Viewer's exploration follows the live model, at its places.
+        if (onExploration(get())) get()._saveShownCanvas()
         const { liveBackup } = get()
         const backOnLive = !!get().activeSnapshotId && get().appMode === 'designer'
         const parked = backOnLive && _liveHistory ? [_liveHistory.undo, _liveHistory.redo] : null
@@ -6901,6 +7311,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // against that and keeps named views as stable as the "All
         // elements" view (which writes to defaultPositions instead).
         const W = window as any
+        // An exploration stays open between Designer, Viewer and the
+        // metamodel editor (Designer explores the live model, Viewer the one
+        // it shows); Presenter and the Inspector close it, back on the canvas
+        // it was opened from. Its places go with it.
+        const keepsExploration = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'viewer' || m === 'metamodel'
+        if (get().exploration && !keepsExploration(mode)) get().closeExploration()
+        else if (onExploration(get())) get()._saveShownCanvas()
         // The view on screen when Designer is entered again: Designer stays
         // on it (with its own layout) rather than going back to the one it left.
         const shownViewId = get().activeViewId
@@ -6956,9 +7373,19 @@ export const useDiagramStore = create<DiagramStore>()(
           // snapshot we just restored. reset() drops that cache so the
           // next start() rebuilds against the restored c4Nodes.
           _liveLayout?.reset()
+          const x = get().exploration
           // Still in the explore mode, setActiveView loads the view's
           // Designer positions and camera and saves nothing of the one left.
-          if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
+          if (x && shownViewId === x.id) {
+            // The exploration shown stays shown, as it is, over Designer's
+            // model (the live one: what a milestone shown had and the live
+            // model has not is left out). Designer showing a milestone
+            // closes it.
+            if (editing(mode) && get().activeSnapshotId) get().closeExploration()
+            else if (get().activeViewId === x.id) {
+              set((state) => { applyPositions(state.c4Nodes as Record<string, C4Node>, x.positions as Record<string, NodePosition>) })
+            } else get().setActiveView(x.id)
+          } else if (shownViewId !== get().activeViewId && (shownViewId === null || get().views[shownViewId])) {
             get().setActiveView(shownViewId)
           } else if (editing(mode) && W.__preModeCamera) {
             parkedCamera = { camera: { ...W.__preModeCamera }, keep: true }
@@ -7575,6 +8002,10 @@ export const useDiagramStore = create<DiagramStore>()(
         const data = conceptFileAsModel(loaded)
         if (!opts?.outsideChange) _modelLoads++
         get().stopLiveLayout()
+        // The exploration shown keeps its places through an outside change;
+        // another model drops it.
+        if (opts?.outsideChange && onExploration(get())) get()._saveShownCanvas()
+        if (!opts?.outsideChange) _exploredFrom = null
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
@@ -7719,6 +8150,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // an agent's write closed its card.
           state.activeSequenceId = opts?.outsideChange && st.activeSequenceId && (sequences as Record<string, unknown>)[st.activeSequenceId] ? st.activeSequenceId : null
           state.views = views as any
+          state.exploration = opts?.outsideChange ? prunedExploration(st.exploration, nodes) as any : null
           state.defaultPositions = defaultPos as any
           state.defaultViewport = defaultVP
           const rawVP = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
@@ -7893,7 +8325,9 @@ export const useDiagramStore = create<DiagramStore>()(
 
         const liveConstraints = (timeTravelling && liveBackup.defaultLayoutConstraints) || get().defaultLayoutConstraints
         return {
-          nodes: Object.values(liveNodes),
+          // On the exploration the nodes hold its places: they are saved
+          // where All elements has them.
+          nodes: onExploration(get()) ? Object.values(atDefaultPositions(Object.values(liveNodes), defaultPositions)) : Object.values(liveNodes),
           relations: Object.values(liveRelations),
           sequences: Object.values(liveSequences),
           views: savedViews,
@@ -7921,6 +8355,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.sequences = {} as any
           state.activeSequenceId = null
           state.views = {} as any
+          state.exploration = null
           state.activeViewId = null
           state.defaultPositions = snapshotPositions(sample.nodes) as any
           state.defaultLayoutConstraints = []
@@ -7960,6 +8395,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.sequences = {} as any
           state.activeSequenceId = null
           state.views = {} as any
+          state.exploration = null
           state.activeViewId = null
           state.defaultPositions = {} as any
           state.defaultLayoutConstraints = []

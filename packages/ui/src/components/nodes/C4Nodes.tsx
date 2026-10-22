@@ -157,12 +157,55 @@ const SimpleNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
 
 SimpleNode.displayName = 'SimpleNode'
 
+/** The + and − of an element of an exploration (Explore from here). The +
+ *  says how many neighbours it does not show yet and opens the menu of what
+ *  to add (ExploreMenu); the − takes back what its + added, and all added
+ *  from those since. Neither off an exploration. */
+function ExploreMore({ c4id, label }: { c4id: string; label: string }): React.ReactElement | null {
+  const more = useDiagramStore((s) => s.exploreMore?.[c4id] ?? 0)
+  const canFold = useDiagramStore((s) => !!s.exploreFoldable?.[c4id])
+  const open = useDiagramStore((s) => s.exploreMenuFor === c4id)
+  const openExploreMenu = useDiagramStore((s) => s.openExploreMenu)
+  const foldExploration = useDiagramStore((s) => s.foldExploration)
+  if (!more && !canFold) return null
+  return (
+    <div className="explore-more-group nodrag nopan" onMouseDown={(e) => e.stopPropagation()}>
+      {more > 0 && (
+        <button
+          type="button"
+          className="explore-more"
+          data-explore-more={c4id}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={`Show ${more} more related to ${label}`}
+          title={`Show the ${more === 1 ? 'element' : `${more} elements`} related to ${label} not shown yet`}
+          onClick={(e) => { e.stopPropagation(); openExploreMenu(open ? null : c4id) }}
+        >+{more}</button>
+      )}
+      {canFold && (
+        <button
+          type="button"
+          className="explore-more explore-fold"
+          aria-label={`Fold back what ${label} added`}
+          title={`Take back what the + of ${label} added, and all added from those`}
+          onClick={(e) => { e.stopPropagation(); foldExploration(c4id) }}
+        >−</button>
+      )}
+    </div>
+  )
+}
+
 /** `Full` while the zoom shows cards, a SimpleNode below it; always the
- *  card while an export is drawn. */
+ *  card while an export is drawn. On an exploration, with its +. */
 export function withDetail(Full: React.ComponentType<NodeProps<C4NodeRFData>>): React.ComponentType<NodeProps<C4NodeRFData>> {
   const Detailed = memo((props: NodeProps<C4NodeRFData>) => {
     const low = useDiagramStore((s) => s.lowDetail && !s.allEdgeLabelsShown)
-    return low ? <SimpleNode {...props} /> : <Full {...props} />
+    return (
+      <>
+        {low ? <SimpleNode {...props} /> : <Full {...props} />}
+        <ExploreMore c4id={props.data.c4id} label={props.data.label} />
+      </>
+    )
   }, sameCard)
   Detailed.displayName = `WithDetail(${Full.displayName ?? 'Node'})`
   return Detailed

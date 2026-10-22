@@ -23,7 +23,10 @@ const NOTHING: Picked = { viewId: null, nodeIds: [], relationIds: [] }
 function pick(): Picked {
   const s = useDiagramStore.getState()
   const nodeIds = s.selectedNodeIds.length ? s.selectedNodeIds : (s.selectedNodeId ? [s.selectedNodeId] : [])
-  return { viewId: s.activeViewId, nodeIds, relationIds: s.selectedEdgeId ? [s.selectedEdgeId] : [] }
+  // An exploration (Explore from here) is no view of the model's: what is
+  // selected there is selected in none.
+  const viewId = s.activeViewId && s.views[s.activeViewId] ? s.activeViewId : null
+  return { viewId, nodeIds, relationIds: s.selectedEdgeId ? [s.selectedEdgeId] : [] }
 }
 
 if (typeof window !== 'undefined') {

@@ -540,11 +540,14 @@ export function forgetNodesInViews(state: ModelState, removed: Set<string>): voi
   if (state.defaultLayoutConstraints?.length) {
     state.defaultLayoutConstraints = withoutNodes(state.defaultLayoutConstraints, removed)
   }
-  // A view of one element goes with it.
+  // A view of one element goes with it, and the canvas leaves it when it
+  // was the one shown (only then: Studio's exploration is shown and is
+  // none of `views`).
   for (const view of Object.values(state.views)) {
-    if (view.subject && removed.has(view.subject)) delete state.views[view.id]
+    if (!view.subject || !removed.has(view.subject)) continue
+    if (state.activeViewId === view.id) state.activeViewId = null
+    delete state.views[view.id]
   }
-  if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
 }
 
 /** Constraints without the removed nodes; a rule left with one member goes
@@ -946,7 +949,9 @@ export function syncViewGroups(state: ModelState, newId: () => string): boolean 
     if (folder) view.folder = folder
     else delete view.folder
   }
-  if (state.activeViewId && !state.views[state.activeViewId]) state.activeViewId = null
+  // Leaves a view of the group only when it was the one shown: Studio's
+  // exploration is shown and is none of `views`.
+  if (state.activeViewId && remove.includes(state.activeViewId)) state.activeViewId = null
   return add.length > 0 || remove.length > 0 || refolder.length > 0 || unlist.length > 0 || rename.length > 0
 }
 

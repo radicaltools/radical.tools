@@ -38,7 +38,7 @@
 
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { useDiagramStore, viewById } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
@@ -270,7 +270,8 @@ function applyViewModeFocus(route: Route): void {
     // hold that doc, so we fell back to the freshly-seeded sample) degrades
     // gracefully to All elements rather than leaving a dangling id.
     const reqView = isAllElements(route.view) ? null : route.view
-    const targetView = reqView && useDiagramStore.getState().views[reqView] ? reqView : null
+    // The exploration open too (Back to it); one closed since is gone.
+    const targetView = reqView && viewById(useDiagramStore.getState(), reqView) ? reqView : null
     if (useDiagramStore.getState().activeViewId !== targetView) {
       useDiagramStore.getState().setActiveView(targetView)
     }

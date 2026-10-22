@@ -1,6 +1,6 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useDiagramStore, type BranchOverlay } from '../store/diagramStore'
+import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
@@ -1258,6 +1258,10 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   const views = useDiagramStore((s) => s.views)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
+  const exploration = useDiagramStore((s) => s.exploration)
+  const exploring = useDiagramStore(onExploration)
+  const explored = useDiagramStore((s) => s.exploration?.nodeIds.filter((id) => !!s.c4Nodes[id]).length ?? 0)
+  const closeExploration = useDiagramStore((s) => s.closeExploration)
   const addView = useDiagramStore((s) => s.addView)
   const addViewOfViewpoint = useDiagramStore((s) => s.addViewOfViewpoint)
   const metamodel = useDiagramStore((s) => s.metamodel)
@@ -1438,6 +1442,34 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
 
   return (
     <div className="lp-view-list">
+      {/* The exploration (Explore from here): first while it is open, and
+          none of the model's views. */}
+      {exploration && (
+        <div
+          className={`lp-card lp-view-card lp-explore-card${exploring ? ' active' : ''}`}
+          style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.structure }}
+          onClick={() => setActiveView(exploration.id)}
+          {...cardKeys(() => setActiveView(exploration.id))}
+          title="A temporary view: not saved unless you save it as a view"
+        >
+          <div className="lp-view-icon"><Icon.Layers /></div>
+          <div className="lp-card-body">
+            <div className="lp-card-title">{exploration.name}</div>
+            <div className="lp-card-meta">
+              <span>{explored} {explored === 1 ? 'node' : 'nodes'}</span>
+              <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>exploration</span>
+            </div>
+          </div>
+          <div className="lp-card-actions">
+            <button
+              className="lp-icon-btn"
+              aria-label="Close the exploration"
+              onClick={(e) => { e.stopPropagation(); closeExploration() }}
+              title="Close the exploration (it is not kept)"
+            >×</button>
+          </div>
+        </div>
+      )}
       {/* All elements: the whole model as a table, always first and never
           deleted. A canvas of the whole model is a structure view that
           lists no elements. */}
@@ -1623,7 +1655,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   const snapshotsCount = useDiagramStore((s) => s.snapshots.length)
   const sequencesCount = useDiagramStore((s) => Object.keys(s.sequences).length)
   // What each folded section says it holds.
-  const activeViewName = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId]?.name : undefined))
+  const activeViewName = useDiagramStore((s) => viewById(s, s.activeViewId)?.name)
   const latestMilestone = useDiagramStore((s) => s.snapshots[s.snapshots.length - 1]?.name)
   const sequenceNames = useDiagramStore(useCallback((s: { sequences: Record<string, { name: string }> }) =>
     Object.values(s.sequences).map((q) => q.name).join(', '), []))
@@ -2333,6 +2365,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const hubTemplates = useDiagramStore((s) => s.hubTemplates)
   const openNodeWizard = useDiagramStore((s) => s.openNodeWizard)
+  const exploreFrom = useDiagramStore((s) => s.exploreFrom)
+  // Explore from here: Designer's on the live model, Viewer's on the model it shows.
+  const canExplore = useDiagramStore((s) => !s.presentationActive && ((s.appMode === 'designer' && !s.activeSnapshotId) || s.appMode === 'viewer'))
 
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
@@ -2378,8 +2413,9 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
     }
 
     const typeLabel = nodeTypeDef?.label ?? TYPE_LABELS[node.type] ?? node.type
-    const menu: PanelMenuItem[] = readOnly ? [] : [
-      { label: 'Delete element (and what it contains)', danger: true, onClick: () => { removeNode(node.id); selectNode(null) } },
+    const menu: PanelMenuItem[] = [
+      ...(canExplore ? [{ label: 'Explore from here', onClick: () => exploreFrom(node.id) }] : []),
+      ...(readOnly ? [] : [{ label: 'Delete element (and what it contains)', danger: true, onClick: () => { removeNode(node.id); selectNode(null) } }]),
     ]
     const hubEntry = Object.entries(hubTemplates as Record<string, HubImportRecord>).find(([, rec]) => rec.nodeIds.includes(node.id))
 
