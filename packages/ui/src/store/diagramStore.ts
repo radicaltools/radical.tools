@@ -67,6 +67,7 @@ import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
   applyAlignments,
@@ -319,8 +320,18 @@ function _entryModel(entry: HistoryEntry): DiagramData {
  *  element that is gone. A step brought them back on a model an outside
  *  change had taken their container or other end from (Undo of a delete
  *  after the agent deleted the API: "charges card" from no element). Taken
- *  out; returns the names of what was. */
-function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints'>): { parts: typeof parts; dropped: string[] } {
+ *  out; returns the names of what was. With them go the steps of every
+ *  relation gone, `gone.relations` too (deleted outside Studio since): Undo
+ *  of a relation's delete after the agent deleted its end brought its step
+ *  back without it (item 254). And what the step puts back on the views and
+ *  layout rules of the elements and relations in `gone` (a fold, a row, an
+ *  entry in a view's list, a hidden relation), unless a milestone is shown
+ *  (`inMilestone`): the views are the live model's then (keepingSharedViews). */
+function _withoutStrays(
+  parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'defaultLayoutConstraints' | 'sequences'>,
+  gone: { nodes: Set<string>; relations: Set<string> },
+  inMilestone: boolean,
+): { parts: typeof parts; dropped: string[] } {
   const dropped: string[] = []
   const next = produce(parts, (draft) => {
     const state = { ...draft, activeViewId: null } as unknown as model.ModelState
@@ -329,12 +340,22 @@ function _withoutStrays(parts: Pick<model.ModelState, 'c4Nodes' | 'c4Relations' 
       dropped.push(node.label || node.id)
       model.deleteNode(state, node.id)
     }
+    const relations = new Set([...gone.relations].filter((id) => !state.c4Relations[id]))
     for (const [id, rel] of Object.entries(state.c4Relations)) {
       const ends = [state.c4Nodes[rel.sourceId], state.c4Nodes[rel.targetId]]
       if (ends.every(Boolean)) continue
       const end = ends.find(Boolean)
       dropped.push(rel.label || (end ? `a relation of ${end.label}` : 'a relation'))
       delete state.c4Relations[id]
+      relations.add(id)
+    }
+    model.forgetRelationsInSequences(state, relations)
+    if (!inMilestone) {
+      for (const view of Object.values(state.views)) {
+        if (view.hiddenRelationIds?.some((id) => relations.has(id))) view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => !relations.has(id))
+      }
+      const nodes = new Set([...gone.nodes].filter((id) => !state.c4Nodes[id]))
+      if (nodes.size) model.forgetNodesInViews(state, nodes)
     }
     // Set anew, not changed in place (forgetNodesInViews).
     draft.defaultLayoutConstraints = state.defaultLayoutConstraints ?? []
@@ -418,10 +439,11 @@ function _keptBuiltOn(from: DiagramData, now: DiagramData, merged: DiagramData):
  *  the step brings back that has no place left in it does not come back
  *  (`dropped`, _withoutStrays). Shown on the canvas of `change.to`, as Undo
  *  goes back to its step's canvas. */
-function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
+function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = false): { entry: HistoryEntry; conflicts: string[]; kept: string[]; dropped: string[]; notices: string[] } {
   const nowModel = _entryModel(now)
   const fromModel = _entryModel(change.from)
-  const result = mergeModels(fromModel, _entryModel(change.to), nowModel, { keepParents: false })
+  const toModel = _entryModel(change.to)
+  const result = mergeModels(fromModel, toModel, nowModel, { keepParents: false })
   // What the step changes in an element deleted outside Studio since stays deleted.
   const conflicts = [...result.conflicts, ...result.dropped.filter((d) => d.by === 'ours').map((d) => d.name)]
   const notices = mergeNotices({ dropped: result.dropped.filter((d) => d.by === 'theirs') }, { ours: 'by the step', theirs: 'outside Studio' })
@@ -432,23 +454,32 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry): { entry: HistoryE
   for (const r of merged.relations) mergedRelations[r.id] = r
   const mergedViews: Record<string, DiagramView> = {}
   for (const v of merged.views ?? []) mergedViews[v.id] = v
+  const sequencesIn: Record<string, DiagramSequence> = {}
+  for (const q of merged.sequences ?? []) sequencesIn[q.id] = q
+  // What a side had and the merge left out: deleted on one side.
+  const had = (of: (d: DiagramData) => Array<{ id: string }>, present: Record<string, unknown>) =>
+    new Set([fromModel, toModel, nowModel].flatMap((d) => of(d).map((e) => e.id)).filter((id) => !present[id]))
   const { parts, dropped } = _withoutStrays({
     c4Nodes: mergedNodes,
     c4Relations: mergedRelations,
     views: mergedViews,
     defaultLayoutConstraints: merged.defaultLayoutConstraints ?? [],
-  })
+    sequences: sequencesIn,
+  }, { nodes: had((d) => d.nodes, mergedNodes), relations: had((d) => d.relations, mergedRelations) }, inMilestone)
   const c4Nodes: Record<string, C4Node> = {}
   for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
   const c4Relations = parts.c4Relations
   const views = parts.views
-  const sequences: Record<string, DiagramSequence> = {}
-  for (const q of merged.sequences ?? []) sequences[q.id] = q
+  const sequences = parts.sequences ?? {}
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
   const view = activeViewId ? views[activeViewId] : undefined
   const positions = view ? view.positions ?? {} : defaultPositions
   if (Object.keys(positions).length > 0) showCanvasPositions(c4Nodes, positions, view, c4Relations)
+  // What the step puts back may meet what was placed outside Studio since,
+  // as a merge of unsaved edits does (Undo of Smart Layout after the agent
+  // grew Payment Provider): on All elements, room is made as on a load.
+  if (!activeViewId && !change.to.activeViewId) _settleOutsidePlaces(c4Nodes, change.to.c4Nodes)
   return {
     entry: {
       c4Nodes,
@@ -492,6 +523,73 @@ function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<History
     list.splice(Math.min(i, list.length), 0, m)
   })
   return { snapshots: list, slideMilestones: { ...now.slideMilestones, ...change.to.slideMilestones } }
+}
+
+/** What a change read from outside Studio (an agent's write, merged with
+ *  the edits Studio had not written yet) placed on a sibling where Studio
+ *  has it (`was`, Studio's live model before the change, at All elements'
+ *  places), on All elements. Each side placed clear of what it had: a queue
+ *  dropped into Payment Provider in Studio and Orders DB moved into it by
+ *  the agent came to the same spot (item 264). By the rule for moves, the
+ *  one the change placed (added, moved into another parent or moved) keeps
+ *  its place where it lies clear, else goes beside its siblings, with room
+ *  made (settleMovedNodes); one the change grew where Studio has it (a
+ *  container the agent added into) has room made round it (makeRoomAround),
+ *  as an add makes it. Overlaps Studio had already stay. Mutates `nodes`
+ *  (copies); returns the ids moved. */
+function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>): string[] {
+  const before = canvasBoxes(was)
+  const overlap = (a: CanvasBox, b: CanvasBox): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  const sameParent = (a: C4Node, b: C4Node): boolean => (a.parentId ?? undefined) === (b.parentId ?? undefined)
+  const placed = (n: C4Node): boolean => {
+    const w = was[n.id]
+    return !w || !sameParent(w, n) || Math.abs(w.x - n.x) >= 0.5 || Math.abs(w.y - n.y) >= 0.5
+  }
+  const touched: string[] = []
+  const settled = new Set<string>()
+  let canvas = canvasBoxes(nodes)
+  const siblings = new Map<string, string[]>()
+  for (const n of Object.values(nodes)) {
+    if (!canvas.shown(n)) continue
+    const key = n.parentId ?? ''
+    siblings.set(key, [...(siblings.get(key) ?? []), n.id])
+  }
+  const pairs = [...siblings.values()].flatMap((group) => group.flatMap((aId, i) => group.slice(i + 1).map((bId) => [aId, bId] as const)))
+  for (const [aId, bId] of pairs) {
+    const a = nodes[aId], b = nodes[bId]
+    if (settled.has(aId) || settled.has(bId) || !sameParent(a, b)) continue
+    if (!overlap(canvas.boxOf(a), canvas.boxOf(b))) continue
+    const wa = was[aId], wb = was[bId]
+    if (wa && wb && sameParent(wa, wb) && before.shown(wa) && before.shown(wb) && overlap(before.boxOf(wa), before.boxOf(wb))) continue
+    const grew = (n: C4Node): boolean => {
+      const w = was[n.id]
+      if (!w || !sameParent(w, n)) return false
+      const now = canvas.boxOf(n), then = before.boxOf(w)
+      return now.w > then.w + 0.5 || now.h > then.h + 0.5
+    }
+    const [pa, pb, ga, gb] = [placed(a), placed(b), grew(a), grew(b)]
+    if (!pa && !pb && !ga && !gb) continue
+    // One the change grew where Studio has it: room is made round it.
+    const grown = !pb && gb ? b : !pa && ga ? a : undefined
+    if (grown) {
+      for (const [id, at] of Object.entries(makeRoomAround(grown.id, nodes, canvas))) {
+        nodes[id].x = at.x
+        nodes[id].y = at.y
+        touched.push(id)
+      }
+      // What was pushed may reach past the parent's frame: it fits again.
+      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes)))
+      settled.add(grown.id)
+      canvas = canvasBoxes(nodes)
+      continue
+    }
+    // The one the change placed; of two, the one Studio did not have.
+    const mover = pa && pb ? (wb ? a : b) : pa ? a : b
+    touched.push(mover.id, ...settleMovedNodes(nodes, [mover.id], canvas))
+    settled.add(mover.id)
+    canvas = canvasBoxes(nodes)
+  }
+  return [...new Set(touched)]
 }
 
 /** A milestone shown when the folder changed outside Studio (an agent's
@@ -955,6 +1053,16 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
   state.defaultLayoutConstraints = defaultLayoutConstraints
 }
 
+/** model.syncViewpoints on the views, which are the live model's: their
+ *  elements are looked up there, not in the milestone shown. Checked
+ *  against a milestone without it (or with it deleted there), a view of
+ *  one element lost its element and its "within" filter, in the live views
+ *  too (Undo and Redo in a milestone). Use inside immer set. */
+function syncViewpointsOfLive(state: DiagramStore): string[] {
+  const nodes = state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes : state.c4Nodes
+  return model.syncViewpoints({ c4Nodes: nodes, views: state.views, metamodel: state.metamodel } as unknown as model.ModelState)
+}
+
 /** The Hub template records as a milestone has them: its texts hold the
  *  values (read from them through the Hub's originals), the records keep
  *  the live model's. Shown so, the section said 250 where the card said
@@ -1120,6 +1228,19 @@ function settleMoveOnShownCanvas(
     }))))
   }
   const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
+  // A new parent the canvas drew with nothing in it was drawn at its folded
+  // size, whatever size it keeps: it grows from that, and makes room for
+  // what it grows by. Measured at the size it kept, it shrank to what was
+  // moved into it, made no room, and lay over its neighbours (System 0
+  // moved into System 1 on a System context view, over Operator).
+  const moved = new Set(ids.flatMap((id) => [id, ...getDescendants(id, shownNodes)]))
+  for (const parentId of new Set(ids.map((id) => shownNodes[id]?.parentId))) {
+    const parent = parentId ? shownNodes[parentId] : undefined
+    if (!parent || !isContainerType(parent.type) || isFixedSizeType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
+    if (Object.values(shownNodes).some((c) => c.parentId === parent.id && !moved.has(c.id) && canvas.shown(c))) continue
+    parent.width = COLLAPSED_WIDTH[parent.type]
+    parent.height = COLLAPSED_HEIGHT[parent.type]
+  }
   // A refit can grow the old parent too (to its type's least size).
   for (const oldParentId of oldParentIds) if (shownNodes[oldParentId]) growWithRoom(shownNodes, oldParentId, canvas, fit)
   // Measured with the folds above it open.
@@ -1161,6 +1282,8 @@ function applyPositions(nodes: Record<string, C4Node>, positions: Record<string,
  * elements') onto the nodes, and gives the nodes it has none for a place of
  * their own there (placeUnplaced): an element added on another canvas kept
  * that one's place, outside its parent's frame here or on a sibling.
+ * In a milestone (`live`: the live nodes), what the milestone cannot draw at
+ * the view's places gets one of its own too (ownPlacesInMilestone).
  * Mutates the nodes (use inside immer set); returns the ids it placed, for
  * the live layout to settle with their surroundings.
  */
@@ -1169,7 +1292,15 @@ function showCanvasPositions(
   positions: Record<string, NodePosition>,
   view: DiagramView | undefined,
   relations: Record<string, C4Relation>,
+  live?: Record<string, C4Node>,
 ): string[] {
+  // Only the view's own places are the live layout's (All elements', which
+  // a view never laid out opens on, are the milestone's own).
+  const own = view && live && positions === view.positions ? ownPlacesInMilestone(positions, view, nodes, live) : []
+  if (own.length) {
+    positions = { ...positions }
+    for (const id of own) delete positions[id]
+  }
   applyPositions(nodes, positions)
   // An exploration is flat: its places are where it draws its elements,
   // and it gives every element one when it grows. One it lists with no
@@ -1191,7 +1322,119 @@ function showCanvasPositions(
   // container none of whose children it shows.
   const childless = computeViewCollapsedSet(shown, nodes)
   const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  return placeUnplaced(nodes, positions, shown, folded)
+  const placed = placeUnplaced(nodes, positions, shown, folded)
+  // One whose parent got a place of its own too moved with it, at a place
+  // that was not its own in it: it is placed in it now.
+  const left = own.filter((id) => nodes[id] && !placed.includes(id))
+  if (!left.length) return placed
+  const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
+  return [...placed, ...placeUnplaced(nodes, known, shown, folded)]
+}
+
+/**
+ * What a milestone shown (`nodes`) cannot draw at a view's places. A view keeps
+ * one layout for every milestone, the live model's (`live`); an element with
+ * another parent in the milestone than on live has its place there relative
+ * to the live parent, and one folded on live but open in the milestone has
+ * the room of its fold: drawn there, it lay on its siblings (Component 1.1.1
+ * moved into Container 2.0 since, drawn on 1.1.2 in Early). Such an element
+ * has no place in the view for the milestone, and gets one of its own there
+ * as an add does (placeUnplaced: beside its siblings, its parent grown with
+ * room made), which nothing saves into the view. Returns their ids.
+ */
+function ownPlacesInMilestone(
+  positions: Record<string, NodePosition>,
+  view: DiagramView,
+  nodes: Record<string, C4Node>,
+  live: Record<string, C4Node>,
+): string[] {
+  const differs = (id: string): boolean => {
+    const n = nodes[id]
+    const was = live[id]
+    if (!n || !was) return false
+    if ((n.parentId ?? null) !== (was.parentId ?? null)) return true
+    return isContainerType(n.type) && !nodeEffectivelyCollapsedInView(n, view.id, view) && nodeEffectivelyCollapsedInView(was, view.id, view)
+  }
+  return Object.keys(positions).filter(differs)
+}
+
+/** The live nodes while a milestone is shown, for showCanvasPositions. */
+const liveWhileInMilestone = (state: Pick<DiagramStore, 'activeSnapshotId' | 'liveBackup'>): Record<string, C4Node> | undefined =>
+  state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes as Record<string, C4Node> : undefined
+
+/**
+ * The places the other canvases give `ids` (just added, or moved into
+ * another parent, on the canvas shown) where they draw them and have none
+ * for them: All elements while a view is shown, and every view laid out
+ * before (one with positions). Each gets them as showing it would
+ * (showCanvasPositions): inside the parent, beside its siblings, the parent
+ * grown there with room made. Left to the canvas's next opening, the place
+ * was made then and the live layout settled it with its surroundings:
+ * opening a view moved elements no one had touched, and a parent grown
+ * there lay over its neighbour. Not in a milestone, whose canvases are not
+ * the live ones. Returns the positions to write, per canvas ('' for All
+ * elements).
+ */
+function placesOnOtherCanvases(
+  state: Pick<DiagramStore, 'c4Nodes' | 'c4Relations' | 'views' | 'activeViewId' | 'activeSnapshotId' | 'defaultPositions' | 'defaultLayoutConstraints'>,
+  ids: readonly string[],
+  added: boolean,
+): Map<string, Record<string, NodePosition>> {
+  const out = new Map<string, Record<string, NodePosition>>()
+  const nodes = state.c4Nodes as Record<string, C4Node>
+  const relations = state.c4Relations as Record<string, C4Relation>
+  const touched = ids.filter((id) => nodes[id])
+  if (state.activeSnapshotId || !touched.length) return out
+  const place = (key: string, positions: Record<string, NodePosition>, view: DiagramView | undefined): void => {
+    if (!Object.keys(positions).length || touched.every((id) => id in positions)) return
+    const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+    if (!touched.some((id) => !(id in positions) && (!shown || shown.has(id)))) return
+    const copy: Record<string, C4Node> = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
+    // An element added into a parent the canvas has a place for keeps its
+    // place in it where that lies inside its frame there, clear of its
+    // siblings, as a move does (a child added into a container added just
+    // before stays where it was put in it).
+    let known = positions
+    if (added) {
+      applyPositions(copy, positions)
+      const canvas = modelCanvas(copy, shown)
+      for (const id of touched) {
+        const n = copy[id]
+        if (id in positions || !n.parentId || !(n.parentId in positions) || !canvas.shown(n) || !liesClearInParent(n, copy, canvas)) continue
+        if (known === positions) known = { ...positions }
+        known[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+      }
+    }
+    if (!showCanvasPositions(copy, known, view, relations).length && known === positions) return
+    // A row or column of that canvas holds there, as opening it (or a
+    // reload) holds it (_enforceLayoutConstraints): the room made for the
+    // place could put one of its members off the line, and a reload then
+    // snapped it and refit every container.
+    const constraints = (view ? view.layoutConstraints : state.defaultLayoutConstraints) ?? []
+    if (constraints.length) applyAlignments(copy, viewLayoutInput(view, copy, relations, constraints))
+    const next: Record<string, NodePosition> = {}
+    for (const n of Object.values(copy)) {
+      if (!(n.id in positions) && shown && !shown.has(n.id)) continue
+      const was = positions[n.id]
+      if (was && was.x === n.x && was.y === n.y && was.width === n.width && was.height === n.height) continue
+      next[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+    }
+    if (Object.keys(next).length) out.set(key, next)
+  }
+  if (state.activeViewId !== null) place('', state.defaultPositions ?? {}, undefined)
+  for (const view of Object.values(state.views) as DiagramView[]) {
+    if (view.id === state.activeViewId || view.id === _firstLayoutOf || (view.kind ?? 'static') !== 'static') continue
+    place(view.id, view.positions ?? {}, view)
+  }
+  return out
+}
+
+/** Writes what placesOnOtherCanvases gave. Mutates `state` (inside immer set). */
+function writeOtherCanvases(state: DiagramStore, places: Map<string, Record<string, NodePosition>>): void {
+  for (const [key, next] of places) {
+    const positions = key === '' ? state.defaultPositions : state.views[key]?.positions
+    if (positions) Object.assign(positions, next)
+  }
 }
 
 /** The positions a canvas view opens with when it has none of its own (a
@@ -1251,7 +1494,7 @@ function showSlideView(
   const positions = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, shown ? snapshotPositions(shown.nodes) : null)
     ?? view.positions as Record<string, NodePosition>
   if (!Object.keys(positions ?? {}).length) return []
-  return showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions, view, state.c4Relations as Record<string, C4Relation>)
+  return showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
 }
 
 /**
@@ -3268,7 +3511,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // drafts of the views: in the pass above they are the entry's own,
       // frozen, and changing them threw once the step was off the stack
       // (Undo after "Save as viewpoint… → Replace").
-      set((state) => { model.syncViewpoints(state as unknown as model.ModelState) })
+      set((state) => { syncViewpointsOfLive(state as DiagramStore) })
       get()._sync()
       if (canvasChanged && typeof window !== 'undefined') {
         const viewId = get().activeViewId
@@ -3284,7 +3527,7 @@ export const useDiagramStore = create<DiagramStore>()(
     const _restoreHistoryItem = (item: HistoryItem, now: HistoryEntry, action: 'Undo' | 'Redo'): void => {
       if (isExplorationStep(item)) return
       if (!isStepChange(item)) { _restoreHistoryEntry(item); return }
-      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now)
+      const { entry, conflicts, kept, dropped, notices } = _rebasedEntry(item, now, !!get().activeSnapshotId)
       _restoreHistoryEntry(entry)
       const list = (names: string[]): string => names.slice(0, 5).join('; ') + (names.length > 5 ? ` and ${names.length - 5} more` : '')
       if (conflicts.length) {
@@ -3394,6 +3637,13 @@ export const useDiagramStore = create<DiagramStore>()(
       return [live as unknown as model.ModelState, typeId, milestones]
     }
 
+    /** Gives `ids` (added, or else moved) their places on the other canvases
+     *  (placesOnOtherCanvases). */
+    const _placeOnOtherCanvases = (ids: readonly string[], added = true): void => {
+      const places = placesOnOtherCanvases(get(), ids, added)
+      if (places.size) set((state) => { writeOtherCanvases(state as DiagramStore, places) })
+    }
+
     const _createNodeWithLinks = (draft: Omit<C4Node, 'id'>, links: WizardLink[]): string => {
       const node = _placeNewChild(draft)
       const refused = model.checkAddNode(get(), node)
@@ -3417,14 +3667,19 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       }
       get()._pushUndo()
-      get()._markMilestoneEdit()
+      // In a milestone, an edit of the view it is listed in too (its list is
+      // the live view's): it went into the saved live view, and stayed
+      // after Discard.
+      if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+      else get()._markMilestoneEdit()
       set((state) => {
         insertNodeShown(state as DiagramStore, id, node)
         _insertWizardLinks(state, id, links)
       })
       if (node.parentId) get().fitParentToChildren(node.parentId)
+      _placeOnOtherCanvases([id])
       get()._sync()
-      _liveLayout?.invalidate()
+      _liveLayout?.invalidate(node.parentId ? [id, node.parentId] : [id])
       return id
     }
 
@@ -3678,7 +3933,9 @@ export const useDiagramStore = create<DiagramStore>()(
           return ''
         }
         get()._pushUndo()
-        get()._markMilestoneEdit()
+        // In a milestone, an edit of the view it is listed in too.
+        if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+        else get()._markMilestoneEdit()
         const id = uid()
         node = _placeNewChild(node)
         set((state) => { insertNodeShown(state as DiagramStore, id, node) })
@@ -3686,8 +3943,11 @@ export const useDiagramStore = create<DiagramStore>()(
         if (node.parentId) {
           get().fitParentToChildren(node.parentId)
         }
+        _placeOnOtherCanvases([id])
         get()._sync()
-        _liveLayout?.invalidate()
+        // It stays where it was dropped; what it (or the parent it grew,
+        // where this canvas does not draw it) covers is pushed clear.
+        _liveLayout?.invalidate(node.parentId ? [id, node.parentId] : [id])
         return id
       },
 
@@ -3704,7 +3964,9 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           if (ids.length === 0) {
             get()._pushUndo()
-            get()._markMilestoneEdit()
+            // In a milestone, an edit of the view they are listed in too.
+            if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
+            else get()._markMilestoneEdit()
           }
           const id = uid()
           set((state) => {
@@ -3716,8 +3978,9 @@ export const useDiagramStore = create<DiagramStore>()(
         if (ids.length === 0) return ids
         const parents = new Set(ids.map((id) => get().c4Nodes[id]?.parentId).filter((p): p is string => !!p))
         for (const parentId of parents) get().fitParentToChildren(parentId)
+        _placeOnOtherCanvases(ids)
         get()._sync()
-        _liveLayout?.invalidate()
+        _liveLayout?.invalidate([...ids, ...parents])
         return ids
       },
 
@@ -3853,7 +4116,14 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         })
         get()._sync()
-        if (placed) _liveLayout?.reset(placed)
+        // A row or column through what it leaves holds now, as a reload
+        // would draw it: a container left without children is drawn at its
+        // folded size, and its middle left the line.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+        if (snapped) get()._sync()
+        if (placed || snapped) _liveLayout?.reset(placed ?? [])
         else _liveLayout?.invalidate()
       },
 
@@ -3927,12 +4197,28 @@ export const useDiagramStore = create<DiagramStore>()(
           ? ((modelCollapsed && !(viewById(get(), activeViewId)?.expandedNodeIds?.includes(id) ?? false))
               || (viewById(get(), activeViewId)?.collapsedNodeIds?.includes(id) ?? false))
           : modelCollapsed
+        // An element the view shown does not draw (one an agent added,
+        // folded from the search or the Nodes tree) only changes the fold
+        // the view keeps: nothing on the canvas grows or shrinks. Laid out
+        // as drawn, the expand made room round a box the canvas has not
+        // got and threw (item 259).
+        const viewShown = activeViewId ? get().views[activeViewId] : undefined
+        const drawnHere = computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations)?.has(id) ?? true
+        // Folded in the model and opened on a view that draws none of its
+        // children, it is drawn there at its open size all the same (the
+        // view opens it over the model's fold: deriveRFNodes). Measured
+        // below as it will be drawn: opened in the model for the toggle, it
+        // counted as a container drawn without children, at its folded size,
+        // no room was made, and it opened over the container beside it.
+        const shownWhere = drawnHere && viewShown ? computeViewNodeSet(viewShown as any, get().c4Nodes, get().c4Relations) : undefined
+        const openedEmpty = !!shownWhere && modelCollapsed && prevCollapsed
+          && !Object.values(get().c4Nodes).some((c) => c.parentId === id && shownWhere.has(c.id))
         // Apply to model temporarily — layout helpers below (separateSiblings /
         // fitParentToChildren) query node.collapsed to compute effective sizes.
         set((state) => {
           const node = state.c4Nodes[id]
           if (!node) return
-          node.collapsed = !prevCollapsed
+          node.collapsed = openedEmpty ? true : !prevCollapsed
         })
 
         // ── Expand origin: ensure children appear at their saved positions ─
@@ -3943,7 +4229,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Seeding live cola with the correct absolute position prevents the
         // "teleport, then drift" jump that would occur if cola treated the
         // node as brand-new and spawned it at neighbours' average.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const allNodes = get().c4Nodes
           const parent = allNodes[id]
           if (parent && isContainerType(parent.type)) {
@@ -4019,7 +4305,7 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           }
-        } else {
+        } else if (!prevCollapsed && drawnHere) {
           // Collapsing: shrink to the centre of the expanded box, the
           // reverse of an expand. The node turns from a cola group into a
           // leaf the layout has no position for, and a new leaf spawns among
@@ -4027,8 +4313,15 @@ export const useDiagramStore = create<DiagramStore>()(
           const allNodes = get().c4Nodes
           const node = allNodes[id]
           if (node && isContainerType(node.type)) {
-            const dx = Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2)
-            const dy = Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2)
+            // One the canvas shows without children (it has none, or the
+            // view draws none of them) is drawn at the folded size already:
+            // it stays where it is. Shrunk from its model size, it moved by
+            // half the difference on every fold.
+            const shownView = activeViewId ? get().views[activeViewId] : undefined
+            const shownHere = shownView ? computeViewNodeSet(shownView as any, allNodes, get().c4Relations) : undefined
+            const drawnOpen = Object.values(allNodes).some((c) => c.parentId === id && (!shownHere || shownHere.has(c.id)))
+            const dx = drawnOpen ? Math.max(0, ((node.width ?? 0) - COLLAPSED_WIDTH[node.type]) / 2) : 0
+            const dy = drawnOpen ? Math.max(0, ((node.height ?? 0) - COLLAPSED_HEIGHT[node.type]) / 2) : 0
             if (dx > 0 || dy > 0) {
               set((state) => {
                 const n = state.c4Nodes[id]
@@ -4074,6 +4367,7 @@ export const useDiagramStore = create<DiagramStore>()(
             // previously in view.expandedNodeIds — otherwise fitParentToChildren
             // would still measure it at full height (stale override).
             loopExpandedSet = viewExpandedSet(view as DiagramView, get().c4Nodes, get().c4Relations)
+            if (openedEmpty) loopExpandedSet = new Set([...(loopExpandedSet ?? []), id])
             if (loopExpandedSet) {
               if (!prevCollapsed) loopExpandedSet.delete(id) // we are collapsing `id`
               if (loopExpandedSet.size === 0) loopExpandedSet = undefined
@@ -4096,7 +4390,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Opening: the frame is the one its children need now. One added
         // while it was collapsed was not fit for (a collapsed container
         // keeps its size) and lay outside the frame it came back with.
-        if (prevCollapsed) {
+        if (prevCollapsed && drawnHere) {
           const openVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
           const untangled = untangleChildren(id, get().c4Nodes, loopViewFilter, openVcs, loopExpandedSet)
           if (Object.keys(untangled).length > 0) {
@@ -4114,7 +4408,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         // An expand makes room round what grew, level by level up the tree.
         const roomVcs = loopVcs ? new Set([...loopVcs].filter((nid) => nid !== id)) : undefined
-        let currentId: string | undefined = id
+        let currentId: string | undefined = drawnHere ? id : undefined
         while (currentId) {
           const overlapUpdates = prevCollapsed
             ? makeRoomAround(currentId, get().c4Nodes, canvasBoxes(get().c4Nodes, loopViewFilter, roomVcs, loopExpandedSet))
@@ -4174,19 +4468,19 @@ export const useDiagramStore = create<DiagramStore>()(
           })
         }
 
-        if (prevCollapsed) {
-          // Children kept in a row or column while it was collapsed line up
-          // now: the physics, which held them on their line, takes this
-          // result as it is.
-          const input = layoutInputForView(get())
-          if (input.alignments.length) {
-            let snapped = false
-            set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
-            if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
-          }
+        // Children kept in a row or column while it was collapsed line up
+        // now: the physics, which held them on their line, takes this
+        // result as it is. A fold too: the parent it shrinks may be on a
+        // line, which then ran off it until the next load snapped it and
+        // refit every container.
+        let snapped = false
+        const input = layoutInputForView(get())
+        if (input.alignments.length) {
+          set((state) => { snapped = applyAlignments(state.c4Nodes, input) })
+          if (snapped) get()._resizeParentsBottomUp(input.viewFilter, input.viewCollapsedSet, input.expandedSet)
         }
         get()._sync()
-        if (prevCollapsed) _liveLayout?.reset()
+        if (prevCollapsed || snapped) _liveLayout?.reset()
         else _liveLayout?.invalidate()
         // Smart fit frames the result as soon as the canvas shows it, not on
         // its next 300 ms tick. React Flow takes the new nodes in an effect,
@@ -4602,6 +4896,15 @@ export const useDiagramStore = create<DiagramStore>()(
         // On the canvas shown (model.reparentNodes saw to the others).
         const shownNodes = settleMoveOnShownCanvas(get(), ids, oldParentId ? [oldParentId] : [])
         set((state) => { writeGeometry(state, shownNodes) })
+        // And on the others, where it lost its place.
+        _placeOnOtherCanvases(ids, false)
+        // In a milestone, its own All elements (kept aside while a view is
+        // shown) had the place relative to the old parent: read against the
+        // new one, it lay on a sibling there. Without one, it is placed
+        // beside its siblings when All elements opens (placeUnplaced).
+        if (get().activeSnapshotId && get().activeViewId !== null && _milestoneAllPositions) {
+          for (const id of ids) delete _milestoneAllPositions[id]
+        }
 
         get().setSelectedNodeIds(ids)
         get()._sync()
@@ -4680,7 +4983,7 @@ export const useDiagramStore = create<DiagramStore>()(
               : firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, null)
                 ?? view?.positions as Record<string, NodePosition> | undefined
             if (incoming && (Object.keys(incoming).length > 0 || isExploration(view))) {
-              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, view, state.c4Relations as Record<string, C4Relation>)
+              placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
             }
             state.activeViewId = newId
             if (incomingViewport) state.lowDetail = lowDetailAt(incomingViewport.zoom, state.lowDetail)
@@ -4739,7 +5042,7 @@ export const useDiagramStore = create<DiagramStore>()(
           }
 
           if (incoming) {
-            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, viewById(state as DiagramStore, newId), state.c4Relations as Record<string, C4Relation>)
+            placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, incoming, viewById(state as DiagramStore, newId), state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
           }
 
           state.activeViewId = newId
@@ -4935,6 +5238,13 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._milestoneViewEdit(viewId)
         set((state) => { hide(state.views[viewId] as DiagramView) })
         get()._sync()
+        // A container whose children it hid is drawn at its folded size: a
+        // row or column through it holds again, as a reload would draw it,
+        // and the physics takes the canvas as it is now.
+        if (viewId === get().activeViewId) {
+          get()._enforceLayoutConstraints()
+          _liveLayout?.reset()
+        }
       },
       setViewNodes(viewId, nodeIds) {
         if (!get().views[viewId]) return
@@ -4984,7 +5294,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const view = viewById(state as DiagramStore, state.activeViewId)
           const positions = view ? view.positions : (_milestoneAllPositions ?? state.defaultPositions)
-          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>)
+          if (positions && Object.keys(positions).length > 0) showCanvasPositions(state.c4Nodes as Record<string, C4Node>, positions as Record<string, NodePosition>, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
         })
       },
 
@@ -5227,7 +5537,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const view = state.views[viewId] as DiagramView
           const first = firstCanvasPositions(view, state.defaultPositions as Record<string, NodePosition>, state.activeSnapshotId ? _milestoneAllPositions : null)
             ?? (!wasCanvas && kind === 'static' ? view.positions : undefined)
-          if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>)
+          if (first) placed = showCanvasPositions(state.c4Nodes as Record<string, C4Node>, first, view, state.c4Relations as Record<string, C4Relation>, liveWhileInMilestone(state as DiagramStore))
         })
         get()._sync()
         // The live layout drops what it had of the canvas shown before (and,
@@ -5341,9 +5651,9 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertAlignment(state, viewId, id, axis, ids, ordered) })
         get()._enforceLayoutConstraints()
-        // The members were snapped onto their line: the physics settles them
-        // there, with what they now touch; the rest of the diagram stays.
-        _liveLayout?.reset(ids)
+        // The members were snapped onto their line: what they now cover is
+        // pushed clear; the rest of the diagram stays.
+        _liveLayout?.reset([], ids)
         return id
       },
 
@@ -5361,7 +5671,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const id = uid()
         set((state) => { model.insertGrid(state, viewId, id, ids, cols) })
         get()._arrangeGrid(id)
-        _liveLayout?.reset(ids)
+        _liveLayout?.reset([], ids)
         return id
       },
 
@@ -5379,7 +5689,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setGridColumns(state, viewId, id, columns) })
         if (viewId === get().activeViewId) {
           get()._arrangeGrid(id)
-          _liveLayout?.reset(c.nodeIds)
+          _liveLayout?.reset([], c.nodeIds)
         }
       },
 
@@ -5425,7 +5735,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.setAlignmentOrder(state, viewId, id, ids) })
         if (viewId === get().activeViewId) {
           get()._enforceLayoutConstraints()
-          _liveLayout?.reset(c.nodeIds)
+          _liveLayout?.reset([], c.nodeIds)
         }
       },
 
@@ -5482,15 +5792,21 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const name = seq ? `${seq.name} view` : 'Sequence view'
         get()._pushUndo()
+        const view: DiagramView = { id: viewId, name, kind: 'dynamic', sequenceId, nodeIds: Array.from(nodeSet), positions: {} }
+        // Made in a milestone, the view is made (views are the live model's),
+        // but what it names of the milestone only (a sequence added there,
+        // its elements) is not the live view's: that is parked without it,
+        // as Propagate would find it. It was saved naming what the live
+        // model lacks, also after Discard.
+        const { activeSnapshotId, liveBackup } = get()
+        const liveIds = liveBackup ? view.nodeIds.filter((id) => liveBackup.nodes[id]) : view.nodeIds
+        const liveSequence = !liveBackup || !!liveBackup.sequences?.[sequenceId]
+        const parked = activeSnapshotId && liveBackup && (!liveSequence || liveIds.length < view.nodeIds.length)
+          ? { ...view, nodeIds: liveIds, sequenceId: liveSequence ? sequenceId : undefined }
+          : null
         set((state) => {
-          state.views[viewId] = {
-            id: viewId,
-            name,
-            kind: 'dynamic',
-            sequenceId,
-            nodeIds: Array.from(nodeSet),
-            positions: {},
-          }
+          state.views[viewId] = view as any
+          if (parked) state.liveBackup!.views = { ...state.liveBackup!.views, [viewId]: parked } as any
         })
         get().setActiveView(viewId)
         return viewId
@@ -5512,6 +5828,12 @@ export const useDiagramStore = create<DiagramStore>()(
       removeSequence(id) {
         if (!get().sequences[id]) return
         get()._pushUndo()
+        // In a milestone, an edit of the views it unlinks too (they are the
+        // live model's): a flow view lost its sequence for good, also after
+        // Discard.
+        for (const view of Object.values(get().views)) {
+          if (view.sequenceId === id) get()._milestoneViewEdit(view.id)
+        }
         set((state) => {
           delete state.sequences[id]
           // Unlink views that referenced this sequence
@@ -6603,7 +6925,9 @@ export const useDiagramStore = create<DiagramStore>()(
           state.sequences = (snap.sequences ?? {}) as any
           if (state.activeSequenceId && !state.sequences[state.activeSequenceId]) state.activeSequenceId = null
           // The Hub template values its texts hold, not the live model's.
-          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
+          // Read from the store, not the draft: _milestoneHubBase outlives
+          // this set, and a draft kept is revoked (Propagate threw).
+          _milestoneHubBase = milestoneHubTemplates((backup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>)
           state.hubTemplates = _milestoneHubBase as any
           state.activeSnapshotId = id
           // Coming from another milestone: its views (its own, or edits
@@ -6737,7 +7061,7 @@ export const useDiagramStore = create<DiagramStore>()(
             state.snapshots.splice(idx + 1, 0, newSnap as any)
             // The live model is as it was: so are its Hub template records.
             // The new milestone shown has the values its texts hold.
-            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? state.hubTemplates) as Record<string, HubImportRecord>, editedNodes)
+            _milestoneHubBase = milestoneHubTemplates((liveBackup?.hubTemplates ?? get().hubTemplates) as Record<string, HubImportRecord>, editedNodes)
             state.hubTemplates = _milestoneHubBase as any
             // Stay viewing the freshly-created milestone (canvas already shows its content).
             // liveBackup is preserved so the user can still discard back to live HEAD.
@@ -6892,6 +7216,11 @@ export const useDiagramStore = create<DiagramStore>()(
             else delete target.stepBackward
           }
           for (const id of removedSeqIds) delete targetSeqs[id]
+          // The steps of the relations gone here go with them, as a delete
+          // takes them: a later model can step through relations the edited
+          // milestone deleted with an element while it had no such sequence.
+          const missing = new Set(Object.values(targetSeqs).flatMap((q) => q.relationIds.filter((rid) => !targetRels[rid])))
+          model.forgetRelationsInSequences({ sequences: targetSeqs } as unknown as model.ModelState, missing)
         }
 
         // The views the milestone keeps its own way stay its own: what was
@@ -7241,7 +7570,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
       _syncViewpoints() {
         let changed: string[] = []
-        set((state) => { changed = model.syncViewpoints(state as unknown as model.ModelState) })
+        set((state) => { changed = syncViewpointsOfLive(state as DiagramStore) })
         if (changed.length) get()._sync()
       },
       resetMetamodelToC4(confirm) {
@@ -7811,6 +8140,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // The history is Designer's live model's: a milestone shown, a slide
         // played or Viewer's model in the store is not the one it rebases on.
         const st = get()
+        // Studio's live model at All elements' places, for what the change
+        // placed on it (_settleOutsidePlaces).
+        const wasLive = opts?.outsideChange && (st.appMode === 'designer' || st.appMode === 'metamodel') && !st.presentationActive
+          ? (() => { const doc = st.saveDiagram(); return atDefaultPositions(doc.nodes, doc.defaultPositions) })()
+          : null
         // A milestone shown stays shown, with its edits (ShownMilestone).
         const shownBefore = opts?.outsideChange && st.activeSnapshotId && st.liveBackup ? st.snapshots.find((m) => m.id === st.activeSnapshotId) : undefined
         const shownMilestone: ShownMilestone | null = shownBefore ? {
@@ -7867,8 +8201,13 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         } else if (opts?.outsideChange && designerShown && milestone && !st.presentationActive) {
           // The milestone's steps stay, unless it was changed too; the live
-          // model's, parked, make their change on it as it is now.
+          // model's, parked, make their change on it as it is now. So do
+          // the milestone's: they hold the views, the metamodel and the
+          // milestones, which are the live model's too, and put back whole,
+          // Undo took back what the change did to them (Web App's place on
+          // Containers after the agent moved it: item 262).
           if (milestone.changed) { _undoStack.length = 0; _redoStack.length = 0 }
+          else _historyRebased(_captureState(st))
           if (_liveHistory) {
             const live = st.liveBackup!
             _liveHistoryKeepsVisit(_sharedNow(st, live), [_liveHistory.undo, _liveHistory.redo])
@@ -7900,6 +8239,12 @@ export const useDiagramStore = create<DiagramStore>()(
           nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
           placedOnLoad = placeUnplaced(nodes, data.defaultPositions)
         }
+        let settledOnLoad: string[] = []
+        if (wasLive) {
+          nodes = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { ...n }]))
+          settledOnLoad = _settleOutsidePlaces(nodes, wasLive)
+          placedOnLoad = [...new Set([...placedOnLoad, ...settledOnLoad])]
+        }
         const relations: Record<string, C4Relation> = {}
         const views: Record<string, DiagramView> = {}
         const sequences: Record<string, DiagramSequence> = {}
@@ -7915,7 +8260,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const presInit = buildPresentationsFromData(data.presentations, data.presentationSlides)
 
         // Restore per-view positions (backward compat: old files won't have them)
-        const defaultPos = data.defaultPositions ?? snapshotPositions(nodes)
+        const settledPos = settledOnLoad.length ? Object.fromEntries(Object.entries(snapshotPositions(nodes)).filter(([id]) => settledOnLoad.includes(id))) : {}
+        const defaultPos = data.defaultPositions ? { ...data.defaultPositions, ...settledPos } : snapshotPositions(nodes)
         const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
 
         const activeDocId = documentBackend()?.getActiveId()
@@ -8040,7 +8386,9 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences, hubTemplates: state.hubTemplates } as any
             showMilestoneViews(state as DiagramStore, snapshots.find((m) => m.id === shownMilestone.id))
-            _milestoneHubBase = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
+            // From the store, not the draft: a draft kept past this set is
+            // revoked, and Propagate threw on it.
+            _milestoneHubBase = milestoneHubTemplates(get().hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
             state.hubTemplates = _milestoneHubBase as any
             state.c4Nodes = shownNodes as any
             state.c4Relations = milestone.relations as any

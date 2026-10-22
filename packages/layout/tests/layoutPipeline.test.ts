@@ -55,6 +55,38 @@ describe('applyElkLayout with a collapsed container', () => {
   })
 })
 
+describe('applyElkLayout with a relation to its own container', () => {
+  // API moved into Payment Provider, which it already called: the relation
+  // now joins an element and its container. ELK rejected the whole graph
+  // (UnsupportedGraphException, logged once per ELK candidate of Smart
+  // Layout) and gave nothing.
+  it('lays out the graph without an error', async () => {
+    const nodes: Record<string, C4Node> = {
+      p: node('p', 'person'),
+      S: node('S', 'system', { width: 600, height: 400 }),
+      a: node('a', 'container', { parentId: 'S', x: 20, y: 120 }),
+      b: node('b', 'container', { parentId: 'S', x: 300, y: 120 }),
+      c: node('c', 'container', { parentId: 'a', x: 20, y: 120 }),
+    }
+    const relations: Record<string, C4Relation> = {
+      r1: rel('r1', 'p', 'a'),
+      r2: rel('r2', 'a', 'S'),
+      r3: rel('r3', 'S', 'c'),
+      r4: rel('r4', 'a', 'b'),
+    }
+    const errors: unknown[] = []
+    const realError = console.error
+    console.error = (...args: unknown[]) => { errors.push(args) }
+    try {
+      const positions = await applyElkLayout(nodes, relations)
+      expect(Object.keys(positions).sort()).toEqual(['S', 'a', 'b', 'c', 'p'])
+    } finally {
+      console.error = realError
+    }
+    expect(errors).toEqual([])
+  })
+})
+
 describe('finalizeLayout', () => {
   it('pushes overlapping roots apart to the root gap', () => {
     const boxes = [

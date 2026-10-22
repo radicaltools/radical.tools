@@ -139,3 +139,36 @@ describe('Propagate a move into a parent the later models lack', () => {
     }
   })
 })
+
+describe('Propagate a delete of relations later sequences step through', () => {
+  // The sample's v1 has no sequences; Web Banking deleted there and
+  // propagated took its relations out of the live model, but the live
+  // Payment Processing kept its steps r-cust-web and r-web-apigw (a flow
+  // naming relations that do not exist), saved so.
+  it('takes their steps, with their notes, out of the later milestones and the live sequences', () => {
+    s().loadDiagram({
+      nodes: [node('a', 'system', 0, 0), node('b', 'system', 400, 0), node('c', 'system', 800, 0)],
+      relations: [{ id: 'r1', sourceId: 'a', targetId: 'b' }, { id: 'r2', sourceId: 'b', targetId: 'c' }],
+      views: [],
+    } as DiagramData)
+    const first = s().createSnapshot('first')
+    s().addSequence('Order')
+    const order = Object.keys(s().sequences)[0]
+    s().toggleRelationInSequence(order, 'r1')
+    s().toggleRelationInSequence(order, 'r2')
+    s().updateStepDescription(order, 0, 'asks')
+    s().updateStepDescription(order, 1, 'passes on')
+    s().createSnapshot('second')
+    s().selectMilestone(first)
+    s().removeNode('a')
+    s().commitMilestoneChanges('propagate')
+    const steps = (seqs: unknown) => {
+      const q = (seqs as Record<string, { relationIds: string[]; stepDescriptions?: (string | undefined)[] }>)[order]
+      return q.relationIds.map((r, i) => `${r}:${q.stepDescriptions?.[i] ?? '-'}`)
+    }
+    expect(steps(s().snapshots[1].sequences)).toEqual(['r2:passes on'])
+    expect(steps(s().liveBackup!.sequences)).toEqual(['r2:passes on'])
+    s().discardMilestoneChanges()
+    expect(steps(s().saveDiagram().sequences!.reduce((all, q) => ({ ...all, [q.id]: q }), {}))).toEqual(['r2:passes on'])
+  })
+})
