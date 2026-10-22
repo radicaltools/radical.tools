@@ -18,7 +18,7 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
-import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover } from '@radical/common/concerns'
+import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboundDecisions } from '@radical/common/concerns'
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { computeViewNodeSet, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
@@ -42,7 +42,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_issues',
-    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). After them it lists the concerns of the Hub\'s concern packs the model has not settled (who is calling, …), with the elements, the questions to ask the user and the pack to import. Call it after building or changing a state machine, and before you report work as done.',
+    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). After them it lists the decisions of the Hub\'s concern packs imported but bound to nothing, with the elements to bind them to, and the concerns the model has not settled (who is calling, …), with the elements, the questions to ask the user and the pack to import. Call it after building or changing a state machine, and before you report work as done.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -262,31 +262,43 @@ export class FolderModel {
   private readonly forge = new Forge()
 
   /** The concerns of the Hub's packs the model has not settled, for
-   *  get_issues: each with its elements, its questions and how to settle it. */
+   *  get_issues, as radical check reports them: the decisions imported but
+   *  bound to nothing (concern-unbound), each with where to bind it, then
+   *  the open concerns (concern-unaddressed), each with its elements, its
+   *  questions and how to settle it; one whose decision is in the model
+   *  unbound is settled by binding it, not by importing the pack again. */
   private openConcerns(data: DiagramData, mm: Metamodel | undefined): string[] {
     if (!holdsConcerns(mm)) return []
     const byId = <T extends { id: string }>(items: T[]) => Object.fromEntries(items.map((x) => [x.id, x]))
     const nodes = byId(data.nodes)
     const relations = byId(data.relations)
-    const open = concernStatuses(this.forge.concernPacks(), nodes, relations).filter((s) => s.open.length)
-    if (!open.length) return []
-    return ['', 'Unaddressed concerns (warnings of radical check\'s concern-unaddressed). Each is settled by an accepted ADR marked with the concern that constrains the elements, or the system containing them: ask the user the questions, then forge_import_hub_concept with conceptId, their answers and bindTo.',
-      ...open.flatMap(({ pack, open: ids, pending }) => [
-        `- ${pack.name} (conceptId ${pack.id}): ${pack.concern.why}`,
-        `  Elements: ${ids.map((id) => `${nodes[id].label} (${id})`).join(', ')}`,
-        ...(() => {
+    const packs = this.forge.concernPacks()
+    const named = (id: string) => `${nodes[id].label} (${id})`
+    const unbound = unboundDecisions(packs, nodes, relations, mm)
+    const open = concernStatuses(packs, nodes, relations).filter((s) => s.open.length)
+    return [
+      ...(unbound.length ? ['', 'Unbound decisions (warnings of radical check\'s concern-unbound). Each settles its concern for nothing until it constrains the elements: add_relation constrains from the ADR and its fitness functions to each element, and satisfies from each element to the requirements the pack brought.',
+        ...unbound.map(({ adr, concern, checks, bindTo }) =>
+          `- ADR "${adr.label}" (${adr.id}) settles the concern "${concern}" but constrains no element.${bindTo.length ? ` Bind it to ${bindTo.map(named).join(', ')}, which the concern applies to.` : ' Nothing in the model is what the concern applies to yet.'}${checks.length ? ` Its fitness functions: ${checks.map(named).join(', ')}.` : ''}`)] : []),
+      ...(open.length ? ['', 'Unaddressed concerns (warnings of radical check\'s concern-unaddressed). Each is settled by an accepted ADR marked with the concern that constrains the elements, or the system containing them: ask the user the questions, then forge_import_hub_concept with conceptId, their answers and bindTo.',
+        ...open.flatMap(({ pack, open: ids, pending }) => {
+          const imported = unbound.filter((u) => u.concern === pack.concern.id)
           const suggestions = bindSuggestions(pack, nodes, relations, mm)
           const cover = suggestedCover(suggestions)
           return [
-            `  Suggested bindTo: ${cover.map((id) => `${nodes[id].label} (${id})`).join(', ')}, which settles all of them`,
+            `- ${pack.name} (conceptId ${pack.id}): ${pack.concern.why}`,
+            `  Elements: ${ids.map(named).join(', ')}`,
+            `  Suggested bindTo: ${cover.map(named).join(', ')}, which settles all of them`,
             ...suggestions.filter((b) => !cover.includes(b.id)).slice(0, 3).map((b) =>
-              `  Or: ${nodes[b.id].label} (${b.id}), settles ${b.covers.length} of ${ids.length}`),
+              `  Or: ${named(b.id)}, settles ${b.covers.length} of ${ids.length}`),
+            ...(pending.length ? [`  Proposed, being decided: ${pending.map((n) => named(n.id)).join(', ')}`] : []),
+            ...(imported.length
+              ? [`  Already imported, not bound: ${imported.map((u) => `ADR "${u.adr.label}" (${u.adr.id})`).join(', ')}: bind it instead of importing the pack again (Unbound decisions above).`]
+              : ['  Questions:',
+                ...(pack.templateParams ?? []).map((p) => `  - ${p.key}: ${p.label}${p.options?.length ? ` [${p.options.map((o) => `${o.value} = ${o.label}`).join('; ')}]` : ''}${p.defaultValue ? ` (default ${p.defaultValue})` : ''}`)]),
           ]
-        })(),
-        ...(pending.length ? [`  Proposed, being decided: ${pending.map((n) => `${n.label} (${n.id})`).join(', ')}`] : []),
-        '  Questions:',
-        ...(pack.templateParams ?? []).map((p) => `  - ${p.key}: ${p.label}${p.options?.length ? ` [${p.options.map((o) => `${o.value} = ${o.label}`).join('; ')}]` : ''}${p.defaultValue ? ` (default ${p.defaultValue})` : ''}`),
-      ])]
+        })] : []),
+    ]
   }
   private readonly folder: string
   private metamodelKey: string

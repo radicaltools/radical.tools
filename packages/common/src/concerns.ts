@@ -116,6 +116,45 @@ const prop = (node: C4Node, key: string): string => {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+export interface UnboundDecision {
+  /** The accepted ADR marked with a concern that constrains no element. */
+  adr: C4Node
+  /** The concern it is marked with. */
+  concern: string
+  /** The pack of that concern, when one is known. */
+  pack?: ConcernPack
+  /** The fitness functions that implement it. */
+  checks: string[]
+  /** Where to bind it: the fewest elements that settle every element the
+   *  concern applies to (suggestedCover); none while it applies to nothing. */
+  bindTo: string[]
+}
+
+/** The accepted ADRs marked with a concern that constrain no element, so
+ *  settle it for nothing: what the check's concern-unbound reports, and
+ *  get_issues with it. */
+export function unboundDecisions(packs: ConcernPack[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, metamodel: Metamodel | undefined): UnboundDecision[] {
+  if (!holdsConcerns(metamodel)) return []
+  const constraining = new Set<string>()
+  const implementedBy = new Map<string, string[]>()
+  for (const r of Object.values(relations)) {
+    if (r.relationType === 'constrains') constraining.add(r.sourceId)
+    if (r.relationType === 'implements' && nodes[r.sourceId]?.type === 'fitness-fn') implementedBy.set(r.targetId, [...(implementedBy.get(r.targetId) ?? []), r.sourceId])
+  }
+  return Object.values(nodes)
+    .filter((n) => n.type === 'adr' && prop(n, CONCERN_KEY) && prop(n, 'status') === 'accepted' && !constraining.has(n.id))
+    .map((adr) => {
+      const pack = packs.find((p) => p.concern.id === prop(adr, CONCERN_KEY))
+      return {
+        adr,
+        concern: prop(adr, CONCERN_KEY),
+        ...(pack ? { pack } : {}),
+        checks: implementedBy.get(adr.id) ?? [],
+        bindTo: pack ? suggestedCover(bindSuggestions(pack, nodes, relations, metamodel)) : [],
+      }
+    })
+}
+
 // ─── Import: the answers pick the slice, the element binds it ───────────────
 
 /** Why the answers do not fit the pack's questions, or null. */

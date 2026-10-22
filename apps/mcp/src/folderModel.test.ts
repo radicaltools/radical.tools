@@ -872,4 +872,38 @@ describe('get_issues', () => {
     expect(after.split('\n')[0]).toBe('No issues: the model follows its metamodel.')
     expect(after).not.toContain('- Authentication (conceptId concern-authentication)')
   })
+
+  // F-0005: a pack imported unbound was listed as open with "import it",
+  // and the agent imported a second copy; radical check names its ADR.
+  it('names a concern pack imported unbound and where to bind it, not to import it again', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const ids = new Map<string, string>()
+    const add = async (name: string, args: Record<string, unknown>) => {
+      const result = await model.call(name, args)
+      expect(result.ok, `${name}: ${result.text}`).toBe(true)
+      const id = /Created node ([\w-]+)/.exec(result.text)?.[1]
+      if (id && typeof args.tempId === 'string') ids.set(args.tempId, id)
+      return result.text
+    }
+    await add('add_node', { tempId: 'user', type: 'person', label: 'Customer' })
+    await add('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await add('add_node', { tempId: 'web', type: 'webapp', label: 'Web', parentId: 'shop' })
+    await add('add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' })
+    await add('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: {} })
+    const adr = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "adr"' })).text).rows as Array<{ id: string; label: string }>
+    expect(adr).toHaveLength(1)
+
+    const issues = (await model.call('get_issues', {})).text
+    expect(issues).toContain('Unbound decisions (warnings of radical check\'s concern-unbound)')
+    expect(issues).toContain(`- ADR "${adr[0].label}" (${adr[0].id}) settles the concern "authentication" but constrains no element. Bind it to Web (${ids.get('web')})`)
+    const block = issues.split('\n- ').find((b) => b.startsWith('Authentication (conceptId')) ?? ''
+    expect(block).toContain(`Already imported, not bound: ADR "${adr[0].label}" (${adr[0].id}): bind it instead of importing the pack again`)
+    expect(block).not.toContain('Questions:')
+
+    await add('add_relation', { sourceId: adr[0].id, targetId: ids.get('web'), relationType: 'constrains' })
+    const bound = (await model.call('get_issues', {})).text
+    expect(bound).not.toContain('Unbound decisions')
+    expect(bound).not.toContain('- Authentication (conceptId concern-authentication)')
+  })
 })
