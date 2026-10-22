@@ -89,6 +89,23 @@ describe('radical check', () => {
     expect(out).toContain('folder-manifest')
   })
 
+  it('reports an unaddressed concern from the bundled catalogue', async () => {
+    const cwd = await workspace({
+      nodes: [node('user', 'person', 'Customer'), node('sys', 'system', 'Shop'), node('web', 'webapp', 'Storefront', { parentId: 'sys' })],
+      relations: [{ id: 'u', relationType: 'interacts', sourceId: 'user', targetId: 'web' }],
+    })
+    const { code, out } = await run(cwd, 'check', 'model', '--format', 'json')
+    const found = (JSON.parse(out) as { findings: Array<{ rule: string; code?: string; nodeId?: string; details?: string[] }> }).findings
+      .filter((f) => f.rule === 'concern-unaddressed')
+    // Several packs apply to a web app people use; authentication is one.
+    const auth = found.find((f) => f.code === 'concern-authentication')
+    expect(auth).toMatchObject({ nodeId: 'web' })
+    expect(auth?.details?.[0]).toMatch(/^How do people sign in\? \(idp: /)
+    expect(found.length).toBeGreaterThan(1)
+    // A warning by default: it does not fail the check.
+    expect(code).toBe(0)
+  })
+
   it('exits 2 when it cannot run', async () => {
     const cwd = await workspace()
     expect((await run(cwd, 'check', 'nowhere')).code).toBe(2)

@@ -6,6 +6,7 @@ import {
   type HubConceptSummary,
   type HubRadicalDoc,
 } from '@radical/common/hubFormat'
+import { HUB_GROUPS, hubGroupOf } from '../types/hubTheme'
 
 export type { HubConcept, HubConceptMeta, HubConceptSummary, HubCategory, HubImportRecord, TemplateParam } from '@radical/common/hubFormat'
 
@@ -64,6 +65,20 @@ export type HubSortKey = 'name' | 'category' | 'connections'
 
 const REMOTE_BASE = 'https://hub.radical.tools/hub/'
 const LOCAL_BASE = '/hub/'
+
+/** The concepts of the catalogue this build bundles, read from the app
+ *  itself (never the network): what the check's critic compares a model
+ *  against, the same version as the code that reads it. [] when the build
+ *  bundles none. */
+export async function loadBundledConcepts(): Promise<HubConceptSummary[]> {
+  try {
+    const res = await fetch(LOCAL_BASE + HUB_INDEX_FILE)
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return []
+    return (await res.json()) as HubConceptSummary[]
+  } catch {
+    return []
+  }
+}
 const HUB_BASE = import.meta.env.DEV ? LOCAL_BASE : REMOTE_BASE
 const FALLBACK_BASE = import.meta.env.DEV ? REMOTE_BASE : LOCAL_BASE
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -171,7 +186,8 @@ export const useHubStore = create<HubState>()((set, get) => ({
     const { concepts, activeCategory, searchQuery, activeTags, activeStatuses, sortBy } = get()
     const q = searchQuery.toLowerCase().trim()
     const filtered = concepts.filter((c) => {
-      if (activeCategory && c.category !== activeCategory) return false
+      // The category filter picks a concern pack's group (or a category).
+      if (activeCategory && hubGroupOf(c) !== activeCategory) return false
       // Multiple tags/statuses are the same facet — OR within it (broadens),
       // combined with everything else via AND (narrows).
       if (activeTags.size > 0 && !c.tags.some((t) => activeTags.has(t))) return false
@@ -188,7 +204,7 @@ export const useHubStore = create<HubState>()((set, get) => ({
     const connectionCounts = sortBy === 'connections' ? buildConnectionCounts(concepts) : undefined
     const byName = (a: HubConceptSummary, b: HubConceptSummary) => a.name.localeCompare(b.name)
     const cmp: (a: HubConceptSummary, b: HubConceptSummary) => number =
-      sortBy === 'category' ? (a, b) => a.category.localeCompare(b.category) || byName(a, b)
+      sortBy === 'category' ? (a, b) => groupRank(a) - groupRank(b) || byName(a, b)
       : sortBy === 'connections' ? (a, b) => (connectionCounts!.get(b.id) ?? 0) - (connectionCounts!.get(a.id) ?? 0) || byName(a, b)
       : byName
     return [...filtered].sort(cmp)
@@ -216,6 +232,11 @@ export const useHubStore = create<HubState>()((set, get) => ({
   },
 
 }))
+
+const groupRank = (c: HubConceptSummary): number => {
+  const i = HUB_GROUPS.indexOf(hubGroupOf(c))
+  return i < 0 ? HUB_GROUPS.length : i
+}
 
 /** Toggle membership of `value` in `set`, returning a new Set (immutable). */
 export function toggleInSet<T>(set: Set<T>, value: T): Set<T> {

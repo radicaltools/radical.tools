@@ -1,0 +1,1304 @@
+{
+  "hub": {
+    "id": "concern-backup-recovery",
+    "category": "concern",
+    "name": "Backup and recovery",
+    "description": "When a store is lost: how much data may go with it, how fast it comes back, where the copies are kept, and the drill that proves it.",
+    "tags": [
+      "reliability",
+      "backup",
+      "disaster-recovery",
+      "rpo",
+      "rto",
+      "ransomware"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "backup-recovery",
+      "trigger": "LIST NODES WHERE type = \"database\" AND external != true",
+      "why": "these stores hold what may not be recomputable, so how much may be lost, how fast it comes back and where the copies are kept has to be decided.",
+      "group": "data"
+    },
+    "sources": [
+      {
+        "title": "Google SRE book, chapter 26: Data Integrity: What You Read Is What You Wrote",
+        "url": "https://sre.google/sre-book/data-integrity/"
+      },
+      {
+        "title": "AWS whitepaper: Disaster Recovery of Workloads on AWS: Recovery in the Cloud",
+        "url": "https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-workloads-on-aws.html"
+      },
+      {
+        "title": "AWS Well-Architected Framework, Reliability Pillar (REL09 back up data, REL13 plan for disaster recovery)",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html"
+      },
+      {
+        "title": "Azure Well-Architected Framework: Develop a disaster recovery plan",
+        "url": "https://learn.microsoft.com/en-us/azure/well-architected/reliability/disaster-recovery"
+      },
+      {
+        "title": "CISA #StopRansomware Guide (offline, immutable backups)",
+        "url": "https://www.cisa.gov/stopransomware/ransomware-guide"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "METHOD",
+        "title": "Copies",
+        "label": "How is the store copied?",
+        "hint": "The method decides the recovery point: how much committed data may be lost. Pick the cheapest one that meets the RPO below.",
+        "defaultValue": "pitr",
+        "options": [
+          {
+            "value": "sync",
+            "label": "synchronous replication",
+            "description": "Every write is acknowledged only once a second zone or region has it, and backups still cover mistakes. Pick it when the RPO is 0: payments, ledgers, anything a customer was told is saved and cannot be redone."
+          },
+          {
+            "value": "pitr",
+            "label": "continuous backup with point-in-time recovery",
+            "description": "The write-ahead log is archived continuously, so the store restores to any second of the retention period. Pick it when a few minutes of loss is acceptable, which suits most transactional stores; managed databases offer it built in."
+          },
+          {
+            "value": "snapshot",
+            "label": "scheduled snapshots",
+            "description": "A consistent snapshot every few hours or every night. Pick it when the RPO is hours or more and the lost changes can be redone or re-imported, as for back-office or reference data."
+          },
+          {
+            "value": "rebuild",
+            "label": "rebuilt from its sources",
+            "description": "A cache, search index, read model or projection that can be rebuilt from the stores or event log it is derived from. Pick it only when nothing is written to it first and the rebuild fits in the RTO."
+          }
+        ]
+      },
+      {
+        "key": "COPIES",
+        "title": "Copy location",
+        "label": "Where are the copies kept?",
+        "hint": "A copy that the same credentials can delete, or that sits in the same region, is lost together with the store; the 3-2-1 rule asks for three copies on two kinds of media, one of them off-site.",
+        "defaultValue": "vault",
+        "options": [
+          {
+            "value": "vault",
+            "label": "in another account and region, locked",
+            "description": "Copies go to a backup vault in a separate account and region, under a compliance-mode lock (write once, read many) that nobody can lift before they expire. Pick it for any production store on a cloud: it is what survives ransomware and a stolen administrator credential."
+          },
+          {
+            "value": "region",
+            "label": "in another region of the same account",
+            "description": "Copies go to a second region with deletion protection and an alert on every deletion. Pick it when a separate account is not possible yet and the risk accepted is an attacker with administrator rights."
+          },
+          {
+            "value": "offline",
+            "label": "offline at a second site",
+            "description": "A copy on tape or removable disks, disconnected after writing and kept at a second site under separate administration. Pick it for on-premises systems, or as the third copy where regulation demands an air gap."
+          }
+        ]
+      },
+      {
+        "key": "DR",
+        "title": "Region outage",
+        "label": "What happens when the whole region or site is lost?",
+        "hint": "The disaster recovery strategy decides the RTO for the worst case: from hours (backup and restore) to minutes (warm standby). Its cost rises in the same order.",
+        "defaultValue": "restore",
+        "options": [
+          {
+            "value": "restore",
+            "label": "backup and restore in a second region",
+            "description": "Infrastructure is recreated from code and the store restored from its copies in a second region. Pick it when an RTO of hours for a region loss is acceptable; it costs little more than the copies."
+          },
+          {
+            "value": "standby",
+            "label": "a warm standby in a second region",
+            "description": "A replica runs in the second region all the time, with the rest of the system scaled down beside it, and is promoted on failover. Pick it when a region loss must be recovered within minutes to an hour."
+          },
+          {
+            "value": "single",
+            "label": "one region, across zones",
+            "description": "The store survives the loss of a zone, but a region outage is waited out. Pick it when the business accepts that, and it is written down where customers can see it (the service level agreement)."
+          }
+        ]
+      },
+      {
+        "key": "DRILL",
+        "title": "Restore drill",
+        "label": "How is recovery proven?",
+        "hint": "Recovery that is not exercised fails when it is needed: an expired credential, a missing step, a restore slower than anyone thought.",
+        "defaultValue": "auto",
+        "options": [
+          {
+            "value": "auto",
+            "label": "an automated restore test every week",
+            "description": "A scheduled pipeline restores (or rebuilds) the latest copy into an isolated environment, checks the data and measures the time. Pick it when the restore can be scripted end to end, which managed databases and pgBackRest allow."
+          },
+          {
+            "value": "manual",
+            "label": "a restore drill by the team every quarter",
+            "description": "People follow the runbook to restore into a clean environment, record the time and fix the runbook. Pick it when the restore needs human steps (tapes, approvals, a second site), or as the first step before automating."
+          }
+        ]
+      },
+      {
+        "key": "RPO_MINUTES",
+        "label": "How many minutes of committed data may be lost (RPO)?",
+        "defaultValue": "15",
+        "type": "number"
+      },
+      {
+        "key": "RTO_MINUTES",
+        "label": "How many minutes may the store be down after a loss (RTO)?",
+        "defaultValue": "60",
+        "type": "number"
+      },
+      {
+        "key": "RETAIN_DAYS",
+        "label": "For how many days are copies kept?",
+        "defaultValue": "35",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Data survives a disaster",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Backup and recovery",
+      "description": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed."
+    },
+    {
+      "id": "req-sync",
+      "type": "requirement",
+      "label": "Writes stored twice",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "acknowledge a write only after it is durable in two availability zones or regions, so that losing one loses no acknowledged write",
+      "rationale": "An RPO of zero is reachable only with synchronous replication; asynchronous replicas lose what was in flight (AWS DR whitepaper, multi-site strategies; PostgreSQL synchronous_commit).",
+      "hubWhen": {
+        "METHOD": [
+          "sync"
+        ]
+      }
+    },
+    {
+      "id": "req-pitr",
+      "type": "requirement",
+      "label": "Point-in-time restore",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "archive the write-ahead log continuously so the store restores to any second of the last {{RETAIN_DAYS}} days, with the newest archived change never more than {{RPO_MINUTES}} minutes old",
+      "rationale": "Continuous archiving bounds the loss to the archive delay and gives a way back from a mistake made an hour ago (PostgreSQL docs, Continuous Archiving and Point-in-Time Recovery; AWS REL09-BP03).",
+      "hubWhen": {
+        "METHOD": [
+          "pitr"
+        ]
+      }
+    },
+    {
+      "id": "req-snapshot",
+      "type": "requirement",
+      "label": "Snapshots on schedule",
+      "x": 260,
+      "y": 260,
+      "ears_type": "ubiquitous",
+      "action": "take an application-consistent snapshot at least every {{RPO_MINUTES}} minutes and keep each for {{RETAIN_DAYS}} days",
+      "rationale": "The snapshot interval is the recovery point; the retention is the time to notice a silent corruption before the last good copy expires (Google SRE book, ch. 26; AWS REL09-BP03).",
+      "hubWhen": {
+        "METHOD": [
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "req-recover",
+      "type": "requirement",
+      "label": "Back within the limit",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "the store is lost, or a mistake or an attack destroys or corrupts its data",
+      "action": "restore service from its copies within {{RTO_MINUTES}} minutes, losing no more than {{RPO_MINUTES}} minutes of committed writes",
+      "rationale": "RTO and RPO are the recovery objectives the business sets for downtime and data loss (AWS REL13-BP01); replication alone does not undo a mistaken delete, which needs a copy from before it.",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "req-copy-alert",
+      "type": "requirement",
+      "label": "Failed copies noticed",
+      "x": 260,
+      "y": 520,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a backup, a log archive or replication fails, or the newest copy is older than {{RPO_MINUTES}} minutes",
+      "action": "page the on-call engineer within 15 minutes",
+      "rationale": "Backups fail silently for months unless their age is watched; the age of the newest copy is the RPO actually held (Google SRE book, ch. 26).",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "req-copies-vault",
+      "type": "requirement",
+      "label": "Copies locked away",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "keep the copies in a separate account and region, under a compliance-mode lock that prevents deleting or changing them for {{RETAIN_DAYS}} days, encrypted with a key held in that account",
+      "rationale": "Ransomware and stolen administrator credentials reach every copy that the same identity can delete; a write-once lock in another account is the off-site copy of the 3-2-1 rule (CISA #StopRansomware Guide; AWS REL09-BP02).",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "vault"
+        ]
+      }
+    },
+    {
+      "id": "req-copies-region",
+      "type": "requirement",
+      "label": "Copies in another region",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "copy every backup to a second region within 60 minutes of taking it, keep it {{RETAIN_DAYS}} days with deletion protection, and alert the on-call engineer within 5 minutes of any copy being deleted",
+      "rationale": "A copy in the same region goes down with it (AWS DR whitepaper, backup and restore); deletion protection and an alert are what is left when the account is shared.",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "region"
+        ]
+      }
+    },
+    {
+      "id": "req-copies-offline",
+      "type": "requirement",
+      "label": "Offline copy at a second site",
+      "x": 260,
+      "y": 910,
+      "ears_type": "ubiquitous",
+      "action": "write a copy at least every 24 hours to media that are disconnected after writing and kept at a second site under separate administration, and keep each for {{RETAIN_DAYS}} days",
+      "rationale": "An air-gapped copy cannot be reached by an attacker on the network (CISA #StopRansomware Guide: maintain offline, encrypted backups); the 3-2-1 rule asks for one copy off-site.",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "offline"
+        ]
+      }
+    },
+    {
+      "id": "req-dr-restore",
+      "type": "requirement",
+      "label": "Restored in a second region",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "event-driven",
+      "trigger": "the primary region or site becomes unavailable",
+      "action": "recreate the infrastructure from code in the second region and restore the store there from its copies, within the region RTO the service level agreement states (at most 24 hours)",
+      "rationale": "Backup and restore is the cheapest disaster recovery strategy, with an RTO of hours (AWS DR whitepaper, REL13-BP02); it works only if the infrastructure is code.",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "restore"
+        ]
+      }
+    },
+    {
+      "id": "req-dr-standby",
+      "type": "requirement",
+      "label": "Standby takes over",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "event-driven",
+      "trigger": "the primary region or site becomes unavailable",
+      "action": "promote the standby in the second region and serve from it within {{RTO_MINUTES}} minutes, its replication lag kept under {{RPO_MINUTES}} minutes while both are healthy",
+      "rationale": "A warm standby brings the region RTO down to minutes (AWS DR whitepaper, pilot light and warm standby; REL13-BP02); replication lag is the RPO of a region loss.",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "standby"
+        ]
+      }
+    },
+    {
+      "id": "req-dr-single",
+      "type": "requirement",
+      "label": "Zone loss survived",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "state-driven",
+      "precondition": "while one availability zone of the store's region is unavailable",
+      "action": "keep serving from the other zones within {{RTO_MINUTES}} minutes, and state in the service level agreement that a loss of the whole region is waited out",
+      "rationale": "A single region with zone redundancy covers the common failures; a region outage is then an accepted risk, which customers must be told (Azure Well-Architected, disaster recovery; AWS REL10).",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "single"
+        ]
+      }
+    },
+    {
+      "id": "req-rebuild",
+      "type": "requirement",
+      "label": "Rebuilt from sources",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "event-driven",
+      "trigger": "the store is lost or found corrupted",
+      "action": "rebuild it from its sources, in this or a second region, within {{RTO_MINUTES}} minutes, and serve nothing from it until the rebuild has caught up with the sources",
+      "rationale": "Data that can be reproduced from sources needs no backup if it can be reproduced in time (AWS REL09-BP01).",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "req-derived",
+      "type": "requirement",
+      "label": "Nothing only here",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "code other than the rebuild or projection process tries to write to the store",
+      "action": "refuse the write, so that nothing exists only in the store",
+      "rationale": "A rebuilt store loses whatever was written to it first; keeping it derived is what makes having no backup safe.",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "req-drill-auto",
+      "type": "requirement",
+      "label": "Weekly automated restore",
+      "x": 260,
+      "y": 1690,
+      "ears_type": "event-driven",
+      "trigger": "a week has passed since the last restore test",
+      "action": "restore or rebuild the latest copy automatically into an isolated environment, check row counts, the newest timestamp and a sample of records, and alert the owner when it fails or takes longer than {{RTO_MINUTES}} minutes",
+      "rationale": "Nobody wants backups, they want restores: only a restore that is exercised is known to work (Google SRE book, ch. 26; AWS REL09-BP04 periodic recovery).",
+      "hubWhen": {
+        "DRILL": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "id": "req-drill-manual",
+      "type": "requirement",
+      "label": "Quarterly restore drill",
+      "x": 260,
+      "y": 1820,
+      "ears_type": "event-driven",
+      "trigger": "a quarter has passed since the last restore drill",
+      "action": "have someone other than the runbook's author restore or rebuild the store into a clean environment by following the runbook, record the time taken and the age of the data, and correct the runbook within 14 days",
+      "rationale": "A drill by someone who did not write the runbook finds the steps only its author knows (Google SRE book, ch. 26; AWS REL13-BP03 test disaster recovery).",
+      "hubWhen": {
+        "DRILL": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "id": "sc-sync",
+      "type": "scenario",
+      "label": "Primary lost, nothing lost",
+      "x": 520,
+      "y": 0,
+      "given": "writes acknowledged to clients under load",
+      "when": "the primary is stopped without warning",
+      "then": "every acknowledged write is on the promoted replica",
+      "hubWhen": {
+        "METHOD": [
+          "sync"
+        ]
+      }
+    },
+    {
+      "id": "sc-pitr",
+      "type": "scenario",
+      "label": "Restored to the minute",
+      "x": 520,
+      "y": 130,
+      "given": "a table deleted by mistake at a known time",
+      "when": "the store is restored to one minute before",
+      "then": "the table is back with its data, and no more than {{RPO_MINUTES}} minutes of other changes are missing",
+      "hubWhen": {
+        "METHOD": [
+          "pitr"
+        ]
+      }
+    },
+    {
+      "id": "sc-snapshot",
+      "type": "scenario",
+      "label": "Last snapshot restores",
+      "x": 520,
+      "y": 260,
+      "given": "the newest snapshot",
+      "when": "it is restored into a clean environment",
+      "then": "the store holds the data of no more than {{RPO_MINUTES}} minutes before the snapshot ran",
+      "hubWhen": {
+        "METHOD": [
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "sc-recover",
+      "type": "scenario",
+      "label": "Store restored in time",
+      "x": 520,
+      "y": 390,
+      "given": "the store in a test environment with known data",
+      "when": "it is destroyed and restored from its copies",
+      "then": "service is back within {{RTO_MINUTES}} minutes and no more than {{RPO_MINUTES}} minutes of writes are missing",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "sc-copy-alert",
+      "type": "scenario",
+      "label": "Stale copy pages",
+      "x": 520,
+      "y": 520,
+      "given": "a backup job whose credentials have expired",
+      "when": "the newest copy grows older than {{RPO_MINUTES}} minutes",
+      "then": "the on-call engineer is paged within 15 minutes",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "sc-copies-vault",
+      "type": "scenario",
+      "label": "Copies out of reach",
+      "x": 520,
+      "y": 650,
+      "given": "the store's account fully taken over",
+      "when": "the attacker tries to delete or overwrite the copies",
+      "then": "every attempt is refused until the copies expire after {{RETAIN_DAYS}} days",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "vault"
+        ]
+      }
+    },
+    {
+      "id": "sc-copies-region",
+      "type": "scenario",
+      "label": "Deleted copy noticed",
+      "x": 520,
+      "y": 780,
+      "given": "copies in the second region",
+      "when": "someone deletes one",
+      "then": "the on-call engineer is alerted within 5 minutes",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "region"
+        ]
+      }
+    },
+    {
+      "id": "sc-copies-offline",
+      "type": "scenario",
+      "label": "Air-gapped copy restores",
+      "x": 520,
+      "y": 910,
+      "given": "the newest offline copy, brought back from the second site",
+      "when": "it is restored into an isolated environment",
+      "then": "the store holds the data of its day",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "offline"
+        ]
+      }
+    },
+    {
+      "id": "sc-dr-restore",
+      "type": "scenario",
+      "label": "Region rebuilt",
+      "x": 520,
+      "y": 1040,
+      "given": "the primary region marked unavailable in a test",
+      "when": "the recovery runbook is started",
+      "then": "the store serves from the second region within the stated region RTO",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "restore"
+        ]
+      }
+    },
+    {
+      "id": "sc-dr-standby",
+      "type": "scenario",
+      "label": "Region failover",
+      "x": 520,
+      "y": 1170,
+      "given": "the standby replicating with a lag under {{RPO_MINUTES}} minutes",
+      "when": "the primary region is cut off in a failover test",
+      "then": "the standby serves within {{RTO_MINUTES}} minutes",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "standby"
+        ]
+      }
+    },
+    {
+      "id": "sc-dr-single",
+      "type": "scenario",
+      "label": "Zone lost",
+      "x": 520,
+      "y": 1300,
+      "given": "the store across two zones",
+      "when": "one zone is cut off in a test",
+      "then": "it serves from the other within {{RTO_MINUTES}} minutes",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "single"
+        ]
+      }
+    },
+    {
+      "id": "sc-rebuild",
+      "type": "scenario",
+      "label": "Projection rebuilt",
+      "x": 520,
+      "y": 1430,
+      "given": "the store emptied in a test environment",
+      "when": "the rebuild runs",
+      "then": "within {{RTO_MINUTES}} minutes it holds what the sources say",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "sc-derived",
+      "type": "scenario",
+      "label": "Direct write refused",
+      "x": 520,
+      "y": 1560,
+      "given": "the store's database role",
+      "when": "a service other than the projector writes to it",
+      "then": "the write is refused",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "sc-drill-auto",
+      "type": "scenario",
+      "label": "Weekly restore passes",
+      "x": 520,
+      "y": 1690,
+      "given": "the scheduled restore test",
+      "when": "it runs",
+      "then": "the restored store passes the data checks within {{RTO_MINUTES}} minutes, or the owner is alerted",
+      "hubWhen": {
+        "DRILL": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "id": "sc-drill-manual",
+      "type": "scenario",
+      "label": "Drill recorded",
+      "x": 520,
+      "y": 1820,
+      "given": "the runbook and an engineer who did not write it",
+      "when": "the quarterly drill is run",
+      "then": "the drill record shows the time taken against {{RTO_MINUTES}} minutes, the data age, and the runbook fixes",
+      "hubWhen": {
+        "DRILL": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "id": "adr-sync",
+      "type": "adr",
+      "label": "Synchronous replication and backups",
+      "x": 780,
+      "y": 0,
+      "concern": "backup-recovery",
+      "status": "accepted",
+      "date": "",
+      "context": "This store keeps data that the system cannot work without. The forces: stores are lost to broken disks, bad deployments, mistaken deletes, ransomware and region outages, and replication copies the mistakes as faithfully as the data; the less data may be lost (the recovery point objective, RPO) and the faster it must be back (the recovery time objective, RTO), the more every write and every month costs; copies in the same account and region go down, or get encrypted, together with the store; and a backup that has never been restored is a hope, not a copy.",
+      "decision": "Writes are replicated synchronously and acknowledged only when a second zone or region has them: PostgreSQL with synchronous_standby_names and synchronous_commit = on (managed by Patroni or CloudNativePG), or a managed service that does it (Amazon Aurora, Azure SQL Business Critical, Cloud SQL high availability; Spanner or CockroachDB across regions). Replication copies mistakes, so continuous backups with point-in-time recovery cover them, kept {{RETAIN_DAYS}} days {{COPIES}}. Region loss: {{DR}}. Service comes back within {{RTO_MINUTES}} minutes. Proven by {{DRILL}}. Choose a managed service unless the database must run on premises; choose cross-region synchronous replication only when the added latency of every write (tens of milliseconds) is acceptable.",
+      "consequences": "• No acknowledged write is lost when a zone (or region) is.\n• Every write waits for the second copy: higher latency, and writes stop if no synchronous standby is available.\n• Twice the database cost, plus the backups that still guard against mistakes.\n• Failover must be automatic and tested, or the zero RPO comes with a long RTO.",
+      "alternatives": "1. Continuous backup with point-in-time recovery: minutes of loss, cheaper and faster writes.\n2. Asynchronous replication: fast writes, but what was in flight is lost on failover.\n3. Scheduled snapshots: hours of loss.",
+      "hubWhen": {
+        "METHOD": [
+          "sync"
+        ]
+      }
+    },
+    {
+      "id": "adr-pitr",
+      "type": "adr",
+      "label": "Point-in-time recovery",
+      "x": 780,
+      "y": 130,
+      "concern": "backup-recovery",
+      "status": "accepted",
+      "date": "",
+      "context": "This store keeps data that the system cannot work without. The forces: stores are lost to broken disks, bad deployments, mistaken deletes, ransomware and region outages, and replication copies the mistakes as faithfully as the data; the less data may be lost (the recovery point objective, RPO) and the faster it must be back (the recovery time objective, RTO), the more every write and every month costs; copies in the same account and region go down, or get encrypted, together with the store; and a backup that has never been restored is a hope, not a copy.",
+      "decision": "The store archives its write-ahead log continuously and restores to any second of the last {{RETAIN_DAYS}} days, the newest archived change no older than {{RPO_MINUTES}} minutes: the managed service's point-in-time recovery (Amazon RDS and Aurora automated backups, Azure Database for PostgreSQL, Cloud SQL, MongoDB Atlas continuous backup), or pgBackRest or WAL-G to object storage for self-managed PostgreSQL. Copies are kept {{COPIES}}. Region loss: {{DR}}. Service comes back within {{RTO_MINUTES}} minutes. Proven by {{DRILL}}. Choose the managed service's own feature when there is one; pgBackRest when you run PostgreSQL yourself and need parallel restore and verification.",
+      "consequences": "• At most {{RPO_MINUTES}} minutes of loss, and a way back from a mistake to the second before it.\n• Cheap: most managed databases include it.\n• Restoring a large store replays a lot of log: the restore time must be measured, not assumed, against {{RTO_MINUTES}} minutes.\n• Copies to another account or region are a separate step the managed feature does not always do.",
+      "alternatives": "1. Synchronous replication: no loss, slower and dearer writes, and still needs backups.\n2. Scheduled snapshots: simpler, hours of loss.",
+      "hubWhen": {
+        "METHOD": [
+          "pitr"
+        ]
+      }
+    },
+    {
+      "id": "adr-snapshot",
+      "type": "adr",
+      "label": "Scheduled snapshots",
+      "x": 780,
+      "y": 260,
+      "concern": "backup-recovery",
+      "status": "accepted",
+      "date": "",
+      "context": "This store keeps data that the system cannot work without. The forces: stores are lost to broken disks, bad deployments, mistaken deletes, ransomware and region outages, and replication copies the mistakes as faithfully as the data; the less data may be lost (the recovery point objective, RPO) and the faster it must be back (the recovery time objective, RTO), the more every write and every month costs; copies in the same account and region go down, or get encrypted, together with the store; and a backup that has never been restored is a hope, not a copy.",
+      "decision": "The store is snapshotted at least every {{RPO_MINUTES}} minutes and each snapshot is kept {{RETAIN_DAYS}} days, {{COPIES}}: AWS Backup or Azure Backup plans for managed stores and volumes, Velero for Kubernetes volumes, pg_dump or mysqldump for small databases. Snapshots are taken application-consistent (quiesced or from the database's own tool). Region loss: {{DR}}. Service comes back within {{RTO_MINUTES}} minutes. Proven by {{DRILL}}. The changes since the last snapshot are lost and must be redone or re-imported; the owner of the data agrees to that.",
+      "consequences": "• Simple and cheap to run.\n• Up to {{RPO_MINUTES}} minutes of changes is lost: the business must be able to redo them.\n• Crash-consistent volume snapshots of a running database may not restore: consistency must be checked in the drill.",
+      "alternatives": "1. Point-in-time recovery: minutes of loss for little more.\n2. Synchronous replication: no loss, far dearer.",
+      "hubWhen": {
+        "METHOD": [
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "adr-rebuild",
+      "type": "adr",
+      "label": "Rebuilt, not backed up",
+      "x": 780,
+      "y": 390,
+      "concern": "backup-recovery",
+      "status": "accepted",
+      "date": "",
+      "context": "This store keeps data that the system cannot work without. The forces: stores are lost to broken disks, bad deployments, mistaken deletes, ransomware and region outages, and replication copies the mistakes as faithfully as the data; the less data may be lost (the recovery point objective, RPO) and the faster it must be back (the recovery time objective, RTO), the more every write and every month costs; copies in the same account and region go down, or get encrypted, together with the store; and a backup that has never been restored is a hope, not a copy.",
+      "decision": "The store holds only what is derived from its sources (a cache, a search index such as Elasticsearch or OpenSearch, a read model fed from an event log kept long enough to replay); it has no backups. Only the projection process may write to it, which its database role enforces. When it is lost it is rebuilt within {{RTO_MINUTES}} minutes by replaying the sources; the sources themselves are backed up under their own decision. Proven by {{DRILL}}.",
+      "consequences": "• No backups to keep or lock.\n• Anything written only here would be lost: the store must stay derived.\n• Rebuild time grows with the sources: when it nears {{RTO_MINUTES}} minutes, snapshot the store as well or rebuild in parallel.\n• While it rebuilds, what depends on it is degraded or down.",
+      "alternatives": "1. Back it up anyway: a faster recovery when the rebuild cannot meet the time.\n2. Keep a warm second copy: instant recovery, double the cost.",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "ff-sync",
+      "type": "fitness-fn",
+      "label": "Synchronous standby attached",
+      "x": 1040,
+      "y": 0,
+      "category": "operational",
+      "threshold": "At least 1 standby in sync or quorum state at every moment; a page after 1 minute without one",
+      "description": "The database exporter counts the standbys replicating synchronously; Prometheus pages when there is none, because writes then either stop or lose their second copy.\n\nTool: Prometheus with sql_exporter\n\n```yaml\n# sql_exporter collector\ncollector_name: replication\nmetrics:\n  - metric_name: pg_sync_standbys\n    type: gauge\n    help: 'Standbys replicating synchronously'\n    values: [n]\n    query: |\n      SELECT count(*) AS n FROM pg_stat_replication WHERE sync_state IN ('sync', 'quorum')\n---\n# Prometheus alerting rule\ngroups:\n  - name: backup-recovery\n    rules:\n      - alert: NoSynchronousStandby\n        expr: pg_sync_standbys < 1\n        for: 1m\n        labels: { severity: page }\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync"
+        ]
+      }
+    },
+    {
+      "id": "ff-rpo",
+      "type": "fitness-fn",
+      "label": "Newest copy within the RPO",
+      "x": 1040,
+      "y": 130,
+      "category": "operational",
+      "threshold": "The newest recoverable copy is never older than {{RPO_MINUTES}} minutes for more than 5 minutes",
+      "description": "The backup job pushes the time of its last success (for point-in-time recovery, the exporter reports the last archived log segment); Prometheus pages when the newest copy is older than the RPO, which also catches a job that silently stopped.\n\nTool: Prometheus (Pushgateway for backup jobs)\n\n```yaml\ngroups:\n  - name: backup-recovery\n    rules:\n      - alert: RecoveryPointTooOld\n        # backup_last_success_timestamp_seconds: pushed by the backup job, or\n        # pg_stat_archiver.last_archived_time exported for point-in-time recovery\n        expr: time() - backup_last_success_timestamp_seconds{store=\"orders\"} > {{RPO_MINUTES}} * 60\n        for: 5m\n        labels: { severity: page }\n        annotations:\n          summary: 'The newest copy of {{ $labels.store }} is older than {{RPO_MINUTES}} minutes'\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "ff-vault",
+      "type": "fitness-fn",
+      "label": "Copies locked in another account",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "Every backup plan copies to a vault under a compliance-mode lock of at least {{RETAIN_DAYS}} days; 0 plans without a copy",
+      "description": "In CI the Terraform plan (terraform show -json) is checked: a vault lock must exist in compliance mode with the retention, and every backup rule must copy to the vault in the other account.\n\nTool: Open Policy Agent (conftest) on the Terraform plan\n\n```rego\npackage main\nimport rego.v1\n\nlocks := [r | some r in input.resource_changes; r.type == \"aws_backup_vault_lock_configuration\"]\n\ndeny contains \"no backup vault is locked (AWS Backup Vault Lock)\" if count(locks) == 0\n\ndeny contains msg if {\n  some l in locks\n  l.change.after.min_retention_days < {{RETAIN_DAYS}}\n  msg := sprintf(\"%s locks copies for fewer than {{RETAIN_DAYS}} days\", [l.address])\n}\n\ndeny contains msg if {\n  some l in locks\n  not l.change.after.changeable_for_days   # without it the lock is governance mode, which an administrator can lift\n  msg := sprintf(\"%s is not in compliance mode\", [l.address])\n}\n\ndeny contains msg if {\n  some r in input.resource_changes\n  r.type == \"aws_backup_plan\"\n  some rule in r.change.after.rule\n  count(rule.copy_action) == 0\n  msg := sprintf(\"%s rule %s copies nothing to the locked vault\", [r.address, rule.rule_name])\n}\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "vault"
+        ]
+      }
+    },
+    {
+      "id": "ff-copy-region",
+      "type": "fitness-fn",
+      "label": "Copies leave the region",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "0 backup rules without a copy to a vault outside the primary region",
+      "description": "In CI the Terraform plan is checked: every backup rule must copy to a vault whose ARN names another region. Deletions of copies are alerted by an EventBridge rule on the backup vault events, set up beside it.\n\nTool: Open Policy Agent (conftest) on the Terraform plan\n\n```rego\npackage main\nimport rego.v1\n\nprimary := \"eu-central-1\"\n\ncopies_elsewhere(rule) if {\n  some c in rule.copy_action\n  not contains(c.destination_vault_arn, sprintf(\":%s:\", [primary]))\n}\n\ndeny contains msg if {\n  some r in input.resource_changes\n  r.type == \"aws_backup_plan\"\n  some rule in r.change.after.rule\n  not copies_elsewhere(rule)\n  msg := sprintf(\"%s rule %s keeps its copies in %s\", [r.address, rule.rule_name, primary])\n}\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "region"
+        ]
+      }
+    },
+    {
+      "id": "ff-offline",
+      "type": "fitness-fn",
+      "label": "Offline copy fresh",
+      "x": 1040,
+      "y": 520,
+      "category": "process",
+      "threshold": "The newest offline copy, written and disconnected, is never older than 26 hours",
+      "description": "The job that writes the offline copy pushes its success time after the media are verified and ejected; Prometheus alerts when it is older than a day and a margin.\n\nTool: Prometheus (Pushgateway)\n\n```yaml\ngroups:\n  - name: backup-recovery\n    rules:\n      - alert: OfflineCopyTooOld\n        expr: time() - offline_copy_last_success_timestamp_seconds{store=\"orders\"} > 26 * 3600\n        for: 15m\n        labels: { severity: ticket }\n        annotations:\n          summary: 'No verified offline copy of {{ $labels.store }} in the last 26 hours'\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "COPIES": [
+          "offline"
+        ]
+      }
+    },
+    {
+      "id": "ff-dr-policy",
+      "type": "fitness-fn",
+      "label": "Region recovery assessed",
+      "x": 1040,
+      "y": 650,
+      "category": "operational",
+      "threshold": "The resiliency assessment of the latest release meets the policy (RPO {{RPO_MINUTES}} minutes, RTO {{RTO_MINUTES}} minutes) for zone, hardware, software and region disruptions",
+      "description": "A resiliency policy states the objectives; each release is assessed against it and the pipeline fails unless the assessment says the policy is met. On Azure, a test failover with Azure Site Recovery plays the same part.\n\nTool: AWS Resilience Hub (AWS CLI)\n\n```sh\nRPO=$(( {{RPO_MINUTES}} * 60 )); RTO=$(( {{RTO_MINUTES}} * 60 ))\naws resiliencehub create-resiliency-policy --policy-name orders-store --tier Critical \\\n  --policy \"{\\\"AZ\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Hardware\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Software\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Region\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO}}\"\n\n# in the release pipeline, after the assessment of the new version has finished:\nSTATUS=$(aws resiliencehub describe-app-assessment --assessment-arn \"$ASSESSMENT_ARN\" \\\n  --query 'assessment.complianceStatus' --output text)\ntest \"$STATUS\" = \"PolicyMet\" || { echo \"recovery objectives not met: $STATUS\"; exit 1; }\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "restore",
+          "standby"
+        ]
+      }
+    },
+    {
+      "id": "ff-zones",
+      "type": "fitness-fn",
+      "label": "Store spans zones",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "0 database instances in the Terraform plan without Multi-AZ",
+      "description": "In CI the Terraform plan is checked: every database instance must run across availability zones, since a zone loss is the failure this decision promises to survive.\n\nTool: Open Policy Agent (conftest) on the Terraform plan\n\n```rego\npackage main\nimport rego.v1\n\ndeny contains msg if {\n  some r in input.resource_changes\n  r.type == \"aws_db_instance\"\n  not r.change.after.multi_az\n  msg := sprintf(\"%s runs in one availability zone\", [r.address])\n}\n```",
+      "hubWhen": {
+        "METHOD": [
+          "sync",
+          "pitr",
+          "snapshot"
+        ],
+        "DR": [
+          "single"
+        ]
+      }
+    },
+    {
+      "id": "ff-derived",
+      "type": "fitness-fn",
+      "label": "Only the projector writes",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "0 modules outside the projection that import the store's write client",
+      "description": "A dependency rule fails the build when code outside the projection imports the store's client, which would let something be written that the rebuild cannot bring back. The store's database role grants writes to the projector only.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'store-is-derived',\n    comment: 'ADR Rebuilt, not backed up: only the projection writes to the store',\n    severity: 'error',\n    from: { pathNot: '^src/projection/' },\n    to: { path: '^src/stores/search/writer' },\n  }],\n}\n```",
+      "hubWhen": {
+        "METHOD": [
+          "rebuild"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-auto",
+      "type": "fitness-fn",
+      "label": "Weekly restore test",
+      "x": 1040,
+      "y": 1040,
+      "category": "operational",
+      "threshold": "A restore (or rebuild) into an isolated environment every week, passing the data checks within {{RTO_MINUTES}} minutes, with data no older than {{RPO_MINUTES}} minutes",
+      "description": "A scheduled workflow restores the latest copy (or rebuilds from the sources) into a throwaway environment, runs the data checks and tears it down; the job's timeout is the RTO, so a slow restore fails it. AWS Backup restore testing can do the same for stores it backs up.\n\nTool: GitHub Actions (scheduled workflow)\n\n```yaml\n# .github/workflows/restore-drill.yml\nname: restore-drill\non:\n  schedule: [{ cron: '0 3 * * 1' }]   # every Monday, 03:00 UTC\n  workflow_dispatch: {}\njobs:\n  restore:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{RTO_MINUTES}}\n    steps:\n      - uses: actions/checkout@v4\n      - name: Restore the latest copy into a clean environment\n        run: ./ops/recover.sh --target \"drill-$GITHUB_RUN_ID\" --latest\n      - name: Check row counts, newest timestamp and a sample of records\n        run: ./ops/verify.sh --target \"drill-$GITHUB_RUN_ID\" --max-age-minutes {{RPO_MINUTES}}\n      - name: Tear down\n        if: always()\n        run: ./ops/teardown.sh \"drill-$GITHUB_RUN_ID\"\n```",
+      "hubWhen": {
+        "DRILL": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-manual",
+      "type": "fitness-fn",
+      "label": "Quarterly drill on record",
+      "x": 1040,
+      "y": 1170,
+      "category": "process",
+      "threshold": "The newest drill record is at most 92 days old and its restore took no more than {{RTO_MINUTES}} minutes",
+      "description": "Each drill is recorded as docs/drills/YYYY-MM-DD.md with a \"minutes:\" line; a daily scheduled job fails, and notifies the owner, when the newest record is too old or too slow.\n\nTool: GitHub Actions (scheduled workflow)\n\n```yaml\n# .github/workflows/drill-overdue.yml\nname: drill-overdue\non:\n  schedule: [{ cron: '0 7 * * *' }]\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: |\n          latest=$(ls docs/drills/*.md | sort | tail -n 1)\n          age=$(( ( $(date +%s) - $(date -d \"$(basename \"$latest\" .md)\" +%s) ) / 86400 ))\n          minutes=$(grep -m1 '^minutes:' \"$latest\" | awk '{print $2}')\n          echo \"last drill $latest: $age days ago, $minutes minutes\"\n          test \"$age\" -le 92 && test \"$minutes\" -le {{RTO_MINUTES}}\n```",
+      "hubWhen": {
+        "DRILL": [
+          "manual"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-sync--derives--need",
+      "sourceId": "req-sync",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pitr--derives--need",
+      "sourceId": "req-pitr",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-snapshot--derives--need",
+      "sourceId": "req-snapshot",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-recover--derives--need",
+      "sourceId": "req-recover",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-copy-alert--derives--need",
+      "sourceId": "req-copy-alert",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-copies-vault--derives--need",
+      "sourceId": "req-copies-vault",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-copies-region--derives--need",
+      "sourceId": "req-copies-region",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-copies-offline--derives--need",
+      "sourceId": "req-copies-offline",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-dr-restore--derives--need",
+      "sourceId": "req-dr-restore",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-dr-standby--derives--need",
+      "sourceId": "req-dr-standby",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-dr-single--derives--need",
+      "sourceId": "req-dr-single",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-rebuild--derives--need",
+      "sourceId": "req-rebuild",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-derived--derives--need",
+      "sourceId": "req-derived",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-drill-auto--derives--need",
+      "sourceId": "req-drill-auto",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-drill-manual--derives--need",
+      "sourceId": "req-drill-manual",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-sync--verifies--req-sync",
+      "sourceId": "sc-sync",
+      "targetId": "req-sync",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pitr--verifies--req-pitr",
+      "sourceId": "sc-pitr",
+      "targetId": "req-pitr",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-snapshot--verifies--req-snapshot",
+      "sourceId": "sc-snapshot",
+      "targetId": "req-snapshot",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-recover--verifies--req-recover",
+      "sourceId": "sc-recover",
+      "targetId": "req-recover",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-copy-alert--verifies--req-copy-alert",
+      "sourceId": "sc-copy-alert",
+      "targetId": "req-copy-alert",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-copies-vault--verifies--req-copies-vault",
+      "sourceId": "sc-copies-vault",
+      "targetId": "req-copies-vault",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-copies-region--verifies--req-copies-region",
+      "sourceId": "sc-copies-region",
+      "targetId": "req-copies-region",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-copies-offline--verifies--req-copies-offline",
+      "sourceId": "sc-copies-offline",
+      "targetId": "req-copies-offline",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-dr-restore--verifies--req-dr-restore",
+      "sourceId": "sc-dr-restore",
+      "targetId": "req-dr-restore",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-dr-standby--verifies--req-dr-standby",
+      "sourceId": "sc-dr-standby",
+      "targetId": "req-dr-standby",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-dr-single--verifies--req-dr-single",
+      "sourceId": "sc-dr-single",
+      "targetId": "req-dr-single",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-rebuild--verifies--req-rebuild",
+      "sourceId": "sc-rebuild",
+      "targetId": "req-rebuild",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-derived--verifies--req-derived",
+      "sourceId": "sc-derived",
+      "targetId": "req-derived",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-drill-auto--verifies--req-drill-auto",
+      "sourceId": "sc-drill-auto",
+      "targetId": "req-drill-auto",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-drill-manual--verifies--req-drill-manual",
+      "sourceId": "sc-drill-manual",
+      "targetId": "req-drill-manual",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-sync--implements--adr-sync",
+      "sourceId": "ff-sync",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-rpo--implements--adr-sync",
+      "sourceId": "ff-rpo",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-rpo--implements--adr-pitr",
+      "sourceId": "ff-rpo",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-rpo--implements--adr-snapshot",
+      "sourceId": "ff-rpo",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-vault--implements--adr-sync",
+      "sourceId": "ff-vault",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-vault--implements--adr-pitr",
+      "sourceId": "ff-vault",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-vault--implements--adr-snapshot",
+      "sourceId": "ff-vault",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-copy-region--implements--adr-sync",
+      "sourceId": "ff-copy-region",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-copy-region--implements--adr-pitr",
+      "sourceId": "ff-copy-region",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-copy-region--implements--adr-snapshot",
+      "sourceId": "ff-copy-region",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-offline--implements--adr-sync",
+      "sourceId": "ff-offline",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-offline--implements--adr-pitr",
+      "sourceId": "ff-offline",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-offline--implements--adr-snapshot",
+      "sourceId": "ff-offline",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-dr-policy--implements--adr-sync",
+      "sourceId": "ff-dr-policy",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-dr-policy--implements--adr-pitr",
+      "sourceId": "ff-dr-policy",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-dr-policy--implements--adr-snapshot",
+      "sourceId": "ff-dr-policy",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-zones--implements--adr-sync",
+      "sourceId": "ff-zones",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-zones--implements--adr-pitr",
+      "sourceId": "ff-zones",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-zones--implements--adr-snapshot",
+      "sourceId": "ff-zones",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-derived--implements--adr-rebuild",
+      "sourceId": "ff-derived",
+      "targetId": "adr-rebuild",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-auto--implements--adr-sync",
+      "sourceId": "ff-drill-auto",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-auto--implements--adr-pitr",
+      "sourceId": "ff-drill-auto",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-auto--implements--adr-snapshot",
+      "sourceId": "ff-drill-auto",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-auto--implements--adr-rebuild",
+      "sourceId": "ff-drill-auto",
+      "targetId": "adr-rebuild",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-manual--implements--adr-sync",
+      "sourceId": "ff-drill-manual",
+      "targetId": "adr-sync",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-manual--implements--adr-pitr",
+      "sourceId": "ff-drill-manual",
+      "targetId": "adr-pitr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-manual--implements--adr-snapshot",
+      "sourceId": "ff-drill-manual",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-manual--implements--adr-rebuild",
+      "sourceId": "ff-drill-manual",
+      "targetId": "adr-rebuild",
+      "relationType": "implements"
+    }
+  ]
+}

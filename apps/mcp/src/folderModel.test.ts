@@ -773,7 +773,7 @@ describe('state machines over MCP', () => {
       const req = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.nodes.find((n) => n.label === 'Hold stock') as unknown as Record<string, unknown>
       expect(req.precondition_state).toBe(id('Pending', 'state'))
 
-      expect(await call('get_issues', {})).toBe('No issues: the model follows its metamodel.')
+      expect((await call('get_issues', {})).split('\n')[0]).toBe('No issues: the model follows its metamodel.')
 
       // Smart Layout keeps every state inside its parent, four levels deep.
       await call('smart_layout', {})
@@ -839,5 +839,37 @@ describe('metamodel changes over MCP', () => {
     expect(narrowed.text).toContain('Container "API" cannot be inside Software System. Allowed parents: group.')
     const limited = await model.call('upsert_node_type', { id: 'system', maxCount: 1 })
     expect(limited.text).not.toContain('Warning')
+  })
+})
+
+describe('get_issues', () => {
+  it('lists unaddressed concerns after the metamodel issues', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const ids = new Map<string, string>()
+    const add = async (name: string, args: Record<string, unknown>) => {
+      const result = await model.call(name, args)
+      expect(result.ok, `${name}: ${result.text}`).toBe(true)
+      const id = /Created node ([\w-]+)/.exec(result.text)?.[1]
+      if (id && typeof args.tempId === 'string') ids.set(args.tempId, id)
+      return result.text
+    }
+    await add('add_node', { tempId: 'user', type: 'person', label: 'Customer' })
+    await add('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await add('add_node', { tempId: 'web', type: 'webapp', label: 'Storefront', parentId: 'shop' })
+    await add('add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' })
+
+    const before = (await model.call('get_issues', {})).text
+    expect(before.split('\n')[0]).toBe('No issues: the model follows its metamodel.')
+    expect(before).toContain('Unaddressed concerns')
+    expect(before).toContain('- Authentication (conceptId concern-authentication)')
+    expect(before).toContain(`Elements: Storefront (${ids.get('web')})`)
+    expect(before).toContain(`Suggested bindTo: Storefront (${ids.get('web')}), which settles all of them`)
+    expect(before).toMatch(/- IDENTITY: How do people sign in\? \[idp = .*none = nobody signs in\]/)
+
+    await add('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' }, bindTo: ids.get('web') })
+    const after = (await model.call('get_issues', {})).text
+    expect(after.split('\n')[0]).toBe('No issues: the model follows its metamodel.')
+    expect(after).not.toContain('- Authentication (conceptId concern-authentication)')
   })
 })

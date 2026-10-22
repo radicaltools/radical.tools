@@ -28,7 +28,8 @@ const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((x
 
 interface Fixture { name: string; nodes: C4Node[]; relations: C4Relation[]; metamodel?: unknown; constraints?: unknown }
 const fixtures: Fixture[] = []
-const catalogue = '../hub-catalogue/catalogue'
+// The former Hub blueprints and patterns, kept here as models to lay out.
+const catalogue = 'bench/models'
 for (const dir of ['blueprint', 'pattern']) {
   for (const f of readdirSync(join(catalogue, dir)).filter((f) => f.endsWith('.radical')).sort()) {
     const d = JSON.parse(readFileSync(join(catalogue, dir, f), 'utf8'))

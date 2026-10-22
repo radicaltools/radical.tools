@@ -1,0 +1,1048 @@
+{
+  "hub": {
+    "id": "concern-module-boundaries",
+    "category": "concern",
+    "name": "Module boundaries",
+    "description": "How the code is cut into parts, which way the dependencies between them may point, and how the build keeps it that way.",
+    "tags": [
+      "maintainability",
+      "modularity",
+      "dependencies",
+      "architecture rules",
+      "hexagonal",
+      "modular monolith"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "module-boundaries",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "code lives in these elements, so how it is cut into parts and which way its dependencies point has to be decided.",
+      "group": "maintainability"
+    },
+    "sources": [
+      {
+        "title": "ISO/IEC 25010, Maintainability: modularity, analysability, modifiability, testability",
+        "url": "https://iso25000.com/index.php/en/iso-25000-standards/iso-25010"
+      },
+      {
+        "title": "Ford, Parsons, Kua, Sadalage: Building Evolutionary Architectures, 2nd ed. (fitness functions)",
+        "url": "https://www.oreilly.com/library/view/building-evolutionary-architectures/9781492097532/"
+      },
+      {
+        "title": "Alistair Cockburn: Hexagonal architecture (ports and adapters)",
+        "url": "https://alistair.cockburn.us/hexagonal-architecture/"
+      },
+      {
+        "title": "Martin Fowler: MonolithFirst",
+        "url": "https://martinfowler.com/bliki/MonolithFirst.html"
+      },
+      {
+        "title": "Martin Fowler: BoundedContext",
+        "url": "https://martinfowler.com/bliki/BoundedContext.html"
+      },
+      {
+        "title": "ArchUnit user guide",
+        "url": "https://www.archunit.org/userguide/html/000_Index.html"
+      },
+      {
+        "title": "dependency-cruiser",
+        "url": "https://github.com/sverweij/dependency-cruiser"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "STYLE",
+        "title": "Structure",
+        "label": "How is the code cut into parts?",
+        "hint": "This decides which way dependencies may point and what a part is: a layer, the core and its adapters, a domain module, or a service of its own.",
+        "defaultValue": "modular",
+        "options": [
+          {
+            "value": "layered",
+            "label": "layers (presentation, business, data access)",
+            "description": "Each layer uses only the one below it. Pick it for a small codebase with little domain logic (mostly forms over data), one team, and a framework that already works this way."
+          },
+          {
+            "value": "hexagonal",
+            "label": "ports and adapters (hexagonal)",
+            "description": "A domain core with no framework or database in it; adapters for HTTP, the database and messaging plug into its ports. Pick it when the domain rules are the valuable part and must be testable without infrastructure, or the infrastructure is likely to change."
+          },
+          {
+            "value": "modular",
+            "label": "a modular monolith, one module per domain",
+            "description": "One deployable, cut into modules by business domain, each with a public API and private internals and data. Pick it when there are several domains but one or two teams, or the boundaries are not yet proven: modules can become services later."
+          },
+          {
+            "value": "services",
+            "label": "one service per bounded context",
+            "description": "Each bounded context is its own deployable with its own data, owned by one team. Pick it only when several teams must release independently and the domain boundaries are known; it brings network calls, distributed failure and more to run."
+          }
+        ]
+      },
+      {
+        "key": "ENFORCE",
+        "title": "Enforcement",
+        "label": "How are the rules enforced on the code there is today?",
+        "hint": "Rules that only fail on new code can be adopted on an old codebase today; rules that fail on everything need a clean codebase first.",
+        "defaultValue": "fail",
+        "options": [
+          {
+            "value": "fail",
+            "label": "every violation fails the build",
+            "description": "The rule check fails the build on any violation. Pick it for new code, or when the existing violations are few enough to fix before switching the check on."
+          },
+          {
+            "value": "ratchet",
+            "label": "existing violations frozen, new ones fail",
+            "description": "Today's violations are recorded in a baseline; only new ones fail, and the baseline must shrink every quarter. Pick it for an existing codebase with more violations than can be fixed at once."
+          }
+        ]
+      },
+      {
+        "key": "SHARED",
+        "title": "Shared code",
+        "label": "What may the parts share?",
+        "hint": "Shared code couples the parts that use it: a change to it is a change to each of them. The policy decides how much coupling is accepted, and who decides.",
+        "defaultValue": "kernel",
+        "options": [
+          {
+            "value": "kernel",
+            "label": "a small shared kernel",
+            "description": "A few value types and contracts (money, identifiers, event schemas) live in one shared part that every user of it must approve changes to. Pick it when parts genuinely speak the same language about a few concepts."
+          },
+          {
+            "value": "library",
+            "label": "versioned internal libraries",
+            "description": "Shared code is published as libraries with semantic versions; each part upgrades on its own schedule. Pick it when the parts are released separately (services, several repositories)."
+          },
+          {
+            "value": "none",
+            "label": "nothing but third-party libraries",
+            "description": "Parts share no code of their own; small helpers are duplicated and data crosses only through APIs or events. Pick it when teams must never wait for each other, accepting some duplication."
+          }
+        ]
+      },
+      {
+        "key": "OWNERS",
+        "title": "Ownership",
+        "label": "Does each part have a team that owns it?",
+        "hint": "Boundaries hold better when someone is responsible for each side: a change to a part asks its owners.",
+        "defaultValue": "team",
+        "options": [
+          {
+            "value": "team",
+            "label": "yes, one owning team per part",
+            "description": "Each part has an owning team in CODEOWNERS whose approval a change to it needs. Pick it when more than one team works in the code."
+          },
+          {
+            "value": "collective",
+            "label": "no, one team owns the whole codebase",
+            "description": "One team owns everything and any member may change any part. Pick it for a single team of up to about eight people."
+          }
+        ]
+      },
+      {
+        "key": "RATCHET_PERCENT",
+        "label": "By how much must the baseline of known violations shrink each quarter (%)?",
+        "defaultValue": "20",
+        "type": "number"
+      },
+      {
+        "key": "KERNEL_PERCENT",
+        "label": "At most how much of the code may the shared kernel be (% of lines)?",
+        "defaultValue": "5",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Parts change on their own",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Module boundaries",
+      "description": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them."
+    },
+    {
+      "id": "req-direction",
+      "type": "requirement",
+      "label": "Dependencies follow the rules",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "allow only the dependencies the {{STYLE}} rules permit, with 0 violations of the dependency rules on the main branch outside the recorded baseline",
+      "rationale": "Rules that are not checked erode with every shortcut; a checked rule is an architectural fitness function (Building Evolutionary Architectures, ch. 2; ISO 25010 modularity)."
+    },
+    {
+      "id": "req-cycles",
+      "type": "requirement",
+      "label": "No cycles between parts",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "keep the dependency graph between parts free of cycles, with 0 cycles between modules, layers or services",
+      "rationale": "Parts in a cycle can only be understood, tested and released together, which makes them one part (Acyclic Dependencies Principle, R. C. Martin; ISO 25010 modularity)."
+    },
+    {
+      "id": "req-fail",
+      "type": "requirement",
+      "label": "Violations fail the build",
+      "x": 260,
+      "y": 260,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a change adds a dependency the rules forbid or a cycle",
+      "action": "fail the build of that change before it can be merged, naming the rule and the two parts involved",
+      "rationale": "A violation is cheapest to fix in the pull request that brings it; after the merge others start to depend on it (Building Evolutionary Architectures, atomic fitness functions).",
+      "hubWhen": {
+        "ENFORCE": [
+          "fail"
+        ]
+      }
+    },
+    {
+      "id": "req-ratchet",
+      "type": "requirement",
+      "label": "Known violations shrink",
+      "x": 260,
+      "y": 390,
+      "ears_type": "state-driven",
+      "precondition": "known violations remain in the recorded baseline",
+      "action": "fail any change that adds a violation outside the baseline, and shrink the baseline by at least {{RATCHET_PERCENT}}% each quarter",
+      "rationale": "An old codebase cannot be fixed at once; freezing what is there stops it getting worse while the baseline records the debt to pay down (ArchUnit FreezingArchRule, dependency-cruiser known violations).",
+      "hubWhen": {
+        "ENFORCE": [
+          "ratchet"
+        ]
+      }
+    },
+    {
+      "id": "req-layers",
+      "type": "requirement",
+      "label": "Layers call downwards",
+      "x": 260,
+      "y": 520,
+      "ears_type": "ubiquitous",
+      "action": "let presentation depend only on business logic and business logic only on data access, never the reverse, with 0 HTTP or user-interface types in the business layer and 0 SQL outside data access",
+      "rationale": "Layering keeps each concern in one place, so a change of screen or of database stays in its layer (Fowler, PresentationDomainDataLayering).",
+      "hubWhen": {
+        "STYLE": [
+          "layered"
+        ]
+      }
+    },
+    {
+      "id": "req-core",
+      "type": "requirement",
+      "label": "Core free of infrastructure",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "keep the domain core free of framework, database, messaging and HTTP imports, with adapters reaching it only through its ports, so that 100% of the core's tests run without starting infrastructure",
+      "rationale": "The domain rules are tested and changed without the infrastructure, and infrastructure is replaced without touching them (Cockburn, Hexagonal architecture).",
+      "hubWhen": {
+        "STYLE": [
+          "hexagonal"
+        ]
+      }
+    },
+    {
+      "id": "req-module-api",
+      "type": "requirement",
+      "label": "Modules meet through APIs",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "let a module use another only through that module's published API, with 0 references to another module's internal packages and 0 queries on another module's tables",
+      "rationale": "A module whose internals and data others reach into cannot change them alone, and cannot later become a service (Fowler, MonolithFirst; Spring Modulith).",
+      "hubWhen": {
+        "STYLE": [
+          "modular"
+        ]
+      }
+    },
+    {
+      "id": "req-service-data",
+      "type": "requirement",
+      "label": "Each service owns its data",
+      "x": 260,
+      "y": 910,
+      "ears_type": "ubiquitous",
+      "action": "keep each service's data in a store only that service reads and writes, with other services getting it through its API or events, and 0 compile-time dependencies on another service's code",
+      "rationale": "Services that share a database or code have to change and release together, losing the reason they were split (Fowler, BoundedContext; Newman, Building Microservices).",
+      "hubWhen": {
+        "STYLE": [
+          "services"
+        ]
+      }
+    },
+    {
+      "id": "req-kernel",
+      "type": "requirement",
+      "label": "Shared kernel stays small",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "ubiquitous",
+      "action": "keep in the shared kernel only types and contracts used by at least two parts, with no I/O, framework or rule of a single part, at most {{KERNEL_PERCENT}}% of the code, and changes approved by an owner of every part that uses it",
+      "rationale": "A shared kernel is shared on purpose and kept small; a growing \"common\" folder couples everything to everything (Evans, Domain-Driven Design, Shared Kernel).",
+      "hubWhen": {
+        "SHARED": [
+          "kernel"
+        ]
+      }
+    },
+    {
+      "id": "req-library",
+      "type": "requirement",
+      "label": "Shared libraries are versioned",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "event-driven",
+      "trigger": "shared code changes",
+      "action": "publish it as a new semantic version of its library, and keep every consumer at most one major version behind the latest for no longer than 90 days",
+      "rationale": "Versioned libraries let each part upgrade on its own schedule; bounding the lag keeps old versions from piling up (Semantic Versioning 2.0.0).",
+      "hubWhen": {
+        "SHARED": [
+          "library"
+        ]
+      }
+    },
+    {
+      "id": "req-no-shared",
+      "type": "requirement",
+      "label": "Nothing shared but contracts",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "share no source code between parts apart from third-party libraries and API clients generated from published contracts, with 0 imports of another part's code",
+      "rationale": "Every shared line is a reason for two teams to coordinate; duplication of small helpers is cheaper than that coupling (Building Evolutionary Architectures, coupling).",
+      "hubWhen": {
+        "SHARED": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "req-owners",
+      "type": "requirement",
+      "label": "Every part has an owner",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "name an owning team in CODEOWNERS for 100% of the parts, and require that team's approval to merge a change to its part",
+      "rationale": "A boundary nobody owns is crossed by whoever is in a hurry; owners review what crosses theirs (Conway's law; GitHub CODEOWNERS).",
+      "hubWhen": {
+        "OWNERS": [
+          "team"
+        ]
+      }
+    },
+    {
+      "id": "sc-direction",
+      "type": "scenario",
+      "label": "Forbidden dependency found",
+      "x": 520,
+      "y": 0,
+      "given": "the dependency rules of the {{STYLE}} structure",
+      "when": "the rule check runs over the main branch",
+      "then": "it reports 0 violations outside the baseline"
+    },
+    {
+      "id": "sc-cycles",
+      "type": "scenario",
+      "label": "Cycle refused",
+      "x": 520,
+      "y": 130,
+      "given": "two parts where A depends on B",
+      "when": "a change makes B depend on A",
+      "then": "the rule check reports the cycle with both parts named and the change is not merged"
+    },
+    {
+      "id": "sc-fail",
+      "type": "scenario",
+      "label": "Violation blocks merge",
+      "x": 520,
+      "y": 260,
+      "given": "a pull request that adds a forbidden dependency",
+      "when": "the build runs",
+      "then": "the build fails naming the rule and both parts, and the pull request cannot be merged",
+      "hubWhen": {
+        "ENFORCE": [
+          "fail"
+        ]
+      }
+    },
+    {
+      "id": "sc-ratchet",
+      "type": "scenario",
+      "label": "Baseline holds and shrinks",
+      "x": 520,
+      "y": 390,
+      "given": "a baseline of known violations",
+      "when": "a change adds a new violation, and a quarter ends",
+      "then": "the change fails the build, and the baseline holds at least {{RATCHET_PERCENT}}% fewer violations than a quarter earlier",
+      "hubWhen": {
+        "ENFORCE": [
+          "ratchet"
+        ]
+      }
+    },
+    {
+      "id": "sc-layers",
+      "type": "scenario",
+      "label": "Upward call refused",
+      "x": 520,
+      "y": 520,
+      "given": "the layer rules",
+      "when": "data-access code imports a presentation type",
+      "then": "the rule check reports the upward dependency",
+      "hubWhen": {
+        "STYLE": [
+          "layered"
+        ]
+      }
+    },
+    {
+      "id": "sc-core",
+      "type": "scenario",
+      "label": "Core runs alone",
+      "x": 520,
+      "y": 650,
+      "given": "the domain core and its ports",
+      "when": "the core's tests run with no database, broker or web server available",
+      "then": "all of them pass, and the rule check finds 0 infrastructure imports in the core",
+      "hubWhen": {
+        "STYLE": [
+          "hexagonal"
+        ]
+      }
+    },
+    {
+      "id": "sc-module-api",
+      "type": "scenario",
+      "label": "Internal access refused",
+      "x": 520,
+      "y": 780,
+      "given": "two domain modules, each with a published API",
+      "when": "one module imports the other's internal class or reads its table",
+      "then": "the module check reports it and the build fails",
+      "hubWhen": {
+        "STYLE": [
+          "modular"
+        ]
+      }
+    },
+    {
+      "id": "sc-service-data",
+      "type": "scenario",
+      "label": "Service stays separate",
+      "x": 520,
+      "y": 910,
+      "given": "two services of different bounded contexts",
+      "when": "one of them is changed, built and deployed",
+      "then": "the other is neither rebuilt nor redeployed, and no other service holds credentials to its store",
+      "hubWhen": {
+        "STYLE": [
+          "services"
+        ]
+      }
+    },
+    {
+      "id": "sc-kernel",
+      "type": "scenario",
+      "label": "Kernel stays small",
+      "x": 520,
+      "y": 1040,
+      "given": "the shared kernel",
+      "when": "a change adds code used by one part only, or the kernel passes {{KERNEL_PERCENT}}% of the lines",
+      "then": "the check fails and the change is moved into the part that uses it",
+      "hubWhen": {
+        "SHARED": [
+          "kernel"
+        ]
+      }
+    },
+    {
+      "id": "sc-library",
+      "type": "scenario",
+      "label": "Library upgraded in time",
+      "x": 520,
+      "y": 1170,
+      "given": "a shared library and its consumers",
+      "when": "a new major version is published",
+      "then": "within 90 days every consumer is on it or the previous major",
+      "hubWhen": {
+        "SHARED": [
+          "library"
+        ]
+      }
+    },
+    {
+      "id": "sc-no-shared",
+      "type": "scenario",
+      "label": "Cross-part import refused",
+      "x": 520,
+      "y": 1300,
+      "given": "two parts",
+      "when": "one imports a helper from the other",
+      "then": "the rule check reports it and the build fails",
+      "hubWhen": {
+        "SHARED": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "sc-owners",
+      "type": "scenario",
+      "label": "Owner approves change",
+      "x": 520,
+      "y": 1430,
+      "given": "a part owned by a team",
+      "when": "someone outside the team opens a pull request changing it",
+      "then": "the pull request cannot be merged until the owning team approves it",
+      "hubWhen": {
+        "OWNERS": [
+          "team"
+        ]
+      }
+    },
+    {
+      "id": "adr-layered",
+      "type": "adr",
+      "label": "Code is layered",
+      "x": 780,
+      "y": 0,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: the user interface reaches into the database, one domain reads another's tables, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; splitting into services early buys network calls and distributed failure before the domain boundaries are known; sharing code saves typing but couples the teams that share it; and an old codebase cannot fix every violation at once.",
+      "decision": "The code is cut into three layers, presentation, business logic and data access, each depending only on the one below it; SQL stays in data access and HTTP and user-interface types stay in presentation. Dependency rules are checked in the build ({{ENFORCE}}), cycles are forbidden, and shared code is {{SHARED}}. The checker by stack: ArchUnit's layeredArchitecture() on the JVM, NetArchTest on .NET, dependency-cruiser or eslint-plugin-boundaries for TypeScript, import-linter's layers contract for Python. Pick the one that runs as a unit test in the existing test runner, so a violation shows up like any failing test.",
+      "consequences": "• Simple to explain and matches most web frameworks, so new people find their way at once.\n• Business logic still depends on data access, so testing it needs a database or mocks of the data layer.\n• A feature cuts across all three layers; with several domains the layers grow wide and domains blur inside them.\n• Moving to modules later means cutting each layer by domain.",
+      "alternatives": "1. Ports and adapters: business logic without infrastructure, at the cost of ports and mapping code.\n2. A modular monolith: parts by domain rather than by technical role, better once there are several domains.\n3. No explicit structure: fastest for a prototype, and the most expensive to untangle later.",
+      "hubWhen": {
+        "STYLE": [
+          "layered"
+        ]
+      }
+    },
+    {
+      "id": "adr-hexagonal",
+      "type": "adr",
+      "label": "Ports and adapters",
+      "x": 780,
+      "y": 130,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: the user interface reaches into the database, one domain reads another's tables, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; splitting into services early buys network calls and distributed failure before the domain boundaries are known; sharing code saves typing but couples the teams that share it; and an old codebase cannot fix every violation at once.",
+      "decision": "The code has a domain core (entities, domain services, use cases) that imports no framework, database, messaging or HTTP library; it declares ports (interfaces) for what it needs and offers, and adapters for the web, the database and the broker implement them outside the core. Dependencies point inwards only. Rules are checked in the build ({{ENFORCE}}), cycles are forbidden, and shared code is {{SHARED}}. The checker by stack: ArchUnit's onionArchitecture() (or jMolecules' architecture annotations) on the JVM, NetArchTest on .NET, dependency-cruiser for TypeScript, import-linter's independence and layers contracts for Python.",
+      "consequences": "• Domain rules are tested in milliseconds without infrastructure, and infrastructure can be replaced without touching them.\n• More code: ports, adapters and the mapping between domain objects and persistence or transport models.\n• Framework conveniences that reach into the domain (ORM annotations on entities, validation annotations) are given up or kept in adapters.\n• Says nothing about cutting the core by domain: with several domains combine it with modules.",
+      "alternatives": "1. Layers: less code and closer to the framework, but business logic depends on data access.\n2. A modular monolith with layers inside each module: cuts by domain first.\n3. Clean or onion architecture: the same inward rule with more named rings; pick the vocabulary the team knows.",
+      "hubWhen": {
+        "STYLE": [
+          "hexagonal"
+        ]
+      }
+    },
+    {
+      "id": "adr-modular",
+      "type": "adr",
+      "label": "A modular monolith",
+      "x": 780,
+      "y": 260,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: the user interface reaches into the database, one domain reads another's tables, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; splitting into services early buys network calls and distributed failure before the domain boundaries are known; sharing code saves typing but couples the teams that share it; and an old codebase cannot fix every violation at once.",
+      "decision": "The element is one deployable cut into modules, one per business domain (bounded context). Each module has a published API (a public package or index, plus the events it publishes) and keeps its classes and tables private; other modules use only the API or its events. Cycles between modules are forbidden. Rules are checked in the build ({{ENFORCE}}), shared code is {{SHARED}}. The checker by stack: Spring Modulith (ApplicationModules.verify(), built on ArchUnit) for Spring Boot, ArchUnit slices for other JVM code, Nx module boundaries or eslint-plugin-boundaries for TypeScript monorepos, import-linter for Python, NetArchTest for .NET. Tables are prefixed or in a schema per module, so a cross-module query is visible.",
+      "consequences": "• Boundaries by domain without the network: one deploy, local calls, one transaction where it is really needed.\n• A module with a clean API and private data can be extracted into a service later, when a team or a scaling need justifies it.\n• All modules release together, so a broken module blocks the release of the others.\n• The boundaries hold only while the check runs in every build.",
+      "alternatives": "1. Services per bounded context: independent releases and scaling, at the cost of network calls, distributed data and more to run.\n2. Layers only: simpler, but domains blur inside wide layers.\n3. Separate repositories per module: strong boundaries, but versioning and cross-module changes get slow.",
+      "hubWhen": {
+        "STYLE": [
+          "modular"
+        ]
+      }
+    },
+    {
+      "id": "adr-services",
+      "type": "adr",
+      "label": "A service per bounded context",
+      "x": 780,
+      "y": 390,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: the user interface reaches into the database, one domain reads another's tables, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; splitting into services early buys network calls and distributed failure before the domain boundaries are known; sharing code saves typing but couples the teams that share it; and an old codebase cannot fix every violation at once.",
+      "decision": "Each bounded context is a service of its own: its own deployable, its own data store that no other service reads, and one owning team. Services talk only through published APIs and events with versioned contracts; there are no compile-time dependencies between services and no shared database. Inside a service the code is layered or hexagonal. Rules are checked in the build ({{ENFORCE}}), cycles of calls between services are forbidden, and shared code is {{SHARED}}. The checker: Nx module boundaries (tags per service) or dependency-cruiser in a monorepo, ArchUnit per JVM service; across repositories, separate builds make code coupling impossible, and the remaining coupling is checked through contracts (Pact).",
+      "consequences": "• Teams release, scale and choose technology per service without waiting for each other.\n• Every call between contexts is a network call that can fail or be slow, and a business operation across services needs sagas or events instead of one transaction.\n• More to run: per-service pipelines, observability, data stores and on-call.\n• A wrong boundary is expensive to move; the boundaries should be proven, ideally first as modules of a monolith.",
+      "alternatives": "1. A modular monolith: the same domain boundaries in one deployable, simpler to run, but released together.\n2. Services per technical layer (a \"data service\", a \"UI service\"): every feature touches all of them, the worst of both.\n3. A distributed monolith with a shared database: services in name only.",
+      "hubWhen": {
+        "STYLE": [
+          "services"
+        ]
+      }
+    },
+    {
+      "id": "ff-cycles",
+      "type": "fitness-fn",
+      "label": "No dependency cycles",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "0 cycles between modules, layers or services on the main branch",
+      "description": "A dependency rule in the build fails on any cycle between the folders that make up the parts. On the JVM the same check is ArchUnit's slices().matching(\"..(*)..\").should().beFreeOfCycles(); for Python, import-linter's independence contract.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-circular',\n    comment: 'ADR Module boundaries: parts in a cycle are one part',\n    severity: 'error',\n    from: { path: '^src/' },\n    to: { circular: true },\n  }],\n  options: { tsConfig: { fileName: 'tsconfig.json' }, doNotFollow: { path: 'node_modules' } },\n}\n// package.json: \"check:deps\": \"depcruise src --config .dependency-cruiser.cjs\"\n```"
+    },
+    {
+      "id": "ff-layers",
+      "type": "fitness-fn",
+      "label": "Layers call downwards",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "0 layer violations: no layer is accessed by a layer below it",
+      "description": "An ArchUnit test declares the three layers and which may access which; it runs with the unit tests and fails on any upward access.\n\nTool: ArchUnit\n\n```java\n@AnalyzeClasses(packages = \"com.example.shop\")\nclass LayerRulesTest {\n  @ArchTest\n  static final ArchRule layers = layeredArchitecture().consideringAllDependencies()\n      .layer(\"Presentation\").definedBy(\"..web..\")\n      .layer(\"Business\").definedBy(\"..service..\")\n      .layer(\"DataAccess\").definedBy(\"..repository..\")\n      .whereLayer(\"Presentation\").mayNotBeAccessedByAnyLayer()\n      .whereLayer(\"Business\").mayOnlyBeAccessedByLayers(\"Presentation\")\n      .whereLayer(\"DataAccess\").mayOnlyBeAccessedByLayers(\"Business\");\n}\n```",
+      "hubWhen": {
+        "STYLE": [
+          "layered"
+        ]
+      }
+    },
+    {
+      "id": "ff-core",
+      "type": "fitness-fn",
+      "label": "Core imports no infrastructure",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "0 imports from adapters, frameworks or drivers in src/core",
+      "description": "Dependency rules forbid the core to import adapters or infrastructure packages, and adapters to import each other; the build fails on a violation. On the JVM, ArchUnit's onionArchitecture() does the same.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [\n    {\n      name: 'core-is-pure',\n      comment: 'ADR Ports and adapters: the core depends on nothing outside it',\n      severity: 'error',\n      from: { path: '^src/core/' },\n      to: { path: ['^src/adapters/', 'node_modules/(express|fastify|@nestjs|pg|mongodb|kafkajs|amqplib|axios|prisma|@prisma)'] },\n    },\n    {\n      name: 'adapters-apart',\n      severity: 'error',\n      from: { path: '^src/adapters/([^/]+)/' },\n      to: { path: '^src/adapters/', pathNot: '^src/adapters/$1/' },\n    },\n  ],\n}\n```",
+      "hubWhen": {
+        "STYLE": [
+          "hexagonal"
+        ]
+      }
+    },
+    {
+      "id": "ff-modules",
+      "type": "fitness-fn",
+      "label": "Modules use only APIs",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "0 accesses to another module's internals and 0 cycles between modules",
+      "description": "A test lets Spring Modulith find the modules (top-level packages under the application package) and verify that each uses only the others' API packages and that there are no cycles; it also writes the module diagram. In a TypeScript monorepo, Nx module boundaries with a tag per module does the same.\n\nTool: Spring Modulith (ArchUnit underneath)\n\n```java\nclass ModuleStructureTest {\n  static final ApplicationModules modules = ApplicationModules.of(ShopApplication.class);\n\n  @Test\n  void modulesUseOnlyEachOthersApi() {\n    modules.verify(); // fails on access to internals and on cycles\n  }\n\n  @Test\n  void writeDocumentation() {\n    new Documenter(modules).writeModulesAsPlantUml();\n  }\n}\n```",
+      "hubWhen": {
+        "STYLE": [
+          "modular"
+        ]
+      }
+    },
+    {
+      "id": "ff-services",
+      "type": "fitness-fn",
+      "label": "Services do not import each other",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "0 imports from one service's project into another's; services depend only on projects tagged type:contract or type:util",
+      "description": "In a monorepo each service is an Nx project tagged with its scope; the lint rule fails when a service imports another service or anything but contracts and utilities.\n\nTool: Nx module boundaries (@nx/enforce-module-boundaries)\n\n```js\n// eslint.config.mjs\nimport nx from '@nx/eslint-plugin'\nexport default [\n  ...nx.configs['flat/base'],\n  {\n    files: ['**/*.ts'],\n    rules: {\n      '@nx/enforce-module-boundaries': ['error', {\n        enforceBuildableLibDependency: true,\n        depConstraints: [\n          { sourceTag: 'type:service', onlyDependOnLibsWithTags: ['type:contract', 'type:util'] },\n          { sourceTag: 'type:contract', onlyDependOnLibsWithTags: [] },\n          { sourceTag: 'type:util', onlyDependOnLibsWithTags: ['type:util'] },\n        ],\n      }],\n    },\n  },\n]\n```",
+      "hubWhen": {
+        "STYLE": [
+          "services"
+        ]
+      }
+    },
+    {
+      "id": "ff-ratchet",
+      "type": "fitness-fn",
+      "label": "Known violations frozen",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "0 new violations outside the baseline; the baseline shrinks by at least {{RATCHET_PERCENT}}% each quarter",
+      "description": "The rules run with today's violations frozen in a baseline committed to the repository: a new violation fails, a fixed one is removed from the store automatically. A quarterly review compares the size of the baseline with the quarter before. With dependency-cruiser the same is `depcruise-baseline` and `--ignore-known`.\n\nTool: ArchUnit FreezingArchRule\n\n```java\n@AnalyzeClasses(packages = \"com.example.shop\")\nclass FrozenRulesTest {\n  // archunit.properties:\n  //   freeze.store.default.path=src/test/resources/archunit_store\n  //   freeze.store.default.allowStoreCreation=true   (first run only)\n  //   freeze.refreeze=false\n  @ArchTest\n  static final ArchRule noCycles =\n      freeze(slices().matching(\"com.example.shop.(*)..\").should().beFreeOfCycles());\n\n  @ArchTest\n  static final ArchRule domainIsPure =\n      freeze(noClasses().that().resideInAPackage(\"..domain..\")\n          .should().dependOnClassesThat().resideInAnyPackage(\"..web..\", \"..persistence..\"));\n}\n```",
+      "hubWhen": {
+        "ENFORCE": [
+          "ratchet"
+        ]
+      }
+    },
+    {
+      "id": "ff-kernel",
+      "type": "fitness-fn",
+      "label": "Shared kernel stays small",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "The shared kernel imports no part and no I/O library, and holds at most {{KERNEL_PERCENT}}% of the source lines",
+      "description": "A dependency rule keeps the kernel free of the parts and of I/O; a second step in the same job compares the kernel's line count with the whole and fails above the limit.\n\nTool: dependency-cruiser and cloc\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'kernel-depends-on-nothing',\n    comment: 'ADR Module boundaries: the shared kernel holds types and contracts only',\n    severity: 'error',\n    from: { path: '^src/shared-kernel/' },\n    to: { path: ['^src/modules/', 'node_modules/(pg|mongodb|axios|express|fastify|kafkajs)'] },\n  }],\n}\n// CI: fail when the kernel passes the limit\n// kernel=$(cloc --json src/shared-kernel | jq '.SUM.code'); all=$(cloc --json src | jq '.SUM.code')\n// [ $((kernel * 100 / all)) -le $KERNEL_PERCENT ]\n```",
+      "hubWhen": {
+        "SHARED": [
+          "kernel"
+        ]
+      }
+    },
+    {
+      "id": "ff-library",
+      "type": "fitness-fn",
+      "label": "Library versions not left behind",
+      "x": 1040,
+      "y": 910,
+      "category": "process",
+      "threshold": "An update pull request for a new internal library version is opened within 1 day; no consumer stays more than one major version behind for over 90 days",
+      "description": "Renovate watches the internal registry and opens a pull request in every consumer when a shared library is released; patch and minor versions merge automatically on green tests, majors go to the owning team, and the dependency dashboard shows who lags.\n\nTool: Renovate\n\n```json\n{\n  \"$schema\": \"https://docs.renovatebot.com/renovate-schema.json\",\n  \"extends\": [\"config:recommended\", \":dependencyDashboard\"],\n  \"packageRules\": [\n    {\n      \"matchPackageNames\": [\"@shop/**\"],\n      \"groupName\": \"internal libraries\",\n      \"schedule\": [\"at any time\"],\n      \"automerge\": true,\n      \"matchUpdateTypes\": [\"minor\", \"patch\"]\n    },\n    {\n      \"matchPackageNames\": [\"@shop/**\"],\n      \"matchUpdateTypes\": [\"major\"],\n      \"labels\": [\"internal-major\"],\n      \"prPriority\": 5\n    }\n  ]\n}\n```",
+      "hubWhen": {
+        "SHARED": [
+          "library"
+        ]
+      }
+    },
+    {
+      "id": "ff-no-shared",
+      "type": "fitness-fn",
+      "label": "No code shared between parts",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "0 imports from one part's folder into another's",
+      "description": "A dependency rule forbids any import from one part into another; generated API clients live in each consumer and are generated from the provider's published contract.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'parts-share-nothing',\n    comment: 'ADR Module boundaries: parts share no code of their own',\n    severity: 'error',\n    from: { path: '^src/modules/([^/]+)/' },\n    to: { path: '^src/modules/', pathNot: '^src/modules/$1/' },\n  }],\n}\n```",
+      "hubWhen": {
+        "SHARED": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "ff-owners",
+      "type": "fitness-fn",
+      "label": "Every part has owners",
+      "x": 1040,
+      "y": 1170,
+      "category": "process",
+      "threshold": "100% of the part folders are matched by a CODEOWNERS entry naming an existing team; branch protection requires code owner review",
+      "description": "A workflow validates CODEOWNERS on every pull request: every file is owned, and each owner exists and has write access. Branch protection on main requires a review from code owners.\n\nTool: codeowners-validator (GitHub Action) with GitHub branch protection\n\n```yaml\n# .github/workflows/codeowners.yml\nname: CODEOWNERS\non: [pull_request]\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: mszostok/codeowners-validator@v0.7.4\n        with:\n          checks: \"files,owners,duppatterns,syntax\"\n          experimental_checks: \"notowned\"\n          github_access_token: \"${{ secrets.OWNERS_VALIDATOR_TOKEN }}\"\n```",
+      "hubWhen": {
+        "OWNERS": [
+          "team"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-direction--derives--need",
+      "sourceId": "req-direction",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-cycles--derives--need",
+      "sourceId": "req-cycles",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-fail--derives--need",
+      "sourceId": "req-fail",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-ratchet--derives--need",
+      "sourceId": "req-ratchet",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-layers--derives--need",
+      "sourceId": "req-layers",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-core--derives--need",
+      "sourceId": "req-core",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-module-api--derives--need",
+      "sourceId": "req-module-api",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-service-data--derives--need",
+      "sourceId": "req-service-data",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-kernel--derives--need",
+      "sourceId": "req-kernel",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-library--derives--need",
+      "sourceId": "req-library",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-no-shared--derives--need",
+      "sourceId": "req-no-shared",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-owners--derives--need",
+      "sourceId": "req-owners",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-direction--verifies--req-direction",
+      "sourceId": "sc-direction",
+      "targetId": "req-direction",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-cycles--verifies--req-cycles",
+      "sourceId": "sc-cycles",
+      "targetId": "req-cycles",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-fail--verifies--req-fail",
+      "sourceId": "sc-fail",
+      "targetId": "req-fail",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-ratchet--verifies--req-ratchet",
+      "sourceId": "sc-ratchet",
+      "targetId": "req-ratchet",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-layers--verifies--req-layers",
+      "sourceId": "sc-layers",
+      "targetId": "req-layers",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-core--verifies--req-core",
+      "sourceId": "sc-core",
+      "targetId": "req-core",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-module-api--verifies--req-module-api",
+      "sourceId": "sc-module-api",
+      "targetId": "req-module-api",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-service-data--verifies--req-service-data",
+      "sourceId": "sc-service-data",
+      "targetId": "req-service-data",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-kernel--verifies--req-kernel",
+      "sourceId": "sc-kernel",
+      "targetId": "req-kernel",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-library--verifies--req-library",
+      "sourceId": "sc-library",
+      "targetId": "req-library",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-no-shared--verifies--req-no-shared",
+      "sourceId": "sc-no-shared",
+      "targetId": "req-no-shared",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-owners--verifies--req-owners",
+      "sourceId": "sc-owners",
+      "targetId": "req-owners",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-cycles--implements--adr-layered",
+      "sourceId": "ff-cycles",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cycles--implements--adr-hexagonal",
+      "sourceId": "ff-cycles",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cycles--implements--adr-modular",
+      "sourceId": "ff-cycles",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cycles--implements--adr-services",
+      "sourceId": "ff-cycles",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-layers--implements--adr-layered",
+      "sourceId": "ff-layers",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-core--implements--adr-hexagonal",
+      "sourceId": "ff-core",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-modules--implements--adr-modular",
+      "sourceId": "ff-modules",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-services--implements--adr-services",
+      "sourceId": "ff-services",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ratchet--implements--adr-layered",
+      "sourceId": "ff-ratchet",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ratchet--implements--adr-hexagonal",
+      "sourceId": "ff-ratchet",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ratchet--implements--adr-modular",
+      "sourceId": "ff-ratchet",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ratchet--implements--adr-services",
+      "sourceId": "ff-ratchet",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-kernel--implements--adr-layered",
+      "sourceId": "ff-kernel",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-kernel--implements--adr-hexagonal",
+      "sourceId": "ff-kernel",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-kernel--implements--adr-modular",
+      "sourceId": "ff-kernel",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-kernel--implements--adr-services",
+      "sourceId": "ff-kernel",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-library--implements--adr-layered",
+      "sourceId": "ff-library",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-library--implements--adr-hexagonal",
+      "sourceId": "ff-library",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-library--implements--adr-modular",
+      "sourceId": "ff-library",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-library--implements--adr-services",
+      "sourceId": "ff-library",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-shared--implements--adr-layered",
+      "sourceId": "ff-no-shared",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-shared--implements--adr-hexagonal",
+      "sourceId": "ff-no-shared",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-shared--implements--adr-modular",
+      "sourceId": "ff-no-shared",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-shared--implements--adr-services",
+      "sourceId": "ff-no-shared",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-owners--implements--adr-layered",
+      "sourceId": "ff-owners",
+      "targetId": "adr-layered",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-owners--implements--adr-hexagonal",
+      "sourceId": "ff-owners",
+      "targetId": "adr-hexagonal",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-owners--implements--adr-modular",
+      "sourceId": "ff-owners",
+      "targetId": "adr-modular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-owners--implements--adr-services",
+      "sourceId": "ff-owners",
+      "targetId": "adr-services",
+      "relationType": "implements"
+    }
+  ]
+}

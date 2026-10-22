@@ -1,0 +1,205 @@
+import type { PackSpec, When } from '../../src/packSpec'
+
+const SIGN_IN: When = { IDENTITY: ['idp', 'own'] }
+const FORCES = 'People or other systems reach this element from outside, so it must know who is calling before it acts for them. The forces: credentials leak and get guessed (credential stuffing tries billions of leaked pairs); sessions outlive the person on a shared or lost device; self-contained tokens stay valid until they expire unless revocation is designed in; other systems call too, and a call from inside the network is not a call from a known system; and after an incident the record of who did what has to hold.'
+
+const pack: PackSpec = {
+  id: 'concern-authentication',
+  name: 'Authentication',
+  group: 'identity',
+  description: 'Who is calling: how people and other systems prove who they are, how long that lasts, and how it is taken back.',
+  tags: ['security', 'authentication', 'identity', 'sessions', 'oidc', 'mfa'],
+  concern: {
+    id: 'authentication',
+    trigger: 'LIST RELATIONS WHERE (source.type = "person" OR source.external = true) AND target.external != true AND (target.type = "system" OR target.type = "container" OR target.type = "webapp" OR target.type = "component")',
+    applyTo: 'target',
+    why: 'people or external systems reach these elements, so who is calling has to be decided.',
+  },
+  sources: [
+    { title: 'OWASP ASVS 4.0.3, V2 Authentication and V3 Session Management', url: 'https://owasp.org/www-project-application-security-verification-standard/' },
+    { title: 'NIST SP 800-63B, Digital Identity Guidelines: Authentication and Lifecycle Management', url: 'https://pages.nist.gov/800-63-3/sp800-63b.html' },
+    { title: 'RFC 9700, Best Current Practice for OAuth 2.0 Security', url: 'https://www.rfc-editor.org/rfc/rfc9700' },
+    { title: 'OpenID Connect Core 1.0', url: 'https://openid.net/specs/openid-connect-core-1_0.html' },
+  ],
+  questions: [
+    {
+      key: 'IDENTITY', title: 'Sign-in', label: 'How do people sign in?',
+      hint: 'This decides most of what follows: who keeps the passwords, who slows down guessing, and who you depend on to sign in.',
+      default: 'idp',
+      options: [
+        { value: 'idp', label: 'an external identity provider (OpenID Connect)', description: 'Entra ID, Okta, Auth0, Keycloak or Google keep the passwords, MFA and lockout. Pick it for business users with a corporate directory, or whenever you would rather not own credentials.' },
+        { value: 'own', label: 'our own user store', description: 'You keep accounts, password hashes, lockout and the breach response. Pick it only when a provider is ruled out (cost per user, data residency, offline use) and someone owns it.' },
+        { value: 'none', label: 'nobody signs in', description: 'Everything is public and the same for everyone. Pick it for read-only public sites and tools; the decision records it so nothing comes to depend on who is calling.' },
+      ],
+    },
+    {
+      key: 'MACHINE', title: 'Other systems', label: 'How do other systems call it?',
+      hint: 'A call from inside the network is not a call from a known system: each caller needs an identity of its own, and its own list of what it may do.',
+      default: 'oauth',
+      options: [
+        { value: 'oauth', label: 'OAuth 2.0 client credentials', description: 'Each caller gets a client id and short-lived tokens from the identity provider. Pick it when you have a provider and the callers can use OAuth.' },
+        { value: 'mtls', label: 'mutual TLS', description: 'Each caller holds its own certificate; the connection proves who it is. Pick it inside a service mesh or between companies with a PKI.' },
+        { value: 'keys', label: 'API keys, one per calling system', description: 'Simple to hand out and to revoke one by one; they must be rotated and kept out of logs. Pick it for a few partners without OAuth.' },
+        { value: 'none', label: 'none, no other system calls it', description: 'Only people reach it. Pick it when the model shows no other system calling.' },
+      ],
+    },
+    {
+      key: 'STEP_UP', title: 'Second factor', label: 'Do some operations need a second factor?',
+      hint: 'A stolen session alone should not be enough for the operations that do the most harm: changing permissions, moving money, exporting data.',
+      default: 'yes',
+      options: [
+        { value: 'yes', label: 'yes', description: 'Risky operations ask for a second factor confirmed in the last 5 minutes (step-up). Pick it when any operation moves money, changes rights or exports data.' },
+        { value: 'no', label: 'no', description: 'A signed-in session may do everything its account may. Pick it only when no operation is worth more than the session itself.' },
+      ],
+    },
+  ],
+  details: [
+    { key: 'SESSION_MINUTES', label: 'How long may a session stay idle (minutes)?', default: '30', number: true },
+    { key: 'REVOKE_SECONDS', label: 'How fast must a revoked session stop working (seconds)?', default: '60', number: true },
+    { key: 'PRIVILEGED_OPS', label: 'Which operations need a second factor?', default: 'changing permissions, exporting data, payouts' },
+  ],
+  need: {
+    label: 'Callers are who they claim',
+    text: 'People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident.',
+  },
+  forces: FORCES,
+  requirements: [
+    {
+      id: 'req-reject', label: 'Unauthenticated calls refused', when: SIGN_IN, ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'a request to an operation that is not on the public list carries no credential, or an expired or revoked one',
+      action: 'refuse it with 401 before any part of the operation runs, and say nothing about whether the account exists',
+      rationale: 'An operation forgotten on the protected side is the most common authentication flaw; the public list makes the exceptions explicit (ASVS V2.1, V3.1).',
+      scenario: { label: 'Call without credential', given: 'an operation that is not on the public list', when: 'it is called without a credential, with an expired one and with a revoked one', then: 'each call is refused with 401 and the operation leaves no trace' },
+    },
+    {
+      id: 'req-idle', label: 'Idle sessions end', when: SIGN_IN, ears_type: 'event-driven',
+      trigger: 'a session has seen no request for {{SESSION_MINUTES}} minutes',
+      action: 'end it, so that the next request has to sign in again',
+      rationale: 'A session left open on a shared or lost device is a credential nobody is watching (ASVS V3.3, NIST 800-63B 7.2).',
+      scenario: { label: 'Idle session ends', given: 'a signed-in session', when: 'no request comes for {{SESSION_MINUTES}} minutes and then one does', then: 'the request is refused and asks to sign in again' },
+    },
+    {
+      id: 'req-revoke', label: 'Revoked sessions stop', when: SIGN_IN, ears_type: 'event-driven',
+      trigger: 'a user signs out, or an administrator revokes one session or every session of an account',
+      action: 'refuse that session\'s credentials within {{REVOKE_SECONDS}} seconds on every instance, tokens already issued included',
+      rationale: 'Self-contained tokens are valid until they expire unless revocation is designed in; this bounds how long a stolen one keeps working (RFC 9700 4.14).',
+      scenario: { label: 'Revoked session stops', given: 'a signed-in session on two instances', when: 'the user signs out on one of them', then: 'within {{REVOKE_SECONDS}} seconds both instances refuse its credentials' },
+    },
+    {
+      id: 'req-audit', label: 'Sign-ins are audited', when: SIGN_IN, ears_type: 'ubiquitous',
+      action: 'record every sign-in, failed sign-in, sign-out and revocation in the audit log with the account, the time, the client and the source address, keep the records for at least 12 months, and never record the credential itself',
+      rationale: 'After an incident this is the record of who was in; with the credential in it, the log becomes the leak (ASVS V7.1).',
+      scenario: { label: 'Sign-in leaves a record', given: 'an account', when: 'it signs in, fails to sign in, signs out and has a session revoked', then: 'the audit log holds the four events with account, time, client and address, and no credential' },
+    },
+    {
+      id: 'req-lockout', label: 'Guessing is slowed', when: { IDENTITY: ['own'] }, ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'five sign-ins to one account fail within 15 minutes',
+      action: 'delay further attempts on that account and from that source address, longer after each failure up to 15 minutes, and tell the account\'s owner',
+      rationale: 'With your own user store, credential stuffing and guessing hit you directly; an identity provider does this for you (NIST 800-63B 5.2.2).',
+      scenario: { label: 'Guessing slowed', given: 'an account', when: 'five sign-ins to it fail within 15 minutes', then: 'the sixth attempt is delayed and the owner is told' },
+    },
+    {
+      id: 'req-passwords', label: 'Passwords stored as hashes', when: { IDENTITY: ['own'] }, ears_type: 'ubiquitous',
+      action: 'store passwords only as Argon2id hashes (at least 19 MiB memory, 2 iterations, 1 lane), accept passwords of 8 to 64 characters, and refuse one found in known breaches',
+      rationale: 'A leaked user table must not become a list of working passwords; length and breach checks beat composition rules (OWASP Password Storage Cheat Sheet, NIST 800-63B 5.1.1).',
+      scenario: { label: 'Breached password refused', given: 'a user setting a password', when: 'the password is in a list of breached passwords, and then one that is not', then: 'the first is refused; the second is stored as an Argon2id hash, never as the text' },
+    },
+    {
+      id: 'req-stepup', label: 'Second factor for risky operations', when: { IDENTITY: ['idp', 'own'], STEP_UP: ['yes'] }, ears_type: 'event-driven',
+      trigger: 'a signed-in user starts one of: {{PRIVILEGED_OPS}}',
+      action: 'require a second factor confirmed within the last 5 minutes before running it',
+      rationale: 'A stolen session alone must not be enough for the operations that do the most harm (ASVS V2.8, V4.3).',
+      scenario: { label: 'Risky operation asks again', given: 'a signed-in user whose second factor is older than 5 minutes', when: 'the user starts one of: {{PRIVILEGED_OPS}}', then: 'it runs only after the second factor is confirmed' },
+    },
+    {
+      id: 'req-machine', label: 'Calling systems authenticate', when: { MACHINE: ['oauth', 'mtls', 'keys'] }, ears_type: 'event-driven',
+      trigger: 'another system calls the element',
+      action: 'require it to authenticate with {{MACHINE}}, with credentials of its own that expire or are rotated within 90 days, and let each caller run only the operations listed for it',
+      rationale: 'A call from inside the network is not a call from a known system; each caller gets its own identity and its own list (RFC 9700 2.3).',
+      scenario: { label: 'Unknown system refused', given: 'a calling system with its own identity and list of operations', when: 'it calls an operation on its list, one off its list, and a third system calls without authenticating', then: 'only the first call runs' },
+    },
+    {
+      id: 'req-public', label: 'Public by design', when: { IDENTITY: ['none'] }, ears_type: 'ubiquitous',
+      action: 'offer no sign-in, session or stored credential, and run only operations that are safe for anyone who reaches it',
+      rationale: 'Nobody signs in, so nothing may depend on knowing who the caller is; this makes that a requirement instead of an accident.',
+      scenario: { label: 'No sign-in surface', given: 'the element as deployed', when: 'every route or command it offers is listed', then: 'none signs in, keeps a session or stores a credential' },
+    },
+  ],
+  adrs: [
+    {
+      id: 'adr-idp', label: 'Users sign in through an identity provider', when: { IDENTITY: ['idp'] },
+      decision: 'Users sign in through an external identity provider with OpenID Connect (authorization code flow with PKCE); we store no password. Sessions end after {{SESSION_MINUTES}} minutes without a request and are revoked within {{REVOKE_SECONDS}} seconds: access tokens live no longer than that, and refresh tokens are rotated on use and checked against a revocation list. Calls from other systems: {{MACHINE}}. Operations open without sign-in are on a public list kept in the code. Choosing the provider: the one the users\' organisation already runs (Entra ID, Okta, Google Workspace) for business users; Auth0, Cognito or Keycloak for consumers, by cost per active user and where the data may be kept.',
+      consequences: '• No passwords to store, reset or leak; MFA, lockout and breached-password checks come from the provider.\n• The provider is on the sign-in path: when it is down nobody new signs in, sessions already open keep working until they expire.\n• Revocation within {{REVOKE_SECONDS}} s means short-lived access tokens and a refresh on every expiry, a little more traffic to the provider.\n• Who may do what (authorisation) is still yours to design: a valid token says who, not what.',
+      alternatives: '1. Our own user store: full control of the experience, but you own password storage, lockout, MFA and breach response.\n2. Server-side sessions only (cookies): simple for one web app, awkward for APIs called by other systems and mobile clients.\n3. Long-lived tokens without revocation: fewer calls to the provider, but a stolen token works until it expires.',
+    },
+    {
+      id: 'adr-own', label: 'Users sign in with our own user store', when: { IDENTITY: ['own'] },
+      decision: 'Users sign in with an account in our own user store: passwords kept as Argon2id hashes, failed attempts slowed per account and per address, breached passwords refused (Have I Been Pwned range API). Sessions end after {{SESSION_MINUTES}} minutes without a request and are revoked within {{REVOKE_SECONDS}} seconds; session state lives on the server, so revoking is deleting it. Calls from other systems: {{MACHINE}}. Operations open without sign-in are on a public list kept in the code. Use the framework\'s maintained identity library (ASP.NET Core Identity, Spring Security, Devise, Lucia) rather than code of our own.',
+      consequences: '• We own the whole of sign-in: password storage, resets, lockout, MFA and the response to a breach.\n• No third party on the sign-in path, and no per-user cost of a provider.\n• Server-side sessions make revocation immediate, but every instance needs the session store.\n• Single sign-on with customers\' own identity providers is a later project.',
+      alternatives: '1. An external identity provider (OpenID Connect): no passwords to keep, MFA and lockout included, but a dependency on the sign-in path and a cost per user.\n2. Passwordless sign-in by e-mail link or passkeys only: nothing to guess, but sign-in is as safe as the mailbox or needs passkey support everywhere.',
+    },
+    {
+      id: 'adr-none', label: 'Nobody signs in', when: { IDENTITY: ['none'] },
+      context: `${FORCES} Here nobody needs to be told apart: the element serves the same to everyone who reaches it.`,
+      decision: 'The element has no sign-in, no session and keeps no credential; everything it offers is public and safe for anyone who reaches it. Calls from other systems: {{MACHINE}}. Anything that would need to know who is calling is out of scope until this decision is superseded.',
+      consequences: '• Nothing to steal at sign-in and nothing to revoke.\n• Any feature that depends on who the user is (their own data, rights, an audit of who did what) needs this decision superseded first.\n• Abuse is limited by what the element offers, not by who asks: rate limits and the shape of the operations matter more.',
+      alternatives: '1. Sign-in through an external identity provider, kept for later.\n2. A shared secret for everyone: no real identity, and a secret everyone knows is not one.',
+    },
+  ],
+  fitness: [
+    {
+      id: 'ff-reject', label: 'Unauthenticated calls refused', when: SIGN_IN, category: 'structural', implements: ['adr-idp', 'adr-own'],
+      threshold: 'Every operation not on the public list answers 401 without a credential and with an expired one; 0 operations outside the public list answer anything else',
+      description: 'A test lists the element\'s operations from its router (not from a list kept by hand), calls each without a credential and with an expired one, and expects 401 from every one that is not on the public list. A new operation fails the test until it is protected or added to the public list, which shows up in the pull request.',
+      tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
+      language: 'ts',
+      snippet: `import request from 'supertest'
+import { app, routes } from '../src/app'          // routes: the router's table
+import { PUBLIC } from '../src/auth/publicRoutes' // the public list, in the code
+
+describe.each(routes.filter((r) => !PUBLIC.has(\`\${r.method} \${r.path}\`)))('%s %s', (route) => {
+  it('refuses a call without a credential', async () => {
+    await request(app)[route.method.toLowerCase()](route.example).expect(401)
+  })
+  it('refuses an expired token', async () => {
+    await request(app)[route.method.toLowerCase()](route.example).set('Authorization', \`Bearer \${EXPIRED}\`).expect(401)
+  })
+})`,
+    },
+    {
+      id: 'ff-session', label: 'Session limits hold', when: SIGN_IN, category: 'operational', implements: ['adr-idp', 'adr-own'],
+      threshold: 'An idle session ends after {{SESSION_MINUTES}} minutes; a revoked one is refused within {{REVOKE_SECONDS}} seconds on every instance',
+      description: 'An integration test signs in on two instances, revokes the session on one and polls the other until it refuses, failing past {{REVOKE_SECONDS}} seconds; a second test advances the clock past {{SESSION_MINUTES}} idle minutes and expects the next request to be refused.',
+      tool: 'Vitest (fake timers) against two instances started by Testcontainers or docker compose',
+      language: 'ts',
+      snippet: `it('a revoked session stops on every instance in time', async () => {
+  const token = await signIn(instanceA)
+  await signOut(instanceA, token)
+  const started = Date.now()
+  while ((await call(instanceB, token)).status !== 401) {
+    expect(Date.now() - started).toBeLessThan(REVOKE_SECONDS * 1000)
+    await sleep(1000)
+  }
+})`,
+    },
+    {
+      id: 'ff-none', label: 'Nothing to sign in to', when: { IDENTITY: ['none'] }, category: 'structural', implements: ['adr-none'],
+      threshold: 'No operation signs in, starts a session or reads a credential, and no authentication library is a dependency',
+      description: 'A dependency rule fails the build when an authentication or session library is added, which would mean a sign-in arrived without its decision.',
+      tool: 'dependency-cruiser',
+      language: 'js',
+      snippet: `// .dependency-cruiser.cjs
+module.exports = {
+  forbidden: [{
+    name: 'no-authentication',
+    comment: 'ADR Nobody signs in: supersede it before adding sign-in',
+    severity: 'error',
+    from: {},
+    to: { path: 'node_modules/(passport|next-auth|@auth/|express-session|jsonwebtoken|oidc-client)' },
+  }],
+}`,
+    },
+  ],
+}
+
+export default pack

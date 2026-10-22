@@ -55,7 +55,10 @@ import {
   fileIntoForgeViews,
   forgeArrangeGroups,
   forgeGaps,
-  forgeHubCandidates,
+  bindUnboundConcerns,
+  buildConcernsBlock,
+  decidedConcern,
+  type DecidedConcern,
   formatClarificationAnswers,
   formatForgeGaps,
   formatProposal,
@@ -75,7 +78,6 @@ import {
   stageRefinements,
   type ClarifyStageQuestion,
   type FiledNodes,
-  type ForgeHubCandidates,
   type ForgeArrangement,
   type ForgeProposal,
   type ForgeRefinement,
@@ -93,7 +95,7 @@ import type { Metamodel } from '@radical/common/metamodel'
 import { runPipeline } from '@radical/common/viewPipeline'
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { docToConcept, type HubConceptSummary, type HubRadicalDoc } from '@radical/common/hubFormat'
-import { buildConceptInsert } from '@radical/common/hubImport'
+import { answersProblem, buildConcernInsert, concernPacks, type ConcernPack } from '@radical/common/concerns'
 import { sanitizeWireframeSvg } from '@radical/common/wireframe'
 import type { ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { CATALOGUE_DIR, buildIndex, readCatalogue } from '@radical/hub-catalogue'
@@ -119,9 +121,11 @@ export const FORGE_PROCEDURE = [
   '   user chose. The description is kept in the model as a need. From then on talk to the user in the one language',
   '   and write the model in the other.',
   '2. For each stage, in order:',
-  '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any, including which',
-  '      Hub concepts you pick from its candidates to apply. Wait for the answers.',
-  '   b. forge_generate with those answers and the Hub concepts the user kept. It returns the stage task:',
+  '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any. In the',
+  '      Requirements stage it also lists the Hub\'s concern packs: pick those the description calls for, have',
+  '      the user confirm them and ask their questions. Wait for the answers.',
+  '   b. forge_generate with those answers (in Requirements, the confirmed packs with their answers as',
+  '      concerns: they come into the model whole, unbound, before the stage). It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
   '      A stage may also close gaps in earlier stages within the description (a requirement or scenario a',
   '      process shows is missing, a wrong name), but only by proposing it: forge_propose_refinement returns',
@@ -134,8 +138,8 @@ export const FORGE_PROCEDURE = [
   '      on their view? Run Smart Layout on that view? Do what they choose with forge_arrange. Then ask whether',
   '      to continue, regenerate the stage (forge_generate with regenerate: true, which first removes what the',
   '      stage added) or finish here.',
-  '   After the mockups stage, offer to draw the wireframes (forge_wireframe). A Hub match can also be',
-  '   imported as it is with forge_import_hub_concept.',
+  '   After the mockups stage, offer to draw the wireframes (forge_wireframe). The C4 stage links the',
+  '   concern packs\' decisions to the elements they are about; forge_complete_stage binds any it left unbound.',
   '3. forge_finish: what each stage added, and the Gherkin .feature files of the scenarios.',
 ].join('\n')
 
@@ -175,7 +179,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_clarify',
-    description: 'Before generating a Forge stage: returns what to clarify with the user first and the stage\'s Hub candidates to pick from. Ask the user, then call forge_generate with the answers.',
+    description: 'Before generating a Forge stage: returns what to clarify with the user first, and in the Requirements stage the Hub\'s concern packs to pick from with their questions. Ask the user, then call forge_generate with the answers.',
     inputSchema: {
       type: 'object',
       properties: { stage: { ...stageEnum, description: 'The next stage of the run, or one already generated (to regenerate it with new answers).' } },
@@ -200,10 +204,15 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
             additionalProperties: false,
           },
         },
-        hubConcepts: {
+        concerns: {
           type: 'array',
-          items: { type: 'string' },
-          description: 'Ids of this stage\'s Hub candidates (from forge_clarify) the user wants applied: the ones you picked and the user kept. Omit to apply the few best keyword matches; [] applies none.',
+          description: 'Requirements stage only: the concern packs (from forge_clarify) the user confirmed, each with the user\'s answers by question key (option values). They come into the model whole and unbound before the stage; the C4 stage binds them. Omit to keep the last run\'s; [] imports none.',
+          items: {
+            type: 'object',
+            properties: { id: { type: 'string' }, answers: { type: 'object', additionalProperties: { type: 'string' } } },
+            required: ['id'],
+            additionalProperties: false,
+          },
         },
         regenerate: { type: 'boolean', description: 'Required to run a stage again: removes what its previous run added first.' },
       },
@@ -278,10 +287,14 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_import_hub_concept',
-    description: 'Import a Hub catalogue concept (pattern, ADR, fitness function, requirement or blueprint) into the model as it is, beside the existing elements, as Forge\'s Import button does.',
+    description: 'Import a Hub concern pack (get_issues lists the concerns the model has not settled, with the pack to import) with the user\'s answers to its questions and the elements to bind it to: it brings the requirements, ADR, fitness functions and scenarios those answers pick, the ADR and fitness functions constraining each element and each element satisfying the requirements. Ask the user the questions first; do not answer them yourself.',
     inputSchema: {
       type: 'object',
-      properties: { conceptId: { type: 'string', description: 'A Hub concept id, e.g. from forge_clarify\'s candidates.' } },
+      properties: {
+        conceptId: { type: 'string', description: 'A Hub concept id, e.g. from forge_clarify\'s candidates or a concern get_issues lists.' },
+        answers: { type: 'object', additionalProperties: { type: 'string' }, description: 'By question key, the user\'s answers: for a question with options, the option\'s value. Unanswered questions take their default.' },
+        bindTo: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'For a concern pack: the id of the element it settles the concern for, or a list of them, such as those get_issues suggests (a system settles what it contains). Leave it out to import the pack unbound, before the elements exist; radical check reports it as concern-unbound until it is bound.' },
+      },
       required: ['conceptId'],
       additionalProperties: false,
     },
@@ -338,8 +351,8 @@ interface StageState {
   declined: number
   summary?: string
   clarifications?: string
-  /** Ids of the Hub concepts applied; undefined = the suggested ones. */
-  hubConcepts?: string[]
+  /** Requirements stage: the concern packs it imported, with the answers. */
+  concernPicks?: Array<{ id: string; answers: Record<string, string> }>
 }
 
 interface ForgeRun {
@@ -349,7 +362,8 @@ interface ForgeRun {
   startedAt: string
   /** forge_finish was called. */
   finished?: boolean
-  hub: ForgeHubCandidates
+  /** The concern packs the Requirements stage imported (unbound until C4). */
+  concerns: DecidedConcern[]
   /** The view structure the user chose. */
   structure: ForgeStructure
   /** The languages the user chose: to talk in, and to write the model in. */
@@ -468,6 +482,11 @@ export class Forge {
   private run: ForgeRun | null = null
   private catalogue: Catalogue | null = null
 
+  /** The catalogue's concern packs, for get_issues. */
+  concernPacks(): ConcernPack[] {
+    return concernPacks(this.hub().summaries)
+  }
+
   private hub(): Catalogue {
     if (!this.catalogue) {
       const entries = readCatalogue(catalogueDir())
@@ -571,7 +590,7 @@ export class Forge {
       needId: need,
       needLabel: need ? facade.getNodes()[need]?.label : undefined,
       startedAt: new Date().toISOString(),
-      hub: forgeHubCandidates(this.hub().summaries, description, metamodel?.id),
+      concerns: [],
       structure,
       languages,
       clarified: new Set(),
@@ -601,16 +620,13 @@ export class Forge {
     const id = stage as ForgeStageId
     const blocked = this.blocked(run, id)
     if (blocked) return fail(`forge_clarify: ${blocked}`)
-    const candidates = run.hub.stages[id]?.candidates ?? []
+    const packs = id === 'requirements' ? this.concernPacks() : []
     const priorQA = STAGE_IDS.slice(0, STAGE_IDS.indexOf(id))
       .map((prior) => run.stages[prior]?.clarifications ?? '')
       .filter(Boolean)
       .join('\n\n')
-    const lines = [buildClarifyPrompt(stageTitle(id), run.description, candidates, priorQA, 'ask'), '', ...forgeLanguageRules(run.languages)]
-    if (id === 'c4' && run.hub.blueprint) {
-      lines.push('', `The blueprint ${run.hub.blueprint.id} fits the whole description; offering it to import as a skeleton (forge_import_hub_concept) is a good first pick.`)
-    }
-    lines.push('', `Then call forge_generate with stage "${id}"${candidates.length ? ', the answers and hubConcepts' : ' and the answers'}.`)
+    const lines = [buildClarifyPrompt(stageTitle(id), run.description, packs, priorQA, 'ask'), '', ...forgeLanguageRules(run.languages)]
+    lines.push('', `Then call forge_generate with stage "${id}"${packs.length ? ', the answers and the concerns' : ' and the answers'}.`)
     return ok(lines.join('\n'), { readOnly: true, commit: () => { run.clarified.add(id) } })
   }
 
@@ -642,17 +658,22 @@ export class Forge {
       })
       clarifications = formatClarificationAnswers(questions, answers)
     }
-    const { candidates = [], suggested = [] } = run.hub.stages[id] ?? {}
-    let hubConcepts = previous?.hubConcepts
-    if (args.hubConcepts !== undefined) {
-      if (!Array.isArray(args.hubConcepts) || args.hubConcepts.some((c) => typeof c !== 'string')) {
-        return fail('forge_generate: hubConcepts must be an array of concept ids')
+    // The concern packs to import with the Requirements stage.
+    let concernPicks = previous?.concernPicks
+    if (args.concerns !== undefined) {
+      if (id !== 'requirements') return fail('forge_generate: concerns are picked in the Requirements stage')
+      if (!Array.isArray(args.concerns)) return fail('forge_generate: concerns must be an array of { id, answers }')
+      const picks: Array<{ id: string; answers: Record<string, string> }> = []
+      for (const raw of args.concerns) {
+        const { id: packId, answers = {} } = (raw ?? {}) as { id?: unknown; answers?: unknown }
+        const pack = this.concernPacks().find((p) => p.id === packId)
+        if (!pack) return fail(`forge_generate: no concern pack "${String(packId)}"; forge_clarify lists them`)
+        if (!answers || typeof answers !== 'object' || Object.values(answers).some((v) => typeof v !== 'string')) return fail(`forge_generate: the answers of ${pack.id} must map question keys to strings`)
+        const problem = answersProblem(pack, answers as Record<string, string>)
+        if (problem) return fail(`forge_generate: ${pack.id}: ${problem}`)
+        picks.push({ id: pack.id, answers: answers as Record<string, string> })
       }
-      const unknown = (args.hubConcepts as string[]).filter((c) => !candidates.some((m) => m.id === c))
-      if (unknown.length) {
-        return fail(`forge_generate: not a Hub candidate of this stage: ${unknown.join(', ')}. See forge_clarify for the candidates${candidates.length ? '' : ' (this stage has none)'}.`)
-      }
-      hubConcepts = args.hubConcepts as string[]
+      concernPicks = picks
     }
 
     // Regenerate replaces the previous attempt instead of adding a second copy.
@@ -675,27 +696,49 @@ export class Forge {
     const views = facade.getViews?.() ?? {}
     const openedNames = opened.map((v) => views[v]?.name).filter(Boolean)
 
-    const nodes = facade.getNodes()
-    const effectiveMatches = hubConcepts
-      ? hubConcepts.map((c) => candidates.find((m) => m.id === c)!).filter(Boolean)
-      : suggested
+    // The picked concern packs come in whole, unbound, as part of the stage
+    // (so a regenerate takes them out too); C4 binds them.
+    let data: DiagramData | undefined
+    let decided = run.concerns
+    if (id === 'requirements') {
+      decided = []
+      if (concernPicks?.length) {
+        data = facade.toDiagramData()
+        const roots = data.nodes.filter((n) => !n.parentId)
+        let top = roots.length ? Math.max(...roots.map((n) => n.y + n.height)) + IMPORT_GAP : 0
+        for (const pick of concernPicks) {
+          const concept = docToConcept(this.hub().docs.get(pick.id)!)
+          const insert = buildConcernInsert(concept, {
+            answers: pick.answers, elements: [], metamodel: facade.getMetamodel?.(), today: new Date().toISOString().slice(0, 10),
+            newId: () => crypto.randomUUID(), place: ({ height }) => { const at = { x: 0, y: top }; top += height + IMPORT_GAP; return at },
+          })
+          data.nodes.push(...Object.values(insert.nodes))
+          data.relations.push(...Object.values(insert.relations))
+          decided.push(decidedConcern(this.concernPacks().find((p) => p.id === pick.id)!, insert))
+        }
+        readOnly = false
+      }
+    }
+    const nodes: Record<string, C4Node> = data ? Object.fromEntries(data.nodes.map((n) => [n.id, n])) : facade.getNodes()
+    const relations = data ? Object.fromEntries(data.relations.map((r) => [r.id, r])) : facade.getRelations()
     const stageIdx = STAGE_IDS.indexOf(id)
     const priorSummaries = buildPriorStagesBlock(
       FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: run.stages[s.id]?.summary ?? '' })),
     )
     const needNode = run.needId ? nodes[run.needId] : undefined
-    const gaps = forgeGaps(STAGE_IDS.slice(0, stageIdx), nodes, facade.getRelations(), facade.getMetamodel?.())
-    const prompt = buildForgeStagePrompt(id, run.description, effectiveMatches, clarifications, priorSummaries,
+    const gaps = forgeGaps(STAGE_IDS.slice(0, stageIdx), nodes, relations, facade.getMetamodel?.())
+    const prompt = buildForgeStagePrompt(id, run.description, buildConcernsBlock(id, decided, nodes), clarifications, priorSummaries,
       needNode ? { id: needNode.id, label: needNode.label } : undefined, formatForgeGaps(gaps), 'forge_propose_refinement')
     const metamodelMessage = buildMetamodelMessage(facade.getMetamodel?.(), new Set(PRIMARY_TYPE_IDS_FOR_STAGE[id]), nodes)
-    let context = buildContextMessage(nodes, facade.getRelations(), null, facade.getViews?.())
+    let context = buildContextMessage(nodes, relations, null, facade.getViews?.())
     if (context.length > MAX_CONTEXT_CHARS) {
-      context = `The model has ${Object.keys(nodes).length} nodes and ${Object.keys(facade.getRelations()).length} relations, too many to list here. Look up what this stage needs with search_model, e.g. LIST NODES WHERE type = "requirement".`
+      context = `The model has ${Object.keys(nodes).length} nodes and ${Object.keys(relations).length} relations, too many to list here. Look up what this stage needs with search_model, e.g. LIST NODES WHERE type = "requirement".`
     }
     const brief = [
       `Radical Forge — stage ${stageIdx + 1} of ${STAGE_IDS.length}: ${stageTitle(id)}${previous ? ' (regenerating; what it added before has been removed)' : ''}`,
       FORGE_STAGES[stageIdx].blurb,
       ...(openedNames.length ? [`Made the stage's views before it begins: ${openedNames.join(', ')}. What you add shows up in them as you add it.`] : []),
+      ...(id === 'requirements' && decided.length ? [`Imported the concern packs the user confirmed, whole and unbound: ${decided.map((d) => d.name).join(', ')}. The C4 stage links them.`] : []),
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
       'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',
@@ -713,10 +756,10 @@ export class Forge {
     ].join('\n')
 
     const state: StageState = {
-      status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, hubConcepts,
+      status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, concernPicks,
       proposed: new Set(), accepted: [], proposals: 0, declined: 0,
     }
-    return ok(brief, { readOnly, commit: () => { run.stages[id] = state } })
+    return ok(brief, { readOnly, ...(data ? { data } : {}), commit: () => { run.stages[id] = state; run.concerns = decided } })
   }
 
   private complete(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
@@ -739,12 +782,21 @@ export class Forge {
     // The views made for the stage that it left empty go again.
     const dropped = dropEmptyForgeViews(facade, state.opened)
     added.views = added.views.filter((v) => !dropped.includes(v))
+    // The C4 stage: what it left of the concern packs unbound is bound where
+    // each pack's trigger points.
+    let bound: string[] = []
+    if (id === 'c4' && run.concerns.length) {
+      const binding = bindUnboundConcerns(run.concerns, this.concernPacks(), facade.getNodes(), facade.getRelations(), facade.getMetamodel?.())
+      for (const r of binding.relations) facade.addRelation(r)
+      bound = binding.lines
+    }
     const nodes = facade.getNodes()
     const byType = countByType(nodes, added.nodes)
     const lines = [
       `${stageTitle(id)} done: +${added.nodes.length} nodes${byType ? ` (${byType})` : ''}, +${added.relations.length} relations, +${added.views.length} views.`,
     ]
     lines.push(...viewLines(filed))
+    if (bound.length) lines.push('Concern packs:', ...bound.map((l) => `- ${l}`))
     if (refinements.length) {
       lines.push(`It refined earlier stages as the user accepted (${refinements.length}):`, ...refinements.map((r) => `- ${describeRefinement(r)}`))
     }
@@ -776,7 +828,7 @@ export class Forge {
       : `This was the last stage. ${groups.length ? 'Then' : 'Show the user what it added and'} ask whether to regenerate it (forge_generate with regenerate: true) or finish (forge_finish).`)
     // A view of a viewpoint lists nothing (it shows what its chain gives):
     // made now, it is a change all the same.
-    const changed = dropped.length > 0 || filed.some((f) => (f.canvas && f.nodeIds.length) || f.made)
+    const changed = dropped.length > 0 || filed.some((f) => (f.canvas && f.nodeIds.length) || f.made) || bound.some((l) => l.includes('was bound'))
     return ok(lines.join('\n'), {
       readOnly: !changed,
       data: changed ? placeInViews(facade.toDiagramData(), filed, facade.getMetamodel?.()) : undefined,
@@ -918,26 +970,42 @@ export class Forge {
   private importConcept(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
     if (typeof args.conceptId !== 'string' || !args.conceptId) return fail('forge_import_hub_concept: conceptId is required')
     const doc = this.hub().docs.get(args.conceptId)
-    if (!doc) return fail(`forge_import_hub_concept: no Hub concept "${args.conceptId}"`)
+    if (!doc) return fail(`forge_import_hub_concept: no Hub concern pack "${args.conceptId}"`)
     const concept = docToConcept(doc)
+    const answers = args.answers ?? {}
+    if (typeof answers !== 'object' || Object.values(answers).some((v) => typeof v !== 'string')) return fail('forge_import_hub_concept: answers must map question keys to strings')
+    const bindTo = args.bindTo === undefined ? [] : typeof args.bindTo === 'string' ? [args.bindTo] : args.bindTo
+    if (!Array.isArray(bindTo) || bindTo.some((id) => typeof id !== 'string' || !id)) {
+      return fail('forge_import_hub_concept: bindTo must be an element id or a list of them')
+    }
     const data = facade.toDiagramData()
+    const missing = bindTo.find((id) => !data.nodes.some((n) => n.id === id))
+    if (missing) return fail(`forge_import_hub_concept: no element ${missing}`)
+    const elements = bindTo.map((id) => data.nodes.find((n) => n.id === id)!)
     // Beside the model's top-level elements, top-aligned with them.
     const roots = data.nodes.filter((n) => !n.parentId)
     const right = roots.length ? Math.max(...roots.map((n) => n.x + n.width)) + IMPORT_GAP : 0
     const top = roots.length ? Math.min(...roots.map((n) => n.y)) : 0
-    const insert = buildConceptInsert(concept, {
-      newId: () => crypto.randomUUID(),
-      place: () => ({ x: right, y: top }),
-      takenNames: { views: (data.views ?? []).map((v) => v.name), sequences: (data.sequences ?? []).map((q) => q.name) },
-    })
+    let insert: ReturnType<typeof buildConcernInsert>
+    try {
+      insert = buildConcernInsert(concept, {
+        answers: answers as Record<string, string>, elements, metamodel: facade.getMetamodel?.(), today: new Date().toISOString().slice(0, 10),
+        newId: () => crypto.randomUUID(), place: () => ({ x: right, y: top }),
+      })
+    } catch (error) {
+      return fail(`forge_import_hub_concept: ${(error as Error).message}`)
+    }
+    const count = (type: string) => Object.values(insert.nodes).filter((n) => n.type === type).length
+    const names = elements.map((e) => `${e.type} "${e.label}"`).join(', ')
+    const bound = !elements.length
+      ? `Not bound to any element: radical check reports its ADR as concern-unbound until it constrains the elements it is about (add_relation constrains from the ADR and fitness functions, satisfies to the requirements). Left to the team: name the tests of ${count('scenario')} scenarios and ${count('fitness-fn')} fitness functions.`
+      : `Bound to ${names}: the ADR and ${count('fitness-fn')} fitness functions constrain ${elements.length === 1 ? 'it' : 'each'} and ${elements.length === 1 ? 'it satisfies' : 'each satisfies'} ${count('requirement')} requirements. Left to the team: name the tests of ${count('scenario')} scenarios and ${count('fitness-fn')} fitness functions.`
     data.nodes.push(...Object.values(insert.nodes))
     data.relations.push(...Object.values(insert.relations))
-    if (Object.keys(insert.sequences).length) data.sequences = [...(data.sequences ?? []), ...Object.values(insert.sequences)]
-    if (insert.views.length) data.views = [...(data.views ?? []), ...insert.views]
-    if (insert.template) data.hubTemplates = { ...(data.hubTemplates ?? {}), [insert.template.id]: insert.template.record }
     const added = Object.values(insert.nodes).map((n) => `- ${n.id} ${n.type} "${n.label}"`)
     return ok([
-      `Imported ${concept.name}: +${added.length} nodes, +${Object.keys(insert.relations).length} relations, +${insert.views.length} views.`,
+      `Imported ${concept.name}: +${added.length} nodes, +${Object.keys(insert.relations).length} relations.`,
+      bound,
       ...added,
     ].join('\n'), { data })
   }

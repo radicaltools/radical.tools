@@ -515,6 +515,7 @@
   font-size: 16px; line-height: 1.6; color: var(--text-secondary);
 }
 .hub-hero-sub em { color: var(--text-primary); font-style: normal; font-weight: 600; }
+.hub-hero-sub code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; color: var(--text-primary); }
 .hub-hero-search {
   display: flex; gap: 8px;
   max-width: 640px; margin: 0 auto;
@@ -645,3 +646,5 @@
   .hub-hero { padding: 40px 0 32px; }
   .hub-hero-search { flex-direction: column; }
 }
+/* A concern pack's sources, where the Related bar would be (packs refer to none). */
+.hub-sources .hub-related-chip { --cat-color: var(--accent); text-decoration: none; }

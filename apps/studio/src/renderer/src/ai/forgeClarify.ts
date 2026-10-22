@@ -8,16 +8,16 @@
 // provider-agnostic — same pattern AISettingsModal.tsx already uses for its
 // "Test connection" button: getAdapter(id).chat({...}, cfg) then textOf(res.content).
 
-import { buildClarifyPrompt, parseClarifyReply, pickedHubConcepts, type ClarifyStageQuestion } from '@radical/common/ai/forge'
-import type { HubConceptSummary } from '@radical/common/hubFormat'
+import { buildClarifyPrompt, parseClarifyReply, withConcernQuestions, type ClarifyStageQuestion } from '@radical/common/ai/forge'
+import type { ConcernPack } from '@radical/common/concerns'
 import { getAdapter } from './registry'
 import { textOf, type AISettings, type TokenUsage } from './types'
 
 export interface ClarifyResult {
   questions: ClarifyStageQuestion[]
-  /** The Hub candidates the model picked for this stage ([] = none fits), or
-   *  null when its reply could not be read. */
-  picked: HubConceptSummary[] | null
+  /** The concern packs the model picked (Requirements stage); their
+   *  questions are among `questions`. */
+  picked: ConcernPack[]
   /** From this call alone — the caller sums it into whatever running total
    *  it's tracking (the clarify call is real token spend too, same as any
    *  generation round; it just doesn't touch the diagram). */
@@ -30,7 +30,7 @@ export interface ClarifyResult {
 export async function askClarifyingQuestions(
   stageTitle: string,
   description: string,
-  hubCandidates: HubConceptSummary[] | undefined,
+  concernPacks: ConcernPack[] | undefined,
   settings: AISettings,
   signal?: AbortSignal,
   priorQA?: string,
@@ -44,13 +44,13 @@ export async function askClarifyingQuestions(
   // routes clarify there regardless of what generation is configured to use.
   const res = await adapter.chat({
     model: adapter.defaultModel,
-    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, hubCandidates, priorQA) }],
+    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, concernPacks, priorQA) }],
     maxTokens: 900,
     temperature: 0.3,
     signal,
   }, cfg)
   const reply = parseClarifyReply(textOf(res.content))
-  if (!reply) return { questions: [], picked: null, usage: res.usage }
-  const { questions, picked } = pickedHubConcepts(reply, hubCandidates ?? [])
+  if (!reply) return { questions: [], picked: [], usage: res.usage }
+  const { questions, picked } = withConcernQuestions(reply, concernPacks ?? [])
   return { questions, picked, usage: res.usage }
 }

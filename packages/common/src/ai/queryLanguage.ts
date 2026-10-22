@@ -40,8 +40,8 @@ Supported node fields:
 
 Supported relation fields:
 - id, sourceId, targetId, label, technology, relationType,
-  source.label, source.type, target.label, target.type,
-  plus any custom property key for that relation's type
+  source.label, source.type, source.external, target.label, target.type,
+  target.external, plus any custom property key for that relation's type
 
 Supported view fields:
 - id, name, kind
@@ -399,8 +399,10 @@ function getRelationField(rel: C4Relation, field: string, nodes: Record<string, 
     case 'relationType': return rel.relationType ?? null
     case 'source.label': return source?.label ?? null
     case 'source.type': return source?.type ?? null
+    case 'source.external': return source ? source.external ?? false : null
     case 'target.label': return target?.label ?? null
     case 'target.type': return target?.type ?? null
+    case 'target.external': return target ? target.external ?? false : null
     default: return (rel as unknown as Record<string, unknown>)[field] ?? null
   }
 }

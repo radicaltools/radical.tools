@@ -1,4 +1,4 @@
-import { test, expect, fixture, DOC_ID, withWhole, WHOLE } from '../../support/fixtures'
+import { test, expect, fixture, DOC_ID } from '../../support/fixtures'
 import { HUB_PORT } from '../../playwright.config'
 
 // Import from the Hub into an existing model. Studio reads the catalogue
@@ -12,43 +12,6 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-const overlaps = (boxes: Record<string, { x: number; y: number; width: number; height: number }>, ids: string[]): string[] => {
-  const out: string[] = []
-  for (const a of ids) for (const b of ids) {
-    if (a >= b || !boxes[a] || !boxes[b]) continue
-    const p = boxes[a], q = boxes[b]
-    if (Math.min(p.x + p.width, q.x + q.width) - Math.max(p.x, q.x) > 1 && Math.min(p.y + p.height, q.y + q.height) - Math.max(p.y, q.y) > 1) out.push(`${a} / ${b}`)
-  }
-  return out
-}
-
-test('concepts added from a Hub link land where nothing is', async ({ page, studio }) => {
-  // Each was centred on the camera: three requirements lay at one place, on
-  // each other and on an element of the model.
-  const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(JSON.stringify(doc))
-  await page.goto(`/?hub=req-mfa,req-data-integrity,req-iac#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/designer/v/canvas`)
-  await studio.ready()
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await expect(dialog.getByRole('button', { name: 'Add to Model' }).first()).toBeVisible()
-  for (let i = 0; i < 3; i++) {
-    await dialog.getByRole('button', { name: 'Add to Model' }).first().click()
-    const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
-    const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
-    // The related-concepts picker, the template form, or straight in.
-    await expect.poll(async () => (await skip.count()) + (await importButton.count()) > 0
-      || (await studio.storedDoc()).nodes.length === 7 + i).toBe(true)
-    if (await skip.count()) await skip.click()
-    if (await importButton.count()) await importButton.click()
-    await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7 + i)
-  }
-  await dialog.getByRole('button', { name: 'Close' }).first().click()
-  await studio.settle()
-  const roots = (await studio.storedDoc()).nodes.filter((n) => !n.parentId).map((n) => n.id)
-  expect(overlaps(await studio.boxes(), roots)).toEqual([])
-})
-
 test('a concept added from a Hub link in Viewer reaches the model', async ({ page, studio }) => {
   // The Hub's link lands in Viewer, a perspective for looking: Add to Model
   // said "imported" and drew it, but it went into what Viewer shows, was
@@ -57,168 +20,127 @@ test('a concept added from a Hub link in Viewer reaches the model', async ({ pag
   const doc = JSON.parse(fixture('bookstore'))
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
-  await page.goto(`/?hub=req-mfa#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/viewer/v/canvas`)
+  await page.goto(`/?hub=concern-authentication#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/viewer/v/canvas`)
   await studio.ready()
+  const before = (await studio.storedDoc()).nodes.length
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByRole('button', { name: 'Add to Model' }).first().click()
-  const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
-  const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
-  await expect.poll(async () => (await skip.count()) + (await importButton.count()) > 0
-    || (await studio.storedDoc()).nodes.length === 7).toBe(true)
-  if (await skip.count()) await skip.click()
-  if (await importButton.count()) await importButton.click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+  // The wizard, at its default answers: the decision for an identity provider.
+  await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 16)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
-  expect(await studio.storedJson()).toContain('Multi-Factor')
-  await dialog.getByRole('button', { name: 'Close' }).first().click()
+  expect(await studio.storedJson()).toContain('Users sign in through an identity provider')
   await studio.settle()
-  expect((await studio.storedDoc()).nodes.length).toBe(7)
+  expect((await studio.storedDoc()).nodes.length).toBe(before + 16)
 })
 
-test('a concept added with its related concepts is one undo step', async ({ page, studio }) => {
-  // Each related concept came in with its own step: one Undo took back the
-  // main concept only.
-  await studio.seed('order-machine')
-  await studio.open('v-order')
+test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {
+  const box = { x: 0, y: 0, width: 200, height: 100, collapsed: false }
+  await studio.seedDocument(JSON.stringify({
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+    nodes: [
+      { id: 'user', type: 'person', label: 'Customer', ...box, x: 40, y: 40 },
+      { id: 'shop', type: 'system', label: 'Shop', ...box, x: 40, y: 260, width: 360, height: 220 },
+      { id: 'web', type: 'webapp', label: 'Storefront', ...box, parentId: 'shop', x: 40, y: 60 },
+      { id: 'admin', type: 'webapp', label: 'Back office', ...box, parentId: 'shop', x: 280, y: 60 },
+    ],
+    relations: [
+      { id: 'u', sourceId: 'user', targetId: 'web', relationType: 'interacts', label: 'shops' },
+      { id: 'a', sourceId: 'user', targetId: 'admin', relationType: 'interacts', label: 'manages' },
+    ],
+    views: [{ id: 'v-shop', name: 'Shop', kind: 'static', nodeIds: [], positions: {} }],
+  }))
+  await studio.open('v-shop')
+  await studio.node('web').click()
   const before = (await studio.storedDoc()).nodes.length
+
   await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Response Time')
-  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /API Response Time$/ }) })
+  await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
+  const card = dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
     .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
   await card.getByRole('button', { name: 'Add to Model' }).click()
-  await dialog.getByRole('button', { name: /^Import \(\d+\)$/ }).click()
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 3)
+
+  // A wizard: where it applies first, the shop suggested since it covers
+  // both web apps; any other element can be added from the list.
+  const wizard = page.getByTestId('concern-wizard')
+  const scope = wizard.getByRole('group', { name: 'Bind to' })
+  await expect(scope.getByRole('checkbox')).toHaveCount(3)
+  await expect(scope.getByRole('checkbox', { name: /^Shop.*Suggested/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(scope).toContainText('Covers 2: Back office, Storefront.')
+  await expect(wizard).toContainText('2 of 2 covered')
+  await expect(wizard.getByRole('checkbox', { name: 'Customer' })).not.toBeChecked()
+  // Bound to the two web apps instead.
+  await scope.getByRole('checkbox', { name: /^Shop/ }).click()
+  await expect(wizard).toContainText('0 of 2 covered')
+  // Bound to nothing it may still come in; the wizard says the check will list it.
+  await expect(wizard.locator('.nw-missing')).toHaveText('Not bound: the check will list it until it is')
+  await expect(wizard.getByRole('button', { name: 'Add to model' })).toBeEnabled()
+  await scope.getByRole('checkbox', { name: /^Storefront/ }).click()
+  await scope.getByRole('checkbox', { name: /^Back office/ }).click()
+  await expect(wizard).toContainText('2 of 2 covered')
+  const step = (title: string) => wizard.locator('.nw-step', { hasText: title })
+  const brings = wizard.getByTestId('concern-brings')
+
+  // One question a step, the answers as cards; the review says what they bring.
+  await wizard.getByRole('button', { name: 'Next' }).click()
+  await expect(wizard.locator('.nw-heading')).toHaveText('How do people sign in?')
+  await wizard.getByRole('radio', { name: /^Our own user store/ }).click()
+  await step('Review').click()
+  await expect(brings).toContainText('8 requirements')
+  await expect(brings).toContainText('Passwords stored as hashes')
+  await step('Sign-in').click()
+  await wizard.getByRole('radio', { name: /^An external identity provider/ }).click()
+  await step('Second factor').click()
+  await wizard.getByRole('radio', { name: /^No\b/ }).click()
+  // Which operations need it is no longer asked.
+  await step('Details').click()
+  await expect(wizard.getByLabel('How long may a session stay idle (minutes)?')).toBeVisible()
+  await expect(wizard.getByLabel('Which operations need a second factor?')).toHaveCount(0)
+  await step('Review').click()
+  await expect(brings).toContainText('5 requirements')
+  await expect(wizard.locator('.nw-heading')).toHaveText('What comes into 2 elements')
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+  await expect(wizard).toBeHidden()
+  await expect(dialog).toBeHidden()
+
+  // need + 5 requirements + 5 scenarios + ADR + 2 fitness functions.
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 14)
+  const doc = await studio.storedDoc() as unknown as {
+    nodes: Array<{ id: string; type: string; status?: string; concern?: string }>
+    relations: Array<{ sourceId: string; targetId: string; relationType?: string }>
+  }
+  const adr = doc.nodes.find((n) => n.type === 'adr')!
+  expect(adr).toMatchObject({ status: 'accepted', concern: 'authentication' })
+  const has = (type: string, from: string, to: string) => doc.relations.some((r) => r.relationType === type && r.sourceId === from && r.targetId === to)
+  for (const app of ['web', 'admin']) {
+    expect(has('constrains', adr.id, app)).toBe(true)
+    for (const req of doc.nodes.filter((n) => n.type === 'requirement')) expect(has('satisfies', app, req.id)).toBe(true)
+  }
+  expect(has('constrains', adr.id, 'shop')).toBe(false)
+
   await studio.pane.click({ position: { x: 5, y: 5 } })
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before)
 })
 
-test('a blueprint leaves no {{KEY}} placeholder in the model', async ({ page, studio }) => {
-  // The template form asked only for the parameters the selected elements
-  // listed themselves, and the flows' step notes were not filled in.
-  const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(withWhole(JSON.stringify(doc)))
-  await studio.open(WHOLE)
-  await page.getByRole('button', { name: 'Models', exact: true }).click()
-  await page.getByText(/Import from Hub/).first().click()
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concepts…').pressSequentially('Fintech')
-  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /Fintech/ }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-  await card.getByRole('button', { name: 'Add to Model' }).click()
-  // The picker: leave the referenced concepts out, import the elements.
-  for (const box of await dialog.locator('input[type=checkbox]:checked').all()) {
-    const label = (await box.locator('xpath=..').innerText()).trim()
-    if (/hub|concept/i.test(label)) await box.uncheck().catch(() => {})
-  }
-  await dialog.getByRole('button', { name: /^Import \(/ }).click()
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBeGreaterThan(20)
-  await page.waitForTimeout(1000)
-  // The template record keeps the Hub's text with its tokens, to apply new
-  // values later; the model itself has none.
-  const saved = JSON.parse(await studio.storedJson()) as { nodes: unknown[]; relations: unknown[]; sequences?: unknown[] }
-  expect(JSON.stringify([saved.nodes, saved.relations, saved.sequences ?? []])).not.toMatch(/\{\{[A-Z0-9_]+\}\}/)
-})
-
-test('a concept imported into a selected container lands beside what it holds', async ({ page, studio }) => {
-  // It kept the concept's own coordinates inside the container: on its
-  // children, and a second import on the first.
-  const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(JSON.stringify(doc))
-  await studio.open('v-containers')
-  for (let i = 0; i < 2; i++) {
-    const bookstore = studio.node('bookstore')
-    if (!/selected/.test((await bookstore.getAttribute('class')) ?? '')) await bookstore.click({ position: { x: 30, y: 12 } })
-    await page.getByRole('button', { name: 'Models', exact: true }).click()
-    await page.getByText(/Import from Hub/).first().click()
-    const dialog = page.locator('[aria-label="Import from Hub"]')
-    await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
-    const card = dialog.locator('div', { has: page.getByRole('heading', { name: /API Versioning/ }) })
-      .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-    await card.getByRole('button', { name: 'Add to Model' }).click()
-    await page.waitForTimeout(800)
-    const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
-    if (await skip.count()) await skip.click()
-    await page.waitForTimeout(300)
-    const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
-    if (await importButton.count()) await importButton.click()
-    await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7 + i)
-    if (await dialog.isVisible().catch(() => false)) await page.keyboard.press('Escape')
-  }
-  await studio.settle()
-  const inside = (await studio.storedDoc()).nodes.filter((n) => n.parentId === 'bookstore').map((n) => n.id)
-  expect(overlaps(await studio.boxes(), inside)).toEqual([])
-  // The container grew; its neighbour made room, as after a drop.
-  expect(overlaps(await studio.boxes(), ['bookstore', 'payments', 'customer'])).toEqual([])
-})
-
-test('a concept added in Viewer with a container selected goes into it, as the card says', async ({ page, studio }) => {
-  // The switch to Designer dropped the selection before the import read it:
-  // the card said "↳ Bookstore" and the concept landed at the top.
-  const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(JSON.stringify(doc))
-  await studio.open('v-containers', 'viewer')
-  await studio.node('bookstore').click({ position: { x: 30, y: 12 } })
-  await expect(studio.node('bookstore')).toHaveClass(/selected/)
-  await page.getByRole('button', { name: 'Models', exact: true }).click()
-  await page.getByText(/Import from Hub/).first().click()
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concepts…').pressSequentially('API Versioning')
-  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /API Versioning/ }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-  await expect(card).toContainText('↳ Bookstore')
-  await card.getByRole('button', { name: 'Add to Model' }).click()
-  await page.waitForTimeout(800)
-  const skip = dialog.getByRole('button', { name: 'Skip', exact: true })
-  if (await skip.count()) await skip.click()
-  await page.waitForTimeout(300)
-  const importButton = dialog.getByRole('button', { name: 'Import', exact: true })
-  if (await importButton.count()) await importButton.click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
-  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
-  const added = (await studio.storedDoc()).nodes.filter((n) => !JSON.parse(fixture('bookstore')).nodes.some((m: { id: string }) => m.id === n.id))
-  expect(added.map((n) => n.parentId)).toEqual(['bookstore'])
-})
-
-test("a blueprint's views keep the Hub's layout, also after a reload", async ({ page, studio }) => {
-  // Imported on a view, its elements had places on that view only (1 of 39
-  // on All elements) and its views none: Containers, opened after a reload,
-  // drew the Ledger Platform over the model's root elements.
-  const doc = JSON.parse(fixture('bookstore'))
-  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
-  await studio.seedDocument(JSON.stringify(doc))
+test('the import dialog filters concern packs by group', async ({ page, studio }) => {
+  await studio.seed('bookstore')
   await studio.open('v-containers')
   await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concepts…').pressSequentially('Fintech')
-  const card = dialog.locator('div', { has: page.getByRole('heading', { name: /Fintech/ }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-  await card.getByRole('button', { name: 'Add to Model' }).click()
-  for (const box of await dialog.locator('input[type=checkbox]:checked').all()) {
-    const label = (await box.locator('xpath=..').innerText()).trim()
-    if (/hub|concept/i.test(label)) await box.uncheck().catch(() => {})
+  const groups = dialog.getByRole('group', { name: 'Concern groups' })
+  await expect(groups.getByRole('button')).toHaveText(['All', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
+  await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
+  await groups.getByRole('button', { name: 'Data', exact: true }).click()
+  await expect(dialog.getByRole('heading', { name: 'Personal data', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toHaveCount(0)
+  // Every card names its group.
+  const cards = dialog.locator('h4')
+  for (const name of await cards.allInnerTexts()) {
+    await expect(dialog.locator('div', { has: page.getByRole('heading', { name, exact: true }) }).last()).toContainText('Data')
   }
-  await dialog.getByRole('button', { name: /^Import \(/ }).click()
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBeGreaterThan(20)
-  await page.waitForTimeout(1000)
-  const saved = await studio.storedDoc() as unknown as { nodes: Array<{ id: string }>; views: Array<{ id: string; name: string; positions: Record<string, unknown> }>; defaultPositions: Record<string, unknown> }
-  expect(saved.nodes.filter((n) => !(n.id in saved.defaultPositions)).map((n) => n.id)).toEqual([])
-  const view = (name: string) => saved.views.find((v) => v.name.endsWith(`— ${name}`))!
-  expect(Object.keys(view('Containers').positions).length).toBeGreaterThan(10)
-  await studio.open(view('System context').id)
-  await page.reload()
-  await studio.ready()
-  await studio.open(view('Containers').id)
-  await studio.settle()
-  expect(await studio.layoutViolations()).toEqual([])
 })

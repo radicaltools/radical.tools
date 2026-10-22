@@ -4,7 +4,9 @@
  * ignores the format) without ever throwing or blocking the wizard.
  */
 import { describe, it, expect } from 'vitest'
-import { parseClarifyResponse, parseClarifyReply, pickedHubConcepts, formatClarificationAnswers, HUB_MATCHES_QUESTION_ID, buildClarifyPrompt } from '../src/ai/forge/clarify'
+import { parseClarifyResponse, parseClarifyReply, formatClarificationAnswers, buildClarifyPrompt } from '../src/ai/forge/clarify'
+import { CONCERNS_QUESTION_ID } from '../src/ai/forge/concerns'
+import type { ConcernPack } from '../src/concerns'
 
 describe('parseClarifyResponse', () => {
   it('parses a clean JSON array', () => {
@@ -44,14 +46,19 @@ describe('parseClarifyResponse', () => {
   })
 })
 
+const PACK: ConcernPack = {
+  id: 'concern-authentication', name: 'Authentication', description: 'Who is calling.',
+  concern: { id: 'authentication', trigger: 'LIST NODES', why: 'w', group: 'identity' },
+  templateParams: [{ key: 'IDENTITY', label: 'How do people sign in?', defaultValue: 'idp', options: [{ value: 'idp', label: 'a provider' }, { value: 'none', label: 'nobody' }] }],
+}
+
 describe('buildClarifyPrompt', () => {
-  it('requires the hub_matches question only when there are hub matches', () => {
-    const withMatches = buildClarifyPrompt('C4 model', 'desc', [
-      { id: 'p1', category: 'pattern', name: 'Pattern One', description: 'd', tags: [] } as any,
-    ])
-    const withoutMatches = buildClarifyPrompt('C4 model', 'desc', undefined)
-    expect(withMatches).toContain(HUB_MATCHES_QUESTION_ID)
-    expect(withoutMatches).not.toContain(HUB_MATCHES_QUESTION_ID)
+  it('asks for the concerns question only when there are concern packs', () => {
+    const withPacks = buildClarifyPrompt('Requirements', 'desc', [PACK])
+    const withoutPacks = buildClarifyPrompt('C4 model', 'desc', undefined)
+    expect(withPacks).toContain(`"${CONCERNS_QUESTION_ID}"`)
+    expect(withPacks).toContain('- concern-authentication | Authentication: Who is calling.')
+    expect(withoutPacks).not.toContain(CONCERNS_QUESTION_ID)
   })
 
   it('includes prior-stage Q&A (and the do-not-repeat instruction) only when passed', () => {
@@ -63,33 +70,17 @@ describe('buildClarifyPrompt', () => {
     expect(withoutPrior).not.toContain('do NOT ask about these')
   })
 
-  it("in 'ask' mode tells the model to ask the user instead of answering with JSON", () => {
-    const hub = [{ id: 'p1', category: 'pattern', name: 'Pattern One', description: 'd', tags: [] } as any]
-    const ask = buildClarifyPrompt('C4 model', 'desc', hub, undefined, 'ask')
+  it("in 'ask' mode tells the model to ask the user, the packs' questions included, instead of answering with JSON", () => {
+    const ask = buildClarifyPrompt('Requirements', 'desc', [PACK], undefined, 'ask')
     expect(ask).toContain('Ask the user those questions')
-    expect(ask).toContain('ask the user which of your picks to apply')
-    expect(ask).toContain('- p1 | [pattern] Pattern One: d')
+    expect(ask).toContain('pass the packs with the user\'s answers to forge_generate as concerns')
+    expect(ask).toContain('  - IDENTITY: How do people sign in? [idp = a provider; none = nobody] (default idp)')
     expect(ask).not.toContain('JSON')
-    expect(ask).not.toContain(HUB_MATCHES_QUESTION_ID)
-  })
-})
-
-describe('Hub picks', () => {
-  const candidates = [
-    { id: 'p1', category: 'pattern', name: 'Pattern One', description: 'd', tags: [] },
-    { id: 'p2', category: 'pattern', name: 'Pattern Two', description: 'd', tags: [] },
-  ] as any[]
-
-  it('maps the picked names to the candidates, in the model\'s order, and drops unknown ones', () => {
-    const questions = parseClarifyReply(`[{"id":"auth","question":"Which auth?","kind":"text"},{"id":"${HUB_MATCHES_QUESTION_ID}","question":"Apply?","kind":"select","multiSelect":true,"options":["pattern two","Invented","p1"]}]`)!
-    const { questions: rest, picked } = pickedHubConcepts(questions, candidates)
-    expect(picked.map((c) => c.id)).toEqual(['p2', 'p1'])
-    expect(rest.map((q) => q.id)).toEqual(['auth', HUB_MATCHES_QUESTION_ID])
-    expect(rest[1].options).toEqual(['Pattern Two', 'Pattern One'])
+    expect(ask).not.toContain(`"${CONCERNS_QUESTION_ID}"`)
   })
 
-  it('tells a reply without picks from one that is not a reply', () => {
-    expect(pickedHubConcepts(parseClarifyReply('[]')!, candidates).picked).toEqual([])
+  it('tells a reply without questions from one that is not a reply', () => {
+    expect(parseClarifyReply('[]')).toEqual([])
     expect(parseClarifyReply('Sorry, I cannot help.')).toBeNull()
     expect(parseClarifyResponse('Sorry, I cannot help.')).toEqual([])
   })
@@ -107,12 +98,13 @@ describe('formatClarificationAnswers', () => {
     expect(out).toContain('Q: Which tier?\nA: paid')
   })
 
-  it('excludes the hub_matches question and skips unanswered ones', () => {
+  it('excludes the concern packs\' questions and skips unanswered ones', () => {
     const questions = [
-      { id: HUB_MATCHES_QUESTION_ID, question: 'Which patterns?', kind: 'select' as const, options: ['A'], multiSelect: true },
+      { id: CONCERNS_QUESTION_ID, question: 'Which concerns?', kind: 'select' as const, options: ['A'], multiSelect: true },
+      { id: 'concern:concern-authentication:IDENTITY', question: 'How?', kind: 'select' as const, options: ['a provider'] },
       { id: 'unanswered', question: 'Skipped?', kind: 'text' as const },
     ]
-    const out = formatClarificationAnswers(questions, { [HUB_MATCHES_QUESTION_ID]: ['A'] })
+    const out = formatClarificationAnswers(questions, { [CONCERNS_QUESTION_ID]: ['A'], 'concern:concern-authentication:IDENTITY': 'a provider' })
     expect(out).toBe('')
   })
 

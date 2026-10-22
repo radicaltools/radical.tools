@@ -19,7 +19,8 @@ const studioDir = dirname(require.resolve('radical-model/package.json'))
 const hubDir = dirname(require.resolve('@radical/hub/package.json'))
 
 const STUDIO_PORT = 4320
-const HUB_PORT = 4321
+export const DOCS_HUB_PORT = 4321
+const HUB_PORT = DOCS_HUB_PORT
 
 const themes = ['light', 'dark'] as const
 

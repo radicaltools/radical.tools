@@ -4,6 +4,6 @@ type: "scenario"
 label: "Browse category and search"
 given: "the Hub landing page is open"
 tests: "apps/e2e/tests/hub/hub.spec.ts › browse a category and search"
-then: "only blueprints are listed with the link #/cat/blueprint, and the search shows the Fintech Ledger blueprint but not the AI Support Assistant one"
-when: "the user clicks Blueprints and then searches for ledger"
+then: "only the Data packs are listed with the link #/cat/data, Authentication is not, and the search shows Backup and recovery but not Personal data"
+when: "the user clicks the Data group and then searches for backup"
 ---

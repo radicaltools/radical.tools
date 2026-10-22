@@ -555,7 +555,8 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     description and properties of a component; the ids, types and labels
     were all that was needed, and the result had to be cut up with a
     script. A field list (`LIST NODES id, type, label WHERE …`) or a
-    compact mode would do.
+    compact mode would do. Again on 2026-10-22: the Hub elements, 54 000
+    characters for 56 rows.
 39. **`update_node` cannot clear a property.** Turning the requirement "No
     refinement without asking" from event-driven into unwanted-behaviour
     (2026-10-19) needed its `trigger` gone: `null` is refused ("must be a
@@ -579,6 +580,17 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     `get_changes` for one element on request, would do. Item 24 again too:
     adding that sentence meant sending each description (up to 3 000
     characters) back whole.
+42. **`GET NODE` of a group returns everything in it.** Checking which
+    element the id 4f7ff47a… is (2026-10-22, the Decisions group) returned
+    179 000 characters on one line: the group, then every ADR and fitness
+    function inside it with all its fields. Asking for one node should
+    return that node, with its children as ids and labels at most
+    (`GET CHILDREN OF` is there for the rest).
+43. **Ids must be given whole.** `search_model` rows are long UUIDs, and a
+    short prefix (`GET CHILDREN OF 6d7250bb`) answers "Unknown node id"
+    instead of the one element it names, as git does with commit
+    prefixes. An agent has to keep every full id it has seen, or search
+    again.
 
 ### Reverse-engineered requirements (2026-10-06)
 

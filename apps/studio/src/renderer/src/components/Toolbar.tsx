@@ -13,6 +13,7 @@ import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { AboutDialog } from './AboutDialog'
 import { HubImportModal } from './HubImportModal'
+import { OPEN_HUB_EVENT } from '../persistence/inspector'
 import { RadicalForgeModal } from './RadicalForgeModal'
 import { AgentForgeModal } from './AgentForgeModal'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
@@ -722,13 +723,28 @@ export function Toolbar(): React.ReactElement {
 
   const [hubOpen, setHubOpen] = useState(false)
   const [hubPreselectedIds, setHubPreselectedIds] = useState<string[] | undefined>(undefined)
+  const [hubBindTo, setHubBindTo] = useState<string | undefined>(undefined)
   const handleOpenHub = useCallback(() => {
     setHubPreselectedIds(undefined)
+    setHubBindTo(undefined)
     setHubOpen(true)
   }, [])
   const handleCloseHub = useCallback(() => {
     setHubOpen(false)
     setHubPreselectedIds(undefined)
+    setHubBindTo(undefined)
+  }, [])
+  // The Inspector's concern finding opens the modal on its pack, bound to
+  // the element the concern applies to (persistence/inspector.ts, openConcern).
+  useEffect(() => {
+    const onOpen = (e: Event): void => {
+      const { ids, bindTo } = (e as CustomEvent<{ ids: string[]; bindTo?: string }>).detail
+      setHubPreselectedIds(ids)
+      setHubBindTo(bindTo)
+      setHubOpen(true)
+    }
+    window.addEventListener(OPEN_HUB_EVENT, onOpen)
+    return () => window.removeEventListener(OPEN_HUB_EVENT, onOpen)
   }, [])
 
   // Detect ?hub=id1,id2 query param and open modal pre-filtered.
@@ -781,7 +797,7 @@ export function Toolbar(): React.ReactElement {
     <div className="toolbar">
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
-      <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} />
+      <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
       <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
       <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
       <AppMenu

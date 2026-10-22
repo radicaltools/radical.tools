@@ -106,8 +106,8 @@ Spend most of the run where bugs are likely, not where it is easy:
   (from there up a ⌘/Ctrl drag frees only the held element's surroundings,
   and Smart Layout does not try the physics' relaxation), several hundred.
 - **Different models.** The sample (Open → Sample model),
-  `apps/e2e/fixtures/*.radical`, and the Hub blueprints in
-  `packages/hub-catalogue/catalogue`. Models with state machines, domains,
+  `apps/e2e/fixtures/*.radical`, and the former Hub blueprints and patterns
+  in `packages/layout/bench/models`. Models with state machines, domains,
   mockups and many root elements behave unlike plain C4 ones.
 
 Do not walk the same path twice in a row. Each run, choose differently.

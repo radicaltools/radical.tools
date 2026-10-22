@@ -1,9 +1,11 @@
 import type { Page, Route } from '@playwright/test'
 import { test, expect, fixture } from '../../support/fixtures'
+import { HUB_PORT } from '../../playwright.config'
 
 // Radical Forge asks for the view structure first: the Radical one (views of
-// the viewpoints in folders, made as they fill) or the layer canvases. It
-// offers the Hub concepts the model picked from a stage's candidates; with
+// the viewpoints in folders, made as they fill) or the layer canvases. In the
+// Requirements stage it asks the questions of the concern packs the model
+// picked and imports them whole; with
 // layer canvases it files what each stage generates into the views
 // Conceptual, Logical & physical and Governance, places it beside what the
 // view already shows, and after the stage offers to keep it in a row, column
@@ -22,7 +24,7 @@ interface ScriptedStage {
 /** Answers Anthropic Messages calls: no clarifying questions, and per stage
  *  one round of tool calls (or calls made from the stage's prompt), its
  *  follow-up rounds, then a summary. */
-async function scriptAnthropic(page: Page, stages: ScriptedStage[]): Promise<string[]> {
+async function scriptAnthropic(page: Page, stages: ScriptedStage[], pickConcern?: string): Promise<string[]> {
   const stagePrompts: string[] = []
   await page.addInitScript(() => {
     localStorage.setItem('radical-ai-settings', JSON.stringify({
@@ -38,10 +40,10 @@ async function scriptAnthropic(page: Page, stages: ScriptedStage[]): Promise<str
       body: JSON.stringify({ model: 'claude-haiku-4-5', content, stop_reason: stop, usage: { input_tokens: 10, output_tokens: 10 } }),
     })
     if (!body.tools) {
-      // Clarify: pick one Hub candidate when the requirements stage offers it.
+      // Clarify: pick the concern pack asked for when the requirements stage offers the packs.
       const prompt = JSON.stringify(body.messages)
-      const pick = prompt.includes('\\"Requirements\\" stage') && prompt.includes('- req-idempotency |')
-        ? [{ id: 'hub_matches', question: 'Apply these Hub concepts?', kind: 'select', multiSelect: true, options: ['Idempotent Write Operations'] }]
+      const pick = pickConcern && prompt.includes('\\"Requirements\\" stage') && prompt.includes('Concern packs of the Hub')
+        ? [{ id: 'concerns', question: 'Settle these concerns?', kind: 'select', multiSelect: true, options: [pickConcern] }]
         : []
       return reply([{ type: 'text', text: JSON.stringify(pick) }], 'end_turn')
     }
@@ -100,19 +102,11 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   const conceptual = (await viewNamed('Conceptual'))!
   await expect(page).toHaveURL(new RegExp(`/v/${conceptual.id}$`))
 
-  // The model picked one of the stage's Hub candidates; the user confirms it.
-  const hub = page.locator('.forge-hub-suggestions')
-  await expect(hub.locator('.forge-hub-suggestions-label')).toHaveText('Picked from the Hub')
-  await expect(hub.locator('.forge-hub-card-name')).toHaveText(['Idempotent Write Operations'])
-  await expect(page.getByLabel('Idempotent Write Operations')).toBeChecked()
-  await page.getByRole('button', { name: 'Confirm answers' }).click()
-
   // Requirements: into Conceptual, then the arrange questions.
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   const arrange = page.locator('.forge-arrange')
   await expect(arrange).toContainText('Keep the 5 new elements on Conceptual in a')
-  expect(stagePrompts[0]).toContain('Relevant prior art already in the Hub catalogue')
-  expect(stagePrompts[0]).toContain('Idempotent Write Operations')
+  expect(stagePrompts[0]).not.toContain('Concerns already decided by Hub concern packs')
   await expect(arrange).toContainText('Run Smart Layout on Conceptual?')
   await expect.poll(async () => (await viewNamed('Conceptual'))!.nodeIds.length).toBe(6)
   const requirements = (await stored()).nodes.filter((n) => n.type === 'requirement').map((n) => n.id)
@@ -189,7 +183,6 @@ test('Forge builds the domain model after the requirements and the state machine
   // …without scrolling.
   expect(await page.locator('.forge-steps').evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0)
 
-  await page.getByRole('button', { name: 'Skip questions' }).click()
   for (const stage of ['requirements', 'domain model', 'fitness functions', 'Gherkin scenarios']) {
     await page.getByRole('button', { name: `Generate ${stage}` }).click()
     await page.getByRole('button', { name: 'Continue →' }).click()
@@ -250,7 +243,6 @@ test('Forge asks for the view structure and files the run into the Radical one',
   const traceability = ((await studio.storedDoc()) as unknown as { views: View[] }).views.find((v) => v.viewpoint === 'traceability')!
   await expect(page).toHaveURL(new RegExp(`/v/${traceability.id}$`))
 
-  await page.getByRole('button', { name: 'Skip questions' }).click()
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()
   // The views of requirements in Governance; nothing for Specification, which
@@ -316,7 +308,6 @@ test('Forge asks before it refines an earlier stage and applies only what the us
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
   await page.getByRole('button', { name: 'Start →' }).click()
-  await page.getByRole('button', { name: 'Skip questions' }).click()
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.getByTestId('forge-refinements')).toHaveCount(0)
   await page.getByRole('button', { name: 'Continue →' }).click()
@@ -396,4 +387,43 @@ test('without an AI provider Radical Forge is offered disabled, with how to set 
   await expect(page.getByRole('button', { name: 'Open Radical Forge' })).toBeDisabled()
   await expect(page.locator('.forge-panel')).toHaveCount(0)
   expect(asked).toEqual([])
+})
+
+test('Forge asks a concern pack\'s questions and imports it whole', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  // The Hub's packs, from this build's Hub instead of hub.radical.tools.
+  await page.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
+    const response = await route.fetch({ url: `http://localhost:${HUB_PORT}` + new URL(route.request().url()).pathname })
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-type': 'application/json' } })
+  })
+  const stagePrompts = await scriptAnthropic(page, [
+    { task: /extract its functional requirements/, calls: [requirement(1)] },
+  ], 'Authentication')
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
+  await page.locator('.forge-textarea').fill('# Book shop\n\nReaders browse the catalogue; nobody needs an account.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+
+  // The pack's questions, at their defaults, among the stage's questions.
+  const sign = page.locator('.forge-clarify-q', { hasText: 'Authentication — How do people sign in?' })
+  await expect(sign.getByLabel('an external identity provider (OpenID Connect)')).toBeChecked()
+  await sign.getByLabel('nobody signs in').check()
+  await page.locator('.forge-clarify-q', { hasText: 'Authentication — How do other systems call it?' }).getByLabel('none, no other system calls it').check()
+  await page.getByRole('button', { name: 'Confirm answers' }).click()
+  await page.getByRole('button', { name: 'Generate requirements' }).click()
+  await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()
+
+  // In the model, whole and unbound; the stage was told it is decided.
+  await expect.poll(async () => (await studio.storedDoc()).nodes.some((n) => (n as { type?: string }).type === 'adr')).toBe(true)
+  const stored = await studio.storedDoc() as unknown as { nodes: Array<{ id: string; type: string; label: string; concern?: string }>; relations: Array<{ sourceId: string; relationType?: string }> }
+  const adr = stored.nodes.find((n) => n.type === 'adr')!
+  expect(adr).toMatchObject({ label: 'Nobody signs in', concern: 'authentication' })
+  expect(stored.nodes.some((n) => n.label === 'Public by design')).toBe(true)
+  expect(stored.relations.some((r) => r.sourceId === adr.id && r.relationType === 'constrains')).toBe(false)
+  // (The prompt is kept as JSON: its quotes are escaped.)
+  expect(stagePrompts[0]).toContain('Concerns already decided by Hub concern packs')
+  expect(stagePrompts[0]).toContain(`- Authentication: ${adr.id} `)
 })

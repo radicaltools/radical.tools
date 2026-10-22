@@ -11,7 +11,7 @@
 // This module is imported by both the renderer and the node-side build
 // plugin, so it must stay free of browser / vite / store imports.
 
-export type HubCategory = 'pattern' | 'fitness-function' | 'requirement' | 'adr' | 'blueprint'
+export type HubCategory = 'pattern' | 'fitness-function' | 'requirement' | 'adr' | 'blueprint' | 'concern'
 
 /** A single parameter that must be filled in before a hub concept is imported. */
 export interface TemplateParam {
@@ -20,6 +20,37 @@ export interface TemplateParam {
   hint?: string
   type?: 'text' | 'number'
   defaultValue?: string
+  /** The answers to choose from (a concern pack's questions): the value
+   *  picks the elements whose hubWhen names it, the label fills {{KEY}} and
+   *  is what the user reads, the description says what the answer means.
+   *  Without them the value is free text. */
+  options?: Array<{ value: string; label: string; description?: string }>
+  /** A question's name in a word or two, for the step of a wizard. */
+  title?: string
+}
+
+/** What makes a concept a concern pack (category `concern`): when the
+ *  concern applies to a model and what decides it. The questions are the
+ *  pack's templateParams; see concerns.ts. */
+export interface ConcernMeta {
+  /** The concern's id, which an ADR that settles it holds in `concern`. */
+  id: string
+  /** A LIST NODES or LIST RELATIONS query in the model query language
+   *  (ai/queryLanguage.ts): the elements it lists, or for relations the
+   *  `applyTo` end of each, are the ones the concern applies to. */
+  trigger: string
+  applyTo?: 'source' | 'target'
+  /** Why the trigger fires, in one sentence, for the finding. */
+  why: string
+  /** The group it belongs to (CONCERN_GROUPS in concerns.ts): the area of
+   *  the architecture where its decision is made. */
+  group: string
+}
+
+/** A standard, law or reference a concern pack rests on. */
+export interface HubSource {
+  title: string
+  url: string
 }
 
 /** Catalogue metadata — the `hub` block of a concept's .radical file. */
@@ -39,6 +70,10 @@ export interface HubConceptMeta {
    * requirements, fitness functions, ADRs, or patterns from the hub catalogue.
    */
   hubRefs?: string[]
+  /** Set on a concern pack (category `concern`). */
+  concern?: ConcernMeta
+  /** What a concern pack rests on, at least two. */
+  sources?: HubSource[]
 }
 
 /** On-disk shape of `hub/<category>/<id>.radical`. */

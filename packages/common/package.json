@@ -22,6 +22,7 @@
     "./hubFormat": "./src/hubFormat.ts",
     "./hubViews": "./src/hubViews.ts",
     "./hubImport": "./src/hubImport.ts",
+    "./concerns": "./src/concerns.ts",
     "./wireframe": "./src/wireframe.ts",
     "./formats/structurizrDsl": "./src/formats/structurizrDsl.ts",
     "./formats/mdFolder": "./src/formats/mdFolder.ts",

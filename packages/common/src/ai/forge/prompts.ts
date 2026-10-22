@@ -60,7 +60,6 @@
 // also lists the gaps radical check's rules find for the stages done. The
 // Review stage comes last: with every part there, it makes them agree.
 
-import type { HubConceptSummary } from '../../hubFormat'
 
 export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'processes' | 'c4' | 'mockups' | 'review'
 
@@ -135,29 +134,6 @@ export const FORGE_STAGES: ForgeStage[] = [
     blurb: 'Read the whole model against the description: close the gaps left and make its parts agree. You keep or reject each change.',
   },
 ]
-
-/** Formats Hub catalogue matches (see ./hubMatches.ts) as prior-art
- *  guidance: the model is told to apply the principles these concepts
- *  embody — proven decomposition/coupling patterns, ADR precedent, fitness-
- *  function thresholds — rather than re-deriving everything from scratch,
- *  while being explicit that only a real add_node call creates a node (so
- *  it doesn't just claim to have "imported" one in prose). */
-function buildHubGuidanceBlock(hubMatches: HubConceptSummary[] | undefined): string {
-  if (!hubMatches?.length) return ''
-  const lines = hubMatches.map((c) => {
-    const tags = c.tags.length ? ` (tags: ${c.tags.join(', ')})` : ''
-    return `- [${c.category}] ${c.name}: ${c.description}${tags}`
-  })
-  return [
-    '',
-    'Relevant prior art already in the Hub catalogue — apply these principles',
-    '(proven decomposition/coupling patterns, ADR precedent, fitness-function',
-    'thresholds) where they fit this system, and reference one by name in a',
-    "node's `description` when you follow it. Do not claim to have \"imported\"",
-    'one in prose — only a real add_node/add_relation call creates something:',
-    ...lines,
-  ].join('\n')
-}
 
 /** Formats a compact synopsis of earlier stages in this run — replaces
  *  carrying their full verbatim tool-call transcripts forward (which
@@ -245,9 +221,8 @@ export function forgeLanguageRules(languages: ForgeLanguages = {}): string[] {
  *  free-text system description the user provided in the Input step — later
  *  stages still get it for grounding, even though the requirements/model it
  *  implies are by then already in the live diagram (and thus in `history`).
- *  `hubMatches` are the same Hub suggestions shown in the wizard UI for this
- *  stage (see RadicalForgeModal.tsx, or forge_clarify over MCP) — generation and what the user sees
- *  stay the same set, no separate "what did the AI see" mystery.
+ *  `concerns` is ./concerns.ts' buildConcernsBlock: the concerns the run's
+ *  concern packs decided, and in C4 what to link.
  *  `clarifications` is the formatted Q&A from the pre-stage clarify step
  *  (./clarify.ts), when the user answered any. `priorStageSummaries`
  *  is the pre-formatted output of `buildPriorStagesBlock` above. `need` is
@@ -258,7 +233,7 @@ export function forgeLanguageRules(languages: ForgeLanguages = {}): string[] {
 export function buildForgeStagePrompt(
   stageId: ForgeStageId,
   description: string,
-  hubMatches?: HubConceptSummary[],
+  concerns?: string,
   clarifications?: string,
   priorStageSummaries?: string,
   need?: ForgeNeedRef,
@@ -271,7 +246,7 @@ export function buildForgeStagePrompt(
     description.trim(),
     '"""',
     priorStageSummaries,
-    buildHubGuidanceBlock(hubMatches),
+    concerns,
     buildClarificationsBlock(clarifications),
   ].filter(Boolean).join('\n')
 

@@ -12,6 +12,8 @@
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseTestResults, type CheckConfig, type CheckResult, type TestResults } from '@radical/common/check'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { loadBundledConcepts } from '@radical/ui/store/hubStore'
+import { concernPacks, type ConcernPack } from '@radical/common/concerns'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
 
@@ -75,6 +77,20 @@ export async function saveCheckConfig(config: CheckConfig): Promise<void> {
 
 let lastConfig = ''
 
+/** The concern packs of the catalogue Studio bundles: read from the app,
+ *  not hub.radical.tools, so the critic needs no network and checks against
+ *  the packs of this version. */
+let packs: ConcernPack[] = []
+let packsLoading: Promise<void> | null = null
+
+/** Opens the Hub import dialog (Toolbar.tsx listens) on a concern pack,
+ *  bound to an element: the Inspector's answer to a concern-unaddressed
+ *  finding. */
+export const OPEN_HUB_EVENT = 'radical:open-hub'
+export function openConcern(packId: string, elementId?: string): void {
+  window.dispatchEvent(new CustomEvent(OPEN_HUB_EVENT, { detail: { ids: [packId], bindTo: elementId } }))
+}
+
 /** The document whose test results and check.json have been read: the
  *  check waits for them, or a link that opens the Inspector showed the
  *  model without its test results first and then again with them. */
@@ -87,7 +103,9 @@ function recheck(): void {
   if (!id || filesReadFor !== id || loadingDocumentId() === id) return
   const { results, config } = useInspectorStore.getState()
   // saveDiagram gives the live model also while a milestone is on screen.
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, results ? { tests: results.cases } : {})
+  // The Hub's concern packs, for concern-unaddressed (none until loaded).
+  const concerns = packs
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases } : {}), concerns })
   useInspectorStore.setState({ check })
 }
 
@@ -112,6 +130,11 @@ if (typeof window !== 'undefined') {
     const configText = files.config ?? ''
     if (filesReadFor === id && resultsText === lastResults && configText === lastConfig) return
     filesReadFor = id
+    // The concern packs, once, for a model that has a check report or
+    // settings beside it: the one the Inspector is for.
+    if ((resultsText || configText) && !packsLoading) {
+      packsLoading = loadBundledConcepts().then((concepts) => { packs = concernPacks(concepts); recheck() })
+    }
     lastResults = resultsText
     lastConfig = configText
     let config: CheckConfig = {}
@@ -134,6 +157,7 @@ if (typeof window !== 'undefined') {
   // The model of the active document is in, and its folder can be read:
   // read the files beside it now rather than at the next poll.
   onDocumentLoaded((id) => { if (id === documents.getActiveId()) { recheck(); void poll() } })
+
 
   setInterval(() => { void poll() }, POLL_MS)
   useDocumentsStore.subscribe((s) => { if (s.activeId !== polledFor) void poll() })

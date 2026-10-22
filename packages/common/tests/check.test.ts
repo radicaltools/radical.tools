@@ -3,6 +3,7 @@ import { CHECK_RULES, FOLDER_RULES, checkModel, formatCheckGithub, formatCheckTe
 import { serializeToMdFolderWithPaths, type FolderFiles } from '../src/formats/mdFolder'
 import { builtInC4Metamodel, builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
+import { bindSuggestions, suggestedCover, type ConcernPack } from '../src/concerns'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -265,5 +266,100 @@ describe('radical check: output', () => {
     data.relations.push(rel('bad', 'verifies', 'sc', 'ghost'))
     const out = formatCheckGithub(check(data), { folder: 'my,model' })
     expect(out.split('\n')[0]).toMatch(/^::error file=my%2Cmodel\/relations.json,title=radical check%3A metamodel\/[\w-]+::/)
+  })
+})
+
+describe('radical check: concerns', () => {
+  const pack: ConcernPack = {
+    id: 'concern-authentication', name: 'Authentication', description: 'd',
+    concern: {
+      id: 'authentication',
+      trigger: 'LIST RELATIONS WHERE (source.type = "person" OR source.external = true) AND target.external != true',
+      applyTo: 'target',
+      why: 'people reach these elements.',
+      group: 'identity',
+    },
+    templateParams: [{ key: 'IDENTITY', label: 'How do people sign in?', options: [{ value: 'idp', label: 'an identity provider' }, { value: 'none', label: 'nobody signs in' }] }],
+  }
+  /** A person uses the shop's web app, and nothing decides who they are. */
+  const shop = (): DiagramData => ({
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [node('user', 'person', 'Customer'), node('sys', 'system', 'Shop'), node('web', 'webapp', 'Storefront', { parentId: 'sys' }), node('db', 'database', 'Orders', { parentId: 'sys' })],
+    relations: [rel('u', 'interacts', 'user', 'web'), rel('w', 'interacts', 'web', 'db')],
+  })
+  const concerns = (data: DiagramData) => checkModel(data, {}, { concerns: [pack] }).findings.filter((f) => f.rule === 'concern-unaddressed')
+  const decide = (data: DiagramData, on: string, props: Record<string, unknown>): DiagramData => {
+    data.nodes.push(node('adr', 'adr', 'Who signs in', { ...ACCEPTED_ADR, concern: 'authentication', ...props }))
+    data.relations.push(rel('c', 'constrains', 'adr', on))
+    return data
+  }
+
+  it('reports a concern its trigger finds and no ADR addresses', () => {
+    const [finding, ...more] = concerns(shop())
+    expect(more).toEqual([])
+    expect(finding).toMatchObject({ nodeId: 'web', code: 'concern-authentication', severity: 'warning' })
+    expect(finding.message).toContain('Authentication: people reach these elements.')
+    expect(finding.message).toContain('"Storefront"')
+    expect(finding.details).toEqual(['How do people sign in? (idp: an identity provider | none: nobody signs in)'])
+    expect(CHECK_RULES.find((r) => r.id === 'concern-unaddressed')).toMatchObject({ severity: 'warning', dimension: 'decisions' })
+    // Without the packs, and on a metamodel whose ADRs hold no concern, there is nothing to report.
+    expect(checkModel(shop()).findings.filter((f) => f.rule === 'concern-unaddressed')).toEqual([])
+    expect(concerns({ ...shop(), metamodel: builtInC4Metamodel() })).toEqual([])
+  })
+
+  it('counts an accepted ADR marked with the concern on the element or what contains it, whatever it decides', () => {
+    expect(concerns(decide(shop(), 'web', { decision: 'An identity provider.' }))).toEqual([])
+    expect(concerns(decide(shop(), 'sys', { decision: 'Nobody signs in: everything is public.' }))).toEqual([])
+  })
+
+  it('names a proposed ADR and ignores a superseded or deprecated one and one on another element', () => {
+    const [pending] = concerns(decide(shop(), 'web', { status: 'proposed' }))
+    expect(pending.message).toContain('"Who signs in" is proposed: the decision is being made.')
+    for (const status of ['superseded', 'deprecated']) expect(concerns(decide(shop(), 'web', { status }))).toHaveLength(1)
+    expect(concerns(decide(shop(), 'db', {}))).toHaveLength(1)
+    const unmarked = decide(shop(), 'web', { concern: '' })
+    expect(concerns(unmarked)).toHaveLength(1)
+  })
+
+  it('reports an accepted concern decision that constrains nothing, with where to bind it', () => {
+    const unbound = (data: DiagramData) => checkModel(data, {}, { concerns: [pack] }).findings.filter((f) => f.rule === 'concern-unbound')
+    const data = shop()
+    data.nodes.push(
+      node('adr', 'adr', 'Who signs in', { ...ACCEPTED_ADR, concern: 'authentication' }),
+      node('ff', 'fitness-fn', 'Calls refused', { threshold: '401' }),
+      node('plain', 'adr', 'Use cards', ACCEPTED_ADR),
+    )
+    data.relations.push(rel('i', 'implements', 'ff', 'adr'))
+    const [finding, ...more] = unbound(data)
+    expect(more).toEqual([])
+    expect(finding).toMatchObject({ nodeId: 'adr', relatedIds: ['ff'], code: 'authentication', severity: 'warning' })
+    expect(finding.message).toBe('ADR "Who signs in" settles the concern "authentication" but constrains no element, so it settles it for nothing. Bind it to "Storefront", which the concern applies to.')
+    expect(CHECK_RULES.find((r) => r.id === 'concern-unbound')).toMatchObject({ severity: 'warning', dimension: 'decisions' })
+    // Without the pack it still says so, without where.
+    expect(checkModel(data).findings.find((f) => f.rule === 'concern-unbound')?.message).toMatch(/so it settles it for nothing\.$/)
+    const bound = { ...data, relations: [...data.relations, rel('b', 'constrains', 'adr', 'web')] }
+    expect(unbound(bound)).toEqual([])
+    const superseded = { ...data, nodes: data.nodes.map((n) => (n.id === 'adr' ? { ...n, status: 'superseded' } as C4Node : n)) }
+    expect(unbound(superseded)).toEqual([])
+  })
+
+  it('suggests where to bind a pack: the smallest element that settles the most, and the fewest that settle all', () => {
+    const data = shop()
+    data.nodes.push(node('admin', 'webapp', 'Back office', { parentId: 'sys' }), node('cli', 'container', 'CLI'), node('order', 'entity', 'Order'))
+    data.relations.push(rel('ua', 'interacts', 'user', 'admin'), rel('uc', 'interacts', 'user', 'cli'))
+    const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((x) => [x.id, x]))
+    const suggest = (d: DiagramData) => bindSuggestions(pack, byId(d.nodes), byId(d.relations), d.metamodel)
+    // The shop holds two of the three: first; then each element for itself,
+    // those inside a system before the CLI, which is in none.
+    expect(suggest(data)).toEqual([
+      { id: 'sys', covers: ['admin', 'web'], recommended: true },
+      { id: 'admin', covers: ['admin'], recommended: false },
+      { id: 'web', covers: ['web'], recommended: false },
+      { id: 'cli', covers: ['cli'], recommended: false },
+    ])
+    // To begin with, the fewest that cover all: the shop and the CLI.
+    expect(suggestedCover(suggest(data))).toEqual(['sys', 'cli'])
+    // With the shop settled, the CLI is what is left; the shop, holding none of it, is not offered.
+    expect(suggest(decide(data, 'sys', {})).map((b) => b.id)).toEqual(['cli'])
   })
 })

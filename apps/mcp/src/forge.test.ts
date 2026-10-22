@@ -10,6 +10,8 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { parseForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { parseModelBase, serializeModelBase } from '@radical/common/formats/modelBase'
+import { FolderModel } from './folderModel'
+import { checkModel } from '@radical/common/check'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -63,10 +65,11 @@ describe('Radical Forge over MCP', () => {
 
       const clarify = await call(client, 'forge_clarify', { stage: 'requirements' })
       expect(clarify).toContain('"Requirements" stage')
-      // Every requirement in the Hub is a candidate to pick from, ranked.
-      expect(clarify).toContain('Hub catalogue candidates for this stage')
-      expect(clarify).toContain('- req-idempotency | [requirement] Idempotent Write Operations')
-      expect(clarify).toContain('ask the user which of your picks to apply')
+      // The Hub's concern packs to pick from, with their questions.
+      expect(clarify).toContain('Concern packs of the Hub')
+      expect(clarify).toContain('- concern-authentication | Authentication: ')
+      expect(clarify).toContain('pass the packs with the user\'s answers to forge_generate as concerns')
+      expect(clarify).toContain('  - IDENTITY: How do people sign in? [idp = ')
       expect(clarify).toContain('Ask the user those questions')
       expect(clarify).not.toContain('JSON')
 
@@ -103,9 +106,8 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'No domain model needed.' })
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
-      expect(await refused(client, 'forge_generate', { stage: 'fitness', hubConcepts: ['req-idempotency'] })).toContain('not a Hub candidate of this stage')
-      const fitness = await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: ['ff-ledger-balance-integrity'] })
-      expect(fitness).toContain('Ledger Balance Integrity Check')
+      expect(await refused(client, 'forge_generate', { stage: 'fitness', concerns: [{ id: 'concern-authentication' }] })).toContain('concerns are picked in the Requirements stage')
+      const fitness = await call(client, 'forge_generate', { stage: 'fitness' })
       expect(fitness).toContain('- Requirements: Pick-up requirement.')
       expect(await refused(client, 'forge_generate', { stage: 'scenarios' })).toContain('still open')
     } finally {
@@ -167,7 +169,7 @@ describe('Radical Forge over MCP', () => {
       expect(data.views!.find((v) => v.name === 'Conceptual')!.nodeIds).toEqual(expect.arrayContaining(modelIds))
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
-      await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
+      await call(client, 'forge_generate', { stage: 'fitness' })
       await call(client, 'add_node', { tempId: 'f1', type: 'fitness-fn', label: 'Ready within 2 h', properties: { category: 'performance', threshold: '2 h' } })
       const fitness = await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'Pick-up time.' })
       expect(fitness).not.toContain('row, a column or a grid')
@@ -194,7 +196,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_node', { tempId: 'order', type: 'entity', label: 'Order', parentId: 'shop' })
       await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'The order.' })
       await call(client, 'forge_clarify', { stage: 'fitness' })
-      await call(client, 'forge_generate', { stage: 'fitness', hubConcepts: [] })
+      await call(client, 'forge_generate', { stage: 'fitness' })
       await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'None needed.' })
       await call(client, 'forge_clarify', { stage: 'scenarios' })
       await call(client, 'forge_generate', { stage: 'scenarios' })
@@ -253,7 +255,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
       for (const stage of ['domain', 'fitness']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
       }
       await call(client, 'forge_clarify', { stage: 'scenarios' })
@@ -310,7 +312,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'Two requirements.' })
       for (const stage of ['domain', 'fitness']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
       }
       await call(client, 'forge_clarify', { stage: 'scenarios' })
@@ -423,7 +425,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
       for (const stage of ['domain', 'fitness']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
       }
       await call(client, 'forge_clarify', { stage: 'scenarios' })
@@ -489,7 +491,7 @@ describe('Radical Forge over MCP', () => {
       const need = (await read()).nodes.find((n) => n.type === 'need')!
       for (const stage of ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' || stage === 'c4' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         if (stage === 'requirements') {
           await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
           await call(client, 'add_relation', { sourceId: 'req', targetId: need.id, relationType: 'derives' })
@@ -552,11 +554,11 @@ describe('Radical Forge over MCP', () => {
 
       for (const stage of ['domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
       }
       await call(client, 'forge_clarify', { stage: 'c4' })
-      expect(await call(client, 'forge_generate', { stage: 'c4', hubConcepts: [] })).toContain("Made the stage's views before it begins: Containers, System context.")
+      expect(await call(client, 'forge_generate', { stage: 'c4' })).toContain("Made the stage's views before it begins: Containers, System context.")
       expect((await read()).views!.map((v) => v.name)).toEqual(expect.arrayContaining(['Containers', 'System context']))
       await call(client, 'add_node', { tempId: 'shopper', type: 'person', label: 'Shopper' })
       await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
@@ -584,11 +586,11 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_start', { description: BRIEF, views: { structure: 'radical', viewpoints: ['system-context'] } })
       for (const stage of ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
         await call(client, 'forge_clarify', { stage })
-        await call(client, 'forge_generate', { stage, ...(stage === 'fitness' ? { hubConcepts: [] } : {}) })
+        await call(client, 'forge_generate', { stage })
         await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
       }
       await call(client, 'forge_clarify', { stage: 'c4' })
-      await call(client, 'forge_generate', { stage: 'c4', hubConcepts: [] })
+      await call(client, 'forge_generate', { stage: 'c4' })
       await call(client, 'add_node', { tempId: 'shopper', type: 'person', label: 'Shopper' })
       await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
       await call(client, 'add_relation', { sourceId: 'shopper', targetId: 'shop', relationType: 'interacts', label: 'Reserves' })
@@ -651,7 +653,7 @@ describe('Radical Forge over MCP', () => {
     await expect.poll(async () => parseForgeRun(await readFile(file, 'utf8'))?.state, { timeout: 5000 }).toBe('closed')
   }, 60_000)
 
-  it('draws wireframes, imports Hub concepts and exports the Gherkin files', async () => {
+  it('draws wireframes, imports Hub concern packs and exports the Gherkin files', async () => {
     const { client, folder, read } = await connect()
     try {
       await call(client, 'forge_start', { description: BRIEF })
@@ -673,22 +675,24 @@ describe('Radical Forge over MCP', () => {
 
       const before = await read()
       const right = Math.max(...before.nodes.filter((n) => !n.parentId).map((n) => n.x + n.width))
-      const imported = await call(client, 'forge_import_hub_concept', { conceptId: 'pattern-anti-corruption-layer' })
+      const imported = await call(client, 'forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' } })
       expect(imported).toContain('Imported')
       const after = await read()
       const added = after.nodes.filter((n) => !before.nodes.some((b) => b.id === n.id))
       expect(added.length).toBeGreaterThan(0)
       for (const node of added.filter((n) => !n.parentId)) expect(node.x).toBeGreaterThan(right)
-      expect(await refused(client, 'forge_import_hub_concept', { conceptId: 'nope' })).toContain('no Hub concept')
+      expect(await refused(client, 'forge_import_hub_concept', { conceptId: 'nope' })).toContain('no Hub concern pack')
 
       const finish = await call(client, 'forge_finish', {})
       expect(finish).toContain('- Requirements: skipped')
       expect(finish).toContain('Feature:')
       const dir = join(folder, '..', `${basename(folder)}-features`)
       folders.push(dir)
-      expect(await call(client, 'forge_finish', { gherkinDir: dir })).toContain('Wrote 1 .feature files')
-      const [file] = await readdir(dir)
-      expect(await readFile(join(dir, file), 'utf8')).toContain('Scenario: Reserve a product')
+      // The model's scenario and the imported pack's.
+      expect(await call(client, 'forge_finish', { gherkinDir: dir })).toMatch(/Wrote \d+ \.feature files/)
+      const features = await Promise.all((await readdir(dir)).map((f) => readFile(join(dir, f), 'utf8')))
+      expect(features.join('\n')).toContain('Scenario: Reserve a product')
+      expect(features.join('\n')).toContain('Scenario: No sign-in surface')
     } finally {
       await client.close()
     }
@@ -740,6 +744,136 @@ describe('Radical Forge over MCP', () => {
       const text = (prompt.messages[0].content as { text: string }).text
       expect(text).toContain('A parking app')
       expect(text).toContain('forge_start')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+})
+
+describe('forge_import_hub_concept', () => {
+  /** A folder model where a person uses a web app, the ids by temp id. */
+  async function shop() {
+    const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-concern-'))
+    folders.push(folder)
+    const files = serializeToMdFolder({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() }, 'Concerns')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const ids = new Map<string, string>()
+    for (const [name, args] of [
+      ['add_node', { tempId: 'user', type: 'person', label: 'Customer' }],
+      ['add_node', { tempId: 'shop', type: 'system', label: 'Shop' }],
+      ['add_node', { tempId: 'web', type: 'webapp', label: 'Storefront', parentId: 'shop' }],
+      ['add_node', { tempId: 'order', type: 'entity', label: 'Order' }],
+      ['add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' }],
+    ] as Array<[string, Record<string, unknown>]>) {
+      const result = await model.call(name, args)
+      expect(result.ok, `${name}: ${result.text}`).toBe(true)
+      const id = /Created node ([\w-]+)/.exec(result.text)?.[1]
+      if (id) ids.set(args.tempId as string, id)
+    }
+    const read = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    return { model, ids, read }
+  }
+
+  it('binds a concern pack to an element', async () => {
+    const { model, ids, read } = await shop()
+    const web = ids.get('web')!
+    const result = await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'idp', MACHINE: 'mtls' }, bindTo: web })
+    expect(result.ok, result.text).toBe(true)
+    expect(result.text).toContain('Bound to webapp "Storefront"')
+    const data = await read()
+    const adr = data.nodes.find((n) => n.type === 'adr')! as unknown as Record<string, string>
+    expect(adr).toMatchObject({ label: 'Users sign in through an identity provider', concern: 'authentication', status: 'accepted' })
+    expect(adr.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(adr.decision).toContain('Calls from other systems: mutual TLS.')
+    // The answers picked the slice: no own user store, no public-by-design.
+    const labels = data.nodes.map((n) => n.label)
+    expect(labels).toContain('Calling systems authenticate')
+    expect(labels).not.toContain('Passwords stored as hashes')
+    expect(labels).not.toContain('Public by design')
+    const has = (type: string, from: string, to: string) => data.relations.some((r) => r.relationType === type && r.sourceId === from && r.targetId === to)
+    expect(has('constrains', adr.id, web)).toBe(true)
+    for (const ff of data.nodes.filter((n) => n.type === 'fitness-fn')) expect(has('constrains', ff.id, web)).toBe(true)
+    for (const req of data.nodes.filter((n) => n.type === 'requirement')) expect(has('satisfies', web, req.id)).toBe(true)
+    expect(JSON.stringify(data.nodes)).not.toMatch(/\{\{[A-Z_]+\}\}|hubWhen/)
+  })
+
+  it('binds a concern pack to several elements', async () => {
+    const { model, ids, read } = await shop()
+    const [web, shopId] = [ids.get('web')!, ids.get('shop')!]
+    const result = await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' }, bindTo: [web, shopId] })
+    expect(result.ok, result.text).toBe(true)
+    expect(result.text).toContain('Bound to webapp "Storefront", system "Shop"')
+    const data = await read()
+    const adr = data.nodes.find((n) => n.type === 'adr')!
+    const req = data.nodes.find((n) => n.type === 'requirement')!
+    const has = (type: string, from: string, to: string) => data.relations.some((r) => r.relationType === type && r.sourceId === from && r.targetId === to)
+    for (const id of [web, shopId]) {
+      expect(has('constrains', adr.id, id)).toBe(true)
+      expect(has('satisfies', id, req.id)).toBe(true)
+    }
+    expect((await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', bindTo: [web, 'nope'] })).text).toContain('no element nope')
+  })
+
+  it('refuses to bind a concern pack to an element that cannot satisfy requirements, and imports it unbound without one', async () => {
+    const { model, ids, read } = await shop()
+    const count = (await read()).nodes.length
+    const entity = await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', bindTo: ids.get('order') })
+    expect(entity.ok).toBe(false)
+    expect(entity.text).toContain('an entity ("Order") cannot be constrained by an ADR and satisfy requirements')
+    const answer = await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'passkeys' }, bindTo: ids.get('web') })
+    expect(answer.ok).toBe(false)
+    expect(answer.text).toContain('"passkeys" is not an answer to IDENTITY')
+    expect((await read()).nodes).toHaveLength(count)
+    // Without bindTo it comes in unbound, which the check reports.
+    const unbound = await model.call('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' } })
+    expect(unbound.ok, unbound.text).toBe(true)
+    expect(unbound.text).toContain('Not bound to any element')
+    const data = await read()
+    const adr = data.nodes.find((n) => n.type === 'adr')!
+    expect(data.relations.some((r) => r.sourceId === adr.id && r.relationType === 'constrains')).toBe(false)
+  })
+})
+
+describe('concern packs in a Forge run', () => {
+  it('imports the picked packs whole in Requirements and binds them after C4', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      expect(await refused(client, 'forge_generate', { stage: 'requirements', concerns: [{ id: 'concern-authentication', answers: { IDENTITY: 'passkeys' } }] })).toContain('"passkeys" is not an answer to IDENTITY')
+      const brief = await call(client, 'forge_generate', { stage: 'requirements', concerns: [{ id: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' } }] })
+      expect(brief).toContain('Imported the concern packs the user confirmed, whole and unbound: Authentication.')
+      const adr = (await read()).nodes.find((n) => n.type === 'adr')!
+      expect(adr).toMatchObject({ label: 'Nobody signs in', concern: 'authentication', status: 'accepted' })
+      expect(brief).toContain(`- Authentication: ${adr.id} "Nobody signs in"`)
+      expect((await read()).relations.some((r) => r.sourceId === adr.id && r.relationType === 'constrains')).toBe(false)
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'The Authentication pack.' })
+
+      for (const stage of ['domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups']) {
+        await call(client, 'forge_clarify', { stage })
+        const task = await call(client, 'forge_generate', { stage })
+        expect(task).toContain('Concerns already decided by Hub concern packs')
+        await call(client, 'forge_complete_stage', { stage, summary: 'Nothing.' })
+      }
+      await call(client, 'forge_clarify', { stage: 'c4' })
+      const c4 = await call(client, 'forge_generate', { stage: 'c4' })
+      expect(c4).toContain(`- Authentication: decision ${adr.id};`)
+      // The stage makes the shop and links nothing to the pack.
+      await call(client, 'add_node', { tempId: 'user', type: 'person', label: 'Shopper' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'add_node', { tempId: 'web', type: 'webapp', label: 'Storefront', parentId: 'shop' })
+      await call(client, 'add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' })
+      const done = await call(client, 'forge_complete_stage', { stage: 'c4', summary: 'The shop.' })
+      expect(done).toContain('Authentication: the stage linked it to nothing, so it was bound to "Storefront", where its concern applies.')
+
+      const data = await read()
+      const web = data.nodes.find((n) => n.label === 'Storefront')!
+      expect(data.relations.some((r) => r.sourceId === adr.id && r.targetId === web.id && r.relationType === 'constrains')).toBe(true)
+      expect(checkModel(data).findings.filter((f) => f.rule === 'concern-unbound')).toEqual([])
     } finally {
       await client.close()
     }

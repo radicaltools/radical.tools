@@ -5,4 +5,4 @@ label: "Hub concept"
 kind: "aggregate-root"
 ---
 
-A curated pattern, ADR, fitness function, requirement or blueprint with its own small model and template parameters (HubConcept).
+A concern pack (HubConcept of category concern): its concern id, trigger and questions (template parameters with options), and its own small model, the slice it brings.

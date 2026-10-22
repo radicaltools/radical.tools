@@ -58,7 +58,7 @@ try {
   assert(paths.includes('dist/index.js'))
   assert(paths.includes('README.md'))
   assert(paths.includes('LICENSE'))
-  assert(paths.includes('dist/hub-catalogue/requirement/req-idempotency.radical'))
+  assert(paths.includes('dist/hub-catalogue/concern/concern-authentication.radical'))
   assert(paths.every(p => p.startsWith('dist/') || ['package.json', 'README.md', 'LICENSE'].includes(p)), 'Unexpected file in npm package')
   assert(Object.keys(manifest.dependencies).every(name => !name.startsWith('@radical/')), 'Private workspaces must be bundled, not runtime dependencies')
 
@@ -83,7 +83,7 @@ try {
     await call(client, 'smart_layout')
     await call(client, 'forge_start', { description: 'Customers buy products online and pay once for each order.' })
     const catalogue = await call(client, 'forge_clarify', { stage: 'requirements' })
-    assert(catalogue.includes('req-idempotency'), 'Installed server must read its bundled Hub catalogue')
+    assert(catalogue.includes('concern-authentication'), 'Installed server must read its bundled Hub catalogue')
     await call(client, 'get_issues')
   } finally { await client.close() }
 

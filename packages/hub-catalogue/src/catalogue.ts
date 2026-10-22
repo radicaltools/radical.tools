@@ -10,6 +10,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { summarize, type HubConceptSummary, type HubRadicalDoc } from '@radical/common/hubFormat'
+import { concernPackProblems, isConcernPack, type ConcernPack } from '@radical/common/concerns'
 
 /** Absolute path of the catalogue shipped with this package. */
 export const CATALOGUE_DIR = fileURLToPath(new URL('../catalogue', import.meta.url))
@@ -62,8 +63,14 @@ export function validateCatalogue(entries: CatalogueEntry[]): string[] {
   }
   for (const { file, doc } of entries) {
     for (const ref of doc.hub?.hubRefs ?? []) if (!ids.has(ref)) errors.push(`${file}: hubRefs → unknown concept "${ref}"`)
+    if (doc.hub?.category === 'concern') for (const e of concernPackProblems(doc)) errors.push(`${file}: ${e}`)
   }
   return errors
+}
+
+/** The catalogue's concern packs, for the check's concern-unaddressed rule. */
+export function concernPacksOf(entries: CatalogueEntry[]): ConcernPack[] {
+  return entries.map(({ doc }) => doc.hub).filter(isConcernPack)
 }
 
 export function buildIndex(entries: CatalogueEntry[]): HubConceptSummary[] {

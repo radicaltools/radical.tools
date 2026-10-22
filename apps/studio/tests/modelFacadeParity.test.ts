@@ -8,7 +8,8 @@
  * a new child, and it keeps per-view positions.
  */
 import { describe, it, expect } from 'vitest'
-import { readCatalogue } from '@radical/hub-catalogue'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildToolHandlers } from '@radical/common/ai/tools'
 import type { DiagramFacade } from '@radical/common/ai/diagramFacade'
@@ -55,7 +56,8 @@ function normalize(data: DiagramData, tempToReal: Map<string, string>) {
   return { nodes, relations, views, sequences, metamodel: data.metamodel, text }
 }
 
-const blueprint = readCatalogue().find((e) => e.doc.hub.category === 'blueprint')!.doc
+// A large model with views and sequences: a former Hub blueprint.
+const blueprint = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/bp-fintech-ledger-platform.radical', import.meta.url)), 'utf8'))
 const { hub: _hub, ...blueprintDoc } = blueprint
 
 describe('headless facade matches the Studio store', () => {

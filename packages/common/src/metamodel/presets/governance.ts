@@ -46,6 +46,9 @@ export function builtInGovernanceMetamodel(): Metamodel {
     { key: 'decision',     label: 'Decision',               type: 'textarea' },
     { key: 'consequences', label: 'Consequences',           type: 'textarea' },
     { key: 'alternatives', label: 'Alternatives considered', type: 'textarea' },
+    // The Hub concern pack the decision settles (its concern id), for the
+    // check's concern-unaddressed rule; set by a pack's import.
+    { key: 'concern',      label: 'Concern (Hub)',          type: 'text' },
   ]
 
   const adr: NodeTypeDef = {

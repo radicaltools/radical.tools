@@ -34,6 +34,7 @@
   "devDependencies": {
     "@radical/common": "*",
     "@radical/crucible": "*",
+    "@radical/hub-catalogue": "*",
     "@radical/node-files": "*",
     "@types/node": "^22.20.4",
     "markdown-to-jsx": "^9.10.3",

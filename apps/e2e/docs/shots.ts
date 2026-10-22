@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Studio } from '../support/fixtures'
+import { DOCS_HUB_PORT } from '../playwright.docs.config'
 
 export interface DocsOptions {
   theme: 'light' | 'dark'
@@ -29,6 +30,12 @@ export const test = base.extend<DocsOptions & { studio: Studio; shot: (name: str
       headless: true, viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent,
     })
     const page = context.pages()[0] ?? await context.newPage()
+    // The Hub's catalogue from this build's Hub, not hub.radical.tools: the
+    // manual shows what is about to be deployed.
+    await context.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
+      const response = await route.fetch({ url: `http://localhost:${DOCS_HUB_PORT}` + new URL(route.request().url()).pathname })
+      await route.fulfill({ response, headers: { ...response.headers(), 'content-type': 'application/json' } })
+    })
     await page.addInitScript((t) => {
       if (!localStorage.getItem('radical-theme')) localStorage.setItem('radical-theme', t)
     }, theme)
