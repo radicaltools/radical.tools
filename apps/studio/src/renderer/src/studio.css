@@ -2128,7 +2128,7 @@ div.milestone-option { cursor: default; }
   border-color: var(--accent);
 }
 /* ─── Quick search · AI agent additions ───────────────────────────── */
-.quick-search-bar { width: var(--qs-w); }
+.quick-search-bar { width: var(--qs-w); left: var(--qs-x); }
 .quick-search-bar.ai-mode {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   box-shadow:
@@ -3639,12 +3639,15 @@ div.milestone-option { cursor: default; }
 .toolbar-group .toolbar-btn:hover { background: var(--hover-bg); border-color: transparent; }
 .toolbar-icon-btn { padding: 0 7px; min-width: 30px; justify-content: center; }
 .toolbar-icon-btn svg { width: 15px; height: 15px; }
-/* Quick Search's width (.quick-search-bar): narrower in a window that has
-   less room between the toolbar's two sides. */
-:root { --qs-w: clamp(300px, calc(100vw - 920px), 520px); }
-/* Navigation either side of Quick Search, measured from the toolbar's middle,
-   where it stands. */
-.toolbar-center { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+/* Quick Search's width and middle (.quick-search-bar): the toolbar sets them
+   to the room between its two sides (Toolbar.tsx useMiddleRoom); these are
+   for the first paint. */
+:root { --qs-w: clamp(300px, calc(100vw - 920px), 520px); --qs-x: 50vw; }
+/* Navigation either side of Quick Search, measured from its middle. */
+.toolbar-center { position: absolute; left: var(--qs-x); top: 50%; width: 0; height: 0; }
+/* Too little room even for a narrow Quick Search: the perspectives keep
+   their icons; the names stay for screen readers and the tooltip. */
+.toolbar.compact .toolbar-mode-btn .toolbar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .toolbar-center > .toolbar-group { position: absolute; top: 0; transform: translateY(-50%); }
 .toolbar-center > .toolbar-group:first-child { right: calc(var(--qs-w) / 2 + 8px); }
 .toolbar-center > .toolbar-group:last-child { left: calc(var(--qs-w) / 2 + 8px); }
