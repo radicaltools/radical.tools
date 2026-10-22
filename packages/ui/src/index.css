@@ -437,6 +437,85 @@ body {
 /* Near the bottom of the screen the report opens upwards. */
 .canvas-controls .smart-layout-report-popover { top: auto; bottom: calc(100% + 8px); }
 
+/* ─── What is done to the selection (SelectionActions) ─────────────────────
+   Several elements: a bar at the top of the canvas, as flat as the canvas
+   controls. One element or relation: rows in its properties card. */
+.sel-bar {
+  grid-area: canvas; justify-self: center; align-self: start;
+  position: relative; z-index: 6; margin-top: 8px; max-width: calc(100% - 24px);
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
+  font-size: 12px; color: var(--text-primary);
+}
+.sel-bar-count { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; white-space: nowrap; }
+.sel-bar-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--accent); color: #fff; font-weight: 600; font-size: 11px;
+}
+.sel-bar-label { color: var(--text-muted); }
+.sel-bar-divider { width: 1px; height: 18px; background: var(--border-color); margin: 0 2px; flex-shrink: 0; }
+.sel-bar-wrap { position: relative; display: inline-flex; }
+.sel-bar-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; white-space: nowrap;
+  border: none; border-radius: 6px; background: transparent; color: var(--text-primary);
+  font: inherit; font-size: 12px; cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.sel-bar-btn svg { color: var(--text-muted); flex-shrink: 0; }
+.sel-bar-btn:hover:not(:disabled), .sel-bar-btn[aria-expanded="true"] { background: var(--hover-bg); }
+.sel-bar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sel-bar-btn-danger, .sel-bar-btn-danger svg { color: var(--danger); }
+.sel-bar-btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.sel-chevron { opacity: 0.6; transition: transform 0.12s; }
+[aria-expanded="true"] > .sel-chevron { transform: rotate(180deg); }
+/* The bar's menus drop under it, kept inside the window (a long Move to…
+   scrolls). */
+.sel-bar-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 200px;
+  max-height: calc(100vh - 140px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px; padding: 4px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.18));
+}
+.sel-bar-menu-wide { min-width: 290px; }
+.sel-bar-menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 7px 10px;
+  border: none; border-radius: 6px; background: transparent; text-align: left;
+  font: inherit; font-size: 12px; color: var(--text-primary); cursor: pointer;
+}
+.sel-bar-menu-item:hover, .sel-bar-menu-item:focus-visible { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.sel-bar-menu-reason { font-size: 10.5px; color: var(--text-muted); line-height: 1.3; white-space: normal; }
+.sel-bar-menu-note { padding: 6px 10px 4px; font-size: 10.5px; color: var(--text-muted); line-height: 1.3; }
+.sel-bar-menu-check { border-top: 1px solid var(--border-color); border-radius: 0 0 6px 6px; }
+.sel-bar-menu-check > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.sel-bar-menu-grid { display: flex; align-items: center; gap: 4px; }
+.sel-bar-menu-grid > .sel-bar-menu-item { flex: 1; }
+.sel-bar-stepper { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; font-size: 12px; color: var(--text-primary); }
+.sel-bar-stepper > span { min-width: 16px; text-align: center; }
+.sel-bar-stepper > button {
+  width: 20px; height: 20px; padding: 0; border-radius: 5px; border: 1px solid var(--border-color);
+  background: transparent; color: var(--text-primary); font: inherit; cursor: pointer;
+}
+.sel-bar-stepper > button:hover:not(:disabled) { background: var(--hover-bg); }
+.sel-bar-stepper > button:disabled { opacity: 0.4; cursor: default; }
+
+/* The card's Actions: a row per action, as its Views; a menu opens under
+   its row, inside the card. */
+.pp-actions { display: grid; gap: 1px; margin: 0 -8px; }
+.pp-action {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 28px; padding: 3px 8px;
+  border: none; border-radius: 6px; background: none; text-align: left;
+  font: inherit; font-size: 13px; color: var(--text-primary); cursor: pointer;
+}
+.pp-action svg { color: var(--text-muted); flex-shrink: 0; }
+.pp-action > span { flex: 1; min-width: 0; }
+.pp-action:hover:not(:disabled), .pp-action[aria-expanded="true"] { background: var(--hover-bg); }
+.pp-action:disabled { opacity: 0.45; cursor: not-allowed; }
+.pp-action-menu {
+  margin: 2px 0 6px 30px; padding: 4px; max-height: 260px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+  border: 1px solid var(--border-color); border-radius: 8px;
+}
+
 .element-palette {
   /* Down the canvas's left side, under the view's name chip, over the
      canvas (as the properties card is on the right): the canvas keeps its
@@ -447,7 +526,7 @@ body {
   z-index: 4;
   width: 168px;
   height: max-content;
-  /* Clear of the selection bar at the canvas's bottom. */
+  /* Clear of the canvas controls at the canvas's bottom. */
   max-height: calc(100% - 140px);
   display: flex;
   flex-direction: column;
@@ -769,10 +848,12 @@ body {
 }
 .pp-resize:hover::after, .right-panel.resizing .pp-resize::after { background: rgba(var(--accent-rgb), 0.6); }
 
+/* The card's head and foot: a shade off its content, in both themes. */
+.right-panel { --pp-chrome-bg: color-mix(in srgb, var(--text-primary) 5%, var(--bg-panel)); }
 .pp-head {
   position: sticky; top: 0; z-index: 3;
   padding: 10px 12px 10px 16px;
-  background: var(--bg-panel);
+  background: var(--pp-chrome-bg);
   border-bottom: 1px solid var(--border-color);
 }
 .pp-head-bar { display: flex; align-items: center; gap: 8px; min-height: 24px; }
@@ -791,27 +872,13 @@ body {
   transition: background 0.12s, color 0.12s;
 }
 .pp-icon-btn:hover, .pp-icon-btn[aria-expanded="true"] { background: var(--hover-bg); color: var(--text-primary); }
-.pp-wizard-btn {
+.pp-head-btn {
   display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; margin-right: 2px;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--accent);
   background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-radius: 6px; cursor: pointer; transition: border-color 0.12s, background 0.12s;
 }
-.pp-wizard-btn:hover { border-color: var(--accent); }
-.pp-menu-wrap { position: relative; }
-.pp-menu {
-  position: absolute; top: calc(100% + 4px); right: 0; z-index: 10; min-width: 220px;
-  display: flex; flex-direction: column; padding: 4px;
-  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
-  box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.18));
-}
-.pp-menu-item {
-  text-align: left; padding: 7px 10px; border: none; border-radius: 5px; background: transparent;
-  color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer;
-}
-.pp-menu-item:hover { background: var(--hover-bg); }
-.pp-menu-item.danger { color: var(--danger); }
-.pp-menu-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.pp-head-btn:hover { border-color: var(--accent); }
 .pp-title {
   display: block; box-sizing: border-box; width: calc(100% + 12px); margin: 6px -6px 0; padding: 3px 6px;
   font: inherit; font-size: 17px; font-weight: 650; line-height: 1.3; color: var(--text-primary);
@@ -831,6 +898,21 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 .pp-link:hover { color: var(--accent); text-decoration-color: currentColor; }
 
 .right-panel .props-content { padding: 0 0 14px; gap: 0; }
+/* The card's foot (the element's views, its actions, Delete) stays on the
+   card's bottom edge: under a short card's attributes, and over a long
+   card's while they scroll. A tall foot scrolls its views and actions;
+   Delete stays in sight under them. */
+.right-panel .props-content:has(> .pp-foot) { min-height: 100%; padding-bottom: 0; }
+.pp-foot {
+  margin-top: auto; position: sticky; bottom: 0; z-index: 2;
+  display: flex; flex-direction: column; max-height: 60vh;
+  background: var(--pp-chrome-bg); border-top: 1px solid var(--border-color);
+}
+.pp-foot-scroll { min-height: 0; overflow-y: auto; }
+.pp-foot-scroll:empty { display: none; }
+.pp-foot .pp-section { padding-top: 10px; padding-bottom: 10px; }
+.pp-foot > .pp-delete { flex-shrink: 0; border-top: 1px solid var(--border-color); }
+.pp-foot-scroll > .pp-section:last-child { border-bottom: none; }
 /* A sequence's fields, under the card's head: the card's own margins. */
 .right-panel .props-content.props-sequence { padding: 12px 16px 14px; gap: 12px; }
 .right-panel .props-content > .props-empty { margin: 24px 16px; }
@@ -1626,18 +1708,6 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   letter-spacing: 0.05em;
 }
 
-.props-delete {
-  margin-top: auto;
-  padding: 7px;
-  border: 1px solid var(--danger);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--danger);
-  cursor: pointer;
-  font-size: 12px;
-  transition: background 0.15s;
-}
-.props-delete:hover { background: rgba(255,107,107,0.12); }
 
 .mockup-wf { margin-bottom: 12px; }
 .mockup-wf-preview {
@@ -4318,7 +4388,12 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 .tv-row:hover { background: var(--hover-bg-faint, rgba(255,255,255,0.03)); }
 .tv-row:hover .tv-cell-placeholder { opacity: 0.5; }
-.tv-row-selected { background: var(--accent-soft, rgba(59,130,246,0.1)) !important; }
+/* The selected row reads at a glance in both themes: a clear accent tint,
+   an accent bar down its left edge and its text at full strength (a 10%
+   tint was hard to find). */
+.tv-row-selected, .tv-row-selected:hover { background: color-mix(in srgb, var(--accent) 26%, var(--bg-panel)) !important; }
+.tv-row-selected > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.tv-row-selected .tv-cell-value, .tv-row-selected .tv-cell-readonly { color: var(--text-primary); }
 
 /* ── Cell content ────────────────────────────────────────────────────────── */
 
@@ -4551,6 +4626,30 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 
 /* ─── Changes on branch: counts on the view cards, changed fields on the card ─── */
 .lp-branch-count { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 0 6px; border-radius: 999px; color: var(--warning, #d97706); background: color-mix(in srgb, var(--warning, #d97706) 16%, transparent); }
+/* Delete, last on a card or a pane: a red outline across its width. */
+.pp-delete-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 7px;
+  border: 1px solid var(--danger); border-radius: 6px; background: transparent;
+  font: inherit; font-size: 12px; color: var(--danger); cursor: pointer; transition: background 0.15s;
+}
+.pp-delete-btn:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.pp-delete-note { opacity: 0.75; }
+/* In a view's, milestone's or sequence's properties: at the pane's foot. */
+.pp-delete-btn.props-delete { margin-top: auto; }
+/* The card's Views: the views that show the element, each its type's colour. */
+.pp-views { list-style: none; margin: 0 -8px; padding: 0; display: grid; gap: 1px; }
+.pp-view {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 28px; padding: 3px 8px;
+  border: none; border-radius: 6px; background: none; font: inherit; font-size: 13px;
+  color: var(--text-primary); text-align: left; cursor: pointer;
+}
+.pp-view::before { content: ''; width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; background: var(--kind-color, var(--accent)); }
+.pp-view:hover { background: var(--hover-bg); }
+.pp-view.open { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.pp-view-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-view-open { font-size: 11px; color: var(--accent); }
+.pp-view-kind { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--kind-color, var(--accent)); flex-shrink: 0; }
+.pp-views-none { margin: 0; font-size: 12px; color: var(--text-muted); }
 .pp-branch { display: grid; gap: 8px; }
 .pp-branch-mark { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; border-radius: 4px; padding: 1px 6px; }
 .pp-branch-mark.new { background: var(--success); }

@@ -16,8 +16,7 @@ import { Inspector } from './components/Inspector'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
 import { MilestoneChip } from '@radical/ui/components/MilestoneChip'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
-import { SelectionActionBar } from './components/SelectionActionBar'
-import { EdgeActionBar } from './components/EdgeActionBar'
+import { SelectionActionBar } from '@radical/ui/components/SelectionActions'
 import { QuickSearch } from './components/QuickSearch'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
@@ -103,7 +102,6 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
-      {!isPresenting && !isInspector && isCanvasView && <EdgeActionBar />}
       {!isInspector && <QuickSearch />}
       {isDesigner && <NodeWizard />}
       <NotificationHost />

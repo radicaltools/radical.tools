@@ -11,7 +11,7 @@
 // a plain object or an immer draft.
 
 import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
-import { readPipeline } from './viewPipeline'
+import { readPipeline, viewShownNodes } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
@@ -888,6 +888,19 @@ export function groupViewNodesRefusal(state: Pick<ModelState, 'views' | 'metamod
 /** The views of group `groupId`, in the list's order. */
 export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView[] {
   return Object.values(views).filter((v) => v.partOf === groupId)
+}
+
+/** The views that show element `nodeId`, in model order: what viewShownNodes
+ *  says each shows, as the view list counts them, a view of the whole model
+ *  among them. A group of views per element lists none itself: its views
+ *  stand for it. */
+export function viewsShowingNode(nodeId: string, state: Pick<ModelState, 'c4Nodes' | 'c4Relations' | 'views' | 'metamodel'>): DiagramView[] {
+  if (!state.c4Nodes[nodeId]) return []
+  return Object.values(state.views).filter((v) => {
+    if (isViewGroup(v, state.metamodel)) return false
+    const shown = viewShownNodes(v, state.c4Nodes, state.c4Relations)
+    return shown ? shown.has(nodeId) : true
+  })
 }
 
 /** What syncViewGroups would do: the views to add (a group and an element),

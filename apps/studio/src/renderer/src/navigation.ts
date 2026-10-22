@@ -9,6 +9,9 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { isViewGroup } from '@radical/common/model'
 import { create } from 'zustand'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { focusWhenDrawn, showOnPage } from '@radical/ui/store/showInView'
+
+export { showOnPage }
 
 /** The Inspector's tabs. */
 export type InspectorTab = 'changes' | 'model' | 'implementation' | 'settings'
@@ -113,33 +116,6 @@ export function pickViewFor(nodeId: string | readonly string[], activeViewId: st
   return best?.id ?? null
 }
 
-/** Puts `nodeId` in sight on a wiki or hierarchy view picked for it: the
- *  wiki shows its page, the hierarchy the level that draws it. A pick there
- *  selected the element and stayed on the Overview, or on a level that did
- *  not draw it. */
-export function showOnPage(viewId: string | null, nodeId: string): void {
-  const store = useDiagramStore.getState()
-  const view = viewId ? store.views[viewId] : undefined
-  if (!view) return
-  if (view.kind === 'wiki') {
-    if (store.slideWikiPage) useDiagramStore.setState({ slideWikiPage: null })
-    if ((view.wikiFocusId ?? null) !== nodeId) store.setWikiFocus(view.id, nodeId)
-    return
-  }
-  if (view.kind !== 'treemap') return
-  const nodes = store.c4Nodes
-  const focusId = store.slideTreemapFocus?.viewId === view.id ? store.slideTreemapFocus.focusId : (view.treemapFocusId ?? null)
-  const maxDepth = view.treemapMaxDepth === null ? Infinity : (typeof view.treemapMaxDepth === 'number' && view.treemapMaxDepth > 0 ? view.treemapMaxDepth : 2)
-  // How many levels below the focus the element is (Infinity: not under it).
-  let depth = 0
-  let cur: string | undefined = nodeId
-  while (cur && cur !== focusId) { cur = nodes[cur]?.parentId; depth++ }
-  if (focusId !== null && cur !== focusId) depth = Infinity
-  if (depth >= 1 && depth <= maxDepth) return
-  if (store.slideTreemapFocus) useDiagramStore.setState({ slideTreemapFocus: null })
-  store.setTreemapFocus(view.id, nodes[nodeId]?.parentId ?? null)
-}
-
 /** A model just opened (from a file, a folder, a list, a Hub link) shows
  *  its first view in model order, rather than All elements, the table of
  *  everything, which it landed on. All elements stays when it has no view,
@@ -150,9 +126,6 @@ export function openFirstView(): void {
   const first = Object.values(store.views).find((v) => !isViewGroup(v, store.metamodel))
   if (first) store.setActiveView(first.id)
 }
-
-type FocusFn = (id: string, opts?: { zoom?: number; duration?: number }) => void
-const FOCUS_ZOOM = 1.2
 
 /** Designer, on the canvas that shows `nodeId` (or on `viewId`, one the
  *  user chose; null for All elements), with it selected, its containers
@@ -171,27 +144,14 @@ export function revealOnCanvas(nodeId: string, viewId?: string | null): void {
     const s = useDiagramStore.getState()
     try {
       s.expandAncestors(nodeId)
+      showOnPage(target, nodeId)
       s.setSelectedNodeIds([nodeId])
       s.selectNode(nodeId)
     } finally {
       usePlaceHold.setState((h) => ({ held: Math.max(0, h.held - 1) }))
     }
     ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
-    // The canvas registers its camera function when it mounts, so right
-    // after the switch the one on window may still be the unmounted
-    // canvas's: try again until the camera is there.
-    const w = window as unknown as { __rfFocusNode?: FocusFn; __rfCurrentViewport?: { zoom: number } }
-    const started = Date.now()
-    const focus = (): void => {
-      if (typeof document === 'undefined') return
-      const drawn = document.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"]`)
-      if (drawn && w.__rfFocusNode) w.__rfFocusNode(nodeId, { zoom: FOCUS_ZOOM, duration: 400 })
-      if (Date.now() - started > 4000) return
-      setTimeout(() => {
-        if (Math.abs((w.__rfCurrentViewport?.zoom ?? 0) - FOCUS_ZOOM) > 0.01) focus()
-      }, drawn ? 500 : 100)
-    }
-    requestAnimationFrame(focus)
+    focusWhenDrawn(nodeId)
   }, switching ? 150 : 60)
 }
 

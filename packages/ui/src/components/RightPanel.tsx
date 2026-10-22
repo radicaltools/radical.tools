@@ -15,9 +15,11 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
-import { isViewGroup, parentCandidates, viewsOfGroup } from '@radical/common/model'
+import { isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
+import { showNodeInView } from '../store/showInView'
+import { NodeActions, RelationActions } from './SelectionActions'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 /** A text field got or lost focus: what is typed into it in between (each
@@ -135,6 +137,16 @@ const VIEW_KIND_COLORS: Record<string, string> = {
   wiki: '#ec4899',
   warnier: '#0d9488',
   explore: '#6366f1',
+}
+
+/** A view's type as its card names it, the key of its colour. */
+function viewKindBadge(v: DiagramView): string {
+  switch (v.kind) {
+    case 'dynamic': return 'flow'
+    case 'treemap': return 'hierarchy'
+    case 'table': case 'matrix': case 'wiki': case 'warnier': case 'explore': return v.kind
+    default: return 'structure'
+  }
 }
 
 function AccordionSection({
@@ -1018,9 +1030,8 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       </>)}
       {/* A group's view goes with its element; deleting the group takes them all. */}
       {!readOnly && !ofGroup && (
-        <button className="props-delete" onClick={() => { removeView(view.id); setActiveView(null); onClose() }}>
-          🗑 Delete {isViewGroup(view, metamodel) ? 'the group and its views' : 'view'}
-        </button>
+        <DeleteButton className="props-delete" label={isViewGroup(view, metamodel) ? 'Delete the group and its views' : 'Delete view'}
+          onDelete={() => { removeView(view.id); setActiveView(null); onClose() }} />
       )}
     </div>
   )
@@ -1097,9 +1108,7 @@ function MilestonePropertiesContent({ snapId, readOnly = false, onClose }: { sna
           >
             <Icon.Restore /> Restore to live
           </button>
-          <button className="props-delete" onClick={() => { removeSnapshot(snap.id); onClose() }}>
-            🗑 Delete milestone
-          </button>
+          <DeleteButton className="props-delete" label="Delete milestone" onDelete={() => { removeSnapshot(snap.id); onClose() }} />
         </>
       )}
     </div>
@@ -1376,7 +1385,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const isWiki    = v.kind === 'wiki'
     const isWarnier = v.kind === 'warnier'
     const isExplore = v.kind === 'explore'
-    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : isWarnier ? 'warnier' : isExplore ? 'explore' : 'structure'
+    const badge = viewKindBadge(v)
     // A view of a viewpoint names it too, after its view type.
     const viewpoint = viewpointOfView(v, metamodel)
     // A group of views of one element: a click shows or hides its views.
@@ -1948,9 +1957,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
               </button>
             )
           })()}
-          <button className="props-delete" onClick={() => { removeSequence(seq.id); setActiveSequence(null) }}>
-            🗑 Delete sequence
-          </button>
+          <DeleteButton className="props-delete" label="Delete sequence" onDelete={() => { removeSequence(seq.id); setActiveSequence(null) }} />
         </>
       )}
     </div>
@@ -2234,12 +2241,55 @@ function AttrValue({ def, value, readOnly, onChange }: {
   )
 }
 
-type PanelMenuItem = { label: string; danger?: boolean; onClick: () => void }
+/** Something done to what the card shows rather than written in it: a
+ *  button with its icon and `label` on the card's head, as Wizard. */
+type PanelAction = { label: string; title: string; icon: React.ReactNode; onClick: () => void }
+
+const ActionIcon = {
+  /** An element with its neighbours, a level below (the Explore view's icon). */
+  Explore: () => (
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="5.5" y="1.5" width="5" height="3.5" rx="0.8"/>
+      <rect x="1" y="11" width="4.5" height="3.5" rx="0.8"/>
+      <rect x="10.5" y="11" width="4.5" height="3.5" rx="0.8"/>
+      <path d="M8 5 V8 M3.25 11 V8 H12.75 V11"/>
+    </svg>
+  ),
+  /** A bin, as the selection bar's Delete. */
+  Delete: () => (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 4h10M6 4V2.5h4V4M5 4l1 9h4l1-9M7 6.5v4M9 6.5v4" />
+    </svg>
+  ),
+}
+
+/** Deleting what a card or a pane shows: a bin and its words, in the
+ *  danger colour only under the pointer. Always last, away from the other
+ *  buttons. */
+function DeleteButton({ label, note, className, onDelete }: { label: string; note?: string; className?: string; onDelete: () => void }) {
+  return (
+    <button type="button" className={`pp-delete-btn${className ? ` ${className}` : ''}`} onClick={onDelete}>
+      <ActionIcon.Delete />
+      {label}
+      {note && <span className="pp-delete-note">{note}</span>}
+    </button>
+  )
+}
+
+/** The card's last section: deleting what it shows, away from the head
+ *  where a click is meant to explore or close. */
+function DeleteSection({ label, note, onDelete }: { label: string; note?: string; onDelete: () => void }) {
+  return (
+    <section className="pp-section pp-delete">
+      <DeleteButton label={label} note={note} onDelete={onDelete} />
+    </section>
+  )
+}
 
 /** The card's head: the type, the name (edited in place), where it sits,
- *  the wizard when its type has one, a ⋯ menu with what is done to it
- *  rather than written in it, and ✕. */
-function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, readOnly, onTitle, context, onWizard, menu, onClose }: {
+ *  the wizard when its type has one, what is done to it rather than written
+ *  in it (Explore) beside it, and ✕. Delete is the card's last section. */
+function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, readOnly, onTitle, context, onWizard, actions, onClose }: {
   typeLabel: string
   color: string
   iconPath?: string
@@ -2250,12 +2300,9 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
   context?: React.ReactNode
   /** Opens the type's wizard, when it has one. */
   onWizard?: () => void
-  menu: PanelMenuItem[]
+  actions: PanelAction[]
   onClose: () => void
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  useOutsideClick([menuRef], menuOpen, useCallback(() => setMenuOpen(false), []))
   return (
     <div className="pp-head">
       <div className="pp-head-bar">
@@ -2267,27 +2314,18 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
         </span>
         <span className="pp-head-actions">
           {onWizard && (
-            <button type="button" className="pp-wizard-btn" title="Fill in with the wizard" onClick={onWizard}>
+            <button type="button" className="pp-head-btn" title="Fill in with the wizard" onClick={onWizard}>
               <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M2.5 13.5 L10 6" /><path d="M9 4.5 L11.5 7" /><path d="M12 1.5v2M11 2.5h2M14 5.5v1.6M13.2 6.3h1.6M6 1.8v1.4M5.3 2.5h1.4" />
               </svg>
               Wizard
             </button>
           )}
-          {menu.length > 0 && (
-            <div className="pp-menu-wrap" ref={menuRef}>
-              <button type="button" className="pp-icon-btn" aria-label="More actions" aria-expanded={menuOpen}
-                title="More actions" onClick={() => setMenuOpen((o) => !o)}>⋯</button>
-              {menuOpen && (
-                <div className="pp-menu" role="menu">
-                  {menu.map((m) => (
-                    <button type="button" role="menuitem" key={m.label} className={`pp-menu-item${m.danger ? ' danger' : ''}`}
-                      onClick={() => { setMenuOpen(false); m.onClick() }}>{m.label}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {actions.map((a) => (
+            <button type="button" key={a.label} className="pp-head-btn" title={a.title} onClick={a.onClick}>
+              {a.icon}{a.label}
+            </button>
+          ))}
           <button type="button" className="pp-icon-btn" aria-label="Close properties" title="Close" onClick={onClose}>✕</button>
         </span>
       </div>
@@ -2367,11 +2405,71 @@ function BranchFieldChanges({ node, branch }: { node: C4Node; branch?: CardBranc
   )
 }
 
-function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
+/** The views that show `nodeId` (viewsShowingNode), as the view list counts
+ *  them. Running every view's chain takes tens of milliseconds on a large
+ *  model: another set of views (a view switch) asks again at once, an edit
+ *  of the model a moment after it stops. */
+function useViewsShowing(nodeId: string): DiagramView[] {
+  const views = useDiagramStore((s) => s.views)
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const c4Relations = useDiagramStore((s) => s.c4Relations)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const find = useCallback(() => viewsShowingNode(nodeId, { c4Nodes, c4Relations, views, metamodel }), [nodeId, c4Nodes, c4Relations, views, metamodel])
+  const [shown, setShown] = useState(find)
+  const seen = useRef({ find, nodeId, views })
+  useEffect(() => {
+    const was = seen.current
+    seen.current = { find, nodeId, views }
+    if (was.find === find) return
+    if (was.nodeId !== nodeId || was.views !== views) { setShown(find()); return }
+    const t = setTimeout(() => setShown(find()), 300)
+    return () => clearTimeout(t)
+  }, [find, nodeId, views])
+  return shown
+}
+
+/** The card's Views: every view that shows the element, the open one
+ *  marked; a click opens it with the element selected and in sight. */
+function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: string) => void }) {
+  const shown = useViewsShowing(nodeId)
+  // The Inspector shows no view: none is open there.
+  const activeViewId = useDiagramStore((s) => (s.appMode === 'designer' || s.appMode === 'viewer' ? s.activeViewId : null))
+  return (
+    <section className="pp-section" aria-label="Views">
+      <div className="pp-section-title">Views · {shown.length}</div>
+      {shown.length === 0
+        ? <p className="pp-views-none">On no view: only All elements shows it.</p>
+        : (
+          <ul className="pp-views">
+            {shown.map((v) => {
+              const badge = viewKindBadge(v)
+              const open = v.id === activeViewId
+              return (
+                <li key={v.id}>
+                  <button type="button" className={`pp-view${open ? ' open' : ''}`} aria-current={open || undefined}
+                    style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
+                    title={open ? `${v.name} is open` : `Open ${v.name} with this element selected`}
+                    onClick={() => onOpen(v.id)}>
+                    <span className="pp-view-name">{v.name}</span>
+                    {open && <span className="pp-view-open">open</span>}
+                    <span className="pp-view-kind">{badge}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+    </section>
+  )
+}
+
+function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenView }: {
   readOnly?: boolean; onClose: () => void
   /** The element to show instead of the selection (a card opened from outside the canvas). */
   nodeId?: string
   branch?: CardBranch | null
+  /** Opens a view from the card's Views (else showNodeInView, in the mode the app is in). */
+  onOpenView?: (viewId: string) => void
 }) {
   const selected = useDiagramStore((s) => s.selectedNodeId)
   const selectedNodeId = nodeId ?? selected
@@ -2437,9 +2535,8 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
     }
 
     const typeLabel = nodeTypeDef?.label ?? TYPE_LABELS[node.type] ?? node.type
-    const menu: PanelMenuItem[] = [
-      ...(canExplore ? [{ label: 'Explore from here', onClick: () => exploreFrom(node.id) }] : []),
-      ...(readOnly ? [] : [{ label: 'Delete element (and what it contains)', danger: true, onClick: () => { removeNode(node.id); selectNode(null) } }]),
+    const actions: PanelAction[] = [
+      ...(canExplore ? [{ label: 'Explore', title: 'Explore from here: a temporary view grown from this element', icon: <ActionIcon.Explore />, onClick: () => exploreFrom(node.id) }] : []),
     ]
     const hubEntry = Object.entries(hubTemplates as Record<string, HubImportRecord>).find(([, rec]) => rec.nodeIds.includes(node.id))
 
@@ -2459,7 +2556,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             ))}</>
           )}
           onWizard={!readOnly && nodeTypeDef?.wizard ? () => openNodeWizard(node.id) : undefined}
-          menu={menu}
+          actions={actions}
           onClose={onClose}
         />
         <BranchFieldChanges node={node} branch={branch} />
@@ -2520,6 +2617,13 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
             />
           </section>
         )}
+        <div className="pp-foot">
+          <div className="pp-foot-scroll">
+            <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
+            {!readOnly && <NodeActions nodeId={node.id} />}
+          </div>
+          {!readOnly && <DeleteSection label="Delete element" note="and what it contains" onDelete={() => { removeNode(node.id); selectNode(null) }} />}
+        </div>
       </div>
     )
   }
@@ -2578,7 +2682,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
                 {dstNode ? <NodeLink id={dstNode.id} label={dstNode.label} /> : '?'}
               </>
             )}
-            menu={readOnly ? [] : [{ label: 'Delete relation', danger: true, onClick: () => { removeRelation(rel.id); selectEdge(null) } }]}
+            actions={[]}
             onClose={onClose}
           />
           {(short.length > 0 || showType) && (
@@ -2607,6 +2711,12 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
                 onChange={(v) => set(p.key, v)} />
             </section>
           ))}
+          {!readOnly && (
+            <div className="pp-foot">
+              <div className="pp-foot-scroll"><RelationActions relationId={rel.id} /></div>
+              <DeleteSection label="Delete relation" onDelete={() => { removeRelation(rel.id); selectEdge(null) }} />
+            </div>
+          )}
         </div>
       )
     }
@@ -2614,7 +2724,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch }: {
     return (
       <div className="props-content">
         <PanelHeader typeLabel="Relation" color="#64748b" title="" titlePlaceholder="Virtual relation"
-          readOnly menu={[]} onClose={onClose} />
+          readOnly actions={[]} onClose={onClose} />
         <div className="props-empty">
           It stands for relations between elements inside collapsed ones.<br />
           Expand them to edit each relation.
@@ -2631,14 +2741,16 @@ const PANEL_W_DEFAULT = 340
 
 /** The properties card of one element, outside the canvas (Studio's
  *  Inspector): the same card, read-only, with `actions` under its head. */
-export function ElementCard({ nodeId, branch, onClose, actions }: {
+export function ElementCard({ nodeId, branch, onClose, actions, onOpenView }: {
   nodeId: string; branch?: CardBranch | null; onClose: () => void; actions?: React.ReactNode
+  /** Opens one of the views the card lists: the card is outside the canvas. */
+  onOpenView: (viewId: string) => void
 }): React.ReactElement {
   return (
     <aside className="right-panel open element-card" aria-label="Properties" style={{ width: PANEL_W_DEFAULT }}>
       <div className="pp-scroll">
         {actions && <div className="element-card-actions">{actions}</div>}
-        <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} />
+        <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} onOpenView={onOpenView} />
       </div>
     </aside>
   )
@@ -2721,7 +2833,7 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
       ? (
         <div className="props-content">
           <PanelHeader typeLabel="Sequence" color="var(--accent)" title="" titlePlaceholder="" readOnly
-            menu={[]} onClose={() => { close(); setActiveSequence(null) }} />
+            actions={[]} onClose={() => { close(); setActiveSequence(null) }} />
           <SequencePropertiesContent sequenceId={activeSequenceId} readOnly={readOnly} />
         </div>
       )

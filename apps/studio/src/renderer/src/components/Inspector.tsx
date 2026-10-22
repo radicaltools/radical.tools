@@ -14,7 +14,7 @@ import { compareCheckConfig, defaultSeverity } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
-import { useInspectorNav, type InspectorTab } from '../navigation'
+import { revealOnCanvas, useInspectorNav, type InspectorTab } from '../navigation'
 import { useInspectorStore, useSettingsDraft } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
 import { ThisChange } from './inspector/ThisChange'
@@ -125,7 +125,8 @@ export function Inspector(): React.ReactElement {
       </div>
       {peekId && <Peek id={peekId} ctx={ctx} check={check} onClose={() => setPeekId(null)} />}
       {tab === 'changes' && cardId && nodes[cardId] && (
-        <ElementCard nodeId={cardId} branch={cardBranch} onClose={() => setCardId(null)} actions={<>
+        <ElementCard nodeId={cardId} branch={cardBranch} onClose={() => setCardId(null)}
+          onOpenView={(viewId) => revealOnCanvas(cardId, viewId)} actions={<>
           <ShowOnCanvas id={cardId} className="insp-btn primary" />
           <OpenWikiPage id={cardId} className="insp-btn" />
         </>} />

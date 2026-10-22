@@ -168,7 +168,7 @@ test('a viewpoint that draws one element makes a group with a view of each, whic
 
   // Nothing is hidden from a view per element by hand.
   await studio.node('order-0').click()
-  await expect(page.locator('.sel-bar-btn', { hasText: 'Hide from view' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Hide from view' })).toHaveCount(0)
   await page.keyboard.press('Delete')
   await expect(page.getByRole('button', { name: /Hide from current view/ })).toBeDisabled()
   await page.getByRole('button', { name: /^Cancel/ }).click()
