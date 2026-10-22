@@ -88,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- MCP `get_issues` names a concern pack's decision imported unbound and the elements to bind it to, as `radical check`'s `concern-unbound` does; it used to list the concern as open and ask for the pack again, and an agent that followed it imported a second copy
+- A concern pack bound to an element inside a container: its view in *Concerns* shows the container holding that element on the left of the pack, and opens as it was saved (the element was listed without a place and the container placed but not drawn, so the first opening laid all of the pack out again)
+- A concern pack is not added to a model whose metamodel cannot hold it (C4): the wizard says which types the metamodel lacks and *Add to model* is disabled, as `forge_import_hub_concept` refuses it; it used to come in and validation then flagged everything it brought
+- A concern pack imported while a milestone is shown is an edit of the milestone, its view included: *Discard* leaves the live model's views as they were (the view was saved at once and stayed after Discard, listing elements that do not exist), and *Propagate* brings the view in with the elements
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)
