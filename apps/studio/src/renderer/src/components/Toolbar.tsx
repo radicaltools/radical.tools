@@ -17,7 +17,7 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
-import { useMenuKeys } from './menuKeys'
+import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
 import {
   loadStudioSettings,
   saveStudioSettings,

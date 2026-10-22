@@ -311,7 +311,7 @@ test('files the model does not own are left alone', async ({ page, studio }) => 
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
 
   await studio.node('payments').click()
-  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await studio.properties.getByRole('button', { name: /^Delete element/ }).click()
   await expect.poll(() => folder.paths()).not.toContain('nodes/payment-provider/_index.md')
 
   const files = await folder.files()

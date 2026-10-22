@@ -118,7 +118,7 @@ test('explore', async ({ page, studio, shot }) => {
   await expect(page.locator('.app-layout')).toBeVisible()
   await settle(page)
   await studio.node('api').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   const api = page.getByRole('menu', { name: 'Add to API' })
   for (const text of ['reads/writes', 'charges card', 'calls']) await api.locator('.explore-menu-row', { hasText: text }).getByRole('checkbox').check()
   await api.getByRole('menuitem', { name: 'Show checked' }).click()
@@ -258,7 +258,8 @@ test('hub-import', async ({ page, shot }) => {
 
 test('ai-settings', async ({ page, shot }) => {
   await open(page, 'view-ctx')
-  await menu(page, 'AI providers…')
+  // Radical Forge's hint names it too ("Needs an AI provider: AI providers… above").
+  await menu(page, /^AI providers…/)
   await page.waitForTimeout(300)
   await shot('ai-settings')
 })

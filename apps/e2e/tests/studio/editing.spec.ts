@@ -237,7 +237,7 @@ test('the Parent field moves an element into its new parent, and offers no loop'
 
 test('delete an element', async ({ page, studio }) => {
   await studio.node('payments').click()
-  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await studio.properties.getByRole('button', { name: /^Delete element/ }).click()
   await expect(studio.node('payments')).toHaveCount(0)
   await expect(studio.edges).toHaveCount(1)
   await expect.poll(async () => (await studio.storedDoc()).nodes.some((n) => n.id === 'payments')).toBe(false)
@@ -514,8 +514,9 @@ test('Move to… with many parents stays in the window and scrolls', async ({ pa
   await page.setViewportSize({ width: 1280, height: 720 })
   await studio.openSample('view-payment-process')
   await studio.nodeByLabel('Book the ledger').first().click()
-  await page.getByRole('button', { name: /Move to…/ }).click()
-  const menu = page.locator('.sel-bar-menu')
+  // In the card, under its row.
+  await studio.properties.getByRole('button', { name: /Move to…/ }).click()
+  const menu = studio.properties.getByRole('menu')
   const box = (await menu.boundingBox())!
   expect(box.y).toBeGreaterThanOrEqual(48)
   await page.keyboard.press('ArrowDown')

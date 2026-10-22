@@ -1,6 +1,6 @@
 // ─── A menu's keys ───────────────────────────────────────────────────────────
 //
-// The Radical menu and the selection bar's menus (Wrap into…, Move to…,
+// The Radical menu and the selection actions' menus (Wrap into…, Move to…,
 // Change source/destination…) did not answer ↑/↓, and the Radical menu
 // stayed open when Tab left it.
 

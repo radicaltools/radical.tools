@@ -99,7 +99,7 @@ test('Explore from here grows level by level from each +', async ({ page, studio
   await studio.open('v-containers')
   const stored = await studio.storedJson()
   await studio.node('api').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
 
   // A view of API alone, no Bookstore frame, listed first, named after it.
   await expect(page.locator('.explore-bar')).toContainText('Explore: API')
@@ -172,7 +172,7 @@ test('the + of an element adds the relations of the types and direction chosen',
   await studio.open('v-containers')
   const stored = await studio.storedJson()
   await studio.node('api').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
 
   // The menu: Show all, then what goes out from API and what comes in,
   // each kind with its count, its parent last.
@@ -217,7 +217,7 @@ test('the + of an element adds the relations of the types and direction chosen',
 
   // Another exploration: API's parent, then Bookstore's children.
   await pick(studio.node('api'))
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(studio.node('bookstore')).toHaveCount(0)
   menu = await plus(page, 'API')
   await row(menu, 'in', 'Contained in').getByRole('menuitem').click()
@@ -238,7 +238,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   await studio.seed()
   await studio.open('v-containers')
   await studio.node('api').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   // Its relations (not its parent).
   const menu = await plus(page, 'API')
   for (const [column, text] of [['out', 'reads/writes'], ['out', 'charges card'], ['in', 'calls']] as const) await row(menu, column, text).getByRole('checkbox').check()
@@ -287,7 +287,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   await page.waitForTimeout(1000)
   const stored = await studio.storedJson()
   await pick(studio.node('db'))
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(page.locator('.explore-bar')).toContainText('Explore: Orders DB')
   await all(page, 'Orders DB')
   await page.locator('.explore-bar').getByRole('button', { name: 'Close the exploration' }).click()
@@ -299,9 +299,9 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
 
   // Replaced by another exploration, and dropped with another model.
   await pick(studio.node('web'))
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await pick(studio.node('web'))
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(page.locator('.lp-explore-card')).toHaveCount(1)
   await studio.openSample()
   await expect(page.locator('.lp-explore-card')).toHaveCount(0)
@@ -311,7 +311,7 @@ test('a saved exploration stays an explore view, grown in Designer and only look
   await studio.seed()
   await studio.open('v-containers')
   await studio.node('api').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   // API's relations: Web App, Orders DB and Payment Provider below it.
   const menu = await plus(page, 'API')
   for (const [column, text] of [['out', 'reads/writes'], ['out', 'charges card'], ['in', 'calls']] as const) await row(menu, column, text).getByRole('checkbox').check()
@@ -407,7 +407,7 @@ test('Explore from here in Viewer follows the milestone shown and saves nothing'
 
   // In v1 the API gateway serves the web app, accounts and auth only.
   await studio.node('ctn-apigw').click()
-  await page.getByRole('button', { name: 'Explore from here' }).click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(page.locator('.explore-bar')).toContainText('Explore: API Gateway')
   await expect(page.locator('.explore-bar').getByRole('button', { name: 'Save as view…' })).toHaveCount(0)
   let menu = await plus(page, 'API Gateway')

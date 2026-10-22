@@ -7,5 +7,5 @@ tests: |
   packages/ui/tests/exploreView.test.ts › an explore view in Viewer
   apps/e2e/tests/studio/explore.spec.ts › Explore from here in Viewer follows the milestone shown and saves nothing
 then: "the exploration shows the element and its neighbours in v1, then in the live model; it offers no Save as view; nothing is saved and Designer's undo history is unchanged"
-when: "the user chooses Explore from here on an element, clicks its +, then shows Current (live)"
+when: "the user chooses Explore on an element's properties card, clicks its +, then shows Current (live)"
 ---
