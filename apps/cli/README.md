@@ -355,7 +355,9 @@ not change the model's files.
 the base (default: the merge base with `origin/main`) set back to it, the test
 must fail; put back, it must pass; and it must pass `--runs` runs at once
 (default 5). Tests, findings and `crucible.json` are not set back, and the
-working tree is left as it was (files are copied aside, never stashed). A test
+working tree is left as it was (files are copied aside, never stashed), also
+when the gate is interrupted: Ctrl+C, `kill` or a closed terminal stops the
+test, puts the changed files back and ends with exit status 2. A test
 runs through the runner `crucible.json` gives for its folder, else with
 `npx vitest run <file> -t <name>` in the file's package:
 
@@ -365,7 +367,7 @@ runs through the runner `crucible.json` gives for its folder, else with
 ```
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
-could not run.
+could not run or was interrupted.
 
 ## radical explore
 

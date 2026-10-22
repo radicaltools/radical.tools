@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -21,7 +21,8 @@ Turns a finding into a test bound to the model (Radical Crucible).
   --gate              checks a test before it is bound: with the source files
                       changed since the base set back to it, it must fail;
                       with them put back, it must pass; and it must pass
-                      several runs at once. The working tree is left as it was
+                      several runs at once. The working tree is left as it was,
+                      also when the gate is interrupted (Ctrl+C, kill)
   --test "<f> › <n>"  the test to gate: a file from the folder crucible.json
                       is in, and the test's name
   --base <ref>        the commit without the fix (default: the merge base
@@ -36,7 +37,7 @@ else with npx vitest run {file} -t {name} in the file's package. Tests,
 findings and crucible.json are not set back.
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
-could not run.`
+could not run or was interrupted.`
 
 interface Runner {
   files: string
@@ -145,7 +146,40 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
   io.out(`Gate for ${run.label}, base ${base}, ${changed.length} source file${changed.length === 1 ? '' : 's'} changed since:`)
   for (const f of changed) io.out(`  ${f}`)
 
-  const without = await setBack(top, base, changed, () => runTest(run, io))
+  // Interrupted (Ctrl+C, kill, the terminal closed), Node would end without
+  // running a finally: stop the tests, put the fix back, then end.
+  let putBack: (() => void) | undefined
+  const interrupted = (signal: NodeJS.Signals) => {
+    for (const child of running) child.kill('SIGTERM')
+    try {
+      putBack?.()
+      io.err(`Interrupted (${signal}): ${putBack ? 'the changed files are put back as they were.' : 'the working tree is as it was.'}`)
+    } catch (error) {
+      io.err(`Interrupted (${signal}): ${(error as Error).message}`)
+    }
+    process.exit(2)
+  }
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP']
+  for (const s of signals) process.on(s, interrupted)
+  try {
+    return await gate(run, runs, io, async () => {
+      putBack = setBack(top, base, changed)
+      try {
+        return await runTest(run, io)
+      } finally {
+        const done = putBack
+        putBack = undefined
+        done()
+      }
+    })
+  } finally {
+    for (const s of signals) process.off(s, interrupted)
+  }
+}
+
+/** The gate's three steps, the first run by `withoutFix`. */
+async function gate(run: TestRun, runs: number, io: Io, withoutFix: () => Promise<number>): Promise<number> {
+  const without = await withoutFix()
   if (without === 0) {
     io.out('1. Without the fix: passed. ✖ The test does not fail without the fix, so it does not prove it.')
     return 1
@@ -219,12 +253,33 @@ function changedSources(root: string, base: string): string[] | string {
   return [...new Set(all)].filter((f) => !NOT_A_FIX.test(f)).sort()
 }
 
-/** Runs `inside` with `files` as they are at `base` (a file the base has not
- *  is taken away), and puts every one back as it was afterwards, whatever
- *  happened. Copies, never git stash. */
-async function setBack<T>(root: string, base: string, files: string[], inside: () => Promise<T>): Promise<T> {
+/** Sets `files` as they are at `base` (a file the base has not is taken
+ *  away), and returns what puts every one back as it was, once. Copies,
+ *  never git stash; when a copy cannot be put back, the error names the
+ *  folder that keeps them. */
+function setBack(root: string, base: string, files: string[]): () => void {
   const saved = mkdtempSync(join(tmpdir(), 'radical-harden-'))
   const had = new Set<string>()
+  let back = false
+  const putBack = () => {
+    if (back) return
+    back = true
+    const failed: string[] = []
+    for (const f of files) {
+      try {
+        if (had.has(f)) {
+          mkdirSync(dirname(join(root, f)), { recursive: true })
+          copyFileSync(join(saved, f), join(root, f))
+        } else {
+          rmSync(join(root, f), { force: true })
+        }
+      } catch (error) {
+        failed.push(`${f} (${(error as Error).message})`)
+      }
+    }
+    if (failed.length) throw new Error(`could not put back ${failed.join(', ')}: the copies of the changed files are in ${saved}.`)
+    rmSync(saved, { recursive: true, force: true })
+  }
   try {
     for (const f of files) {
       if (!existsSync(join(root, f))) continue
@@ -241,24 +296,22 @@ async function setBack<T>(root: string, base: string, files: string[], inside: (
         rmSync(join(root, f), { force: true })
       }
     }
-    return await inside()
-  } finally {
-    for (const f of files) {
-      if (had.has(f)) {
-        mkdirSync(dirname(join(root, f)), { recursive: true })
-        copyFileSync(join(saved, f), join(root, f))
-      } else {
-        rmSync(join(root, f), { force: true })
-      }
-    }
-    rmSync(saved, { recursive: true, force: true })
+  } catch (error) {
+    putBack()
+    throw error
   }
+  return putBack
 }
+
+/** The tests running now, stopped when the gate is interrupted. */
+const running = new Set<ChildProcess>()
 
 /** Runs the test, its output passed on; resolves with its exit status. */
 function runTest(run: TestRun, io: Io): Promise<number> {
   return new Promise((done) => {
     const child = spawn(run.command, run.args, { cwd: run.cwd, shell: process.platform === 'win32' })
+    running.add(child)
+    child.on('close', () => running.delete(child))
     child.stdout.on('data', (d: Buffer) => { for (const line of d.toString().split('\n')) if (line.trim()) io.out(`    ${line}`) })
     child.stderr.on('data', (d: Buffer) => { for (const line of d.toString().split('\n')) if (line.trim()) io.err(`    ${line}`) })
     child.on('error', (error) => { io.err(`${run.command}: ${error.message}`); done(2) })
