@@ -163,3 +163,45 @@ test('several concern packs from a Hub link open their wizards one after another
     return [stored.nodes.filter((n) => n.type === 'adr').map((n) => n.concern).sort(), stored.views.filter((v) => v.folder === 'Concerns').map((v) => v.name).sort()]
   }).toEqual([['authentication', 'secrets'], ['Authentication', 'Secrets']])
 })
+
+test('a pack bound to an element inside a container opens its view as saved, the container holding it on the left', async ({ page, studio }) => {
+  // F-0008: the view listed Web App without a place and placed Bookstore
+  // without listing it: opening it laid all 16 pack elements out again,
+  // Web App in the middle, and Bookstore was not drawn.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
+  await dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+    .getByRole('button', { name: 'Add to Model' }).click()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard.getByRole('group', { name: 'Bind to' }).getByRole('checkbox', { name: /^Web App/ })).toHaveAttribute('aria-checked', 'true')
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+  await expect(wizard).toBeHidden()
+
+  type View = { id: string; name: string; folder?: string; nodeIds: string[]; positions: Record<string, { x: number; y: number }> }
+  const packView = async () => ((await studio.storedDoc()) as unknown as { views: View[] }).views.find((v) => v.folder === 'Concerns')
+  await expect.poll(async () => (await packView())?.nodeIds.length ?? 0).toBeGreaterThan(16)
+  const saved = (await packView())!
+
+  await studio.open(saved.id)
+  await studio.settle()
+  // Nothing it placed moves (the container may fit what it shows).
+  const opened = (await packView())!
+  for (const id of Object.keys(saved.positions).filter((id) => id !== 'bookstore')) {
+    expect(opened.positions[id], id).toMatchObject({ x: saved.positions[id].x, y: saved.positions[id].y })
+  }
+  await expect(studio.node('bookstore')).toBeVisible()
+  await expect(studio.node('web')).toBeVisible()
+  expect(saved.nodeIds).toEqual(expect.arrayContaining(['bookstore', 'web']))
+  for (const id of saved.nodeIds) expect(saved.positions[id], id).toBeDefined()
+  // On the left of the pack's columns.
+  const boxes = await studio.boxes()
+  const packLeft = Math.min(...saved.nodeIds.filter((id) => !['bookstore', 'web'].includes(id)).map((id) => boxes[id].x))
+  expect(boxes.bookstore.x + boxes.bookstore.width).toBeLessThan(packLeft)
+})

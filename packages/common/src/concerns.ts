@@ -307,8 +307,12 @@ export function buildConcernInsert(concept: HubConcept, options: ConcernInsertOp
 
 /** The canvas view a pack brings, in the folder Concerns: its elements as
  *  the pack lays them out (need, requirements, scenarios, decisions,
- *  fitness functions in columns), and the elements it is bound to, by
- *  their outermost containers, in a column on their left. */
+ *  fitness functions in columns), and the elements it is bound to, inside
+ *  what holds them, in a column on their left: the outermost containers
+ *  there, each element below them where the model has it (relative to its
+ *  parent). It lists and places every element it draws: one it listed
+ *  without a place, or placed without listing, was laid out again the
+ *  first time the view was opened. */
 function concernView(name: string, insert: ConceptInsert, options: ConcernInsertOptions): DiagramView {
   const packNodes = Object.values(insert.nodes)
   const minX = Math.min(...packNodes.map((n) => n.x))
@@ -316,24 +320,28 @@ function concernView(name: string, insert: ConceptInsert, options: ConcernInsert
   const positions: DiagramView['positions'] = {}
   for (const n of packNodes) positions[n.id] = { x: n.x - minX, y: n.y - minY, width: n.width, height: n.height }
   const all = options.nodes ?? {}
-  const outermost = (n: C4Node): C4Node => {
-    let cur = n
-    for (let p = all[cur.parentId ?? '']; p; p = all[p.parentId ?? '']) cur = p
-    return cur
+  /** The element and what holds it, the outermost first. */
+  const chain = (n: C4Node): C4Node[] => {
+    const out = [n]
+    for (let p = all[n.parentId ?? '']; p && !out.includes(p); p = all[p.parentId ?? '']) out.unshift(p)
+    return out
   }
-  const roots = [...new Map(options.elements.map((e) => { const r = outermost(all[e.id] ?? e); return [r.id, r] })).values()]
+  const chains = options.elements.map((e) => chain(all[e.id] ?? e))
+  const roots = [...new Map(chains.map((c) => [c[0].id, c[0]])).values()]
   const width = Math.max(0, ...roots.map((r) => r.width))
   let y = 0
   for (const r of roots) {
     positions[r.id] = { x: -width - VIEW_COLUMN_GAP * 2, y, width: r.width, height: r.height }
     y += r.height + VIEW_ROW_GAP
   }
+  const held = chains.flatMap((c) => c.slice(1))
+  for (const n of held) positions[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
   return {
     id: options.newId(),
     name: uniqueName(name, new Set(options.takenNames?.views ?? [])),
     kind: 'static',
     folder: CONCERN_VIEWS_FOLDER,
-    nodeIds: [...packNodes.map((n) => n.id), ...options.elements.map((e) => e.id)],
+    nodeIds: [...new Set([...packNodes.map((n) => n.id), ...roots.map((r) => r.id), ...held.map((n) => n.id)])],
     positions,
   }
 }
