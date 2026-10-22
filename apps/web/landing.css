@@ -174,8 +174,9 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
   font-size: clamp(34px, 5.2vw, 58px);
   line-height: 1.05; font-weight: 800; letter-spacing: -0.03em;
   margin-bottom: 20px;
+  text-wrap: balance;
 }
-.lead { max-width: 640px; margin: 0 auto 30px; font-size: 16.5px; line-height: 1.6; color: var(--text-2); }
+.lead { max-width: 640px; margin: 0 auto 30px; font-size: 16.5px; line-height: 1.6; color: var(--text-2); text-wrap: balance; }
 .lead em { color: var(--text); font-style: normal; font-weight: 600; }
 .cta-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .cta {
@@ -201,24 +202,32 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 30px; }
 .map { display: block; width: 100%; min-width: 680px; height: auto; margin: 0 auto; }
 .map .box { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.2; }
-.map .core { fill: var(--bg-panel); stroke: rgba(var(--accent-rgb), .55); stroke-width: 1.4; filter: drop-shadow(0 6px 28px rgba(var(--accent-rgb), .22)); }
+.map .core { fill: var(--bg-panel); stroke: rgba(var(--accent-rgb), .55); stroke-width: 1.4; }
 .map .name { font-size: 15px; font-weight: 600; fill: var(--text); }
 .map .core-name { font-size: 19px; font-weight: 700; fill: var(--text); letter-spacing: -0.01em; }
 .map .sub { font-size: 11px; fill: var(--muted); }
 .map .why { font-size: 11px; font-weight: 500; fill: var(--c); }
 .map .rule { stroke: var(--border); stroke-width: 1; }
-.map .key { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--accent); }
+.map .key { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--accent); }
 .map .val { font-size: 11px; fill: var(--text-2); }
-.map .file { font-family: var(--mono); font-size: 10.5px; fill: var(--text-2); }
+.map .file { font-size: 11px; fill: var(--text-2); }
 .map .icon-bg { fill: var(--c); fill-opacity: .14; }
 .map .icon { fill: var(--c); }
 .map .edge { fill: none; stroke: var(--border-strong); stroke-width: 1.5; marker-end: url(#ar); }
 .map .edge.both { marker-start: url(#ar); }
-.map .edge.strong { stroke: var(--accent); stroke-width: 2; marker-end: url(#ar-accent); }
 .map .pill { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
-.map .pill.strong { stroke: rgba(var(--accent-rgb), .5); }
 .map .lbl { font-size: 11px; fill: var(--muted); font-weight: 500; }
-.map .lbl.strong { fill: var(--accent); font-weight: 600; }
+/* the branches of the map, each in the colour of the part it reaches */
+.map .branch { fill: none; stroke: var(--c); stroke-width: 2.4; stroke-opacity: .6; stroke-linecap: round; }
+.map .pill.tint { stroke: var(--c); stroke-opacity: .5; }
+.map .lbl.tint { fill: var(--c); font-weight: 600; }
+/* yours, at the edges of the map: smaller, dashed, neutral */
+.map .leaf .box { fill: none; stroke: var(--border-strong); stroke-dasharray: 4 4; }
+.map .leaf .icon-bg { fill: var(--muted); fill-opacity: .12; }
+.map .leaf .icon { fill: var(--muted); }
+.map .leaf .name { font-size: 13.5px; fill: var(--text-2); }
+.map a.leaf:hover .box, .map a.leaf:focus-visible .box { stroke: var(--text-2); }
+.map a.leaf:hover .name { fill: var(--text); }
 .map a { cursor: pointer; }
 .map a:hover .box, .map a:focus-visible .box { stroke: var(--c); stroke-width: 1.6; }
 .map a:hover .name { fill: var(--c); }
@@ -226,6 +235,9 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 @media (prefers-reduced-motion: no-preference) { .map .box, .map .name { transition: stroke .15s, fill .15s; } }
 .map-tall { display: none; }
 .map-tall .bus { stroke: var(--border-strong); stroke-width: 1.5; }
+/* the tall picture has its own markers: the wide one's are not drawn while it is hidden */
+.map-tall .edge { marker-end: url(#art); }
+.map-tall .edge.both { marker-start: url(#art); }
 .map-tall .name { font-size: 16px; }
 .map-tall .sub, .map-tall .why, .map-tall .val, .map-tall .lbl { font-size: 12px; }
 .map-tall .key { font-size: 11px; }
@@ -291,4 +303,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 @media (max-width: 760px) {
   .hero { padding: 44px 0 36px; }
   .who-list { grid-template-columns: 1fr; }
+  .cta-row { flex-direction: column; align-items: stretch; max-width: 340px; margin: 0 auto; }
+  .cta { justify-content: center; }
 }
