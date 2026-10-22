@@ -4,6 +4,18 @@ import { HUB_PORT } from '../../playwright.config'
 // Import from the Hub into an existing model. Studio reads the catalogue
 // from hub.radical.tools; served here from this build's Hub.
 
+/** Models → Import from Hub…, the pack's Add to Model: its wizard. */
+async function packWizard(page: import('@playwright/test').Page, name: string): Promise<import('@playwright/test').Locator> {
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concern packs…').pressSequentially(name)
+  await dialog.locator('div', { has: page.getByRole('heading', { name, exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+    .getByRole('button', { name: 'Add to Model' }).click()
+  return page.getByTestId('concern-wizard')
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
     const local = `http://localhost:${HUB_PORT}` + new URL(route.request().url()).pathname
@@ -172,14 +184,7 @@ test('a pack bound to an element inside a container opens its view as saved, the
   doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
   await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-containers')
-  await page.getByRole('button', { name: 'Models', exact: true }).click()
-  await page.getByText(/Import from Hub/).first().click()
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
-  await dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-    .getByRole('button', { name: 'Add to Model' }).click()
-  const wizard = page.getByTestId('concern-wizard')
+  const wizard = await packWizard(page, 'Authentication')
   await expect(wizard.getByRole('group', { name: 'Bind to' }).getByRole('checkbox', { name: /^Web App/ })).toHaveAttribute('aria-checked', 'true')
   await wizard.getByRole('button', { name: 'Add to model' }).click()
   await expect(wizard).toBeHidden()
@@ -214,18 +219,58 @@ test('a concern pack is not added to a model whose metamodel cannot hold it, and
   await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-containers')
   const before = (await studio.storedDoc()).nodes.length
-  await page.getByRole('button', { name: 'Models', exact: true }).click()
-  await page.getByText(/Import from Hub/).first().click()
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
-  await dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
-    .getByRole('button', { name: 'Add to Model' }).click()
-  const wizard = page.getByTestId('concern-wizard')
+  const wizard = await packWizard(page, 'Authentication')
   await expect(wizard.getByRole('alert')).toHaveText(/^Cannot be added: the metamodel "C4[^"]*" has no type need, .*such as Radical$/)
   await expect(wizard.getByText(/^This model cannot take the pack: /)).toBeVisible()
   for (const button of await wizard.getByRole('button', { name: 'Add to model' }).all()) await expect(button).toBeDisabled()
   await page.keyboard.press('ControlOrMeta+Enter')
   await expect(wizard).toBeVisible()
   expect((await studio.storedDoc()).nodes.length).toBe(before)
+})
+
+test('a concern pack imported in a milestone brings its view with its elements: Discard takes it back, Propagate keeps it', async ({ page, studio }) => {
+  // F-0010: the pack's view was saved into the live model before the
+  // milestone question was answered, and stayed after Discard listing 22
+  // elements that do not exist.
+  type Doc = { nodes: Array<{ id: string }>; views: Array<{ id: string; name: string; folder?: string; nodeIds: string[] }> }
+  await studio.openSample()
+  const docId = studio.activeDocId()
+  await studio.open('view-core', 'designer', docId)
+  const stored = async () => await studio.storedDoc(docId) as unknown as Doc
+  const lists = (doc: Doc) => doc.views.map((v) => [v.id, [...v.nodeIds].sort()])
+  const before = await stored()
+  const inV3 = async () => {
+    const v3 = page.locator('.lp-snap-card', { hasText: 'v3' }).first()
+    // The rail's tab closes its panel when it is open already.
+    if (!(await v3.isVisible())) await page.getByRole('tab', { name: 'Milestones' }).click()
+    await v3.click()
+    await expect(page).toHaveURL(/\/s\//)
+    await studio.settle()
+    const wizard = await packWizard(page, 'Secrets')
+    await wizard.getByRole('button', { name: 'Add to model' }).first().click()
+    await page.locator('.milestone-modal').getByRole('button', { name: 'Continue editing (decide later)' }).click()
+    await expect(wizard).toBeHidden()
+  }
+  // The canvas's milestone bar: Propagate, New milestone, Discard.
+  const button = (name: string) => page.getByRole('button', { name, exact: true }).first()
+
+  await inV3()
+  // Not decided yet: the live model's views are as they were.
+  await page.waitForTimeout(1000)
+  expect(lists(await stored())).toEqual(lists(before))
+  await button('Discard').click()
+  await expect(button('Discard')).toHaveCount(0)
+  await page.waitForTimeout(1000)
+  const discarded = await stored()
+  expect(discarded.nodes.length).toBe(before.nodes.length)
+  expect(lists(discarded)).toEqual(lists(before))
+
+  await inV3()
+  await button('Propagate').click()
+  await expect.poll(async () => (await stored()).views.filter((v) => v.folder === 'Concerns').map((v) => v.name)).toEqual(['Secrets'])
+  const propagated = await stored()
+  const ids = new Set(propagated.nodes.map((n) => n.id))
+  const view = propagated.views.find((v) => v.folder === 'Concerns')!
+  expect(view.nodeIds.length).toBeGreaterThan(10)
+  expect(view.nodeIds.filter((id) => !ids.has(id))).toEqual([])
 })
