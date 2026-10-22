@@ -240,6 +240,8 @@ function StructuralCanvas(): React.ReactElement {
   const activeViewName = useDiagramStore((s) =>
     s.activeViewId ? s.views[s.activeViewId]?.name : 'All elements'
   )
+  // A view of type Explore says so where a structure view does.
+  const activeViewExplore = useDiagramStore((s) => !!s.activeViewId && s.views[s.activeViewId]?.kind === 'explore')
 
   // Track whether the modifier key is currently held — use BOTH ref (sync)
   // and state (triggers re-render for visual feedback).
@@ -1598,7 +1600,7 @@ function StructuralCanvas(): React.ReactElement {
             zIndex: 10,
           }}
         >
-          Structure: <strong style={{ color: 'var(--text-primary)' }}>{activeViewName}</strong>
+          {activeViewExplore ? 'Explore' : 'Structure'}: <strong style={{ color: 'var(--text-primary)' }}>{activeViewName}</strong>
         </div>
       )}
     </div>

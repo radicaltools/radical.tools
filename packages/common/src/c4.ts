@@ -164,8 +164,15 @@ export interface DiagramView {
    * 'table'   = governance-aware spreadsheet view of nodes and relations.
    * 'wiki'    = documentation-style pages per element with inline editing.
    * 'warnier' = the hierarchy as a Warnier–Orr diagram (braces, left to right).
+   * 'explore' = an exploration (Explore from here, saved as a view): grown
+   *             level by level from its start element (`explore`), drawn
+   *             top-down by level, each element with its + and −.
    */
-  kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki' | 'warnier'
+  kind?: 'static' | 'dynamic' | 'treemap' | 'table' | 'matrix' | 'wiki' | 'warnier' | 'explore'
+  /** Explore-only: how it grew from its start (ExploreState). Its
+   *  `positions` are where it draws each element it lists, flat: not
+   *  relative to a parent, which it does not draw. */
+  explore?: ExploreState
   /** The metamodel's viewpoint (ViewpointDef id) the view is of: its kind
    *  and chain are the viewpoint's, kept in step when the viewpoint changes. Set
    *  another kind or chain and the view is of no viewpoint any more. */
@@ -285,6 +292,35 @@ export interface DiagramView {
    * physics, Smart Layout, MCP) keeps them. Optional for backwards compat.
    */
   layoutConstraints?: LayoutConstraint[]
+}
+
+/** One use of an element's + on an exploration: what it chose. */
+export interface ExploreExpansion {
+  id: string
+  /** The element whose + it was. */
+  from: string
+  /** The relations it took: of one kind (`t:<relation type>`, or
+   *  `l:<label>` for one with no type) running one way from `from`. null:
+   *  every relation, either way. */
+  rows: Array<{ key: string; direction: 'out' | 'in' }> | null
+  /** It took the parent of `from` (it is contained in it). */
+  parent: boolean
+  /** It took the children of `from` (it contains them). */
+  children: boolean
+}
+
+/** How a view of type Explore grew from its start element. */
+export interface ExploreState {
+  /** The element it was opened on: level 0. */
+  start: string
+  /** Element id → the level it was added on: one below the element whose
+   *  + added it, kept as added. */
+  levels: Record<string, number>
+  /** Element id → the expansion that added it (none for the start, or for
+   *  one added otherwise). */
+  addedBy: Record<string, string>
+  /** Each use of an element's +, by id. */
+  expansions: Record<string, ExploreExpansion>
 }
 
 /**
@@ -710,6 +746,8 @@ export function viewCanvasPositions<P>(
    *  what the chain gives, not every node. */
   drawn?: Iterable<string>,
 ): Record<string, P> {
+  // An exploration draws what it lists, flat: no container round it.
+  if (view.kind === 'explore') return Object.fromEntries(view.nodeIds.filter((id) => id in positions && nodes[id]).map((id) => [id, positions[id]]))
   if (view.kind && view.kind !== 'static') positions = view.positions ?? {}
   const ids = drawn ?? (viewShowsEveryNode(view) ? undefined : view.nodeIds)
   if (!ids) return positions

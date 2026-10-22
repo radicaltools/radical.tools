@@ -134,6 +134,7 @@ const VIEW_KIND_COLORS: Record<string, string> = {
   matrix: '#a855f7',
   wiki: '#ec4899',
   warnier: '#0d9488',
+  explore: '#6366f1',
 }
 
 function AccordionSection({
@@ -258,6 +259,15 @@ const Icon = {
       <circle cx="8.25" cy="3.75" r="1" fill="currentColor" stroke="none"/>
       <circle cx="3.75" cy="8.25" r="1" fill="currentColor" stroke="none"/>
       <circle cx="12.75" cy="12.75" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  /** Explore: an element with its neighbours, a level below. */
+  Explore: () => (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5.5" y="1.5" width="5" height="3.5" rx="0.8"/>
+      <rect x="1" y="11" width="4.5" height="3.5" rx="0.8"/>
+      <rect x="10.5" y="11" width="4.5" height="3.5" rx="0.8"/>
+      <path d="M8 5 V8 M3.25 11 V8 H12.75 V11"/>
     </svg>
   ),
   Warnier: () => (
@@ -723,7 +733,8 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const isMatrix  = view.kind === 'matrix'
   const isWiki    = view.kind === 'wiki'
   const isWarnier = view.kind === 'warnier'
-  const isStatic  = !isDynamic && !isTreemap && !isTable && !isMatrix && !isWiki && !isWarnier
+  const isExplore = view.kind === 'explore'
+  const isStatic  = !isDynamic && !isTreemap && !isTable && !isMatrix && !isWiki && !isWarnier && !isExplore
 
   const commitName = () => {
     if (nameVal.trim()) renameView(view.id, nameVal.trim())
@@ -732,9 +743,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
 
   return (
     <div className="props-content">
-      <div className="props-type-badge" style={{ background: isDynamic ? 'var(--accent)' : isTreemap ? '#2a3a5a' : isTable ? '#1e3a2a' : isMatrix ? '#3a1e3a' : isWiki ? '#3a2e1e' : isWarnier ? '#123a36' : '#334155', color: '#fff' }}>
-        {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : <Icon.Layers />}
-        &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : isWarnier ? 'WARNIER VIEW' : 'STRUCTURE VIEW'}
+      <div className="props-type-badge" style={{ background: isDynamic ? 'var(--accent)' : isTreemap ? '#2a3a5a' : isTable ? '#1e3a2a' : isMatrix ? '#3a1e3a' : isWiki ? '#3a2e1e' : isWarnier ? '#123a36' : isExplore ? '#2e2a5a' : '#334155', color: '#fff' }}>
+        {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : isExplore ? <Icon.Explore /> : <Icon.Layers />}
+        &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : isWarnier ? 'WARNIER VIEW' : isExplore ? 'EXPLORE VIEW' : 'STRUCTURE VIEW'}
         {ofType && <>&nbsp;·&nbsp;{ofType.label.toUpperCase()}</>}
       </div>
       <div>
@@ -874,6 +885,10 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             <button className={`view-kind-btn${isWarnier ? ' active' : ''}`} aria-pressed={isWarnier} onClick={() => setViewKind(view.id, 'warnier')}>
               <Icon.Warnier /> Warnier
             </button>
+            <button className={`view-kind-btn${isExplore ? ' active' : ''}`} aria-pressed={isExplore} onClick={() => setViewKind(view.id, 'explore')}
+              title="Grown level by level from one element: the one selected on it, else its first">
+              <Icon.Explore /> Explore
+            </button>
           </div>
         </div>
       )}
@@ -991,7 +1006,15 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
       )}
       {/* What the view shows, step by step: Structure on the right shows the
           result. A flow view plays its sequence instead. */}
-      {view.kind !== 'dynamic' && <ViewPipelinePanel view={view} readOnly={readOnly || !!ofGroup} />}
+      {view.kind !== 'dynamic' && !isExplore && <ViewPipelinePanel view={view} readOnly={readOnly || !!ofGroup} />}
+      {isExplore && (
+        <div>
+          <div className="props-section-title">Explore</div>
+          <div className="viewpoint-help">
+            Grown from <strong>{(view.explore && allNodes[view.explore.start]?.label) || 'its first element'}</strong>, level by level: each element's + adds what it is joined to on the level below, its − takes that back.
+          </div>
+        </div>
+      )}
       </>)}
       {/* A group's view goes with its element; deleting the group takes them all. */}
       {!readOnly && !ofGroup && (
@@ -1352,7 +1375,8 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const isMatrix  = v.kind === 'matrix'
     const isWiki    = v.kind === 'wiki'
     const isWarnier = v.kind === 'warnier'
-    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : isWarnier ? 'warnier' : 'structure'
+    const isExplore = v.kind === 'explore'
+    const badge = isDynamic ? 'flow' : isTreemap ? 'hierarchy' : isTable ? 'table' : isMatrix ? 'matrix' : isWiki ? 'wiki' : isWarnier ? 'warnier' : isExplore ? 'explore' : 'structure'
     // A view of a viewpoint names it too, after its view type.
     const viewpoint = viewpointOfView(v, metamodel)
     // A group of views of one element: a click shows or hides its views.
@@ -1369,7 +1393,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           aria-expanded={group ? groupOpen : undefined}
         >
           <div className="lp-view-icon">
-            {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : <Icon.Layers />}
+            {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : isExplore ? <Icon.Explore /> : <Icon.Layers />}
           </div>
           <div className="lp-card-body">
             <div className="lp-card-title">
@@ -1447,12 +1471,12 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
       {exploration && (
         <div
           className={`lp-card lp-view-card lp-explore-card${exploring ? ' active' : ''}`}
-          style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.structure }}
+          style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.explore }}
           onClick={() => setActiveView(exploration.id)}
           {...cardKeys(() => setActiveView(exploration.id))}
           title="A temporary view: not saved unless you save it as a view"
         >
-          <div className="lp-view-icon"><Icon.Layers /></div>
+          <div className="lp-view-icon"><Icon.Explore /></div>
           <div className="lp-card-body">
             <div className="lp-card-title">{exploration.name}</div>
             <div className="lp-card-meta">

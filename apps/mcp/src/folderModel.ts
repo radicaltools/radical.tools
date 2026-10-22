@@ -436,6 +436,8 @@ export class FolderModel {
           relations: data.relations.length,
           views: (data.views ?? []).map((view) => ({
             id: view.id, name: view.name, kind: view.kind ?? 'static',
+            // An exploration saved as a view: the element it grew from.
+            ...(view.kind === 'explore' && view.explore?.start ? { start: view.explore.start } : {}),
             ...(view.folder ? { folder: view.folder } : {}),
             ...(view.edgeStyle ? { edgeStyle: view.edgeStyle } : {}),
             ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}),

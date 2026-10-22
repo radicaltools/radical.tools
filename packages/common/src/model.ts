@@ -524,6 +524,12 @@ function namesRemoved(level: unknown, removed: Set<string>): boolean {
 export function forgetNodesInViews(state: ModelState, removed: Set<string>): void {
   for (const view of Object.values(state.views)) {
     removeFromViewList(view, removed)
+    // An exploration forgets the level of what is gone, and what added it.
+    if (view.explore) {
+      const keep = <T,>(record: Record<string, T>): Record<string, T> => Object.fromEntries(Object.entries(record ?? {}).filter(([id]) => !removed.has(id)))
+      view.explore = { ...view.explore, levels: keep(view.explore.levels), addedBy: keep(view.explore.addedBy) }
+      if (view.positions && Object.keys(view.positions).some((id) => removed.has(id))) view.positions = keep(view.positions)
+    }
     if (view.collapsedNodeIds?.length) view.collapsedNodeIds = view.collapsedNodeIds.filter((nid) => !removed.has(nid))
     if (view.expandedNodeIds?.length) view.expandedNodeIds = view.expandedNodeIds.filter((nid) => !removed.has(nid))
     if (view.layoutConstraints?.length) view.layoutConstraints = withoutNodes(view.layoutConstraints, removed)
@@ -812,10 +818,18 @@ export function setViewNodeIds(state: ModelState, viewId: string, nodeIds: strin
   return true
 }
 
-/** Another kind: the view is of no viewpoint any more. */
+/** Another kind: the view is of no viewpoint any more. A view of type
+ *  Explore turned into another keeps its elements, not how it grew, nor
+ *  its places: they are where it drew its elements, flat, and a structure
+ *  view nests them in their containers (Studio turns them into a structure
+ *  view's places itself). */
 export function setViewKind(state: ModelState, viewId: string, kind: DiagramView['kind']): void {
   const view = state.views[viewId]
   if (!view) return
+  if (view.kind === 'explore' && kind !== 'explore') {
+    delete view.explore
+    view.positions = {}
+  }
   view.kind = kind
   delete view.viewpoint
   delete view.subject

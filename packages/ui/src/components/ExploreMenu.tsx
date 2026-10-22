@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { shownExploration, useDiagramStore } from '../store/diagramStore'
 import { type ExploreChoice, type ExploreLink, explorationLinks, menuRows } from '../store/exploration'
 
 /** Distinct neighbours among `links`. */
@@ -26,7 +26,8 @@ interface Row {
  */
 export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }): React.ReactElement | null {
   const nodeId = useDiagramStore((s) => s.exploreMenuFor)
-  const exploration = useDiagramStore((s) => s.exploration)
+  // The temporary exploration, or a view of type Explore.
+  const exploration = useDiagramStore(shownExploration)
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
