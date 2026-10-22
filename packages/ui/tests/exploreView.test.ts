@@ -18,8 +18,9 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { labelGaps, pairKey } from '@radical/layout/labelRoom'
 import { historyMark, useDiagramStore, viewById } from '../src/store/diagramStore'
 import { explorationLinks, menuRows } from '../src/store/exploration'
-// The e2e suite's fixture, the model the scenarios name.
-import bookstoreFile from '../../../apps/e2e/fixtures/bookstore.radical?raw'
+// A copy of the e2e suite's fixture (apps/e2e/fixtures), the model the
+// scenarios name: a workspace imports no file of another.
+import bookstoreFile from './fixtures/bookstore.radical?raw'
 
 const s = useDiagramStore.getState
 
