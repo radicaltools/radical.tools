@@ -17,7 +17,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore, viewById } from '../store/diagramStore'
+import { useDiagramStore, viewById, milestoneOnCanvas } from '../store/diagramStore'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
@@ -216,12 +216,15 @@ function StructuralCanvas(): React.ReactElement {
   const activeSequenceName = useDiagramStore((s) => s.activeSequenceId ? s.sequences[s.activeSequenceId]?.name : undefined)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
 
-  // Milestone view mode
-  const activeSnapshotId = useDiagramStore((s) => s.activeSnapshotId)
-  const snapshotName = useDiagramStore((s) =>
-    s.activeSnapshotId ? s.snapshots.find((sn) => sn.id === s.activeSnapshotId)?.name : undefined
-  )
-  const milestoneDirty = useDiagramStore((s) => s.milestoneDirty)
+  // Milestone view mode: the milestone drawn (a playing slide's own, none
+  // over one that draws the live model), with nothing to act on while a
+  // presentation plays.
+  const activeSnapshotId = useDiagramStore(milestoneOnCanvas)
+  const snapshotName = useDiagramStore((s) => {
+    const id = milestoneOnCanvas(s)
+    return id ? s.snapshots.find((sn) => sn.id === id)?.name : undefined
+  })
+  const milestoneDirty = useDiagramStore((s) => s.milestoneDirty && !s.presentationActive)
   const commitMilestoneChanges = useDiagramStore((s) => s.commitMilestoneChanges)
   const discardMilestoneChanges = useDiagramStore((s) => s.discardMilestoneChanges)
   const [milestoneNewName, setMilestoneNewName] = useState<string | null>(null)
@@ -1418,7 +1421,7 @@ function StructuralCanvas(): React.ReactElement {
       )}
       {activeSnapshotId && snapshotName && (
         <div
-          className="nodrag nopan"
+          className="nodrag nopan milestone-chip"
           style={{
             position: 'absolute',
             top: 8,
@@ -1441,12 +1444,12 @@ function StructuralCanvas(): React.ReactElement {
             Milestone: <strong style={{ color: 'var(--text-primary)' }}>{snapshotName}</strong>
             {milestoneDirty && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
           </span>
-          <button
+          {!presentationActive && <button
             title={showDiff ? 'Hide diff' : 'Show changes vs. previous milestone'}
             onClick={toggleShowDiff}
             style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: showDiff ? 'var(--accent)' : 'var(--bg-surface)', color: showDiff ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 3 }}
-          >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>
-          {showDiff && (milestoneStats.added + milestoneStats.changed + milestoneStats.removed) > 0 && (
+          >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>}
+          {!presentationActive && showDiff && (milestoneStats.added + milestoneStats.changed + milestoneStats.removed) > 0 && (
             <span style={{ marginLeft: 2, opacity: 0.9 }}>
               <span style={{ color: '#4ade80' }}>+{milestoneStats.added}</span>
               {' '}

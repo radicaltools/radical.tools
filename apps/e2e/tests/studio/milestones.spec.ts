@@ -171,3 +171,58 @@ test('leaving the page with unsaved edits of a milestone asks, and staying keeps
   expect(page.isClosed()).toBe(false)
   await expect(page.getByText('· unsaved')).toBeVisible()
 })
+
+/** Milestone sizes and the live model's in the saved document. */
+async function storedCounts(studio: import('../../support/fixtures').Studio, docId: string): Promise<string> {
+  const doc = await studio.storedDoc(docId) as unknown as { nodes: unknown[]; snapshots: Array<{ nodes: Record<string, unknown> }> }
+  return [...doc.snapshots.map((m) => Object.keys(m.nodes).length), doc.nodes.length].join(' ')
+}
+
+test('a slide that plays the live model while a milestone is open names no milestone, and offers neither its diff nor Propagate', async ({ page, studio }) => {
+  // F-0027: the sample's first slide has neither a milestone nor a copy and
+  // draws the live model, under a chip naming v1, with diff and Propagate.
+  await studio.openSample()
+  await studio.open('view-ctx', 'designer', studio.activeDocId())
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await studio.settle()
+  const chip = page.getByText(/^Milestone: v1/)
+  await expect(chip).toBeVisible()
+  await page.keyboard.press('F5')
+  await expect(page).toHaveURL(/\/play\//)
+  await studio.settle()
+  await expect(page.locator('.react-flow__node[data-id="sys-swift"]')).toHaveCount(1)
+  await expect(chip).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /⊙ diff/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page).not.toHaveURL(/\/play\//)
+  await expect(chip).toBeVisible()
+})
+
+test('F5 does not start behind the milestone question, and Propagate after a slide played carries the milestone\'s edit', async ({ page, studio }) => {
+  // F-0022: F5 started the presentation behind the question; its Propagate
+  // (or the chip's) then wrote the playing slide's model into v2, v3, v4
+  // and the live model.
+  await sampleTableIn(page, studio, 'v2')
+  const docId = studio.activeDocId()
+  await expect.poll(() => storedCounts(studio, docId)).toBe('11 17 30 65 78')
+  await page.getByRole('button', { name: 'Add under API Gateway' }).click()
+  const question = page.locator('.milestone-modal')
+  await expect(question).toBeVisible()
+  await page.keyboard.press('F5')
+  await page.waitForTimeout(500)
+  await expect(page).not.toHaveURL(/\/play\//)
+  await expect(question).toBeVisible()
+  await question.getByRole('button', { name: 'Continue editing (decide later)' }).click()
+  await page.keyboard.press('Escape')
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('F5')
+  await expect(page).toHaveURL(/\/play\//)
+  // The slide draws the live model: nothing of v2's to propagate there.
+  await expect(page.getByRole('button', { name: 'Propagate' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page).not.toHaveURL(/\/play\//)
+  await page.getByRole('button', { name: 'Propagate' }).click()
+  await expect.poll(() => storedCounts(studio, docId)).toBe('11 18 31 66 79')
+})

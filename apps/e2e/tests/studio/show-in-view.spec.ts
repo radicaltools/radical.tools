@@ -153,3 +153,27 @@ test.describe('a wiki nested by its chain', () => {
     await expect(studio.properties.getByText('Pick up in store').first()).toBeVisible()
   })
 })
+
+test('in a milestone, a view opened from the card opens the element\'s containers without asking how to save the milestone', async ({ page, studio }) => {
+  // F-0011: the containers opened around the element were a milestone
+  // edit; the question opened and the chip said unsaved, nothing edited.
+  await studio.openSample('view-core')
+  await studio.node('dom-banking').locator('.c4-node-collapse-btn').dispatchEvent('click')
+  await expect(studio.node('ctn-payments')).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await page.getByRole('tab', { name: 'Views' }).click()
+  await page.locator('.lp-view-card', { hasText: 'Payments Domain' }).first().click()
+  await expect(page).toHaveURL(/\/v\/view-payments/)
+  await studio.settle()
+  await expect(page.getByText(/^Milestone: v3/)).toBeVisible()
+  await studio.node('ctn-payments').click({ position: { x: 30, y: 10 } })
+  await studio.properties.getByRole('region', { name: 'Views' }).getByRole('button', { name: /^Core Banking/ }).click()
+  await expect(page).toHaveURL(/\/v\/view-core/)
+  await expect(studio.node('ctn-payments')).toHaveCount(1)
+  await expect(studio.node('ctn-payments')).toHaveClass(/selected/)
+  await expect(page.locator('.milestone-modal')).toHaveCount(0)
+  await expect(page.getByText(/^Milestone: v3/)).toBeVisible()
+  await expect(page.getByText('· unsaved')).toHaveCount(0)
+})
