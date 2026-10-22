@@ -12,7 +12,7 @@ import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamo
 import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
-import { bindSuggestions, concernStatuses, holdsConcerns, questionLine, suggestedCover, type ConcernPack } from '../concerns'
+import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -272,24 +272,13 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'Every accepted ADR marked with a concern (property `concern`, set by a Hub concern pack) constrains the elements it settles the concern for.',
     severity: 'warning',
     dimension: 'decisions',
-    run: (model) => {
-      if (!holdsConcerns(model.metamodel)) return []
-      const constraining = new Set(linked(model, 'constrains', 'out').keys())
-      const implementedBy = linked(model, 'implements', 'in')
-      return nodesOf(model, 'adr')
-        .filter((n) => prop(n, 'concern') && prop(n, 'status') === 'accepted' && !constraining.has(n.id))
-        .map((n) => {
-          const checks = (implementedBy.get(n.id) ?? []).map((r) => r.sourceId).filter((id) => model.nodes[id]?.type === 'fitness-fn')
-          const pack = model.concerns?.find((p) => p.concern.id === prop(n, 'concern'))
-          const where = pack ? suggestedCover(bindSuggestions(pack, model.nodes, model.relations, model.metamodel)) : []
-          return {
-            nodeId: n.id,
-            ...(checks.length ? { relatedIds: checks } : {}),
-            code: prop(n, 'concern'),
-            message: `ADR ${quote(n)} settles the concern "${prop(n, 'concern')}" but constrains no element, so it settles it for nothing.${where.length ? ` Bind it to ${where.map((id) => quote(model.nodes[id])).join(', ')}, which the concern applies to.` : ''}`,
-          }
-        })
-    },
+    run: (model) => unboundDecisions(model.concerns ?? [], model.nodes, model.relations, model.metamodel)
+      .map(({ adr, concern, checks, bindTo }) => ({
+        nodeId: adr.id,
+        ...(checks.length ? { relatedIds: checks } : {}),
+        code: concern,
+        message: `ADR ${quote(adr)} settles the concern "${concern}" but constrains no element, so it settles it for nothing.${bindTo.length ? ` Bind it to ${bindTo.map((id) => quote(model.nodes[id])).join(', ')}, which the concern applies to.` : ''}`,
+      })),
   },
   {
     id: 'fitness-fn-without-threshold',

@@ -28,6 +28,9 @@ interface Props {
   onCancel: () => void
   /** Its place among several packs answered one after another ("2 of 3"). */
   position?: string
+  /** Why the model cannot take the pack (metamodelProblem), or null: then
+   *  it is not added, as the MCP server refuses it. */
+  problem?: string | null
 }
 
 type Step =
@@ -38,7 +41,7 @@ type Step =
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function ConcernWizard({ concept, suggestions, others, nodes, onImport, onCancel, position }: Props): React.ReactElement {
+export function ConcernWizard({ concept, suggestions, others, nodes, onImport, onCancel, position, problem }: Props): React.ReactElement {
   const params = concept.templateParams ?? []
   const [answers, setAnswers] = useState<Record<string, string>>(() =>
     Object.fromEntries(params.map((p) => [p.key, p.defaultValue ?? ''])))
@@ -81,7 +84,7 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
   }
   // Bound to nothing it still comes in, as Forge brings it before C4: the
   // check's concern-unbound reports it until it is bound.
-  const add = (): void => onImport(answers, bound)
+  const add = (): void => { if (!problem) onImport(answers, bound) }
   const next = (): void => (isLast ? add() : goTo(index + 1))
 
   const addRef = useRef(add)
@@ -233,7 +236,9 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
                   </section>
                 )}
                 {!suggestions.length && !others.length && (
-                  <div className="nw-empty">Nothing in the model can carry this decision yet: add the system or container it is about first.</div>
+                  <div className="nw-empty">{problem
+                    ? `This model cannot take the pack: ${problem}.`
+                    : 'Nothing in the model can carry this decision yet: add the system or container it is about first.'}</div>
                 )}
               </div>
             )}
@@ -276,12 +281,14 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
           </div>
 
           <footer className="nw-foot">
-            {!bound.length && <span className="nw-missing">Not bound: the check will list it until it is</span>}
+            {problem
+              ? <span className="nw-missing" role="alert">Cannot be added: {problem}</span>
+              : !bound.length && <span className="nw-missing">Not bound: the check will list it until it is</span>}
             <span className="nw-spacer" />
             {index > 0 && <button type="button" className="nw-btn ghost" onClick={() => goTo(index - 1)}>Back</button>}
-            {!isLast && <button type="button" className="nw-btn secondary" onClick={add}>Add to model</button>}
+            {!isLast && <button type="button" className="nw-btn secondary" onClick={add} disabled={!!problem}>Add to model</button>}
             {isLast ? (
-              <button type="button" className="nw-btn primary" onClick={add}>Add to model</button>
+              <button type="button" className="nw-btn primary" onClick={add} disabled={!!problem}>Add to model</button>
             ) : (
               <button type="button" className="nw-btn primary" onClick={next}>
                 Next

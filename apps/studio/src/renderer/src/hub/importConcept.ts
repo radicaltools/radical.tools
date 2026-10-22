@@ -11,7 +11,7 @@ import { freeSpotNear } from '@radical/layout/geometry'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { HubConcept } from '@radical/ui/store/hubStore'
-import { addToViewList } from '@radical/common/c4'
+import { addToViewList, type DiagramView } from '@radical/common/c4'
 
 export interface ImportHubConceptResult {
   nodeIds: string[]
@@ -42,18 +42,48 @@ export function importConcernPackIntoDiagram(concept: HubConcept, answers: Recor
     takenNames: { views: Object.values(store.views).map((v) => v.name), sequences: Object.values(store.sequences).map((q) => q.name) },
   })
 
+  // In a milestone the import is an edit of the milestone: the view it is
+  // listed in is parked as the live model has it, and the pack's own view
+  // waits for its elements to reach the live model.
+  const inMilestone = !!store.activeSnapshotId && !!store.liveBackup && store.appMode === 'designer'
   store._pushUndo()
-  store._markMilestoneEdit()
+  if (store.activeViewId) store._milestoneViewEdit(store.activeViewId)
+  else store._markMilestoneEdit()
   useDiagramStore.setState((state) => {
     Object.assign(state.c4Nodes, insert.nodes)
     Object.assign(state.c4Relations, insert.relations)
     // The pack's own view, in the folder Concerns.
-    for (const v of insert.views) state.views[v.id] = v
+    if (!inMilestone) for (const v of insert.views) state.views[v.id] = v
     if (state.activeViewId && state.views[state.activeViewId]) {
       addToViewList(state.views[state.activeViewId], Object.keys(insert.nodes))
     }
   })
+  if (inMilestone) addViewsOnceLive(insert.views, Object.keys(insert.nodes))
   useDiagramStore.getState()._placeOnAllElements()
   store._sync()
   return { nodeIds: Object.keys(insert.nodes), insert }
+}
+
+/** The pack's views, for a pack imported in a milestone: views are the live
+ *  model's, so they come in when its elements reach the live model
+ *  (Propagate), listing those there, and not at all when they do not
+ *  (Discard, or Undo and then leaving). Made at once, a view was saved into
+ *  the live model before the milestone question was answered, and stayed
+ *  after Discard listing elements that do not exist. */
+function addViewsOnceLive(views: DiagramView[], nodeIds: string[]): void {
+  const unsubscribe = useDiagramStore.subscribe((s) => {
+    const live = s.activeSnapshotId ? s.liveBackup?.nodes : s.c4Nodes
+    const there = !!live && nodeIds.some((id) => live[id])
+    if (!there && s.activeSnapshotId) return
+    unsubscribe()
+    if (!there) return
+    useDiagramStore.setState((state) => {
+      for (const v of views) {
+        if (state.views[v.id]) continue
+        const nodeIds = v.nodeIds.filter((id) => live[id])
+        state.views[v.id] = { ...v, nodeIds, positions: Object.fromEntries(Object.entries(v.positions).filter(([id]) => live[id])) }
+      }
+    })
+    useDiagramStore.getState()._sync()
+  })
 }

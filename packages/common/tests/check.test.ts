@@ -360,13 +360,13 @@ describe('radical check: concerns', () => {
     const bound = buildConcernInsert(concept, { ...options, elements: [nodes.web] })
     const [view] = bound.views
     expect(view).toMatchObject({ name: 'Authentication 3', kind: 'static', folder: 'Concerns' })
-    expect(view.nodeIds).toEqual([...Object.keys(bound.nodes), 'web'])
+    expect(view.nodeIds).toEqual([...Object.keys(bound.nodes), 'sys', 'web'])
     // The pack in its columns from 0, the decision right of the requirement; the shop holding the web app on their left.
     const at = (label: string) => view.positions[Object.values(bound.nodes).find((x) => x.label === label)!.id]
     expect(at('N')).toMatchObject({ x: 0, y: 0 })
     expect(at('D').x).toBeGreaterThan(at('R').x)
     expect(view.positions.sys.x).toBeLessThan(0)
-    expect(view.positions.web).toBeUndefined()
+    expect(view.positions.web).toMatchObject({ x: nodes.web.x, y: nodes.web.y })
     const unbound = buildConcernInsert(concept, { ...options, elements: [] })
     expect(unbound.views[0].nodeIds).toEqual(Object.keys(unbound.nodes))
   })
