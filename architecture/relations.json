@@ -13278,7 +13278,7 @@
   },
   {
     "id": "dd5b8e75-1979-412b-a825-28c68f209cdc",
-    "label": "links to each concept category of",
+    "label": "links to",
     "relationType": "interacts",
     "sourceId": "ca07e33c-43dc-48fc-b0aa-8bda8f97864e",
     "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
