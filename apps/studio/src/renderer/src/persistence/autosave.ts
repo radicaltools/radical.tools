@@ -14,7 +14,7 @@ import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
-import { useDiagramStore, historyMark, onExploration, parkedLiveModel, viewById, type ParkedDesigner } from '@radical/ui/store/diagramStore'
+import { useDiagramStore, afterDrag, dragHeld, historyMark, onExploration, parkedLiveModel, viewById, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
 import { openFirstView } from '../navigation'
@@ -249,6 +249,14 @@ if (typeof window !== 'undefined') {
    *  once it stops. Read at once, it ended the presentation (the store holds
    *  a slide, not the document) and lost the edits held for an agent. */
   let _changedWhilePresenting: string | null = null
+  /** The folder changed outside Studio while an element was held in a
+   *  drag: read at the drop. Read at once, the model was reloaded under the
+   *  held mouse: the element jumped back to where the drag began, and the
+   *  drop landed short by what was dragged before (saved so, pinned). */
+  let _changedWhileDragging: string | null = null
+  /** How long after the pointer is let go a change that waited for a drop
+   *  is read when no drop came (the drop itself lands within a second). */
+  const DRAG_LOST_MS = 2000
 
   // ── A load saves nothing by itself ──────────────────────────────────────
   // After a load (a reload of the page, a document opened, an outside
@@ -500,9 +508,28 @@ if (typeof window !== 'undefined') {
     _stopWatch = documents.watchDocument(id, () => {
       if (documents.getActiveId() !== id) return
       if (presenting()) { _changedWhilePresenting = id; return }
+      if (dragHeld()) { reloadAtDrop(id); return }
       console.info('[diagramStore] document changed on disk — reloading')
       loadActive(id, 'md', { keepUi: true })
     })
+  }
+  function reloadAtDrop(id: string): void {
+    const waiting = _changedWhileDragging !== null
+    _changedWhileDragging = id
+    if (waiting) return
+    const reload = (): void => {
+      const changed = _changedWhileDragging
+      _changedWhileDragging = null
+      if (!changed || documents.getActiveId() !== changed) return
+      if (presenting()) { _changedWhilePresenting = changed; return }
+      console.info('[diagramStore] document changed on disk during a drag — reloading at the drop')
+      loadActive(changed, 'md', { keepUi: true })
+    }
+    // Once the drop has landed (its place, pin and undo step). A pointer
+    // let go of with no drop to follow (a drag the canvas never ended)
+    // reads it a while later all the same.
+    afterDrag(reload)
+    window.addEventListener('pointerup', () => setTimeout(reload, DRAG_LOST_MS), { once: true, capture: true })
   }
 
   reloadActive = () => {

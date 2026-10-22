@@ -1,9 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activeLayoutConstraints, childrenInView, hideRefusal, shownExploration, useDiagramStore } from '../store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { isParentAllowed, isPlacementAllowed, isRelationAllowed } from '@radical/common/metamodel'
 import { defaultGridColumns, type C4Node } from '@radical/common/c4'
+import { checkPatchRelation, relationTypeOnMove } from '@radical/common/model'
 import { useMenuKeys } from '../hooks/menuKeys'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 
@@ -352,13 +353,54 @@ function CardActions({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** The elements an end of a relation may move to; picked one where the
+ *  type the relation has does not fit and several do, the types to choose
+ *  from, as on a relation drawn (it was left with none, unasked). */
+function RelationEndItems({ relationId, end, candidates, close }: {
+  relationId: string
+  end: 'sourceId' | 'targetId'
+  candidates: { id: string; label: string; path: string }[]
+  close: () => void
+}): React.ReactElement {
+  const updateRelation = useDiagramStore((s) => s.updateRelation)
+  const metamodel = useDiagramStore((s) => s.metamodel)
+  const [asking, setAsking] = useState<{ nodeId: string; title: string; types: string[] } | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => { if (asking) listRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus() }, [asking])
+  const pick = (nodeId: string): void => {
+    const s = useDiagramStore.getState()
+    const rel = s.c4Relations[relationId]
+    const fit = relationTypeOnMove(s, relationId, { [end]: nodeId })
+    // A refused move is said so by updateRelation, not asked about.
+    if (rel && fit.ask && !checkPatchRelation(s, relationId, { [end]: nodeId })) {
+      const ends = { sourceId: rel.sourceId, targetId: rel.targetId, [end]: nodeId }
+      const name = (id: string) => s.c4Nodes[id]?.label || id
+      setAsking({ nodeId, title: `${name(ends.sourceId)} → ${name(ends.targetId)}: which relation?`, types: fit.ask })
+      return
+    }
+    close()
+    updateRelation(relationId, { [end]: nodeId, ...(fit.type ? { relationType: fit.type } : {}) })
+  }
+  if (asking) {
+    return (
+      <div ref={listRef}>
+        <div className="relation-type-menu-title">{asking.title}</div>
+        {asking.types.map((t) => (
+          <MenuItem key={t} label={metamodel?.relationTypes[t]?.label ?? t}
+            onClick={() => { close(); updateRelation(relationId, { [end]: asking.nodeId, relationType: t }) }} />
+        ))}
+      </div>
+    )
+  }
+  return <>{candidates.map((c) => <MenuItem key={c.id} label={c.label} reason={c.path} onClick={() => pick(c.id)} />)}</>
+}
+
 /** The Actions section of one relation's properties card: its ends moved to
  *  other elements the metamodel lets it join, and Hide from view. */
 export function RelationActions({ relationId }: { relationId: string }): React.ReactElement | null {
   const rel = useDiagramStore((s) => s.c4Relations[relationId])
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const metamodel = useDiagramStore((s) => s.metamodel)
-  const updateRelation = useDiagramStore((s) => s.updateRelation)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const canvas = useDiagramStore(onCanvas)
@@ -383,10 +425,10 @@ export function RelationActions({ relationId }: { relationId: string }): React.R
   return (
     <CardActions>
       <ActionMenu variant="card" icon={<Icons.Source />} label="Change source…" title="Re-route this relation from another element" disabled={sources.length === 0}>
-        {(close) => sources.map((c) => <MenuItem key={c.id} label={c.label} reason={c.path} onClick={() => { close(); updateRelation(rel.id, { sourceId: c.id }) }} />)}
+        {(close) => <RelationEndItems relationId={rel.id} end="sourceId" candidates={sources} close={close} />}
       </ActionMenu>
       <ActionMenu variant="card" icon={<Icons.Destination />} label="Change destination…" title="Re-route this relation to another element" disabled={targets.length === 0}>
-        {(close) => targets.map((c) => <MenuItem key={c.id} label={c.label} reason={c.path} onClick={() => { close(); updateRelation(rel.id, { targetId: c.id }) }} />)}
+        {(close) => <RelationEndItems relationId={rel.id} end="targetId" candidates={targets} close={close} />}
       </ActionMenu>
       {canvas && activeViewId && (
         <ActionButton variant="card" icon={<Icons.Hide />} label="Hide from view" title="Hide this relation from this view (the model is not changed)"

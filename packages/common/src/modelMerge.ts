@@ -69,8 +69,9 @@ const LAYOUT_KEYS = new Set(['x', 'y', 'width', 'height', 'positions', 'viewport
  *  its steps in order, and may repeat: not one of them. */
 const ID_SET_KEYS = new Set(['nodeIds', 'hiddenRelationIds', 'collapsedNodeIds', 'expandedNodeIds', 'focusNodeIds', 'removedViewpoints', 'allowedParents', 'options'])
 
-/** Lists of ids where an empty one means every id (a node type's allowed
- *  parents: any parent): one that the merge alone empties is a conflict. */
+/** Lists of ids that no side would empty lightly (a node type's allowed
+ *  parents: none is no parent at all): one that the merge alone empties is
+ *  a conflict. */
 const ALL_WHEN_EMPTY_KEYS = new Set(['allowedParents'])
 
 /** A sequence's keys merged together, as its steps (mergeSteps). */
@@ -181,7 +182,7 @@ function merge3(base: unknown, ours: unknown, theirs: unknown, where: string[], 
       }
       if (ID_SET_KEYS.has(key) && [b[key], ours[key], theirs[key]].every(isIdSet)) {
         let value = mergeIdSet(b[key] as string[] | undefined, ours[key] as string[] | undefined, theirs[key] as string[] | undefined)
-        // Each side narrowed the list, together to none, which would mean any.
+        // Each side narrowed the list, together to none, which neither said.
         if (ALL_WHEN_EMPTY_KEYS.has(key) && value && value.length === 0 && [ours[key], theirs[key]].every((v) => Array.isArray(v) && v.length > 0)) {
           ctx.conflicts.push([...where, key].join(': '))
           value = theirs[key] as string[]

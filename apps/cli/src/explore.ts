@@ -1,7 +1,7 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
 import { nextFindingId, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import { diffCommand } from './diff'
@@ -28,11 +28,13 @@ checks what comes back; the agent session starts the agents
                       round's commit)
     --from <n>        the first run's number (default: after the last round's)
     --no-build        copy what is built already
-  verify <run> …      serves the run's build on its port, runs each script
+  verify <run> …      serves the run's build on its ports, runs each script
                       ("<script> [args]", from the run's folder) and stops the
-                      server; the results go into round.json
+                      servers; the results go into round.json
   record <report>     writes the findings of a run's report (its JSON block)
-                      as findings, with a copy of each one's script
+                      as findings, with a copy of each one's script and
+                      screenshot; warns about a script that names the
+                      round's absolute paths
 
   --config <file>     the Crucible settings (default: crucible.json)
 
@@ -40,7 +42,9 @@ crucible.json's "explore": { "rounds": ".crucible/rounds", "brief": "…",
 "known": […], "model": "architecture", "build": [[…], …], "copy": { "name":
 "path" }, "serve": { "cwd": "…", "command": [… "{port}" … "{build}/name" …] },
 "ports": 4500, "rules": […] }. A run NN has the ports <ports>+NN (the app),
-+100+NN and +200+NN.
++100+NN (the hub) and +200+NN (other). "serve" can be a list of servers,
+each on one of them: { "cwd": "…", "command": [… "{hubPort}" …], "port":
+"hub" } ("app" when not given).
 
 Exit status: 0 done, 2 radical explore could not run.`
 
@@ -51,9 +55,16 @@ interface ExploreConfig {
   model?: string
   build: string[][]
   copy: Record<string, string>
-  serve?: { cwd?: string; command: string[] }
+  serve: Server[]
   ports: number
   rules: string[]
+}
+
+/** A server of a run's build, on one of the run's ports. */
+interface Server {
+  cwd?: string
+  command: string[]
+  port: keyof RunEntry['ports']
 }
 
 interface RunEntry {
@@ -91,6 +102,7 @@ interface ReportedFinding {
   seen?: string
   where?: string
   test?: string
+  screenshot?: string
   question?: boolean
 }
 
@@ -111,7 +123,9 @@ function readSettings(file: string): Settings | string {
       model: typeof e.model === 'string' ? e.model : undefined,
       build: Array.isArray(e.build) ? e.build.filter((c): c is string[] => Array.isArray(c) && c.length > 0) : [],
       copy: e.copy && typeof e.copy === 'object' ? e.copy as Record<string, string> : {},
-      serve: e.serve && Array.isArray(e.serve.command) && e.serve.command.length ? e.serve : undefined,
+      serve: (Array.isArray(e.serve) ? e.serve : e.serve ? [e.serve] : [])
+        .filter((v): v is Server => !!v && typeof v === 'object' && Array.isArray(v.command) && v.command.length > 0)
+        .map((v) => ({ ...v, port: v.port === 'hub' || v.port === 'other' ? v.port : 'app' })),
       ports: typeof e.ports === 'number' ? e.ports : 4500,
       rules: strings(e.rules),
     },
@@ -178,14 +192,14 @@ function portsOf(explore: ExploreConfig, run: number): RunEntry['ports'] {
   return { app: explore.ports + nn, hub: explore.ports + 100 + nn, other: explore.ports + 200 + nn }
 }
 
-/** The serve command of a run, its placeholders filled. */
-function serveCommand(settings: Settings, round: string, entry: RunEntry): { cwd: string; command: string[] } | undefined {
-  const serve = settings.explore.serve
-  if (!serve) return undefined
-  const fill = (part: string) => part
-    .replace(/\{port\}/g, String(entry.ports.app)).replace(/\{hubPort\}/g, String(entry.ports.hub)).replace(/\{otherPort\}/g, String(entry.ports.other))
-    .replace(/\{build\}/g, join(round, 'build')).replace(/\{run\}/g, entry.folder)
-  return { cwd: resolve(settings.root, serve.cwd ?? '.'), command: serve.command.map(fill) }
+/** The serve commands of a run, their placeholders filled, each with its port. */
+function serveCommands(settings: Settings, round: string, entry: RunEntry): { cwd: string; command: string[]; port: number }[] {
+  return settings.explore.serve.map((serve) => {
+    const fill = (part: string) => part
+      .replace(/\{port\}/g, String(entry.ports.app)).replace(/\{hubPort\}/g, String(entry.ports.hub)).replace(/\{otherPort\}/g, String(entry.ports.other))
+      .replace(/\{build\}/g, join(round, 'build')).replace(/\{run\}/g, entry.folder)
+    return { cwd: resolve(settings.root, serve.cwd ?? '.'), command: serve.command.map(fill), port: entry.ports[serve.port] }
+  })
 }
 
 async function prepare(settings: Settings, count: number, areas: string[], sinceArg: string | undefined, fromArg: number | undefined, build: boolean, io: Io): Promise<number> {
@@ -235,7 +249,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
   const open = readFindings(resolve(root, settings.findings)).filter((f) => f.status === 'open' || f.status === 'question' || f.status === 'hardened')
   const earlierRuns = earlier.flatMap((r) => r.runs.map((x) => x.folder)).slice(-20)
 
-  const serve = (entry: RunEntry) => serveCommand(settings, dir, entry)
+  const serve = (entry: RunEntry) => serveCommands(settings, dir, entry)
   const brief = [
     `# Exploratory runs ${from}–${to}: common setup`,
     '',
@@ -259,8 +273,9 @@ async function prepare(settings: Settings, count: number, areas: string[], since
     '## Setup (done: do not build in the repository)',
     '',
     `- The build of ${commit}: \`${dir}/build\`${Object.keys(explore.copy).length ? ` (${Object.keys(explore.copy).join(', ')})` : ''}.`,
-    ...(explore.serve ? [`- Serve it for your run from \`${resolve(root, explore.serve.cwd ?? '.')}\` with the command in your prompt.`] : []),
+    ...(explore.serve.length ? [`- Serve it for your run with the command${explore.serve.length === 1 ? '' : 's'} in your prompt.`] : []),
     '- Your folder and your ports are in your prompt: a run NN has the ports of NN. Write scripts, screenshots and notes only in your folder.',
+    `- Scripts name no absolute path: a finding's script is copied into \`${settings.findings}/F-NNNN/\` with the helpers it imports and must run from there too. Find the repository by walking up from the script's own folder to \`crucible.json\`, and take your ports and anything of the round's folder as arguments.`,
     `- ${count} run${count === 1 ? '' : 's'} share this machine: keep one browser open at a time and close it when a script ends; do not run the project's whole test suites.`,
     '',
     '## Rules',
@@ -282,7 +297,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
   ].join('\n')
   writeFileSync(join(dir, 'BRIEF.md'), brief)
   for (const entry of runs) {
-    const s = serve(entry)
+    const servers = serve(entry)
     writeFileSync(join(entry.folder, 'PROMPT.md'), [
       `# Run ${entry.run} of exploratory runs ${from}–${to}`,
       '',
@@ -291,7 +306,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
       `- Your area: ${entry.area ?? 'your choice: one of the candidate areas of the brief that no other run of this round has, or another place where bugs are likely'}.`,
       `- Your folder: \`${entry.folder}\`.`,
       `- Your ports: ${entry.ports.app} (the app), ${entry.ports.hub}, ${entry.ports.other}.`,
-      ...(s ? [`- Serve your build: from \`${s.cwd}\`, \`${s.command.join(' ')}\`.`] : []),
+      ...servers.map((s) => `- Serve your build${servers.length > 1 ? ` on port ${s.port}` : ''}: from \`${s.cwd}\`, \`${s.command.join(' ')}\`.`),
       '',
     ].join('\n'))
   }
@@ -337,14 +352,18 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
   const found = findRun(settings, run)
   if (!found) { io.err(`No round has run ${run}.`); return 2 }
   const { dir, round, entry } = found
-  const serve = serveCommand(settings, dir, entry)
-  let server: ChildProcess | undefined
+  const servers = serveCommands(settings, dir, entry)
+  const started: { pid?: number; port: number }[] = []
   try {
-    if (serve) {
-      if (await listening(entry.ports.app, 200)) { io.err(`Port ${entry.ports.app} is taken: stop what listens there first.`); return 2 }
-      server = spawn(serve.command[0], serve.command.slice(1), { cwd: serve.cwd, detached: process.platform !== 'win32', stdio: 'ignore', shell: process.platform === 'win32' })
-      if (!(await listening(entry.ports.app, 30_000))) { io.err(`The run's server did not answer on port ${entry.ports.app}: ${serve.command.join(' ')}`); return 2 }
-      io.out(`Serving run ${run}'s build on port ${entry.ports.app}.`)
+    for (const serve of servers) {
+      if (await listening(serve.port, 200)) { io.err(`Port ${serve.port} is taken: stop what listens there first.`); return 2 }
+      const server = spawn(serve.command[0], serve.command.slice(1), { cwd: serve.cwd, detached: process.platform !== 'win32', stdio: 'ignore', shell: process.platform === 'win32' })
+      started.push({ pid: server.pid, port: serve.port })
+      if (!(await listening(serve.port, 30_000))) { io.err(`The run's server did not answer on port ${serve.port}: ${serve.command.join(' ')}`); return 2 }
+    }
+    if (servers.length) {
+      const ports = servers.map((s) => s.port)
+      io.out(`Serving run ${run}'s build on port${ports.length === 1 ? '' : 's'} ${ports.length === 1 ? ports[0] : `${ports.slice(0, -1).join(', ')} and ${ports[ports.length - 1]}`}.`)
     }
     for (const line of scripts) {
       const [script, ...args] = line.trim().split(/\s+/)
@@ -358,10 +377,11 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
     writeFileSync(join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n')
     return 0
   } finally {
-    if (server?.pid) {
+    for (const server of started) {
+      if (!server.pid) continue
       try { process.kill(process.platform === 'win32' ? server.pid : -server.pid) } catch { /* gone already */ }
-      await waitClosed(entry.ports.app)
     }
+    for (const server of started) await waitClosed(server.port)
   }
 }
 
@@ -401,6 +421,9 @@ async function record(settings: Settings, file: string, io: Io): Promise<number>
   const ids = existing.map((f) => f.id)
   const commit = found.round.commit
   const written: Finding[] = []
+  const warnings: string[] = []
+  // The round's absolute paths: a script that names one runs only where the round ran.
+  const roundPaths = [...new Set([settings.root, found.dir].flatMap((p) => [resolve(p), realpath(p)]))].sort((a, b) => b.length - a.length)
   for (const f of report.findings) {
     if (!f.title || existing.some((x) => x.round === found.round.round && x.title === f.title) || written.some((x) => x.title === f.title)) continue
     const id = nextFindingId(ids)
@@ -409,7 +432,25 @@ async function record(settings: Settings, file: string, io: Io): Promise<number>
     if (f.script) {
       const [name, ...args] = f.script.trim().split(/\s+/)
       const copied = copyScript(found.entry.folder, name, join(findingsDir, id))
-      script = copied ? [`${id}/${name}`, ...args].join(' ') : f.script
+      script = copied.length ? [`${id}/${name}`, ...args].join(' ') : f.script
+      for (const file of copied) {
+        for (const { path, line } of absolutePaths(readFileSync(join(findingsDir, id, file), 'utf8'), roundPaths)) {
+          warnings.push(`${id}/${file} names ${path} (line ${line}): it runs only where the round ran.`)
+        }
+      }
+    }
+    let screenshot: string | undefined
+    if (f.screenshot) {
+      const shot = resolve(found.entry.folder, f.screenshot)
+      if (existsSync(shot) && shot.startsWith(resolve(found.entry.folder) + sep)) {
+        const rel = relative(found.entry.folder, shot)
+        mkdirSync(dirname(join(findingsDir, id, rel)), { recursive: true })
+        copyFileSync(shot, join(findingsDir, id, rel))
+        screenshot = `${id}/${rel.split(sep).join('/')}`
+      } else {
+        screenshot = f.screenshot
+        warnings.push(`${id}'s screenshot ${f.screenshot} is not in run ${report.run}'s folder.`)
+      }
     }
     const finding: Finding = {
       id,
@@ -421,6 +462,7 @@ async function record(settings: Settings, file: string, io: Io): Promise<number>
       round: found.round.round,
       run: report.run,
       ...(script ? { script } : {}),
+      ...(screenshot ? { screenshot } : {}),
       commit,
       found: new Date().toISOString().slice(0, 10),
       steps: f.steps ?? [],
@@ -432,23 +474,41 @@ async function record(settings: Settings, file: string, io: Io): Promise<number>
   io.out(written.length
     ? `Wrote ${written.length} finding${written.length === 1 ? '' : 's'} of run ${report.run}:\n${written.map((f) => `  ${f.id}  ${f.title}${f.status === 'question' ? ' (question)' : ''}`).join('\n')}`
     : `No new findings in run ${report.run}'s report.`)
+  for (const w of warnings) io.err(`Warning: ${w}`)
+  if (warnings.some((w) => w.endsWith('where the round ran.'))) io.err("Make those copies find the repository by walking up from their own folder, and take ports and the round's folder as arguments (the round's brief asks for it).")
   return 0
 }
 
+const realpath = (path: string) => { try { return realpathSync(path) } catch { return resolve(path) } }
+
+/** The paths in `text` under one of `roots` (longest first), each with its line. */
+function absolutePaths(text: string, roots: string[]): { path: string; line: number }[] {
+  const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`(?:${roots.map(escape).join('|')})(?![^/\\s'"\`)])[^\\s'"\`),;]*`, 'g')
+  const found: { path: string; line: number }[] = []
+  text.split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(pattern)) if (!found.some((f) => f.path === m[0])) found.push({ path: m[0], line: i + 1 })
+  })
+  return found
+}
+
 /** Copies a script and the scripts beside it that it imports (relative
- *  imports, followed) into `to`; false when the script is not there. */
-function copyScript(folder: string, name: string, to: string): boolean {
+ *  imports, followed) into `to`; the files copied (relative to `to`, the
+ *  script first), none when the script is not there. */
+function copyScript(folder: string, name: string, to: string): string[] {
   const seen = new Set<string>()
+  const copied: string[] = []
   const visit = (rel: string) => {
     const file = resolve(folder, rel)
     if (seen.has(file) || !existsSync(file) || !file.startsWith(resolve(folder))) return
     seen.add(file)
     mkdirSync(dirname(join(to, relative(folder, file))), { recursive: true })
     copyFileSync(file, join(to, relative(folder, file)))
+    copied.push(relative(folder, file))
     const text = readFileSync(file, 'utf8')
     for (const m of text.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g)) visit(join(dirname(relative(folder, file)), m[1]))
   }
-  if (!existsSync(resolve(folder, name))) return false
+  if (!existsSync(resolve(folder, name))) return []
   visit(name)
-  return true
+  return copied
 }

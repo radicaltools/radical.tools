@@ -528,3 +528,63 @@ describe('Studio\'s edits merged with an outside change (item 264)', () => {
     expect(at('b')).toEqual({ x: 100, y: 50 })
   })
 })
+
+describe('Undo of a delete that an outside change built on, on a view', () => {
+  // F-0025: Bookstore deleted in Studio (not saved yet, an agent writing),
+  // the agent's add_node put Search into it, so it came back with Search
+  // alone, drawn where Web App had been; Undo of the delete put Web App,
+  // API and Orders DB back where they were, Web App right on top of Search
+  // (saved so).
+  const el = (id: string, type: string, parentId: string | undefined, x: number, y: number, width: number, height: number): C4Node =>
+    ({ id, type, label: id, collapsed: false, x, y, width, height, ...(parentId ? { parentId } : {}) } as C4Node)
+  const nodes = [
+    el('customer', 'person', undefined, 355, 0, 150, 170),
+    el('bookstore', 'system', undefined, 0, 270, 860, 350),
+    el('web', 'webapp', 'bookstore', 30, 120, 210, 140),
+    el('api', 'container', 'bookstore', 290, 120, 300, 200),
+    el('db', 'database', 'bookstore', 640, 155, 190, 130),
+  ]
+  const positions = Object.fromEntries(nodes.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
+  beforeEach(() => {
+    s().setAppMode('designer')
+    s().loadDiagram({ nodes, relations: [], views: [{ id: 'v', name: 'Containers', nodeIds: nodes.map((n) => n.id), positions }] })
+    s().setActiveView('v')
+  })
+  afterEach(() => s().stopLiveLayout())
+
+  /** Siblings drawn over each other on the canvas shown. */
+  const overlapping = (): string[] => {
+    const shown = Object.values(s().c4Nodes).filter((n) => !s().rfNodes.find((r) => r.id === n.id)?.hidden)
+    const out: string[] = []
+    for (const a of shown) for (const b of shown) {
+      if (a.id >= b.id || (a.parentId ?? '') !== (b.parentId ?? '')) continue
+      if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) out.push(`${a.id}/${b.id}`)
+    }
+    return out
+  }
+
+  it('puts the deleted elements back clear of what the outside change put there since', () => {
+    const base = throughFolder(structuredClone(s().saveDiagram()))
+    s().removeNode('bookstore')
+    expect(s().c4Nodes.web).toBeUndefined()
+    // The agent saw Bookstore as it was and put Search in beside the others.
+    const theirs = structuredClone(base)
+    theirs.nodes.push(el('search', 'container', 'bookstore', 30, 360, 149, 100))
+    theirs.views![0].nodeIds.push('search')
+    const { merged, restored } = mergeModels(base, throughFolder(structuredClone(s().saveDiagram())), theirs)
+    expect(restored.length).toBe(1)
+    s().loadDiagram(structuredClone(merged), { outsideChange: true })
+    s().setActiveView('v')
+    expect(s().c4Nodes.bookstore).toBeDefined()
+    expect(s().c4Nodes.search).toBeDefined()
+
+    s().undo()
+    expect(s().activeViewId).toBe('v')
+    expect(['web', 'api', 'db', 'search'].map((id) => s().c4Nodes[id]?.parentId)).toEqual(['bookstore', 'bookstore', 'bookstore', 'bookstore'])
+    expect(overlapping()).toEqual([])
+    // Saved so: the view's places are the ones drawn.
+    const saved = s().saveDiagram().views!.find((v) => v.id === 'v')!
+    const { search, web } = saved.positions!
+    expect(search.x < web.x + web.width && web.x < search.x + search.width && search.y < web.y + web.height && web.y < search.y + search.height).toBe(false)
+  })
+})

@@ -7,8 +7,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
+// A copy of the e2e suite's fixture (apps/e2e/fixtures).
+import bookstoreFile from './fixtures/bookstore.radical?raw'
 
 const s = useDiagramStore.getState
+const bookstore = (): DiagramData => JSON.parse(bookstoreFile) as DiagramData
 function model(): DiagramData {
   return {
     nodes: [
@@ -287,5 +290,153 @@ describe('the model a slide shows once its milestone is gone (item 232)', () => 
     s().setAppMode('designer')
     expect(s().activeSnapshotId).toBeNull()
     expect(s().c4Nodes[pay]).toBeDefined()
+  })
+})
+
+describe('Capture on a slide while a milestone is shown (F-0016)', () => {
+  // Milestone v1 has the four elements; the live model has a fifth since.
+  const live = (): string => s().addNode({ type: 'system', label: 'Pay', x: 900, y: 600, collapsed: false, ...NODE_SIZES.system } as Omit<C4Node, 'id'>)
+
+  it('links a slide that showed no milestone to the one shown, as Add slide does, and keeps no copy of it', () => {
+    const v1 = s().createSnapshot('v1')
+    const pay = live()
+    s().addPresentationSlide('Live')
+    const id = s().presentationSlides[0].id
+    expect(s().presentationSlides[0].modelSnapshot).toBeDefined()
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    s().selectMilestone(v1)
+    s().captureSlideViewport(id)
+    expect(s().presentationSlides[0].snapshotId).toBe(v1)
+    expect(s().presentationSlides[0].modelSnapshot).toBeUndefined()
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeUndefined()
+    // Delete milestone: the slide shows the live model, nothing of v1.
+    s().setAppMode('designer')
+    expect(s().activeSnapshotId).toBeNull()
+    s().removeSnapshot(v1)
+    expect(s().presentationSlides[0].snapshotId).toBeNull()
+    expect(s().presentationSlides[0].modelSnapshot).toBeUndefined()
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    expect(s().c4Nodes[pay]).toBeDefined()
+  })
+})
+
+describe('Undo in Designer after a slide was unlinked in Presenter (F-0023)', () => {
+  it('takes back Designer\'s step only: the slide stays on the live model', () => {
+    const v1 = s().createSnapshot('v1')
+    s().addPresentationSlide('v1 MVP')
+    const id = s().presentationSlides[0].id
+    s().linkSnapshotToSlide(id, v1)
+    s().addNode({ type: 'system', label: 'Live1', x: 900, y: 600, collapsed: false, ...NODE_SIZES.system } as Omit<C4Node, 'id'>)
+    s().setAppMode('presenter')
+    s().linkSnapshotToSlide(id, null)
+    s().setAppMode('designer')
+    s().undo()
+    expect(Object.values(s().c4Nodes).some((n) => n.label === 'Live1')).toBe(false)
+    expect(s().presentationSlides[0].snapshotId).toBeNull()
+    expect(s().saveDiagram().presentations?.find((p) => p.id === s().activePresentationId)?.slides[0].snapshotId).toBeNull()
+    s().redo()
+    expect(s().presentationSlides[0].snapshotId).toBeNull()
+  })
+})
+
+describe('a slide of a view that gained elements since (F-0015)', () => {
+  /** Where each element is drawn, its box summed up the frames it is in. */
+  function drawnBoxes(): Record<string, { x: number; y: number; w: number; h: number; parent?: string }> {
+    const rf = new Map(s().rfNodes.map((n) => [n.id, n]))
+    const out: Record<string, { x: number; y: number; w: number; h: number; parent?: string }> = {}
+    for (const n of s().rfNodes) {
+      if (n.hidden) continue
+      let x = 0
+      let y = 0
+      for (let p: typeof n | undefined = n; p; p = p.parentNode ? rf.get(p.parentNode) : undefined) { x += p.position.x; y += p.position.y }
+      const data = n.data as { width: number; height: number }
+      out[n.id] = { x, y, w: data.width, h: data.height, parent: n.parentNode }
+    }
+    return out
+  }
+  /** Pairs of drawn elements on each other (a frame and what is in it aside). */
+  function overlaps(): string[] {
+    const boxes = drawnBoxes()
+    const inside = (a: string, b: string): boolean => {
+      for (let p = boxes[a]?.parent; p; p = boxes[p]?.parent) if (p === b) return true
+      return false
+    }
+    const out: string[] = []
+    const ids = Object.keys(boxes).sort()
+    for (const a of ids) for (const b of ids) {
+      if (a >= b || inside(a, b) || inside(b, a)) continue
+      const p = boxes[a]
+      const q = boxes[b]
+      if (p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h) out.push(`${a}–${b}`)
+    }
+    return out
+  }
+
+  it('draws what an explore view gained since where the view draws it, on none of the elements captured', () => {
+    s().loadDiagram(bookstore())
+    s().setActivePresentation(s().addPresentation('Deck'))
+    s().exploreFrom('api')
+    s().exploreNeighbours('api', { parent: false, children: false })
+    const view = s().saveExploration('API context', null)!
+    s().addPresentationSlide('API')
+    const captured = drawnBoxes()
+    expect(Object.keys(captured).sort()).toEqual(['api', 'db', 'payments', 'web'])
+    // Grown in Designer since: Customer, a level below Web App.
+    s().exploreNeighbours('web', { parent: false, children: false })
+    const designer = drawnBoxes()
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    expect(s().activeViewId).toBe(view)
+    const slide = drawnBoxes()
+    expect(Object.keys(slide).sort()).toEqual(['api', 'customer', 'db', 'payments', 'web'])
+    for (const id of Object.keys(captured)) expect(slide[id]).toMatchObject({ x: captured[id].x, y: captured[id].y })
+    expect(overlaps()).toEqual([])
+    expect(slide.customer).toMatchObject({ x: designer.customer.x, y: designer.customer.y })
+  })
+
+  it('draws what an explore view gained since beside the elements captured when the view has it where one of them was', () => {
+    s().loadDiagram(bookstore())
+    s().setActivePresentation(s().addPresentation('Deck'))
+    s().exploreFrom('api')
+    s().exploreNeighbours('api', { parent: false, children: false })
+    const view = s().saveExploration('API context', null)!
+    // Customer, not drawn, where another canvas left it: on API.
+    const api = s().c4Nodes.api
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, customer: { ...st.c4Nodes.customer, x: api.x, y: api.y } } }))
+    s().addPresentationSlide('API')
+    const captured = drawnBoxes()
+    s().exploreNeighbours('web', { parent: false, children: false })
+    // And moved in Designer since to where the slide has API.
+    useDiagramStore.setState((st) => ({ views: { ...st.views, [view]: { ...st.views[view], positions: { ...st.views[view].positions, customer: { ...st.views[view].positions.customer, x: captured.api.x, y: captured.api.y } } } } }))
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    const slide = drawnBoxes()
+    expect(Object.keys(slide).sort()).toEqual(['api', 'customer', 'db', 'payments', 'web'])
+    for (const id of Object.keys(captured)) expect(slide[id]).toMatchObject({ x: captured[id].x, y: captured[id].y })
+    expect(overlaps()).toEqual([])
+  })
+
+  it('places an element a structure view gained since as the view does, on none of the elements captured', () => {
+    s().loadDiagram(bookstore())
+    s().setActivePresentation(s().addPresentation('Deck'))
+    // Customer and Payment Provider where All elements has the Bookstore.
+    const view = s().addView('Two')
+    s().setViewNodes(view, ['customer', 'payments'])
+    s().setActiveView(view)
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, customer: { ...st.c4Nodes.customer, x: 0, y: 300 }, payments: { ...st.c4Nodes.payments, x: 400, y: 300 } } }))
+    s()._sync()
+    s().addPresentationSlide('Two')
+    const captured = drawnBoxes()
+    expect(Object.keys(captured).sort()).toEqual(['customer', 'payments'])
+    s().addNodeToView(view, 'bookstore')
+    s().setAppMode('presenter')
+    s().previewSlide(0)
+    const slide = drawnBoxes()
+    expect(Object.keys(slide).sort()).toEqual(['bookstore', 'customer', 'payments'])
+    for (const id of Object.keys(captured)) expect(slide[id]).toMatchObject({ x: captured[id].x, y: captured[id].y })
+    expect(overlaps()).toEqual([])
   })
 })

@@ -1,0 +1,42 @@
+// Quick Search opens a group of views per element as a canvas of its own,
+// which the left panel never does (a click on the group's card only folds
+// its list of views). Sample model, New view -> Containers of a system.
+import { launch, openSample, activeDocId, stored, settle, shot, boxes, violations } from './lib.mjs'
+const s = await launch()
+const { page } = s
+await openSample(page)
+const id = activeDocId(page)
+await page.getByRole('button', { name: /New view/ }).first().click()
+await page.waitForTimeout(400)
+await page.locator('.lp-add-view-option').filter({ hasText: /^Containers of a system/ }).click()
+await page.waitForTimeout(2500); await settle(page)
+let doc = await stored(page, id)
+const group = doc.views.find(v => v.name === 'Containers of a system' && !v.partOf)
+const members = doc.views.filter(v => v.partOf === group.id)
+console.log('group', group.id, 'members', members.map(v => v.name))
+console.log('after New view, active card:', await page.locator('.lp-view-card.active .lp-card-title').allInnerTexts(), page.url().replace(/.*\/v\//, 'v/'))
+// The group's own card: a click shows or hides its views, opens nothing.
+const groupCard = page.locator('.lp-view-card.lp-view-group').filter({ hasText: 'Containers of a system' })
+console.log('group card text:', (await groupCard.innerText()).replace(/\n/g, ' | '))
+// Quick Search for the group's name, Enter.
+await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } }).catch(() => {})
+const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+await search.click()
+await page.keyboard.type('Containers of a system')
+await page.waitForTimeout(400)
+console.log('first result:', (await page.locator('.quick-search-item').first().innerText()).replace(/\n/g, ' | '))
+await page.keyboard.press('Enter')
+await page.waitForTimeout(2500); await settle(page)
+const route = page.url().replace(/.*\/v\//, 'v/')
+console.log('route', route, 'is the group:', route.startsWith(`v/${group.id}`))
+console.log('active card:', await page.locator('.lp-view-card.active .lp-card-title').allInnerTexts())
+console.log('canvas nodes drawn:', await page.locator('.react-flow__node').count())
+await shot(page, 'f3-qs-group.png')
+const parentOf = Object.fromEntries((await stored(page, id)).nodes.map(n => [n.id, n.parentId]))
+console.log('geometry', violations(await boxes(page), parentOf))
+doc = await stored(page, id)
+const g2 = doc.views.find(v => v.id === group.id)
+console.log('group positions saved', Object.keys(g2.positions ?? {}).length)
+console.log(route.startsWith(`v/${group.id}`) ? `BUG: Enter opened the group itself as a canvas of ${await page.locator('.react-flow__node').count()} elements; its card only folds its ${members.length} views` : 'PASS')
+console.log('problems', s.problems, s.external)
+await s.close()

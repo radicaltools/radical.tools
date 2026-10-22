@@ -5,6 +5,7 @@
 // expands, the selection and the camera.
 
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
 import { viewShownNodes } from '@radical/common/viewPipeline'
 import { isViewGroup } from '@radical/common/model'
 import { create } from 'zustand'
@@ -24,10 +25,14 @@ export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string
 
 /** For each view, the elements it shows (viewShownNodes): what its chain
  *  gives, or those it lists and their ancestors. A view that lists none and
- *  is not marked empty shows every element. */
-export function viewNodeSets(views: Record<string, DiagramView>, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Record<string, Set<string>> {
+ *  is not marked empty shows every element. A group of views per element
+ *  has none: its views show them, and it is never a canvas of its own. */
+export function viewNodeSets(views: Record<string, DiagramView>, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, metamodel: Metamodel | undefined): Record<string, Set<string>> {
   const out: Record<string, Set<string>> = {}
-  for (const v of Object.values(views)) out[v.id] = viewShownNodes(v, nodes, relations) ?? new Set(Object.keys(nodes))
+  for (const v of Object.values(views)) {
+    if (isViewGroup(v, metamodel)) continue
+    out[v.id] = viewShownNodes(v, nodes, relations) ?? new Set(Object.keys(nodes))
+  }
   return out
 }
 
@@ -36,8 +41,8 @@ const isCanvas = (v: DiagramView): boolean => !v.kind || v.kind === 'static'
 /** The canvas to show `nodeId` on: the active view when it is a canvas that
  *  shows it, else the smallest canvas view that does, else All elements (null). */
 export function canvasViewFor(nodeId: string): string | null {
-  const { views, c4Nodes, c4Relations, activeViewId } = useDiagramStore.getState()
-  const sets = viewNodeSets(views, c4Nodes, c4Relations)
+  const { views, c4Nodes, c4Relations, activeViewId, metamodel } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations, metamodel)
   const active = activeViewId ? views[activeViewId] : undefined
   if (active && isCanvas(active) && sets[active.id]?.has(nodeId)) return active.id
   let best: { id: string; size: number } | null = null
@@ -62,8 +67,8 @@ export function wikiViewsFor(nodeId: string): ViewChoice[] {
 export interface ViewChoice { id: string; name: string; size: number }
 
 function viewsFor(nodeId: string, kind: (v: DiagramView) => boolean): ViewChoice[] {
-  const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
-  const sets = viewNodeSets(views, c4Nodes, c4Relations)
+  const { views, c4Nodes, c4Relations, metamodel } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations, metamodel)
   return Object.values(views)
     .filter((v) => kind(v) && sets[v.id]?.has(nodeId))
     .map((v) => ({ id: v.id, name: v.name, size: sets[v.id].size }))
@@ -72,8 +77,8 @@ function viewsFor(nodeId: string, kind: (v: DiagramView) => boolean): ViewChoice
 
 /** A wiki view with a page for `nodeId`, or null when the model has none. */
 export function wikiViewFor(nodeId: string): string | null {
-  const { views, c4Nodes, c4Relations } = useDiagramStore.getState()
-  const sets = viewNodeSets(views, c4Nodes, c4Relations)
+  const { views, c4Nodes, c4Relations, metamodel } = useDiagramStore.getState()
+  const sets = viewNodeSets(views, c4Nodes, c4Relations, metamodel)
   const wikis = Object.values(views).filter((v) => v.kind === 'wiki' && sets[v.id]?.has(nodeId))
   wikis.sort((a, b) => sets[a.id].size - sets[b.id].size)
   return wikis[0]?.id ?? null

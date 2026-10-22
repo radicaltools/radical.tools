@@ -13,6 +13,7 @@ import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/format
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
 import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
+import { isViewGroup, viewsOfGroup } from '@radical/common/model'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI } from '../ai/settings'
 
@@ -31,6 +32,7 @@ export function QuickSearch(): React.ReactElement | null {
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
   const views = useDiagramStore((s) => s.views)
+  const metamodel = useDiagramStore((s) => s.metamodel)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const selectNode = useDiagramStore((s) => s.selectNode)
@@ -238,7 +240,7 @@ export function QuickSearch(): React.ReactElement | null {
   // ancestors), so we can answer "which views contain node X?" and
   // pick a sensible fallback view when jumping to a node that isn't in the
   // currently-active one.
-  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes, c4Relations), [views, c4Nodes, c4Relations])
+  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes, c4Relations, metamodel), [views, c4Nodes, c4Relations, metamodel])
 
   // Pick a stable view to switch into when the user jumps to a node that
   // isn't visible in the active view: the active view if it already
@@ -325,11 +327,13 @@ export function QuickSearch(): React.ReactElement | null {
       if (best > 0) {
         const set = viewNodeSets[v.id]
         const count = set ? set.size : v.nodeIds.length
+        // A group of views per element opens on its first view (setActiveView).
+        const group = isViewGroup(v, metamodel) ? viewsOfGroup(views, v.id).length : null
         out.push({
           kind: 'view',
           id: v.id,
           label: v.name,
-          sub: `View · ${count} node${count === 1 ? '' : 's'}`,
+          sub: group !== null ? `Group · ${group} view${group === 1 ? '' : 's'}` : `View · ${count} node${count === 1 ? '' : 's'}`,
           // Bias views slightly above raw nodes/edges of the same score so
           // typing a view name surfaces the view itself first.
           score: best + 50,
@@ -340,7 +344,7 @@ export function QuickSearch(): React.ReactElement | null {
     return out.slice(0, 30)
     // pathOf intentionally omitted — recomputed cheaply each render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, c4Nodes, c4Relations, views, viewNodeSets, activeViewId])
+  }, [q, c4Nodes, c4Relations, views, viewNodeSets, activeViewId, metamodel])
 
   // Reset hover when the result list shape changes.
   useEffect(() => { setHover(0) }, [q])

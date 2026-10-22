@@ -2,9 +2,33 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useStore, type Node } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
 
-/** A container's −/+ as drawn inside its node: where (relative to the
- *  node's top-left, in canvas units), how large, and how it looks. */
+/** The buttons drawn inside a node that a relation's line can run over:
+ *  a container's −/+ and an exploration element's + and − (ExploreMore). */
+const NODE_CONTROLS = '.c4-node-collapse-btn, .explore-more'
+
+/** How far around a control a click still reaches it: the −/+ has a hit
+ *  area 10 px beyond its box (CSS), an exploration's + and − none. */
+const reachOf = (control: Element): number => control.classList.contains('c4-node-collapse-btn') ? 10 : 0
+
+/**
+ * The node control (NODE_CONTROLS) at a point on the screen inside `root`,
+ * whatever is drawn over it there: the line of a relation drawn above the
+ * elements took the click meant for it.
+ */
+export function nodeControlAt(root: Element | null | undefined, x: number, y: number): HTMLElement | null {
+  for (const control of root?.querySelectorAll<HTMLElement>(NODE_CONTROLS) ?? []) {
+    const r = control.getBoundingClientRect()
+    const reach = reachOf(control)
+    if (!r.width || !r.height) continue
+    if (x >= r.left - reach && x <= r.right + reach && y >= r.top - reach && y <= r.bottom + reach) return control
+  }
+  return null
+}
+
+/** A node control as drawn inside its node: where (relative to the node's
+ *  top-left, in canvas units), how large, and how it looks. */
 interface Toggle {
+  key: string
   id: string
   dx: number
   dy: number
@@ -15,15 +39,17 @@ interface Toggle {
 }
 
 /**
- * The containers' expand / collapse buttons, drawn again above the
- * relations. Edges between elements in different containers are drawn
- * above the containers so they stay visible and clickable, and one could
- * run over a container's −/+ (zoomed out, across the dashed frame's corner,
- * it hid it). React Flow draws each node in a layer of its own, so the
- * button inside it cannot rise above the edges: this draws a copy of each
- * at the button's place, which the pointer passes through to the button
- * (a click on an edge over it is handed to the button, Canvas'
- * onClickCapture).
+ * The containers' expand / collapse buttons, and the + and − of an
+ * exploration's elements, drawn again above the relations. Edges between
+ * elements in different containers are drawn above the containers so they
+ * stay visible and clickable, and one could run over a container's −/+
+ * (zoomed out, across the dashed frame's corner, it hid it); a selected
+ * element's lines are drawn above the elements, and one ran over its + in
+ * an exploration (F-0012). React Flow draws each node in a layer of its
+ * own, so the button inside it cannot rise above the edges: this draws a
+ * copy of each at the button's place, which the pointer passes through to
+ * the button (a click on an edge over it is handed to the button, Canvas'
+ * onClickCapture and nodeControlAt).
  *
  * Rendered as a ReactFlow child, outside the viewport element that exports
  * capture, like AlignmentGuides.
@@ -34,6 +60,10 @@ export function CollapseToggleMirror(): React.ReactElement | null {
   const domNode = useStore((s) => s.domNode)
   const rfNodes = useDiagramStore((s) => s.rfNodes)
   const lowDetail = useDiagramStore((s) => s.lowDetail)
+  // An exploration's + shows a count and whether its menu is open.
+  const exploreMore = useDiagramStore((s) => s.exploreMore)
+  const exploreFoldable = useDiagramStore((s) => s.exploreFoldable)
+  const exploreMenuFor = useDiagramStore((s) => s.exploreMenuFor)
   const [toggles, setToggles] = useState<Toggle[]>([])
   const last = useRef('')
 
@@ -41,7 +71,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
   useLayoutEffect(() => {
     if (!domNode || !zoom) return
     const out: Toggle[] = []
-    for (const button of domNode.querySelectorAll<HTMLElement>('.react-flow__node .c4-node-collapse-btn')) {
+    for (const button of domNode.querySelectorAll<HTMLElement>('.react-flow__node :is(.c4-node-collapse-btn, .explore-more)')) {
       const nodeEl = button.closest<HTMLElement>('.react-flow__node')
       const id = nodeEl?.dataset.id
       if (!nodeEl || !id) continue
@@ -50,6 +80,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
       if (!b.width || !b.height) continue
       const cs = getComputedStyle(button)
       out.push({
+        key: `${id} ${out.filter((t) => t.id === id).length}`,
         id,
         dx: (b.left - n.left) / zoom,
         dy: (b.top - n.top) / zoom,
@@ -71,7 +102,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
     if (key === last.current) return
     last.current = key
     setToggles(out)
-  }, [domNode, rfNodes, nodeInternals, lowDetail, zoom])
+  }, [domNode, rfNodes, nodeInternals, lowDetail, zoom, exploreMore, exploreFoldable, exploreMenuFor])
 
   if (!toggles.length) return null
   return (
@@ -82,7 +113,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
         const p = n.positionAbsolute ?? n.position
         return (
           <div
-            key={t.id}
+            key={t.key}
             className="c4-collapse-mirror"
             style={{
               ...t.style,

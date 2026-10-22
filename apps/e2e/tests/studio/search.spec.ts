@@ -60,6 +60,37 @@ test('Quick Search is on every view, and a pick on a table selects the element',
   await expect(page.getByLabel('Warnier diagram')).toBeVisible()
 })
 
+// F-0021: Quick Search opened a group of views per element as a canvas of
+// its own, and saved positions into it.
+test('Quick Search opens a group of views per element on its first view', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await studio.designer()
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^Containers of a system\s*Structure/ }).click()
+  await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
+  await page.locator('.lp-view-card', { hasText: 'All elements' }).click()
+  await expect(page).toHaveURL(/\/v\/all$/)
+
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('Containers of a system')
+  await expect(page.locator('.quick-search-item').first()).toContainText('Group · 1 view')
+  await page.keyboard.press('Enter')
+  // Shop's view in the group, drawn as a canvas; the group is no canvas.
+  const active = page.locator('.lp-view-card.active')
+  await expect(active).toHaveCount(1)
+  await expect(active.locator('.lp-card-title')).toHaveText('Shop')
+  await expect(page.locator('.lp-view-card.lp-view-group')).not.toHaveClass(/active/)
+  await expect(studio.node('shop')).toBeVisible()
+})
+
 test('a pick on a wiki opens the element\'s page, and the highlighted result stays in sight', async ({ page, studio }) => {
   const many: DiagramData = { ...MODEL, nodes: [...MODEL.nodes, ...Array.from({ length: 25 }, (_, i) => node(`svc${i}`, 'system', `Service ${String(i).padStart(2, '0')}`))] }
   const folder = new ModelFolder(page)

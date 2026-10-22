@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  builtInC4Metamodel, builtInGovernanceMetamodel, hasPlaceUnder, isParentAllowed, isPlacementAllowed, placeOf, validateModel,
+  builtInC4Metamodel, builtInGovernanceMetamodel, hasPlaceUnder, isParentAllowed, isPlacementAllowed, metamodelChangeBreaks, placeOf, validateModel,
 } from '../src/metamodel'
 import { checkAddNode, checkNodeUpdate, checkReparent, type ModelState } from '../src/model'
 import type { C4Node } from '../src/c4'
@@ -104,4 +104,27 @@ describe('what a group may hold', () => {
       nodeId: 'stray',
     }])
   })
+})
+
+// F-0017: a type whose last allowed parent was unticked (allowedParents left
+// undefined, or []) may sit in no element: Studio refused every drop, while
+// the validation read no parents as any parent and said nothing, so the
+// editor did not ask either.
+describe('a type with no allowed parents', () => {
+  const node = (id: string, type: string, parentId?: string): C4Node =>
+    ({ id, type: type as C4Node['type'], label: id, parentId, collapsed: false, x: 0, y: 0, width: 100, height: 60 })
+  const nodes: Record<string, C4Node> = Object.fromEntries([node('shop', 'system'), node('db', 'database', 'shop')].map((n) => [n.id, n]))
+  for (const allowedParents of [undefined, []]) {
+    const before = builtInC4Metamodel()
+    const after = builtInC4Metamodel()
+    after.nodeTypes.database = { ...after.nodeTypes.database, allowedParents }
+    it(`(${JSON.stringify(allowedParents)}) is placed in none, and the validation says so of one that is`, () => {
+      expect(isParentAllowed(after, 'database', 'system')).toBe(false)
+      expect(validateModel(nodes, {}, after).map((i) => i.id)).toContain('bad-parent:db')
+    })
+    it(`(${JSON.stringify(allowedParents)}) is a change that breaks what the model holds`, () => {
+      expect(metamodelChangeBreaks(nodes, {}, before, after).map((i) => i.message))
+        .toEqual(['Database "db" cannot be inside Software System. Allowed parents: (none).'])
+    })
+  }
 })

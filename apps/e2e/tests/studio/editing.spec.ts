@@ -296,6 +296,24 @@ test('a click on a collapse button reaches it even when an edge lies over it', a
   await expect(studio.node('bookstore').locator('.c4-node-collapse-btn').first()).toHaveAttribute('title', 'Expand')
 })
 
+test('Wrap into… makes room for the new parent beside what it wraps, also after a reload', async ({ page, studio }) => {
+  // F-0020: the group round API lay on the database, and stayed there.
+  await studio.seed()
+  await studio.open('v-containers')
+  expect(await studio.layoutViolations()).toEqual([])
+  await studio.node('api').click()
+  const actions = studio.properties.getByRole('region', { name: 'Actions' })
+  await actions.getByRole('button', { name: /^Wrap into…/ }).click()
+  await actions.getByRole('menu').getByRole('menuitem', { name: 'Group', exact: true }).click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'api')?.parentId).not.toBe('bookstore')
+  await studio.settle()
+  expect(await studio.layoutViolations()).toEqual([])
+  await page.waitForTimeout(1000)
+  await page.reload()
+  await studio.ready()
+  expect(await studio.layoutViolations()).toEqual([])
+})
+
 test('a second relation between the same two elements is drawn and can be selected', async ({ page, studio }) => {
   // It was never drawn: invisible, and impossible to select or delete.
   await studio.open('v-containers')
@@ -470,6 +488,23 @@ test('the activity rail keeps the app\'s menus in the metamodel editor, without 
   for (const name of ['Models', 'AI', 'Export', 'Settings']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
 })
 
+// F-0003: the editor's backdrop lay over the rail, so a click on Models, AI,
+// Export or Settings closed the editor and opened no menu.
+test('the activity rail\'s menus open over the metamodel editor, which stays open', async ({ page }) => {
+  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  const close = page.getByRole('button', { name: 'Close metamodel editor' })
+  await expect(close).toBeVisible()
+  for (const name of ['Models', 'AI', 'Export', 'Settings']) {
+    await page.getByRole('button', { name, exact: true }).click()
+    await expect(page.getByRole('menu', { name })).toBeVisible()
+    await expect(close).toBeVisible()
+    // Esc closes the menu, not the editor.
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu', { name })).toHaveCount(0)
+    await expect(close).toBeVisible()
+  }
+})
+
 test('the toolbar groups undo, navigation around Quick Search, and the branch\'s changes beside the perspectives', async ({ page }) => {
   const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
   const edit = await box(page.getByRole('group', { name: 'Edit' }))
@@ -488,6 +523,41 @@ test('the toolbar groups undo, navigation around Quick Search, and the branch\'s
   // The branch's changes beside the perspectives, clear of the clock.
   expect(changes.x).toBeGreaterThan(history.x + history.width)
   expect(changes.x + changes.width).toBeLessThanOrEqual(modes.x)
+})
+
+// F-0001: below about 1160 px the toolbar's buttons lay on top of each
+// other, and a click on Designer opened History.
+test('at every window width down to the desktop app\'s narrowest, nothing in the toolbar lies on top of anything clickable', async ({ page }) => {
+  const clash = () => page.evaluate(() => {
+    const shown = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
+    const items = [...document.querySelectorAll('.toolbar button, .quick-search-bar')].filter(shown)
+    const name = (el: Element) => el.getAttribute('aria-label') || el.textContent?.trim() || el.className
+    for (const el of items) {
+      const r = el.getBoundingClientRect()
+      if (r.left < 0 || r.right > window.innerWidth) return `${name(el)} is out of the window`
+      if ((el as HTMLButtonElement).disabled) continue
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      if (!hit || !el.contains(hit)) return `${name(el)} is under ${hit ? name(hit) : 'nothing'}`
+    }
+    for (const a of items) for (const b of items) {
+      if (a === b || a.contains(b) || b.contains(a)) continue
+      const p = a.getBoundingClientRect(), q = b.getBoundingClientRect()
+      if (p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5) return `${name(a)} overlaps ${name(b)}`
+    }
+    return null
+  })
+  for (const mode of ['Designer', 'Viewer']) {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await page.locator('.toolbar-mode-btn', { hasText: mode }).click()
+    await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(new RegExp(mode))
+    for (let width = 1440; width >= 900; width -= 20) {
+      await page.setViewportSize({ width, height: 800 })
+      await expect.poll(clash, { message: `${mode} at ${width} px` }).toBeNull()
+    }
+  }
+  // The perspectives still answer a click at the narrowest.
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
 })
 
 test('a menu of the activity rail answers ↑ and ↓ and closes when Tab leaves it', async ({ page }) => {

@@ -17,14 +17,14 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore, viewById } from '../store/diagramStore'
+import { useDiagramStore, viewById, milestoneOnCanvas } from '../store/diagramStore'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
 import { edgeLabelDetail, edgeLabelsShownAt } from './edges/edgeGeometry'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { AlignmentGuides } from './AlignmentGuides'
-import { CollapseToggleMirror } from './CollapseToggleMirror'
+import { CollapseToggleMirror, nodeControlAt } from './CollapseToggleMirror'
 import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
@@ -216,12 +216,15 @@ function StructuralCanvas(): React.ReactElement {
   const activeSequenceName = useDiagramStore((s) => s.activeSequenceId ? s.sequences[s.activeSequenceId]?.name : undefined)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
 
-  // Milestone view mode
-  const activeSnapshotId = useDiagramStore((s) => s.activeSnapshotId)
-  const snapshotName = useDiagramStore((s) =>
-    s.activeSnapshotId ? s.snapshots.find((sn) => sn.id === s.activeSnapshotId)?.name : undefined
-  )
-  const milestoneDirty = useDiagramStore((s) => s.milestoneDirty)
+  // Milestone view mode: the milestone drawn (a playing slide's own, none
+  // over one that draws the live model), with nothing to act on while a
+  // presentation plays.
+  const activeSnapshotId = useDiagramStore(milestoneOnCanvas)
+  const snapshotName = useDiagramStore((s) => {
+    const id = milestoneOnCanvas(s)
+    return id ? s.snapshots.find((sn) => sn.id === id)?.name : undefined
+  })
+  const milestoneDirty = useDiagramStore((s) => s.milestoneDirty && !s.presentationActive)
   const commitMilestoneChanges = useDiagramStore((s) => s.commitMilestoneChanges)
   const discardMilestoneChanges = useDiagramStore((s) => s.discardMilestoneChanges)
   const [milestoneNewName, setMilestoneNewName] = useState<string | null>(null)
@@ -1321,11 +1324,16 @@ function StructuralCanvas(): React.ReactElement {
       if (!node) return
       const from = dragFrom.current
       const moved = !from || Math.abs(node.position.x - from.x) > 0.5 || Math.abs(node.position.y - from.y) > 0.5
+      // Where the pointer let go. React Flow reports a move only when the
+      // position relative to the parent changes: while a child drags its
+      // parent's edge along, every other step went unreported, and the drop
+      // was saved short of where it was drawn (F-0014).
+      if (moved) liveDrag(node.id, node.position.x, node.position.y, node.positionAbsolute)
       liveRelease(node.id, dragDragsAlong.current, moved)
       dragDragsAlong.current = []
       dragFrom.current = null
     },
-    [liveRelease]
+    [liveDrag, liveRelease]
   )
 
   // After a box select React Flow drags the selection's frame, not a node:
@@ -1361,20 +1369,17 @@ function StructuralCanvas(): React.ReactElement {
 
   // Edges between a container's children are drawn above the container (so
   // they stay visible and clickable), and one can lie over its expand /
-  // collapse button. A click there is meant for the button: hand it over
-  // before the edge sees it. Same reach as the button's own hit area (CSS).
+  // collapse button; a selected element's lines are drawn above the
+  // elements, and one can lie over its + in an exploration. A click there
+  // is meant for the button: hand it over before the edge sees it. Same
+  // reach as the button's own hit area (CSS).
   const onClickCapture = useCallback((e: React.MouseEvent) => {
-    if ((e.target as Element).closest('.c4-node-collapse-btn')) return
-    const reach = 10
-    for (const btn of containerRef.current?.querySelectorAll<HTMLElement>('.c4-node-collapse-btn') ?? []) {
-      const r = btn.getBoundingClientRect()
-      if (e.clientX >= r.left - reach && e.clientX <= r.right + reach && e.clientY >= r.top - reach && e.clientY <= r.bottom + reach) {
-        e.stopPropagation()
-        e.preventDefault()
-        btn.click()
-        return
-      }
-    }
+    if ((e.target as Element).closest('.c4-node-collapse-btn, .explore-more')) return
+    const btn = nodeControlAt(containerRef.current, e.clientX, e.clientY)
+    if (!btn) return
+    e.stopPropagation()
+    e.preventDefault()
+    btn.click()
   }, [])
 
   return (
@@ -1418,7 +1423,7 @@ function StructuralCanvas(): React.ReactElement {
       )}
       {activeSnapshotId && snapshotName && (
         <div
-          className="nodrag nopan"
+          className="nodrag nopan milestone-chip"
           style={{
             position: 'absolute',
             top: 8,
@@ -1441,12 +1446,12 @@ function StructuralCanvas(): React.ReactElement {
             Milestone: <strong style={{ color: 'var(--text-primary)' }}>{snapshotName}</strong>
             {milestoneDirty && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
           </span>
-          <button
+          {!presentationActive && <button
             title={showDiff ? 'Hide diff' : 'Show changes vs. previous milestone'}
             onClick={toggleShowDiff}
             style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: showDiff ? 'var(--accent)' : 'var(--bg-surface)', color: showDiff ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 3 }}
-          >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>
-          {showDiff && (milestoneStats.added + milestoneStats.changed + milestoneStats.removed) > 0 && (
+          >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>}
+          {!presentationActive && showDiff && (milestoneStats.added + milestoneStats.changed + milestoneStats.removed) > 0 && (
             <span style={{ marginLeft: 2, opacity: 0.9 }}>
               <span style={{ color: '#4ade80' }}>+{milestoneStats.added}</span>
               {' '}

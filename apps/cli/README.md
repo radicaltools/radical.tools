@@ -355,7 +355,9 @@ not change the model's files.
 the base (default: the merge base with `origin/main`) set back to it, the test
 must fail; put back, it must pass; and it must pass `--runs` runs at once
 (default 5). Tests, findings and `crucible.json` are not set back, and the
-working tree is left as it was (files are copied aside, never stashed). A test
+working tree is left as it was (files are copied aside, never stashed), also
+when the gate is interrupted: Ctrl+C, `kill` or a closed terminal stops the
+test, puts the changed files back and ends with exit status 2. A test
 runs through the runner `crucible.json` gives for its folder, else with
 `npx vitest run <file> -t <name>` in the file's package:
 
@@ -365,7 +367,7 @@ runs through the runner `crucible.json` gives for its folder, else with
 ```
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
-could not run.
+could not run or was interrupted.
 
 ## radical explore
 
@@ -385,10 +387,15 @@ ports (`<ports>+NN`, `+100+NN`, `+200+NN`) and a `PROMPT.md` with its area;
 `BRIEF.md` names the commit, the commits and the model elements changed since
 the last round (by area), the open findings, the setup, the rules and the
 report's JSON form. `--since`, `--from` and `--no-build` change what it
-counts from, the first run's number and whether it builds. `verify` serves a
-run's build on its port, runs its scripts from its folder and stops the
-server. `record` writes a report's findings (`open`, or `question`) with
-copies of their scripts.
+counts from, the first run's number and whether it builds. The brief asks
+that scripts name no absolute path (they find the repository by walking up to
+`crucible.json`), since a finding's script is copied out of the round.
+`verify` serves a run's build on its ports (each server `serve` lists, on the
+run's port it names: `app`, `hub` or `other`), runs its scripts from its
+folder and stops the servers. `record` writes a report's findings (`open`, or
+`question`) with copies of their scripts and of the screenshot each names,
+and warns about a copied script that names the repository's or the round's
+absolute paths.
 
 ```json
 { "explore": {
@@ -396,7 +403,9 @@ copies of their scripts.
     "known": ["docs/IMPROVEMENTS.md"], "model": "architecture",
     "build": [["npm", "run", "build:web"]],
     "copy": { "renderer": "apps/studio/out/renderer" },
-    "serve": { "cwd": "apps/studio", "command": ["npx", "vite", "preview", "--port", "{port}", "--strictPort", "--outDir", "{build}/renderer"] },
+    "serve": [
+      { "cwd": "apps/studio", "command": ["npx", "vite", "preview", "--port", "{port}", "--strictPort", "--outDir", "{build}/renderer"] },
+      { "cwd": "apps/hub", "command": ["npx", "vite", "preview", "--port", "{hubPort}", "--strictPort", "--outDir", "{build}/hub"], "port": "hub" } ],
     "ports": 4500, "rules": ["…"] } }
 ```
 

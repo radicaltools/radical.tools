@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFileSync, spawn } from 'node:child_process'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
@@ -64,6 +65,8 @@ async function repository(): Promise<string> {
     'src/old.mjs': 'export const gone = true\n',
     'tests/calc.test.mjs': "import { add } from '../src/calc.mjs'\nprocess.exit(add(2, 3) === 5 ? 0 : 1)\n",
     'tests/always.test.mjs': 'process.exit(0)\n',
+    // Says it runs, with its pid, then takes its time: long enough to be interrupted.
+    'tests/slow.test.mjs': "console.log('running ' + process.pid)\nawait new Promise((r) => setTimeout(r, 30000))\nprocess.exit(1)\n",
     // Fails when another run of it is going on: flaky under load.
     'tests/flaky.test.mjs': [
       "import { existsSync, rmSync, writeFileSync } from 'node:fs'",
@@ -133,4 +136,38 @@ describe('radical harden --gate', () => {
     expect(broken.code).toBe(2)
     expect(await state(cwd)).toEqual(before)
   })
+
+  // Ctrl+C sends SIGINT to the whole process group, the test with it; kill
+  // sends SIGTERM to radical alone. Node ended on either without running
+  // the finally that puts the fix back.
+  for (const [signal, group] of [['SIGINT', true], ['SIGTERM', false]] as const) {
+    it(`puts the fix back when it is interrupted (${signal}${group ? ' to the process group, as Ctrl+C does' : ''})`, async () => {
+      const cwd = await repository()
+      const before = await state(cwd)
+      const temp = await mkdtemp(join(tmpdir(), 'radical-gate-tmp-'))
+      dirs.push(temp)
+      const child = spawn(process.execPath, ['--import', createRequire(import.meta.url).resolve('tsx'), join(import.meta.dirname, 'index.ts'), 'harden', '--gate', '--test', 'tests/slow.test.mjs › waits', '--base', 'main', '--runs', '1'],
+        { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, TMPDIR: temp } })
+      let out = ''
+      child.stdout.on('data', (chunk: Buffer) => { out += chunk.toString() })
+      child.stderr.on('data', (chunk: Buffer) => { out += chunk.toString() })
+      const closed = new Promise<number | string | null>((done) => child.on('close', (code, sig) => done(code ?? sig)))
+      // The test runs without the fix.
+      for (let i = 0; i < 300 && !/running \d+/.test(out); i++) await new Promise((r) => setTimeout(r, 50))
+      expect(out).toMatch(/running \d+/)
+      expect(await readFile(join(cwd, 'src/calc.mjs'), 'utf8')).toContain('a - b')
+      process.kill(group ? -child.pid! : child.pid!, signal)
+      const code = await closed
+      expect(code).toBe(2)
+      expect(out).toContain(`Interrupted (${signal}): the changed files are put back as they were.`)
+      // The fix is back (the changed file, the new one, and the removed one removed),
+      expect(await state(cwd)).toEqual(before)
+      // and its copies are tidied away.
+      expect((await readdir(temp)).filter((f) => f.startsWith('radical-harden-'))).toEqual([])
+      // The test it ran is stopped too.
+      const pid = Number(/running (\d+)/.exec(out)![1])
+      await new Promise((r) => setTimeout(r, 300))
+      expect(() => process.kill(pid, 0)).toThrow()
+    }, 30_000)
+  }
 })

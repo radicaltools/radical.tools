@@ -125,6 +125,8 @@ describe('radical explore prepare', () => {
     expect(brief).toContain('  - F-0001 A reload moves Customer (open)')
     expect(brief).toContain('- Do not use the MCP tools of the real model.')
     expect(brief).toContain('```json\n{ "run": NN, "findings": [')
+    // A finding's script is copied out of the round: it must run from there too.
+    expect(brief).toContain('Scripts name no absolute path:')
   })
 
   it('exits 2 without explore settings', async () => {
@@ -152,6 +154,32 @@ describe('radical explore verify', () => {
     const journal = JSON.parse(await readFile(join(cwd, 'rounds', 'round-5-5', 'round.json'), 'utf8'))
     expect(journal.runs[0].verified.map((v: { script: string; exit: number }) => [v.script, v.exit])).toEqual([[`look.mjs ${PORTS + 5}`, 0], ['broken.mjs', 3]])
     expect((await run(cwd, 'verify', '9', 'look.mjs')).code).toBe(2)
+  })
+})
+
+describe('radical explore verify with several servers', () => {
+  it('serves each server on its port of the run, and stops them all', async () => {
+    const { cwd } = await project({
+      copy: { site: 'out', hub: 'out' },
+      serve: [
+        { command: ['node', 'serve.mjs', '{port}', '{build}/site'] },
+        { command: ['node', 'serve.mjs', '{hubPort}', '{build}/hub'], port: 'hub' },
+      ],
+    })
+    expect((await run(cwd, 'prepare', '--runs', '1')).code).toBe(0)
+    const round = join(cwd, 'rounds', 'round-5-5')
+    const prompt = await readFile(join(round, 'run-5', 'PROMPT.md'), 'utf8')
+    expect(prompt).toContain(`\`node serve.mjs ${PORTS + 5} ${join(round, 'build')}/site\``)
+    expect(prompt).toContain(`\`node serve.mjs ${PORTS + 105} ${join(round, 'build')}/hub\``)
+    const folder = join(round, 'run-5')
+    await writeFile(join(folder, 'both.mjs'), `for (const p of process.argv.slice(2)) console.log(p + ': ' + await (await fetch('http://127.0.0.1:' + p)).text())\n`)
+    const { code, out, err } = await run(cwd, 'verify', '5', `both.mjs ${PORTS + 5} ${PORTS + 105}`)
+    expect(err).toBe('')
+    expect(code).toBe(0)
+    expect(out).toContain(`Serving run 5's build on ports ${PORTS + 5} and ${PORTS + 105}.`)
+    expect(out).toContain(`  ${PORTS + 5}: the app\n  ${PORTS + 105}: the app\n  (exit 0)`)
+    expect(await listening(PORTS + 5)).toBe(false)
+    expect(await listening(PORTS + 105)).toBe(false)
   })
 })
 
@@ -186,5 +214,46 @@ describe('radical explore record', () => {
     const again = await run(cwd, 'record', report)
     expect(again.out).toContain('No new findings in run 5\'s report.')
     expect(readFindings(join(cwd, 'crucible', 'findings'))).toHaveLength(3)
+  })
+
+  it('keeps the screenshot a finding names, beside its script', async () => {
+    const { cwd } = await project()
+    await run(cwd, 'prepare', '--runs', '1')
+    const folder = join(cwd, 'rounds', 'round-5-5', 'run-5')
+    await writeFile(join(folder, 'f1-row.mjs'), "console.log('row')\n")
+    await mkdir(join(folder, 'shots'))
+    await writeFile(join(folder, 'shots', 'f1.png'), 'png')
+    const report = join(folder, 'REPORT.md')
+    await writeFile(report, '```json\n' + JSON.stringify({ run: 5, findings: [
+      { title: 'The row is off', script: 'f1-row.mjs', screenshot: 'shots/f1.png' },
+      { title: 'The camera jumps', screenshot: 'shots/missing.png' },
+    ] }) + '\n```\n')
+    const { code, err } = await run(cwd, 'record', report)
+    expect(code).toBe(0)
+    const [, shot, missing] = readFindings(join(cwd, 'crucible', 'findings'))
+    expect(shot).toMatchObject({ script: 'F-0002/f1-row.mjs', screenshot: 'F-0002/shots/f1.png' })
+    expect(await readFile(join(cwd, 'crucible', 'findings', 'F-0002', 'shots', 'f1.png'), 'utf8')).toBe('png')
+    // One that is not there is named as the report names it, and said.
+    expect(missing).toMatchObject({ screenshot: 'shots/missing.png' })
+    expect(err).toContain(`F-0003's screenshot shots/missing.png is not in run 5's folder.`)
+  })
+
+  it('warns about a recorded script that names the round\'s absolute paths', async () => {
+    const { cwd } = await project()
+    await run(cwd, 'prepare', '--runs', '1')
+    const folder = join(cwd, 'rounds', 'round-5-5', 'run-5')
+    await writeFile(join(folder, 'lib.mjs'), `export const CLI = '${join(cwd, 'apps/cli/dist/index.js')}'\n`)
+    await writeFile(join(folder, 'f1-row.mjs'), `import { CLI } from './lib.mjs'\nconst build = '${join(cwd, 'rounds', 'round-5-5', 'build')}'\nconsole.log(CLI, build)\n`)
+    await writeFile(join(folder, 'f2-ok.mjs'), "console.log('/usr/bin/env')\n")
+    const report = join(folder, 'REPORT.md')
+    await writeFile(report, '```json\n' + JSON.stringify({ run: 5, findings: [
+      { title: 'The row is off', script: 'f1-row.mjs' },
+      { title: 'The camera jumps', script: 'f2-ok.mjs' },
+    ] }) + '\n```\n')
+    const { code, err } = await run(cwd, 'record', report)
+    expect(code).toBe(0)
+    expect(err).toContain(`Warning: F-0002/f1-row.mjs names ${join(cwd, 'rounds', 'round-5-5', 'build')} (line 2): it runs only where the round ran.`)
+    expect(err).toContain(`Warning: F-0002/lib.mjs names ${join(cwd, 'apps/cli/dist/index.js')} (line 1): it runs only where the round ran.`)
+    expect(err).not.toContain('F-0003')
   })
 })

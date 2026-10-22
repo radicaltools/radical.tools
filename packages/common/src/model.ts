@@ -26,6 +26,8 @@ import {
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
+  relationTypeKeepsAggregates,
+  relationTypesFitting,
   initialPseudostateRefusal,
   isInitialPseudostate,
   lifecycleRefusal,
@@ -780,6 +782,27 @@ export function checkPatchRelation(state: ModelState, id: string, updates: Parti
   return relationRefusal(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)
 }
 
+/** What moving an end of relation `id` (`updates`) does to its type: none
+ *  (`{}`) where the type it has still fits the new pair, the move gives one,
+ *  or it has none and at most one fits; else the one type that fits
+ *  (`type`), or, where several do, the ones to ask the user about (`ask`),
+ *  as for a relation drawn (an Alt-drag). Moved unasked, it was left with
+ *  no type, which the validation then flagged. */
+export function relationTypeOnMove(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): { type?: string; ask?: string[] } {
+  const rel = state.c4Relations[id]
+  if (!rel || updates.relationType !== undefined) return {}
+  const src = state.c4Nodes[updates.sourceId ?? rel.sourceId]
+  const dst = state.c4Nodes[updates.targetId ?? rel.targetId]
+  if (!src || !dst || (src.id === rel.sourceId && dst.id === rel.targetId)) return {}
+  const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
+  if (def && relationTypeAllows(def, src.type, dst.type) && relationTypeKeepsAggregates(def.id, src, dst)) return {}
+  const types = relationTypesFitting(state.metamodel, src.type, dst.type)
+    .filter((rt) => relationTypeKeepsAggregates(rt.id, src, dst))
+    .map((rt) => rt.id)
+  if (types.length > 1) return { ask: types }
+  return types.length === 1 && rel.relationType ? { type: types[0] } : {}
+}
+
 export function patchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): void {
   const rel = state.c4Relations[id]
   if (!rel) return
@@ -888,6 +911,12 @@ export function groupViewNodesRefusal(state: Pick<ModelState, 'views' | 'metamod
 /** The views of group `groupId`, in the list's order. */
 export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView[] {
   return Object.values(views).filter((v) => v.partOf === groupId)
+}
+
+/** The view a group of views per element opens on: its first by name, as
+ *  the list shows them. A group is never a canvas of its own. */
+export function firstViewOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView | undefined {
+  return viewsOfGroup(views, groupId).sort((a, b) => a.name.localeCompare(b.name))[0]
 }
 
 /** The views that show element `nodeId`, in model order: what viewShownNodes

@@ -524,3 +524,46 @@ test('an outside write keeps the selected relation\'s card open, and what is typ
   await page.keyboard.type('.1')
   await expect(technology).toHaveValue('SQL v2.1')
 })
+
+// F-0026: an agent's write that arrived while an element was held in a drag
+// reloaded the canvas under the held mouse: the element jumped back to where
+// the drag began, and the drop landed short by what was dragged before the
+// write (that place and a pin were saved). The write is taken in at the drop.
+test('an outside write during a drag waits for the drop, and the drop lands under the pointer', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
+  const start = (await studio.boxes()).customer
+  const [sx, sy] = [start.x + start.width / 2, start.y + 30]
+  await page.mouse.move(sx, sy)
+  await page.mouse.down()
+  await page.mouse.move(sx - 60, sy + 20, { steps: 6 })
+  await expect.poll(async () => Math.round((await studio.boxes()).customer.x - start.x)).toBe(-60)
+  const held = (await studio.boxes()).customer
+  const file = (await folder.files())['nodes/payment-provider/_index.md']
+  await folder.write('nodes/payment-provider/_index.md', file.replace('label: "Payment Provider"', 'label: "Card Gateway"'))
+  // The folder is polled every couple of seconds.
+  await page.waitForTimeout(4500)
+  const stillHeld = (await studio.boxes()).customer
+  expect([stillHeld.x, stillHeld.y]).toEqual([held.x, held.y])
+  await page.mouse.move(sx - 150, sy + 60, { steps: 6 })
+  await page.mouse.up()
+  await expect(studio.node('payments')).toContainText('Card Gateway', { timeout: 10_000 })
+  await expect.poll(async () => {
+    const { customer } = await studio.boxes()
+    return [Math.round(customer.x - start.x), Math.round(customer.y - start.y)]
+  }).toEqual([-150, 60])
+  const boxes = await studio.boxes()
+  // Saved so, with the outside write.
+  // Where Customer lies from Bookstore, in Bookstore's widths (the camera may differ).
+  const apart = (b: Record<string, { x: number; y: number; width: number }>) =>
+    [(b.customer.x - b.bookstore.x) / b.bookstore.width, (b.customer.y - b.bookstore.y) / b.bookstore.width]
+  await expect.poll(async () => (await folder.files())['nodes/payment-provider/_index.md']).toContain('Card Gateway')
+  await page.waitForTimeout(1500)
+  await page.reload()
+  await studio.ready()
+  await expect(studio.node('payments')).toContainText('Card Gateway')
+  const [dx, dy] = apart(await studio.boxes())
+  const [ex, ey] = apart(boxes)
+  expect(dx).toBeCloseTo(ex, 2)
+  expect(dy).toBeCloseTo(ey, 2)
+})

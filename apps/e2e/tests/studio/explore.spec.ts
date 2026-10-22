@@ -449,3 +449,35 @@ test('Explore from here in Viewer follows the milestone shown and saves nothing'
   await page.waitForTimeout(1000)
   expect(await studio.storedJson(docId)).toBe(stored)
 })
+
+test('a click on an element\'s + opens its menu even where a relation\'s line lies over it', async ({ page, studio }) => {
+  // F-0012: Web App selected, the line of its relation to API, drawn above
+  // the elements, lay over its +: a click there selected the relation.
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.node('api').click()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
+  await all(page, 'API')
+  await studio.settle()
+  await pick(studio.node('web'))
+  await studio.settle()
+  const more = page.getByRole('button', { name: /^Show \d+ more related to Web App$/ })
+  const r = (await more.boundingBox())!
+  await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
+  const menu = page.getByRole('menu', { name: 'Add to Web App' })
+  await expect(menu).toBeVisible()
+  await expect(studio.attribute('Name')).toHaveValue('Web App')
+  // And with anything at all over it; a click on it again closes the menu.
+  await page.evaluate(([x, y, w, h]) => {
+    const cover = document.createElement('div')
+    cover.className = 'test-cover'
+    Object.assign(cover.style, { position: 'fixed', left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, zIndex: '1000' })
+    document.querySelector('.react-flow')!.appendChild(cover)
+  }, [r.x - 2, r.y - 2, r.width + 4, r.height + 4])
+  await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
+  await expect(menu).toHaveCount(0)
+  await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
+  await expect(menu).toBeVisible()
+  // The + is drawn above the lines too.
+  await expect(page.locator('.c4-collapse-mirror', { hasText: /^\+\d+$/ })).toHaveCount(await page.locator('[data-explore-more]').count())
+})

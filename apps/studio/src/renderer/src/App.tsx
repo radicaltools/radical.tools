@@ -81,6 +81,7 @@ function AppInner(): React.ReactElement {
     'app-layout',
     isPresenting ? 'mode-presenting' : '',
     !isPresenting && isInspector ? 'mode-inspector' : '',
+    !isPresenting && isMetamodel ? 'mode-metamodel' : '',
     !isPresenting && isReadOnlyMode ? 'mode-presentation' : '',
     !isPresenting && leftCollapsed ? 'lp-collapsed' : '',
   ].filter(Boolean).join(' ')

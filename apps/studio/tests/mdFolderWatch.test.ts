@@ -281,6 +281,23 @@ describe('md-folder documents follow outside edits', () => {
     expect([...Array((localStorage as unknown as MemLS).length).keys()].map((i) => localStorage.key(i)).filter((k) => k?.startsWith('radical-unsaved-edits:'))).toEqual([])
   })
 
+  it('takes an outside edit in at the drop of a drag held when it came', async () => {
+    // F-0026: reloaded under the held mouse, the element jumped back to where the
+    // drag began, and the drop landed short by what was dragged before.
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    useDiagramStore.getState().liveGrab('sys2', 0, 0)
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'Ledger')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+    expect(useDiagramStore.getState().c4Nodes.sys1.label).toBe('Payments')
+
+    // Read once the layout has put the drop where it landed.
+    useDiagramStore.getState().liveRelease('sys2', [], true)
+    await vi.waitFor(() => expect(useDiagramStore.getState().c4Nodes.sys1.label).toBe('Payments hub'))
+  })
+
   it('keeps the document unchanged on disk when a save is refused as a conflict', async () => {
     const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
     const meta = documents.createMdDocument('/tmp/model')

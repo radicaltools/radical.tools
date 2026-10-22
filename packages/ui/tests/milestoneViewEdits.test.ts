@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
+import { showNodeInView } from '../src/store/showInView'
 
 const s = useDiagramStore.getState
 const node = (id: string, type: string, x: number, y: number, parentId?: string, extra: Record<string, unknown> = {}): C4Node =>
@@ -118,6 +119,51 @@ describe('A view edited while a milestone is shown', () => {
     expect(json(savedView('v'))).toBe(live)
     s().discardMilestoneChanges()
     expect(s().views.v.collapsedNodeIds ?? []).not.toContain('shop')
+  })
+})
+
+describe('Revealing an element in a milestone (F-0011)', () => {
+  // The card's Views, Quick Search and the Inspector open the containers
+  // around the element they show (expandAncestors): navigation, not an
+  // edit. It asked how to save the milestone, and the chip said unsaved.
+  beforeEach(() => {
+    s().discardMilestoneChanges()
+    s().setActiveView('v')
+    s().toggleCollapse('shop')
+    s().selectMilestone(early)
+  })
+
+  it('opens its containers on the view without asking, and the live view keeps its folds', () => {
+    const live = json(savedView('v'))
+    expect(savedView('v').collapsedNodeIds).toEqual(['shop'])
+    showNodeInView('api', 'v')
+    expect(s().views.v.collapsedNodeIds ?? []).not.toContain('shop')
+    expect(s().selectedNodeIds).toEqual(['api'])
+    expect(s().milestoneDirty).toBe(false)
+    expect(s().milestonePromptOpen).toBe(false)
+    expect(json(savedView('v'))).toBe(live)
+    s().discardMilestoneChanges()
+    expect(s().views.v.collapsedNodeIds).toContain('shop')
+  })
+
+  it('on All elements, and from another view, asks nothing either', () => {
+    s().setActiveView(null)
+    useDiagramStore.setState((st) => ({ c4Nodes: { ...st.c4Nodes, shop: { ...st.c4Nodes.shop, collapsed: true } } }))
+    s().expandAncestors('api')
+    expect(s().c4Nodes.shop.collapsed).toBe(false)
+    expect(s().milestoneDirty).toBe(false)
+    showNodeInView('web', 'v')
+    expect(s().activeViewId).toBe('v')
+    expect(s().views.v.collapsedNodeIds ?? []).not.toContain('shop')
+    expect(s().milestoneDirty).toBe(false)
+    expect(s().milestonePromptOpen).toBe(false)
+  })
+
+  it('a fold made by hand after it still asks', () => {
+    showNodeInView('api', 'v')
+    s().toggleCollapse('shop')
+    expect(s().milestoneDirty).toBe(true)
+    expect(s().milestonePromptOpen).toBe(true)
   })
 })
 

@@ -8,6 +8,9 @@ tests: |
   packages/common/tests/mdFolderPersistence.test.ts › md-folder persistence › sorts custom frontmatter keys and ends JSON sidecars with a newline
   packages/common/tests/mdFolderPersistence.test.ts › a custom metamodel in a folder › keeps the order of its node and relation types
   packages/common/tests/mdFolderPersistence.test.ts › a node file in a folder model › whose label has a character outside the BMP at the 60th place keeps a file name the disk keeps
+  packages/common/tests/mdFolderSync.test.ts › renaming an element to its sibling's label moves only the renamed element's file
+  packages/common/tests/mdFolderSync.test.ts › a merge with an outside edit leaves the files where the folder has them
+  apps/mcp/src/folderModel.test.ts › adds an element named as one already there without moving the other's file
 then: "the files are identical, custom frontmatter keys are sorted and JSON sidecars end with a newline; a custom metamodel keeps the order of its types; a file name is cut at 60 characters, never inside one, so the element's file survives the next write"
 when: "it is written as a Markdown folder"
 ---

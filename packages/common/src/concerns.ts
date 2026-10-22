@@ -20,6 +20,7 @@ import { runModelQuery } from './ai/queryLanguage'
 import type { ConcernMeta, HubConcept, HubConceptMeta, HubRadicalDoc, TemplateParam } from './hubFormat'
 import { buildConceptInsert, resolveParamValues, type ConceptInsert, type ConceptInsertOptions } from './hubImport'
 import type { Metamodel } from './metamodel'
+import { RADICAL_METAMODEL_NAME } from './metamodel/presets/governance'
 
 /** What the check and the dialogs need of a pack: its hub block. */
 export type ConcernPack = Pick<HubConceptMeta, 'id' | 'name' | 'description' | 'requiredMetamodel' | 'sources'> & {
@@ -116,6 +117,45 @@ const prop = (node: C4Node, key: string): string => {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+export interface UnboundDecision {
+  /** The accepted ADR marked with a concern that constrains no element. */
+  adr: C4Node
+  /** The concern it is marked with. */
+  concern: string
+  /** The pack of that concern, when one is known. */
+  pack?: ConcernPack
+  /** The fitness functions that implement it. */
+  checks: string[]
+  /** Where to bind it: the fewest elements that settle every element the
+   *  concern applies to (suggestedCover); none while it applies to nothing. */
+  bindTo: string[]
+}
+
+/** The accepted ADRs marked with a concern that constrain no element, so
+ *  settle it for nothing: what the check's concern-unbound reports, and
+ *  get_issues with it. */
+export function unboundDecisions(packs: ConcernPack[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, metamodel: Metamodel | undefined): UnboundDecision[] {
+  if (!holdsConcerns(metamodel)) return []
+  const constraining = new Set<string>()
+  const implementedBy = new Map<string, string[]>()
+  for (const r of Object.values(relations)) {
+    if (r.relationType === 'constrains') constraining.add(r.sourceId)
+    if (r.relationType === 'implements' && nodes[r.sourceId]?.type === 'fitness-fn') implementedBy.set(r.targetId, [...(implementedBy.get(r.targetId) ?? []), r.sourceId])
+  }
+  return Object.values(nodes)
+    .filter((n) => n.type === 'adr' && prop(n, CONCERN_KEY) && prop(n, 'status') === 'accepted' && !constraining.has(n.id))
+    .map((adr) => {
+      const pack = packs.find((p) => p.concern.id === prop(adr, CONCERN_KEY))
+      return {
+        adr,
+        concern: prop(adr, CONCERN_KEY),
+        ...(pack ? { pack } : {}),
+        checks: implementedBy.get(adr.id) ?? [],
+        bindTo: pack ? suggestedCover(bindSuggestions(pack, nodes, relations, metamodel)) : [],
+      }
+    })
+}
+
 // ─── Import: the answers pick the slice, the element binds it ───────────────
 
 /** Why the answers do not fit the pack's questions, or null. */
@@ -148,6 +188,26 @@ export function pickVariant(concept: HubConcept, values: Record<string, string>)
   const kept = new Set(nodes.map((n) => n.id as string))
   const relations = (concept.relations ?? []).filter((r) => kept.has(r.sourceId as string) && kept.has(r.targetId as string))
   return { ...concept, nodes, relations }
+}
+
+/** Why the model's metamodel cannot hold the pack, or null: a type of
+ *  element or relation the pack brings or binds with that it lacks, or an
+ *  ADR with no concern to mark. Brought in anyway, every one of them was an
+ *  'unknown type' issue (the MCP server refused them). No metamodel:
+ *  nothing to check. */
+export function metamodelProblem(concept: Pick<HubConcept, 'nodes' | 'relations'>, metamodel: Metamodel | undefined): string | null {
+  if (!metamodel) return null
+  const nodeTypes = [...new Set(concept.nodes.map((n) => String(n.type)))].filter((t) => !metamodel.nodeTypes[t])
+  const relationTypes = [...new Set([...(concept.relations ?? []).map((r) => String(r.relationType)), 'constrains', 'satisfies'])]
+    .filter((t) => !metamodel.relationTypes[t])
+  const lacks = [
+    ...(nodeTypes.length ? [`type ${nodeTypes.join(', ')}`] : []),
+    ...(relationTypes.length ? [`relation ${relationTypes.join(', ')}`] : []),
+  ]
+  const advice = `it needs one that holds decisions and requirements, such as ${RADICAL_METAMODEL_NAME}`
+  if (lacks.length) return `the metamodel "${metamodel.name}" has no ${lacks.join(', nor ')}, which the pack brings: ${advice}`
+  if (concept.nodes.some((n) => n.type === 'adr') && !holdsConcerns(metamodel)) return `the metamodel "${metamodel.name}" gives an ADR no ${CONCERN_KEY} to mark: ${advice}`
+  return null
 }
 
 /** Why `element` cannot carry the pack, or null: the pack's ADR and fitness
@@ -241,9 +301,10 @@ const VIEW_ROW_GAP = 40
  *  `elements`: the ADR (accepted, dated today) and the fitness functions
  *  constrain each and each satisfies the requirements. No template record:
  *  the answers also chose the elements, which a later change of value would
- *  not. Throws when the answers or an element do not fit. */
+ *  not. Throws when the metamodel cannot hold the pack, or the answers or
+ *  an element do not fit. */
 export function buildConcernInsert(concept: HubConcept, options: ConcernInsertOptions): ConceptInsert {
-  const problem = answersProblem(concept, options.answers)
+  const problem = metamodelProblem(concept, options.metamodel) ?? answersProblem(concept, options.answers)
     ?? options.elements.map((e) => bindProblem(e, options.metamodel)).find(Boolean) ?? null
   if (problem) throw new Error(problem)
   const values = resolveParamValues(concept.templateParams, options.answers)
@@ -268,8 +329,12 @@ export function buildConcernInsert(concept: HubConcept, options: ConcernInsertOp
 
 /** The canvas view a pack brings, in the folder Concerns: its elements as
  *  the pack lays them out (need, requirements, scenarios, decisions,
- *  fitness functions in columns), and the elements it is bound to, by
- *  their outermost containers, in a column on their left. */
+ *  fitness functions in columns), and the elements it is bound to, inside
+ *  what holds them, in a column on their left: the outermost containers
+ *  there, each element below them where the model has it (relative to its
+ *  parent). It lists and places every element it draws: one it listed
+ *  without a place, or placed without listing, was laid out again the
+ *  first time the view was opened. */
 function concernView(name: string, insert: ConceptInsert, options: ConcernInsertOptions): DiagramView {
   const packNodes = Object.values(insert.nodes)
   const minX = Math.min(...packNodes.map((n) => n.x))
@@ -277,24 +342,28 @@ function concernView(name: string, insert: ConceptInsert, options: ConcernInsert
   const positions: DiagramView['positions'] = {}
   for (const n of packNodes) positions[n.id] = { x: n.x - minX, y: n.y - minY, width: n.width, height: n.height }
   const all = options.nodes ?? {}
-  const outermost = (n: C4Node): C4Node => {
-    let cur = n
-    for (let p = all[cur.parentId ?? '']; p; p = all[p.parentId ?? '']) cur = p
-    return cur
+  /** The element and what holds it, the outermost first. */
+  const chain = (n: C4Node): C4Node[] => {
+    const out = [n]
+    for (let p = all[n.parentId ?? '']; p && !out.includes(p); p = all[p.parentId ?? '']) out.unshift(p)
+    return out
   }
-  const roots = [...new Map(options.elements.map((e) => { const r = outermost(all[e.id] ?? e); return [r.id, r] })).values()]
+  const chains = options.elements.map((e) => chain(all[e.id] ?? e))
+  const roots = [...new Map(chains.map((c) => [c[0].id, c[0]])).values()]
   const width = Math.max(0, ...roots.map((r) => r.width))
   let y = 0
   for (const r of roots) {
     positions[r.id] = { x: -width - VIEW_COLUMN_GAP * 2, y, width: r.width, height: r.height }
     y += r.height + VIEW_ROW_GAP
   }
+  const held = chains.flatMap((c) => c.slice(1))
+  for (const n of held) positions[n.id] = { x: n.x, y: n.y, width: n.width, height: n.height }
   return {
     id: options.newId(),
     name: uniqueName(name, new Set(options.takenNames?.views ?? [])),
     kind: 'static',
     folder: CONCERN_VIEWS_FOLDER,
-    nodeIds: [...packNodes.map((n) => n.id), ...options.elements.map((e) => e.id)],
+    nodeIds: [...new Set([...packNodes.map((n) => n.id), ...roots.map((r) => r.id), ...held.map((n) => n.id)])],
     positions,
   }
 }

@@ -55,6 +55,21 @@ test('a view opened from the card is scrolled into sight in the list of views', 
   await expect(listed).toBeInViewport()
 })
 
+// F-0002: opened while the rail showed Milestones, the view was out of
+// sight in the list when Views was opened again.
+test('a view opened while another section is open is in sight in the list when Views opens', async ({ page, studio }) => {
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await expect(page.locator('#lp-sec-views')).toBeHidden()
+  await studio.node('target').click()
+  const views = studio.properties.getByRole('region', { name: 'Views' })
+  await views.getByRole('button', { name: /^More 29/ }).click()
+  await expect(page).toHaveURL(/\/v\/v-more-29/)
+  await page.getByRole('tab', { name: 'Views' }).click()
+  const listed = page.locator('.lp-view-card', { hasText: 'More 29' })
+  await expect(listed).toHaveClass(/active/)
+  await expect(listed).toBeInViewport()
+})
+
 test('a wiki opened from the card shows the element\'s page from its top, also after another wiki', async ({ page, studio }) => {
   await studio.node('target').click()
   const views = studio.properties.getByRole('region', { name: 'Views' })
@@ -152,4 +167,28 @@ test.describe('a wiki nested by its chain', () => {
     await page.getByRole('button', { name: 'Properties of Pick up in store' }).click()
     await expect(studio.properties.getByText('Pick up in store').first()).toBeVisible()
   })
+})
+
+test('in a milestone, a view opened from the card opens the element\'s containers without asking how to save the milestone', async ({ page, studio }) => {
+  // F-0011: the containers opened around the element were a milestone
+  // edit; the question opened and the chip said unsaved, nothing edited.
+  await studio.openSample('view-core')
+  await studio.node('dom-banking').locator('.c4-node-collapse-btn').dispatchEvent('click')
+  await expect(studio.node('ctn-payments')).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v3' }).first().click()
+  await expect(page).toHaveURL(/\/s\//)
+  await page.getByRole('tab', { name: 'Views' }).click()
+  await page.locator('.lp-view-card', { hasText: 'Payments Domain' }).first().click()
+  await expect(page).toHaveURL(/\/v\/view-payments/)
+  await studio.settle()
+  await expect(page.getByText(/^Milestone: v3/)).toBeVisible()
+  await studio.node('ctn-payments').click({ position: { x: 30, y: 10 } })
+  await studio.properties.getByRole('region', { name: 'Views' }).getByRole('button', { name: /^Core Banking/ }).click()
+  await expect(page).toHaveURL(/\/v\/view-core/)
+  await expect(studio.node('ctn-payments')).toHaveCount(1)
+  await expect(studio.node('ctn-payments')).toHaveClass(/selected/)
+  await expect(page.locator('.milestone-modal')).toHaveCount(0)
+  await expect(page.getByText(/^Milestone: v3/)).toBeVisible()
+  await expect(page.getByText('· unsaved')).toHaveCount(0)
 })

@@ -58,17 +58,31 @@ export function moveTo(state: NavState, index: number): NavState {
   return { entries: state.entries, index }
 }
 
-export const useNavHistory = create<NavState>(() => ({ entries: [], index: 0 }))
-
-/** One step back or forward, or to entry `index`: the window's history does
- *  it, and the route it lands on is applied by route.ts. */
-export function goBack(): void {
-  if (useNavHistory.getState().index > 0) history.back()
+/** The entry one step back (`-1`) or forward (`1`) from the current one,
+ *  passing over those whose place is `gone` (route.ts placeGone: an
+ *  exploration closed since); undefined when there is none. */
+export function stepIndex(state: NavState, dir: -1 | 1, gone: (entry: NavEntry) => boolean = () => false): number | undefined {
+  for (let i = state.index + dir; i >= 0 && i < state.entries.length; i += dir) {
+    if (!gone(state.entries[i])) return i
+  }
+  return undefined
 }
 
-export function goForward(): void {
-  const { index, entries } = useNavHistory.getState()
-  if (index < entries.length - 1) history.forward()
+export const useNavHistory = create<NavState>(() => ({ entries: [], index: 0 }))
+
+/** One step back or forward, over places that are `gone`, or to entry
+ *  `index`: the window's history does it, and the route it lands on is
+ *  applied by route.ts. */
+export function goBack(gone?: (entry: NavEntry) => boolean): void {
+  const state = useNavHistory.getState()
+  const to = stepIndex(state, -1, gone)
+  if (to !== undefined) history.go(to - state.index)
+}
+
+export function goForward(gone?: (entry: NavEntry) => boolean): void {
+  const state = useNavHistory.getState()
+  const to = stepIndex(state, 1, gone)
+  if (to !== undefined) history.go(to - state.index)
 }
 
 export function goTo(index: number): void {
