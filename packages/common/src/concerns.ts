@@ -20,6 +20,7 @@ import { runModelQuery } from './ai/queryLanguage'
 import type { ConcernMeta, HubConcept, HubConceptMeta, HubRadicalDoc, TemplateParam } from './hubFormat'
 import { buildConceptInsert, resolveParamValues, type ConceptInsert, type ConceptInsertOptions } from './hubImport'
 import type { Metamodel } from './metamodel'
+import { RADICAL_METAMODEL_NAME } from './metamodel/presets/governance'
 
 /** What the check and the dialogs need of a pack: its hub block. */
 export type ConcernPack = Pick<HubConceptMeta, 'id' | 'name' | 'description' | 'requiredMetamodel' | 'sources'> & {
@@ -189,6 +190,26 @@ export function pickVariant(concept: HubConcept, values: Record<string, string>)
   return { ...concept, nodes, relations }
 }
 
+/** Why the model's metamodel cannot hold the pack, or null: a type of
+ *  element or relation the pack brings or binds with that it lacks, or an
+ *  ADR with no concern to mark. Brought in anyway, every one of them was an
+ *  'unknown type' issue (the MCP server refused them). No metamodel:
+ *  nothing to check. */
+export function metamodelProblem(concept: Pick<HubConcept, 'nodes' | 'relations'>, metamodel: Metamodel | undefined): string | null {
+  if (!metamodel) return null
+  const nodeTypes = [...new Set(concept.nodes.map((n) => String(n.type)))].filter((t) => !metamodel.nodeTypes[t])
+  const relationTypes = [...new Set([...(concept.relations ?? []).map((r) => String(r.relationType)), 'constrains', 'satisfies'])]
+    .filter((t) => !metamodel.relationTypes[t])
+  const lacks = [
+    ...(nodeTypes.length ? [`type ${nodeTypes.join(', ')}`] : []),
+    ...(relationTypes.length ? [`relation ${relationTypes.join(', ')}`] : []),
+  ]
+  const advice = `it needs one that holds decisions and requirements, such as ${RADICAL_METAMODEL_NAME}`
+  if (lacks.length) return `the metamodel "${metamodel.name}" has no ${lacks.join(', nor ')}, which the pack brings: ${advice}`
+  if (concept.nodes.some((n) => n.type === 'adr') && !holdsConcerns(metamodel)) return `the metamodel "${metamodel.name}" gives an ADR no ${CONCERN_KEY} to mark: ${advice}`
+  return null
+}
+
 /** Why `element` cannot carry the pack, or null: the pack's ADR and fitness
  *  function constrain it and it satisfies the pack's requirements. */
 export function bindProblem(element: C4Node | undefined, metamodel: Metamodel | undefined): string | null {
@@ -280,9 +301,10 @@ const VIEW_ROW_GAP = 40
  *  `elements`: the ADR (accepted, dated today) and the fitness functions
  *  constrain each and each satisfies the requirements. No template record:
  *  the answers also chose the elements, which a later change of value would
- *  not. Throws when the answers or an element do not fit. */
+ *  not. Throws when the metamodel cannot hold the pack, or the answers or
+ *  an element do not fit. */
 export function buildConcernInsert(concept: HubConcept, options: ConcernInsertOptions): ConceptInsert {
-  const problem = answersProblem(concept, options.answers)
+  const problem = metamodelProblem(concept, options.metamodel) ?? answersProblem(concept, options.answers)
     ?? options.elements.map((e) => bindProblem(e, options.metamodel)).find(Boolean) ?? null
   if (problem) throw new Error(problem)
   const values = resolveParamValues(concept.templateParams, options.answers)

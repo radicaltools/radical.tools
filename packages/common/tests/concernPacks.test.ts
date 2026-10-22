@@ -4,10 +4,10 @@
  * each fitness function's tool and snippet.
  */
 import { describe, it, expect } from 'vitest'
-import { buildConcernInsert, concernPackProblems, CONCERN_GROUPS } from '../src/concerns'
+import { buildConcernInsert, concernPackProblems, CONCERN_GROUPS, metamodelProblem } from '../src/concerns'
 import type { HubConcept, HubRadicalDoc } from '../src/hubFormat'
 import type { C4Node } from '../src/c4'
-import { builtInGovernanceMetamodel } from '../src/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel } from '../src/metamodel'
 
 const option = (value: string, description = 'When it fits.') => ({ value, label: value, description })
 const question = (key: string) => ({ key, label: `${key}?`, options: [option('a'), option('b')] })
@@ -98,5 +98,21 @@ describe('buildConcernInsert', () => {
     expect(view.positions.orders).toEqual({ x: 30, y: 50, ...box })
     const packLeft = Math.min(...Object.keys(insert.nodes).map((id) => view.positions[id].x))
     for (const id of ['shop', 'user']) expect(view.positions[id].x + view.positions[id].width).toBeLessThan(packLeft)
+  })
+
+  // F-0009: Studio brought a pack into a model on the C4 metamodel, whose
+  // validation then flagged all it brought; the MCP server refused it.
+  it('refuses a pack the model\'s metamodel cannot hold, saying which types it lacks', () => {
+    const concept: HubConcept = {
+      id: 'concern-x', category: 'concern', name: 'X', description: 'd', tags: [],
+      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "webapp"', why: 'w', group: 'data' },
+      nodes: [{ id: 'need', type: 'need', label: 'N', x: 0, y: 0 }, { id: 'adr', type: 'adr', label: 'D', concern: 'x', x: 300, y: 0 }],
+      relations: [],
+    }
+    const options = { answers: {}, elements: [], today: '2026-10-22', newId: () => 'id', place: () => ({ x: 0, y: 0 }) }
+    expect(() => buildConcernInsert(concept, { ...options, metamodel: builtInC4Metamodel() }))
+      .toThrow('the metamodel "C4 (built-in)" has no type need, adr, nor relation constrains, satisfies, which the pack brings: it needs one that holds decisions and requirements, such as Radical')
+    expect(metamodelProblem(concept, builtInGovernanceMetamodel())).toBeNull()
+    expect(metamodelProblem(concept, undefined)).toBeNull()
   })
 })

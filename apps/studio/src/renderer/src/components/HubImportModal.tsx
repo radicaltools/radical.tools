@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useHubStore, type HubConcept, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useDialogFocus } from './dialogKeys'
-import { bindProblem, bindSuggestions, CONCERN_GROUPS, isConcernPack, type BindSuggestion } from '@radical/common/concerns'
+import { bindProblem, bindSuggestions, CONCERN_GROUPS, isConcernPack, metamodelProblem, type BindSuggestion } from '@radical/common/concerns'
 import { categoryTheme, hubGroupOf } from '@radical/ui/types/hubTheme'
 import { ConcernWizard } from './ConcernWizard'
 import { importConcernPackIntoDiagram } from '../hub/importConcept'
@@ -568,6 +568,7 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
             others={concernChoices.others}
             nodes={c4Nodes}
             position={queuePlace >= 0 ? `${queuePlace + 1} of ${queue.length}` : undefined}
+            problem={metamodelProblem(concernConcept, metamodel)}
             onCancel={() => {
               // Opened from the Inspector for this pack: back there, not to a list of one.
               if (bindTo) onClose()

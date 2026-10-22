@@ -205,3 +205,27 @@ test('a pack bound to an element inside a container opens its view as saved, the
   const packLeft = Math.min(...saved.nodeIds.filter((id) => !['bookstore', 'web'].includes(id)).map((id) => boxes[id].x))
   expect(boxes.bookstore.x + boxes.bookstore.width).toBeLessThan(packLeft)
 })
+
+test('a concern pack is not added to a model whose metamodel cannot hold it, and the wizard says why', async ({ page, studio }) => {
+  // F-0009: on the C4 metamodel it came in all the same and validation
+  // flagged its 16 elements of unknown type; the MCP server refuses it.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-builtin', name: 'C4 (built-in)', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await studio.open('v-containers')
+  const before = (await studio.storedDoc()).nodes.length
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByText(/Import from Hub/).first().click()
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
+  await dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+    .getByRole('button', { name: 'Add to Model' }).click()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard.getByRole('alert')).toHaveText(/^Cannot be added: the metamodel "C4[^"]*" has no type need, .*such as Radical$/)
+  await expect(wizard.getByText(/^This model cannot take the pack: /)).toBeVisible()
+  for (const button of await wizard.getByRole('button', { name: 'Add to model' }).all()) await expect(button).toBeDisabled()
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await expect(wizard).toBeVisible()
+  expect((await studio.storedDoc()).nodes.length).toBe(before)
+})
