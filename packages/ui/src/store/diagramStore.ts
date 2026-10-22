@@ -850,6 +850,38 @@ function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.Mod
 let _beforeDrag: HistoryEntry | null = null
 /** The exploration as it was when a drag on it began: its step (liveRelease). */
 let _explorationBeforeDrag: Exploration | null = null
+/** A drag is held: from liveGrab until its drop has landed (_dragLanded),
+ *  in any perspective. */
+let _dragHeld = false
+/** Called once at the drop of the drag held now (afterDrag). */
+const _afterDrag: (() => void)[] = []
+/** The drop is made and the layout has yet to hand back where it landed
+ *  (LiveColaLayout.release): the longest it is waited for. */
+let _dropLanding: ReturnType<typeof setTimeout> | null = null
+const DROP_LANDING_MS = 1000
+
+/** The drop of the drag held has landed: what waited for it runs. */
+function _dragLanded(): void {
+  if (_dropLanding !== null) clearTimeout(_dropLanding)
+  _dropLanding = null
+  _dragHeld = false
+  for (const fn of _afterDrag.splice(0)) fn()
+}
+
+/** An element is held in a drag. A model reloaded under the held mouse
+ *  (an agent's write) threw it back to where the drag began, and the drop
+ *  landed short by what was dragged before: an outside change waits for
+ *  the drop (afterDrag). */
+export function dragHeld(): boolean {
+  return _dragHeld
+}
+
+/** Run `fn` once the drag held now is dropped, after the drop is made
+ *  (its place, pin and undo step) and the layout has put it where it
+ *  landed. */
+export function afterDrag(fn: () => void): void {
+  _afterDrag.push(fn)
+}
 
 /**
  * What Designer showed when it was left for Viewer or Presenter
@@ -6607,6 +6639,9 @@ export const useDiagramStore = create<DiagramStore>()(
         _beforeDrag = designer && !onExploration(get()) ? _captureState(get()) : null
         _explorationBeforeDrag = designer && onExploration(get()) ? explorationNow(get()) : null
         _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
+        if (_dropLanding !== null) clearTimeout(_dropLanding)
+        _dropLanding = null
+        _dragHeld = true
       },
 
       liveDrag(nodeId, x, y, abs) {
@@ -6614,7 +6649,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       liveRelease(nodeId, withIds = [], moved = true) {
-        _liveLayout?.release(nodeId)
+        // Where the drop landed comes from the layout, a frame or more later
+        // (its worker answers): what waits for the drop (afterDrag) runs then.
+        const landing = moved && !!_liveLayout?.running
+        if (landing) _dropLanding = setTimeout(_dragLanded, DROP_LANDING_MS)
+        _liveLayout?.release(nodeId, () => { if (_dropLanding !== null) _dragLanded() })
         // One undo step for the drag: the elements it moved or pushed go
         // back, and the pins it set come off. It used to have none, so the
         // next undo took back the drag together with whatever was done
@@ -6644,6 +6683,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // milestones reverts the move. A click (nothing moved) is no edit: it
         // asked how to save changes nobody had made.
         if (moved) get()._markMilestoneEdit()
+        if (!landing) _dragLanded()
       },
 
       setConnectionModifier(mod) {

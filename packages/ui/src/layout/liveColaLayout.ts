@@ -44,6 +44,8 @@ function inThreadRequested(): boolean {
 export type LiveColaReply =
   | { type: 'positions'; positions: LiveColaPositions; gen: number }
   | { type: 'settled'; gen: number }
+  /** The release before it is done: its positions were sent. */
+  | { type: 'released'; gen: number }
 
 export class LiveColaLayout {
   private worker: Worker | null = null
@@ -55,6 +57,8 @@ export class LiveColaLayout {
   private frame = 0
   /** Build sent to the worker last (see LiveColaMessage). */
   private gen = 0
+  /** Called once the release sent last has put the drop where it landed. */
+  private landed: (() => void) | null = null
 
   constructor(private readonly callbacks: LiveColaCallbacks) {
     if (typeof Worker !== 'undefined' && !inThreadRequested()) {
@@ -67,6 +71,7 @@ export class LiveColaLayout {
           // collapsed group would get back its expanded box.
           if (e.data.gen !== this.gen) return
           if (e.data.type === 'positions') this.applyNextFrame(e.data.positions)
+          else if (e.data.type === 'released') this.landAfterPending()
           else this.settleAfterPending()
         }
         this.worker.onerror = () => this.runInThread()
@@ -107,6 +112,17 @@ export class LiveColaLayout {
     } else {
       this.callbacks.onSettled?.()
     }
+  }
+
+  /** Says the release has landed, after the positions still waiting for a
+   *  frame (its own among them). */
+  private landAfterPending(): void {
+    const landed = this.landed
+    this.landed = null
+    if (!landed) return
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f: FrameRequestCallback) => setTimeout(() => f(0), 16)
+    if (this.frame) raf(() => landed())
+    else landed()
   }
 
   /** Starts a new build: replies and positions of the previous one are void. */
@@ -173,8 +189,18 @@ export class LiveColaLayout {
     else this.post({ type: 'drag', id, x, y, abs })
   }
 
-  release(id: string): void {
-    if (this.engine) this.engine.release(id)
-    else this.post({ type: 'release', id })
+  /** See LiveColaEngine.release. `landed` is called once the positions it
+   *  makes are applied (the worker answers a frame or more later; never
+   *  before this call returns). */
+  release(id: string, landed?: () => void): void {
+    this.landed = landed ?? null
+    if (this.engine) {
+      this.engine.release(id)
+      // On this thread the positions are applied (or paced into a frame) by now.
+      const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (f: FrameRequestCallback) => setTimeout(() => f(0), 16)
+      raf(() => this.landAfterPending())
+    } else {
+      this.post({ type: 'release', id })
+    }
   }
 }

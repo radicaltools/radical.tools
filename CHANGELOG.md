@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- An agent's change arriving while an element is held in a drag waits for the drop: the element no longer jumps back to where the drag began under the held mouse, and the drop lands under the pointer instead of short of it
 - Undo of a delete that an agent's element brought back (Bookstore came back with only the agent's Search in it) puts Web App, API and Orders DB back clear of Search on the view it goes back to; Web App was drawn right on top of it, and saved so
 - Markdown folders: renaming an element to the name of one beside it, or adding an element named as one already there (a concern pack imported twice), no longer moves the other element's file to `-2`; each element keeps its file until it is renamed or moved itself, and a directory and a file of one name no longer count as a clash
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else

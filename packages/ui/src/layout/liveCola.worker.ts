@@ -11,6 +11,7 @@
  *              | { type: 'grab', id, x, y, mode, abs?, withIds? } | { type: 'drag', id, x, y, abs? }
  *              | { type: 'release', id }
  * Worker → Main  { type: 'positions', positions, gen } | { type: 'settled', gen }
+ *              | { type: 'released', gen } (after a release's own replies)
  *
  * `model` is the store's nodes and relations at the time of the call; the
  * engine reads it whenever it rebuilds. `gen` numbers that model; replies
@@ -43,6 +44,6 @@ self.onmessage = (e: MessageEvent<LiveColaMessage>) => {
     case 'seed': engine.seedPosition(m.id, m.x, m.y); break
     case 'grab': engine.grab(m.id, m.x, m.y, m.mode, m.abs, m.withIds); break
     case 'drag': engine.drag(m.id, m.x, m.y, m.abs); break
-    case 'release': engine.release(m.id); break
+    case 'release': engine.release(m.id); reply({ type: 'released', gen }); break
   }
 }
