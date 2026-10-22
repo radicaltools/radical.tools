@@ -258,6 +258,42 @@ test('a drag with Cmd held lets the physics move the surroundings', async ({ pag
   expect(moved.length).toBeLessThanOrEqual(40)
 })
 
+for (const dx of [30, 120]) {
+  test(`a drop that moves its group's edge is saved where it is drawn, and Redo and a reload draw it there (${dx} px)`, async ({ page, studio }) => {
+    // F-0014: API Gateway, the left one in Access & Security, dragged to
+    // the right takes the group's left edge along. The canvas drew it where
+    // it was dropped, the view saved it 27 px further left (72 px for a
+    // 120 px drag), and Redo and a reload drew it there.
+    await studio.openSample('view-core')
+    const docId = studio.activeDocId()
+    const xy = (at: string): [number, number] => {
+      const [, x, y] = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(at)!
+      return [Number(x), Number(y)]
+    }
+    const before = xy((await studio.positions())['ctn-apigw'])
+    await dragBy(page, studio.node('ctn-apigw'), dx, 0)
+    await page.waitForTimeout(1500)
+    const dropped = await studio.positions()
+    const [ax] = xy(dropped['ctn-apigw'])
+    const [gx] = xy(dropped['dom-access'])
+    expect(ax).toBeGreaterThan(before[0] + dx / 2)
+    const saved = async (): Promise<number> => (await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions['ctn-apigw'].x
+    await expect.poll(saved).toBeCloseTo(ax - gx, 0)
+    const near = (a: Record<string, string>, b: Record<string, string>): string[] =>
+      Object.keys(b).filter((id) => !a[id] || xy(a[id]).some((v, i) => Math.abs(v - xy(b[id])[i]) > 0.5))
+
+    await studio.pane.click({ position: { x: 20, y: 20 } })
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(async () => near(await studio.positions(), dropped)).toContain('ctn-apigw')
+    await page.keyboard.press('ControlOrMeta+Shift+z')
+    await expect.poll(async () => near(await studio.positions(), dropped)).toEqual([])
+    await page.waitForTimeout(1000)
+    await page.reload()
+    await studio.ready()
+    expect(near(await studio.positions(), dropped)).toEqual([])
+  })
+}
+
 test('a large diagram keeps its positions on open and suggests Smart Layout when it is not laid out', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument({ x: 120, y: 60 }))
   // The hint is a toast that dismisses itself: watch for it while opening.

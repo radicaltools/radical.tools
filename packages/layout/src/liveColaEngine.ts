@@ -677,6 +677,12 @@ export class LiveColaEngine {
         const lined = new Set([...this.followedInDrag, ...shifted])
         if (lined.size) this.clearOverlaps([...lined])
       }
+      // React Flow drew what it dragged where the pointer took it, relative
+      // to the parent as it knew it: reported again, as it stands now, even
+      // where that is the place reported last. A parent's edge that moved
+      // with the drag left the canvas drawing the drop 27 px from the
+      // place saved (F-0014).
+      for (const id of moved) this.reported.delete(id)
       this.emitPositions(true)
       this.callbacks.onSettled?.()
       return

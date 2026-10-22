@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- An element dragged to the right inside its container, taking the container's left edge along, was saved up to 72 px left of where the canvas drew it: *Redo*, a reload and a view switch drew it there. It is saved where it is drawn
+- *Wrap into…* no longer puts the new container on top of the elements beside the selection (and keeps it so after a reload): it makes room as a drop does, pushing what it covers clear
+- Explore from here: a click on an element's *+* where the line of one of its relations runs over it opened the relation instead of the *+*'s menu; the *+* and *−* are drawn above the lines, and a click on them always reaches them
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)
