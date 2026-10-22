@@ -7,7 +7,10 @@ suites. It says how to tell that something is wrong, where to look, and what
 to hand back.
 
 The maintainer edits this file when a run reports something that is not a
-bug, or misses a kind that it should have caught.
+bug, or misses a kind that it should have caught. A round is prepared with
+`radical explore prepare` (Radical Crucible): each run gets this brief, a
+round brief (the commit, what changed since the last round, the setup) and a
+prompt with its area, folder and ports.
 
 ## What a finding is
 
@@ -16,9 +19,10 @@ you reproduced **twice from a fresh page**, and that is not already known.
 
 Not a finding:
 
-- anything in `docs/IMPROVEMENTS.md` (earlier runs are under "Found by
-  exploratory runs") or in `apps/e2e/tests/studio/known-issues.spec.ts`.
-  The repository has no GitHub issues;
+- anything in `crucible/findings/` (the findings since Radical Crucible), in
+  `docs/IMPROVEMENTS.md` (earlier runs are under "Found by exploratory
+  runs") or in `apps/e2e/tests/studio/known-issues.spec.ts`. The repository
+  has no GitHub issues;
 - a matter of taste (a layout you would have drawn differently, wording);
 - something you saw once and could not make happen again: note it under
   "Seen once" in the report, in one line, and move on;
@@ -215,15 +219,18 @@ cover named areas covers them and reports what it finds). At most two
 findings from one area: a third is worth less than a first look somewhere
 no run has been (each run lists what it did not cover).
 
-One report per run, as a pull request that adds the findings to "Found by
-exploratory runs" in `docs/IMPROVEMENTS.md` and, for each, a `test.fail`
-test to `apps/e2e/tests/studio/known-issues.spec.ts` (the suite stays green
-while the bug is there and turns red once it is fixed). For each finding:
+One report per run, as your final message (a run started as a subagent
+cannot write a file). It ends with one JSON block, the form the round brief
+gives, from which the maintainer's session records your findings in
+`crucible/findings/` after re-running each script (`radical explore verify`,
+`radical explore record`). For each finding:
 
 - **Title**: what is wrong, as the user would say it.
 - **Rule**: which of the eleven above it breaks.
 - **Steps**: the shortest sequence that shows it, from a named model, and
-  the script that runs it.
+  the script that runs it (`node <script> [args]` from your run's folder
+  while your server runs; helpers it imports from your folder are copied
+  with it).
 - **Expected / actual**, with numbers where there are any (positions,
   counts) and a screenshot.
 - **How often**: every time, or how many of how many tries.

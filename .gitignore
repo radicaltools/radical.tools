@@ -44,3 +44,6 @@ apps/e2e/all-blob-reports/
 # What Studio and radical check keep beside the architecture model (canvas
 # selection, Forge run status, test results); the model itself is committed.
 /architecture/.radical/
+
+# Radical Crucible: exploratory rounds (radical explore prepare)
+.crucible/
