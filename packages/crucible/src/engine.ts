@@ -12,6 +12,7 @@
 import fc from 'fast-check'
 import { RuleBroken, type Action, type Violation } from './violation'
 import { knownMatches, signatureOf, type Known } from './signature'
+import { findingTestName, type Finding } from './findings'
 
 /** How a world runs in CI: fixed, so every run of CI sees the same sequences. */
 export interface Plan {
@@ -120,8 +121,10 @@ export interface SurveyRecord {
   seed: number
   path?: string
   length: number
-  /** The actions of the shrunk sequence. */
+  /** The actions of the shrunk sequence, for a report. */
   actions: string[]
+  /** The same actions as data, for the finding's test to replay. */
+  sequence: unknown[]
   /** What each did, as resolved. */
   steps: string[]
   detail: string
@@ -141,6 +144,14 @@ export function showAction(action: Action): string {
   return `{ a: '${a}'${list ? `, ${list}` : ''} }`
 }
 
+/** A finding of the suite's file replayed as a test case. */
+export interface Regression<A extends Action> {
+  /** "<id> stays fixed: <title>". */
+  name: string
+  world: string
+  sequence: A[]
+}
+
 /** The failures a world's runs ended in, by rule. */
 export interface WorldResult {
   world: string
@@ -157,6 +168,7 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
   private readonly broken = new Map<string, Set<string>>()
   private readonly surveySkip = new Set<string>()
   private readonly seeds = new Map<string, number>()
+  private readonly prepared = new Map<string, Promise<P>>()
   private runIndex = 0
 
   constructor(readonly suite: FuzzSuite<A, P, R>, readonly options: FuzzOptions) {}
@@ -234,6 +246,7 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
           ...(result.counterexamplePath ? { path: result.counterexamplePath } : {}),
           length,
           actions: (e.actions as A[]).map((a) => (this.suite.describe ?? showAction)(a)),
+          sequence: JSON.parse(JSON.stringify(e.actions)) as unknown[],
           steps: [...e.trace],
           detail: e.violation.detail,
         }
@@ -243,9 +256,29 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
     return { world, seed, runs, broken }
   }
 
-  private async runSequence(world: string, prepared: P, actions: A[]): Promise<void> {
-    if (++this.runIndex < this.options.from) return
-    const context = this.context(world)
+  /** A case for each hardened or fixed finding of the suite's file that has
+   *  a sequence to replay in one of its worlds. */
+  regressions(findings: readonly Finding[]): Regression<A>[] {
+    return findings
+      .filter((f) => f.file === this.suite.file && (f.status === 'hardened' || f.status === 'fixed') && Array.isArray(f.sequence) && !!f.world && !!this.suite.worlds[f.world])
+      .map((f) => ({ name: findingTestName(f), world: f.world!, sequence: f.sequence as A[] }))
+  }
+
+  /** Runs one sequence in a world once, as a test: no fast-check, no known
+   *  failures; throws RuleBroken when a rule breaks. */
+  async replay(world: string, sequence: A[]): Promise<void> {
+    if (!this.suite.worlds[world]) throw new Error(`${this.suite.name} has no world ${world}`)
+    let prepared = this.prepared.get(world)
+    if (!prepared) {
+      prepared = Promise.resolve(this.suite.prepare(world))
+      this.prepared.set(world, prepared)
+    }
+    await this.runSequence(world, await prepared, sequence, { known: false })
+  }
+
+  private async runSequence(world: string, prepared: P, actions: A[], how: { known: boolean } = { known: true }): Promise<void> {
+    if (how.known && ++this.runIndex < this.options.from) return
+    const context = this.context(world, how.known)
     const run = await this.suite.start(world, prepared, context)
     try {
       this.stats.runs++
@@ -255,10 +288,12 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
         if (this.suite.isNoOp?.(context.trace[context.trace.length - 1] ?? '')) this.stats.noOps++
       }
     } catch (e) {
-      if (e instanceof RuleBroken) {
+      if (e instanceof RuleBroken && how.known) {
         const known = this.knownFor(e.violation, e.actions as A[], e.trace)
         if (known) return
         if (this.surveySkip.has(signatureOf(e.violation, e.actions[e.actions.length - 1]?.a, this.suite.idKeys))) return
+        e.message = `${world}: ${e.message}`
+      } else if (e instanceof RuleBroken) {
         e.message = `${world}: ${e.message}`
       }
       throw e
@@ -267,7 +302,7 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
     }
   }
 
-  private context(world: string): RunContext<A> {
+  private context(world: string, known = true): RunContext<A> {
     const actions: A[] = []
     const trace: string[] = []
     return {
@@ -277,7 +312,7 @@ export class Fuzzer<A extends Action, P = unknown, R = unknown> {
       fail: (violation) => {
         throw new RuleBroken(violation, trace, [...actions])
       },
-      known: (violation) => this.knownFor(violation, actions, trace),
+      known: (violation) => (known ? this.knownFor(violation, actions, trace) : undefined),
     }
   }
 

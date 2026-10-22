@@ -214,6 +214,7 @@ function recordSurvey(recordsFile: string, findingsDir: string, root: string, io
       length: r.length,
       ...(commit ? { commit } : {}),
       found,
+      sequence: r.sequence,
       steps: r.steps,
       detail: r.detail,
     }

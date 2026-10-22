@@ -5,9 +5,7 @@
 // its fields as front matter (one JSON value per key, as the model folder
 // writes them), then the steps and what differs. It starts open; a test bound
 // to a scenario makes it hardened, the fix fixed, a decision intended.
-
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+// Reading and writing the folder is in findingFiles.ts (Node only).
 
 export type FindingStatus = 'open' | 'question' | 'hardened' | 'fixed' | 'intended'
 
@@ -34,6 +32,9 @@ export interface Finding {
   /** The scenario and the test that hold it, once hardened. */
   scenario?: string
   test?: string
+  /** The shrunk sequence of actions, as JSON, for a fuzz finding: what its
+   *  test replays. */
+  sequence?: unknown[]
   /** The steps as resolved. */
   steps: string[]
   /** What differs, as the rule reported it. */
@@ -42,7 +43,7 @@ export interface Finding {
   notes?: string
 }
 
-const FIELDS = ['id', 'title', 'source', 'status', 'rule', 'signature', 'file', 'suite', 'world', 'seed', 'path', 'length', 'commit', 'found', 'scenario', 'test'] as const
+const FIELDS = ['id', 'title', 'source', 'status', 'rule', 'signature', 'file', 'suite', 'world', 'seed', 'path', 'length', 'commit', 'found', 'scenario', 'test', 'sequence'] as const
 
 /** The finding as its Markdown file. */
 export function findingToMarkdown(finding: Finding): string {
@@ -84,23 +85,6 @@ export function findingFromMarkdown(text: string): Finding {
   }
 }
 
-/** The findings in `dir`, by id; none when it does not exist. */
-export function readFindings(dir: string): Finding[] {
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
-    .filter((f) => /^F-\d+\.md$/.test(f))
-    .sort()
-    .map((f) => findingFromMarkdown(readFileSync(join(dir, f), 'utf8')))
-}
-
-/** Writes the finding as `<dir>/<id>.md`; returns the file's path. */
-export function writeFinding(dir: string, finding: Finding): string {
-  mkdirSync(dir, { recursive: true })
-  const file = join(dir, `${finding.id}.md`)
-  writeFileSync(file, findingToMarkdown(finding))
-  return file
-}
-
 /** The id after the highest of `ids` (F-0001 for none). */
 export function nextFindingId(ids: Iterable<string>): string {
   let high = 0
@@ -109,4 +93,22 @@ export function nextFindingId(ids: Iterable<string>): string {
     if (n) high = Math.max(high, Number(n))
   }
   return `F-${String(high + 1).padStart(4, '0')}`
+}
+
+/** The findings in `dir` (a path from the working directory), by id; none
+ *  when it does not exist. node:fs is loaded only here, so that a fuzz file
+ *  in a browser package reads its findings without Node's types. */
+export async function loadFindings(dir: string): Promise<Finding[]> {
+  const fs = (await import('node:fs' as string)) as { existsSync(p: string): boolean; readdirSync(p: string): string[]; readFileSync(p: string, encoding: 'utf8'): string }
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir)
+    .filter((f) => /^F-\d+\.md$/.test(f))
+    .sort()
+    .map((f) => findingFromMarkdown(fs.readFileSync(`${dir}/${f}`, 'utf8')))
+}
+
+/** The test that replays a fuzz finding, as its fuzz file reports it and a
+ *  scenario names it: "<file> › <id> stays fixed: <title>". */
+export function findingTestName(finding: Pick<Finding, 'id' | 'title'>): string {
+  return `${finding.id} stays fixed: ${finding.title}`
 }

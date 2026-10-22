@@ -3,11 +3,13 @@
 // fuzzSuite registers a case per world, which runs the world, and after it a
 // case per rule of that world, which fails when a run of the world broke the
 // rule outside the known failures. radical check binds tests by name, so a
-// scenario or a fitness function can name one rule of one world.
+// scenario or a fitness function can name one rule of one world. Each
+// hardened or fixed finding of the file is a case too, which replays its steps.
 
 import { afterAll, describe, expect, it } from 'vitest'
 import { Fuzzer, fuzzOptionsFromEnv, type FuzzOptions, type FuzzSuite } from './engine'
 import type { Action } from './violation'
+import type { Finding } from './findings'
 
 export interface FuzzSuiteOptions {
   /** The describe block's title. */
@@ -17,6 +19,9 @@ export interface FuzzSuiteOptions {
   worldTitle?: (world: string) => string
   /** The settings (default: the FUZZ_* environment variables). */
   options?: FuzzOptions
+  /** The project's findings (loadFindings): each hardened or fixed one of
+   *  this file becomes a case that replays its steps. */
+  findings?: readonly Finding[]
 }
 
 /** Registers the suite's cases; returns the fuzzer, whose summary is logged
@@ -38,6 +43,11 @@ export function fuzzSuite<A extends Action, P, R>(suite: FuzzSuite<A, P, R>, set
           expect(fuzzer.brokenIn(world).has(rule), `a run of ${world} broke ${rule}`).toBe(false)
         })
       }
+    }
+    for (const regression of fuzzer.regressions(settings.findings ?? [])) {
+      it(regression.name, async () => {
+        await fuzzer.replay(regression.world, regression.sequence)
+      }, 600_000)
     }
   })
   afterAll(() => log(fuzzer.summary()))
