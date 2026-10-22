@@ -8,6 +8,9 @@
  *   - saveDiagram / loadDiagram keep All elements' alignments
  *   - the live physics holds an alignment of leaves and one of groups,
  *     also while a member is dragged
+ *   - an alignment made of elements already on their line moves nothing,
+ *     and a run of the physics elsewhere leaves a row of components inside
+ *     their container (item 255)
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { activeLayoutConstraints, childrenInView, useDiagramStore } from '../src/store/diagramStore'
@@ -204,6 +207,51 @@ describe('addAlignment', () => {
     useDiagramStore.getState().loadDiagram(data)
     expect(useDiagramStore.getState().defaultLayoutConstraints).toEqual(data.defaultLayoutConstraints)
     useDiagramStore.getState().stopLiveLayout()
+  })
+})
+
+/** A system of three containers in a row, the first holding three
+ *  components in a row, 40 px apart, as a layout leaves them. */
+function nested(): Record<string, C4Node> {
+  const comp = (id: string, parentId: string, k: number): C4Node => node(id, 'component', { parentId, x: 40 + k * 240, y: 120, width: 200, height: 120 })
+  return byId(
+    node('sys', 'system', { x: 0, y: 400, width: 2440, height: 440 }),
+    node('c0', 'container', { parentId: 'sys', x: 40, y: 120, width: 760, height: 280 }),
+    comp('k0', 'c0', 0), comp('k1', 'c0', 1), comp('k2', 'c0', 2),
+    node('c1', 'container', { parentId: 'sys', x: 840, y: 120, width: 520, height: 280 }),
+    comp('k3', 'c1', 0), comp('k4', 'c1', 1),
+    node('c2', 'container', { parentId: 'sys', x: 1400, y: 120, width: 1000, height: 280 }),
+    comp('k5', 'c2', 0), comp('k6', 'c2', 1), comp('k7', 'c2', 2), comp('k8', 'c2', 3),
+    node('user', 'person', { x: 200, y: 0 }),
+  )
+}
+
+describe('An alignment of elements already on their line', () => {
+  it('moves nothing, their container included (item 255)', async () => {
+    // Component 0.0.0 to 0.0.2, one row already, kept in a row: freed for
+    // the physics, they spread to its own spacing (280 px) with their
+    // container's forty nearest elements; the system grew 2440 → 3040 px,
+    // moved 814 px left, and a component ended 40 px outside its container.
+    useDiagramStore.setState({
+      c4Nodes: nested(),
+      c4Relations: byId(
+        { id: 'r1', sourceId: 'user', targetId: 'c0' } as C4Relation,
+        { id: 'r2', sourceId: 'k0', targetId: 'k1' } as C4Relation,
+        { id: 'r3', sourceId: 'k1', targetId: 'k4' } as C4Relation,
+        { id: 'r4', sourceId: 'k2', targetId: 'k5' } as C4Relation,
+      ),
+    } as any)
+    const s = useDiagramStore.getState
+    s()._sync()
+    s().startLiveLayout({ skipBulk: true })
+    const before = structuredClone(s().c4Nodes)
+    s().addAlignment('horizontal', ['k0', 'k1', 'k2'])
+    await wait(500)
+    s().stopLiveLayout()
+    for (const id of Object.keys(before)) {
+      const { x, y, width, height } = s().c4Nodes[id]
+      expect({ x, y, width, height }, id).toEqual({ x: before[id].x, y: before[id].y, width: before[id].width, height: before[id].height })
+    }
   })
 })
 
@@ -413,5 +461,30 @@ describe('Live layout physics with alignments', () => {
     layout.stop()
     const cx = (id: string): number => nodes[id].x + nodes[id].width / 2
     expect(Math.abs(cx('s1') - cx('s2'))).toBeLessThanOrEqual(1)
+  })
+
+  it('leaves a row of components inside their container in a row of containers when something else is placed (item 255)', async () => {
+    // A row of Component 0.0.0 and 0.0.1, Propagate, the document read
+    // again, a group placed on All elements: starting the physics spread the
+    // row to its own spacing and held its members by their old places, and
+    // Container 0.0 was drawn at x −703, its components at 80 to 760.
+    const nodes = nested()
+    nodes.g = node('g', 'group', { x: 2600, y: 0, width: 360, height: 220 })
+    const relations: Record<string, C4Relation> = byId({ id: 'r1', sourceId: 'user', targetId: 'c0' } as C4Relation)
+    const layout = run(nodes, relations, [
+      { axis: 'y', ids: ['c0', 'c1', 'c2'], orders: [] },
+      { axis: 'y', ids: ['k0', 'k1'], orders: [] },
+    ])
+    layout.start(true)
+    const before = structuredClone(nodes)
+    layout.reset(['g'])
+    await wait(600)
+    layout.stop()
+    for (const id of ['k0', 'k1', 'k2']) {
+      expect(nodes[id].x, id).toBeGreaterThanOrEqual(0)
+      expect(nodes[id].x + nodes[id].width, id).toBeLessThanOrEqual(nodes.c0.width)
+      expect(nodes[id].x, id).toBe(before[id].x)
+    }
+    expect(nodes.c0.x).toBeCloseTo(before.c0.x, 0)
   })
 })

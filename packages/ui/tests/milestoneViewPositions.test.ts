@@ -6,7 +6,8 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
-import type { C4Node } from '@radical/common/c4'
+import type { C4Node, DiagramData } from '@radical/common/c4'
+import { NODE_SIZES } from '@radical/common/c4'
 
 const s = () => useDiagramStore.getState()
 const box = (x: number) => ({ x, y: 0, width: 160, height: 80 })
@@ -71,5 +72,142 @@ describe('milestones and view positions', () => {
     s().setActiveView(null)
     expect(s().c4Nodes.a.label).toBe('Renamed')
     expect(s().c4Nodes.b.x).toBe(300)
+  })
+})
+
+/** System S holds containers P and Q; P holds K1 and K2 in a row. The
+ *  milestone M was made before K1 moved into Q and P was folded on live;
+ *  the view v was laid out after: K2 where K1 was in P, Q beside P's fold. */
+function movedSince(): DiagramData {
+  const k = NODE_SIZES.component
+  const c = NODE_SIZES.container
+  const nodes: C4Node[] = [
+    { id: 's', type: 'system', label: 'S', collapsed: false, x: 0, y: 0, width: 1160, height: 480 } as C4Node,
+    { id: 'p', type: 'container', label: 'P', collapsed: false, parentId: 's', x: 30, y: 120, width: 520, height: 320 } as C4Node,
+    { id: 'q', type: 'container', label: 'Q', collapsed: false, parentId: 's', x: 600, y: 120, width: 520, height: 320 } as C4Node,
+    { id: 'k1', type: 'component', label: 'K1', collapsed: false, parentId: 'p', x: 20, y: 120, ...k } as C4Node,
+    { id: 'k2', type: 'component', label: 'K2', collapsed: false, parentId: 'p', x: 280, y: 120, ...k } as C4Node,
+  ]
+  const early = JSON.parse(JSON.stringify(Object.fromEntries(nodes.map((n) => [n.id, n])))) as Record<string, C4Node>
+  const live = JSON.parse(JSON.stringify(nodes)) as C4Node[]
+  const byId = Object.fromEntries(live.map((n) => [n.id, n]))
+  Object.assign(byId.k1, { parentId: 'q', x: 20, y: 120 })
+  byId.p.collapsed = true
+  const positions = {
+    s: { x: 0, y: 0, width: 30 + c.width + 40 + 520 + 30, height: 480 },
+    // Folded, P keeps its open size; Q stands beside the fold.
+    p: { x: 30, y: 120, width: 520, height: 320 },
+    q: { x: 30 + c.width + 40, y: 120, width: 520, height: 320 },
+    k1: { x: 20, y: 120, ...k },
+    k2: { x: 20, y: 120, ...k },
+  }
+  return {
+    nodes: live, relations: [],
+    defaultPositions: Object.fromEntries(live.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }])),
+    views: [{ id: 'v', name: 'v', nodeIds: [], positions }],
+    snapshots: [{ id: 'm', name: 'M', timestamp: 1, nodes: early, relations: {} }],
+  }
+}
+
+describe('a milestone shown on a view laid out since', () => {
+  const abs = (id: string): { x: number; y: number; width: number; height: number } => {
+    const nodes = s().c4Nodes
+    const n = nodes[id]
+    const b = { x: n.x, y: n.y, width: n.width, height: n.height }
+    for (let p = n.parentId; p; p = nodes[p].parentId) { b.x += nodes[p].x; b.y += nodes[p].y }
+    return b
+  }
+  const clear = (a: string, b: string): boolean => {
+    const [p, q] = [abs(a), abs(b)]
+    return p.x + p.width <= q.x || q.x + q.width <= p.x || p.y + p.height <= q.y || q.y + q.height <= p.y
+  }
+  const within = (id: string): boolean => {
+    const n = s().c4Nodes[id]
+    const p = s().c4Nodes[n.parentId!]
+    return n.x >= 0 && n.y >= 0 && n.x + n.width <= p.width && n.y + n.height <= p.height
+  }
+
+  beforeEach(() => {
+    s().loadDiagram(movedSince())
+    s().setActiveView('v')
+  })
+
+  // K1 in P in the milestone kept the view's place for it in Q: drawn on K2.
+  it('draws an element with another parent there beside its siblings, inside its parent', () => {
+    s().selectMilestone('m')
+    expect(s().c4Nodes.k1.parentId).toBe('p')
+    expect(clear('k1', 'k2')).toBe(true)
+    expect(within('k1')).toBe(true)
+    expect(within('k2')).toBe(true)
+  })
+
+  // P, folded on live, open in the milestone, took its open size at the
+  // place of its fold: over Q.
+  it('draws a container open there but folded on live clear of its siblings', () => {
+    s().selectMilestone('m')
+    expect(s().c4Nodes.p.collapsed).toBe(false)
+    expect(clear('p', 'q')).toBe(true)
+    expect(within('p')).toBe(true)
+    expect(within('q')).toBe(true)
+  })
+
+  it('changes nothing of the view\'s layout', () => {
+    const before = JSON.parse(JSON.stringify(s().saveDiagram().views![0].positions))
+    s().selectMilestone('m')
+    s().setActiveView(null)
+    s().setActiveView('v')
+    expect(s().saveDiagram().views![0].positions).toEqual(before)
+    s().discardMilestoneChanges()
+    expect(s().saveDiagram().views![0].positions).toEqual(before)
+  })
+})
+
+describe('a move into another parent made in a milestone on a view', () => {
+  // The milestone's All elements kept the element's place relative to its
+  // old parent, read against the new one when it was opened: Component 1.1.0
+  // moved into Container 0.0 on a view in Early was drawn on Component 0.0.0
+  // there (the fuzzer, nested).
+  const abs = (id: string): { x: number; y: number; width: number; height: number } => {
+    const nodes = s().c4Nodes
+    const n = nodes[id]
+    const b = { x: n.x, y: n.y, width: n.width, height: n.height }
+    for (let p = n.parentId; p; p = nodes[p].parentId) { b.x += nodes[p].x; b.y += nodes[p].y }
+    return b
+  }
+  const clear = (a: string, b: string): boolean => {
+    const [p, q] = [abs(a), abs(b)]
+    return p.x + p.width <= q.x || q.x + q.width <= p.x || p.y + p.height <= q.y || q.y + q.height <= p.y
+  }
+  const within = (id: string): boolean => {
+    const n = s().c4Nodes[id]
+    const p = s().c4Nodes[n.parentId!]
+    return n.x >= 0 && n.y >= 0 && n.x + n.width <= p.width && n.y + n.height <= p.height
+  }
+
+  it('places it inside its new parent on the milestone\'s All elements, clear of its siblings', () => {
+    const k = NODE_SIZES.component
+    const nodes: C4Node[] = [
+      { id: 's', type: 'system', label: 'S', collapsed: false, x: 0, y: 0, width: 1160, height: 480 } as C4Node,
+      { id: 'p', type: 'container', label: 'P', collapsed: false, parentId: 's', x: 30, y: 120, width: 520, height: 320 } as C4Node,
+      { id: 'q', type: 'container', label: 'Q', collapsed: false, parentId: 's', x: 600, y: 120, width: 520, height: 320 } as C4Node,
+      { id: 'k1', type: 'component', label: 'K1', collapsed: false, parentId: 'p', x: 20, y: 120, ...k } as C4Node,
+      { id: 'k2', type: 'component', label: 'K2', collapsed: false, parentId: 'p', x: 280, y: 120, ...k } as C4Node,
+      { id: 'k3', type: 'component', label: 'K3', collapsed: false, parentId: 'q', x: 20, y: 120, ...k } as C4Node,
+    ]
+    const positions = Object.fromEntries(nodes.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
+    s().loadDiagram({
+      nodes, relations: [],
+      defaultPositions: positions,
+      views: [{ id: 'v', name: 'v', nodeIds: [], positions: JSON.parse(JSON.stringify(positions)) }],
+      snapshots: [{ id: 'm', name: 'M', timestamp: 1, nodes: JSON.parse(JSON.stringify(Object.fromEntries(nodes.map((n) => [n.id, n])))), relations: {} }],
+    })
+    s().selectMilestone('m')
+    s().setActiveView('v')
+    s().reparentNodes(['k3'], 'p', { quiet: true })
+    s().setActiveView(null)
+    expect(s().c4Nodes.k3.parentId).toBe('p')
+    expect(clear('k3', 'k1')).toBe(true)
+    expect(clear('k3', 'k2')).toBe(true)
+    expect(within('k3')).toBe(true)
   })
 })

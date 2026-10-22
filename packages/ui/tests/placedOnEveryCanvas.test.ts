@@ -9,7 +9,7 @@
  * a save kept it.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
+import type { C4Node, DiagramData, DiagramView, NodePosition } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
@@ -115,6 +115,42 @@ describe('an element added on a view', () => {
     s().setActiveView(null)
     expect(inside(outer)).toBe(true)
     expect({ x: s().c4Nodes[inner].x, y: s().c4Nodes[inner].y }).toEqual(within)
+  })
+})
+
+describe('an element added on a view, on another view laid out before', () => {
+  // A view of a filter chain (it lists nothing) drew the new container but
+  // had no place for it until it was opened: the place was made then, the
+  // live layout settled it with its surroundings, and opening the view
+  // moved elements no one had touched (nested: System 0 2440 → 1380 px
+  // wide, System 1 210 px away).
+  const withChain = (): DiagramData => {
+    const data = model()
+    data.views!.push({
+      id: 'chain', name: 'Systems and containers', nodeIds: [], positions: JSON.parse(JSON.stringify(data.defaultPositions)),
+      pipeline: { levels: [{ ways: [{ types: ['system', 'container'] }] }] },
+    } as DiagramView)
+    return data
+  }
+  const saved = (viewId: string): Record<string, NodePosition> =>
+    JSON.parse(JSON.stringify(s().saveDiagram().views!.find((v) => v.id === viewId)!.positions))
+
+  it('has its place there at once, inside its parent, clear of its siblings', () => {
+    s().loadDiagram(withChain())
+    const id = addOnView()
+    const there = saved('chain')
+    expect(there[id]).toBeDefined()
+    const [added, shop] = [there[id], there.shop]
+    expect(added.x >= 0 && added.y >= 0 && added.x + added.width <= shop.width && added.y + added.height <= shop.height).toBe(true)
+    for (const sibling of ['web', 'api']) expect(overlap(added, there[sibling]), sibling).toBe(false)
+  })
+
+  it('opening it moves nothing there', () => {
+    s().loadDiagram(withChain())
+    addOnView()
+    const there = saved('chain')
+    s().setActiveView('chain')
+    expect(saved('chain')).toEqual(there)
   })
 })
 

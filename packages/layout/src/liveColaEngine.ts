@@ -72,6 +72,9 @@ interface GroupOrder {
   members: AlignedMember[]
 }
 
+/** A line through a group, by its axis and members: the same across rebuilds. */
+const groupLineKey = (a: GroupAlignment): string => `${a.axis}:${a.members.map((m) => m.id).sort().join(',')}`
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Walk parent chain to compute absolute top-left from relative positions. */
@@ -114,6 +117,14 @@ const SETTLE_TICKS = 15
  *  model, grids of groups inside a column of groups). The run ends on a
  *  projected step, so the alignments hold. */
 const MAX_PROJECTED_RUN_MS = 4000
+/** Every other run stops after this long too, moving or not: what is new
+ *  has found its place long before (a few hundred milliseconds after an
+ *  add, an expand or a push drag), and a run still going is one that does
+ *  not converge. On the sample's All elements an add into a container
+ *  freed records related to the governance hubs that then drifted, and
+ *  swapped places, for good (21 px a second after 40 s). The diagram
+ *  stands where the run ends. */
+const MAX_RUN_MS = 8000
 
 // ─── Public interface ────────────────────────────────────────────────────────
 
@@ -162,6 +173,10 @@ export interface LiveColaCallbacks {
 
 /** A node is reported again once it moved or resized by more than this. */
 const REPORT_PX = 0.5
+/** A leaf the model has this much away from where it had it is taken as
+ *  moved by the store (reported places are relative to parents reported
+ *  within REPORT_PX). */
+const MODEL_MOVED_PX = 1
 
 /** The physics is local: rebuilds (open, view switch, undo, Smart Layout)
  *  keep the positions they get, and new nodes move only their nearest
@@ -244,16 +259,16 @@ export class LiveColaEngine {
   private _grabbedId: string | null = null
   private allNodes: Record<string, C4Node> = {}
   /**
-   * One-shot seed positions consumed by the next rebuild(). Used when a
+   * One-shot seed positions for the next rebuild(). Used when a
    * caller wants a re-appearing node (e.g. children of a just-expanded
    * parent) to start at a specific absolute centre coordinate, overriding
-   * the default "spawn near connected neighbours" heuristic. Entries are
-   * cleared after they are applied.
+   * the default "spawn near connected neighbours" heuristic. That rebuild
+   * clears them all, applied or not.
    */
   private seedPositions = new Map<string, { x: number; y: number }>()
   /** Pace bookkeeping (see HEAVY_TICK_MS and SETTLE_PX). */
   private lastTickAt = 0
-  /** When the run started, or a drag began or ended (MAX_PROJECTED_RUN_MS). */
+  /** When the run started, or a drag began or ended (MAX_RUN_MS, MAX_PROJECTED_RUN_MS). */
   private runStartedAt = 0
   private skippedRenders = 0
   private quietTicks = 0
@@ -265,6 +280,11 @@ export class LiveColaEngine {
   private alignedWith = new Map<string, Set<string>>()
   private groupAlignments: GroupAlignment[] = []
   private groupOrders: GroupOrder[] = []
+  /** Lines through a group that were off their line when a calm drag
+   *  started (groupLineKey): its drop leaves them so. */
+  private offLinesAtGrab = new Set<string>()
+  /** What lines through a group moved along with a calm drag (followCarriers). */
+  private followedInDrag = new Set<string>()
   /**
    * Open groups still drawn with the frame the model has, and where their
    * leaves stood when the layout was built. A layout leaves more room
@@ -283,6 +303,11 @@ export class LiveColaEngine {
   private reported = new Map<string, { x: number; y: number; width?: number; height?: number }>()
   /** Absolute top-left last reported per element (calm drags, emitPositions). */
   private reportedAbs = new Map<string, { x: number; y: number }>()
+  /** Each leaf's absolute top-left as the model had it at the last build,
+   *  or as last reported to it since: where the model differs at the next
+   *  build, the store moved the leaf (a move into another parent made room,
+   *  a refit), and the build takes the model's place over the one here. */
+  private modelAbs = new Map<string, { x: number; y: number }>()
   /** The canvas's alignments as last built. */
   private alignments: Alignment[] = []
   /** Pinned elements: the model's (LiveColaModel.pinned) and those dropped since. */
@@ -294,6 +319,11 @@ export class LiveColaEngine {
   /** Position of each cola node in colaNodes (WebCoLa's solver arrays). */
   private nodeIndexOf = new Map<ColaNode, number>()
   private calm: CalmDrag | null = null
+  /** Elements new in the run going on (added, or shown by an expand): what
+   *  they still cover when it comes to rest is pushed clear, as a calm drop
+   *  pushes (clearOverlaps). The physics alone left them over their
+   *  neighbours where those were frozen or pinned. */
+  private arrivals: string[] = []
   /** A push drag's start, to tell a drag from a click on release. */
   private pushFrom: { x: number; y: number; moved: boolean } | null = null
 
@@ -309,7 +339,8 @@ export class LiveColaEngine {
   /**
    * Provide an absolute-centre seed position for a node, applied on the next
    * rebuild() if the node was not present in the previous cola pass (i.e.
-   * a re-appearing child after expand). No-op once consumed.
+   * a re-appearing child after expand). That rebuild drops every seed,
+   * used or not.
    */
   seedPosition(id: string, x: number, y: number): void {
     this.seedPositions.set(id, { x, y })
@@ -327,8 +358,10 @@ export class LiveColaEngine {
     if (this._running) return
     this._running = true
     if (skipBulk) {
-      // Another document, or this one read again: nothing cached holds.
+      // Another document, or this one read again: nothing cached holds,
+      // nor do seeds given while the layout was stopped.
       this.forget()
+      this.seedPositions.clear()
       this.rebuild('rest')
       this._bulkDone = true
     } else if (this._bulkDone && this.cola) {
@@ -361,21 +394,37 @@ export class LiveColaEngine {
   }
 
   /** The model changed (an element added, removed, expanded, collapsed):
-   *  what is new finds its place, the rest stays. */
-  invalidate(): void {
-    if (this._running) this.rebuild('local')
+   *  what is new finds its place, the rest stays. `added`: elements new to
+   *  the model, which stay where they were put, and the parents they went
+   *  into; what they cover is pushed clear (rebuild). */
+  invalidate(added: string[] = []): void {
+    if (this._running) this.rebuild('local', [], added)
   }
 
   /**
    * The store's positions were replaced wholesale (view switch, undo,
    * milestone, Smart Layout): they are taken as they are, and nothing moves
    * until an element is added or dragged. `free` names elements that should
-   * settle from where they were put (the members of an alignment just
-   * made, snapped onto their line): they move, with their surroundings.
+   * settle from where they were put (given a place as a view opened): they
+   * move, with their surroundings. `aligned`: the members of an alignment
+   * just made or changed, snapped onto their line already: what they now
+   * cover is pushed clear, as a calm drop pushes, and nothing else moves.
+   * Freed for the physics, they spread to its own spacing and took their
+   * containers and the nearest forty elements along (a row of three
+   * components already in a row moved their system 814 px and left one
+   * outside its container).
    */
-  reset(free: string[] = []): void {
+  reset(free: string[] = [], aligned: string[] = []): void {
     this.forget()
-    if (this._running) this.rebuild(free.length ? 'local' : 'rest', free)
+    if (!this._running) return
+    this.rebuild(free.length ? 'local' : 'rest', free)
+    const members = aligned.filter((id) => this.idToNode.has(id) || this.idToGroup.has(id))
+    if (!members.length || !this.cola) return
+    // Each member pushes and is pushed: along the line, when two cover
+    // each other.
+    this.clearOverlaps(members, [])
+    this.emitPositions()
+    this.callbacks.onSettled?.()
   }
 
   /**
@@ -418,6 +467,10 @@ export class LiveColaEngine {
   /** Drops cola's cached positions: the next rebuild takes every node's
    *  from the model. */
   private forget(): void {
+    // Seeds too: one an expand left for children it did not show was taken
+    // by the next document's (or view's) build, and an add then reported a
+    // database where that seed had put it, outside its system.
+    this.seedPositions.clear()
     this.colaNodes = []
     this.idToNode.clear()
     this.colaGroups = []
@@ -470,6 +523,8 @@ export class LiveColaEngine {
   grab(nodeId: string, rfX: number, rfY: number, mode: DragMode = 'push', abs?: { x: number; y: number }, withIds: string[] = []): void {
     this._grabbedId = nodeId
     this.resetPace()
+    // The drop clears what the drag leaves covered.
+    this.arrivals = []
     // From WHOLE_DIAGRAM_MAX_NODES up a push drag freed the nodes nearest by
     // relation and froze the rest: those pulled toward frozen ones far away
     // (by thousands of pixels), never came to rest, and lay on top of them.
@@ -480,6 +535,8 @@ export class LiveColaEngine {
       // Held while the physics may still run, until it moves (calmDrag).
       for (const leaf of this.leavesOf(nodeId)) Layout.dragStart(leaf)
       this.calm = this.calmDrag(nodeId, withIds, abs ?? { x: rfX, y: rfY }, { x: 0, y: 0 })
+      this.offLinesAtGrab = new Set(this.groupAlignments.filter((a) => this.offLine(a)).map(groupLineKey))
+      this.followedInDrag = new Set()
       return
     }
     // The physics starts when it moves (pushStart): a ⌘/Ctrl-click, which
@@ -601,8 +658,26 @@ export class LiveColaEngine {
     if (calm) {
       const moved = calm.id === nodeId ? [nodeId, ...calm.with] : [nodeId]
       for (const id of moved) this.pin(id)
-      if (calm.id === nodeId) this.clearOverlaps([...moved, ...calm.partners])
-      this.emitPositions()
+      // The partners moved with it, across their line, but were not dropped:
+      // one the dropped element now covers is pushed along the line.
+      if (calm.id === nodeId) {
+        this.clearOverlaps([...moved, ...calm.partners], moved)
+        // What the drop pushed inside a group on a line grew the group, as
+        // the drag did: the line follows it, and every line through a group
+        // holds as drawn (a 1 px drag of a component left its container
+        // 2.5 px off its row, and the next load snapped the row and refit
+        // every container).
+        this.followCarriers(moved)
+        // What followed a carrier during the drag or the drop, or was put
+        // on its line, and the group that grew with it, may now cover a
+        // neighbour: it is pushed clear, as the drop's own pushes were (a
+        // component dropped in Container 0.2 moved the containers of its
+        // row down, and System 0, grown with them, lay on System 1).
+        const shifted = this.projectGroupAlignments(false, this.offLinesAtGrab)
+        const lined = new Set([...this.followedInDrag, ...shifted])
+        if (lined.size) this.clearOverlaps([...lined])
+      }
+      this.emitPositions(true)
       this.callbacks.onSettled?.()
       return
     }
@@ -714,7 +789,8 @@ export class LiveColaEngine {
    * Lines through a group that holds a dragged element: the group's box
    * grows and shrinks with it, so its centre moves, and the rest of the line
    * keeps to it as it would if the group itself were dragged. Without this a
-   * child's drag pulled its container off the line.
+   * child's drag pulled its container off the line. What it moves is noted
+   * for the drop (followedInDrag).
    */
   private followCarriers(moved: string[]): void {
     const inside = (id: string, ancestor: string): boolean => {
@@ -742,6 +818,7 @@ export class LiveColaEngine {
         if (c === undefined || Math.abs(line - c) < 0.01) continue
         this.translate(other, a.axis, line - c)
         shifted = true
+        this.followedInDrag.add(other)
       }
     }
     if (shifted) this.refreshBounds()
@@ -812,7 +889,8 @@ export class LiveColaEngine {
   private boxOf(id: string): Box | undefined {
     const cn = this.idToNode.get(id)
     if (cn) {
-      const drawn = drawnSize(this.allNodes[id], false)
+      const node = this.allNodes[id]
+      const drawn = node ? drawnSize(node, false) : { width: cn.realWidth, height: cn.realHeight }
       const x = cn.x - cn.realWidth / 2
       const y = cn.y - cn.realHeight / 2
       return { x, X: x + drawn.width, y, Y: y + drawn.height }
@@ -839,7 +917,9 @@ export class LiveColaEngine {
       const dy = first ? first.node.y - first.y : 0
       const rigid = kept.leaves.every((l) => Math.abs(l.node.x - l.x - dx) <= REPORT_PX && Math.abs(l.node.y - l.y - dy) <= REPORT_PX)
       if (rigid) {
-        if (Math.abs(dx) > REPORT_PX || Math.abs(dy) > REPORT_PX) {
+        // However little: a frame left behind by a third of a pixel showed
+        // a row through it off its line by that much.
+        if (dx !== 0 || dy !== 0) {
           kept.frame = { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
           for (const l of kept.leaves) { l.x = l.node.x; l.y = l.node.y }
         }
@@ -886,11 +966,13 @@ export class LiveColaEngine {
    * line holds on both axes stays, and the element that covers it moves off
    * it instead. What still covers another when the pushes run out
    * (CALM_MAX_PUSHES) goes beside the rest (clearLeftovers): a drop leaves
-   * nothing overlapping.
+   * nothing overlapping. `dropped`: the seeds that stay where they are put
+   * (all of them unless said); the others push and are pushed.
    */
-  private clearOverlaps(seeds: string[]): void {
+  private clearOverlaps(seeds: string[], dropped: string[] = seeds): void {
     this.refreshBounds()
     const pending = new Map<string, Set<string>>()
+    const held = new Set(dropped)
     const push = (id: string): void => {
       const level = this.levelOf(id)
       const set = pending.get(level) ?? new Set<string>()
@@ -906,10 +988,11 @@ export class LiveColaEngine {
     let budget = CALM_MAX_PUSHES
     while (pending.size) {
       const level = [...pending.keys()].sort((a, b) => depth(b) - depth(a))[0]
-      const movers = pending.get(level)!
+      const seeded = pending.get(level)!
       pending.delete(level)
-      const queue = [...movers]
-      const moved = new Set(movers)
+      const movers = new Set([...seeded].filter((id) => held.has(id)))
+      const queue = [...seeded]
+      const moved = new Set(seeded)
       while (queue.length && budget > 0) {
         const a = queue.shift()!
         const A = this.boxOf(a)
@@ -948,6 +1031,7 @@ export class LiveColaEngine {
       // The group grew or moved with what is in it: it pushes its neighbours.
       if (level) {
         this.refreshBounds()
+        held.add(level)
         push(level)
       }
     }
@@ -1121,12 +1205,12 @@ export class LiveColaEngine {
     this.quietTicks = moved <= SETTLE_PX ? this.quietTicks + 1 : 0
     if (this._grabbedId) return false
     if (this.quietTicks >= SETTLE_TICKS) return true
-    if (!this.groupAlignments.length && !this.groupOrders.length) return false
     // relax() counts its steps instead (RELAX_MAX_STEPS).
     if (this.untimed) return false
     const now = performance.now()
     if (!this.runStartedAt) this.runStartedAt = now
-    return now - this.runStartedAt >= MAX_PROJECTED_RUN_MS
+    const projected = this.groupAlignments.length > 0 || this.groupOrders.length > 0
+    return now - this.runStartedAt >= (projected ? MAX_PROJECTED_RUN_MS : MAX_RUN_MS)
   }
 
   /**
@@ -1134,15 +1218,18 @@ export class LiveColaEngine {
    * 'first' arranges a diagram that has no layout yet (small ones only),
    * 'local' moves the nodes that are new since the previous build and
    * those named in `free`, with their surroundings, 'rest' moves nothing,
-   * 'whole' leaves everything free (relax, relaxLive).
+   * 'whole' leaves everything free (relax, relaxLive). Of the new ones,
+   * those in `added` (new to the model) stay where they are put.
    */
-  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = []): void {
+  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = [], added: string[] = []): void {
+    const newIds = new Set(added)
     if (this.cola) this.cola.stop()
     this.resetPace()
     // The store may hold other positions now (view switch, undo, load):
     // report everything once.
     this.reported.clear()
     this.reportedAbs.clear()
+    this.arrivals = []
 
     const { nodes, relations, alignments = [], pinned = [] } = this.callbacks.getModel()
     this.allNodes = nodes
@@ -1152,6 +1239,7 @@ export class LiveColaEngine {
     const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes))
     if (visibleNodes.length === 0) {
       this.cola = null
+      this.seedPositions.clear()
       return
     }
 
@@ -1190,14 +1278,29 @@ export class LiveColaEngine {
       neighbourIds.get(rel.targetId)!.push(rel.sourceId)
     }
 
+    const modelAbsBefore = this.modelAbs
+    this.modelAbs = new Map()
     for (const n of leafNodes) {
       const w = effectiveWidth(n)
       const h = effectiveHeight(n)
 
       const prev = prevPos.get(n.id)
       const seed = this.seedPositions.get(n.id)
+      const at = toAbsoluteTopLeft(n, nodes)
+      this.modelAbs.set(n.id, at)
+      const was = modelAbsBefore.get(n.id)
       let cx: number, cy: number
-      if (prev) {
+      if (!prev && newIds.has(n.id)) {
+        // Added: where it was dropped (or placed), whatever it is related to.
+        cx = at.x + w / 2
+        cy = at.y + h / 2
+      } else if (prev && was && (Math.abs(at.x - was.x) > MODEL_MOVED_PX || Math.abs(at.y - was.y) > MODEL_MOVED_PX)) {
+        // The store moved it since: from where the model has it. Kept where
+        // it was here, a component whose container a move elsewhere refit
+        // (after an agent deleted its sibling) was drawn 50 px outside it.
+        cx = at.x + w / 2
+        cy = at.y + h / 2
+      } else if (prev) {
         cx = prev.x
         cy = prev.y
       } else if (seed) {
@@ -1206,7 +1309,6 @@ export class LiveColaEngine {
         // to a neighbour-average and animating from there).
         cx = seed.x
         cy = seed.y
-        this.seedPositions.delete(n.id)
       } else {
         // New node: try to position near average of its connected
         // neighbours' previous cola positions; fall back to its store
@@ -1222,9 +1324,8 @@ export class LiveColaEngine {
           cx = sx / count + (Math.random() - 0.5) * 40
           cy = sy / count + (Math.random() - 0.5) * 40
         } else {
-          const abs = toAbsoluteTopLeft(n, nodes)
-          cx = abs.x + w / 2
-          cy = abs.y + h / 2
+          cx = at.x + w / 2
+          cy = at.y + h / 2
         }
       }
 
@@ -1235,6 +1336,11 @@ export class LiveColaEngine {
       this.colaNodes.push(cn)
       this.idToNode.set(n.id, cn)
     }
+    // Seeds are for this build only. One for a node it does not show (an
+    // expand on a view that does not draw the children) would otherwise
+    // wait for the next build that shows it, maybe after a reload or on
+    // another view, and put the node where it stood back then.
+    this.seedPositions.clear()
 
     // ── Links ───────────────────────────────────────────────────────────
     // Neighbourhoods for local drags: relations (between visible ends) and containment.
@@ -1554,7 +1660,13 @@ export class LiveColaEngine {
         // a model change rebuilds the layout.
         this.cola?.stop()
         this.resetPace()
-        this.emitPositions()
+        if (this.arrivals.length) {
+          const arrivals = this.arrivals
+          this.arrivals = []
+          this.clearOverlaps(arrivals)
+        }
+        // relax() reports where its steps end (RELAX_MAX_STEPS), as before.
+        this.emitPositions(!this.untimed)
         this.unfreeze()
         this.callbacks.onSettled?.()
         return
@@ -1578,11 +1690,38 @@ export class LiveColaEngine {
     // a new element, it freed the 40 elements nearest to it, reaching into
     // other containers whose frames and other children stayed fixed (a
     // model nested four levels deep never came to rest after one collapse).
-    const fresh = run === 'local' && prevPos.size > 0
+    const arrived = run === 'local' && prevPos.size > 0
       ? leafNodes.filter((n) => !prevPos.has(n.id) && !prevGroups.has(n.id)).map((n) => n.id)
       : []
+    // An element added stays where it was dropped, and what it covers is
+    // pushed clear, as a calm drop pushes (after the build, below). Freed
+    // for the physics with its forty nearest elements, it moved them (an
+    // add into a container of the sample moved 43 elements, a process 560
+    // px with a step outside it), or stayed over its frozen neighbours.
+    const dropped = arrived.filter((id) => newIds.has(id))
+    // One this canvas does not draw (its view's filter leaves it out) still
+    // grew its parent, which the store names with it: the parent pushes, or
+    // the nearest of its ancestors drawn here.
+    for (const id of newIds) {
+      if (arrived.includes(id)) continue
+      for (let p: string | undefined = id; p; p = nodes[p]?.parentId) {
+        if (!this.idToGroup.has(p) && !this.idToNode.has(p)) continue
+        if (!dropped.includes(p)) dropped.push(p)
+        break
+      }
+    }
+    const fresh = arrived.filter((id) => !newIds.has(id))
+    this.arrivals = [...fresh]
     for (const id of free) if (this.idToNode.has(id) || this.idToGroup.has(id)) fresh.push(id)
     if (fresh.length) this.freezeAllBut(...fresh)
+    // WebCoLa's start spreads the leaves of a row or column it is told to
+    // align (Projection's makeFeasible: each at least the previous one's
+    // width further along, from centre to centre), once, outside its
+    // solver. On a diagram that keeps its layout that moved a row's
+    // members on every build, unreported, and the next drag or drop showed
+    // them there, out of their container. Such a build starts from where
+    // everything stands; the overlaps it may keep are the solver's to undo.
+    const standing = !arrange && run !== 'whole' ? this.colaNodes.map((cn) => ({ cn, x: cn.x, y: cn.y })) : []
     try {
       if (arrange) {
         ;(layout as any).start(30, 30, 50, 0, true, true)
@@ -1591,6 +1730,13 @@ export class LiveColaEngine {
       }
     } catch (err) {
       console.error('[cola] start() failed:', err)
+    }
+    const descent = (layout as unknown as { _descent?: { x: number[][] } })._descent?.x
+    for (const [i, { cn, x, y }] of standing.entries()) {
+      if (cn.x === x && cn.y === y) continue
+      cn.x = x
+      cn.y = y
+      if (descent) { descent[0][i] = x; descent[1][i] = y }
     }
 
     this.cola = layout
@@ -1609,6 +1755,10 @@ export class LiveColaEngine {
         })
       }
     }
+    if (dropped.length) {
+      this.clearOverlaps(dropped)
+      this.emitPositions()
+    }
     // Nothing to move: it is at rest as built.
     if (!arrange && !fresh.length && run !== 'whole') this.callbacks.onSettled?.()
 
@@ -1623,17 +1773,29 @@ export class LiveColaEngine {
   }
 
   /** Centre of an alignment member on `axis` as drawn: a leaf's (drawnSize),
-   *  a group's box. */
-  private memberCentre(m: AlignedMember, axis: 'x' | 'y'): number | undefined {
+   *  a group's box; with `framed`, the group's frame as drawn and saved
+   *  (frameOf), which its box here need not be (a frame kept from the
+   *  layout, room above a child group). */
+  private memberCentre(m: AlignedMember, axis: 'x' | 'y', framed = false): number | undefined {
     if (m.node) {
       const drawn = drawnSize(this.allNodes[m.id], false)
       return axis === 'x'
         ? m.node.x - (m.node.realWidth - drawn.width) / 2
         : m.node.y - (m.node.realHeight - drawn.height) / 2
     }
-    const b = (m.group as any)?.bounds
+    const b = framed ? m.group && this.frameOf(m.group) : (m.group as any)?.bounds
     if (!b) return undefined
     return axis === 'x' ? (b.x + b.X) / 2 : (b.y + b.Y) / 2
+  }
+
+  /** True when the members of a line through a group are off it by more
+   *  than half a pixel, as drawn: a line a milestone shows with the places
+   *  it kept from before the line was made. A drop elsewhere leaves it so:
+   *  put on its line, its members moved onto what lay beside them. */
+  private offLine(a: GroupAlignment): boolean {
+    const centres = a.members.map((m) => this.memberCentre(m, a.axis, true))
+    if (centres.some((c) => c === undefined)) return false
+    return Math.max(...(centres as number[])) - Math.min(...(centres as number[])) > 0.5
   }
 
   /** True when the grabbed node is this member or inside it. */
@@ -1735,22 +1897,37 @@ export class LiveColaEngine {
   /**
    * Holds alignments that have a group member, after each WebCoLa step:
    * every member moves onto the members' mean line, or onto the line of the
-   * member being dragged, which the others then follow.
+   * member being dragged, which the others then follow. `apart`: and they
+   * are kept clear of each other along it, as overlap removal sees them
+   * (not after a calm drop, which moves nothing to make room). `skip`: lines
+   * left as they are (groupLineKey). Returns the members it moved.
    */
-  private projectGroupAlignments(): void {
+  private projectGroupAlignments(apart = true, skip?: Set<string>): string[] {
+    const shifted: string[] = []
+    // Frozen leaves where they are held first (the step just taken pulled
+    // them on their springs): a group's frame is read from its leaves, and
+    // one read off a pulled leaf is no longer the frame the layout gave it.
+    if (this.groupAlignments.length) this.pinFrozen()
     for (const a of this.groupAlignments) {
-      const centres = a.members.map((m) => this.memberCentre(m, a.axis))
+      if (skip?.has(groupLineKey(a))) continue
+      // The line runs through the frames as drawn: through the groups'
+      // boxes here, it showed and saved them off it, and the next load
+      // snapped them onto it and refit every container.
+      const centres = a.members.map((m) => this.memberCentre(m, a.axis, true))
       if (centres.some((c) => c === undefined)) continue
       let held = a.members.findIndex((m) => this.holdsGrabbed(m.id))
       // A pinned member stays: the line runs through it.
       if (held < 0) held = a.members.findIndex((m) => this.pinnedMembers.has(m.id))
+      // After a calm drop the line runs where its members are now: one
+      // kept from the physics' last run may be far from there.
       if (held >= 0) a.line = centres[held]!
-      else a.line ??= (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
+      else if (!apart || a.line === undefined) a.line = (centres as number[]).reduce((sum, c) => sum + c, 0) / centres.length
       const target = a.line
       a.members.forEach((m, i) => {
         const d = target - centres[i]!
         if (i === held || Math.abs(d) < 0.01) return
         this.shiftMember(m, a.axis, d)
+        shifted.push(m.id)
       })
       // Keep the members clear of each other along the line, in the order
       // they stand: left to themselves, WebCoLa would separate two that
@@ -1761,10 +1938,11 @@ export class LiveColaEngine {
         .map((m) => ({ m, c: this.memberCentre(m, along) ?? 0 }))
         .sort((p, q) => p.c - q.c)
         .map((p) => p.m)
-      this.pushApart(standing, along)
+      if (apart) this.pushApart(standing, along)
     }
     // Ordered lines: the same, in the order asked for.
-    for (const o of this.groupOrders) this.pushApart(o.members, o.along)
+    if (apart) for (const o of this.groupOrders) this.pushApart(o.members, o.along)
+    return shifted
   }
 
   /** Pushes each member clear of the previous one along `along`; when the
@@ -1840,7 +2018,12 @@ export class LiveColaEngine {
   // ─── Emit positions to store ───────────────────────────────────────────────
   // Reads absolute positions from cola nodes/groups, converts to RF-relative.
 
-  private emitPositions(): void {
+  /** `exact`: where a run or a drop ends, every change is reported, however
+   *  small. Changes under REPORT_PX left the canvas and the saved file up
+   *  to half a pixel off what the layout had: a group just off its row by
+   *  that much was snapped onto it, and every container refit, on the next
+   *  load. */
+  private emitPositions(exact = false): void {
     // 1. Collect absolute top-left positions from cola
     const abs: Record<string, { x: number; y: number; width?: number; height?: number }> = {}
 
@@ -1917,13 +2100,16 @@ export class LiveColaEngine {
     let any = false
     for (const [id, pos] of Object.entries(result)) {
       const last = this.reported.get(id)
+      const within = exact ? 0 : REPORT_PX
       if (last
-        && Math.abs(last.x - pos.x) <= REPORT_PX && Math.abs(last.y - pos.y) <= REPORT_PX
-        && Math.abs((last.width ?? 0) - (pos.width ?? 0)) <= REPORT_PX
-        && Math.abs((last.height ?? 0) - (pos.height ?? 0)) <= REPORT_PX) continue
+        && Math.abs(last.x - pos.x) <= within && Math.abs(last.y - pos.y) <= within
+        && Math.abs((last.width ?? 0) - (pos.width ?? 0)) <= within
+        && Math.abs((last.height ?? 0) - (pos.height ?? 0)) <= within) continue
       this.reported.set(id, pos)
       changed[id] = pos
       any = true
+      const leaf = this.idToNode.get(id)
+      if (leaf) this.modelAbs.set(id, { x: leaf.x - leaf.realWidth / 2, y: leaf.y - leaf.realHeight / 2 })
     }
     if (any) this.callbacks.applyPositions(changed)
   }
