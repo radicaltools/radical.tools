@@ -5152,6 +5152,8 @@ export const useDiagramStore = create<DiagramStore>()(
         let placed: string[] | null = null
         const wasCanvas = (view.kind ?? 'static') === 'static'
         const explored = isExploration(view) ? view : null
+        // Turned into an exploration on screen: the camera shows its start.
+        let framed: string | null = null
         set((state) => {
           const shown = state.activeViewId === viewId
           const nodes = state.c4Nodes as Record<string, C4Node>
@@ -5204,7 +5206,10 @@ export const useDiagramStore = create<DiagramStore>()(
             const hidden = explorationLines(grownView, nodes, relations).hidden
             if (hidden.length) v.hiddenRelationIds = hidden
             else delete v.hiddenRelationIds
-            if (shown) placed = showCanvasPositions(nodes, places, v, relations)
+            if (shown) {
+              placed = showCanvasPositions(nodes, places, v, relations)
+              framed = start
+            }
             return
           }
           // Shown as a table (or another kind with no canvas), the view keeps
@@ -5229,6 +5234,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // shown as no canvas, lays nothing out).
         if (placed) _liveLayout?.reset(placed)
         else if (get().activeViewId === viewId) _liveLayout?.reset()
+        if (framed && typeof window !== 'undefined') (window as any).__rfShowAdded?.(get().views[viewId]?.nodeIds ?? [], [framed])
       },
 
       setTreemapFocus(viewId, focusId) {
