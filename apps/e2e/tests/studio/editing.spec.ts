@@ -79,25 +79,40 @@ test('fit, zoom and Smart Layout sit on the canvas, not in the toolbar', async (
   await expect(page.locator('.canvas-controls')).toHaveCount(0)
 })
 
-test('a click on an open panel section folds it; another section opens alone', async ({ page }) => {
-  const header = (side: string, title: string) => page.locator(`.${side}-panel .lp-section-header`, { hasText: title })
-  // A folded section keeps its content, at no height.
-  const isOpen = (side: string, title: string) => page.locator(`.${side}-panel .lp-section`)
-    .filter({ has: page.locator('.lp-section-header', { hasText: title }) }).locator('.lp-section-body.open')
-  await expect(isOpen('left', 'Views')).toHaveCount(1)
-  await header('left', 'Views').click()
-  await expect(isOpen('left', 'Views')).toHaveCount(0)
-  await header('left', 'Views').click()
-  await expect(isOpen('left', 'Views')).toHaveCount(1)
-  await header('left', 'Milestones').click()
-  await expect(isOpen('left', 'Views')).toHaveCount(0)
-  await expect(isOpen('left', 'Milestones')).toHaveCount(1)
-  await header('left', 'Sequences').click()
-  await expect(isOpen('left', 'Milestones')).toHaveCount(0)
-  await expect(isOpen('left', 'Sequences')).toHaveCount(1)
-  // A folded section says what it holds.
-  await expect(header('left', 'Views')).toContainText('Open: System Context')
-  await expect(header('left', 'Milestones')).toContainText(/Latest: |None saved yet/)
+test('the left panel\'s sections are tabs on the activity rail, one open beside it, and say what they hold', async ({ page }) => {
+  const tab = (title: string) => page.getByRole('tab', { name: title })
+  const section = (title: string) => page.getByRole('tabpanel', { name: title })
+  await expect(tab('Views')).toHaveAttribute('aria-selected', 'true')
+  await expect(section('Views')).toBeVisible()
+  // The open one folds the panel away and back, as in VS Code; the rail stays.
+  await tab('Views').click()
+  await expect(page.locator('.left-panel.collapsed')).toHaveCount(1)
+  await expect(tab('Views')).toHaveAttribute('aria-selected', 'false')
+  await expect(tab('Views')).toBeVisible()
+  await tab('Views').click()
+  await expect(page.locator('.left-panel.collapsed')).toHaveCount(0)
+  await expect(section('Views')).toBeVisible()
+  // The chevron on the panel's edge only folds it; the rail opens it again.
+  await page.getByRole('button', { name: 'Collapse panel' }).click()
+  await expect(page.locator('.left-panel.collapsed')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /(Collapse|Expand) panel/ })).toHaveCount(0)
+  await tab('Views').click()
+  await expect(section('Views')).toBeVisible()
+  // Another one, from a folded panel too, opens the panel on it.
+  await tab('Views').click()
+  await tab('Milestones').click()
+  await expect(page.locator('.left-panel.collapsed')).toHaveCount(0)
+  await expect(section('Views')).toBeHidden()
+  await expect(section('Milestones')).toBeVisible()
+  // ↓ moves to the next tab and opens it.
+  await page.keyboard.press('ArrowDown')
+  await expect(tab('Sequences')).toBeFocused()
+  await expect(section('Sequences')).toBeVisible()
+  await expect(section('Milestones')).toBeHidden()
+  // Each tab gives its count, and on hover what its section holds.
+  await expect(tab('Views')).toContainText(/\d+/)
+  await expect(tab('Views')).toHaveAttribute('title', 'Views · Open: System Context')
+  await expect(tab('Milestones')).toHaveAttribute('title', /Milestones · (Latest: |None saved yet)/)
 })
 
 test('rename an element in the properties panel', async ({ page, studio }) => {
@@ -153,8 +168,7 @@ test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor 
     await page.keyboard.press('ControlOrMeta+z')
   }
   await toolbar.getByRole('button', { name: 'Designer', exact: true }).click()
-  await page.getByTitle('Menu', { exact: true }).click()
-  await page.getByText(/Metamodel editor/).first().click()
+  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
   await expect(undo).toHaveCount(0)
   await expect(redo).toHaveCount(0)
@@ -297,7 +311,7 @@ test('removing one of two steps of the same relation leaves the list as the sequ
   // The rows were keyed by relation id: after removing step 2 the list
   // still showed it, and removing it again took another step.
   await studio.open('v-containers')
-  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
   const edge = page.locator('[data-testid="rf__edge-r2"] path.react-flow__edge-interaction').first()
   const mid = await edge.evaluate((el) => {
@@ -346,7 +360,7 @@ test('a step note shows the note after Undo, and leaving it unchanged writes not
   // The note field was left to itself: after Undo it kept the undone text,
   // and a click into it and out wrote that text back.
   await studio.open('v-containers')
-  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
   const note = page.locator('.right-panel .seq-step input').first()
   await expect(note).toHaveValue('submits the order')
@@ -372,7 +386,7 @@ test('a step turned to run the other way is drawn back as a response, kept, and 
   // provider's reply to the API) had no way to be a step of a flow.
   await page.locator('.lp-view-card', { hasText: 'Place Order Flow' }).click()
   await expect(page.locator('.seq-diagram-step')).toHaveCount(4)
-  await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+  await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
   const step = page.locator('.seq-step').nth(3)
   await expect(step).toContainText('API → Payment Provider')
@@ -404,7 +418,7 @@ for (const mode of ['viewer', 'presenter'] as const) {
     // Picking one turned on "Editing", and a click on a relation added a
     // step (never saved, gone back in Designer).
     await studio.open('v-containers', mode)
-    await page.locator('[class*=header]', { hasText: /^SEQUENCES/i }).first().click()
+    await page.getByRole('tab', { name: 'Sequences' }).click()
     await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
     await expect(page.getByText(/Sequence: Place Order/)).toBeVisible()
     await expect(page.getByText(/Editing: Place Order/)).toHaveCount(0)
@@ -432,7 +446,7 @@ test('a dialog keeps the keys: Tab stays in it, Ctrl+Z and F5 leave the model be
   // presentation; the first Tab left for the toolbar behind.
   await studio.addFromPalette('Software System', await studio.nearBottom())
   await expect(studio.nodes).toHaveCount(4)
-  await page.getByTitle('Menu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByRole('menuitem', { name: /Manage models/ }).click()
   const models = page.getByRole('dialog', { name: 'Models' })
   await expect(models).toBeVisible()
@@ -448,8 +462,36 @@ test('a dialog keeps the keys: Tab stays in it, Ctrl+Z and F5 leave the model be
   await expect(studio.nodes).toHaveCount(4)
 })
 
-test('the Radical menu answers ↑ and ↓ and closes when Tab leaves it', async ({ page }) => {
-  await page.getByTitle('Menu', { exact: true }).click()
+test('the activity rail keeps the app\'s menus in the metamodel editor, without the panel\'s sections', async ({ page }) => {
+  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Metamodel editor', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('tab', { name: 'Views' })).toHaveCount(0)
+  for (const name of ['Models', 'AI', 'Export', 'Settings']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+})
+
+test('the toolbar groups undo, navigation around Quick Search, and the branch\'s changes beside the perspectives', async ({ page }) => {
+  const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
+  const edit = await box(page.getByRole('group', { name: 'Edit' }))
+  const navigate = await box(page.getByRole('group', { name: 'Navigate' }))
+  const history = await box(page.getByRole('button', { name: 'History' }))
+  const search = await box(page.locator('.quick-search-bar'))
+  const changes = await box(page.locator('.toolbar .branch-btn'))
+  const modes = await box(page.locator('.toolbar-mode-switch'))
+  // Undo and Redo after the logo, before the navigation.
+  expect(edit.x + edit.width).toBeLessThan(navigate.x)
+  // ‹ › just before Quick Search, the clock just after it, as in VS Code.
+  expect(navigate.x + navigate.width).toBeLessThanOrEqual(search.x)
+  expect(search.x - (navigate.x + navigate.width)).toBeLessThan(16)
+  expect(history.x).toBeGreaterThanOrEqual(search.x + search.width)
+  expect(history.x - (search.x + search.width)).toBeLessThan(16)
+  // The branch's changes beside the perspectives, clear of the clock.
+  expect(changes.x).toBeGreaterThan(history.x + history.width)
+  expect(changes.x + changes.width).toBeLessThanOrEqual(modes.x)
+})
+
+test('a menu of the activity rail answers ↑ and ↓ and closes when Tab leaves it', async ({ page }) => {
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.keyboard.press('ArrowDown')
   await expect(page.getByRole('menuitem', { name: /Manage models/ })).toBeFocused()
   await page.keyboard.press('ArrowDown')

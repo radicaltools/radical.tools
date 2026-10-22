@@ -96,7 +96,7 @@ export function activeProviderNeedsKey(settings: AISettings): boolean {
 }
 
 /** Why Radical Forge is not offered: it runs on an AI provider. */
-export const FORGE_NEEDS_AI = 'Radical Forge needs an AI provider. Set one up in the Radical menu → AI providers…'
+export const FORGE_NEEDS_AI = 'Radical Forge needs an AI provider. Set one up under AI → AI providers… on the activity rail'
 
 /** AI is switched on and the active provider can be called. */
 export function aiReady(settings: AISettings): boolean {

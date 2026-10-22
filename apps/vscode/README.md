@@ -78,7 +78,7 @@ Three built-in presets ship with the extension:
 | **C4** | Person, System, Container, Component, Database, Web App, Queue, Group |
 
 New files are initialised with the **Radical** metamodel. Files made with the former *C4 + DDD* preset open under it, since it holds all of their types.  
-The metamodel can be customised per-document via the Radical menu → Schema → Metamodel editor.
+The metamodel can be customised per-document with the metamodel editor button on the activity rail.
 
 ---
 

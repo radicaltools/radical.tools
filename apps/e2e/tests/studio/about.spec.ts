@@ -5,7 +5,7 @@ test.describe('About Radical Studio', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await studio.seed()
     await studio.open('v-context')
-    await page.getByTitle('Menu', { exact: true }).click()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await page.getByRole('menuitem', { name: 'About Radical Studio' }).click()
 
     const about = page.getByRole('dialog', { name: 'About Radical Studio' })
@@ -30,11 +30,18 @@ test.describe('About Radical Studio', () => {
     await expect(about).toBeHidden()
   })
 
-  test('the Radical menu scrolls in a window lower than it is tall, so About is reached', async ({ page, studio }) => {
+  test('the logo on the toolbar opens About', async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-context')
+    await page.getByRole('button', { name: /Radical/ }).first().click()
+    await expect(page.getByRole('dialog', { name: 'About Radical Studio' })).toBeVisible()
+  })
+
+  test('the Settings menu fits a low window, so About is reached', async ({ page, studio }) => {
     await studio.seed()
     await studio.open('v-context')
     await page.setViewportSize({ width: 1280, height: 650 })
-    await page.getByTitle('Menu', { exact: true }).click()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
     const menu = page.locator('.app-menu-popover')
     await expect(menu).toBeVisible()
     const box = (await menu.boundingBox())!

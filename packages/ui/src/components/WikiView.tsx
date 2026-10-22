@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { useCardOpen, useShowRequest } from '../store/showInView'
 import {
   GROUP_TYPE,
   isPlacementAllowed,
@@ -439,6 +440,25 @@ export function WikiView(): React.ReactElement {
     }
   }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes])
 
+  // An open properties card goes along to the page read; a closed one (✕
+  // too) stays closed. The Overview and Glossary leave it as it is.
+  const lastFocus = useRef(focusId)
+  useEffect(() => {
+    if (lastFocus.current === focusId) return
+    lastFocus.current = focusId
+    const s = useDiagramStore.getState()
+    if (!focusId || !c4Nodes[focusId] || !useCardOpen.getState().open || s.selectedNodeId === focusId) return
+    s.setSelectedNodeIds([focusId])
+    s.selectNode(focusId)
+  }, [focusId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Another page, or this one asked for again (the card's Views, Quick
+  // Search), opens at its top, not where the page before was scrolled to.
+  // Before the pages' own effects: the glossary scrolls to an entry.
+  const pageRef = useRef<HTMLDivElement>(null)
+  const showSeq = useShowRequest((r) => r.seq)
+  useLayoutEffect(() => { if (pageRef.current) pageRef.current.scrollTop = 0 }, [view?.id, focusId, showSeq])
+
   const typeOrder = useMemo(() => allNodeTypeIds(metamodel), [metamodel])
 
   // The one menu of the view, and the editors a menu opens in a page.
@@ -663,7 +683,7 @@ export function WikiView(): React.ReactElement {
         typeMeta={typeMeta}
         sort={pipelineOf(view)?.sort}
       />
-      <div className="wiki-page">
+      <div className="wiki-page" ref={pageRef}>
         <div className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
@@ -798,15 +818,41 @@ function WikiNav({
   // it is open unless the reader closed it by hand.
   const [byHand, setByHand] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const lower = filter.trim().toLowerCase()
+  // The way to the page in the tree as drawn: a view's filter nests by its
+  // chain's relations (a requirement under the need it derives from), not
+  // by containment. Its first, shortest way from the top.
   const aroundFocus = useMemo(() => {
     const keys = new Set<string>()
-    for (let id: string | undefined = focusId ?? undefined; id && nodes[id] && !keys.has(id); id = nodes[id].parentId ?? undefined) {
+    if (!focusId) return keys
+    const parentOf = new Map<string, string>([[NAV_ROOT, NAV_ROOT]])
+    for (let level = [NAV_ROOT]; level.length && !parentOf.has(focusId);) {
+      const next: string[] = []
+      for (const id of level) {
+        for (const child of childrenOf[id] ?? []) {
+          if (parentOf.has(child.id)) continue
+          parentOf.set(child.id, id)
+          next.push(child.id)
+        }
+      }
+      level = next
+    }
+    for (let id = focusId; id !== NAV_ROOT && parentOf.has(id) && nodes[id]; id = parentOf.get(id)!) {
       keys.add(id)
-      keys.add(typeGroupKey(nodes[id].parentId ?? NAV_ROOT, nodes[id].type))
+      keys.add(typeGroupKey(parentOf.get(id)!, nodes[id].type))
     }
     return keys
-  }, [focusId, nodes])
+  }, [focusId, childrenOf, nodes])
   const isOpen = (key: string, byDefault = false): boolean => byHand.get(key) ?? (aroundFocus.has(key) || byDefault)
+  // Another page opens the way to it, also through a branch closed by hand.
+  useEffect(() => {
+    setByHand((prev) => {
+      const closed = [...prev].filter(([key, open]) => !open && aroundFocus.has(key))
+      if (!closed.length) return prev
+      const next = new Map(prev)
+      for (const [key] of closed) next.delete(key)
+      return next
+    })
+  }, [focusId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The pages the search finds: by name, or by what the page says.
   const hits = useMemo(() => {
@@ -823,11 +869,18 @@ function WikiNav({
   const toggle = (key: string, byDefault = false): void =>
     setByHand((prev) => new Map(prev).set(key, !isOpen(key, byDefault)))
 
-  // Bring the page being read into sight when it changes.
+  // Bring the page being read into sight when it changes, once its row is
+  // drawn (after a branch closed by hand opened).
   const treeRef = useRef<HTMLDivElement | null>(null)
+  const toReveal = useRef<string | null | undefined>(undefined)
+  useEffect(() => { toReveal.current = focusId }, [focusId])
   useEffect(() => {
-    treeRef.current?.querySelector('.wiki-nav-item.active')?.scrollIntoView({ block: 'nearest' })
-  }, [focusId])
+    if (toReveal.current === undefined) return
+    const active = treeRef.current?.querySelector('.wiki-nav-item.active')
+    if (!active) return
+    toReveal.current = undefined
+    active.scrollIntoView?.({ block: 'nearest' })
+  })
 
   const rank = (type: string): number => {
     const i = typeOrder.indexOf(type)
@@ -1917,8 +1970,28 @@ function WikiElementPage({
   // designer, [edit] with the menu of the element (which a right click on
   // the heading opens too).
   const menuTarget: MenuTarget = { nodeId: node.id }
+  // The page's element in the properties card, over the right of the view
+  // (read-only out of Designer); a slide has no card.
+  const presenting = useDiagramStore((s) => s.presentationActive)
+  const carded = useDiagramStore((s) => s.selectedNodeId === node.id && s.selectedNodeIds.length <= 1)
+  const openProperties = () => {
+    const s = useDiagramStore.getState()
+    s.setSelectedNodeIds([node.id])
+    s.selectNode(node.id)
+    ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
+  }
   const tools = (
     <span className="wiki-tools">
+      {!embedded && !presenting && (
+        <button
+          className={`wiki-tool${carded ? ' active' : ''}`}
+          title="Show this element in the properties card"
+          aria-label={`Properties of ${node.label}`}
+          onClick={openProperties}
+        >
+          properties
+        </button>
+      )}
       {embedded && (
         <button
           className="wiki-tool"

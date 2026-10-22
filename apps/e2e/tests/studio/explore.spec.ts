@@ -401,7 +401,7 @@ test('Explore from here in Viewer follows the milestone shown and saves nothing'
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   await page.waitForTimeout(1000)
   const stored = await studio.storedJson(docId)
-  await page.locator('.lp-section-header', { hasText: 'Milestones' }).click()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
   await studio.settle()
 

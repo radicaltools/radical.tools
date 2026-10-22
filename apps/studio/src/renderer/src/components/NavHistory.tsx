@@ -65,8 +65,26 @@ function NavButton({ dir, target, disabled, onClick }: { dir: 'back' | 'forward'
   )
 }
 
-export function NavHistory(): React.ReactElement {
+/** Back and forward (`arrows`, which also take the keys), or the History
+ *  list (`list`): the toolbar puts them either side of Quick Search. */
+export function NavHistory({ part }: { part: 'arrows' | 'list' }): React.ReactElement {
+  if (part === 'arrows') return <NavArrows />
+  return <NavList />
+}
+
+function NavArrows(): React.ReactElement {
   useNavKeys()
+  const entries = useNavHistory((s) => s.entries)
+  const index = useNavHistory((s) => s.index)
+  return (
+    <div className="nav-history">
+      <NavButton dir="back" target={entries[index - 1]} disabled={index <= 0} onClick={goBack} />
+      <NavButton dir="forward" target={entries[index + 1]} disabled={index >= entries.length - 1} onClick={goForward} />
+    </div>
+  )
+}
+
+function NavList(): React.ReactElement {
   const entries = useNavHistory((s) => s.entries)
   const index = useNavHistory((s) => s.index)
   const [open, setOpen] = useState(false)
@@ -83,9 +101,7 @@ export function NavHistory(): React.ReactElement {
   // Newest first; what is ahead of the current place (after going back) on top.
   const listed = entries.map((e, i) => ({ e, i })).reverse()
   return (
-    <div className="nav-history" ref={box}>
-      <NavButton dir="back" target={entries[index - 1]} disabled={index <= 0} onClick={goBack} />
-      <NavButton dir="forward" target={entries[index + 1]} disabled={index >= entries.length - 1} onClick={goForward} />
+    <div className="nav-history nav-history-list" ref={box}>
       <button type="button" className={`toolbar-btn nav-btn${open ? ' active' : ''}`} aria-label="History" aria-haspopup="menu" aria-expanded={open} title="History" onClick={() => setOpen((o) => !o)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
       </button>

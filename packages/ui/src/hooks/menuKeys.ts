@@ -1,7 +1,7 @@
 // ─── A menu's keys ───────────────────────────────────────────────────────────
 //
-// The Radical menu and the selection actions' menus (Wrap into…, Move to…,
-// Change source/destination…) did not answer ↑/↓, and the Radical menu
+// The app's menus and the selection actions' menus (Wrap into…, Move to…,
+// Change source/destination…) did not answer ↑/↓, and the app's menu
 // stayed open when Tab left it.
 
 import { useEffect, useRef, type RefObject } from 'react'

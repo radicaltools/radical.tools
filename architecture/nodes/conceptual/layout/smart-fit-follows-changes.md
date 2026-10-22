@@ -4,6 +4,6 @@ type: "requirement"
 label: "Smart Fit follows changes"
 action: "Studio shall re-fit the camera to the visible elements every 300 ms, except while a presentation is running."
 ears_type: "state-driven"
-precondition: "Smart Fit is switched on in the Radical menu"
+precondition: "Smart Fit is switched on under Settings on the activity rail"
 rationale: "Keeping the camera fitted is useful while importing or laying out, and must not fight a slide's own framing. Evidence: packages/ui/src/store/diagramStore.ts:4344-4365; apps/studio/src/renderer/src/components/Toolbar.tsx:395; packages/ui/tests/autoFit.test.ts:41-148; manual#layout"
 ---

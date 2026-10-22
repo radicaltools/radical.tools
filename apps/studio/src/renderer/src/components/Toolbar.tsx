@@ -1,4 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { useRailSlot } from '@radical/ui/components/RightPanel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
@@ -173,15 +175,6 @@ const IconView = () => (
   </svg>
 )
 
-const IconMetamodel = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4}>
-    <rect x="1.5" y="2" width="5" height="4" rx="0.6" />
-    <rect x="9.5" y="2" width="5" height="4" rx="0.6" />
-    <rect x="5.5" y="10" width="5" height="4" rx="0.6" />
-    <path d="M4 6v2h8V6M8 8v2" strokeLinecap="round" />
-  </svg>
-)
-
 const IconAI = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 2.5l.7 1.6L7.3 4.8l-1.6.7L5 7.1l-.7-1.6L2.7 4.8l1.6-.7z" fill="currentColor" stroke="none" />
@@ -234,10 +227,91 @@ const IconClipboard = () => (
   </svg>
 )
 
-// ── App menu (hamburger popover) ─────────────────────────────────────────────
+// ── App menus (the activity rail's foot, as in VS Code) ──────────────────────
 
 type ConnectionMod = 'alt' | 'shift' | 'ctrl' | 'meta'
+type RailMenuId = 'models' | 'ai' | 'export' | 'settings'
 
+// The rail's own icons: drawn on a 24 grid, larger and bolder than the
+// menus' 16 px ones, so they read at a glance.
+const RailIcon = ({ children }: { children: React.ReactNode }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    {children}
+  </svg>
+)
+const RailIconModels = () => (
+  <RailIcon>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <path d="M3 10h18" />
+  </RailIcon>
+)
+const RailIconMetamodel = () => (
+  <RailIcon>
+    <rect x="9" y="3" width="6" height="5" rx="1" />
+    <rect x="3" y="16" width="6" height="5" rx="1" />
+    <rect x="15" y="16" width="6" height="5" rx="1" />
+    <path d="M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+  </RailIcon>
+)
+const RailIconAI = () => (
+  <RailIcon>
+    <path d="M10 3.5 11.6 8a2 2 0 0 0 1.2 1.2l4.5 1.6-4.5 1.6a2 2 0 0 0-1.2 1.2L10 18.1l-1.6-4.5a2 2 0 0 0-1.2-1.2L2.7 10.8l4.5-1.6A2 2 0 0 0 8.4 8Z" />
+    <path d="M18.5 3v4M16.5 5h4M18 16v3M16.5 17.5h3" />
+  </RailIcon>
+)
+const RailIconExport = () => (
+  <RailIcon>
+    <path d="M12 15V3M7.5 7.5 12 3l4.5 4.5" />
+    <path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
+  </RailIcon>
+)
+const RailIconSettings = () => (
+  <RailIcon>
+    <path d="M10.3 3.2a1.7 1.7 0 0 1 3.4 0l.2 1a1.7 1.7 0 0 0 2.5 1.1l.9-.5a1.7 1.7 0 0 1 2.4 2.4l-.5.9a1.7 1.7 0 0 0 1.1 2.5l1 .2a1.7 1.7 0 0 1 0 3.4l-1 .2a1.7 1.7 0 0 0-1.1 2.5l.5.9a1.7 1.7 0 0 1-2.4 2.4l-.9-.5a1.7 1.7 0 0 0-2.5 1.1l-.2 1a1.7 1.7 0 0 1-3.4 0l-.2-1a1.7 1.7 0 0 0-2.5-1.1l-.9.5a1.7 1.7 0 0 1-2.4-2.4l.5-.9a1.7 1.7 0 0 0-1.1-2.5l-1-.2a1.7 1.7 0 0 1 0-3.4l1-.2a1.7 1.7 0 0 0 1.1-2.5l-.5-.9a1.7 1.7 0 0 1 2.4-2.4l.9.5a1.7 1.7 0 0 0 2.5-1.1Z" />
+    <circle cx="12" cy="12" r="3" />
+  </RailIcon>
+)
+
+/** One button at the foot of the activity rail and the menu it opens beside
+ *  the rail; ↑/↓, Escape and Tab as in any menu (useMenuKeys). */
+function RailMenu({ id, label, icon, open, onOpen, onClose, children }: {
+  id: RailMenuId
+  label: string
+  icon: React.ReactNode
+  open: boolean
+  onOpen: (id: RailMenuId | null) => void
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useOutsideClick([wrapRef], open, onClose)
+  useMenuKeys(wrapRef, open, onClose)
+  return (
+    <div className="rail-menu" ref={wrapRef}>
+      <button
+        type="button"
+        className={`rail-action${open ? ' open' : ''}`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onOpen(open ? null : id)}
+      >
+        {icon}
+      </button>
+      {open && (
+        <div className="app-menu-popover rail-flyout" role="menu" aria-label={label}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Radical's logo on the toolbar, and what its menu held as menus at the
+ *  foot of the activity rail (ActivityRail): Models, the metamodel editor,
+ *  AI, Export and Settings, About last in Settings. A click on the logo is
+ *  About. */
 function AppMenu({
   onManage, activeDocLabel, activeDocSource,
   connectionModifier, setConnectionModifier,
@@ -273,12 +347,13 @@ function AppMenu({
   onOpenAbout: () => void
   exportBusy: boolean
 }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<RailMenuId | null>(null)
+  const close = useCallback(() => setMenu(null), [])
+  const slot = useRailSlot((s) => s.el)
   // Radical Forge talks to an AI provider: without one it is offered
   // disabled (it saved the description, made its views and fetched the
   // Hub's index before saying so). Read each time the menu opens.
-  const forgeReady = open && aiReady(loadAISettings())
+  const forgeReady = menu === 'ai' && aiReady(loadAISettings())
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
   // How the model's canvases draw relations (All elements, and the views
   // that do not choose their own in their properties).
@@ -300,44 +375,14 @@ function AppMenu({
     })
   }, [])
 
-  // Close on outside-click (covers pointerdown + mousedown, capture phase
-  // so descendants that call stopPropagation can't keep the menu open).
-  useOutsideClick([wrapRef], open, useCallback(() => setOpen(false), []))
-  useMenuKeys(wrapRef, open, () => setOpen(false))
+  const run = (fn: () => void) => () => { setMenu(null); fn() }
+  const railMenu = (id: RailMenuId, label: string, icon: React.ReactNode, children: React.ReactNode) => (
+    <RailMenu id={id} label={label} icon={icon} open={menu === id} onOpen={setMenu} onClose={close}>{children}</RailMenu>
+  )
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => { window.removeEventListener('keydown', onKey) }
-  }, [open])
-
-  const run = (fn: () => void) => () => { setOpen(false); fn() }
-
-  return (
-    <div className="app-menu-wrap" ref={wrapRef}>
-      <button
-        className={`app-brand${open ? ' open' : ''}`}
-        onClick={() => setOpen((o) => !o)}
-        title="Menu"
-        aria-haspopup="true"
-        aria-expanded={open}
-      >
-        <span className="app-brand-logo" aria-hidden>
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
-            <path d="M10 1.8 L17.5 6 V14 L10 18.2 L2.5 14 V6 Z" fill="rgba(var(--accent-rgb),0.18)" />
-            <circle cx="10" cy="10" r="2.4" fill="currentColor" stroke="none" />
-          </svg>
-        </span>
-        <span className="app-brand-name">Radical</span>
-        <span className={`app-brand-caret${open ? ' open' : ''}`} aria-hidden>
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 6 L8 10 L12 6" />
-          </svg>
-        </span>
-      </button>
-      {open && (
-        <div className="app-menu-popover" role="menu">
+  const menus = (
+    <>
+      {railMenu('models', 'Models', <RailIconModels />, (
           <div className="app-menu-section">
             <div className="app-menu-label">Models</div>
             <button className="app-menu-item" role="menuitem" onClick={run(onManage)}>
@@ -359,90 +404,18 @@ function AppMenu({
               <span className="app-menu-text">Import from Hub…</span>
             </button>
           </div>
-
-          <div className="app-menu-divider" />
-
-          <div className="app-menu-section">
-            <div className="app-menu-label">Schema</div>
-            <button
-              className={`app-menu-item${metamodelActive ? ' active' : ''}`}
-              role="menuitemcheckbox"
-              aria-checked={metamodelActive}
-              onClick={run(onToggleMetamodel)}
-              title="Define object types, relations and constraints"
-            >
-              <span className="app-menu-icon"><IconMetamodel /></span>
-              <span className="app-menu-text">
-                {metamodelActive ? 'Close metamodel editor' : 'Metamodel editor…'}
-              </span>
-            </button>
-          </div>
-
-          <div className="app-menu-divider" />
-
-          <div className="app-menu-section">
-            <div className="app-menu-label">View</div>
-            <button className="app-menu-item" role="menuitem" onClick={run(onToggleTheme)}>
-              <span className="app-menu-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
-              <span className="app-menu-text">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </button>
-            <button
-              className={`app-menu-item${smartFitActive ? ' active' : ''}`}
-              role="menuitemcheckbox"
-              aria-checked={smartFitActive}
-              onClick={run(onToggleSmartFit)}
-            >
-              <span className="app-menu-icon"><IconSmartFit /></span>
-              <span className="app-menu-text">Smart fit {smartFitActive ? '(on)' : '(off)'}</span>
-            </button>
-            <div className="app-menu-row">
-              <span className="app-menu-row-label">Lines in this model</span>
-              <select
-                className="app-menu-select"
-                aria-label="Lines in this model"
-                value={defaultEdgeStyle}
-                disabled={!editable}
-                onChange={(e) => setDefaultEdgeStyle(e.target.value as 'curved' | 'orthogonal')}
-                title="How All elements, and every view that does not choose its own in its properties, draws relations"
-              >
-                <option value="curved">Curved</option>
-                <option value="orthogonal">Orthogonal</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="app-menu-divider" />
-
-          <div className="app-menu-section">
-            <div className="app-menu-label">Editing</div>
-            <div className="app-menu-row">
-              <span className="app-menu-row-label">Connect key</span>
-              <select
-                className="app-menu-select"
-                value={connectionModifier}
-                onChange={(e) => setConnectionModifier(e.target.value as ConnectionMod)}
-              >
-                <option value="alt">{isMac ? '⌥ Option' : 'Alt'}</option>
-                <option value="shift">⇧ Shift</option>
-                <option value="ctrl">Ctrl</option>
-                <option value="meta">{isMac ? '⌘ Cmd' : '⊞ Win'}</option>
-              </select>
-            </div>
-            <label
-              className="app-menu-row"
-              title="Open a guided form when you create a node whose type has a wizard (ADR, Requirement, …). The wizard stays available from the properties panel either way."
-            >
-              <span className="app-menu-row-label">Wizard on create</span>
-              <input
-                type="checkbox"
-                checked={studioSettings.nodeWizardOnCreate}
-                onChange={(e) => setNodeWizardOnCreate(e.target.checked)}
-              />
-            </label>
-          </div>
-
-          <div className="app-menu-divider" />
-
+      ))}
+      <button
+        type="button"
+        className={`rail-action${metamodelActive ? ' active' : ''}`}
+        title={metamodelActive ? 'Close metamodel editor' : 'Metamodel editor — object types, relations and constraints'}
+        aria-label="Metamodel editor"
+        aria-pressed={metamodelActive}
+        onClick={() => { setMenu(null); onToggleMetamodel() }}
+      >
+        <RailIconMetamodel />
+      </button>
+      {railMenu('ai', 'AI', <RailIconAI />, (
           <div className="app-menu-section">
             <div className="app-menu-label">AI</div>
             <button
@@ -471,9 +444,8 @@ function AppMenu({
               </span>
             </button>
           </div>
-
-          <div className="app-menu-divider" />
-
+      ))}
+      {railMenu('export', 'Export', <RailIconExport />, (
           <div className="app-menu-section">
             <div className="app-menu-label">Export</div>
             <button
@@ -504,18 +476,90 @@ function AppMenu({
               <span className="app-menu-text">Copy to clipboard</span>
             </button>
           </div>
-
+      ))}
+      {railMenu('settings', 'Settings', <RailIconSettings />, (<>
+          <div className="app-menu-section">
+            <div className="app-menu-label">View</div>
+            <button className="app-menu-item" role="menuitem" onClick={run(onToggleTheme)}>
+              <span className="app-menu-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
+              <span className="app-menu-text">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            </button>
+            <button
+              className={`app-menu-item${smartFitActive ? ' active' : ''}`}
+              role="menuitemcheckbox"
+              aria-checked={smartFitActive}
+              onClick={run(onToggleSmartFit)}
+            >
+              <span className="app-menu-icon"><IconSmartFit /></span>
+              <span className="app-menu-text">Smart fit {smartFitActive ? '(on)' : '(off)'}</span>
+            </button>
+            <div className="app-menu-row">
+              <span className="app-menu-row-label">Lines in this model</span>
+              <select
+                className="app-menu-select"
+                aria-label="Lines in this model"
+                value={defaultEdgeStyle}
+                disabled={!editable}
+                onChange={(e) => setDefaultEdgeStyle(e.target.value as 'curved' | 'orthogonal')}
+                title="How All elements, and every view that does not choose its own in its properties, draws relations"
+              >
+                <option value="curved">Curved</option>
+                <option value="orthogonal">Orthogonal</option>
+              </select>
+            </div>
+          </div>
           <div className="app-menu-divider" />
-
+          <div className="app-menu-section">
+            <div className="app-menu-label">Editing</div>
+            <div className="app-menu-row">
+              <span className="app-menu-row-label">Connect key</span>
+              <select
+                className="app-menu-select"
+                value={connectionModifier}
+                onChange={(e) => setConnectionModifier(e.target.value as ConnectionMod)}
+              >
+                <option value="alt">{isMac ? '⌥ Option' : 'Alt'}</option>
+                <option value="shift">⇧ Shift</option>
+                <option value="ctrl">Ctrl</option>
+                <option value="meta">{isMac ? '⌘ Cmd' : '⊞ Win'}</option>
+              </select>
+            </div>
+            <label
+              className="app-menu-row"
+              title="Open a guided form when you create a node whose type has a wizard (ADR, Requirement, …). The wizard stays available from the properties panel either way."
+            >
+              <span className="app-menu-row-label">Wizard on create</span>
+              <input
+                type="checkbox"
+                checked={studioSettings.nodeWizardOnCreate}
+                onChange={(e) => setNodeWizardOnCreate(e.target.checked)}
+              />
+            </label>
+          </div>
+          <div className="app-menu-divider" />
           <div className="app-menu-section">
             <button className="app-menu-item" role="menuitem" onClick={run(onOpenAbout)}>
               <span className="app-menu-icon"><IconInfo /></span>
               <span className="app-menu-text">About Radical Studio</span>
             </button>
           </div>
-        </div>
-      )}
-    </div>
+      </>))}
+    </>
+  )
+
+  return (
+    <>
+      <button className="app-brand" onClick={onOpenAbout} title="About Radical Studio">
+        <span className="app-brand-logo" aria-hidden>
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
+            <path d="M10 1.8 L17.5 6 V14 L10 18.2 L2.5 14 V6 Z" fill="rgba(var(--accent-rgb),0.18)" />
+            <circle cx="10" cy="10" r="2.4" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        <span className="app-brand-name">Radical</span>
+      </button>
+      {slot && createPortal(menus, slot)}
+    </>
   )
 }
 
@@ -761,40 +805,34 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
-      {/* Back, forward and the History list: in every perspective. */}
-      <div className="toolbar-sep" />
-      <NavHistory />
-      {/* Not in the Inspector: it lists the changes itself, and has no canvas to mark. */}
-      {appMode !== 'inspector' && (<>
-        <div className="toolbar-sep" />
-        <BranchChangesButton />
-      </>)}
       {/* Undo belongs to Designer: Viewer, Presenter and the Inspector change
           nothing of the model, and the metamodel editor's steps are undone
           back in Designer (shown there, enabled, they did nothing). Fit, zoom
           and Smart Layout are on the canvas (CanvasControls). */}
-      {appMode === 'designer' && (<>
-        <div className="toolbar-sep" />
+      {appMode === 'designer' && (
+        <div className="toolbar-group" role="group" aria-label="Edit">
+          <button className="toolbar-btn toolbar-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
+            <IconUndo />
+          </button>
+          <button className="toolbar-btn toolbar-icon-btn" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⌘⇧Z)">
+            <IconRedo />
+          </button>
+        </div>
+      )}
 
-        <button
-          className="toolbar-btn"
-          onClick={undo}
-          disabled={!canUndo}
-          title="Undo (⌘Z)"
-        >
-          <IconUndo /> Undo
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={redo}
-          disabled={!canRedo}
-          title="Redo (⌘⇧Z)"
-        >
-          <IconRedo /> Redo
-        </button>
-      </>)}
+      {/* As in VS Code, around Quick Search in the middle (App draws it):
+          back and forward before it, the History list after it; in every
+          perspective. The Inspector has no Quick Search: they meet. */}
+      <div className={`toolbar-center${appMode === 'inspector' ? ' no-search' : ''}`}>
+        <div className="toolbar-group" role="group" aria-label="Navigate"><NavHistory part="arrows" /></div>
+        <div className="toolbar-group"><NavHistory part="list" /></div>
+      </div>
 
       <div style={{ flex: 1 }} />
+
+      {/* The model's state on the branch, beside the perspectives; not in the
+          Inspector, which lists the changes itself and has no canvas to mark. */}
+      {appMode !== 'inspector' && <BranchChangesButton />}
 
       <div className="toolbar-mode-switch">
         <button

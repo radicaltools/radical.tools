@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void
 }
 
-/** About Radical Studio, from the Radical menu: the version and build, with
+/** About Radical Studio, from the logo or the activity rail's Settings: the version and build, with
  *  Copy for a bug report and a link to the changelog. */
 export function AboutDialog({ open, onClose }: Props): React.ReactElement | null {
   const [copied, setCopied] = useState(false)
