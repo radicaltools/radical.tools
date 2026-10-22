@@ -367,6 +367,41 @@ runs through the runner `crucible.json` gives for its folder, else with
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
 could not run.
 
+## radical explore
+
+An exploratory round (Radical Crucible): agents look for bugs no test
+describes, each run in its own area. `radical explore` prepares the round and
+checks what comes back; a coding agent's session starts the agents.
+
+```sh
+radical explore prepare --runs 5 --areas "layout under edits; milestones and undo"
+radical explore verify 70 "f1-row.mjs 2" "f2-undo.mjs"
+radical explore record .crucible/rounds/round-70-74/run-70/REPORT.md
+```
+
+`prepare` builds the project once, copies what the runs need into
+`.crucible/rounds/round-<from>-<to>/build`, and gives each run a folder, its
+ports (`<ports>+NN`, `+100+NN`, `+200+NN`) and a `PROMPT.md` with its area;
+`BRIEF.md` names the commit, the commits and the model elements changed since
+the last round (by area), the open findings, the setup, the rules and the
+report's JSON form. `--since`, `--from` and `--no-build` change what it
+counts from, the first run's number and whether it builds. `verify` serves a
+run's build on its port, runs its scripts from its folder and stops the
+server. `record` writes a report's findings (`open`, or `question`) with
+copies of their scripts.
+
+```json
+{ "explore": {
+    "rounds": ".crucible/rounds", "brief": "docs/EXPLORATORY-TESTING.md",
+    "known": ["docs/IMPROVEMENTS.md"], "model": "architecture",
+    "build": [["npm", "run", "build:web"]],
+    "copy": { "renderer": "apps/studio/out/renderer" },
+    "serve": { "cwd": "apps/studio", "command": ["npx", "vite", "preview", "--port", "{port}", "--strictPort", "--outDir", "{build}/renderer"] },
+    "ports": 4500, "rules": ["…"] } }
+```
+
+Exit status: 0 done, 2 radical explore could not run.
+
 ## Publishing (maintainers)
 
 The public npm package is `@radicaltools/cli`. Its private `@radical/*`
