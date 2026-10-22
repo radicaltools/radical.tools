@@ -5,7 +5,7 @@ import { buildToolDefs, noCanvasLayout, runTool, type ToolDef, type ToolRunConte
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
-import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
+import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, keepMdFolderPaths, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { mergeNotices } from '@radical/common/modelMerge'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
@@ -680,7 +680,9 @@ export class FolderModel {
     const warned = !warnings.length ? ''
       : retyped ? ` Warning: the metamodel now flags what the model holds (${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'}; change those elements or the metamodel back, see get_issues):${list}`
       : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
-    const next = serializeToMdFolderWithPaths(changed).files
+    // Each element's file where the folder has it (the session keeps them
+    // too; here so that the files named as changed are the ones written).
+    const next = keepMdFolderPaths(before, serializeToMdFolderWithPaths(changed).files)
     // Preserve the user's manifest prose/name. The format codec only needs
     // to rewrite model-owned sidecars and node Markdown.
     next['radical.md'] = before['radical.md']

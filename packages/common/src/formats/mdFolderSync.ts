@@ -23,7 +23,7 @@
 // its content differs. Operations run one at a time; a poll that would have to
 // wait is skipped rather than queued.
 
-import { deserializeFromMdFolder, isMdFolderModelPath, isOwnedMdFolderFile, serializeToMdFolder, staleMdFolderFiles, type FolderFiles } from './mdFolder'
+import { deserializeFromMdFolder, isMdFolderModelPath, isOwnedMdFolderFile, keepMdFolderPaths, serializeToMdFolder, staleMdFolderFiles, type FolderFiles } from './mdFolder'
 import { mergeModels, type MergeDrop } from '../modelMerge'
 
 /** Where a session's files live. Paths are POSIX, relative to the folder. */
@@ -68,8 +68,9 @@ export const mergeMdFolderFiles: MdFolderMerge = (base, ours, theirs) => {
   try {
     const t = deserializeFromMdFolder(theirs).data
     const { merged, conflicts, dropped, restored } = mergeModels(deserializeFromMdFolder(base).data, deserializeFromMdFolder(ours).data, t)
-    const files = serializeToMdFolder(merged)
-    const theirsAgain = serializeToMdFolder(t)
+    // Each element's file where the folder has it now.
+    const files = keepMdFolderPaths(theirs, serializeToMdFolder(merged))
+    const theirsAgain = keepMdFolderPaths(theirs, serializeToMdFolder(t))
     for (const [path, content] of Object.entries(files)) {
       if (theirs[path] !== undefined && theirsAgain[path] === content) files[path] = theirs[path]
     }
@@ -137,6 +138,8 @@ export class MdFolderSession {
     // A folder never read in this session (a fresh "save as folder", a
     // restarted main process): what is on disk now is the baseline.
     if (!this.loaded) await this.loadBaseline()
+    // An element keeps its file unless it is renamed or moved itself.
+    files = keepMdFolderPaths(this.baselineFiles(), files)
     const stamps = await this.storage.list()
     const conflict = await this.changedSince(stamps)
     let merged: { changed: string[]; conflicts: string[]; dropped?: MergeDrop[]; restored?: string[] } | undefined
@@ -150,7 +153,7 @@ export class MdFolderSession {
       }
       // The folder as the merge read it is what the merged files replace.
       this.baseline = new Map(Object.entries(theirs).map(([path, content]) => [path, { content, stamp: stamps[path] }]))
-      files = result.files
+      files = keepMdFolderPaths(theirs, result.files)
       merged = { changed: conflict, conflicts: result.conflicts, ...(result.dropped?.length ? { dropped: result.dropped } : {}), ...(result.restored?.length ? { restored: result.restored } : {}) }
     }
 

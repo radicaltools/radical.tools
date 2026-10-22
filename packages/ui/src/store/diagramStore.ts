@@ -469,7 +469,7 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = fals
   const c4Nodes: Record<string, C4Node> = {}
   for (const n of Object.values(parts.c4Nodes)) c4Nodes[n.id] = { ...n }
   const c4Relations = parts.c4Relations
-  const views = parts.views
+  const views = { ...parts.views }
   const sequences = parts.sequences ?? {}
   const defaultPositions = merged.defaultPositions ?? {}
   const activeViewId = change.to.activeViewId && views[change.to.activeViewId] ? change.to.activeViewId : null
@@ -480,6 +480,19 @@ function _rebasedEntry(change: StepChange, now: HistoryEntry, inMilestone = fals
   // as a merge of unsaved edits does (Undo of Smart Layout after the agent
   // grew Payment Provider): on All elements, room is made as on a load.
   if (!activeViewId && !change.to.activeViewId) _settleOutsidePlaces(c4Nodes, change.to.c4Nodes)
+  // And on the view it goes back to, which keeps the places made: Undo of
+  // Bookstore's delete, after the agent put Search into it (it came back
+  // with Search alone, drawn where Web App had been), put Web App back on
+  // top of Search.
+  else if (view && activeViewId === change.to.activeViewId) {
+    const canvasOf = (entry: Pick<HistoryEntry, 'views' | 'c4Nodes' | 'c4Relations'>): CanvasSets =>
+      activeCanvasSets({ activeViewId, views: entry.views, exploration: null, c4Nodes: entry.c4Nodes, c4Relations: entry.c4Relations })
+    const settled = _settleOutsidePlaces(c4Nodes, change.to.c4Nodes, canvasOf({ views, c4Nodes, c4Relations }), canvasOf(change.to))
+    if (settled.length) {
+      const placed = snapshotPositions(c4Nodes)
+      views[view.id] = { ...view, positions: { ...view.positions, ...Object.fromEntries(settled.map((id) => [id, placed[id]])) } }
+    }
+  }
   return {
     entry: {
       c4Nodes,
@@ -537,8 +550,8 @@ function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<History
  *  container the agent added into) has room made round it (makeRoomAround),
  *  as an add makes it. Overlaps Studio had already stay. Mutates `nodes`
  *  (copies); returns the ids moved. */
-function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>): string[] {
-  const before = canvasBoxes(was)
+function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>, sets: CanvasSets = {}, wasSets: CanvasSets = {}): string[] {
+  const before = canvasBoxes(was, wasSets.viewFilter, wasSets.viewCollapsedSet, wasSets.expandedSet)
   const overlap = (a: CanvasBox, b: CanvasBox): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
   const sameParent = (a: C4Node, b: C4Node): boolean => (a.parentId ?? undefined) === (b.parentId ?? undefined)
   const placed = (n: C4Node): boolean => {
@@ -547,7 +560,7 @@ function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string,
   }
   const touched: string[] = []
   const settled = new Set<string>()
-  let canvas = canvasBoxes(nodes)
+  let canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
   const siblings = new Map<string, string[]>()
   for (const n of Object.values(nodes)) {
     if (!canvas.shown(n)) continue
@@ -578,16 +591,16 @@ function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string,
         touched.push(id)
       }
       // What was pushed may reach past the parent's frame: it fits again.
-      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes)))
+      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)))
       settled.add(grown.id)
-      canvas = canvasBoxes(nodes)
+      canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
       continue
     }
     // The one the change placed; of two, the one Studio did not have.
     const mover = pa && pb ? (wb ? a : b) : pa ? a : b
     touched.push(mover.id, ...settleMovedNodes(nodes, [mover.id], canvas))
     settled.add(mover.id)
-    canvas = canvasBoxes(nodes)
+    canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
   }
   return [...new Set(touched)]
 }
@@ -837,6 +850,38 @@ function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.Mod
 let _beforeDrag: HistoryEntry | null = null
 /** The exploration as it was when a drag on it began: its step (liveRelease). */
 let _explorationBeforeDrag: Exploration | null = null
+/** A drag is held: from liveGrab until its drop has landed (_dragLanded),
+ *  in any perspective. */
+let _dragHeld = false
+/** Called once at the drop of the drag held now (afterDrag). */
+const _afterDrag: (() => void)[] = []
+/** The drop is made and the layout has yet to hand back where it landed
+ *  (LiveColaLayout.release): the longest it is waited for. */
+let _dropLanding: ReturnType<typeof setTimeout> | null = null
+const DROP_LANDING_MS = 1000
+
+/** The drop of the drag held has landed: what waited for it runs. */
+function _dragLanded(): void {
+  if (_dropLanding !== null) clearTimeout(_dropLanding)
+  _dropLanding = null
+  _dragHeld = false
+  for (const fn of _afterDrag.splice(0)) fn()
+}
+
+/** An element is held in a drag. A model reloaded under the held mouse
+ *  (an agent's write) threw it back to where the drag began, and the drop
+ *  landed short by what was dragged before: an outside change waits for
+ *  the drop (afterDrag). */
+export function dragHeld(): boolean {
+  return _dragHeld
+}
+
+/** Run `fn` once the drag held now is dropped, after the drop is made
+ *  (its place, pin and undo step) and the layout has put it where it
+ *  landed. */
+export function afterDrag(fn: () => void): void {
+  _afterDrag.push(fn)
+}
 
 /**
  * What Designer showed when it was left for Viewer or Presenter
@@ -2226,12 +2271,17 @@ function separateSiblings(
   return result
 }
 
+/** What a canvas draws, folds and opens over a fold (activeCanvasSets). */
+interface CanvasSets {
+  viewFilter?: Set<string>
+  viewCollapsedSet?: Set<string>
+  expandedSet?: Set<string>
+}
+
 /** The sets the canvas shown draws by (as _sync derives them): what the
  *  active view draws, what it folds, what it opens over a fold. None for
  *  All elements. */
-function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | 'exploration' | 'c4Nodes' | 'c4Relations'>): {
-  viewFilter?: Set<string>; viewCollapsedSet?: Set<string>; expandedSet?: Set<string>
-} {
+function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | 'exploration' | 'c4Nodes' | 'c4Relations'>): CanvasSets {
   const view = viewById(state, state.activeViewId)
   if (!view) return {}
   const viewFilter = computeViewNodeSet(view, state.c4Nodes, state.c4Relations)
@@ -6721,6 +6771,9 @@ export const useDiagramStore = create<DiagramStore>()(
         _beforeDrag = designer && !onExploration(get()) ? _captureState(get()) : null
         _explorationBeforeDrag = designer && onExploration(get()) ? explorationNow(get()) : null
         _liveLayout?.grab(nodeId, x, y, mode, abs, withIds)
+        if (_dropLanding !== null) clearTimeout(_dropLanding)
+        _dropLanding = null
+        _dragHeld = true
       },
 
       liveDrag(nodeId, x, y, abs) {
@@ -6728,7 +6781,11 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       liveRelease(nodeId, withIds = [], moved = true) {
-        _liveLayout?.release(nodeId)
+        // Where the drop landed comes from the layout, a frame or more later
+        // (its worker answers): what waits for the drop (afterDrag) runs then.
+        const landing = moved && !!_liveLayout?.running
+        if (landing) _dropLanding = setTimeout(_dragLanded, DROP_LANDING_MS)
+        _liveLayout?.release(nodeId, () => { if (_dropLanding !== null) _dragLanded() })
         // One undo step for the drag: the elements it moved or pushed go
         // back, and the pins it set come off. It used to have none, so the
         // next undo took back the drag together with whatever was done
@@ -6758,6 +6815,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // milestones reverts the move. A click (nothing moved) is no edit: it
         // asked how to save changes nobody had made.
         if (moved) get()._markMilestoneEdit()
+        if (!landing) _dragLanded()
       },
 
       setConnectionModifier(mod) {

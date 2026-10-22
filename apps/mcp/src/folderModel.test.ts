@@ -226,6 +226,26 @@ describe('folder-backed MCP model', () => {
     expect(after.nodes.map((n) => [n.label, n.description ?? '']).sort()).toEqual([['Bank', ''], ['Shop', 'Sells books']])
   })
 
+  it('adds an element named as one already there without moving the other\'s file', async () => {
+    // A second import of a concern pack moved the first import's files to
+    // -2: slugs went by id order, and the new ids sorted first.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [{ id: 'zzzz', type: 'person', label: 'Session owner', x: 0, y: 0, width: 200, height: 100, collapsed: false }] as never
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const first = await readFile(join(folder, 'nodes/session-owner.md'), 'utf8')
+    const model = await FolderModel.open(folder)
+    const added = await model.call('add_node', { tempId: 't1', type: 'person', label: 'Session owner' })
+    expect(added.ok).toBe(true)
+    expect(added.text).toMatch(/Changed: .*nodes\/session-owner-2\.md/)
+    expect(added.text).not.toContain('nodes/session-owner.md')
+    expect(await readFile(join(folder, 'nodes/session-owner.md'), 'utf8')).toBe(first)
+    expect(await readFile(join(folder, 'nodes/session-owner-2.md'), 'utf8')).toContain('Session owner')
+  })
+
   it('marks the folder as written by an agent after each write', async () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)
