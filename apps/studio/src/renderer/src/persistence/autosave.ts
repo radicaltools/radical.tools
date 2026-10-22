@@ -14,7 +14,7 @@ import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
-import { useDiagramStore, historyMark, parkedLiveModel, type ParkedDesigner } from '@radical/ui/store/diagramStore'
+import { useDiagramStore, historyMark, onExploration, parkedLiveModel, viewById, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
 import { host } from '../platform/host'
 import { openFirstView } from '../navigation'
@@ -338,6 +338,12 @@ if (typeof window !== 'undefined') {
       prev = s
       return
     }
+    // Places given on an exploration (Explore from here: a +, a drag) are
+    // its own, and it is never saved: nothing to write.
+    if (modelChanged && onExploration(s) && onExploration(prev) && placesOnlyChange(s, prev)) {
+      prev = s
+      return
+    }
     if (modelChanged && !isExploreMode) _loadedAt = null
     if (!isExploreMode && modelChanged) {
       prev = s
@@ -422,7 +428,8 @@ if (typeof window !== 'undefined') {
         // A reload of the same document keeps the user where they were.
         if (opts?.keepUi) {
           const next = useDiagramStore.getState()
-          if (activeViewId && next.views[activeViewId]) next.setActiveView(activeViewId)
+          // The exploration shown too (it stays through a reload).
+          if (activeViewId && viewById(next, activeViewId)) next.setActiveView(activeViewId)
           if (selectedNodeId && next.c4Nodes[selectedNodeId]) next.selectNode(selectedNodeId)
           // Loading put back the camera saved on disk; keep the one in use.
           if (camera) {

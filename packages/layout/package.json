@@ -13,6 +13,7 @@
     "./portAllocator": "./src/portAllocator.ts",
     "./edgeRouting": "./src/edgeRouting.ts",
     "./edgeLabels": "./src/edgeLabels.ts",
+    "./labelRoom": "./src/labelRoom.ts",
     "./side": "./src/side.ts",
     "./viewInput": "./src/viewInput.ts",
     "./constraints": "./src/constraints.ts",

@@ -17,7 +17,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore } from '../store/diagramStore'
+import { useDiagramStore, viewById } from '../store/diagramStore'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
@@ -29,6 +29,8 @@ import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
+import { ExploreBar } from './ExploreBar'
+import { ExploreMenu } from './ExploreMenu'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
@@ -108,6 +110,9 @@ function draggedNode(grabbedNode: RFNode | undefined, nodes: RFNode[]): RFNode |
 
 /** How long the camera takes to frame a selection, or to go back. */
 const SELECTION_CAMERA_MS = 400
+/** The least zoom the camera shows what an exploration's + added at:
+ *  readable cards. */
+const EXPLORE_MIN_ZOOM = 0.6
 /** Framing a selection zooms in no further than this, or than the zoom in
  *  use when that is closer already. */
 const SELECTION_MAX_ZOOM = 1
@@ -887,6 +892,55 @@ function StructuralCanvas(): React.ReactElement {
     // captured camera right after a slide switch swaps the visible node set.
     ;(window as any).__rfSuppressAutoFit = suppressAutoFit
     ;(window as any).__rfPlaceCamera = placeCamera
+    // Explore from here: what a + (or + 1 level, or the opening) just added,
+    // `ids`, with what it was added from, `from`, at a readable zoom (no
+    // less than EXPLORE_MIN_ZOOM): as many of them, nearest to `from` first,
+    // as fit at that zoom; never a fit of the whole exploration.
+    ;(window as any).__rfShowAdded = (ids: string[], from: string[]) => {
+      const wanted = new Set([...ids, ...from])
+      let frames = 0
+      const frame = () => {
+        const shown = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
+        if (!(shown.length > 0 && shown.every((n) => n.width && n.height)) && ++frames < 30) {
+          requestAnimationFrame(frame)
+          return
+        }
+        const rect = containerRef.current?.getBoundingClientRect()
+        if (!rect || rect.width === 0 || shown.length === 0) return
+        const MARGIN = 60
+        const PADDING = 0.08
+        const freeW = rect.width - paletteCover() - propertiesPanelCover()
+        // As viewportInFree frames them: with the margin, and the padding
+        // round that.
+        const fits = (list: typeof shown): boolean => {
+          const b = getNodesBounds(list)
+          const scale = EXPLORE_MIN_ZOOM * (1 + PADDING)
+          return (b.width + 2 * MARGIN) * scale <= freeW && (b.height + 2 * MARGIN) * scale <= rect.height
+        }
+        // All the elements added from when they fit, else the first of them.
+        const all = shown.filter((n) => from.includes(n.id))
+        const anchors = all.length && !fits(all) ? [all.find((n) => n.id === from.find((id) => all.some((a) => a.id === id)))!] : all
+        const centre = (n: (typeof shown)[number]) => {
+          const p = n.positionAbsolute ?? n.position
+          return { x: p.x + (n.width ?? 0) / 2, y: p.y + (n.height ?? 0) / 2 }
+        }
+        const at = anchors.length ? getNodesBounds(anchors) : getNodesBounds(shown)
+        const mid = { x: at.x + at.width / 2, y: at.y + at.height / 2 }
+        const added = shown.filter((n) => !from.includes(n.id))
+          .sort((a, b) => Math.hypot(centre(a).x - mid.x, centre(a).y - mid.y) - Math.hypot(centre(b).x - mid.x, centre(b).y - mid.y))
+        let framed = [...anchors]
+        for (const n of added) if (fits([...framed, n])) framed.push(n)
+        if (!framed.length) framed = [added[0] ?? shown[0]]
+        const b = getNodesBounds(framed)
+        const target = viewportInFree(
+          { x: b.x - MARGIN, y: b.y - MARGIN, width: b.width + MARGIN * 2, height: b.height + MARGIN * 2 },
+          rect, EXPLORE_MIN_ZOOM, 1, PADDING, true,
+        )
+        suppressAutoFit(SELECTION_CAMERA_MS + 1800)
+        instance.setViewport(target, { duration: SELECTION_CAMERA_MS })
+      }
+      requestAnimationFrame(frame)
+    }
     // Restore the camera saved with the active view (or default context).
     // Falls back to fit-all if no viewport was persisted yet.
     setTimeout(() => {
@@ -913,7 +967,7 @@ function StructuralCanvas(): React.ReactElement {
         return
       }
       const stored = s.activeViewId
-        ? s.views[s.activeViewId]?.viewport ?? null
+        ? viewById(s, s.activeViewId)?.viewport ?? null
         : s.defaultViewport
       if (stored || s.autoFitActive) {
         placeCamera(stored)
@@ -1491,6 +1545,7 @@ function StructuralCanvas(): React.ReactElement {
       </ReactFlow>
 
       <RelationTypeMenu containerRef={containerRef} />
+      <ExploreMenu containerRef={containerRef} />
 
       {connectSource && connectMouse && (
         <ConnectionPreviewLine
@@ -1521,6 +1576,9 @@ function StructuralCanvas(): React.ReactElement {
           Connecting from "{rfNodes.find((n) => n.id === connectSource)?.data?.label ?? connectSource}" — release on target
         </div>
       )}
+
+      {/* An exploration's name, with what is done to it. */}
+      <ExploreBar />
 
       {/* View name caption — bottom-left, same style as SequenceView */}
       {activeViewName && !activeSnapshotId && (
