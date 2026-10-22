@@ -51,8 +51,8 @@ each finding's script:
 node apps/cli/dist/index.js explore verify <run> "f1-name.mjs args" "f2-name.mjs"
 ```
 
-It serves the run's build on the run's port, runs the scripts from the run's
-folder and stops the server. A finding whose script does not show the bug
+It serves the run's build on the run's ports (Studio and the Hub), runs the
+scripts from the run's folder and stops the servers. A finding whose script does not show the bug
 goes to "Seen once", not to the user. Agents' guesses about causes are
 sometimes narrower than the bug: look at the code before repeating one.
 
@@ -64,7 +64,9 @@ node apps/cli/dist/index.js explore record <run folder>/REPORT.md
 
 Edit the report's JSON first if verification dropped or changed a finding.
 Findings go to `crucible/findings/F-NNNN.md` (open), questions with status
-`question`, each with a copy of its script. Duplicates of open findings or of
+`question`, each with a copy of its script and screenshot. When it warns that
+a copied script names the round's absolute paths, make the copy find the
+repository by walking up from its folder. Duplicates of open findings or of
 `docs/IMPROVEMENTS.md` items are left out by you, not by the command.
 
 ## 5. Tell the user

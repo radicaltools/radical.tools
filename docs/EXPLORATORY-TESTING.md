@@ -158,7 +158,8 @@ Do not walk the same path twice in a row. Each run, choose differently.
   the fixture: the first save adds `defaultPositions`, `defaultViewport`,
   the metamodel and a presentation.
 - The Hub is served from `apps/hub` with
-  `npx vite preview --port <port> --strictPort`. Its requests to
+  `npx vite preview --port <port> --strictPort` (in a round, your prompt
+  gives the command, on your second port). Its requests to
   `hub.radical.tools`, and Studio's, are answered locally as
   `apps/e2e/tests/hub` does.
 - A flow (dynamic) view has no `.react-flow__viewport`: a helper that
@@ -233,9 +234,13 @@ gives, from which the maintainer's session records your findings in
 - **Steps**: the shortest sequence that shows it, from a named model, and
   the script that runs it (`node <script> [args]` from your run's folder
   while your server runs; helpers it imports from your folder are copied
-  with it).
+  with it). The copy runs from `crucible/findings/F-NNNN/`, so the script
+  names no absolute path: it finds the repository by walking up from its
+  own folder to `crucible.json`, and takes ports and the round's folder as
+  arguments.
 - **Expected / actual**, with numbers where there are any (positions,
-  counts) and a screenshot.
+  counts) and a screenshot (its path in your folder, in the JSON block's
+  `screenshot`: it is copied beside the script).
 - **How often**: every time, or how many of how many tries.
 - **Where it probably comes from**, if you looked: file and function. Mark
   a guess as a guess.

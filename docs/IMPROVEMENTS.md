@@ -591,18 +591,28 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     instead of the one element it names, as git does with commit
     prefixes. An agent has to keep every full id it has seen, or search
     again.
-44. **`radical explore verify` serves Studio only.** Run 172 (2026-10-22)
+44. ~~**`radical explore verify` serves Studio only.**~~ Run 172 (2026-10-22)
     tested concern packs against the round's Hub on its second port; verify
     started Studio alone, so every script failed on `hub/index.json` until
     the Hub was served by hand. `explore.serve` could take a list of
     servers, each on one of the run's ports.
-45. **A recorded finding's script still points into the round's worktree.**
+    Fixed 2026-10-22: `explore.serve` takes a list of servers, each on the
+    run's port it names (`"port": "hub"`); `verify` starts them all and stops
+    them all, and each run's prompt gives every command. `crucible.json`
+    serves the Hub from the round's build on the second port.
+45. ~~**A recorded finding's script still points into the round's worktree.**~~
     Most scripts of round 170–175 name `/Volumes/…/rd-cli/.crucible/…` or a
     port, so a copy under `crucible/findings/F-NNNN/` runs only where the
     round ran. Run 174's helpers find the repository by walking up; the
     round brief could ask every run to do so, and `record` could warn about
     absolute paths. `record` also drops the screenshot a finding names
     (F-0007).
+    Fixed 2026-10-22: the round's brief (and `docs/EXPLORATORY-TESTING.md`)
+    asks that scripts name no absolute path, finding the repository by
+    walking up to `crucible.json` and taking ports and the round's folder as
+    arguments; `record` warns about each copied script or helper that names
+    the repository's or the round's absolute paths, with its line, and
+    copies the screenshot a finding names beside its script (F-0007).
 
 ### Reverse-engineered requirements (2026-10-06)
 
