@@ -86,8 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dark theme is a dimmed graphite instead of near-black (canvas, panels, borders, muted text), so the dark C4 palette stays visible; type icons in the node tree and filter chips are lightened in the dark theme
 - Sequence view participants are drawn as their C4 shapes (person, database cylinder, queue, web app, boxes) in the canvas node colours, instead of one dark box style for every type
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
+- *+ New milestone* always captures the live model, also while an older milestone is shown, and files it after the last one; it saved the milestone shown again as the newest one
 
 ### Fixed
+- Propagate, Save as new and Discard act on the milestone's edits, never on what a playing slide draws: pressed while a presentation played, Propagate wrote the slide's model into the later milestones and the live model; F5 no longer starts a presentation behind the question how to save a milestone
+- While a slide plays, the chip names the milestone the slide shows, without its buttons; over a slide that shows the live model it named the milestone open in Designer and offered its diff and Propagate
+- In a milestone, opening a view for an element (the card's Views, Quick Search, the Inspector) opens its containers without asking how to save the milestone; the live view keeps its folds
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)

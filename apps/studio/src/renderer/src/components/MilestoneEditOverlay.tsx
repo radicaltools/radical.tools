@@ -38,8 +38,11 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
 
   return (
     <div className="milestone-modal-backdrop" onClick={dismiss}>
-      <div className="milestone-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="milestone-modal-title">Editing milestone &quot;{active.name}&quot;</h3>
+      {/* A modal dialog: Studio's shortcuts stay out of it (dialogKeys). F5
+          started a presentation behind it, and its Propagate then took
+          the playing slide's model. */}
+      <div className="milestone-modal" role="dialog" aria-modal="true" aria-labelledby="milestone-modal-title" onClick={e => e.stopPropagation()}>
+        <h3 id="milestone-modal-title" className="milestone-modal-title">Editing milestone &quot;{active.name}&quot;</h3>
         <p className="milestone-modal-text">
           You changed a milestone in the past. How should this be saved?
         </p>

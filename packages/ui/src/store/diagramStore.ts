@@ -896,6 +896,18 @@ export function parkedLiveModel(pre: ParkedDesigner): { nodes: Record<string, C4
     : { nodes: pre.c4Nodes, relations: pre.c4Relations, sequences: pre.sequences }
 }
 
+/** The milestone the canvas draws, which the milestone chip names: the one
+ *  shown, or while a presentation plays the one the playing slide is linked
+ *  to. A slide with neither a milestone nor a copy draws the live model,
+ *  one with a copy draws that copy: no milestone. The chip named the
+ *  milestone open in Designer over a slide that drew the live model, and
+ *  offered its diff and Propagate there. */
+export function milestoneOnCanvas(s: Pick<DiagramStore, 'activeSnapshotId' | 'presentationActive' | 'presentationSlides' | 'presentationSlideIndex' | 'snapshots'>): string | null {
+  if (!s.presentationActive) return s.activeSnapshotId
+  const id = s.presentationSlides[s.presentationSlideIndex]?.snapshotId
+  return id && s.snapshots.some((m) => m.id === id) ? id : null
+}
+
 /** The model a slide card replaced in Presenter (previewSlide), put back for
  *  a slide that has no model of its own. */
 let _beforeSlidePreview: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | null = null
@@ -967,6 +979,12 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
 /** Off while restoreSnapshot leaves the milestone shown on its way to
  *  replacing the live model: it lays out the view on screen itself, after. */
 let _arrangeOnLeavingMilestone = true
+
+/** On while expandAncestors opens the containers around an element it
+ *  reveals (the card's Views, Quick Search, the Inspector): navigation, not
+ *  an edit of the milestone shown. The view's live folds are still parked
+ *  (_milestoneViewEdit) and come back when the milestone is left. */
+let _revealing = false
 
 /** True when the elements have no places at all: each one at the same
  *  point as its siblings (a Structurizr import puts them all at 0,0). No
@@ -3892,7 +3910,7 @@ export const useDiagramStore = create<DiagramStore>()(
       /** Mark milestone as dirty if currently editing one (auto-opens prompt on first edit). */
       _markMilestoneEdit() {
         const { activeSnapshotId, milestoneDirty, appMode } = get()
-        if (!activeSnapshotId) return
+        if (!activeSnapshotId || _revealing) return
         // Milestones are read-only outside designer mode — ignore edit signals
         // so viewer/presenter can browse historical state without ever being
         // pushed into the "unsaved milestone changes" workflow.
@@ -4161,16 +4179,23 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         // Outermost first, so that each container opens inside one that is
         // open already. Whether one is collapsed is a matter of the canvas
-        // shown: collapse is per view.
-        _asOneStep(() => {
-          for (const id of chain.reverse()) {
-            const { c4Nodes, activeViewId, views } = get()
-            const node = c4Nodes[id]
-            if (node && nodeEffectivelyCollapsedInView(node, activeViewId, viewById({ views, exploration: get().exploration }, activeViewId))) {
-              get().toggleCollapse(id)
+        // shown: collapse is per view. Showing an element is no edit of the
+        // milestone shown: it asked how to save the milestone.
+        const was = _revealing
+        _revealing = true
+        try {
+          _asOneStep(() => {
+            for (const id of chain.reverse()) {
+              const { c4Nodes, activeViewId, views } = get()
+              const node = c4Nodes[id]
+              if (node && nodeEffectivelyCollapsedInView(node, activeViewId, viewById({ views, exploration: get().exploration }, activeViewId))) {
+                get().toggleCollapse(id)
+              }
             }
-          }
-        })
+          })
+        } finally {
+          _revealing = was
+        }
       },
 
       toggleCollapse(id) {
@@ -6723,14 +6748,20 @@ export const useDiagramStore = create<DiagramStore>()(
         // (see _captureState). Avoids cloning the whole model per snapshot.
         // With a view shown the nodes hold its positions: a milestone keeps
         // All elements' (what is not there yet keeps where it is).
-        const { c4Nodes, activeViewId, defaultPositions } = get()
+        // With a milestone shown it is the live model that is captured
+        // (decided 2026-10-22), at All elements' live places: the milestone
+        // on the canvas was saved again as the newest one.
+        const { c4Nodes, activeViewId, defaultPositions, activeSnapshotId, liveBackup } = get()
+        const live = activeSnapshotId && liveBackup ? liveBackup : null
         const snap: DiagramSnapshot = {
           id,
           name,
           timestamp: Date.now(),
-          nodes: activeViewId === null ? c4Nodes : atDefaultPositions(Object.values(c4Nodes), defaultPositions),
-          relations: get().c4Relations,
-          sequences: get().sequences,
+          nodes: live
+            ? atDefaultPositions(Object.values(live.nodes), live.defaultPositions ?? defaultPositions)
+            : activeViewId === null ? c4Nodes : atDefaultPositions(Object.values(c4Nodes), defaultPositions),
+          relations: live ? live.relations : get().c4Relations,
+          sequences: live ? live.sequences : get().sequences,
         }
         get()._pushUndo()
         set((state) => { state.snapshots.push(snap as any) })
@@ -6972,6 +7003,9 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       discardMilestoneChanges() {
+        // A slide playing draws its own model: the milestone's is put back
+        // first (stopPresentation), or the slide's became the live model.
+        if (get().presentationActive && get().activeSnapshotId) get().stopPresentation()
         // Viewer's exploration follows the live model, at its places.
         if (onExploration(get())) get()._saveShownCanvas()
         const { liveBackup } = get()
@@ -7011,6 +7045,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       commitMilestoneChanges(mode, newName) {
+        if (!get().activeSnapshotId) return
+        // A slide playing draws its own model (a milestone it is linked to,
+        // its copy, or the live one): the milestone's edits are put back on
+        // the canvas first. Diffed against the milestone, the slide's model
+        // went into it, every later milestone and the live model.
+        if (get().presentationActive) get().stopPresentation()
         const { activeSnapshotId, snapshots, c4Nodes, c4Relations, sequences, liveBackup } = get()
         if (!activeSnapshotId) return
         const idx = snapshots.findIndex(s => s.id === activeSnapshotId)
@@ -7843,6 +7883,9 @@ export const useDiagramStore = create<DiagramStore>()(
       startPresentation() {
         const { presentationSlides } = get()
         if (presentationSlides.length === 0) return
+        // The question how to save the milestone's edits is answered first:
+        // started behind it, its Propagate took the playing slide's model.
+        if (get().milestonePromptOpen && get().milestoneDirty && get().appMode === 'designer') return
         get().stopLiveLayout()
         // Snapshot full model + active view so we can restore on exit.
         // (goToSlide replaces c4Nodes/c4Relations from a slide snapshot,

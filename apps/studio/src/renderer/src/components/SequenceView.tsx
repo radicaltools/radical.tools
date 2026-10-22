@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { computeStepDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { computeStepDiff, milestoneOnCanvas, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, isBackwardStep } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { keysTakenByDialog } from './dialogKeys'
@@ -49,13 +49,17 @@ export function SequenceView(): React.ReactElement {
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
   const selectNode   = useDiagramStore((s) => s.selectNode)
   const selectEdge   = useDiagramStore((s) => s.selectEdge)
-  const activeSnapshotId     = useDiagramStore((s) => s.activeSnapshotId)
-  const snapshotName         = useDiagramStore((s) =>
-    s.activeSnapshotId ? s.snapshots.find((sn) => sn.id === s.activeSnapshotId)?.name : undefined
-  )
+  // The milestone drawn: a playing slide's own (none over one that draws
+  // the live model), with nothing to act on while a presentation plays.
+  const presentationActive   = useDiagramStore((s) => s.presentationActive)
+  const activeSnapshotId     = useDiagramStore(milestoneOnCanvas)
+  const snapshotName         = useDiagramStore((s) => {
+    const id = milestoneOnCanvas(s)
+    return id ? s.snapshots.find((sn) => sn.id === id)?.name : undefined
+  })
   const snapshots            = useDiagramStore((s) => s.snapshots)
   const diffBaseSnapshotId   = useDiagramStore((s) => s.diffBaseSnapshotId)
-  const milestoneDirty           = useDiagramStore((s) => s.milestoneDirty)
+  const milestoneDirty           = useDiagramStore((s) => s.milestoneDirty && !s.presentationActive)
   const commitMilestoneChanges   = useDiagramStore((s) => s.commitMilestoneChanges)
   const discardMilestoneChanges  = useDiagramStore((s) => s.discardMilestoneChanges)
   const showDiff             = useDiagramStore((s) => s.showDiff)
@@ -528,6 +532,7 @@ export function SequenceView(): React.ReactElement {
 
       {/* Floating caption / milestone badge */}
       <div
+        className={activeSnapshotId && snapshotName ? 'milestone-chip' : undefined}
         style={{
           position: 'absolute',
           top: 8,
@@ -552,11 +557,11 @@ export function SequenceView(): React.ReactElement {
               Milestone: <strong style={{ color: 'var(--text-primary)' }}>{snapshotName}</strong>
               {milestoneDirty && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
             </span>
-            <button
+            {!presentationActive && <button
               title={showDiff ? 'Hide diff' : 'Show changes vs. previous milestone'}
               onClick={toggleShowDiff}
               style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: showDiff ? 'var(--accent)' : 'var(--bg-surface)', color: showDiff ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 3 }}
-            >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>
+            >{showDiff ? '⊙ diff on' : '⊙ diff'}</button>}
             {milestoneDirty && (
               <>
                 <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--border-color)', margin: '0 2px' }} />
