@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- Presenter: *Capture* on a slide while a milestone is shown links the slide to that milestone, as *Add slide* does; it used to keep a hidden copy of the milestone, and the slide went on showing it after the milestone was deleted
+- Undo in Designer no longer links a slide back to a milestone after Presenter set it to *(none — current state)*
+- Presenter: a slide of a view that gained elements after it was captured (an Explore view grown by a +, an element added to a view) draws them where the view places them; they used to be drawn on top of the slide's elements
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)

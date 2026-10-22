@@ -1562,12 +1562,20 @@ function relinkSlide(slide: PresentationSlide, id: string): void {
   else slide.snapshotId = id
 }
 
-/** Capture all node positions + collapsed state for a presentation slide,
+/** Capture node positions + collapsed state for a presentation slide,
  *  and, on a view, what the view folds and opens: kept in the view, a fold
- *  made or undone after the slide changed what the slide showed. */
-function captureCanvasState(nodes: Record<string, C4Node>, view?: DiagramView): SlideCanvasState {
+ *  made or undone after the slide changed what the slide showed. On a
+ *  canvas view only what it draws (and the frames that hold it): a node it
+ *  did not draw kept the place another canvas left on it, and once the
+ *  view gained it the slide drew it there, on its other elements
+ *  (placeGainedSince places it). */
+function captureCanvasState(nodes: Record<string, C4Node>, view?: DiagramView, relations?: Record<string, C4Relation>): SlideCanvasState {
+  const drawn = view && relations && (isExploration(view) || (view.kind ?? 'static') === 'static')
+    ? computeViewNodeSet(view, nodes, relations)
+    : undefined
   const result: SlideCanvasState['nodes'] = {}
   for (const [id, n] of Object.entries(nodes)) {
+    if (drawn && !drawn.has(id)) continue
     result[id] = { x: n.x, y: n.y, width: n.width, height: n.height, collapsed: n.collapsed }
   }
   if (!view) return { nodes: result }
@@ -1587,10 +1595,58 @@ function applySlideCanvas(state: DiagramStore, canvasState: SlideCanvasState, vi
     n.collapsed = ns.collapsed
   }
   const view = viewId ? state.views[viewId] as DiagramView | undefined : undefined
-  if (!view || !canvasState.collapsedNodeIds) return
-  const same = (a: string[] | undefined, b: string[] | undefined): boolean => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
-  if (!same(view.collapsedNodeIds, canvasState.collapsedNodeIds)) view.collapsedNodeIds = [...canvasState.collapsedNodeIds]
-  if (!same(view.expandedNodeIds, canvasState.expandedNodeIds)) view.expandedNodeIds = [...(canvasState.expandedNodeIds ?? [])]
+  if (!view) return
+  if (canvasState.collapsedNodeIds) {
+    const same = (a: string[] | undefined, b: string[] | undefined): boolean => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
+    if (!same(view.collapsedNodeIds, canvasState.collapsedNodeIds)) view.collapsedNodeIds = [...canvasState.collapsedNodeIds]
+    if (!same(view.expandedNodeIds, canvasState.expandedNodeIds)) view.expandedNodeIds = [...(canvasState.expandedNodeIds ?? [])]
+  }
+  placeGainedSince(state, canvasState, view)
+}
+
+/** What canvas view `view` draws now that its slide did not capture (it
+ *  gained it since): where the view places it, or, where that lies on what
+ *  the slide shows, beside it. It kept the place another canvas had left
+ *  on it, and the slide drew it on the elements it captured (Card Networks
+ *  on Auth Service). A slide captured before slides kept only what they
+ *  drew has none such. Mutates `state` (inside immer set). */
+function placeGainedSince(state: DiagramStore, canvasState: SlideCanvasState, view: DiagramView): void {
+  const nodes = state.c4Nodes as Record<string, C4Node>
+  const relations = state.c4Relations as Record<string, C4Relation>
+  const places = (view.positions ?? {}) as Record<string, NodePosition>
+  // An exploration is flat: its places are where it draws its elements.
+  if (isExploration(view)) {
+    const listed = listedIds(view, nodes)
+    const gained = listed.filter((id) => !canvasState.nodes[id])
+    if (!gained.length) return
+    const box = (id: string) => ({ x: nodes[id].x, y: nodes[id].y, ...drawnSize(nodes[id], false) })
+    const taken = listed.filter((id) => canvasState.nodes[id]).map(box)
+    for (const id of gained) {
+      const at = places[id]
+      if (at) { nodes[id].x = at.x; nodes[id].y = at.y }
+      const b = box(id)
+      const clear = taken.every((o) => b.x + b.width <= o.x || o.x + o.width <= b.x || b.y + b.height <= o.y || o.y + o.height <= b.y)
+      if (!clear) Object.assign(nodes[id], freeSpotNear(taken, b, { x: b.x + b.width / 2, y: b.y + b.height / 2 }))
+      taken.push(box(id))
+    }
+    return
+  }
+  if ((view.kind ?? 'static') !== 'static') return
+  const shown = computeViewNodeSet(view, nodes, relations)
+  if (!shown) return
+  const gained = new Set([...shown].filter((id) => nodes[id] && !canvasState.nodes[id]))
+  if (!gained.size) return
+  // The view's place where it lies clear of what the slide shows; the
+  // others placed beside their siblings (placeUnplaced), as a view places
+  // what it has no place for.
+  const known: Record<string, NodePosition> = {}
+  for (const [id, ns] of Object.entries(canvasState.nodes)) if (nodes[id]) known[id] = { x: ns.x, y: ns.y, width: ns.width, height: ns.height }
+  applyPositions(nodes, Object.fromEntries([...gained].filter((id) => places[id]).map((id) => [id, places[id]])))
+  const canvas = modelCanvas(nodes, shown)
+  for (const id of gained) {
+    if (places[id] && liesClearInParent(nodes[id], nodes, canvas, (s) => gained.has(s.id))) known[id] = places[id]
+  }
+  showCanvasPositions(nodes, known, view, relations)
 }
 
 /** The drill level a hierarchy view shows: a slide's while one is shown,
@@ -3478,15 +3534,17 @@ export const useDiagramStore = create<DiagramStore>()(
         if (state.activeSequenceId && !entry.sequences[state.activeSequenceId]) state.activeSequenceId = null
         // The milestones as the step had them; a slide that showed one
         // deleted since shows it again, one that shows one gone shows the
-        // live model. Other links are Presenter's and stay.
+        // live model. Other links are Presenter's and stay: one Presenter
+        // took off a milestone still there came back with any step undone.
         if (entry.snapshots) {
+          const before = new Set(state.snapshots.map((m) => m.id))
           state.snapshots = entry.snapshots as any
           const ids = new Set(entry.snapshots.map((m) => m.id))
           for (const pres of state.presentations) {
             for (const slide of pres.slides) {
               const was = entry.slideMilestones?.[slide.id]
               if (slide.snapshotId && !ids.has(slide.snapshotId)) unlinkSlide(slide)
-              else if (!slide.snapshotId && was && ids.has(was)) relinkSlide(slide, was)
+              else if (!slide.snapshotId && was && ids.has(was) && !before.has(was)) relinkSlide(slide, was)
             }
             if (pres.id === state.activePresentationId) state.presentationSlides = pres.slides
           }
@@ -7787,7 +7845,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ? { x: raw.x, y: raw.y, zoom: raw.zoom }
           : (_getViewportFn()?.() ?? { x: 0, y: 0, zoom: 1 })
         const { presentationSlides, activeSnapshotId, activeViewId } = get()
-        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, activeViewId ? get().views[activeViewId] : undefined)
+        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, activeViewId ? get().views[activeViewId] : undefined, get().c4Relations as Record<string, C4Relation>)
         // Inline full model snapshot — guarantees the slide replays exactly
         // what was on screen at creation time, even if the user later edits
         // nodes/relations or switches the active milestone. On a milestone
@@ -8070,13 +8128,14 @@ export const useDiagramStore = create<DiagramStore>()(
           : (_getViewportFn()?.() ?? null)
         if (!vp) return
         const currentViewId = get().activeViewId
-        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, currentViewId ? get().views[currentViewId] : undefined)
+        const canvasState = captureCanvasState(get().c4Nodes as Record<string, C4Node>, currentViewId ? get().views[currentViewId] : undefined, get().c4Relations as Record<string, C4Relation>)
         // Re-capture the full inline model snapshot too — "Capture viewport"
         // semantically means "this slide should look like the screen does now".
         const modelSnapshot = {
           nodes: get().c4Nodes as Record<string, C4Node>,
           relations: get().c4Relations as Record<string, C4Relation>,
         }
+        const { activeSnapshotId } = get()
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
@@ -8087,6 +8146,10 @@ export const useDiagramStore = create<DiagramStore>()(
             ;(slide as any).viewId = currentViewId
             // A slide linked to a milestone shows it, and keeps no copy of
             // it, as one added on a milestone: the copy outlived the link.
+            // One that showed none, captured on a milestone, is linked to it
+            // as Add slide links one: with a copy of it, it went on drawing
+            // the milestone once that was deleted.
+            if (!slide.snapshotId && activeSnapshotId) slide.snapshotId = activeSnapshotId
             if (slide.snapshotId) delete slide.modelSnapshot
             else (slide as any).modelSnapshot = modelSnapshot
             // The drill level or wiki page shown now, as Add slide takes it:
