@@ -110,7 +110,7 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/manual.html" "/style.css" "/landing.css" "/theme.js"
+            --paths "/index.html" "/manual.html" "/reference.html" "/docs.js" "/style.css" "/landing.css" "/theme.js"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
       # Built from apps/hub (the viewer runs on Studio's canvas and panels,
