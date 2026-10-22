@@ -1,7 +1,8 @@
 /**
  * The product's rules as invariants over random sequences of store actions
  * (ADR "Rules checked as invariants"; the rules are those of
- * docs/EXPLORATORY-TESTING.md, "How to tell that something is wrong").
+ * docs/EXPLORATORY-TESTING.md, "How to tell that something is wrong"): a fuzz
+ * file on Radical Crucible's engine (@radical/crucible).
  *
  * fast-check builds sequences of what a user or an agent does (add, delete,
  * rename, move into another parent, drag, collapse, keep in a row or a
@@ -36,25 +37,31 @@
  *    relation's ends or type, a reference, a maximum; rule 8);
  *  - noErrors: no action throws and nothing is written to console.error.
  *
- * CI runs fixed seeds. For more:
+ * Each model is a case, and each of its rules a case of its own
+ * ("on the bookstore model: undoRestores holds"). CI runs fixed seeds. For
+ * more, `radical fuzz night` (or `npm run fuzz -w @radical/ui`, 2000 runs of
+ * each model), or the settings by hand:
  *   FUZZ_RUNS=2000 FUZZ_SEED=7 npx vitest run tests/invariants.test.ts
- * (or `npm run fuzz -w @radical/ui`, 2000 runs of each model by default).
- * FUZZ_MODEL=bookstore|sample|nested runs one model, FUZZ_LENGTH sets the
- * longest sequence, FUZZ_PATH (with the same FUZZ_SEED and FUZZ_LENGTH)
- * replays the counterexample a failure prints. A failure names the rule,
- * shows the shrunk sequence, the ids and labels each step resolved to, and
- * what differs. FUZZ_SURVEY=<file> reports every distinct failure into the
- * file and goes on; FUZZ_NO_KNOWN=1 lets KNOWN filter nothing;
- * FUZZ_NO_SHRINK=1 reports a failure unshrunk; FUZZ_FROM=n skips the runs
- * before the nth (does a failure need them?).
+ * FUZZ_WORLD=bookstore|sample|nested (or FUZZ_MODEL) runs one model,
+ * FUZZ_LENGTH sets the longest sequence, FUZZ_PATH (with the same FUZZ_SEED
+ * and FUZZ_LENGTH) replays the counterexample a failure prints. A failure
+ * names the rule, shows the shrunk sequence, the ids and labels each step
+ * resolved to, and what differs. FUZZ_SURVEY=<file> reports every distinct
+ * failure into the file and goes on (`radical fuzz --survey` makes findings
+ * of them); FUZZ_NO_KNOWN=1 lets KNOWN filter nothing; FUZZ_NO_SHRINK=1
+ * reports a failure unshrunk; FUZZ_FROM=n skips the runs before the nth
+ * (does a failure need them?).
  *
  * Violations that are product bugs not fixed yet are listed in KNOWN: a
  * run that hits one ends there, quietly (a known geometry violation is
  * left as it is and the run goes on), so CI stays green until the fix
- * (which removes the entry and adds a plain regression test).
+ * (which removes the entry and adds a plain regression test). The summary
+ * after the run says how often each was hit, and which no run hit.
  */
+
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import fc from 'fast-check'
+import { describeDifference, differences as diffList, fc, fuzzOptionsFromEnv, mulberry32, RuleBroken, sequentialIds, showAction, type Difference, type FuzzSuite, type Known, type RunContext, type Violation } from '@radical/crucible'
+import { fuzzSuite } from '@radical/crucible/vitest'
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView, LayoutConstraint } from '@radical/common/c4'
 import { isContainerType, nodeTypeSize, pinnedNodeIds, withCanvasPositions, NODE_SIZES } from '@radical/common/c4'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -75,27 +82,10 @@ import sampleText from './fixtures/fintechSampleData.json?raw'
 // checks, the same way on every machine.
 vi.mock('d3-timer', async (importOriginal) => {
   const real = await importOriginal<Record<string, unknown>>()
-  interface ManualTimer { cb: (elapsed: number) => void; t0: number; stop(): void; restart(cb: (elapsed: number) => void, delay?: number): void }
-  const timers = new Set<ManualTimer>()
-  let clock = 0
-  const timer = (cb: (elapsed: number) => void, delay = 0): ManualTimer => {
-    const t: ManualTimer = {
-      cb,
-      t0: clock + delay,
-      stop() { timers.delete(t) },
-      restart(next, d = 0) { t.cb = next; t.t0 = clock + d; timers.add(t) },
-    }
-    timers.add(t)
-    return t
-  }
-  ;(globalThis as Record<string, unknown>).__fuzzTimers = {
-    timers,
-    tick() {
-      clock += 16
-      for (const t of [...timers]) if (timers.has(t)) t.cb(clock - t.t0)
-    },
-  }
-  return { ...real, timer, now: () => clock }
+  const { manualTimers } = await import('@radical/crucible')
+  const clock = manualTimers()
+  ;(globalThis as Record<string, unknown>).__fuzzTimers = clock
+  return { ...real, timer: clock.timer, now: clock.now }
 })
 
 import { useDiagramStore, historyMark, activeLayoutConstraints } from '../src/store/diagramStore'
@@ -105,24 +95,8 @@ type State = ReturnType<Store['getState']>
 const timers = (): { timers: Set<unknown>; tick(): void } => (globalThis as unknown as { __fuzzTimers: { timers: Set<unknown>; tick(): void } }).__fuzzTimers
 
 const env = ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env) ?? {}
-const RUNS = env.FUZZ_RUNS ? Number(env.FUZZ_RUNS) : undefined
-const SEED = env.FUZZ_SEED ? Number(env.FUZZ_SEED) : undefined
-const ONLY_MODEL = env.FUZZ_MODEL
-const PATH = env.FUZZ_PATH
-const LENGTH = env.FUZZ_LENGTH ? Number(env.FUZZ_LENGTH) : undefined
-/** Survey mode (FUZZ_SURVEY=1): each failure is reported and then taken as
- *  known by its rule and last action, so that one run finds many. */
-const SURVEY = !!env.FUZZ_SURVEY
-/** FUZZ_NO_KNOWN=1: KNOWN filters nothing (to see whether one still happens). */
-const NO_KNOWN = !!env.FUZZ_NO_KNOWN
-/** FUZZ_NO_SHRINK=1: report the first failure as found (shrinking a long
- *  sequence on the sample takes minutes). */
-const NO_SHRINK = !!env.FUZZ_NO_SHRINK
-/** FUZZ_FROM=n: the first n-1 runs pass without running (to tell whether a
- *  failure depends on the runs before it). */
-const FROM = env.FUZZ_FROM ? Number(env.FUZZ_FROM) : 0
-/** Where survey mode appends its reports as they come (FUZZ_SURVEY=<file>). */
-const SURVEY_FILE = env.FUZZ_SURVEY && env.FUZZ_SURVEY !== '1' ? env.FUZZ_SURVEY : undefined
+/** The FUZZ_* settings (see the header), as Crucible reads them. */
+const OPTIONS = fuzzOptionsFromEnv(env)
 /** Half a pixel: what a place may be off by and still be the same. */
 const TOL = 0.5
 const MAX_TICKS = 2500
@@ -130,23 +104,16 @@ const MAX_TICKS = 2500
 // ─── Determinism ────────────────────────────────────────────────────────────
 // Ids and the physics' jitter come from counters seeded per run, so a
 // counterexample replays to the same ids.
-let idCounter = 0
-let rngState = 1
+const rng = mulberry32(1)
+const ids = sequentialIds()
 function resetDeterminism(seed: number): void {
-  idCounter = 0
-  rngState = (seed >>> 0) || 1
+  ids.reset()
+  rng.reset(seed)
 }
 const realRandom = Math.random
-const realLog = console.log.bind(console)
-function seededRandom(): number {
-  // mulberry32
-  rngState = (rngState + 0x6d2b79f5) >>> 0
-  let t = rngState
-  t = Math.imul(t ^ (t >>> 15), t | 1)
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-}
-const nextId = (): string => `00000000-0000-4000-8000-${(++idCounter).toString(16).padStart(12, '0')}`
+const seededRandom = rng.next
+const nextId = ids.next
+
 
 // ─── Models ─────────────────────────────────────────────────────────────────
 
@@ -324,12 +291,6 @@ const actionArb: fc.Arbitrary<Action> = fc.oneof(
   { weight: 2, arbitrary: fc.constant({ a: 'reload' as const }) },
 ).map((action) => Object.defineProperty({ ...action }, fc.toStringMethod, { value: () => showAction(action), enumerable: false }))
 
-function showAction(action: Action): string {
-  const { a, ...args } = action as Action & Record<string, unknown>
-  const list = Object.entries(args).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')
-  return `{ a: '${a}'${list ? `, ${list}` : ''} }`
-}
-
 // ─── Reading the store ──────────────────────────────────────────────────────
 
 const byIdOf = <T extends { id: string }>(items: T[] | undefined): Record<string, T> =>
@@ -390,38 +351,10 @@ function full(store: Store): Full {
   }
 }
 
-/** Where `a` and `b` differ, as "path: a → b", numbers within `tol`. */
-function differences(a: unknown, b: unknown, tol = TOL, path = '', out: string[] = [], max = 12): string[] {
-  if (out.length >= max) return out
-  if (typeof a === 'number' && typeof b === 'number') {
-    if (Math.abs(a - b) > tol || Number.isNaN(a) !== Number.isNaN(b)) out.push(`${path}: ${a} → ${b}`)
-    return out
-  }
-  if (a === b) return out
-  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) {
-    if (a === undefined && b === undefined) return out
-    out.push(`${path}: ${short(a)} → ${short(b)}`)
-    return out
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) {
-      out.push(`${path}: ${short(a)} → ${short(b)}`)
-      return out
-    }
-    for (let i = 0; i < a.length; i++) differences(a[i], b[i], tol, `${path}[${i}]`, out, max)
-    return out
-  }
-  const ao = a as Record<string, unknown>, bo = b as Record<string, unknown>
-  for (const k of new Set([...Object.keys(ao), ...Object.keys(bo)])) {
-    if (ao[k] === undefined && bo[k] === undefined) continue
-    differences(ao[k], bo[k], tol, path ? `${path}.${k}` : k, out, max)
-  }
-  return out
-}
-function short(v: unknown): string {
-  const s = JSON.stringify(v)
-  return s === undefined ? 'undefined' : s.length > 160 ? `${s.slice(0, 160)}…` : s
-}
+/** Where `a` and `b` differ, numbers within `tol` (Crucible's differences). */
+const differences = (a: unknown, b: unknown, tol = TOL): Difference[] => diffList(a, b, { tolerance: tol })
+/** What differs, a line each, as a violation's detail lists it. */
+const lines = (list: Difference[]): string => list.map(describeDifference).join('\n      ')
 
 /** What a folder writes as nothing: an empty text, an unticked box, an
  *  empty list. Taken out of both sides before comparing a folder round trip. */
@@ -590,27 +523,12 @@ async function settle(store: Store): Promise<boolean> {
 
 // ─── One run ────────────────────────────────────────────────────────────────
 
-interface Violation {
-  rule: string
-  detail: string
-  /** What KNOWN matchers read: for geometry, whether a pin holds the
-   *  elements involved, their parent or an ancestor of it. */
-  facts?: { pinned?: boolean; overlap?: boolean; outside?: boolean; childless?: boolean; aligned?: boolean; types?: string[] }
-  /** Geometry: the new violations, as keys ("overlap a ~ b", "outside c < p"). */
-  keys?: string[]
-}
-class RuleBroken extends Error {
-  constructor(readonly violation: Violation, readonly trace: string[], readonly actions: Action[] = []) {
-    super(`[${violation.rule}] ${violation.detail}\n  steps (as resolved):\n${trace.map((t, i) => `    ${i + 1}. ${t}`).join('\n')}`)
-  }
-}
-
-/** A known product bug: a run that breaks `rule` where `match` says so ends
- *  there, without failing. Each names its IMPROVEMENTS item or says what
- *  happens. Remove the entry with the fix. */
-interface Known { rule: string; match: (trace: Action[], v: Violation, resolved: string[]) => boolean; note: string }
-const lastAction = (trace: Action[]): Action['a'] | undefined => trace[trace.length - 1]?.a
-const KNOWN: Known[] = [
+/** A known product bug (Crucible's Known): a run that breaks `rule` where the
+ *  entry says ends there, without failing. Each names its IMPROVEMENTS item
+ *  or says what happens. Remove the entry with the fix. */
+const lastAction = (trace: readonly Action[]): Action['a'] | undefined => trace[trace.length - 1]?.a
+const mergedUnsaved = (line: string | undefined): boolean => /merged with unsaved edits/.test(line ?? '')
+const KNOWN: Known<Action>[] = [
   {
     // Sample, All elements: Auth Service folded, a component dropped into
     // Accounts Service. The add leaves Check balance outside the step
@@ -618,7 +536,8 @@ const KNOWN: Known[] = [
     // and the physics moves what is near it: Customer (550, 0) → (450, 30),
     // Core Banking 1802 → 1706 high. Seen once the physics rests (K20 fixed).
     rule: 'reloadKeeps',
-    match: (t, v) => lastAction(t) === 'add' && v.detail.split('\n').slice(1).every((line) => /^\s+defaultPositions\./.test(line)),
+    last: 'add',
+    paths: ['defaultPositions.**'],
     note: 'K23: a child an add left outside its parent (K11) is placed afresh on a reload, and what is near it moves (new)',
   },
   {
@@ -630,7 +549,8 @@ const KNOWN: Known[] = [
     // dropped into Bookstore so: read again, the view places it and
     // Bookstore grows 860 → 1300 wide, Customer moves (−101, −55).
     rule: 'reloadKeeps',
-    match: (t, v) => t.some((a) => a.a === 'propagate') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    after: ['propagate'],
+    paths: ['views.*.positions.**'],
     note: 'K24: an element added in a milestone and propagated has no place on the live view it was added on; a reload places it (new; sibling of K12)',
   },
   {
@@ -640,7 +560,7 @@ const KNOWN: Known[] = [
     // every container refit (Container 0.0 (84, 52) → (30, 121)). The same
     // on the code before these fixes, where K2 hid it.
     rule: 'reloadKeeps',
-    match: (t) => lastAction(t) === 'align',
+    last: 'align',
     note: 'K25: a row or column of a container and another element is not held when the physics stops; a reload snaps it and refits every container (new; sibling of K10)',
   },
   {
@@ -649,7 +569,8 @@ const KNOWN: Known[] = [
     // again, Studio makes them (5 views saved, 7 after a reload). The same
     // on the code before these fixes, where K2 hid it.
     rule: 'reloadKeeps',
-    match: (t, v) => t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'viewpointView') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+: undefined →/.test(line)),
+    after: ['openMilestone', 'viewpointView'],
+    match: ({ violation }) => (violation.differences ?? []).every((d) => /^views\.[\w-]+$/.test(d.path) && d.was === undefined),
     note: 'K26: a view of a viewpoint made while a milestone is shown is saved without its views per element; a reload makes them (new)',
   },
   {
@@ -659,7 +580,8 @@ const KNOWN: Known[] = [
     // it is snapped (Bookstore 1 px up, Payment Provider 1 px down). The
     // same on the code before these fixes.
     rule: 'reloadKeeps',
-    match: (t) => lastAction(t) === 'drag' && t.some((a) => a.a === 'align'),
+    last: 'drag',
+    after: ['align'],
     note: 'K27: a drag of a container leaves a row or column through an element in it off its line; a reload snaps it (new)',
   },
   {
@@ -668,7 +590,8 @@ const KNOWN: Known[] = [
     // places for System 0, 1 and their containers. The same on the code
     // before these fixes.
     rule: 'milestoneKeepsLive',
-    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    last: ['undo', 'redo'],
+    paths: ['views.*.positions.**'],
     note: 'K28: Undo or Redo in a milestone after a view switch writes the milestone\'s places into the live view (new; sibling of K17)',
   },
   {
@@ -681,7 +604,7 @@ const KNOWN: Known[] = [
     // dragged 1 px: read again, System 0 and its containers are refit
     // (Container 0.0 (84, 102) → (30, 138)).
     rule: 'reloadKeeps',
-    match: (t) => t.some((a) => a.a === 'agent'),
+    after: ['agent'],
     note: 'K29: after an agent\'s write (a milestone shown or not) the live model is framed otherwise than a reload frames it (new)',
   },
   {
@@ -690,7 +613,7 @@ const KNOWN: Known[] = [
     // read again, the row is snapped (API 10 px lower, Bookstore 10 px
     // taller). The same on the code before these fixes.
     rule: 'reloadKeeps',
-    match: (t) => t.some((a) => a.a === 'propagate') && t.some((a) => a.a === 'align'),
+    after: ['propagate', 'align'],
     note: 'K30: a row or column made in a milestone and propagated does not hold in the live model; a reload snaps it (new; next to K10b)',
   },
   {
@@ -700,7 +623,9 @@ const KNOWN: Known[] = [
     // row is 45 px off; read again, it is snapped and the containers refit.
     // The same on the code before these fixes.
     rule: 'reloadKeeps',
-    match: (t, v) => lastAction(t) === 'add' && t.some((a) => a.a === 'align') && v.detail.split('\n').slice(1).every((line) => /^\s+views\.[\w-]+\.positions\./.test(line)),
+    last: 'add',
+    after: ['align'],
+    paths: ['views.*.positions.**'],
     note: 'K31: an add of an element the view shown does not draw grows its parent there, off a row or column; a reload snaps it (new; next to K3)',
   },
   {
@@ -710,7 +635,8 @@ const KNOWN: Known[] = [
     // wide, 96 px over Container 0.1. The same on the code before these
     // fixes (K5 matched it there).
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap,
+    last: 'viewKind',
+    facts: { overlap: true },
     note: 'K32: a table view turned into a canvas draws containers over each other (new)',
   },
   {
@@ -719,7 +645,9 @@ const KNOWN: Known[] = [
     // where it was, under System 0, which the agent's write grew 2440 →
     // 2750 wide. The same on the code before these fixes.
     rule: 'geometry',
-    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent') && !!v.facts?.overlap,
+    last: ['undo', 'redo'],
+    after: ['agent'],
+    facts: { overlap: true },
     note: 'K33: Undo after an agent\'s write puts an element back under one the write grew (new; next to K16, K17)',
   },
   {
@@ -728,7 +656,9 @@ const KNOWN: Known[] = [
     // System 0 dragged 1 px: System 1, grown by the agent's write, is drawn
     // 92 px over System 2. The same on the code before these fixes.
     rule: 'geometry',
-    match: (t, v, resolved) => lastAction(t) === 'drag' && !!v.facts?.overlap && resolved.some((r) => /merged with unsaved edits/.test(r)),
+    last: 'drag',
+    facts: { overlap: true },
+    match: ({ trace }) => trace.some(mergedUnsaved),
     note: 'K34: after a merge with unsaved edits, the next drag shows a container the agent grew over its neighbour (new; next to K19)',
   },
   {
@@ -738,7 +668,9 @@ const KNOWN: Known[] = [
     // elements Payment Provider (260, 40) 360 × 350 overlaps Bookstore (30,
     // 300). FUZZ_SEED=13 FUZZ_PATH=542:3:4:6:7:17:13:16:17.
     rule: 'geometry',
-    match: (t, v) => !!v.facts?.overlap && (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent' && a.kind === 'add'),
+    last: ['undo', 'redo'],
+    facts: { overlap: true },
+    match: ({ actions }) => actions.some((a) => a.a === 'agent' && a.kind === 'add'),
     note: 'KE1: Undo and Redo after an agent added into a system leave it grown over its neighbour (new)',
   },
   {
@@ -748,7 +680,8 @@ const KNOWN: Known[] = [
     // outside Container 0.1 (971.7 against 1027.7). FUZZ_SEED=11
     // FUZZ_PATH=71:8:8:14:13:17:23:22:22:22:26:26:31:36:19:18:21:26:29:17:10:11:10:10:16:12:12:12:12.
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.outside && !!v.facts.aligned,
+    last: 'reparent',
+    facts: { outside: true, aligned: true },
     note: 'KE2: a move into another parent, with a row elsewhere, leaves a child of a neighbouring container outside it (new)',
   },
   {
@@ -760,7 +693,9 @@ const KNOWN: Known[] = [
     // 56 px outside it. Without the row in System 1 it does not happen.
     // Also on the base (d04b081), found by group C.
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.outside && t.some((a) => a.a === 'align'),
+    last: 'reparent',
+    after: ['align'],
+    facts: { outside: true },
     note: 'C1: after a move into another parent, with a row elsewhere, the live physics leaves a neighbour\'s child outside it (new)',
   },
   {
@@ -771,12 +706,14 @@ const KNOWN: Known[] = [
     // opened instead, Redo does not give back the state after the add.
     // Also on the base (d04b081), found by group C.
     rule: 'milestoneKeepsLive',
-    match: (t) => ['undo', 'redo'].includes(lastAction(t) ?? '') && t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'view'),
+    last: ['undo', 'redo'],
+    after: ['openMilestone', 'view'],
     note: 'C2: Undo and Redo in a milestone after a view was first opened there put the layout it was opened with into the live view (new)',
   },
   {
     rule: 'redoRestores',
-    match: (t) => lastAction(t) === 'redo' && t.some((a) => a.a === 'openMilestone') && t.some((a) => a.a === 'view'),
+    last: 'redo',
+    after: ['openMilestone', 'view'],
     note: 'C2: the same, seen as Redo not giving back the state after its step (new)',
   },
   {
@@ -790,8 +727,9 @@ const KNOWN: Known[] = [
     // lies 65 px below it. Before the fixes of items 249 to 261 K16 took
     // these in.
     rule: 'geometry',
-    match: (t, v, resolved) => !!v.facts?.outside && (/merged with unsaved edits/.test(resolved[resolved.length - 1] ?? '') ||
-      (['undo', 'redo', 'collapse', 'view', 'reload', 'discard', 'openMilestone'].includes(lastAction(t) ?? '') && resolved.some((r) => /merged with unsaved edits/.test(r)))),
+    facts: { outside: true },
+    match: ({ actions, trace }) => mergedUnsaved(trace[trace.length - 1]) ||
+      (['undo', 'redo', 'collapse', 'view', 'reload', 'discard', 'openMilestone'].includes(lastAction(actions) ?? '') && trace.some(mergedUnsaved)),
     note: 'KB1: a merge keeps the parent the agent\'s write refitted around the folder\'s places and the children where Studio has moved them since, one outside it (new; next to K19)',
   },
   {
@@ -801,7 +739,9 @@ const KNOWN: Known[] = [
     // 257.1. The same before the fixes of items 249 to 261 (no entry took
     // it in: it was not found then).
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'viewKind' && !!v.facts?.overlap && t.some((a) => a.a === 'reparent' || a.a === 'add'),
+    last: 'viewKind',
+    facts: { overlap: true },
+    match: ({ actions }) => actions.some((a) => a.a === 'reparent' || a.a === 'add'),
     note: 'KB2: a view turned into a canvas after a move or an add shows the places it then takes over each other (new; K3 through a view type change?)',
   },
   {
@@ -811,7 +751,9 @@ const KNOWN: Known[] = [
     // at y 5226, 190 high, 22 px past its bottom. Not analysed; found once
     // the add before it no longer ended the run (K4).
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'view' && !!v.facts?.outside && t.some((a) => a.a === 'reparent'),
+    last: 'view',
+    after: ['reparent'],
+    facts: { outside: true },
     note: 'KB3: a move made where no canvas is shown, then All elements opened: a group is framed short of its children (new; K3 seen as an outside?)',
   },
   {
@@ -826,8 +768,9 @@ const KNOWN: Known[] = [
     // place on All elements is refit to what Later has in it (1710 → 1400
     // wide) and Component 1.1.1's, which Later has not, is dropped.
     rule: 'milestoneKeepsLive',
-    match: (t, v) => (lastAction(t) === 'undo' || lastAction(t) === 'redo') && t.some((a) => a.a === 'agent') && t.some((a) => a.a === 'openMilestone')
-      && v.detail.split('\n').slice(1).every((line) => /^\s+(nodes\.[\w-]+\.(x|y|width|height)|defaultPositions\.[\w-]+(\.\w+)?):/.test(line)),
+    last: ['undo', 'redo'],
+    after: ['agent', 'openMilestone'],
+    paths: ['nodes.*.x', 'nodes.*.y', 'nodes.*.width', 'nodes.*.height', 'defaultPositions.*', 'defaultPositions.*.*'],
     note: 'KM1: Undo or Redo in a milestone after an agent\'s write drops or refits All elements\' places of live elements in the live document (new; next to K28, item 262)',
   },
   {
@@ -839,7 +782,9 @@ const KNOWN: Known[] = [
     // Component 1.0.0, which Studio had moved into Container 2.0 (K19 took
     // it in there). FUZZ_SEED=404 FUZZ_MODEL=nested FUZZ_PATH=288:2:0:0:3:3:3:3:3:6:5:4:4:8:8:10:12:1:6:3:15:14:14:19:24:13:6:7:8:7:16:17:14:14:15:18:5:19:19:16:16:16.
     rule: 'geometry',
-    match: (t, v, resolved) => lastAction(t) === 'agent' && !!v.facts?.overlap && /merged with unsaved edits/.test(resolved[resolved.length - 1] ?? ''),
+    last: 'agent',
+    facts: { overlap: true },
+    match: ({ trace }) => mergedUnsaved(trace[trace.length - 1]),
     note: 'KM2: a merge of an agent\'s write with unsaved edits leaves two siblings over each other (new; next to K19, item 264)',
   },
   {
@@ -851,15 +796,13 @@ const KNOWN: Known[] = [
     // data loss. FUZZ_SEED=303 FUZZ_MODEL=sample FUZZ_RUNS=60
     // FUZZ_PATH=11:3:1:3:3:3:5:16:16:15:31:31:31:31:31.
     rule: 'geometry',
-    match: (t, v) => lastAction(t) === 'reparent' && !!v.facts?.overlap && t.some((a) => a.a === 'collapse') && t.some((a) => a.a === 'add'),
+    last: 'reparent',
+    after: ['collapse', 'add'],
+    facts: { overlap: true },
     note: 'KM3: after an add and a fold, a move into another parent lets the live physics move the old parent over its neighbours (new; next to C1, KE2)',
   },
 ]
 
-const knownHits = new Map<string, number>()
-const stats = { runs: 0, steps: 0, noOps: 0 }
-const surveySkip = new Set<string>()
-const signature = (v: Violation, actions: Action[]): string => `${v.rule}|${lastAction(actions)}`
 
 interface Prepared {
   data: DiagramData
@@ -905,6 +848,7 @@ async function prepare(name: string): Promise<Prepared> {
 
 /** The run's world: what the "disk" holds, the undo chain the run expects. */
 interface World {
+  prepared: Prepared
   saved: DiagramData
   /** Steps made, as the states before and after, for chains of undo and redo. */
   undoChain: { before: Full; after: Full }[]
@@ -1062,7 +1006,7 @@ async function runAction(store: Store, action: Action, w: World): Promise<string
     }
     case 'newView': {
       // "+ New view": a blank view, a table, opened.
-      const id = st.addView(`View ${idCounter}`, 'table')
+      const id = st.addView(`View ${ids.count()}`, 'table')
       store.getState().setActiveView(id)
       return `new view ${id}`
     }
@@ -1082,7 +1026,7 @@ async function runAction(store: Store, action: Action, w: World): Promise<string
     }
     case 'createMilestone': {
       if (st.activeSnapshotId) return 'createMilestone: a milestone is shown'
-      const id = st.createSnapshot(`M ${idCounter}`)
+      const id = st.createSnapshot(`M ${ids.count()}`)
       return `save milestone ${id}`
     }
     case 'openMilestone': {
@@ -1098,7 +1042,7 @@ async function runAction(store: Store, action: Action, w: World): Promise<string
     }
     case 'saveAsNew': {
       if (!st.activeSnapshotId || !st.milestoneDirty) return 'saveAsNew: nothing to save'
-      st.commitMilestoneChanges('new', `New ${idCounter}`)
+      st.commitMilestoneChanges('new', `New ${ids.count()}`)
       return 'Save as new'
     }
     case 'propagate': {
@@ -1218,7 +1162,7 @@ function agentWrite(store: Store, action: Extract<Action, { a: 'agent' }>, w: Wo
   const theirs = throughFolder(written)
   const st = store.getState()
   const ours = clone(st.saveDiagram())
-  const unsaved = differences(canon(ours), canon(w.saved), 0, '', [], 1).length > 0
+  const unsaved = diffList(canon(ours), canon(w.saved), { tolerance: 0, max: 1 }).length > 0
   const viewId = st.activeViewId
   const selected = st.selectedNodeId
   if (unsaved) {
@@ -1309,13 +1253,13 @@ async function checkReload(store: Store): Promise<Violation | null> {
       if (other) other.positions = {}
     }
     const diff = differences(saved, again)
-    if (diff.length) return { rule: 'reloadKeeps', detail: `the document read again saves differently:\n      ${diff.join('\n      ')}` }
+    if (diff.length) return { rule: 'reloadKeeps', detail: `the document read again saves differently:\n      ${lines(diff)}`, differences: diff }
     // The canvas shown: the same boxes (with no milestone over it).
     if (!st.activeSnapshotId) {
       const a = drawn(st), b = drawn(second.getState())
       if (a && b) {
         const moved = differences(a.boxes, b.boxes)
-        if (moved.length) return { rule: 'reloadKeeps', detail: `the canvas shown draws differently after a reload:\n      ${moved.join('\n      ')}` }
+        if (moved.length) return { rule: 'reloadKeeps', detail: `the canvas shown draws differently after a reload:\n      ${lines(moved)}`, differences: moved.map((d) => ({ ...d, path: `canvas.${d.path}` })) }
       }
     }
     return null
@@ -1351,7 +1295,7 @@ function checkFolder(store: Store): Violation | null {
   // The folder keeps no camera and no Hub concept meta; the metamodel is
   // compared on its own below.
   const diff = differences(a, b)
-  return diff.length ? { rule: 'folderRoundTrip', detail: `written as a folder and read back:\n      ${diff.join('\n      ')}` } : null
+  return diff.length ? { rule: 'folderRoundTrip', detail: `written as a folder and read back:\n      ${lines(diff)}`, differences: diff } : null
 }
 
 function checkReferences(store: Store): Violation | null {
@@ -1386,6 +1330,7 @@ function checkGeometry(store: Store, prepared: Prepared, accepted?: Set<string>)
   return {
     rule: 'geometry',
     keys: fresh,
+    shapes: [...new Set(fresh.map((k) => k.split(' ')[0]))],
     detail: `on ${canvasKey(st)}: ${fresh.slice(0, 4).map((k) => describeGeometry(st, k)).join('\n      ')}`,
     facts: {
       pinned: ids.some(held),
@@ -1400,20 +1345,19 @@ function checkGeometry(store: Store, prepared: Prepared, accepted?: Set<string>)
 }
 
 /** One action, then every check; throws RuleBroken on the first broken rule. */
-async function step(store: Store, action: Action, w: World, prepared: Prepared): Promise<void> {
+async function step(store: Store, action: Action, w: World, ctx: RunContext<Action>): Promise<void> {
   const started = performance.now()
   try {
-    await checkedStep(store, action, w, prepared)
+    await checkedStep(store, action, w, ctx)
   } finally {
     const ms = performance.now() - started
-    if (ms > 1500 && SURVEY_FILE) (await import('node:fs' as string)).appendFileSync(SURVEY_FILE, `slow step ${Math.round(ms)} ms: ${w.trace[w.trace.length - 1]}\n`)
+    if (ms > 1500 && OPTIONS.surveyFile) (await import('node:fs' as string)).appendFileSync(OPTIONS.surveyFile, `slow step ${Math.round(ms)} ms: ${w.trace[w.trace.length - 1]}\n`)
   }
 }
 
-async function checkedStep(store: Store, action: Action, w: World, prepared: Prepared): Promise<void> {
-  const fail = (v: Violation): never => {
-    throw new RuleBroken(v, w.trace, [...w.actions])
-  }
+async function checkedStep(store: Store, action: Action, w: World, ctx: RunContext<Action>): Promise<void> {
+  const fail = (v: Violation): never => ctx.fail(v)
+  const prepared = w.prepared
   const st0 = store.getState()
   const before = full(store)
   const mark = historyMark()
@@ -1457,9 +1401,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
   if (geometry) {
     // A known geometry bug does not end the run: what it left stays, and
     // the run goes on to find others.
-    const known = NO_KNOWN ? undefined : KNOWN.find((k) => k.rule === 'geometry' && k.match(w.actions, geometry, w.trace))
-    if (!known) fail(geometry)
-    knownHits.set(known!.note, (knownHits.get(known!.note) ?? 0) + 1)
+    if (!ctx.known(geometry)) fail(geometry)
     for (const k of geometry.keys ?? []) w.knownGeometry.add(k)
   }
 
@@ -1477,7 +1419,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
       const { snapshots: _a, ...was } = w.liveAtMilestone
       const { snapshots: _b, ...now } = after.doc
       const diff = differences(was, now)
-      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `Save as new changed the live document:\n      ${diff.join('\n      ')}` })
+      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `Save as new changed the live document:\n      ${lines(diff)}`, differences: diff })
       w.liveAtMilestone = after.doc
     } else if (action.a === 'newView' || action.a === 'viewpointView' || action.a === 'undo' || action.a === 'redo') {
       // Views are the live model's as much as a milestone's: a view made in
@@ -1487,7 +1429,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
       const was = { ...w.liveAtMilestone, views: both(w.liveAtMilestone, after.doc) }
       const now = { ...after.doc, views: both(after.doc, w.liveAtMilestone) }
       const diff = differences(was, now)
-      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `a new view made with the milestone shown changed the rest of the live document:\n      ${diff.join('\n      ')}` })
+      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `a new view made with the milestone shown changed the rest of the live document:\n      ${lines(diff)}`, differences: diff })
       w.liveAtMilestone = after.doc
     } else if (action.a === 'propagate' || action.a === 'agent' || action.a === 'reload') {
       w.liveAtMilestone = st.activeSnapshotId ? after.doc : null
@@ -1501,7 +1443,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
         if (!Object.keys(v.positions ?? {}).length && now.views[id]) now.views[id] = { ...now.views[id], positions: {} }
       }
       const diff = differences(was, now)
-      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `${st.activeSnapshotId ? 'with the milestone shown' : 'back on live'}, the live document changed:\n      ${diff.join('\n      ')}` })
+      if (diff.length) fail({ rule: 'milestoneKeepsLive', detail: `${st.activeSnapshotId ? 'with the milestone shown' : 'back on live'}, the live document changed:\n      ${lines(diff)}`, differences: diff })
     }
   }
   if (!st.activeSnapshotId) w.liveAtMilestone = null
@@ -1519,7 +1461,7 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
     if (entry && steps > 0) {
       const expected = action.a === 'undo' ? entry.before : entry.after
       const diff = differences(expected, after)
-      if (diff.length) fail({ rule: action.a === 'undo' ? 'undoRestores' : 'redoRestores', detail: `${action.a === 'undo' ? 'Undo' : 'Redo'} in a chain did not give back the state ${action.a === 'undo' ? 'before' : 'after'} its step:\n      ${diff.join('\n      ')}` })
+      if (diff.length) fail({ rule: action.a === 'undo' ? 'undoRestores' : 'redoRestores', detail: `${action.a === 'undo' ? 'Undo' : 'Redo'} in a chain did not give back the state ${action.a === 'undo' ? 'before' : 'after'} its step:\n      ${lines(diff)}`, differences: diff })
       to.push(entry)
     } else if (entry) {
       // Nothing to undo or redo where the chain has a step: Undo or Redo
@@ -1538,12 +1480,12 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
     await settle(store)
     const undone = full(store)
     const diffUndo = differences(before, undone)
-    if (diffUndo.length) fail({ rule: 'undoRestores', detail: `Undo of "${text!}" did not give back the state before it:\n      ${diffUndo.join('\n      ')}` })
+    if (diffUndo.length) fail({ rule: 'undoRestores', detail: `Undo of "${text!}" did not give back the state before it:\n      ${lines(diffUndo)}`, differences: diffUndo })
     store.getState().redo()
     await settle(store)
     const redone = full(store)
     const diffRedo = differences(after, redone)
-    if (diffRedo.length) fail({ rule: 'redoRestores', detail: `Redo of "${text!}" did not give back the state after it:\n      ${diffRedo.join('\n      ')}` })
+    if (diffRedo.length) fail({ rule: 'redoRestores', detail: `Redo of "${text!}" did not give back the state after it:\n      ${lines(diffRedo)}`, differences: diffRedo })
     if (resetsHistory) { w.undoChain.length = 0 } else w.undoChain.push({ before, after })
     w.redoChain.length = 0
   } else {
@@ -1567,9 +1509,9 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
       const placesAll = action.a === 'view' && st.activeViewId === null && unplaced
       const settles = firstLayout || placesAll || (action.a === 'view' && w.maySettle.has(st.activeViewId ?? ''))
       if (!settles && !EDITS.has(action.a) && action.a !== 'agent' && action.a !== 'reload' && action.a !== 'saveAsNew' && action.a !== 'propagate' && action.a !== 'discard') {
-        fail({ rule: 'nothingMovesByItself', detail: `"${text!}" changed the model:\n      ${diff.join('\n      ')}` })
+        fail({ rule: 'nothingMovesByItself', detail: `"${text!}" changed the model:\n      ${lines(diff)}`, differences: diff })
       }
-      if (EDITS.has(action.a)) fail({ rule: 'undoRestores', detail: `"${text!}" changed the model with no undo step:\n      ${diff.join('\n      ')}` })
+      if (EDITS.has(action.a)) fail({ rule: 'undoRestores', detail: `"${text!}" changed the model with no undo step:\n      ${lines(diff)}`, differences: diff })
       w.undoChain.length = 0
       w.redoChain.length = 0
     }
@@ -1585,50 +1527,39 @@ async function checkedStep(store: Store, action: Action, w: World, prepared: Pre
   if (reload) fail(reload)
 }
 
-let runIndex = 0
-async function runSequence(name: string, prepared: Prepared, actions: Action[]): Promise<void> {
-  if (++runIndex < FROM) return
-  const store = useDiagramStore
-  resetDeterminism(1)
-  store.getState().setAppMode('designer')
-  store.getState().loadDiagram(clone(prepared.data))
-  await settle(store)
-  const w: World = { saved: clone(store.getState().saveDiagram()), undoChain: [], redoChain: [], liveAtMilestone: null, trace: [], actions: [], maySettle: new Set(), afterAgent: null, knownGeometry: new Set() }
-  try {
-    stats.runs++
-    for (const action of actions) {
-      await step(store, action, w, prepared)
-      stats.steps++
-      if (/: (no |nothing|none|skipped)|no change|no pair|no sibling|no canvas|refused/.test(w.trace[w.trace.length - 1])) stats.noOps++
-    }
-  } catch (e) {
-    if (e instanceof RuleBroken) {
-      const known = NO_KNOWN ? undefined : KNOWN.find((k) => k.rule === e.violation.rule && k.match(w.actions, e.violation, w.trace))
-      if (known) {
-        knownHits.set(known.note, (knownHits.get(known.note) ?? 0) + 1)
-        return
-      }
-      if (surveySkip.has(signature(e.violation, w.actions))) return
-      e.message = `${name}: ${e.message}`
-    }
-    throw e
-  } finally {
-    store.getState().stopLiveLayout()
-  }
-}
-
-// ─── The properties ─────────────────────────────────────────────────────────
+// ─── The suite ──────────────────────────────────────────────────────────────
 
 /** CI: fixed seeds, runs sized to keep the file under a minute. */
-const PLAN: Record<string, { seed: number; runs: number; maxLength: number }> = {
-  bookstore: { seed: 20261021, runs: 80, maxLength: 20 },
-  nested: { seed: 4242, runs: 40, maxLength: 20 },
-  sample: { seed: 777, runs: 12, maxLength: 15 },
+const suite: FuzzSuite<Action, Prepared, World> = {
+  name: 'invariants',
+  file: 'packages/ui/tests/invariants.test.ts',
+  rules: ['undoRestores', 'redoRestores', 'oneStepPerAction', 'folderRoundTrip', 'reloadKeeps', 'nothingMovesByItself', 'geometry', 'references', 'milestoneKeepsLive', 'validation', 'noErrors'],
+  actions: actionArb,
+  worlds: {
+    bookstore: { seed: 20261021, runs: 80, maxLength: 20 },
+    nested: { seed: 4242, runs: 40, maxLength: 20 },
+    sample: { seed: 777, runs: 12, maxLength: 15 },
+  },
+  prepare,
+  async start(_world, prepared, ctx) {
+    const store = useDiagramStore
+    resetDeterminism(1)
+    store.getState().setAppMode('designer')
+    store.getState().loadDiagram(clone(prepared.data))
+    await settle(store)
+    return { prepared, saved: clone(store.getState().saveDiagram()), undoChain: [], redoChain: [], liveAtMilestone: null, trace: ctx.trace, actions: ctx.actions, maySettle: new Set(), afterAgent: null, knownGeometry: new Set() }
+  },
+  step: (w, action, ctx) => step(useDiagramStore, action, w, ctx),
+  end: () => useDiagramStore.getState().stopLiveLayout(),
+  known: KNOWN,
+  idKeys: ['nodes', 'relations', 'views', 'sequences', 'snapshots', 'presentations', 'defaultPositions', 'positions', 'canvas'],
+  isNoOp: (resolved) => /: (no |nothing|none|skipped)|no change|no pair|no sibling|no canvas|refused/.test(resolved),
+  describe: showAction,
 }
 
 beforeAll(async () => {
   Math.random = seededRandom
-  vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => nextId() as `${string}-${string}-${string}-${string}-${string}`)
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => nextId())
   vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.spyOn(console, 'info').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -1638,38 +1569,6 @@ beforeAll(async () => {
 afterAll(() => {
   Math.random = realRandom
   vi.restoreAllMocks()
-  realLog(`invariants: ${stats.runs} runs, ${stats.steps} steps (${stats.noOps} found nothing to act on)`)
-  if (knownHits.size) {
-    realLog(`known violations hit: ${[...knownHits].map(([k, n]) => `${n}× ${k}`).join('; ')}`)
-  }
 })
 
-describe('the rules hold over random sequences of actions', () => {
-  for (const name of Object.keys(PLAN)) {
-    if (ONLY_MODEL && ONLY_MODEL !== name) continue
-    const plan = PLAN[name]
-    it(`on the ${name} model`, async () => {
-      const prepared = await prepare(name)
-      const property = fc.asyncProperty(fc.array(actionArb, { minLength: 1, maxLength: LENGTH ?? plan.maxLength, size: 'max' }), async (actions) => {
-        await runSequence(name, prepared, actions)
-      })
-      const options = { seed: SEED ?? plan.seed, numRuns: RUNS ?? plan.runs, ...(PATH ? { path: PATH } : {}), verbose: 1 as const, endOnFailure: NO_SHRINK }
-      if (!SURVEY) {
-        await fc.assert(property, options)
-        return
-      }
-      // Survey: report each failure, then go on with its rule and last
-      // action taken as known, to find the others in one go.
-      for (let round = 0; round < 25; round++) {
-        const result = await fc.check(property, options)
-        if (!result.failed) break
-        const report = `\n===== SURVEY ${name} #${round + 1}\n${fc.defaultReportMessage(result)}\n${(result.errorInstance as Error | undefined)?.message ?? ''}\n`
-        if (SURVEY_FILE) (await import('node:fs' as string)).appendFileSync(SURVEY_FILE, report)
-        else realLog(report)
-        const e = result.errorInstance
-        if (!(e instanceof RuleBroken)) break
-        surveySkip.add(signature(e.violation, e.actions))
-      }
-    }, RUNS ? 24 * 3_600_000 : 600_000)
-  }
-})
+fuzzSuite(suite, { title: 'the rules hold over random sequences of actions', worldTitle: (world) => `on the ${world} model`, options: OPTIONS })

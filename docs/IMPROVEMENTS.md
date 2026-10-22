@@ -398,7 +398,11 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     a branch checked out in a git worktree (2026-10-08, calm drags) meant a
     throwaway script driving the worktree's own server over stdio, or
     editing the user's working copy. A `folder` argument on the tools (or a
-    `switch_folder` tool) would let one server reach either.
+    `switch_folder` tool) would let one server reach either. Again on
+    2026-10-22 (Radical Crucible): another session had checked out its own
+    branch in the main checkout, so the server there wrote to that branch's
+    model, and the model change went in through a stdio client of the
+    worktree's server.
 20. **`search_model` takes no free text.** `search_model "physics"` answers
     "Unsupported query"; finding the ADRs about layout took a `LIST NODES
     WHERE (type = …) AND (label ~ … OR …)`. A plain query could fall back to

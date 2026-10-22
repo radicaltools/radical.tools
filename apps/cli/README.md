@@ -294,6 +294,46 @@ quality and Implementation show the result by dimension, and Settings edit
 `check.json` (goals, severities, baselines), marking a change that loosens
 the gate.
 
+## radical fuzz
+
+Runs a project's fuzz files (Radical Crucible): tests that do random sequences
+of actions to a system and check its rules after every step. `crucible.json`
+in the working directory lists them, and the folder findings go to:
+
+```json
+{
+  "findings": "crucible/findings",
+  "fuzz": [{ "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }]
+}
+```
+
+Each file runs with `npx vitest run <file>` in its `cwd`, or with its own
+`command` (a list). Paths are from the folder `crucible.json` is in.
+
+```sh
+radical fuzz                    # plan ci: each file's fixed seeds and runs
+radical fuzz night              # a random seed and 2000 runs of each world
+radical fuzz --world bookstore --runs 300 --seed 7
+radical fuzz night --survey     # record each new failure as a finding
+radical fuzz --replay F-0003    # run a finding again
+radical fuzz --report reports   # a Vitest JSON report per file, for radical check
+```
+
+`--survey` goes on after each failure and writes each one whose signature (its
+rule, its last action and the shape of what differs, with the ids taken out) no
+finding has yet as `crucible/findings/F-NNNN.md`, status `open`, with the
+world, seed, path and length that replay it, the steps and what differs.
+`--no-known` lets the fuzz files' known failures filter nothing, `--no-shrink`
+reports the first failure as found.
+
+A fuzz file is written with the engine, `@radical/crucible`, which is not
+published yet: so far the fuzz files are this repository's own
+(`packages/ui/tests/invariants.test.ts`). It reports a test case per world and
+one per world and rule (`on the bookstore model: undoRestores holds`), which a
+scenario or a fitness function can name in its Tests.
+
+Exit status: 0 every file passed, 1 one failed, 2 radical fuzz could not run.
+
 ## Publishing (maintainers)
 
 The public npm package is `@radicaltools/cli`. Its private `@radical/*`

@@ -1201,6 +1201,31 @@ node apps/cli/dist/index.js check path/to/my-model --report reports</code></pre>
   }
 }</code></pre>
         <p>This repository checks its own architecture model this way on every push.</p>
+        <h3 id="cli-fuzz"><code>radical fuzz</code> (Radical Crucible)</h3>
+        <p>
+          A test of a scenario proves that one sequence of actions works. A <em>fuzz file</em> checks the system's rules wherever an action can break them: it does random sequences of actions to the system (add, delete, drag, undo, reload, an agent's write, …) and checks its rules after every step (Undo gives back the state before, a reload changes nothing, nothing points at nothing, …). It is built on Radical Crucible's engine. <code>radical fuzz</code> runs the fuzz files that <code>crucible.json</code>, in the folder you run it from, lists:
+        </p>
+<pre class="code"><code>{
+  "findings": "crucible/findings",
+  "fuzz": [{ "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }]
+}</code></pre>
+        <p>Each file runs with <code>npx vitest run</code> in its <code>cwd</code>, or with its own <code>command</code>. A fuzz file names its <em>worlds</em> (the models a run starts from, each with the seed and the number of runs CI uses), its actions, its rules and its known failures. It reports a test case for each world, and one for each rule of each world (<em>on the bookstore model: undoRestores holds</em>), so a scenario or a fitness function can name one rule in its <em>Tests</em> and <code>radical check</code> finds it.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>[plan]</code></td><td><code>ci</code> (default): each file's fixed seeds and runs, the same sequences on every run. <code>night</code>: a random seed (the summary says which) and 2000 runs of each world.</td></tr>
+              <tr><td><code>--world</code>, <code>--seed</code>, <code>--runs</code>, <code>--length</code></td><td>One world of each file, a seed, the runs of each world, the longest sequence of actions.</td></tr>
+              <tr><td><code>--survey</code></td><td>Goes on after each failure, and writes each one whose <em>signature</em> (its rule, its last action and the shape of what differs, with the ids taken out) no finding has yet as an open finding.</td></tr>
+              <tr><td><code>--replay &lt;id&gt;</code></td><td>Runs a finding again with its world, seed, path and length, without shrinking: after a fix, or on another commit.</td></tr>
+              <tr><td><code>--no-known</code>, <code>--no-shrink</code></td><td>Known failures filter nothing (does one still happen?); the first failure is reported as found.</td></tr>
+              <tr><td><code>--report &lt;dir&gt;</code></td><td>A Vitest JSON report of each file, for <code>radical check --report</code>.</td></tr>
+              <tr><td><code>--config &lt;file&gt;</code></td><td>The settings. Default: <code>crucible.json</code> in the working directory.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A failure shrinks to the shortest sequence that breaks the rule, and names the rule, each step as it resolved (which element it acted on) and what differs, with the seed and path that replay it. A <em>known failure</em>, a bug not fixed yet that the fuzz file describes by its rule, its last action, the actions before it, the paths of what differs or facts the rule reports, ends its run quietly, so CI stays green until the fix; the summary says how often each was hit, and which no run hit any more, so an entry a fix made needless is taken out.</p>
+        <p><strong>Findings</strong> are files in the findings folder, <code>crucible/findings/F-0001.md</code>: the rule, the signature, the fuzz file, world, seed, path and length, the commit and the day, then the steps and what differs. A finding starts <em>open</em>; a test bound to a scenario makes it <em>hardened</em>, the fix <em>fixed</em>, a decision that the behaviour is meant <em>intended</em>. Exit status: <code>0</code> every file passed, <code>1</code> one failed, <code>2</code> <code>radical fuzz</code> could not run.</p>
       </section>
 
       <!-- ═══════════════ REFERENCE ═══════════════ -->
@@ -1305,7 +1330,8 @@ npm run build -w @radicaltools/mcp   <span class="cm"># MCP server for coding ag
 npm run build -w @radicaltools/cli   <span class="cm"># radical check</span>
 npm test                 <span class="cm"># unit tests of every workspace</span>
 npm run e2e              <span class="cm"># browser tests (builds Studio and the Hub first)</span>
-npm run check:architecture   <span class="cm"># radical check on this repository's own model</span></code></pre>
+npm run check:architecture   <span class="cm"># radical check on this repository's own model</span>
+npm run fuzz             <span class="cm"># radical fuzz: the fuzz files of crucible.json</span></code></pre>
         <p>The desktop app adds native file dialogs, Markdown folders without browser permissions and <code>--file</code> watching (or the <code>RADICAL_FILE</code> variable). Everything else is identical to the browser build.</p>
       </section>
 
