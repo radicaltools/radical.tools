@@ -38,14 +38,14 @@
 
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { useDiagramStore, viewById } from '@radical/ui/store/diagramStore'
+import { isExplorationId, useDiagramStore, viewById } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
 import { INSPECTOR_TABS, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
 import { useBranchStore } from './persistence/branchChanges'
 import { useInspectorStore } from './persistence/inspector'
-import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, useNavHistory, type NavEntry } from './navHistory'
+import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, stepIndex, useNavHistory, type NavEntry } from './navHistory'
 
 /** The view token of All elements, the table of the whole model. Links
  *  written while it was a canvas say `canvas`, and still open it. */
@@ -360,13 +360,22 @@ const TAB_NAMES: Record<InspectorTab, string> = { changes: 'Changes', model: 'Mo
 /** What the History list says of a route: where, in which perspective, on what. */
 export function describeRoute(route: Route, hash = formatRoute(route), at = Date.now()): NavEntry {
   const s = useDiagramStore.getState()
-  const view = isAllElements(route.view) ? 'All elements' : s.views[route.view]?.name ?? route.view
+  // The exploration too, by its name ("Explore: API"), not its id.
+  const view = isAllElements(route.view) ? 'All elements' : viewById(s, route.view)?.name ?? route.view
   const where = route.mode === 'inspector' ? `Inspector › ${TAB_NAMES[route.tab ?? 'model']}`
     : route.mode === 'metamodel' ? 'Metamodel' : view
   const id = route.el ?? route.focus
   const node = id ? s.c4Nodes[id] : undefined
   const def = node ? s.metamodel?.nodeTypes[node.type] : undefined
   return { hash, where, mode: MODE_NAMES[route.mode], ...(node ? { element: { label: node.label, type: def?.label ?? node.type, color: def?.color } } : {}), at }
+}
+
+/** Whether the place of a History entry is gone: an exploration closed
+ *  since (it is never saved, and one Back led to opened All elements, a
+ *  place never visited). Back and Forward pass over it. */
+export function placeGone(entry: NavEntry): boolean {
+  const route = parseHash(entry.hash)
+  return !!route && isExplorationId(route.view) && !viewById(useDiagramStore.getState(), route.view)
 }
 
 /** The index the history entry on screen carries, if it is one of ours. */
@@ -461,6 +470,9 @@ export function startRouteSync(): () => void {
     queueMicrotask(() => schedule(true))
   })
 
+  // Places being passed over (placeGone) on the way back or forward: their
+  // addresses come and go without being applied.
+  let passing = 0
   const onHash = (e: HashChangeEvent): void => {
     if (applying) return
     // The address that was asked for is read from the event, not from the
@@ -469,6 +481,11 @@ export function startRouteSync(): () => void {
     const asked = e.newURL ? new URL(e.newURL).hash : location.hash
     const r = parseHash(asked)
     if (!r) return
+    if (passing > 0 && placeGone({ hash: asked, where: '', mode: '', at: 0 })) {
+      passing--
+      return
+    }
+    passing = 0
     applyRoute(r)
     // Should such a write have overwritten the address, write what was
     // applied (after `applying` is reset; a no-op when the two agree).
@@ -480,7 +497,18 @@ export function startRouteSync(): () => void {
   // follows the entry the history landed on; hashchange applies its route.
   const onPop = (e: PopStateEvent): void => {
     const index = stateIndex(e.state)
-    if (index !== undefined) useNavHistory.setState(moveTo(useNavHistory.getState(), index))
+    if (index === undefined) return
+    const from = useNavHistory.getState().index
+    useNavHistory.setState(moveTo(useNavHistory.getState(), index))
+    // Landed on a place that is gone (the browser's own Back, say): on in
+    // the same direction to the next place that is not, when there is one.
+    const nav = useNavHistory.getState()
+    const entry = nav.entries[index]
+    if (index === from || !entry || !placeGone(entry)) return
+    const next = stepIndex(nav, index < from ? -1 : 1, placeGone)
+    if (next === undefined) return
+    passing++
+    history.go(next - index)
   }
   window.addEventListener('popstate', onPop)
 

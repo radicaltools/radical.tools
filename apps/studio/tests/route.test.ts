@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseHash, formatRoute, type Route } from '../src/renderer/src/route'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { currentRoute, describeRoute, parseHash, formatRoute, placeGone, type Route } from '../src/renderer/src/route'
+import { stepIndex, type NavState } from '../src/renderer/src/navHistory'
 
 describe('route parse/format', () => {
   it('formats mode + view', () => {
@@ -103,5 +105,32 @@ describe('route parse/format', () => {
       view: 'view-1',
       focus: 'n1',
     })
+  })
+})
+
+// F-0013: History and the ‹ tooltip named an exploration "explore:<uuid>",
+// and once it was closed Back went to All elements, a place never visited.
+describe('an exploration in the history', () => {
+  it('is named by its name, and Back and Forward pass over it once it is closed', () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({ appMode: 'designer', presentationActive: false } as never)
+    const view = s().addView('Canvas')
+    s().setActiveView(view)
+    const node = Object.values(s().c4Nodes)[0]
+    const before = describeRoute(currentRoute())
+
+    s().exploreFrom(node.id)
+    const open = describeRoute(currentRoute())
+    expect(open.where).toBe(`Explore: ${node.label}`)
+    expect(placeGone(open)).toBe(false)
+
+    s().closeExploration()
+    const after = describeRoute(currentRoute())
+    expect(placeGone(open)).toBe(true)
+    expect(placeGone(before)).toBe(false)
+    const nav: NavState = { entries: [before, open, after], index: 2 }
+    expect(stepIndex(nav, -1, placeGone)).toBe(0)
+    expect(stepIndex({ ...nav, index: 0 }, 1, placeGone)).toBe(2)
+    expect(stepIndex({ ...nav, index: 0 }, -1, placeGone)).toBeUndefined()
   })
 })

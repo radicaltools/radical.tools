@@ -94,3 +94,47 @@ test('the history lists the places and goes to the one picked', async ({ page, s
   await expect(page).toHaveURL(/\/m\/designer\/v\/v-context$/)
   await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeDisabled()
 })
+
+// F-0013: History and the ‹ tooltip named an exploration "explore:<uuid>",
+// and once it was closed Back went to All elements, a place never visited.
+test('an exploration is named in the history, and Back passes over it once it is closed', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.node('api').click()
+  await expect(page).toHaveURL(/\/v\/v-containers\/e\/api$/)
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
+  await expect(page.locator('.explore-bar')).toContainText('Explore: API')
+  await page.keyboard.press('Escape')
+  await expect(page).toHaveURL(/\/v\/explore%3A/)
+
+  const menu = page.getByRole('menu', { name: 'History' })
+  await page.getByRole('button', { name: 'History' }).click()
+  await expect(menu.getByRole('menuitem').first()).toContainText('Explore: API')
+  await expect(menu).not.toContainText(/explore:[0-9a-f]{8}/)
+  await page.keyboard.press('Escape')
+
+  await page.locator('.explore-bar').getByRole('button', { name: 'Close the exploration' }).click()
+  await expect(page).toHaveURL(/\/v\/v-containers/)
+  // Still listed, by its name, and no longer a place to go to.
+  await page.getByRole('button', { name: 'History' }).click()
+  await expect(menu.getByRole('menuitem', { name: /Explore: API/ })).toBeDisabled()
+  await expect(menu).not.toContainText(/explore:[0-9a-f]{8}/)
+  await page.keyboard.press('Escape')
+
+  // ‹ names the place before it, and goes there.
+  const back = page.getByRole('button', { name: 'Back', exact: true })
+  await back.hover()
+  await expect(page.locator('#nav-tip-back')).toContainText('to Designer › Containers · API')
+  await back.click()
+  await expect(page).toHaveURL(/\/v\/v-containers\/e\/api$/)
+  await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Containers')
+
+  // The browser's own Forward and Back pass over it too.
+  await page.evaluate(() => history.forward())
+  await expect(page).toHaveURL(/\/v\/v-containers(\/e\/api)?$/)
+  await expect.poll(() => page.evaluate(() => history.state?.navIndex)).toBe(3)
+  await page.evaluate(() => history.back())
+  await expect.poll(() => page.evaluate(() => history.state?.navIndex)).toBe(1)
+  await expect(page).toHaveURL(/\/v\/v-containers\/e\/api$/)
+  await expect(page.locator('.tv-wrap')).toHaveCount(0)
+})

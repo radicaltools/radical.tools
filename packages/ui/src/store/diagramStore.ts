@@ -1839,6 +1839,10 @@ export function viewById(s: Pick<DiagramStore, 'views' | 'exploration'>, id: str
   return s.views[id] ?? (s.exploration?.id === id ? s.exploration : undefined)
 }
 
+/** Whether `id` names an exploration (open or closed since): the route of
+ *  one closed is a place that is gone. */
+export { isExplorationId } from './exploration'
+
 /** The canvas shown is the temporary exploration (Explore from here). */
 export function onExploration(s: Pick<DiagramStore, 'activeViewId' | 'exploration'>): boolean {
   return !!s.activeViewId && s.exploration?.id === s.activeViewId
