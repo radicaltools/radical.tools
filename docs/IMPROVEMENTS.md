@@ -591,6 +591,18 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     instead of the one element it names, as git does with commit
     prefixes. An agent has to keep every full id it has seen, or search
     again.
+44. **`radical explore verify` serves Studio only.** Run 172 (2026-10-22)
+    tested concern packs against the round's Hub on its second port; verify
+    started Studio alone, so every script failed on `hub/index.json` until
+    the Hub was served by hand. `explore.serve` could take a list of
+    servers, each on one of the run's ports.
+45. **A recorded finding's script still points into the round's worktree.**
+    Most scripts of round 170–175 name `/Volumes/…/rd-cli/.crucible/…` or a
+    port, so a copy under `crucible/findings/F-NNNN/` runs only where the
+    round ran. Run 174's helpers find the repository by walking up; the
+    round brief could ask every run to do so, and `record` could warn about
+    absolute paths. `record` also drops the screenshot a finding names
+    (F-0007).
 
 ### Reverse-engineered requirements (2026-10-06)
 

@@ -1,0 +1,26 @@
+// Toolbar at 1000 px: a click on Designer lands on History; at 1140 px a click on History lands on Changes on branch.
+import { launch, seed, open, fixture } from './lib.mjs'
+const W = Number(process.argv[2] ?? 1000)
+const { browser, page, errors } = await launch({ width: W, height: 700 })
+await seed(page, fixture('bookstore'))
+await open(page, 'v-context', 'viewer')
+const center = async (loc) => { const b = await loc.boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, box: b } }
+const designer = page.locator('.toolbar-mode-btn', { hasText: 'Designer' })
+const history = page.getByRole('button', { name: 'History', exact: true })
+const branch = page.getByRole('button', { name: 'Changes on branch', exact: true })
+const d = await center(designer), h = await center(history)
+const b = (await branch.count()) ? await center(branch) : null
+console.log(`window ${W}px: Designer box x=${Math.round(d.box.x)}..${Math.round(d.box.x + d.box.width)}, History x=${Math.round(h.box.x)}..${Math.round(h.box.x + h.box.width)}` + (b ? `, Changes on branch x=${Math.round(b.box.x)}..${Math.round(b.box.x + b.box.width)}` : ''))
+const top = await page.evaluate(([x, y]) => { const t = document.elementFromPoint(x, y); return t?.closest('button')?.getAttribute('aria-label') ?? t?.closest('button')?.textContent?.trim() ?? t?.className }, [d.x, d.y])
+console.log('element at the centre of Designer:', top)
+await page.mouse.click(d.x, d.y)
+await page.waitForTimeout(400)
+const active = await page.locator('.toolbar-mode-btn.active').textContent()
+const menuOpen = await page.locator('.nav-menu').count()
+await page.screenshot({ path: `shots/f1-${W}.png`, clip: { x: 0, y: 0, width: W, height: 260 } })
+console.log(`after a click on Designer: active perspective = "${active.trim()}", History menu open = ${menuOpen > 0}`)
+const ok = active.includes('Designer')
+console.log(ok ? 'PASS' : 'FAIL: the click on Designer did not switch to Designer')
+if (errors.length) console.log('errors', errors)
+await browser.close()
+process.exit(ok ? 0 : 1)
