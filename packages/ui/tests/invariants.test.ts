@@ -64,8 +64,10 @@ import { mergeModels } from '@radical/common/modelMerge'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { fitShown, growWithRoom, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { applyAlignments, viewLayoutInput } from '@radical/layout/viewInput'
-import bookstoreText from '../../../apps/e2e/fixtures/bookstore.radical?raw'
-import sampleText from '../../../apps/studio/src/renderer/src/store/fintechSampleData.json?raw'
+// Copies of the e2e suite's bookstore and Studio's sample model
+// (tests/fixtures): a workspace imports no file of another.
+import bookstoreText from './fixtures/bookstore.radical?raw'
+import sampleText from './fixtures/fintechSampleData.json?raw'
 
 // ─── The live physics, stepped by hand ──────────────────────────────────────
 // The live layout runs on a d3 timer (liveColaEngine.ts). Here the timer only

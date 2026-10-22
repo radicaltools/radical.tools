@@ -11,7 +11,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData, NodePosition } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
-import bookstoreText from '../../../apps/e2e/fixtures/bookstore.radical?raw'
+// Copies of the e2e suite's bookstore and Studio's sample model
+// (tests/fixtures): a workspace imports no file of another.
+import bookstoreText from './fixtures/bookstore.radical?raw'
 
 const s = useDiagramStore.getState
 const pos = (x: number, y: number, width: number, height: number): NodePosition => ({ x, y, width, height })

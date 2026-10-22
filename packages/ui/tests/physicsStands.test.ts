@@ -22,8 +22,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
 import { nodeTypeSize } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import bookstoreText from '../../../apps/e2e/fixtures/bookstore.radical?raw'
-import sampleText from '../../../apps/studio/src/renderer/src/store/fintechSampleData.json?raw'
+// Copies of the e2e suite's bookstore and Studio's sample model
+// (tests/fixtures): a workspace imports no file of another.
+import bookstoreText from './fixtures/bookstore.radical?raw'
+import sampleText from './fixtures/fintechSampleData.json?raw'
 
 vi.mock('d3-timer', async (importOriginal) => {
   const real = await importOriginal<Record<string, unknown>>()
