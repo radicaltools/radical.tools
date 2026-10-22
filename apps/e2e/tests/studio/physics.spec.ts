@@ -226,10 +226,11 @@ test('a drag moves only the dragged node, and the drop pins it', async ({ page, 
 })
 
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
-  // The canvas as wide as before the activity rail took 44 px of it: at the
-  // zoom a narrower canvas fits the grid at, the drop pushes n8_8 too
-  // (docs/IMPROVEMENTS.md).
-  await page.addInitScript(() => { if (!localStorage.getItem('radical.leftPanelWidth')) localStorage.setItem('radical.leftPanelWidth', '216') })
+  // The canvas as wide as before the activity rail took 44 px of it, from
+  // the first frame: at the zoom a narrower canvas fits the grid at, the
+  // drop pushes n8_8 too (docs/IMPROVEMENTS.md).
+  const size = page.viewportSize()!
+  await page.setViewportSize({ width: size.width + 44, height: size.height })
   await studio.seedDocument(gridDocument())
   await studio.open(WHOLE)
   const previous = await untilStill(page, studio)
