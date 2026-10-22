@@ -55,6 +55,21 @@ test('a view opened from the card is scrolled into sight in the list of views', 
   await expect(listed).toBeInViewport()
 })
 
+// F-0002: opened while the rail showed Milestones, the view was out of
+// sight in the list when Views was opened again.
+test('a view opened while another section is open is in sight in the list when Views opens', async ({ page, studio }) => {
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await expect(page.locator('#lp-sec-views')).toBeHidden()
+  await studio.node('target').click()
+  const views = studio.properties.getByRole('region', { name: 'Views' })
+  await views.getByRole('button', { name: /^More 29/ }).click()
+  await expect(page).toHaveURL(/\/v\/v-more-29/)
+  await page.getByRole('tab', { name: 'Views' }).click()
+  const listed = page.locator('.lp-view-card', { hasText: 'More 29' })
+  await expect(listed).toHaveClass(/active/)
+  await expect(listed).toBeInViewport()
+})
+
 test('a wiki opened from the card shows the element\'s page from its top, also after another wiki', async ({ page, studio }) => {
   await studio.node('target').click()
   const views = studio.properties.getByRole('region', { name: 'Views' })

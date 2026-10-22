@@ -1440,14 +1440,17 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     return next
   })
   // The view opened from elsewhere (the card's Views, Quick Search, a link)
-  // is scrolled into sight in the list, once its folder or group is open.
+  // is scrolled into sight in the list, once its folder or group is open,
+  // and once the list is shown: opened while the rail showed another
+  // section, it was scrolled while hidden, which does nothing.
   const listRef = useRef<HTMLDivElement>(null)
   const toReveal = useRef(true)
+  const listShown = useLeftPanelSection((s) => s.open === 'views')
   useEffect(() => { toReveal.current = true }, [activeViewId])
   useEffect(() => {
-    if (!toReveal.current) return
+    if (!toReveal.current || !listShown) return
     const card = listRef.current?.querySelector('.lp-view-card.active')
-    if (!card) return
+    if (!card || !card.getClientRects().length) return
     toReveal.current = false
     card.scrollIntoView?.({ block: 'nearest' })
   })
