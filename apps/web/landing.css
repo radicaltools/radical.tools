@@ -202,7 +202,7 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 30px; }
 .map { display: block; width: 100%; min-width: 680px; height: auto; margin: 0 auto; }
 .map .box { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.2; }
-.map .core { fill: var(--bg-panel); stroke: rgba(var(--accent-rgb), .55); stroke-width: 1.4; }
+.map .core { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.4; }
 .map .name { font-size: 15px; font-weight: 600; fill: var(--text); }
 .map .core-name { font-size: 19px; font-weight: 700; fill: var(--text); letter-spacing: -0.01em; }
 .map .sub { font-size: 11px; fill: var(--muted); }
@@ -231,8 +231,10 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .map a { cursor: pointer; }
 .map a:hover .box, .map a:focus-visible .box { stroke: var(--c); stroke-width: 1.6; }
 .map a:hover .name { fill: var(--c); }
+.map a:hover .core, .map a:focus-visible .core { stroke: var(--c); stroke-width: 1.8; }
+.map a:hover .core-name { fill: var(--c); }
 .map a:focus-visible { outline: none; }
-@media (prefers-reduced-motion: no-preference) { .map .box, .map .name { transition: stroke .15s, fill .15s; } }
+@media (prefers-reduced-motion: no-preference) { .map .box, .map .core, .map .name, .map .core-name { transition: stroke .15s, fill .15s; } }
 .map-tall { display: none; }
 .map-tall .bus { stroke: var(--border-strong); stroke-width: 1.5; }
 /* the tall picture has its own markers: the wide one's are not drawn while it is hidden */
