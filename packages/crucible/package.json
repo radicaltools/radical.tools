@@ -1,0 +1,32 @@
+{
+  "name": "@radical/crucible",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Radical Crucible's engine: fuzz suites of actions and rules run with fast-check, known failures by signature, findings.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vitest": "./src/vitest.ts",
+    "./findings": "./src/findings.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fast-check": "^4.10.2"
+  },
+  "peerDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.4"
+  }
+}

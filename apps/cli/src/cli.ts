@@ -2,6 +2,7 @@ import { CHECK_USAGE, checkCommand, type Io } from './check'
 import { DIFF_USAGE, diffCommand } from './diff'
 import { HOOKS_USAGE, hooksCommand } from './hooks'
 import { EXPORT_USAGE, exportCommand } from './confluence'
+import { FUZZ_USAGE, fuzzCommand } from './fuzz'
 import { displayVersion } from '@radical/common/version'
 
 const USAGE = `Usage: radical <command> [options]
@@ -15,6 +16,8 @@ Commands:
   export confluence [folder]
                    export a wiki view, or publish it to Confluence Cloud
                    (radical export confluence --help)
+  fuzz [plan]      run the fuzz files crucible.json lists (Radical Crucible;
+                   radical fuzz --help)
 
   --version        print the version`
 
@@ -25,9 +28,10 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'diff') return diffCommand(rest, io)
   if (command === 'hooks') return hooksCommand(rest, io)
   if (command === 'export') return exportCommand(rest, io)
+  if (command === 'fuzz') return fuzzCommand(rest, io)
   if (command === '--version' || command === '-v') { io.out(displayVersion()); return 0 }
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
-    io.out(rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : USAGE)
+    io.out(rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : USAGE)
     return 0
   }
   io.err(`Unknown command: ${command}\n\n${USAGE}`)

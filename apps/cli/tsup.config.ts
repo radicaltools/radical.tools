@@ -12,7 +12,7 @@ export default defineConfig({
   clean: true,
   // The product version, commit and day of this build (@radical/common/version).
   define: buildDefine(fileURLToPath(new URL('.', import.meta.url))),
-  noExternal: ['@radical/common', '@radical/node-files', 'markdown-to-jsx'],
+  noExternal: ['@radical/common', '@radical/node-files', '@radical/crucible', 'markdown-to-jsx'],
   onSuccess: async () => {
     await cp(fileURLToPath(new URL('../../LICENSE', import.meta.url)), 'LICENSE')
   },

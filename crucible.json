@@ -1,0 +1,6 @@
+{
+  "findings": "crucible/findings",
+  "fuzz": [
+    { "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }
+  ]
+}
