@@ -141,12 +141,16 @@ Do not walk the same path twice in a row. Each run, choose differently.
   `nodes[].x/y` only mirror the canvas that was active at the last save.
   Compare positions, not sizes: some elements are drawn smaller than the
   size stored (a known item under "Alignments").
-- Switch views as a user does: the "Views" header in the left panel, then
-  a view card (`.lp-view-card`). The left panel is an accordion: the cards
-  of a closed section are in the page but out of reach under another
-  section's header, so click the section's header first (the same for
-  milestones, `.lp-snap-card`). The sample gets a new document id each
-  time it is opened; read it from the address.
+- Switch views as a user does: the Views tab on the activity rail at the
+  left edge (`getByRole('tab', { name: 'Views' })`), then a view card
+  (`.lp-view-card`). The panel shows one section at a time: the cards of
+  another section are in the page but hidden, so open its tab first (the
+  same for Milestones, `.lp-snap-card`, and Sequences). A click on the
+  open tab folds the panel. The rail's foot holds what the Radical menu
+  held: Models, the Metamodel button, AI, Export and Settings (buttons by
+  those names, `exact: true`). The rail takes 44 px of the canvas' width.
+  The sample gets a new document id each time it is opened; read it from
+  the address.
 - The first edit in a milestone opens a prompt whose backdrop covers the
   left panel: answer it before clicking a view or milestone card.
   "Current (live)" discards the milestone's edits without asking.
@@ -178,8 +182,7 @@ Do not walk the same path twice in a row. Each run, choose differently.
   for an agent when no server is needed.
 - Run as a subagent, a run may not be allowed to write a report file:
   then the report is its final message.
-- The toolbar's Undo and Redo are covered by the search bar at 1440 px (a
-  known issue): use the keyboard or a wider window. In headless Chromium
+- The toolbar's Undo and Redo sit right of the logo. In headless Chromium
   on macOS, Meta+Z does not reach Studio's undo: press Control+Z.
 - Use the real controls (buttons by their accessible name, mouse drags),
   as a user would. Reaching into the store proves nothing about the
