@@ -13,7 +13,7 @@ const pack: PackSpec = {
   tags: ['security', 'encryption', 'tls', 'mtls', 'kms', 'key-management', 'certificates'],
   concern: {
     id: 'encryption',
-    trigger: 'LIST RELATIONS WHERE target.external != true AND (target.type = "database" OR target.type = "queue" OR source.type = "person" OR source.external = true)',
+    trigger: 'LIST RELATIONS WHERE target.external != true AND (target.type = "database" OR target.type = "queue" OR ((source.type = "person" OR source.external = true) AND (target.type = "system" OR target.type = "container" OR target.type = "webapp" OR target.type = "component")))',
     applyTo: 'target',
     why: 'data reaches these elements from outside or is stored in them, so how it is encrypted on the wire and on disk, and who holds the keys, has to be decided.',
   },

@@ -221,6 +221,11 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [clarifyStatusByStage, setClarifyStatusByStage] = useState<Partial<Record<ForgeStageId, ClarifyStatus>>>({})
   const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
   const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
+  /** Whether the user accepted the answers the model took from the
+   *  description, per stage; the answers are confirmed only after. */
+  const [proposalsAcceptedByStage, setProposalsAcceptedByStage] = useState<Partial<Record<ForgeStageId, boolean>>>({})
+  /** The proposed answers opened to be changed (question ids). */
+  const [changingProposals, setChangingProposals] = useState<ReadonlySet<string>>(new Set())
   const [progressByStage, setProgressByStage] = useState<Partial<Record<ForgeStageId, StageProgress>>>({})
   /** Running total across every stage generated so far this wizard session —
    *  undefined until the first stage with usage data completes. */
@@ -405,6 +410,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           else if (q.defaultOption) defaults[q.id] = q.defaultOption
         }
         setClarifyAnswersByStage((a) => ({ ...a, [currentStageId]: defaults }))
+        setProposalsAcceptedByStage((a) => ({ ...a, [currentStageId]: false }))
         setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: questions.length ? 'form' : 'done' }))
         // The clarify call is real spend too, even though it never touches
         // the diagram — count it in both the per-stage and session totals
@@ -813,6 +819,40 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     return { total: mockups.length, missing }
   }, [nodes])
 
+  /** The answer controls of one clarifying question: a text box, or its
+   *  options as radios (checkboxes for multiSelect). */
+  const clarifyAnswerInput = (stageId: ForgeStageId, q: ClarifyStageQuestion): React.ReactNode => (
+    q.kind === 'text' ? (
+      <input
+        type="text"
+        className="forge-clarify-input"
+        value={(clarifyAnswersByStage[stageId]?.[q.id] as string) ?? ''}
+        onChange={(e) => setClarifyAnswer(stageId, q.id, e.target.value)}
+      />
+    ) : (
+      <div className="forge-clarify-options">
+        {(q.options ?? []).map((opt) => {
+          const answer = clarifyAnswersByStage[stageId]?.[q.id]
+          const checked = q.multiSelect
+            ? ((answer as string[] | undefined) ?? []).includes(opt)
+            : answer === opt
+          return (
+            <label key={opt} className="forge-clarify-option">
+              <input
+                type={q.multiSelect ? 'checkbox' : 'radio'}
+                checked={checked}
+                onChange={() => q.multiSelect
+                  ? toggleClarifyOption(stageId, q.id, opt)
+                  : setClarifyAnswer(stageId, q.id, opt)}
+              />
+              {opt}
+            </label>
+          )
+        })}
+      </div>
+    )
+  )
+
   const isLastStage = currentStageId === FORGE_STAGES[FORGE_STAGES.length - 1].id
   // The footer is the wizard's single action bar: its right-hand side shows
   // whatever moves the current stage forward right now (answer the clarifying
@@ -826,10 +866,17 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       return <button type="button" className="forge-btn forge-btn-secondary" onClick={cancelStage}>Cancel</button>
     }
     if (clarifyStatus === 'form') {
+      const awaitingAcceptance = !!clarifyQuestionsByStage[currentStageId]?.some((q) => q.fromDescription !== undefined) && !proposalsAcceptedByStage[currentStageId]
       return (
         <>
           <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStageId)}>Skip questions</button>
-          <button type="button" className="forge-btn forge-btn-primary" onClick={() => submitClarify(currentStageId)}>Confirm answers</button>
+          <button
+            type="button"
+            className="forge-btn forge-btn-primary"
+            disabled={awaitingAcceptance}
+            title={awaitingAcceptance ? 'Accept the answers taken from your description first' : undefined}
+            onClick={() => submitClarify(currentStageId)}
+          >Confirm answers</button>
         </>
       )
     }
@@ -1037,45 +1084,61 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
                 </div>
               )}
 
-              {clarifyStatusByStage[currentStage.id] === 'form' && (
-                <div className="forge-clarify">
-                  <div className="forge-clarify-label">A few quick questions before generating</div>
-                  {clarifyQuestionsByStage[currentStage.id]!.map((q) => (
-                    <div key={q.id} className="forge-clarify-q">
-                      <label className="forge-clarify-question">{q.question}</label>
-                      {q.kind === 'text' ? (
-                        <input
-                          type="text"
-                          className="forge-clarify-input"
-                          value={(clarifyAnswersByStage[currentStage.id]?.[q.id] as string) ?? ''}
-                          onChange={(e) => setClarifyAnswer(currentStage.id, q.id, e.target.value)}
-                        />
-                      ) : (
-                        <div className="forge-clarify-options">
-                          {(q.options ?? []).map((opt) => {
-                            const answer = clarifyAnswersByStage[currentStage.id]?.[q.id]
-                            const checked = q.multiSelect
-                              ? ((answer as string[] | undefined) ?? []).includes(opt)
-                              : answer === opt
-                            return (
-                              <label key={opt} className="forge-clarify-option">
-                                <input
-                                  type={q.multiSelect ? 'checkbox' : 'radio'}
-                                  checked={checked}
-                                  onChange={() => q.multiSelect
-                                    ? toggleClarifyOption(currentStage.id, q.id, opt)
-                                    : setClarifyAnswer(currentStage.id, q.id, opt)}
-                                />
-                                {opt}
-                              </label>
-                            )
-                          })}
+              {clarifyStatusByStage[currentStage.id] === 'form' && (() => {
+                const questions = clarifyQuestionsByStage[currentStage.id]!
+                const open = questions.filter((q) => q.fromDescription === undefined)
+                const proposed = questions.filter((q) => q.fromDescription !== undefined)
+                const accepted = !!proposalsAcceptedByStage[currentStage.id]
+                return (
+                  <>
+                    {proposed.length > 0 && (
+                      <div className="forge-clarify forge-clarify-proposed" role="group" aria-label="Answered from your description">
+                        <div className="forge-clarify-proposed-head">
+                          <div className="forge-clarify-label">Answered from your description</div>
+                          <button
+                            type="button"
+                            className={`forge-btn forge-btn-sm ${accepted ? 'forge-btn-success' : 'forge-btn-primary'}`}
+                            aria-pressed={accepted}
+                            onClick={() => setProposalsAcceptedByStage((a) => ({ ...a, [currentStage.id]: !accepted }))}
+                          >{accepted ? 'Accepted ✓' : 'Accept these answers'}</button>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                        <p className="forge-clarify-hint">Forge read these in your description. Check them and accept them, or change any first.</p>
+                        {proposed.map((q) => {
+                          const answer = clarifyAnswersByStage[currentStage.id]?.[q.id]
+                          const changing = changingProposals.has(q.id)
+                          return (
+                            <div key={q.id} className="forge-clarify-q forge-clarify-proposal" data-question={q.id}>
+                              <span className="forge-clarify-question">{q.question}</span>
+                              <div className="forge-clarify-proposal-row">
+                                <span className="forge-clarify-answer">{Array.isArray(answer) ? answer.join(', ') : answer}</span>
+                                {q.fromDescription && <q className="forge-clarify-quote">{q.fromDescription}</q>}
+                                <button
+                                  type="button"
+                                  className="forge-btn forge-btn-ghost forge-btn-sm"
+                                  aria-expanded={changing}
+                                  onClick={() => setChangingProposals((prev) => { const next = new Set(prev); if (changing) next.delete(q.id); else next.add(q.id); return next })}
+                                >{changing ? 'Done' : 'Change'}</button>
+                              </div>
+                              {changing && clarifyAnswerInput(currentStage.id, q)}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {open.length > 0 && (
+                      <div className="forge-clarify">
+                        <div className="forge-clarify-label">A few quick questions before generating</div>
+                        {open.map((q) => (
+                          <div key={q.id} className="forge-clarify-q">
+                            <label className="forge-clarify-question">{q.question}</label>
+                            {clarifyAnswerInput(currentStage.id, q)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
 
               {clarifyStatusByStage[currentStage.id] === 'done' && !!clarifyQuestionsByStage[currentStage.id]?.length && !stageReports[currentStage.id] && !busy && (
                 <div className="forge-clarify-summary">

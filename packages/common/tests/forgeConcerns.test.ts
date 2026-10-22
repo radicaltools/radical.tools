@@ -53,6 +53,33 @@ describe('concern packs in Forge', () => {
     expect(concernAnswersOf(PACK, {})).toEqual({})
   })
 
+  it('the clarify prompt lists the packs\' questions and asks for answers the description settles', () => {
+    const prompt = buildClarifyPrompt('Requirements', 'Customers sign in with Google.', [PACK])
+    expect(prompt).toContain('  - IDENTITY: How do people sign in? [idp = a provider; none = nobody signs in] (default idp)')
+    expect(prompt).toContain('"answers" array of')
+    expect(prompt).toContain('Answer only what the description says')
+    const ask = buildClarifyPrompt('Requirements', 'Customers sign in with Google.', [PACK], undefined, 'ask')
+    expect(ask).toContain('propose the answer, quoting the words of the description it rests on')
+    expect(ask).toContain('  - IDENTITY: How do people sign in?')
+  })
+
+  it('answers the description settles come back proposed, with their words, and an answer that is no option is dropped', () => {
+    const PAIR: ConcernPack = { ...PACK, templateParams: [...PACK.templateParams!, { key: 'MFA', label: 'Second factor?', defaultValue: 'off', options: [{ value: 'off', label: 'none' }, { value: 'totp', label: 'an authenticator app' }] }] }
+    const reply = parseClarifyReply(JSON.stringify([{
+      id: CONCERNS_QUESTION_ID, question: 'Settle?', kind: 'select', multiSelect: true, options: ['Authentication'],
+      answers: [
+        { pack: 'concern-authentication', key: 'IDENTITY', answer: 'idp', because: 'sign in with Google' },
+        { pack: 'concern-authentication', key: 'MFA', answer: 'sms' },
+        { pack: 'concern-authentication', key: 'MINUTES' },
+      ],
+    }]))!
+    const { questions } = withConcernQuestions(reply, [PAIR])
+    expect(questions).toEqual([
+      { id: 'concern:concern-authentication:IDENTITY', question: 'Authentication — How do people sign in?', kind: 'select', options: ['a provider', 'nobody signs in'], defaultOption: 'a provider', fromDescription: 'sign in with Google' },
+      { id: 'concern:concern-authentication:MFA', question: 'Authentication — Second factor?', kind: 'select', options: ['none', 'an authenticator app'], defaultOption: 'none' },
+    ])
+  })
+
   it('later stages are told the concern is decided and C4 is told what to link', () => {
     let n = 0
     const insert = buildConcernInsert(CONCEPT, { answers: { IDENTITY: 'none' }, elements: [], metamodel: builtInGovernanceMetamodel(), today: '2026-10-22', newId: () => `id${++n}`, place: () => ({ x: 0, y: 0 }) })

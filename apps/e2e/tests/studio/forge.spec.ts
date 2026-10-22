@@ -23,8 +23,10 @@ interface ScriptedStage {
 
 /** Answers Anthropic Messages calls: no clarifying questions, and per stage
  *  one round of tool calls (or calls made from the stage's prompt), its
- *  follow-up rounds, then a summary. */
-async function scriptAnthropic(page: Page, stages: ScriptedStage[], pickConcern?: string): Promise<string[]> {
+ *  follow-up rounds, then a summary. `pickConcern` names a concern pack the
+ *  clarify reply picks, with the answers it takes from the description. */
+async function scriptAnthropic(page: Page, stages: ScriptedStage[], pickConcern?: string | { name: string; answers: unknown[] }): Promise<string[]> {
+  const concern = typeof pickConcern === 'string' ? { name: pickConcern, answers: undefined } : pickConcern
   const stagePrompts: string[] = []
   await page.addInitScript(() => {
     localStorage.setItem('radical-ai-settings', JSON.stringify({
@@ -42,8 +44,8 @@ async function scriptAnthropic(page: Page, stages: ScriptedStage[], pickConcern?
     if (!body.tools) {
       // Clarify: pick the concern pack asked for when the requirements stage offers the packs.
       const prompt = JSON.stringify(body.messages)
-      const pick = pickConcern && prompt.includes('\\"Requirements\\" stage') && prompt.includes('Concern packs of the Hub')
-        ? [{ id: 'concerns', question: 'Settle these concerns?', kind: 'select', multiSelect: true, options: [pickConcern] }]
+      const pick = concern && prompt.includes('\\"Requirements\\" stage') && prompt.includes('Concern packs of the Hub')
+        ? [{ id: 'concerns', question: 'Settle these concerns?', kind: 'select', multiSelect: true, options: [concern.name], answers: concern.answers }]
         : []
       return reply([{ type: 'text', text: JSON.stringify(pick) }], 'end_turn')
     }
@@ -387,6 +389,57 @@ test('without an AI provider Radical Forge is offered disabled, with how to set 
   await expect(page.getByRole('button', { name: 'Open Radical Forge' })).toBeDisabled()
   await expect(page.locator('.forge-panel')).toHaveCount(0)
   expect(asked).toEqual([])
+})
+
+test('Forge proposes a concern pack\'s answers from the description and imports them once accepted', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await page.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
+    const response = await route.fetch({ url: `http://localhost:${HUB_PORT}` + new URL(route.request().url()).pathname })
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-type': 'application/json' } })
+  })
+  await scriptAnthropic(page, [
+    { task: /extract its functional requirements/, calls: [requirement(1)] },
+  ], {
+    name: 'Authentication',
+    answers: [
+      { pack: 'concern-authentication', key: 'IDENTITY', answer: 'none', because: 'nobody needs an account' },
+      { pack: 'concern-authentication', key: 'MACHINE', answer: 'carrier pigeon' },
+    ],
+  })
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
+  await page.locator('.forge-textarea').fill('# Book shop\n\nReaders browse the catalogue; nobody needs an account.')
+  await page.getByRole('button', { name: 'Start →' }).click()
+
+  // The answer from the description stands apart, with its words; the one
+  // that is no option is asked like the rest.
+  const proposed = page.getByRole('group', { name: 'Answered from your description' })
+  const sign = proposed.locator('.forge-clarify-proposal', { hasText: 'Authentication — How do people sign in?' })
+  await expect(sign.locator('.forge-clarify-answer')).toHaveText('nobody signs in')
+  await expect(sign.locator('.forge-clarify-quote')).toHaveText('nobody needs an account')
+  await expect(proposed.getByText('How do other systems call it?')).toHaveCount(0)
+  const machine = page.locator('.forge-clarify-q', { hasText: 'Authentication — How do other systems call it?' })
+  await expect(machine.getByLabel('OAuth 2.0 client credentials')).toBeChecked()
+  await sign.getByRole('button', { name: 'Change' }).click()
+  await expect(sign.getByLabel('nobody signs in')).toBeChecked()
+  await sign.getByRole('button', { name: 'Done' }).click()
+
+  // Confirmed only once accepted.
+  const confirm = page.getByRole('button', { name: 'Confirm answers' })
+  await expect(confirm).toBeDisabled()
+  await machine.getByLabel('none, no other system calls it').check()
+  await proposed.getByRole('button', { name: 'Accept these answers' }).click()
+  await expect(proposed.getByRole('button', { name: 'Accepted ✓' })).toBeVisible()
+  await confirm.click()
+  await page.getByRole('button', { name: 'Generate requirements' }).click()
+  await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()
+
+  await expect.poll(async () => (await studio.storedDoc()).nodes.some((n) => (n as { type?: string }).type === 'adr')).toBe(true)
+  const stored = await studio.storedDoc() as unknown as { nodes: Array<{ type: string; label: string; concern?: string }> }
+  expect(stored.nodes.find((n) => n.type === 'adr')).toMatchObject({ label: 'Nobody signs in', concern: 'authentication' })
 })
 
 test('Forge asks a concern pack\'s questions and imports it whole', async ({ page, studio }) => {

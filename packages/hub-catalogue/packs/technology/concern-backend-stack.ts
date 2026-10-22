@@ -1,38 +1,38 @@
 import type { PackSpec } from '../../src/packSpec'
 
 const RUNTIMES = ['adr-jvm', 'adr-dotnet', 'adr-node', 'adr-go', 'adr-python']
-const FORCES = 'Code lives in this element, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team\'s skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.'
+const FORCES = 'This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team\'s skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.'
 
 const pack: PackSpec = {
-  id: 'concern-runtime-stack',
-  name: 'Runtime stack',
+  id: 'concern-backend-stack',
+  name: 'Backend stack',
   group: 'technology',
-  description: 'The runtime, language and main framework the element is built on, why, and how it is kept on supported versions with its dependencies up to date.',
-  tags: ['technology', 'runtime', 'language', 'framework', 'end of life', 'dependency updates', 'lts'],
+  description: 'The language, runtime and framework a server-side service is built on, why, the performance budget it is held to, and how it is kept on supported versions with its dependencies up to date.',
+  tags: ['technology', 'backend', 'runtime', 'language', 'framework', 'end of life', 'dependency updates', 'performance budget'],
   concern: {
-    id: 'runtime-stack',
-    trigger: 'LIST NODES WHERE (type = "container" OR type = "webapp") AND external != true',
-    why: 'code lives in these elements, so what it runs on, and how that is kept supported and up to date, has to be decided.',
+    id: 'backend-stack',
+    trigger: 'LIST NODES WHERE (type = "container" OR type = "component") AND external != true',
+    why: 'these are server-side services, so what they are built on, how fast they must be, and how they are kept supported and up to date has to be decided.',
   },
   sources: [
     { title: 'endoflife.date: end-of-life dates and support lifecycles', url: 'https://endoflife.date/' },
     { title: 'Thoughtworks Technology Radar', url: 'https://www.thoughtworks.com/radar' },
-    { title: 'ISO/IEC 25010, Maintainability and Flexibility', url: 'https://iso25000.com/index.php/en/iso-25000-standards/iso-25010' },
+    { title: 'ISO/IEC 25010, Maintainability, Flexibility and Performance efficiency', url: 'https://iso25000.com/index.php/en/iso-25000-standards/iso-25010' },
     { title: 'Renovate documentation', url: 'https://docs.renovatebot.com/' },
     { title: 'OpenSSF Scorecard', url: 'https://github.com/ossf/scorecard' },
     { title: 'Ford, Parsons, Kua, Sadalage: Building Evolutionary Architectures, 2nd ed.', url: 'https://www.oreilly.com/library/view/building-evolutionary-architectures/9781492097532/' },
   ],
   questions: [
     {
-      key: 'RUNTIME', title: 'Runtime', label: 'What does the element run on?',
-      hint: 'The runtime brings the language, the framework, the libraries and the people who can work on it. Changing it later means rewriting the element.',
+      key: 'RUNTIME', title: 'Runtime', label: 'What is the service built on?',
+      hint: 'The runtime brings the language, the framework, the libraries and the people who can work on it. Changing it later means rewriting the service.',
       default: 'jvm',
       options: [
         { value: 'jvm', label: 'the JVM (Java or Kotlin, Spring Boot)', description: 'Mature, fast after warm-up, the widest choice of enterprise libraries and drivers. Pick it for long-lived business services, when the team knows Java or Kotlin, or integrations need JVM-only SDKs.' },
         { value: 'dotnet', label: '.NET (C#, ASP.NET Core)', description: 'Fast, one vendor-backed stack from language to web framework and ORM. Pick it when the team knows C#, the organisation runs Microsoft tooling or Azure, or desktop and server share code.' },
-        { value: 'node', label: 'Node.js (TypeScript)', description: 'One language with the web front end, quick to start, very large package ecosystem. Pick it for web back ends, BFFs and I/O-bound APIs, when the team writes TypeScript in the front end too.' },
+        { value: 'node', label: 'Node.js (TypeScript, NestJS or Fastify)', description: 'One language with the web front end, quick to start, very large package ecosystem. Pick it for web back ends, BFFs and I/O-bound APIs, when the team writes TypeScript in the front end too.' },
         { value: 'go', label: 'Go', description: 'Small static binaries, fast start-up, low memory, simple concurrency. Pick it for infrastructure-like services, high-throughput network services and CLIs, when a small standard library is enough.' },
-        { value: 'python', label: 'Python (FastAPI or Django)', description: 'The data and machine-learning ecosystem, quick to write. Pick it when the element serves models or data pipelines, or the team are data people; CPU-heavy request handling is not its strength.' },
+        { value: 'python', label: 'Python (FastAPI or Django)', description: 'The data and machine-learning ecosystem, quick to write. Pick it when the service serves models or data pipelines, or the team are data people; CPU-heavy request handling is not its strength.' },
       ],
     },
     {
@@ -41,7 +41,7 @@ const pack: PackSpec = {
       default: 'skills',
       options: [
         { value: 'skills', label: 'the team\'s skills', description: 'The team already knows the stack well. Pick it in most cases: a known stack is faster and safer than a better one nobody knows.' },
-        { value: 'ecosystem', label: 'the ecosystem', description: 'The libraries, SDKs and drivers the element needs exist and are maintained in this stack. Pick it when integrations (a payment SDK, a data or ML library) decide what is practical.' },
+        { value: 'ecosystem', label: 'the ecosystem', description: 'The libraries, SDKs and drivers the service needs exist and are maintained in this stack. Pick it when integrations (a payment SDK, a data or ML library) decide what is practical.' },
         { value: 'performance', label: 'performance', description: 'Latency, memory or start-up time drive cost or user experience. Pick it only when load or cost figures show it matters, and hold the stack to the numbers.' },
       ],
     },
@@ -69,19 +69,22 @@ const pack: PackSpec = {
   details: [
     { key: 'EOL_DAYS', label: 'How many days before end of support must a version be replaced?', default: '180', number: true },
     { key: 'PATCH_DAYS', label: 'Within how many days must a high or critical vulnerability be patched?', default: '14', number: true },
-    { key: 'P95_MS', label: 'What 95th-percentile response time must the element meet (ms)?', default: '200', number: true },
+    { key: 'P95_MS', label: 'What 95th-percentile response time must the service meet (ms)?', default: '200', number: true },
+    { key: 'PEAK_RPS', label: 'What is the expected peak load (requests per second)?', default: '200', number: true },
+    { key: 'MEMORY_MB', label: 'How much memory may one instance use at peak (MB)?', default: '512', number: true },
+    { key: 'STARTUP_SECONDS', label: 'Within how many seconds must a new instance be ready for traffic?', default: '10', number: true },
   ],
   need: {
-    label: 'Built on something that lasts',
-    text: 'The element has to be built on a runtime and framework the team can work in well, that have the libraries it needs, that perform well enough, and that keep receiving security fixes for as long as the element runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years.',
+    label: 'Services built to last',
+    text: 'The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that meet a stated performance budget, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years.',
   },
   forces: FORCES,
   requirements: [
     {
       id: 'req-one-stack', label: 'Built on the chosen stack', ears_type: 'ubiquitous',
-      action: 'build the element on {{RUNTIME}}, using another runtime or main framework only after a new decision record supersedes this one',
+      action: 'build the service on {{RUNTIME}}, using another runtime or main framework only after a new decision record supersedes this one',
       rationale: 'Each extra stack multiplies the skills, pipelines, base images and patching a team must keep up (Thoughtworks Technology Radar on polyglot sprawl; ISO 25010 maintainability).',
-      scenario: { label: 'Other runtime refused', given: 'the element\'s build files and container images', when: 'a change brings a base image or build of another runtime', then: 'the policy check fails until a decision record allows it' },
+      scenario: { label: 'Other runtime refused', given: 'the service\'s build files and container images', when: 'a change brings a base image or build of another runtime', then: 'the policy check fails until a decision record allows it' },
     },
     {
       id: 'req-eol', label: 'Supported versions only', ears_type: 'ubiquitous',
@@ -99,22 +102,22 @@ const pack: PackSpec = {
     {
       id: 'req-lts', label: 'New LTS adopted', when: { UPGRADE: ['lts'] }, ears_type: 'event-driven',
       trigger: 'a new long-term-support release of the runtime or main framework is published',
-      action: 'move the element to it within 6 months, and run no non-LTS release in production',
+      action: 'move the service to it within 6 months, and run no non-LTS release in production',
       rationale: 'Moving from one LTS to the next while the old one is supported keeps every upgrade one step long (endoflife.date support lifecycles).',
-      scenario: { label: 'LTS upgrade on time', given: 'a new LTS release of the runtime', when: '6 months have passed since its release', then: 'the element runs on it in production' },
+      scenario: { label: 'LTS upgrade on time', given: 'a new LTS release of the runtime', when: '6 months have passed since its release', then: 'the service runs on it in production' },
     },
     {
       id: 'req-n1', label: 'At most one major behind', when: { UPGRADE: ['n1'] }, ears_type: 'ubiquitous',
       action: 'run the latest or the previous major version of the runtime and the main framework, never older',
       rationale: 'Most projects support only the last one or two major versions (Go: the two latest releases); staying within them keeps fixes coming and upgrades short (endoflife.date).',
-      scenario: { label: 'Two majors behind refused', given: 'a framework whose latest major is N', when: 'the element still runs on N-2', then: 'the version check fails' },
+      scenario: { label: 'Two majors behind refused', given: 'a framework whose latest major is N', when: 'the service still runs on N-2', then: 'the version check fails' },
     },
     {
       id: 'req-latest', label: 'Latest release adopted', when: { UPGRADE: ['latest'] }, ears_type: 'event-driven',
       trigger: 'a new release of the runtime or main framework is published',
-      action: 'move the element to it within 30 days',
+      action: 'move the service to it within 30 days',
       rationale: 'Small, frequent upgrades are cheaper than large rare ones, and new security hardening arrives sooner (Building Evolutionary Architectures, incremental change).',
-      scenario: { label: 'Release adopted in 30 days', given: 'a new release of the main framework', when: '30 days have passed', then: 'the element runs on it in production' },
+      scenario: { label: 'Release adopted in 30 days', given: 'a new release of the main framework', when: '30 days have passed', then: 'the service runs on it in production' },
     },
     {
       id: 'req-update-prs', label: 'Updates arrive as pull requests', when: { UPDATES: ['renovate', 'dependabot'] }, ears_type: 'event-driven',
@@ -128,13 +131,13 @@ const pack: PackSpec = {
       trigger: 'a quarter ends',
       action: 'upgrade every dependency to its latest version, leaving 0 direct dependencies more than one major version behind',
       rationale: 'Without a bot, only a fixed rhythm keeps drift from growing into a migration (Building Evolutionary Architectures, dependency fitness functions).',
-      scenario: { label: 'Drift cleared each quarter', given: 'the element\'s dependencies at the end of a quarter', when: 'the drift report runs', then: 'no direct dependency is more than one major version behind' },
+      scenario: { label: 'Drift cleared each quarter', given: 'the service\'s dependencies at the end of a quarter', when: 'the drift report runs', then: 'no direct dependency is more than one major version behind' },
     },
     {
       id: 'req-skills', label: 'Enough people know it', when: { CRITERION: ['skills'] }, ears_type: 'ubiquitous',
       action: 'keep at least two engineers in the owning team who have shipped production code on {{RUNTIME}} in the last 12 months',
       rationale: 'A stack chosen for the team\'s skills is only as safe as the number of people who have them (bus factor).',
-      scenario: { label: 'Two people can ship', given: 'the owning team', when: 'its members are reviewed each quarter', then: 'at least two have merged production changes to the element in the last 12 months' },
+      scenario: { label: 'Two people can ship', given: 'the owning team', when: 'its members are reviewed each quarter', then: 'at least two have merged production changes to the service in the last 12 months' },
     },
     {
       id: 'req-maintained', label: 'Dependencies are maintained', when: { CRITERION: ['ecosystem'] }, ears_type: 'event-driven',
@@ -144,41 +147,48 @@ const pack: PackSpec = {
       scenario: { label: 'Abandoned library flagged', given: 'a pull request adding a library without a release for two years', when: 'the dependency review runs', then: 'it is flagged and cannot merge without a recorded reason' },
     },
     {
-      id: 'req-latency', label: 'Meets the performance target', when: { CRITERION: ['performance'] }, ears_type: 'state-driven',
-      precondition: 'the element runs at the expected peak load',
-      action: 'answer 95% of requests within {{P95_MS}} ms, and start a new instance ready for traffic within 10 seconds',
-      rationale: 'A stack chosen for performance has to be held to the numbers that justified it, or the reason is lost (ISO 25010 performance efficiency: time behaviour).',
-      scenario: { label: 'Peak load within target', given: 'the element deployed in a production-like environment', when: 'a load test runs at the expected peak for 10 minutes', then: 'the 95th percentile stays within {{P95_MS}} ms and a new instance is ready within 10 seconds' },
+      id: 'req-latency', label: 'Meets the latency budget', ears_type: 'state-driven',
+      precondition: 'the service runs at the expected peak of {{PEAK_RPS}} requests per second',
+      action: 'answer 95% of requests within {{P95_MS}} ms with under 1% errors',
+      rationale: 'A budget stated as a number is checked on every release candidate; one left implicit is noticed only by users (ISO 25010 performance efficiency: time behaviour).',
+      scenario: { label: 'Peak load within budget', given: 'the service deployed in a production-like environment', when: 'a load test runs at {{PEAK_RPS}} requests per second for 10 minutes', then: 'the 95th percentile stays within {{P95_MS}} ms and errors stay under 1%' },
+    },
+    {
+      id: 'req-footprint', label: 'Small and quick to start', when: { CRITERION: ['performance'] }, ears_type: 'state-driven',
+      precondition: 'the service runs at the expected peak load',
+      action: 'use at most {{MEMORY_MB}} MB of memory per instance, and have a new instance ready for traffic within {{STARTUP_SECONDS}} seconds of its start',
+      rationale: 'A stack chosen for performance has to be held to the numbers that justified it: memory sets the cost per instance, start-up time how fast it scales out (ISO 25010 performance efficiency: resource utilisation).',
+      scenario: { label: 'Instance stays within footprint', given: 'the service under the peak-load test', when: 'a new instance is started and the test runs for 10 minutes', then: 'it is ready within {{STARTUP_SECONDS}} seconds and stays under {{MEMORY_MB}} MB' },
     },
   ],
   adrs: [
     {
       id: 'adr-jvm', label: 'Built on the JVM', when: { RUNTIME: ['jvm'] },
-      decision: 'The element runs on the JVM: Java (or Kotlin where the team prefers it) on the newest LTS JDK from a supported distribution (Eclipse Temurin, Amazon Corretto or Microsoft Build of OpenJDK), with Spring Boot as the framework, built with Gradle or Maven. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (eclipse-temurin, spring-boot). Dependency updates: {{UPDATES}}. Choosing Java or Kotlin: Kotlin for null safety and concise domain code when the team knows it; Java when more people need to read it. Choosing Spring Boot or Quarkus: Spring Boot for the widest ecosystem; Quarkus (or Spring with GraalVM native image) when start-up time and memory matter, e.g. scale-to-zero.',
+      decision: 'The service runs on the JVM: Java (or Kotlin where the team prefers it) on the newest LTS JDK from a supported distribution (Eclipse Temurin, Amazon Corretto or Microsoft Build of OpenJDK), with Spring Boot as the framework, built with Gradle or Maven. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (eclipse-temurin, spring-boot). Dependency updates: {{UPDATES}}. Choosing Java or Kotlin: Kotlin for null safety and concise domain code when the team knows it; Java when more people need to read it. Choosing Spring Boot or Quarkus: Spring Boot for the widest ecosystem; Quarkus (or Spring with GraalVM native image) when start-up time and memory matter, e.g. scale-to-zero.',
       consequences: '• The widest choice of enterprise libraries, drivers and SDKs, and many people who know it.\n• Higher memory use and slower start than Go or .NET native AOT, unless native images are used.\n• Spring Boot\'s major versions follow the JDK baseline; framework and JDK upgrades are planned together.\n• Long-lived LTS releases make the version policy easy to keep.',
       alternatives: '1. .NET: similar maturity and performance, a single vendor stack.\n2. Go: smaller and faster to start, fewer enterprise libraries.\n3. Node.js (TypeScript): one language with the front end, weaker for CPU-heavy work.',
     },
     {
       id: 'adr-dotnet', label: 'Built on .NET', when: { RUNTIME: ['dotnet'] },
-      decision: 'The element runs on .NET with C#, on the newest LTS release, with ASP.NET Core (minimal APIs or controllers) and Entity Framework Core or Dapper for data access. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (dotnet). Dependency updates: {{UPDATES}}. Choosing EF Core or Dapper: EF Core for domain models and migrations; Dapper where queries are hand-tuned. Native AOT only when start-up time matters and every library used supports trimming.',
+      decision: 'The service runs on .NET with C#, on the newest LTS release, with ASP.NET Core (minimal APIs or controllers) and Entity Framework Core or Dapper for data access. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (dotnet). Dependency updates: {{UPDATES}}. Choosing EF Core or Dapper: EF Core for domain models and migrations; Dapper where queries are hand-tuned. Native AOT only when start-up time matters and every library used supports trimming.',
       consequences: '• One coherent stack (language, web framework, ORM, test tooling) maintained by one vendor, with good performance.\n• LTS releases are supported for three years and come every two years, so the version policy needs an upgrade at least every two to three years.\n• Fewer open-source libraries than the JVM or Node.js for some niches.\n• Strong fit with Azure and Microsoft identity; runs equally on Linux containers.',
       alternatives: '1. The JVM with Spring Boot: the widest ecosystem.\n2. Go: smaller and simpler, fewer abstractions.\n3. Node.js (TypeScript): shares the language with the front end.',
     },
     {
       id: 'adr-node', label: 'Built on Node.js', when: { RUNTIME: ['node'] },
-      decision: 'The element runs on Node.js, on an Active or Maintenance LTS release line (even-numbered majors), written in TypeScript in strict mode, with Fastify or NestJS as the framework (Express only for small services). Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in .nvmrc and the base image, end of support tracked through endoflife.date (nodejs). Dependency updates: {{UPDATES}}; lockfile committed, installs with npm ci. Choosing Fastify or NestJS: Fastify for lean APIs and speed; NestJS when the team wants modules and dependency injection in a larger codebase.',
+      decision: 'The service runs on Node.js, on an Active or Maintenance LTS release line (even-numbered majors), written in TypeScript in strict mode, with Fastify or NestJS as the framework (Express only for small services). Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in .nvmrc and the base image, end of support tracked through endoflife.date (nodejs). Dependency updates: {{UPDATES}}; lockfile committed, installs with npm ci. Choosing Fastify or NestJS: Fastify for lean APIs and speed; NestJS when the team wants modules and dependency injection in a larger codebase.',
       consequences: '• One language across the front end and back end; types can be shared through generated contracts.\n• Very large package ecosystem, of very uneven quality: dependencies need review and updates more often than elsewhere.\n• Single-threaded event loop: excellent for I/O-bound APIs, poor for CPU-heavy work, which goes to worker threads or another service.\n• Each LTS line is supported for about 30 months, so expect a runtime upgrade at least every year or two.',
       alternatives: '1. Go: better for CPU-bound and high-throughput services, a separate language from the front end.\n2. The JVM or .NET: more structure and performance for large business domains.\n3. Deno or Bun: modern runtimes with built-in tooling, younger ecosystems and support policies.',
     },
     {
       id: 'adr-go', label: 'Built on Go', when: { RUNTIME: ['go'] },
-      decision: 'The element is written in Go, on one of the two latest Go releases (the ones the Go team supports), using the standard library\'s net/http with a thin router (chi or the standard ServeMux) rather than a large framework, sqlc or pgx for data access, and distroless or scratch base images. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the toolchain is pinned in go.mod, end of support tracked through endoflife.date (go). Dependency updates: {{UPDATES}}; govulncheck runs in every build.',
+      decision: 'The service is written in Go, on one of the two latest Go releases (the ones the Go team supports), using the standard library\'s net/http with a thin router (chi or the standard ServeMux) rather than a large framework, sqlc or pgx for data access, and distroless or scratch base images. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the toolchain is pinned in go.mod, end of support tracked through endoflife.date (go). Dependency updates: {{UPDATES}}; govulncheck runs in every build.',
       consequences: '• Small static binaries, start-up in milliseconds, low memory: cheap to run and to scale.\n• Each Go release is supported for about a year, so the toolchain is upgraded every six to twelve months; the Go 1 compatibility promise makes that routine.\n• Fewer high-level libraries (ORMs, enterprise SDKs); more code written by hand.\n• Simple language, fast to learn; less expressive for rich domain models.',
       alternatives: '1. The JVM or .NET: richer frameworks for large business domains, heavier to run.\n2. Rust: more control and safety, slower to write and to learn.\n3. Node.js (TypeScript): one language with the front end, weaker under CPU load.',
     },
     {
       id: 'adr-python', label: 'Built on Python', when: { RUNTIME: ['python'] },
-      decision: 'The element is written in Python on a supported 3.x release (bugfix or security phase), with FastAPI (async APIs, Pydantic models) or Django (data-heavy apps with an admin), type-checked with mypy or pyright and linted with Ruff, dependencies locked with uv or Poetry. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in pyproject.toml and the base image, end of support tracked through endoflife.date (python, django). Dependency updates: {{UPDATES}}. Choosing FastAPI or Django: FastAPI for APIs and model serving; Django when the element owns a relational data model and needs an admin and its migrations.',
+      decision: 'The service is written in Python on a supported 3.x release (bugfix or security phase), with FastAPI (async APIs, Pydantic models) or Django (data-heavy apps with an admin), type-checked with mypy or pyright and linted with Ruff, dependencies locked with uv or Poetry. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in pyproject.toml and the base image, end of support tracked through endoflife.date (python, django). Dependency updates: {{UPDATES}}. Choosing FastAPI or Django: FastAPI for APIs and model serving; Django when the service owns a relational data model and needs an admin and its migrations.',
       consequences: '• Direct access to the data and machine-learning ecosystem (NumPy, pandas, PyTorch, scikit-learn).\n• Slower and more memory-hungry per request than the JVM, .NET or Go; CPU-heavy work goes to native libraries or worker processes.\n• Dynamic typing needs type checking in the build to keep a large codebase safe to change.\n• Each Python release is supported for five years; a new one every October.',
       alternatives: '1. Go or the JVM for the request-handling service, with Python only where models run.\n2. Node.js (TypeScript): faster for I/O-bound APIs, weaker data ecosystem.\n3. Notebooks deployed as services: quick, but neither testable nor maintainable.',
     },
@@ -193,7 +203,7 @@ const pack: PackSpec = {
       snippet: `#!/usr/bin/env bash
 # versions.txt: "<endoflife.date product> <cycle>", e.g. "nodejs 22", "spring-boot 3.5", "python 3.13"
 set -euo pipefail
-LIMIT=$(( $(date +%s) + EOL_DAYS * 86400 ))
+LIMIT=$(( $(date +%s) + {{EOL_DAYS}} * 86400 ))
 fail=0
 while read -r product cycle; do
   eol=$(curl -fsS "https://endoflife.date/api/\${product}/\${cycle}.json" | jq -r '.eol')
@@ -241,7 +251,7 @@ deny contains msg if {
   instr.Cmd == "from"
   image := split(instr.Value[0], ":")[0]
   not approved[image]
-  msg := sprintf("%s is not an approved base image (ADR Runtime stack)", [image])
+  msg := sprintf("%s is not an approved base image (ADR Backend stack)", [image])
 }`,
     },
     {
@@ -321,8 +331,8 @@ jobs:
           warn-on-openssf-scorecard-level: 5`,
     },
     {
-      id: 'ff-load', label: 'Performance target holds', when: { CRITERION: ['performance'] }, category: 'operational', implements: RUNTIMES,
-      threshold: '95th percentile below {{P95_MS}} ms and under 1% errors at the expected peak load, on every release candidate',
+      id: 'ff-load', label: 'Latency budget holds', category: 'operational', implements: RUNTIMES,
+      threshold: '95th percentile below {{P95_MS}} ms and under 1% errors at {{PEAK_RPS}} requests per second, on every release candidate',
       description: 'A k6 load test runs against a production-like environment for each release candidate; its thresholds fail the run when the 95th percentile or the error rate exceeds the target.',
       tool: 'Grafana k6',
       language: 'js',
@@ -331,10 +341,10 @@ import { check } from 'k6'
 
 export const options = {
   scenarios: {
-    peak: { executor: 'constant-arrival-rate', rate: 200, timeUnit: '1s', duration: '10m', preAllocatedVUs: 100 },
+    peak: { executor: 'constant-arrival-rate', rate: {{PEAK_RPS}}, timeUnit: '1s', duration: '10m', preAllocatedVUs: 100 },
   },
   thresholds: {
-    http_req_duration: ['p(95)<200'],   // P95_MS
+    http_req_duration: ['p(95)<{{P95_MS}}'],
     http_req_failed: ['rate<0.01'],
   },
 }

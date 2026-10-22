@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { test, expect } from '../../support/fixtures'
 
@@ -86,27 +85,11 @@ for (const view of ['canvas', 'wiki', 'table'] as const) {
   })
 }
 
-test('download a concept as a .radical file', async ({ page, studio }) => {
-  await page.goto(`/#/c/${CONCEPT}/v/canvas`)
-  await studio.until(studio.nodes)
-  const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Download' }).click()
-  await studio.advance(500)
-  const file = await download
-  expect(file.suggestedFilename()).toMatch(/\.radical$/)
-  const doc = JSON.parse(await readFile(await file.path(), 'utf8'))
-  expect(doc.hub.id).toBe(CONCEPT)
-  expect(doc.nodes.length).toBeGreaterThan(0)
-  expect(doc.relations.length).toBeGreaterThan(0)
-})
-
-test('a concern pack shows its group and its sources', async ({ page, studio }) => {
+test('a concern pack shows its group', async ({ page, studio }) => {
   const pack = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
   await page.goto(`/#/c/${CONCEPT}/v/wiki`)
   await studio.until(page.getByText(pack.hub.name, { exact: true }).first())
   await expect(page.locator('.hub-toolbar-cat')).toHaveText(/Identity & access/)
-  const sources = page.getByRole('navigation', { name: 'Sources' })
-  for (const src of pack.hub.sources) await expect(sources.getByRole('link', { name: src.title })).toHaveAttribute('href', src.url)
 })
 
 test('a concept link followed inside the Hub opens that concept', async ({ page, studio }) => {

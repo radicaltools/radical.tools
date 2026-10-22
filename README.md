@@ -22,12 +22,12 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you, and keeps the rows, columns and grids you pin.
 - **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling the gaps it finds in the ones before, and ends with a review of the whole model.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
-- **Decisions you would forget, asked for.** The [Hub](https://hub.radical.tools)'s concern packs, in eight groups from Identity & access to Technology, each ask a few questions and bring the requirements, the decision, runnable fitness functions and scenarios that fit your answers, with their sources; `radical check` and the Inspector point out the concerns your model has not decided yet.
+- **Decisions you would forget, asked for.** The [Hub](https://hub.radical.tools)'s concern packs, in nine groups from Architecture to Technology, each ask a few questions and bring the requirements, the decision, runnable fitness functions and scenarios that fit your answers; `radical check` and the Inspector point out the concerns your model has not decided yet.
 
 <table>
   <tr>
     <td width="50%"><img alt="Screen-flow of low-fi UI mockups linked by navigation relations" src="apps/web/screenshots/mockups-light.png"><br><sub><b>UI mockups & screen flows</b>, AI-generated wireframes linked to requirements</sub></td>
-    <td width="50%"><img alt="The Authentication concern pack on the Hub, with its group and sources" src="apps/web/screenshots/hub-catalogue-light.png"><br><sub><b>Concern Hub</b>, packs that settle a concern in a few answers</sub></td>
+    <td width="50%"><img alt="The Authentication concern pack on the Hub, with its group" src="apps/web/screenshots/hub-catalogue-light.png"><br><sub><b>Concern Hub</b>, packs that settle a concern in a few answers</sub></td>
   </tr>
   <tr>
     <td width="50%"><img alt="Dependency matrix view of the sample model" src="apps/web/screenshots/matrix-light.png"><br><sub><b>Dependency matrix</b>, one of six views over the same model</sub></td>
@@ -55,7 +55,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Multiple layout engines**: ELK (hierarchical/layered/force), webcola (live physics), custom Smart Layout pipeline
 - **AI assistant**: chat with OpenAI / Anthropic / Gemini / Ollama to generate and modify diagrams
 - **Radical Forge**: turn a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling gaps in the ones before (you keep or reject each such change), and a final review; the description is kept in the model as a Need the requirements derive from
-- **Concern Hub**: concern packs in eight groups (Identity & access, Security, Data, Integration, Reliability, Operations, Maintainability, Technology) on [hub.radical.tools](https://hub.radical.tools); a wizard asks a pack's questions and binds the requirements, decision, fitness functions (each with its tool and a snippet) and scenarios to the elements they are about; `radical check` reports undecided concerns (`concern-unaddressed`) and unbound decisions (`concern-unbound`); Radical Forge asks them early and binds them in its C4 stage
+- **Concern Hub**: concern packs in nine groups (Architecture, Identity & access, Security, Data, Integration, Reliability, Operations, Maintainability, Technology) on [hub.radical.tools](https://hub.radical.tools); a wizard asks a pack's questions and binds the requirements, decision, fitness functions (each with its tool and a snippet) and scenarios to the elements they are about; `radical check` reports undecided concerns (`concern-unaddressed`) and unbound decisions (`concern-unbound`); Radical Forge asks them early and binds them in its C4 stage
 - **Eight view kinds**: Structure, Flow, Hierarchy, Table, Matrix, Wiki, Warnier and Explore, each filtered by a chain of levels (needs → requirements → scenarios) or, for Explore, grown level by level from one element, and kept in folders
 - **Presentation mode**: slides over views and milestones, played in the window with a navigation bar
 - **Metamodel editor**: customise node types, relation types, and constraints, with typed properties including references to other elements

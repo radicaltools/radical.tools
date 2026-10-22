@@ -14,7 +14,8 @@
 // bundle, Studio the Hub catalogue it loads): this module does not read the
 // catalogue.
 
-import type { C4Node, C4Relation } from './c4'
+import type { C4Node, C4Relation, DiagramView } from './c4'
+import { uniqueName } from './hubViews'
 import { runModelQuery } from './ai/queryLanguage'
 import type { ConcernMeta, HubConcept, HubConceptMeta, HubRadicalDoc, TemplateParam } from './hubFormat'
 import { buildConceptInsert, resolveParamValues, type ConceptInsert, type ConceptInsertOptions } from './hubImport'
@@ -30,6 +31,7 @@ export type ConcernPack = Pick<HubConceptMeta, 'id' | 'name' | 'description' | '
  *  decision is made, each with the ISO/IEC 25010 characteristics it serves.
  *  ADR Concern groups and pack standard. */
 export const CONCERN_GROUPS = [
+  { id: 'architecture', label: 'Architecture', description: 'How the system is structured and divided, and how its parts talk to each other.', iso: ['Maintainability', 'Compatibility', 'Flexibility'] },
   { id: 'identity', label: 'Identity & access', description: 'Who calls, and what they may see and do.', iso: ['Security'] },
   { id: 'security', label: 'Security', description: 'Protection against abuse, leaks and tampering.', iso: ['Security'] },
   { id: 'data', label: 'Data', description: 'What is kept, for how long, and how consistently.', iso: ['Reliability', 'Security'] },
@@ -225,7 +227,15 @@ export interface ConcernInsertOptions extends Omit<ConceptInsertOptions, 'paramV
   metamodel: Metamodel | undefined
   /** The ADR's date, YYYY-MM-DD. */
   today: string
+  /** The model's elements, to place the bound elements' outermost
+   *  containers in the pack's view. */
+  nodes?: Record<string, C4Node>
 }
+
+/** The folder of the views concern packs bring. */
+export const CONCERN_VIEWS_FOLDER = 'Concerns'
+const VIEW_COLUMN_GAP = 60
+const VIEW_ROW_GAP = 40
 
 /** The part of a concern pack the answers pick, its texts filled, bound to
  *  `elements`: the ADR (accepted, dated today) and the fitness functions
@@ -252,7 +262,41 @@ export function buildConcernInsert(concept: HubConcept, options: ConcernInsertOp
       else if (node.type === 'requirement') bind('satisfies', elementId, node.id)
     }
   }
+  insert.views.push(concernView(concept.name, insert, options))
   return insert
+}
+
+/** The canvas view a pack brings, in the folder Concerns: its elements as
+ *  the pack lays them out (need, requirements, scenarios, decisions,
+ *  fitness functions in columns), and the elements it is bound to, by
+ *  their outermost containers, in a column on their left. */
+function concernView(name: string, insert: ConceptInsert, options: ConcernInsertOptions): DiagramView {
+  const packNodes = Object.values(insert.nodes)
+  const minX = Math.min(...packNodes.map((n) => n.x))
+  const minY = Math.min(...packNodes.map((n) => n.y))
+  const positions: DiagramView['positions'] = {}
+  for (const n of packNodes) positions[n.id] = { x: n.x - minX, y: n.y - minY, width: n.width, height: n.height }
+  const all = options.nodes ?? {}
+  const outermost = (n: C4Node): C4Node => {
+    let cur = n
+    for (let p = all[cur.parentId ?? '']; p; p = all[p.parentId ?? '']) cur = p
+    return cur
+  }
+  const roots = [...new Map(options.elements.map((e) => { const r = outermost(all[e.id] ?? e); return [r.id, r] })).values()]
+  const width = Math.max(0, ...roots.map((r) => r.width))
+  let y = 0
+  for (const r of roots) {
+    positions[r.id] = { x: -width - VIEW_COLUMN_GAP * 2, y, width: r.width, height: r.height }
+    y += r.height + VIEW_ROW_GAP
+  }
+  return {
+    id: options.newId(),
+    name: uniqueName(name, new Set(options.takenNames?.views ?? [])),
+    kind: 'static',
+    folder: CONCERN_VIEWS_FOLDER,
+    nodeIds: [...packNodes.map((n) => n.id), ...options.elements.map((e) => e.id)],
+    positions,
+  }
 }
 
 /** The requirements the answers bring, by label: what the import dialog

@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
-import type { HubCategory, HubConcept, HubConceptSummary, HubRadicalDoc } from '@radical/common/hubFormat'
+import type { HubConceptSummary } from '@radical/common/hubFormat'
 import {
   Canvas,
   HUB_GROUPS,
@@ -58,14 +58,6 @@ const IconCheck = () => (
   <svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" /></svg>
 )
 
-const IconCopy = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z" /><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z" /></svg>
-)
-
-const IconDownload = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z" /><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.779a.75.75 0 1 1 1.06-1.06l1.97 1.97Z" /></svg>
-)
-
 const IconStudio = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
@@ -83,26 +75,11 @@ function setToCsv(set: Set<string>): string | undefined {
   return set.size ? [...set].join(',') : undefined
 }
 
-/** The catalogue file as published — what "Download" / "Copy" hand out. */
-function conceptJson(doc: HubRadicalDoc): string {
-  return JSON.stringify(doc, null, 2)
-}
-
 /** Fit once React Flow has measured the nodes, and again after the live
  *  layout's initial settle so the whole diagram ends up in view. */
 function scheduleFit(fit: () => void): () => void {
   const timers = [80, 600].map((ms) => setTimeout(fit, ms))
   return () => timers.forEach(clearTimeout)
-}
-
-function downloadConcept(doc: HubRadicalDoc): void {
-  const blob = new Blob([conceptJson(doc)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${doc.hub.id}.radical`
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: string }> {
@@ -229,7 +206,6 @@ function FacetGroup({ label, items, active, onToggle, onClear, extra }: {
 function HubAppInner(): React.ReactElement {
   const concepts = useHubStore((s) => s.concepts)
   const loaded = useHubStore((s) => s.loaded)
-  const docs = useHubStore((s) => s.docs)
   const loading = useHubStore((s) => s.loading)
   const error = useHubStore((s) => s.error)
   const fetchConcepts = useHubStore((s) => s.fetchConcepts)
@@ -254,7 +230,6 @@ function HubAppInner(): React.ReactElement {
   const loadDiagram = useDiagramStore((s) => s.loadDiagram)
   const setActiveView = useDiagramStore((s) => s.setActiveView)
   const fitAll = useDiagramStore((s) => s.fitAll)
-  const pushNotification = useDiagramStore((s) => s.pushNotification)
 
   const [conceptId, setConceptId] = useState<string | undefined>(() => parseHubHash(window.location.hash).concept)
   // Landing page vs catalogue. Any concept / filter implies the catalogue.
@@ -286,7 +261,6 @@ function HubAppInner(): React.ReactElement {
 
   const summary = useMemo(() => concepts.find((c) => c.id === conceptId), [concepts, conceptId])
   const concept = conceptId ? loaded[conceptId] : undefined
-  const conceptDoc = conceptId ? docs[conceptId] : undefined
   const related = useMemo(
     () => (concept?.hubRefs ?? []).map((id) => concepts.find((c) => c.id === id)).filter((c): c is HubConceptSummary => !!c),
     [concept, concepts],
@@ -412,15 +386,6 @@ function HubAppInner(): React.ReactElement {
     if (ids.length === 0) return
     window.open(studioImportUrl(STUDIO_URL, ids), '_blank', 'noopener')
   }, [])
-
-  const copyJson = useCallback(async (c: HubConcept, d: HubRadicalDoc) => {
-    try {
-      await navigator.clipboard.writeText(conceptJson(d))
-      pushNotification(`Copied "${c.name}" as JSON`, 'info')
-    } catch {
-      pushNotification('Clipboard unavailable — use Download instead', 'error')
-    }
-  }, [pushNotification])
 
   const toggleGroup = useCallback((cat: string) => {
     setCollapsedGroups((prev) => toggleInSet(prev, cat))
@@ -710,8 +675,6 @@ function HubAppInner(): React.ReactElement {
                     </select>
                   )}
                   <div style={{ flex: 1 }} />
-                  <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && void copyJson(concept, conceptDoc)} title="Copy as .radical JSON"><IconCopy /> Copy JSON</button>
-                  <button type="button" className="toolbar-btn" disabled={!conceptDoc} onClick={() => conceptDoc && downloadConcept(conceptDoc)} title="Download as .radical file (opens in Radical Studio)"><IconDownload /> Download</button>
                   <button type="button" className="toolbar-btn active" onClick={() => openInStudio([concept.id])} title="Open Radical Studio with this concept ready to import">
                     <IconStudio /> Add to Studio
                   </button>
@@ -768,21 +731,6 @@ function HubAppInner(): React.ReactElement {
                     </button>
                   )
                 })}
-              </div>
-            )}
-
-            {concept && !!concept.sources?.length && (
-              <div
-                className={`hub-related hub-sources${viewKind === 'wiki' ? ' hub-related-inset' : ''}`}
-                role="navigation"
-                aria-label="Sources"
-              >
-                <span className="hub-related-label">Sources</span>
-                {concept.sources.map((src) => (
-                  <a key={src.url} className="hub-related-chip" href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}>
-                    {src.title}
-                  </a>
-                ))}
               </div>
             )}
 

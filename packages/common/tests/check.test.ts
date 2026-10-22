@@ -3,7 +3,7 @@ import { CHECK_RULES, FOLDER_RULES, checkModel, formatCheckGithub, formatCheckTe
 import { serializeToMdFolderWithPaths, type FolderFiles } from '../src/formats/mdFolder'
 import { builtInC4Metamodel, builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
-import { bindSuggestions, suggestedCover, type ConcernPack } from '../src/concerns'
+import { bindSuggestions, buildConcernInsert, suggestedCover, type ConcernPack } from '../src/concerns'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -341,6 +341,34 @@ describe('radical check: concerns', () => {
     expect(unbound(bound)).toEqual([])
     const superseded = { ...data, nodes: data.nodes.map((n) => (n.id === 'adr' ? { ...n, status: 'superseded' } as C4Node : n)) }
     expect(unbound(superseded)).toEqual([])
+  })
+
+  it('an imported pack gets a view of its own, with what it is bound to', () => {
+    const concept = {
+      ...pack, category: 'concern' as const, tags: [],
+      nodes: [
+        { id: 'need', type: 'need', label: 'N', x: 0, y: 0 },
+        { id: 'req', type: 'requirement', label: 'R', ears_type: 'ubiquitous', action: 'do', x: 260, y: 0 },
+        { id: 'adr', type: 'adr', label: 'D', concern: 'authentication', status: 'accepted', x: 780, y: 0 },
+      ],
+      relations: [{ id: 'd', relationType: 'derives', sourceId: 'req', targetId: 'need' }],
+    }
+    const data = shop()
+    const nodes = Object.fromEntries(data.nodes.map((n) => [n.id, n]))
+    let n = 0
+    const options = { answers: {}, metamodel: data.metamodel, today: '2026-10-22', newId: () => `id${++n}`, place: () => ({ x: 500, y: 500 }), nodes, takenNames: { views: ['Authentication', 'Authentication 2'] } }
+    const bound = buildConcernInsert(concept, { ...options, elements: [nodes.web] })
+    const [view] = bound.views
+    expect(view).toMatchObject({ name: 'Authentication 3', kind: 'static', folder: 'Concerns' })
+    expect(view.nodeIds).toEqual([...Object.keys(bound.nodes), 'web'])
+    // The pack in its columns from 0, the decision right of the requirement; the shop holding the web app on their left.
+    const at = (label: string) => view.positions[Object.values(bound.nodes).find((x) => x.label === label)!.id]
+    expect(at('N')).toMatchObject({ x: 0, y: 0 })
+    expect(at('D').x).toBeGreaterThan(at('R').x)
+    expect(view.positions.sys.x).toBeLessThan(0)
+    expect(view.positions.web).toBeUndefined()
+    const unbound = buildConcernInsert(concept, { ...options, elements: [] })
+    expect(unbound.views[0].nodeIds).toEqual(Object.keys(unbound.nodes))
   })
 
   it('suggests where to bind a pack: the smallest element that settles the most, and the fewest that settle all', () => {

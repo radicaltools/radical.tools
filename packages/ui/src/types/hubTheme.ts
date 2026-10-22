@@ -86,6 +86,7 @@ export const HUB_GROUPS: readonly string[] = CONCERN_GROUPS.map((g) => g.id)
 export const hubGroupOf = (c: { category: string; concern?: { group?: string } }): string => c.concern?.group ?? c.category
 
 const GROUP_COLORS: Record<string, string> = {
+  architecture: '#0f766e',
   identity: '#6d28d9', security: '#b91c1c', data: '#0e7490', integration: '#1d4ed8',
   reliability: '#047857', operations: '#b45309', maintainability: '#4d7c0f', technology: '#475569',
 }

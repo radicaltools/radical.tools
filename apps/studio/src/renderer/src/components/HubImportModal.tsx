@@ -340,17 +340,22 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
     [loadConcept],
   )
 
-  // Opened for one concern pack and an element (the Inspector's concern
-  // finding): straight to its questions, once the catalogue is in.
+  // Opened for concern packs (a Hub link of the user's selection, or the
+  // Inspector's concern finding with its element): straight to the first
+  // one's wizard once the catalogue is in, then each next one's after an
+  // import (the queue, in the link's order).
   const autoOpened = useRef(false)
   useEffect(() => { if (!open) autoOpened.current = false }, [open])
+  const queue = useMemo(
+    () => (preselectedIds ?? []).map((id) => allConcepts.find((c) => c.id === id)).filter((c): c is HubConceptSummary => !!c && isConcernPack(c)),
+    [preselectedIds, allConcepts],
+  )
   useEffect(() => {
-    if (!open || !bindTo || preselectedIds?.length !== 1 || autoOpened.current) return
-    const summary = allConcepts.find((c) => c.id === preselectedIds[0])
-    if (!summary) return
+    if (!open || !queue.length || autoOpened.current) return
     autoOpened.current = true
-    void handleImportClick(summary)
-  }, [open, bindTo, preselectedIds, allConcepts, handleImportClick])
+    void handleImportClick(queue[0])
+  }, [open, queue, handleImportClick])
+  const queuePlace = concernConcept && queue.length > 1 ? queue.findIndex((c) => c.id === concernConcept.id) : -1
 
   // Where a concern pack can be bound, best first (bindSuggestions), with
   // the selected element after them when it is none of them.
@@ -562,9 +567,10 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
             suggestions={concernChoices.suggestions}
             others={concernChoices.others}
             nodes={c4Nodes}
+            position={queuePlace >= 0 ? `${queuePlace + 1} of ${queue.length}` : undefined}
             onCancel={() => {
               // Opened from the Inspector for this pack: back there, not to a list of one.
-              if (autoOpened.current) onClose()
+              if (bindTo) onClose()
               else setConcernConcept(null)
             }}
             onImport={(answers, elementIds) => {
@@ -578,8 +584,13 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
                 useDiagramStore.getState().pushNotification((error as Error).message, 'error')
                 return
               }
+              // The next pack of the queue not imported yet, or done.
+              const imported = new Set(importedIds).add(concernConcept.id)
+              setImportedIds(imported)
               setConcernConcept(null)
-              onClose()
+              const next = queue.find((c) => !imported.has(c.id))
+              if (next && !bindTo) void handleImportClick(next)
+              else onClose()
             }}
           />
         )}

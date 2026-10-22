@@ -104,7 +104,7 @@
             "trigger": { "type": "string" },
             "applyTo": { "type": "string", "enum": ["source", "target"] },
             "why": { "type": "string" },
-            "group": { "type": "string", "enum": ["identity", "security", "data", "integration", "reliability", "operations", "maintainability", "technology"] }
+            "group": { "type": "string", "enum": ["architecture", "identity", "security", "data", "integration", "reliability", "operations", "maintainability", "technology"] }
           }
         },
         "sources": {
