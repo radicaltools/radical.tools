@@ -334,6 +334,39 @@ scenario or a fitness function can name in its Tests.
 
 Exit status: 0 every file passed, 1 one failed, 2 radical fuzz could not run.
 
+## radical harden
+
+Turns a finding into a test bound to the model (Radical Crucible).
+
+```sh
+radical harden F-0003 --scenario "Undo is exact"
+radical harden --gate F-0003
+radical harden --gate --test "apps/e2e/tests/studio/views.spec.ts › a view keeps its places" --base main --runs 5
+```
+
+A fuzz finding is hardened by its own steps: the finding is marked `hardened`,
+and its fuzz file replays the shrunk sequence as the test
+`<fuzz file> › F-0003 stays fixed: <title>`, once and without the known
+failures, so it fails until the bug is fixed. The command prints that test id
+for the scenario's Tests and keeps the scenario's name in the finding; it does
+not change the model's files.
+
+`--gate` checks a test before it is bound: with the source files changed since
+the base (default: the merge base with `origin/main`) set back to it, the test
+must fail; put back, it must pass; and it must pass `--runs` runs at once
+(default 5). Tests, findings and `crucible.json` are not set back, and the
+working tree is left as it was (files are copied aside, never stashed). A test
+runs through the runner `crucible.json` gives for its folder, else with
+`npx vitest run <file> -t <name>` in the file's package:
+
+```json
+{ "runners": [{ "files": "apps/e2e/", "cwd": "apps/e2e",
+                "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }] }
+```
+
+Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
+could not run.
+
 ## Publishing (maintainers)
 
 The public npm package is `@radicaltools/cli`. Its private `@radical/*`

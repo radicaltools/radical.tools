@@ -60,7 +60,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { describeDifference, differences as diffList, fc, fuzzOptionsFromEnv, mulberry32, RuleBroken, sequentialIds, showAction, type Difference, type FuzzSuite, type Known, type RunContext, type Violation } from '@radical/crucible'
+import { describeDifference, differences as diffList, fc, fuzzOptionsFromEnv, loadFindings, mulberry32, RuleBroken, sequentialIds, showAction, type Difference, type FuzzSuite, type Known, type RunContext, type Violation } from '@radical/crucible'
 import { fuzzSuite } from '@radical/crucible/vitest'
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView, LayoutConstraint } from '@radical/common/c4'
 import { isContainerType, nodeTypeSize, pinnedNodeIds, withCanvasPositions, NODE_SIZES } from '@radical/common/c4'
@@ -1571,4 +1571,8 @@ afterAll(() => {
   vi.restoreAllMocks()
 })
 
-fuzzSuite(suite, { title: 'the rules hold over random sequences of actions', worldTitle: (world) => `on the ${world} model`, options: OPTIONS })
+// Each hardened or fixed finding of this file (crucible/findings) is a case
+// that replays its steps.
+const findings = await loadFindings('../../crucible/findings')
+
+fuzzSuite(suite, { title: 'the rules hold over random sequences of actions', worldTitle: (world) => `on the ${world} model`, options: OPTIONS, findings })

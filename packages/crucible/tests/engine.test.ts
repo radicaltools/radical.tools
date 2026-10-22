@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Fuzzer, fuzzOptionsFromEnv, knownMatches, pathShape, signatureOf, type FuzzOptions, type SurveyRecord } from '../src/index'
+import { Fuzzer, fuzzOptionsFromEnv, knownMatches, pathShape, signatureOf, type Finding, type FuzzOptions, type SurveyRecord } from '../src/index'
 import { counterSuite, type CounterAction } from './counter'
 
 const options = (more: Partial<FuzzOptions> = {}): FuzzOptions => ({ ...fuzzOptionsFromEnv({}), ...more })
@@ -97,10 +97,43 @@ describe('survey', () => {
     for (const r of records) {
       expect(r).toMatchObject({ suite: 'counter', file: 'tests/counter.ts', world: 'zero', seed: 3, length: 12 })
       expect(r.steps.length).toBe(r.actions.length)
+      expect(r.sequence.length).toBe(r.actions.length)
       expect(r.path).toMatch(/^\d+(:\d+)*$/)
     }
     expect(readFileSync(surveyFile, 'utf8')).toContain('===== SURVEY zero #1')
     expect(fuzzer.brokenIn('zero')).toEqual(new Set(['bounded', 'undoRestores']))
+  })
+})
+
+describe('replay', () => {
+  const finding = (id: string, status: Finding['status'], more: Partial<Finding> = {}): Finding => ({
+    id, title: 'the counter goes past 20', source: 'fuzz', status, rule: 'bounded', signature: 'bounded|inc|n', file: 'tests/counter.ts', world: 'zero',
+    sequence: [{ a: 'inc', by: 3 }, { a: 'double' }, { a: 'double' }, { a: 'inc', by: 3 }, { a: 'double' }], found: '2026-10-22', steps: [], detail: '', ...more,
+  })
+
+  it('replays a finding\'s sequence without the known list', async () => {
+    const known = { rule: 'bounded', note: 'K1: the counter goes past 20' }
+    const fuzzer = new Fuzzer(counterSuite({ bound: true }, [known]), options())
+    const [regression] = fuzzer.regressions([finding('F-0001', 'hardened')])
+    const error = await fuzzer.replay(regression.world, regression.sequence).then(() => null, (e: Error) => e)
+    expect(error?.message).toContain('zero: [bounded] double took the counter past 20')
+    expect(error?.message).toContain('    5. double 15 → 30')
+    expect(fuzzer.knownHits.size).toBe(0)
+    // Fixed: the same steps pass.
+    await new Fuzzer(counterSuite({}, [known]), options()).replay('zero', regression.sequence)
+  })
+
+  it('makes a case of each hardened or fixed finding of the suite\'s file', () => {
+    const fuzzer = new Fuzzer(counterSuite(), options())
+    const cases = fuzzer.regressions([
+      finding('F-0001', 'hardened'),
+      finding('F-0002', 'fixed', { title: 'Undo of a doubling' }),
+      finding('F-0003', 'open'),
+      finding('F-0004', 'hardened', { file: 'tests/other.ts' }),
+      finding('F-0005', 'hardened', { sequence: undefined }),
+      finding('F-0006', 'hardened', { world: 'one' }),
+    ])
+    expect(cases.map((c) => [c.name, c.world])).toEqual([['F-0001 stays fixed: the counter goes past 20', 'zero'], ['F-0002 stays fixed: Undo of a doubling', 'zero']])
   })
 })
 
