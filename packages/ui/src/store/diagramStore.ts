@@ -4816,6 +4816,14 @@ export const useDiagramStore = create<DiagramStore>()(
         // One undo step for the whole wrap. addNode and each updateNode below
         // push their own, so one Undo used to leave part of the selection in
         // the new parent and part of it out.
+        // The live layout hears of the wrap once it is done (below): told of
+        // each step, it took the new parent for an element added empty, and
+        // the steps after it for edits that move nothing, and the parent
+        // stayed over the elements beside the selection (F-0020).
+        const layout = _liveLayout
+        _liveLayout = null
+        let wrapped: string[] = []
+        try {
         _asOneStep(() => {
         // Create the wrapper. addNode will re-validate metamodel; we already
         // checked but it's a defensive double-check.
@@ -4863,7 +4871,14 @@ export const useDiagramStore = create<DiagramStore>()(
           `Wrapped ${nodes.length} ${nodes.length === 1 ? 'node' : 'nodes'} into ${wrapperLabel}.`,
           'info',
         )
+        wrapped = commonParentId ? [newId, commonParentId] : [newId]
         })
+        } finally {
+          _liveLayout = layout
+        }
+        // It makes room as an element added does: what the new parent, or
+        // the parent it grew, covers is pushed clear, and nothing else moves.
+        if (wrapped.length) _liveLayout?.invalidate(wrapped)
       },
 
       unwrapNode(id) {

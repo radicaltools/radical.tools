@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { shownExploration, useDiagramStore } from '../store/diagramStore'
 import { type ExploreChoice, type ExploreLink, explorationLinks, menuRows } from '../store/exploration'
+import { nodeControlAt } from './CollapseToggleMirror'
 
 /** Distinct neighbours among `links`. */
 const count = (links: ExploreLink[]): number => new Set(links.map((l) => l.id)).size
@@ -89,11 +90,14 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
     const onDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (menuRef.current?.contains(target) || target.closest?.('[data-explore-more]')) return
+      // On the + under a relation's line: the click that follows is the
+      // +'s (Canvas' onClickCapture), and closes the menu itself.
+      if (nodeControlAt(containerRef.current, e.clientX, e.clientY)?.hasAttribute('data-explore-more')) return
       openExploreMenu(null)
     }
     window.addEventListener('mousedown', onDown, true)
     return () => window.removeEventListener('mousedown', onDown, true)
-  }, [nodeId, openExploreMenu])
+  }, [nodeId, openExploreMenu, containerRef])
 
   if (!nodeId || !exploration || !links.length) return null
   const label = nodes[nodeId]?.label ?? nodeId

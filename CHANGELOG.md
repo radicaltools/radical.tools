@@ -98,6 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Propagate, Save as new and Discard act on the milestone's edits, never on what a playing slide draws: pressed while a presentation played, Propagate wrote the slide's model into the later milestones and the live model; F5 no longer starts a presentation behind the question how to save a milestone
 - While a slide plays, the chip names the milestone the slide shows, without its buttons; over a slide that shows the live model it named the milestone open in Designer and offered its diff and Propagate
 - In a milestone, opening a view for an element (the card's Views, Quick Search, the Inspector) opens its containers without asking how to save the milestone; the live view keeps its folds
+- An element dragged to the right inside its container, taking the container's left edge along, was saved up to 72 px left of where the canvas drew it: *Redo*, a reload and a view switch drew it there. It is saved where it is drawn
+- *Wrap into…* no longer puts the new container on top of the elements beside the selection (and keeps it so after a reload): it makes room as a drop does, pushing what it covers clear
+- Explore from here: a click on an element's *+* where the line of one of its relations runs over it opened the relation instead of the *+*'s menu; the *+* and *−* are drawn above the lines, and a click on them always reaches them
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)

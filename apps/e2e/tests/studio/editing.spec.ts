@@ -296,6 +296,24 @@ test('a click on a collapse button reaches it even when an edge lies over it', a
   await expect(studio.node('bookstore').locator('.c4-node-collapse-btn').first()).toHaveAttribute('title', 'Expand')
 })
 
+test('Wrap into… makes room for the new parent beside what it wraps, also after a reload', async ({ page, studio }) => {
+  // F-0020: the group round API lay on the database, and stayed there.
+  await studio.seed()
+  await studio.open('v-containers')
+  expect(await studio.layoutViolations()).toEqual([])
+  await studio.node('api').click()
+  const actions = studio.properties.getByRole('region', { name: 'Actions' })
+  await actions.getByRole('button', { name: /^Wrap into…/ }).click()
+  await actions.getByRole('menu').getByRole('menuitem', { name: 'Group', exact: true }).click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'api')?.parentId).not.toBe('bookstore')
+  await studio.settle()
+  expect(await studio.layoutViolations()).toEqual([])
+  await page.waitForTimeout(1000)
+  await page.reload()
+  await studio.ready()
+  expect(await studio.layoutViolations()).toEqual([])
+})
+
 test('a second relation between the same two elements is drawn and can be selected', async ({ page, studio }) => {
   // It was never drawn: invisible, and impossible to select or delete.
   await studio.open('v-containers')
