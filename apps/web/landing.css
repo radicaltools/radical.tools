@@ -24,6 +24,9 @@
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --w: min(1080px, 92vw);
 
+  /* the parts of the product, in the hero diagram and the Made for cards */
+  --c-studio: #5aa0f0; --c-forge: #b794f6; --c-hub: #2dd4bf; --c-mcp: #22d3ee; --c-cli: #fbbf24; --c-code: #4ade80;
+
   /* aliases used by style.css (manual.html) */
   --text-muted: var(--muted);
   --bg-raised: var(--bg-panel);
@@ -46,6 +49,7 @@
   --hover-faint:   rgba(0,0,0,0.022);
   --shadow-sm: 0 1px 2px rgba(20,30,60,0.06);
   --shadow-md: 0 4px 12px rgba(20,30,60,0.10), 0 1px 3px rgba(20,30,60,0.06);
+  --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d;
 }
 
 /* Until theme.js has run, follow the OS preference to avoid a flash. */
@@ -55,6 +59,7 @@
     --text: #1a1a2e; --text-2: #44485a; --muted: #6b6b80;
     --accent: #3b6fe6; --accent-rgb: 59,111,230;
     --hover: rgba(0,0,0,0.05); --hover-faint: rgba(0,0,0,0.022);
+    --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d;
   }
 }
 
@@ -157,7 +162,7 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 
 /* ── Hero ────────────────────────────────────────────────────────── */
-.hero { padding: 76px 0 52px; text-align: center; }
+.hero { padding: 76px 0 56px; text-align: center; }
 .eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
@@ -192,150 +197,73 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .cta.ghost:hover { border-color: var(--border-strong); background: var(--hover); }
 .hero-note { margin-top: 16px; font-size: 12.5px; color: var(--muted); }
 
-/* ── Harness ─────────────────────────────────────────────────────── */
-.harness { padding: 0 0 8px; }
-.harness .tiles { grid-template-columns: repeat(3, 1fr); padding: 0; }
-
-/* ── Tiles (four layers) ─────────────────────────────────────────── */
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 12px;
-  padding: 8px 0 64px;
+/* ── The product in one picture (hero) ───────────────────────────── */
+.map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 30px; }
+.map { display: block; width: 100%; min-width: 680px; height: auto; margin: 0 auto; }
+.map .box { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.2; }
+.map .core { fill: var(--bg-panel); stroke: rgba(var(--accent-rgb), .55); stroke-width: 1.4; filter: drop-shadow(0 6px 28px rgba(var(--accent-rgb), .22)); }
+.map .name { font-size: 15px; font-weight: 600; fill: var(--text); }
+.map .core-name { font-size: 19px; font-weight: 700; fill: var(--text); letter-spacing: -0.01em; }
+.map .sub { font-size: 11px; fill: var(--muted); }
+.map .why { font-size: 11px; font-weight: 500; fill: var(--c); }
+.map .rule { stroke: var(--border); stroke-width: 1; }
+.map .key { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--accent); }
+.map .val { font-size: 11px; fill: var(--text-2); }
+.map .file { font-family: var(--mono); font-size: 10.5px; fill: var(--text-2); }
+.map .icon-bg { fill: var(--c); fill-opacity: .14; }
+.map .icon { fill: var(--c); }
+.map .edge { fill: none; stroke: var(--border-strong); stroke-width: 1.5; marker-end: url(#ar); }
+.map .edge.both { marker-start: url(#ar); }
+.map .edge.strong { stroke: var(--accent); stroke-width: 2; marker-end: url(#ar-accent); }
+.map .pill { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
+.map .pill.strong { stroke: rgba(var(--accent-rgb), .5); }
+.map .lbl { font-size: 11px; fill: var(--muted); font-weight: 500; }
+.map .lbl.strong { fill: var(--accent); font-weight: 600; }
+.map a { cursor: pointer; }
+.map a:hover .box, .map a:focus-visible .box { stroke: var(--c); stroke-width: 1.6; }
+.map a:hover .name { fill: var(--c); }
+.map a:focus-visible { outline: none; }
+@media (prefers-reduced-motion: no-preference) { .map .box, .map .name { transition: stroke .15s, fill .15s; } }
+.map-tall { display: none; }
+.map-tall .bus { stroke: var(--border-strong); stroke-width: 1.5; }
+.map-tall .name { font-size: 16px; }
+.map-tall .sub, .map-tall .why, .map-tall .val, .map-tall .lbl { font-size: 12px; }
+.map-tall .key { font-size: 11px; }
+.map-tall .file { font-size: 11.5px; }
+@media (max-width: 760px) {
+  .map-wrap { overflow: visible; }
+  .map { display: none; }
+  .map-tall { display: block; min-width: 0; }
 }
-.tile {
+
+/* ── Who it is for ───────────────────────────────────────────────── */
+.who { padding: 0 0 72px; }
+.who h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+.who-list {
+  list-style: none;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.who-card {
   --c: var(--accent);
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  padding: 16px;
+  display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto 1fr; column-gap: 12px; row-gap: 4px; align-items: center;
+  padding: 16px 18px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-panel) 80%, transparent);
-  transition: transform 0.15s cubic-bezier(0.4,0,0.2,1), border-color 0.15s, background 0.15s;
 }
-.tile:hover { transform: translateY(-2px); border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, var(--bg-panel)); }
-.tile-icon {
-  width: 34px; height: 34px;
+.who-icon {
+  width: 28px; height: 28px; border-radius: 7px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 9px; background: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
 }
-.tile-icon svg { width: 18px; height: 18px; fill: #fff; }
-.tile-head { display: flex; align-items: baseline; width: 100%; }
-.tile-name { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
-.tile-n { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.tile-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
-.tile-text b { color: var(--text-2); font-weight: 600; }
-.tile-text a { color: var(--accent); }
-.tile-text a:hover { text-decoration: underline; }
+.who-icon svg { width: 14px; height: 14px; fill: var(--c); }
+.who-role { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+.who-text { grid-column: 2; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.who-link { grid-column: 2; align-self: end; margin-top: 6px; font-size: 13px; font-weight: 500; color: var(--accent); }
+.who-text { align-self: start; }
+.who-link:hover { text-decoration: underline; }
 
-/* ── Feature list ────────────────────────────────────────────────── */
-/* ── Two metamodels ── */
-.metamodels { padding: 0 0 64px; }
-.mm-head { max-width: 720px; margin-bottom: 18px; }
-.mm-head p { margin-top: 8px; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
-.mm-cards { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; }
-.mm-card {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 20px 22px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, transform 0.15s;
-}
-.mm-card:hover { border-color: var(--accent-border); transform: translateY(-2px); }
-.mm-card-head { display: flex; align-items: center; gap: 10px; }
-.mm-name { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
-.mm-tag {
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 2px 8px; border-radius: 999px;
-  color: var(--accent); background: var(--accent-light);
-}
-.mm-text { font-size: 13px; line-height: 1.6; color: var(--muted); }
-.mm-text em { color: var(--text-2); font-style: normal; font-weight: 500; }
-.mm-groups { display: flex; flex-direction: column; gap: 6px; }
-.mm-group {
-  font-size: 12px; line-height: 1.5; color: var(--muted);
-  padding-left: 10px;
-  border-left: 3px solid var(--g);
-}
-.mm-group b { color: var(--text); font-weight: 600; margin-right: 6px; }
-.mm-chain {
-  font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--text-2);
-  padding: 8px 10px; border-radius: var(--radius-md); background: var(--hover-faint);
-}
-.mm-chain i { font-style: normal; color: var(--accent); }
-.mm-more { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--accent); }
-@media (max-width: 760px) {
-  .mm-cards { grid-template-columns: 1fr; }
-}
-
-.features { padding: 0 0 64px; }
-.features h2 { margin-bottom: 18px; }
-.feature-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 10px 28px;
-}
-.feature-list li {
-  display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px; line-height: 1.55; color: var(--muted);
-}
-.feature-list strong { color: var(--text); font-weight: 600; }
-/* A lone item in the last 3-column row stretches across instead of orphaning. */
-@media (min-width: 1000px) {
-  .feature-list li:nth-child(3n + 1):last-child { grid-column: 1 / -1; }
-}
-.feature-list em { color: var(--text-2); font-style: normal; font-weight: 500; }
-.feature-list code { color: var(--text-2); background: var(--hover-faint); padding: 0 5px; border-radius: 4px; }
-.f-icon {
-  --c: var(--accent);
-  width: 30px; height: 30px; margin-top: 1px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--c) 22%, transparent);
-  color: color-mix(in srgb, var(--c) 60%, white);
-}
-.f-icon svg { width: 15px; height: 15px; fill: currentColor; }
-
-/* ── Hub ─────────────────────────────────────────────────────────── */
-.hub {
-  padding: 28px;
-  margin-bottom: 64px !important;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background:
-    radial-gradient(600px 240px at 0% 0%, rgba(var(--accent-rgb), 0.12), transparent 70%),
-    color-mix(in srgb, var(--bg-panel) 80%, transparent);
-  display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: center;
-}
-.hub-head p { margin-top: 8px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.chip {
-  --c: var(--accent);
-  display: inline-flex; align-items: center; gap: 7px;
-  height: 34px; padding: 0 13px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--hover-faint);
-  font-size: 12.5px; font-weight: 500; color: var(--text-2);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.chip svg { width: 13px; height: 13px; fill: color-mix(in srgb, var(--c) 60%, white); }
-.chip:hover { border-color: var(--c); color: var(--text); background: color-mix(in srgb, var(--c) 18%, transparent); }
-
-/* ── Install ─────────────────────────────────────────────────────── */
-.install {
-  display: grid; grid-template-columns: 1fr 1.2fr; gap: 28px; align-items: center;
-  padding: 0 0 72px;
-}
-.install-text p { margin-top: 8px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
-.install-text p a { color: var(--accent); }
-.install-links { display: flex; gap: 16px; margin-top: 16px; font-size: 13px; }
-.install-links a { color: var(--accent); }
-.install-links a:hover { text-decoration: underline; }
+/* ── Code blocks (the manual reuses them) ────────────────────── */
 .code {
   margin: 0; padding: 18px 20px;
   border-radius: var(--radius-lg);
@@ -362,7 +290,5 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .hero { padding: 44px 0 36px; }
-  .hub, .install { grid-template-columns: 1fr; }
-  .harness .tiles { grid-template-columns: 1fr; }
-  .chips { justify-content: flex-start; }
+  .who-list { grid-template-columns: 1fr; }
 }
