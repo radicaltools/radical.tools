@@ -233,16 +233,42 @@ function slugify(text: string, fallback: string): string {
   return [...slug].slice(0, 60).join('') || fallback
 }
 
-/** Allocate a unique slug within a directory (case-insensitive), appending
- *  `-2`, `-3`, … on collision. Filenames are cosmetic; ids live in frontmatter. */
-function uniqueSlug(base: string, used: Set<string>): string {
-  let slug = base
-  let n = 2
-  while (used.has(slug.toLowerCase())) {
-    slug = `${base}-${n++}`
+/** A sibling to name in its directory: a directory (`slug/_index.md`) or a
+ *  file (`slug.md`), wanting the slug of its label, or keeping `keep`. */
+interface SlugClaim {
+  id: string
+  base: string
+  dir: boolean
+  /** The slug it has in the folder now, kept unless a sibling holds it. */
+  keep?: string
+  /** The slug to take when it is free, before `base`. */
+  want?: string
+}
+
+/** Name the siblings of one directory: each keeps the slug it has where it
+ *  can, the rest take their label's slug, appending `-2`, `-3`, … on a
+ *  collision (case-insensitive), in id order. A directory `x/` and a file
+ *  `x.md` do not collide. Filenames are cosmetic; ids live in frontmatter,
+ *  but a file that moves for a sibling's rename is a change nobody made. */
+function allocateSlugs(claims: SlugClaim[]): Map<string, string> {
+  const used = new Set<string>()
+  const name = (slug: string, dir: boolean): string => slug.toLowerCase() + (dir ? '/' : '.md')
+  const slugs = new Map<string, string>()
+  const ordered = [...claims].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const claim of ordered) {
+    if (claim.keep === undefined || used.has(name(claim.keep, claim.dir))) continue
+    used.add(name(claim.keep, claim.dir))
+    slugs.set(claim.id, claim.keep)
   }
-  used.add(slug.toLowerCase())
-  return slug
+  for (const claim of ordered) {
+    if (slugs.has(claim.id)) continue
+    let slug = claim.want !== undefined && !used.has(name(claim.want, claim.dir)) ? claim.want : claim.base
+    let n = 2
+    while (used.has(name(slug, claim.dir))) slug = `${claim.base}-${n++}`
+    used.add(name(slug, claim.dir))
+    slugs.set(claim.id, slug)
+  }
+  return slugs
 }
 
 // ─── Serialize: DiagramData → folder files ───────────────────────────────────
@@ -319,8 +345,7 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
     const md = serializeFrontmatter(front) + (body ? `\n\n${body}\n` : '\n')
 
     const kids = childrenOf.get(node.id) ?? []
-    const isDir = isContainerType(node.type) || kids.length > 0
-    if (isDir) {
+    if (isDirNode(node)) {
       const nodeDir = `${dir}/${slug}`
       nodePaths[node.id] = `${nodeDir}/${INDEX_BASENAME}`
       files[nodePaths[node.id]] = md
@@ -331,15 +356,14 @@ export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: stri
     }
   }
 
+  const isDirNode = (node: C4Node): boolean => isContainerType(node.type) || (childrenOf.get(node.id)?.length ?? 0) > 0
+
   function writeChildren(nodes: C4Node[], dir: string): void {
-    const used = new Set<string>()
-    // Emit siblings in a stable id order so slug de-dup suffixes (`-2`) are
-    // assigned deterministically regardless of the store's array order.
+    // Slugs go by id order, so the de-dup suffixes (`-2`) do not depend on
+    // the store's array order (keepMdFolderPaths keeps the folder's own).
+    const slugs = allocateSlugs(nodes.map((node) => ({ id: node.id, base: slugify(node.label || node.type, node.type), dir: isDirNode(node) })))
     const ordered = [...nodes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    for (const node of ordered) {
-      const slug = uniqueSlug(slugify(node.label || node.type, node.type), used)
-      emitNode(node, dir, slug)
-    }
+    for (const node of ordered) emitNode(node, dir, slugs.get(node.id)!)
   }
 
   writeChildren(childrenOf.get(undefined) ?? [], NODES_DIR)
@@ -547,6 +571,93 @@ export function staleMdFolderFiles(existing: FolderFiles, next: FolderFiles): st
   return Object.keys(existing).filter(
     (path) => !(path in next) && isOwnedMdFolderFile(path, existing[path]),
   )
+}
+
+/** A node's file, where it sits in the folder's tree. */
+interface PlacedNodeFile {
+  id: string
+  path: string
+  /** Its slug: the file's name without `.md`, or its directory's name. */
+  slug: string
+  /** The slug its label gives (slugify). */
+  base: string
+  dir: boolean
+  /** The directory holding it: `nodes`, or a parent's directory. */
+  parentKey: string
+}
+
+function placedNodeFiles(files: FolderFiles): Map<string, PlacedNodeFile> {
+  const placed = new Map<string, PlacedNodeFile>()
+  for (const [path, content] of Object.entries(files)) {
+    if (!path.startsWith(NODES_DIR + '/') || !path.endsWith('.md')) continue
+    const { front } = parseMarkdown(content)
+    if (!front.id || !front.type) continue
+    const dir = path.endsWith('/' + INDEX_BASENAME)
+    const own = dir ? dirname(path) : path.slice(0, -'.md'.length)
+    const type = String(front.type)
+    const label = typeof front.label === 'string' ? front.label : String(front.label ?? '')
+    placed.set(String(front.id), { id: String(front.id), path, slug: own.slice(own.lastIndexOf('/') + 1), base: slugify(label || type, type), dir, parentKey: dirname(own) })
+  }
+  return placed
+}
+
+/** `slug` is `base`, or `base` with a de-dup suffix (`-2`). */
+function fitsBase(slug: string, base: string): boolean {
+  const [s, b] = [slug.toLowerCase(), base.toLowerCase()]
+  return s === b || (s.startsWith(`${b}-`) && /^\d+$/.test(s.slice(b.length + 1)))
+}
+
+/** `next` (a serialized model) with each node's file where `existing` (the
+ *  folder as it is) has it: an element keeps its path unless it is renamed
+ *  or moved itself. The serializer names files afresh: renaming one element
+ *  to its sibling's label, or adding an element named as one already there,
+ *  moved the other's file to `-2` when its id sorted later. A node keeps its
+ *  slug when its parent is the same and its label gives that slug, with or
+ *  without a de-dup suffix; its children go with it. */
+export function keepMdFolderPaths(existing: FolderFiles, next: FolderFiles): FolderFiles {
+  const before = placedNodeFiles(existing)
+  if (before.size === 0) return next
+  const after = placedNodeFiles(next)
+  const parentOf = (placed: Map<string, PlacedNodeFile>): Map<string, string | undefined> => {
+    const byDir = new Map<string, string>()
+    for (const file of placed.values()) if (file.dir) byDir.set(dirname(file.path), file.id)
+    return new Map([...placed.values()].map((file) => [file.id, file.parentKey === NODES_DIR ? undefined : byDir.get(file.parentKey)]))
+  }
+  const parentBefore = parentOf(before)
+  const parentAfter = parentOf(after)
+  const kidsOf = new Map<string | undefined, PlacedNodeFile[]>()
+  for (const file of after.values()) {
+    const parent = parentAfter.get(file.id)
+    const kids = kidsOf.get(parent) ?? []
+    kids.push(file)
+    kidsOf.set(parent, kids)
+  }
+
+  const out: FolderFiles = {}
+  const nodePaths = new Set([...after.values()].map((file) => file.path))
+  for (const [path, content] of Object.entries(next)) if (!nodePaths.has(path)) out[path] = content
+  let moved = false
+  const placed = new Set<string>()
+  const place = (parent: string | undefined, dir: string): void => {
+    const kids = kidsOf.get(parent) ?? []
+    const slugs = allocateSlugs(kids.map((file) => {
+      const was = before.get(file.id)
+      const keep = was && parentBefore.get(file.id) === parent && fitsBase(was.slug, file.base)
+      return { id: file.id, base: file.base, dir: file.dir, want: file.slug, ...(keep ? { keep: was.slug } : {}) }
+    }))
+    for (const file of kids) {
+      const slug = slugs.get(file.id)!
+      const path = file.dir ? `${dir}/${slug}/${INDEX_BASENAME}` : `${dir}/${slug}.md`
+      if (path !== file.path) moved = true
+      placed.add(file.id)
+      out[path] = next[file.path]
+      if (file.dir) place(file.id, `${dir}/${slug}`)
+    }
+  }
+  place(undefined, NODES_DIR)
+  // A node the walk did not reach (none, from the serializer) stays put.
+  for (const file of after.values()) if (!placed.has(file.id)) out[file.path] = next[file.path]
+  return moved ? out : next
 }
 
 /** A file of the folder that is there but cannot be read as what it is. */

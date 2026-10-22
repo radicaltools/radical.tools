@@ -182,3 +182,85 @@ describe('MdFolderSession', () => {
     await writing
   })
 })
+
+describe('an element keeps its file', () => {
+  // Slugs were handed out afresh in id order on every write: renaming API
+  // to its sibling's label "Orders DB" moved the untouched Orders DB from
+  // orders-db.md to orders-db-2.md, and a second import of the same
+  // elements over MCP moved the first import's files to -2.
+  const el = (id: string, type: string, label: string, parentId?: string): C4Node =>
+    ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...(parentId ? { parentId } : {}) }) as C4Node
+  const onDisk = (fs: ReturnType<typeof memStorage>): Record<string, string> =>
+    Object.fromEntries(fs.paths().map((p) => [p, fs.content(p)!]))
+  const pathOf = (files: Record<string, string>, id: string): string | undefined =>
+    Object.keys(files).find((p) => p.startsWith('nodes/') && files[p].includes(`id: "${id}"`))
+
+  async function written(model: DiagramData) {
+    const fs = memStorage()
+    const session = new MdFolderSession(fs.storage)
+    await session.write(serializeToMdFolder(model, 'Books'))
+    return { fs, session }
+  }
+
+  it('renaming an element to its sibling\'s label moves only the renamed element\'s file', async () => {
+    const model: DiagramData = {
+      nodes: [el('bookstore', 'system', 'Bookstore'), el('api', 'container', 'API', 'bookstore'), el('aaa', 'database', 'Cache', 'bookstore'), el('db', 'database', 'Orders DB', 'bookstore')],
+      relations: [],
+    }
+    const { fs, session } = await written(model)
+    const before = onDisk(fs)
+    expect(pathOf(before, 'db')).toBe('nodes/bookstore/orders-db.md')
+
+    // A container (a directory) named as the database (a file).
+    const renamed = { ...model, nodes: model.nodes.map((n) => n.id === 'api' ? { ...n, label: 'Orders DB' } : n) }
+    vi.mocked(fs.storage.write).mockClear()
+    await session.write(serializeToMdFolder(renamed, 'Books'))
+    let after = onDisk(fs)
+    expect(pathOf(after, 'db')).toBe('nodes/bookstore/orders-db.md')
+    expect(after['nodes/bookstore/orders-db.md']).toBe(before['nodes/bookstore/orders-db.md'])
+    // A directory orders-db/ and a file orders-db.md do not collide.
+    expect(pathOf(after, 'api')).toBe('nodes/bookstore/orders-db/_index.md')
+    expect(vi.mocked(fs.storage.write).mock.calls.map(([path]) => path).filter((p) => p.startsWith('nodes/'))).toEqual(['nodes/bookstore/orders-db/_index.md'])
+
+    // A file named as another file, by an element whose id sorts first.
+    const again = { ...renamed, nodes: renamed.nodes.map((n) => n.id === 'aaa' ? { ...n, label: 'Orders DB' } : n) }
+    await session.write(serializeToMdFolder(again, 'Books'))
+    after = onDisk(fs)
+    expect(pathOf(after, 'db')).toBe('nodes/bookstore/orders-db.md')
+    expect(pathOf(after, 'aaa')).toBe('nodes/bookstore/orders-db-2.md')
+    expect(pathOf(after, 'api')).toBe('nodes/bookstore/orders-db/_index.md')
+    expect(deserializeFromMdFolder(after).data.nodes.map((n) => [n.id, n.label, n.parentId ?? '']).sort()).toEqual([
+      ['aaa', 'Orders DB', 'bookstore'], ['api', 'Orders DB', 'bookstore'], ['bookstore', 'Bookstore', ''], ['db', 'Orders DB', 'bookstore'],
+    ])
+  })
+
+  it('a new element named as an existing one gets the new name, whatever its id', async () => {
+    const model: DiagramData = { nodes: [el('zz', 'requirement', 'Session limits hold')], relations: [] }
+    const { fs, session } = await written(model)
+    const first = onDisk(fs)['nodes/session-limits-hold.md']
+    // The same pack imported again: a new id that sorts before the first.
+    await session.write(serializeToMdFolder({ ...model, nodes: [...model.nodes, el('aa', 'requirement', 'Session limits hold')] }, 'Books'))
+    const after = onDisk(fs)
+    expect(pathOf(after, 'zz')).toBe('nodes/session-limits-hold.md')
+    expect(after['nodes/session-limits-hold.md']).toBe(first)
+    expect(pathOf(after, 'aa')).toBe('nodes/session-limits-hold-2.md')
+  })
+
+  it('a merge with an outside edit leaves the files where the folder has them', async () => {
+    const model: DiagramData = { nodes: [el('zz', 'person', 'Shop')], relations: [] }
+    const { fs, session } = await written(model)
+    // An agent adds a second "Shop" whose id sorts first, while the app edits.
+    const agent = serializeToMdFolder({ ...model, nodes: [...model.nodes, el('aa', 'person', 'Shop')] }, 'Books')
+    const agentAt = { ...agent }
+    for (const path of Object.keys(agent)) if (path.startsWith('nodes/')) delete agentAt[path]
+    agentAt['nodes/shop.md'] = agent[pathOf(agent, 'zz')!]
+    agentAt['nodes/shop-2.md'] = agent[pathOf(agent, 'aa')!]
+    for (const [path, content] of Object.entries(agentAt)) if (onDisk(fs)[path] !== content) fs.edit(path, content)
+    const res = await session.write(serializeToMdFolder({ ...model, nodes: [{ ...model.nodes[0], description: 'Sells books' }] }, 'Books'), mergeMdFolderFiles)
+    expect(res.ok).toBe(true)
+    const after = onDisk(fs)
+    expect(pathOf(after, 'zz')).toBe('nodes/shop.md')
+    expect(after['nodes/shop.md']).toContain('Sells books')
+    expect(after['nodes/shop-2.md']).toBe(agentAt['nodes/shop-2.md'])
+  })
+})
