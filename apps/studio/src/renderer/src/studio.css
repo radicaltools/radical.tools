@@ -1299,6 +1299,11 @@ div.milestone-option { cursor: default; }
   max-width: 180px;
 }
 /* ─── Metamodel editor ───────────────────────────────────────────────── */
+/* The activity rail keeps its menus over the editor: the rail lies above
+   the editor's backdrop (a click on it closed the editor and opened no
+   menu), and the dialogs its menus open, drawn after it, above the rail. */
+.milestone-modal-backdrop.mm-editor-backdrop { z-index: 999; }
+.app-layout.mode-metamodel .activity-rail { z-index: 1000; }
 .mm-editor-modal {
   position: relative;
   width: min(1200px, 96vw);

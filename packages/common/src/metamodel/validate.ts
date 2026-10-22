@@ -2,7 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
-import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, placeOf, propertyKeyProblem, relationTypesFitting } from './lookup'
+import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, isParentAllowed, placeOf, propertyKeyProblem, relationTypesFitting } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -73,12 +73,15 @@ export function validateModel(
           message: `Node "${n.label}" references a missing parent.`,
           nodeId: n.id,
         })
-      } else if (allowed && !allowed.includes(parent.type)) {
+      } else if (!allowed?.includes(parent.type)) {
+        // No allowed parents is none, as isParentAllowed reads it (it was
+        // read as any here, so a type's last parent unticked went unseen).
         const parentLabel = metamodel.nodeTypes[parent.type]?.label ?? parent.type
+        const none = isParentAllowed(metamodel, n.type, undefined) ? '(none — must be root)' : '(none)'
         issues.push({
           id: `bad-parent:${n.id}`,
           severity: 'error',
-          message: `${def.label} "${n.label}" cannot be inside ${parentLabel}. Allowed parents: ${allowed.length ? allowed.join(', ') : '(none — must be root)'}.`,
+          message: `${def.label} "${n.label}" cannot be inside ${parentLabel}. Allowed parents: ${allowed?.length ? allowed.join(', ') : none}.`,
           nodeId: n.id,
         })
       } else if (parent.type === GROUP_TYPE && !hasPlaceUnder(metamodel, n.type, placeOf(parent, nodes)?.type)) {

@@ -88,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- Metamodel editor: the activity rail's Models, AI, Export and Settings open their menus over the editor, which stays open (a click on them closed the editor and opened no menu)
+- Metamodel editor: unticking the last allowed parent of a type that elements sit in asks first, naming them, and Validation lists them (it was taken without a word, while Studio then refused to place the type in anything)
+- Metamodel editor: the name of a type, a relation type or a property cannot be left empty: an emptied field goes back to the name it had (a type could be left with no name, a blank entry in the palette)
+- Change source…, Change destination… and the reconnect handle of a relation ask for its type where the one it has does not fit the new pair and several do, as drawing a relation does (it was left with no type, which Validation then flagged)
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)

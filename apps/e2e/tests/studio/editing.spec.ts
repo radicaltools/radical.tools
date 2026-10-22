@@ -470,6 +470,23 @@ test('the activity rail keeps the app\'s menus in the metamodel editor, without 
   for (const name of ['Models', 'AI', 'Export', 'Settings']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
 })
 
+// F-0003: the editor's backdrop lay over the rail, so a click on Models, AI,
+// Export or Settings closed the editor and opened no menu.
+test('the activity rail\'s menus open over the metamodel editor, which stays open', async ({ page }) => {
+  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  const close = page.getByRole('button', { name: 'Close metamodel editor' })
+  await expect(close).toBeVisible()
+  for (const name of ['Models', 'AI', 'Export', 'Settings']) {
+    await page.getByRole('button', { name, exact: true }).click()
+    await expect(page.getByRole('menu', { name })).toBeVisible()
+    await expect(close).toBeVisible()
+    // Esc closes the menu, not the editor.
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu', { name })).toHaveCount(0)
+    await expect(close).toBeVisible()
+  }
+})
+
 test('the toolbar groups undo, navigation around Quick Search, and the branch\'s changes beside the perspectives', async ({ page }) => {
   const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
   const edit = await box(page.getByRole('group', { name: 'Edit' }))

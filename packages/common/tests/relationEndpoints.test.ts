@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, relationTypeOnMove, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
@@ -375,5 +375,27 @@ describe('a preset metamodel with a type the preset lacks', () => {
     expect(documentMetamodel(JSON.parse(JSON.stringify(mm))).nodeTypes.risk?.label).toBe('Risk')
     // Without one, the preset is the preset.
     expect(documentMetamodel(builtInGovernanceMetamodel()).id).toBe('c4-ddd-governance-builtin')
+  })
+})
+
+// F-0018: an end moved onto a pair where several types fit left the relation
+// with none, unasked; Studio asks, as for a relation drawn.
+describe('the type of a relation whose end moves', () => {
+  const entity = (id: string, kind: string): C4Node => ({ ...node(id, 'entity'), kind } as unknown as C4Node)
+  const moved = (): ModelState => ({
+    ...state(),
+    c4Nodes: { line: entity('line', 'entity'), order: entity('order', 'aggregate-root'), customer: entity('customer', 'aggregate-root'), kept: node('kept', 'requirement') },
+    c4Relations: { sat: { id: 'sat', sourceId: 'line', targetId: 'kept', relationType: 'satisfies' }, ref: { id: 'ref', sourceId: 'line', targetId: 'order', relationType: 'references' } },
+  })
+  it('is asked about where the one it has does not fit and several do', () => {
+    expect(relationTypeOnMove(moved(), 'sat', { targetId: 'order' })).toEqual({ ask: ['part-of', 'references'] })
+  })
+  it('is the one that fits, the aggregate rules kept', () => {
+    // part-of leads from a part to a root: between two roots only references.
+    expect(relationTypeOnMove(moved(), 'sat', { sourceId: 'customer', targetId: 'order' })).toEqual({ type: 'references' })
+  })
+  it('is kept where it still fits, or the move gives one', () => {
+    expect(relationTypeOnMove(moved(), 'ref', { targetId: 'customer' })).toEqual({})
+    expect(relationTypeOnMove(moved(), 'sat', { targetId: 'order', relationType: 'part-of' })).toEqual({})
   })
 })

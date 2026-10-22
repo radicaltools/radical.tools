@@ -42,7 +42,7 @@ function ReconnectHandle({
   end: 'source' | 'target'
   otherNodeId: string
 }) {
-  const updateRelation = useDiagramStore((s) => s.updateRelation)
+  const moveRelationEnd = useDiagramStore((s) => s.moveRelationEnd)
   const [dragging, setDragging] = useState(false)
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null)
   const svgRef = useRef<SVGElement | null>(null)
@@ -74,7 +74,7 @@ function ReconnectHandle({
       const nodeId = nodeEl?.getAttribute('data-id')
 
       if (nodeId && nodeId !== otherNodeId && !edgeId.startsWith('virtual-')) {
-        updateRelation(edgeId, end === 'source' ? { sourceId: nodeId } : { targetId: nodeId })
+        moveRelationEnd(edgeId, end === 'source' ? { sourceId: nodeId } : { targetId: nodeId })
       }
     }
 
@@ -84,7 +84,7 @@ function ReconnectHandle({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [dragging, edgeId, end, otherNodeId, updateRelation])
+  }, [dragging, edgeId, end, otherNodeId, moveRelationEnd])
 
   // Compute preview line endpoint in SVG coordinates
   const previewPt = useMemo(() => {
