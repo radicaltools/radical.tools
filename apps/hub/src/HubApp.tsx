@@ -12,7 +12,8 @@ import { ReactFlowProvider } from 'reactflow'
 import type { HubCategory, HubConcept, HubConceptSummary, HubRadicalDoc } from '@radical/common/hubFormat'
 import {
   Canvas,
-  HUB_CATEGORIES,
+  HUB_GROUPS,
+  hubGroupOf,
   NotificationHost,
   RightPanel,
   TableView,
@@ -118,6 +119,8 @@ function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: s
     case 'pattern':
     case 'blueprint':
       push('Elements', concept.nodeCount); push('Relations', concept.relationCount); break
+    case 'concern':
+      push('Questions', concept.templateParams?.filter((p) => p.options?.length).length); push('Elements', concept.nodeCount); break
   }
   return out
 }
@@ -135,7 +138,7 @@ function ConceptCard({
   onToggleSelect: () => void
   onTag: (tag: string) => void
 }) {
-  const theme = categoryTheme(concept.category)
+  const theme = categoryTheme(hubGroupOf(concept))
   const badges = metaBadges(concept)
   return (
     <article
@@ -167,7 +170,7 @@ function ConceptCard({
               🔗 {connections}
             </span>
           )}
-          {concept.templateParams?.length ? (
+          {concept.templateParams?.length && !concept.concern ? (
             <span className="hub-badge" title={concept.templateParams.map((p) => p.key).join(', ')}>
               <span className="hub-badge-k">params</span>{concept.templateParams.length}
             </span>
@@ -474,7 +477,7 @@ function HubAppInner(): React.ReactElement {
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
-    for (const c of concepts) m.set(c.category, (m.get(c.category) ?? 0) + 1)
+    for (const c of concepts) m.set(hubGroupOf(c), (m.get(hubGroupOf(c)) ?? 0) + 1)
     return m
   }, [concepts])
 
@@ -499,14 +502,15 @@ function HubAppInner(): React.ReactElement {
     }
     const byCat = new Map<string, HubConceptSummary[]>()
     for (const c of list) {
-      if (!byCat.has(c.category)) byCat.set(c.category, [])
-      byCat.get(c.category)!.push(c)
+      const group = hubGroupOf(c)
+      if (!byCat.has(group)) byCat.set(group, [])
+      byCat.get(group)!.push(c)
     }
     // Known categories first in their canonical order, then anything else
     // the index happens to carry (so an unrecognised category still shows
     // up instead of silently vanishing from the list).
-    const known = HUB_CATEGORIES.filter((cat) => byCat.has(cat))
-    const other = [...byCat.keys()].filter((cat) => !(HUB_CATEGORIES as readonly string[]).includes(cat))
+    const known = HUB_GROUPS.filter((cat) => byCat.has(cat))
+    const other = [...byCat.keys()].filter((cat) => !HUB_GROUPS.includes(cat))
     return [...known, ...other].map((cat) => ({ category: cat, items: byCat.get(cat)! }))
   }, [list, activeCategory, sortBy])
 
@@ -528,7 +532,7 @@ function HubAppInner(): React.ReactElement {
     )
   }
 
-  const conceptTheme = concept ? categoryTheme(concept.category) : null
+  const conceptTheme = concept ? categoryTheme(hubGroupOf(concept)) : null
   const visibleTags = tagsExpanded ? tagList : tagList.slice(0, TOP_TAGS_SHOWN)
   const hasFacetFilters = activeTags.size > 0 || activeStatuses.size > 0
 
@@ -555,7 +559,7 @@ function HubAppInner(): React.ReactElement {
           >
             All <span className="hub-chip-count">{concepts.length}</span>
           </button>
-          {HUB_CATEGORIES.map((cat: HubCategory) => {
+          {HUB_GROUPS.map((cat) => {
             const t = categoryTheme(cat)
             const n = counts.get(cat) ?? 0
             if (n === 0) return null
@@ -750,7 +754,7 @@ function HubAppInner(): React.ReactElement {
               >
                 <span className="hub-related-label">Related</span>
                 {related.map((r) => {
-                  const t = categoryTheme(r.category)
+                  const t = categoryTheme(hubGroupOf(r))
                   return (
                     <button
                       type="button"
@@ -764,6 +768,21 @@ function HubAppInner(): React.ReactElement {
                     </button>
                   )
                 })}
+              </div>
+            )}
+
+            {concept && !!concept.sources?.length && (
+              <div
+                className={`hub-related hub-sources${viewKind === 'wiki' ? ' hub-related-inset' : ''}`}
+                role="navigation"
+                aria-label="Sources"
+              >
+                <span className="hub-related-label">Sources</span>
+                {concept.sources.map((src) => (
+                  <a key={src.url} className="hub-related-chip" href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}>
+                    {src.title}
+                  </a>
+                ))}
               </div>
             )}
 

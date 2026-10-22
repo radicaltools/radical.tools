@@ -9,7 +9,6 @@ import {
   FORGE_ARRANGEMENTS,
   FORGE_STAGES,
   FORGE_VIEW_NAMES,
-  HUB_MATCHES_QUESTION_ID,
   PRIMARY_TYPE_IDS_FOR_STAGE,
   PROPOSE_REFINEMENT_TOOL,
   acceptedRefinements,
@@ -26,7 +25,11 @@ import {
   findForgeView,
   forgeArrangeGroups,
   forgeGaps,
-  forgeHubCandidates,
+  bindUnboundConcerns,
+  buildConcernsBlock,
+  concernAnswersOf,
+  decidedConcern,
+  type DecidedConcern,
   forgeStageView,
   formatClarificationAnswers,
   formatForgeGaps,
@@ -53,8 +56,9 @@ import {
 import { buildGherkinFiles } from '@radical/common/formats/exportGherkin'
 import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
-import { useHubStore, type HubConceptSummary } from '@radical/ui/store/hubStore'
-import { importHubConceptIntoDiagram } from '../hub/importConcept'
+import { useHubStore } from '@radical/ui/store/hubStore'
+import { concernPacks, type ConcernPack } from '@radical/common/concerns'
+import { importConcernPackIntoDiagram } from '../hub/importConcept'
 import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
@@ -214,8 +218,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
   const [stageSummaries, setStageSummaries] = useState<Partial<Record<ForgeStageId, string>>>({})
   const [aiSettings, setAiSettings] = useState<AISettings>(() => loadAISettings())
-  const [importedHubIds, setImportedHubIds] = useState<Set<string>>(new Set())
-  const [importingHubId, setImportingHubId] = useState<string | null>(null)
   const [clarifyStatusByStage, setClarifyStatusByStage] = useState<Partial<Record<ForgeStageId, ClarifyStatus>>>({})
   const [clarifyQuestionsByStage, setClarifyQuestionsByStage] = useState<Partial<Record<ForgeStageId, ClarifyStageQuestion[]>>>({})
   const [clarifyAnswersByStage, setClarifyAnswersByStage] = useState<Partial<Record<ForgeStageId, ClarifyAnswers>>>({})
@@ -231,8 +233,11 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const answerRef = useRef<((answer: ProposalAnswer) => void) | null>(null)
   /** The gaps the model had right after each stage, by the rules of the stages done. */
   const [gapsByStage, setGapsByStage] = useState<Partial<Record<ForgeStageId, ForgeGap[]>>>({})
-  /** The Hub concepts the model picked from each stage's candidates. */
-  const [hubPicksByStage, setHubPicksByStage] = useState<Partial<Record<ForgeStageId, HubConceptSummary[]>>>({})
+  /** The concern packs the model picked in the Requirements stage's clarify. */
+  const [concernPicks, setConcernPicks] = useState<ConcernPack[]>([])
+  /** The packs the Requirements stage imported, unbound until C4 (a ref, as
+   *  runStage reads it right after it is set). */
+  const decidedRef = useRef<DecidedConcern[]>([])
   const [layingOut, setLayingOut] = useState(false)
   /** Furthest step reached by normal forward navigation — stepper tabs past
    *  it stay disabled. An early finish jumps to the last step without
@@ -263,7 +268,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   const hubConcepts = useHubStore((s) => s.concepts)
   const fetchHubConcepts = useHubStore((s) => s.fetchConcepts)
   const loadHubConcept = useHubStore((s) => s.loadConcept)
-  const activeMetamodelId = useDiagramStore((s) => s.metamodel?.id)
   // Metamodels without the governance `need` type (plain C4, custom ones)
   // run Forge as before, without storing the description in the model.
   const hasNeedType = useDiagramStore((s) => !!s.metamodel?.nodeTypes.need)
@@ -285,7 +289,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setStageReports({})
     setStageSummaries({})
     setAiSettings(loadAISettings())
-    setImportedHubIds(new Set())
     setClarifyStatusByStage({})
     setClarifyQuestionsByStage({})
     setClarifyAnswersByStage({})
@@ -296,7 +299,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     setRefinementsByStage({})
     setPendingProposal(null)
     setGapsByStage({})
-    setHubPicksByStage({})
+    setConcernPicks([])
+    decidedRef.current = []
     setReachedIndex(0)
     setFinishedAt(null)
     // The structure the model already has, or Radical.
@@ -351,14 +355,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
 
   // Per stage: the keyword-ranked candidates the clarify call lets the model
   // pick from, and the few suggested until it has (or when there is no AI).
-  const hubByStage = useMemo(
-    () => forgeHubCandidates(hubConcepts, description, activeMetamodelId).stages,
-    [hubConcepts, description, activeMetamodelId],
-  )
-  const hubMatchesByStage = useMemo(
-    () => Object.fromEntries(FORGE_STAGES.map((s) => [s.id, hubPicksByStage[s.id] ?? hubByStage[s.id]?.suggested])) as Partial<Record<ForgeStageId, HubConceptSummary[]>>,
-    [hubByStage, hubPicksByStage],
-  )
+  // The Hub's concern packs, offered in the Requirements stage's clarify.
+  const packs = useMemo(() => concernPacks(hubConcepts), [hubConcepts])
 
   // Fires once per stage, the moment it becomes current: asks the model
   // whether it needs clarifying questions before generating. Skips the call
@@ -372,7 +370,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
   // re-run's own guard bailed out (status was already non-empty) — the
   // response would arrive, see `cancelled`, and silently no-op, leaving the
   // stage stuck on "Checking for clarifying questions…" forever. Reading
-  // stageReports/unavailableReason/description/hubByStage/aiSettings
+  // stageReports/unavailableReason/description/packs/aiSettings
   // without listing them is deliberate for the same reason — this is a
   // fire-once-per-stage-entry effect, not a sync-on-every-change one.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,17 +393,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       .map((s) => formatClarificationAnswers(clarifyQuestionsByStage[s.id], clarifyAnswersByStage[s.id]))
       .filter(Boolean)
       .join('\n\n')
-    askClarifyingQuestions(stage.title, description, hubByStage[currentStageId]?.candidates, aiSettings, undefined, priorQA)
+    askClarifyingQuestions(stage.title, description, currentStageId === 'requirements' ? packs : undefined, aiSettings, undefined, priorQA)
       .then(({ questions, picked, usage }) => {
-        // An unreadable reply keeps the keyword suggestions.
-        if (picked) setHubPicksByStage((p) => ({ ...p, [currentStageId]: picked }))
+        if (currentStageId === 'requirements') setConcernPicks(picked)
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
-        // multiSelect questions (in practice, just hub_matches) default to
-        // "everything selected" — unless the user deselects something,
-        // generation behaves exactly like it did before this feature.
+        // A concern pack's question starts at its default answer, and a
+        // multiSelect question with everything selected.
         const defaults: ClarifyAnswers = {}
         for (const q of questions) {
           if (q.kind === 'select' && q.multiSelect) defaults[q.id] = q.options ?? []
+          else if (q.defaultOption) defaults[q.id] = q.defaultOption
         }
         setClarifyAnswersByStage((a) => ({ ...a, [currentStageId]: defaults }))
         setClarifyStatusByStage((s) => ({ ...s, [currentStageId]: questions.length ? 'form' : 'done' }))
@@ -495,6 +492,21 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const opened = openForgeStageViews(diagram, stageId, structure)
     const stageView = forgeStageView(useDiagramStore.getState().views, stageId, structure)
     useDiagramStore.getState().setActiveView(isCanvas(stageView) ? stageView!.id : null)
+    // The concern packs the user kept come in whole and unbound, as part of
+    // the Requirements stage (a regenerate takes them out again); C4 binds
+    // them. ADR Forge settles concerns, C4 binds them.
+    if (stageId === 'requirements') {
+      decidedRef.current = []
+      for (const pack of concernPicks) {
+        try {
+          const concept = await loadHubConcept(pack.id)
+          const { insert } = importConcernPackIntoDiagram(concept, concernAnswersOf(pack, clarifyAnswersByStage[stageId]), [])
+          decidedRef.current.push(decidedConcern(pack, insert))
+        } catch (err) {
+          setError(`${pack.name}: ${(err as Error).message || String(err)}`)
+        }
+      }
+    }
     const snapshot = snapshotOf(diagram)
     // What the accepted proposals wrote: only that is the stage's refinement,
     // not an edit made meanwhile in the folder or by another program.
@@ -516,16 +528,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       })
     }
     try {
-      const allMatches = hubMatchesByStage[stageId] ?? []
       const answers = clarifyAnswersByStage[stageId]
-      const hubAnswer = answers?.[HUB_MATCHES_QUESTION_ID]
-      // A hub_matches answer restricts guidance to what the user kept
-      // checked; no such question this run (e.g. no Hub matches existed, or
-      // the model didn't ask) means "use everything found", same as before
-      // this feature.
-      const effectiveMatches = Array.isArray(hubAnswer)
-        ? allMatches.filter((m) => hubAnswer.includes(m.name))
-        : allMatches
       const clarifications = formatClarificationAnswers(clarifyQuestionsByStage[stageId], answers)
       const priorStageSummaries = buildPriorStagesBlock(
         FORGE_STAGES.slice(0, stageIdx).map((s) => ({ title: s.title, summary: stageSummaries[s.id] ?? '' })),
@@ -533,7 +536,8 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       const needNode = needId ? useDiagramStore.getState().c4Nodes[needId] : undefined
       const needRef: ForgeNeedRef | undefined = needNode ? { id: needNode.id, label: needNode.label } : undefined
       const gaps = formatForgeGaps(forgeGaps(done, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()))
-      const prompt = buildForgeStagePrompt(stageId, description, effectiveMatches, clarifications, priorStageSummaries, needRef, gaps)
+      const concerns = buildConcernsBlock(stageId, decidedRef.current, diagram.getNodes())
+      const prompt = buildForgeStagePrompt(stageId, description, concerns, clarifications, priorStageSummaries, needRef, gaps)
       const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
       // The stage writes its own elements; what it would add to or change in
       // earlier stages it proposes, and waits for the user's answer.
@@ -567,8 +571,16 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
         // Each proposal takes a round of its own.
         maxIterations: 20,
       })
+      // What the C4 stage left of the concern packs unbound is bound where
+      // each pack's trigger points, and said in its summary.
+      let bound: string[] = []
+      if (stageId === 'c4' && decidedRef.current.length) {
+        const binding = bindUnboundConcerns(decidedRef.current, packs, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.())
+        for (const rel of binding.relations) diagram.addRelation(rel)
+        bound = binding.lines
+      }
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
-      setStageSummaries((s) => ({ ...s, [stageId]: result.summary || 'Done.' }))
+      setStageSummaries((s) => ({ ...s, [stageId]: [result.summary || 'Done.', ...bound].join(' ') }))
       if (result.usage) {
         setProgressByStage((p) => ({ ...p, [stageId]: { ...(p[stageId] ?? { round: 0, entries: [] }), usage: result.usage } }))
         setSessionUsage((u) => addTokenUsage(u, result.usage))
@@ -596,7 +608,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, needId, hubMatchesByStage, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports, askUser])
+  }, [busy, unavailableReason, description, needId, packs, concernPicks, loadHubConcept, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports, askUser])
 
   /** The user's answer to the proposal the stage waits on. */
   const answerProposal = useCallback((accept: boolean) => {
@@ -698,20 +710,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
     const el = progressListRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [progressByStage, currentStageId])
-
-  const handleImportHubConcept = useCallback(async (summary: HubConceptSummary) => {
-    setImportingHubId(summary.id)
-    setError(null)
-    try {
-      const concept = await loadHubConcept(summary.id)
-      importHubConceptIntoDiagram(concept)
-      setImportedHubIds((s) => new Set(s).add(summary.id))
-    } catch (err) {
-      setError((err as Error).message || String(err))
-    } finally {
-      setImportingHubId(null)
-    }
-  }, [loadHubConcept])
 
   const stepIndex = STEP_ORDER.indexOf(step)
   const goTo = useCallback((s: WizardStep) => { if (!busy) setStep(s) }, [busy])
@@ -1032,34 +1030,6 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
           {currentStage && (
             <div className="forge-stage-card">
               <p className="milestone-modal-text" style={{ margin: '0 0 10px' }}>{currentStage.blurb}</p>
-
-              {/* Hidden while the model picks, so the list does not change under the cursor. */}
-              {!!hubMatchesByStage[currentStage.id]?.length && clarifyStatusByStage[currentStage.id] && clarifyStatusByStage[currentStage.id] !== 'asking' && (
-                <div className="forge-hub-suggestions">
-                  <div className="forge-hub-suggestions-label">{hubPicksByStage[currentStage.id] ? 'Picked from the Hub' : 'Suggested from the Hub'}</div>
-                  {hubMatchesByStage[currentStage.id]!.map((c) => {
-                    const imported = importedHubIds.has(c.id)
-                    const importing = importingHubId === c.id
-                    return (
-                      <div key={c.id} className="forge-hub-card">
-                        <div className="forge-hub-card-main">
-                          <span className="forge-hub-card-name">{c.name}</span>
-                          <span className="forge-hub-card-category">{c.category}</span>
-                          <div className="forge-hub-card-desc">{c.description}</div>
-                        </div>
-                        <button
-                          type="button"
-                          className={`forge-btn forge-btn-sm ${imported ? 'forge-btn-success' : 'forge-btn-secondary'}`}
-                          disabled={imported || importing}
-                          onClick={() => handleImportHubConcept(c)}
-                        >
-                          {imported ? '✓ Imported' : importing ? 'Importing…' : 'Import'}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
 
               {(clarifyStatusByStage[currentStage.id] === 'asking' || !clarifyStatusByStage[currentStage.id]) && (
                 <div className="qs-ai-status">

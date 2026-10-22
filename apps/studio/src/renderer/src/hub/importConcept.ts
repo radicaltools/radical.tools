@@ -1,13 +1,14 @@
-// ─── Hub concept → live diagram insertion ───────────────────────────────────
-// Inserts a fully-loaded Hub concept's nodes/relations/sequences into the
-// current document, centered on the viewport. A standalone counterpart to
-// HubImportModal.tsx's own (more UI-entangled — template param dialog,
-// drop-onto-selected-node, modal close semantics) import flow, for callers
-// that just want "drop this concept into the model" with no modal around it
-// (Radical Forge's Hub suggestion cards). What to insert comes from
-// @radical/common/hubImport, which the MCP server's Forge uses too.
+// ─── Hub concern pack → live diagram insertion ──────────────────────────────
+// Inserts the part of a concern pack its answers pick into the current
+// document, bound to the elements chosen, as one undo step: the import of
+// the concern wizard (components/ConcernWizard.tsx) and of Radical Forge's
+// Requirements stage. What to insert comes from @radical/common/concerns,
+// which the MCP server uses too.
 
-import { buildConceptInsert } from '@radical/common/hubImport'
+import type { ConceptInsert } from '@radical/common/hubImport'
+import { buildConcernInsert } from '@radical/common/concerns'
+import { freeSpotNear } from '@radical/layout/geometry'
+import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { HubConcept } from '@radical/ui/store/hubStore'
 import { addToViewList } from '@radical/common/c4'
@@ -16,25 +17,27 @@ export interface ImportHubConceptResult {
   nodeIds: string[]
 }
 
-/** Inserts `concept` into the live document, centered on the current
- *  viewport (same placement math as HubImportModal's direct-import path,
- *  minus the "drop onto the selected node" behavior, which only makes sense
- *  from a canvas-focused modal). One undo step for the whole insert. */
-export function importHubConceptIntoDiagram(
-  concept: HubConcept,
-  opts?: { paramValues?: Record<string, string> },
-): ImportHubConceptResult {
+/** Inserts the part of a concern pack the answers pick, bound to the
+ *  elements `elementIds` (buildConcernInsert), in the free spot nearest the
+ *  viewport centre, as one undo step. Throws when the answers or an element
+ *  do not fit the pack. */
+export function importConcernPackIntoDiagram(concept: HubConcept, answers: Record<string, string>, elementIds: string[]): ImportHubConceptResult & { insert: ConceptInsert } {
   const store = useDiagramStore.getState()
-
   const getViewport = (window as unknown as { __rfGetViewport?: () => { x: number; y: number; zoom: number } }).__rfGetViewport
   const vp = getViewport?.() ?? { x: 0, y: 0, zoom: 1 }
-  const centerX = (-vp.x + window.innerWidth / 2) / vp.zoom
-  const centerY = (-vp.y + window.innerHeight / 2) / vp.zoom
+  const centre = { x: (-vp.x + window.innerWidth / 2) / vp.zoom, y: (-vp.y + window.innerHeight / 2) / vp.zoom }
+  const shown = store.activeViewId ? computeViewNodeSet(store.views[store.activeViewId], store.c4Nodes) : undefined
+  const taken = Object.values(store.c4Nodes)
+    .filter((n) => !n.parentId && (!shown || shown.has(n.id)))
+    .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
 
-  const insert = buildConceptInsert(concept, {
+  const insert = buildConcernInsert(concept, {
+    answers,
+    elements: elementIds.map((id) => store.c4Nodes[id]).filter(Boolean),
+    metamodel: store.metamodel,
+    today: new Date().toISOString().slice(0, 10),
     newId: () => crypto.randomUUID(),
-    place: ({ width, height }) => ({ x: centerX - width / 2, y: centerY - height / 2 }),
-    paramValues: opts?.paramValues,
+    place: (size) => freeSpotNear(taken, size, centre),
     takenNames: { views: Object.values(store.views).map((v) => v.name), sequences: Object.values(store.sequences).map((q) => q.name) },
   })
 
@@ -43,20 +46,11 @@ export function importHubConceptIntoDiagram(
   useDiagramStore.setState((state) => {
     Object.assign(state.c4Nodes, insert.nodes)
     Object.assign(state.c4Relations, insert.relations)
-    Object.assign(state.sequences, insert.sequences)
-    for (const v of insert.views) state.views[v.id] = v
-    // Empty nodeIds means "show all" — the imported nodes are already in it.
     if (state.activeViewId && state.views[state.activeViewId]) {
       addToViewList(state.views[state.activeViewId], Object.keys(insert.nodes))
     }
   })
-
-  useDiagramStore.getState()._resizeParentsBottomUp()
+  useDiagramStore.getState()._placeOnAllElements()
   store._sync()
-
-  if (insert.template) store.upsertHubTemplate(insert.template.id, insert.template.record)
-
-  // No success toast — callers show the imported state on the card itself.
-
-  return { nodeIds: Object.keys(insert.nodes) }
+  return { nodeIds: Object.keys(insert.nodes), insert }
 }

@@ -1,0 +1,802 @@
+{
+  "hub": {
+    "id": "concern-capacity",
+    "category": "concern",
+    "name": "Capacity and scaling",
+    "description": "How much load it carries: the expected load and its peak, how it scales to meet it, what it does when overloaded, and how often the capacity is proven with a load test.",
+    "tags": [
+      "reliability",
+      "performance",
+      "capacity",
+      "scaling",
+      "autoscaling",
+      "load-shedding",
+      "backpressure",
+      "load-testing"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "capacity",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "these elements run on capacity of their own, so the load they must carry, how they scale and what they do when overloaded has to be decided.",
+      "group": "reliability"
+    },
+    "sources": [
+      {
+        "title": "Google SRE book, chapter 21: Handling Overload",
+        "url": "https://sre.google/sre-book/handling-overload/"
+      },
+      {
+        "title": "Google SRE book, chapter 22: Addressing Cascading Failures",
+        "url": "https://sre.google/sre-book/addressing-cascading-failures/"
+      },
+      {
+        "title": "Amazon Builders' Library: Using load shedding to avoid overload",
+        "url": "https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/"
+      },
+      {
+        "title": "AWS Well-Architected Framework, Reliability Pillar",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html"
+      },
+      {
+        "title": "The Twelve-Factor App, VIII. Concurrency",
+        "url": "https://12factor.net/concurrency"
+      },
+      {
+        "title": "Grafana k6 documentation",
+        "url": "https://grafana.com/docs/k6/latest/"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "SCALING",
+        "title": "Scaling",
+        "label": "How does it scale to the peak?",
+        "hint": "This decides whether capacity follows the load by itself, and what the element must be like for that (stateless, quick to start).",
+        "defaultValue": "horizontal",
+        "options": [
+          {
+            "value": "vertical",
+            "label": "a fixed fleet sized for the peak",
+            "description": "A set number of instances (or one bigger machine) provisioned for the peak with headroom, changed by a reviewed change. Pick it when the load is predictable within a factor of 2, the element keeps state that is hard to split, or the load is small enough that autoscaling saves little."
+          },
+          {
+            "value": "horizontal",
+            "label": "horizontal autoscaling",
+            "description": "Stateless instances added and removed by the platform on CPU, request rate or queue length (Kubernetes HPA or KEDA, ECS Service Auto Scaling, VM scale sets). Pick it when the load varies by more than 2 times over a day or a season and the element keeps no state of its own."
+          },
+          {
+            "value": "serverless",
+            "label": "serverless functions or containers",
+            "description": "The platform starts an instance per demand, down to zero (AWS Lambda, Google Cloud Run, Azure Functions or Container Apps). Pick it for spiky or mostly idle traffic, requests that finish in seconds, and when a cold start fits the latency target."
+          }
+        ]
+      },
+      {
+        "key": "OVERLOAD",
+        "title": "Overload",
+        "label": "What does it do when more arrives than it can handle?",
+        "hint": "Scaling takes minutes and has a ceiling. Without a rule for overload, everything slows down until everything times out.",
+        "defaultValue": "shed",
+        "options": [
+          {
+            "value": "shed",
+            "label": "shed load early",
+            "description": "Above a concurrency limit it refuses new requests at once (503 with Retry-After), lowest priority first, so those it accepts stay fast. Pick it for synchronous APIs and pages where a caller waits and a fast \"try again\" beats a slow timeout."
+          },
+          {
+            "value": "backpressure",
+            "label": "queue with backpressure",
+            "description": "Work goes into a bounded queue processed at the rate the workers sustain; when the queue is full, producers are slowed or refused. Pick it when the work can be done later (orders, e-mails, imports) and the caller does not wait for the result."
+          },
+          {
+            "value": "both",
+            "label": "both: shed requests, queue work",
+            "description": "The synchronous part sheds load, the asynchronous part queues it with backpressure. Pick it when the element both answers callers and processes work in the background."
+          }
+        ]
+      },
+      {
+        "key": "LOADTEST",
+        "title": "Load tests",
+        "label": "When is the capacity proven with a load test?",
+        "hint": "Capacity estimates are wrong until measured; regressions in performance arrive with ordinary changes.",
+        "defaultValue": "release",
+        "options": [
+          {
+            "value": "release",
+            "label": "on every release candidate",
+            "description": "The pipeline runs a load test at the peak against a production-like environment and stops the release on a regression. Pick it when releases are frequent, an environment of production size is affordable, and performance regressions have reached users before."
+          },
+          {
+            "value": "scheduled",
+            "label": "monthly and before peak events",
+            "description": "A full-scale test every month and 4 weeks before each announced peak event, finding the breaking point. Pick it when a production-size environment is costly to keep, or releases rarely change the hot paths."
+          }
+        ]
+      },
+      {
+        "key": "EXPECTED_RPS",
+        "label": "Expected load in a normal busy hour (requests per second)",
+        "defaultValue": "100",
+        "type": "number"
+      },
+      {
+        "key": "PEAK_FACTOR",
+        "label": "How many times that load is the peak (a sale day, a campaign)?",
+        "defaultValue": "5",
+        "type": "number"
+      },
+      {
+        "key": "P95_MS",
+        "label": "Response time at the 95th percentile under load (ms)",
+        "defaultValue": "500",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Carries the load it is given",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Capacity and scaling",
+      "description": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
+    },
+    {
+      "id": "req-peak",
+      "type": "requirement",
+      "label": "Peak load carried",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "serve {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second, sustained for 15 minutes, with a 95th percentile response time under {{P95_MS}} ms and fewer than 0.1 % errors",
+      "rationale": "A service sized for the average fails at the peak; a load figure with a latency and error bound is what a load test can check (AWS Well-Architected REL 7)."
+    },
+    {
+      "id": "req-headroom",
+      "type": "requirement",
+      "label": "Headroom kept",
+      "x": 260,
+      "y": 130,
+      "ears_type": "state-driven",
+      "precondition": "the busiest hour of the last 7 days used more than 70 % of the provisioned CPU, memory or connection pool",
+      "action": "raise the provisioned capacity by a reviewed change before the next expected peak",
+      "rationale": "A fixed fleet does not follow the load; 30 % headroom at the observed peak leaves room for growth and for an instance lost (Google SRE book, Introduction: demand forecasting and capacity planning).",
+      "hubWhen": {
+        "SCALING": [
+          "vertical"
+        ]
+      }
+    },
+    {
+      "id": "req-autoscale",
+      "type": "requirement",
+      "label": "Scales out in time",
+      "x": 260,
+      "y": 260,
+      "ears_type": "event-driven",
+      "trigger": "load rises from {{EXPECTED_RPS}} to {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second within 5 minutes",
+      "action": "add instances, ready to serve within 3 minutes, so that the 95th percentile returns under {{P95_MS}} ms, and remove them only after 15 minutes below the scaling target",
+      "rationale": "Autoscaling helps only if new instances are ready before the queue grows; a slow scale-in avoids flapping (Kubernetes HPA documentation; AWS Well-Architected REL 7).",
+      "hubWhen": {
+        "SCALING": [
+          "horizontal"
+        ]
+      }
+    },
+    {
+      "id": "req-cold-start",
+      "type": "requirement",
+      "label": "Cold starts bounded",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "a request arrives and no warm instance is free",
+      "action": "answer it within 1 second including the start, keeping enough instances warm (provisioned concurrency or minimum instances) for {{EXPECTED_RPS}} requests per second",
+      "rationale": "Cold starts land on users at the start of every spike; warm capacity for the normal load keeps them to the burst only.",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "req-downstream",
+      "type": "requirement",
+      "label": "Dependencies not flooded",
+      "x": 260,
+      "y": 520,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "it scales out faster than its database or another dependency accepts connections",
+      "action": "cap its concurrency at what the dependency's connection limit allows, and reach the database through a connection pooler (Amazon RDS Proxy, PgBouncer)",
+      "rationale": "A function that scales to a thousand instances opens a thousand connections; the database falls over first (Amazon Builders' Library, load shedding).",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "req-shed",
+      "type": "requirement",
+      "label": "Excess load shed",
+      "x": 260,
+      "y": 650,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "requests in flight exceed its concurrency limit, or the oldest waiting request has waited longer than {{P95_MS}} ms",
+      "action": "refuse new requests at once with 503 and a Retry-After header, lowest priority first (health checks and paying customers last), so that the requests it accepts keep a 95th percentile under {{P95_MS}} ms",
+      "rationale": "Refusing early keeps the accepted work fast; queueing everything makes every request slow and invites retries that deepen the overload (Google SRE book, chapter 21; Amazon Builders' Library).",
+      "hubWhen": {
+        "OVERLOAD": [
+          "shed",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "req-backpressure",
+      "type": "requirement",
+      "label": "Backpressure on producers",
+      "x": 260,
+      "y": 780,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "its work queue reaches its bound because the workers fall behind",
+      "action": "slow or refuse new work with 429 and a Retry-After header, never drop work already accepted, and drain the backlog within 15 minutes after the peak",
+      "rationale": "An unbounded queue hides overload until memory or the wait runs out; a bound pushes the pressure back to the producer, who can wait or retry (Google SRE book, chapter 22).",
+      "hubWhen": {
+        "OVERLOAD": [
+          "backpressure",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "req-loadtest-release",
+      "type": "requirement",
+      "label": "Release load-tested",
+      "x": 260,
+      "y": 910,
+      "ears_type": "event-driven",
+      "trigger": "a release candidate is built",
+      "action": "run a load test at {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second for 15 minutes against a production-like environment, and stop the release when the 95th percentile exceeds {{P95_MS}} ms or errors exceed 0.1 %",
+      "rationale": "Performance regressions arrive with ordinary changes; a gate on every candidate finds them before users do.",
+      "hubWhen": {
+        "LOADTEST": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "req-loadtest-scheduled",
+      "type": "requirement",
+      "label": "Capacity tested monthly",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "event-driven",
+      "trigger": "30 days have passed since the last load test, or an announced peak event is 4 weeks away",
+      "action": "run a load test that ramps past {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second until the 95th percentile exceeds {{P95_MS}} ms, and record that breaking point, which must be at least 1.5 times the expected peak",
+      "rationale": "Knowing the breaking point, and keeping it 50 % above the peak, leaves time to act before a peak event instead of during it.",
+      "hubWhen": {
+        "LOADTEST": [
+          "scheduled"
+        ]
+      }
+    },
+    {
+      "id": "sc-peak",
+      "type": "scenario",
+      "label": "Peak load test",
+      "x": 520,
+      "y": 0,
+      "given": "a production-like environment",
+      "when": "load rises to {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second and holds for 15 minutes",
+      "then": "the 95th percentile stays under {{P95_MS}} ms and errors under 0.1 %"
+    },
+    {
+      "id": "sc-headroom",
+      "type": "scenario",
+      "label": "Headroom alert",
+      "x": 520,
+      "y": 130,
+      "given": "a fixed fleet",
+      "when": "the weekly busiest hour uses 75 % of its CPU",
+      "then": "an alert opens a capacity change, merged before the next expected peak",
+      "hubWhen": {
+        "SCALING": [
+          "vertical"
+        ]
+      }
+    },
+    {
+      "id": "sc-autoscale",
+      "type": "scenario",
+      "label": "Ramp to peak",
+      "x": 520,
+      "y": 260,
+      "given": "the element at {{EXPECTED_RPS}} requests per second",
+      "when": "load ramps to {{PEAK_FACTOR}} times that in 5 minutes",
+      "then": "new instances serve within 3 minutes and the 95th percentile is back under {{P95_MS}} ms",
+      "hubWhen": {
+        "SCALING": [
+          "horizontal"
+        ]
+      }
+    },
+    {
+      "id": "sc-cold-start",
+      "type": "scenario",
+      "label": "Burst after idle",
+      "x": 520,
+      "y": 390,
+      "given": "the element idle at its minimum instances",
+      "when": "a burst of {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second arrives",
+      "then": "every request is answered within 1 second",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "sc-downstream",
+      "type": "scenario",
+      "label": "Concurrency capped",
+      "x": 520,
+      "y": 520,
+      "given": "a database that accepts 200 connections",
+      "when": "load would scale the element beyond that",
+      "then": "connections stay under 200 and excess requests are throttled, not failed by the database",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "sc-shed",
+      "type": "scenario",
+      "label": "Twice the peak",
+      "x": 520,
+      "y": 650,
+      "given": "the element at full capacity",
+      "when": "load reaches 2 times {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second",
+      "then": "excess requests get 503 within 50 ms and accepted ones keep a 95th percentile under {{P95_MS}} ms",
+      "hubWhen": {
+        "OVERLOAD": [
+          "shed",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "sc-backpressure",
+      "type": "scenario",
+      "label": "Queue full",
+      "x": 520,
+      "y": 780,
+      "given": "workers slower than the producers",
+      "when": "the queue reaches its bound",
+      "then": "producers get 429 with Retry-After, no accepted message is lost, and the backlog is gone 15 minutes after the load drops",
+      "hubWhen": {
+        "OVERLOAD": [
+          "backpressure",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "sc-loadtest-release",
+      "type": "scenario",
+      "label": "Regression stopped",
+      "x": 520,
+      "y": 910,
+      "given": "a release candidate that makes the hot path 50 % slower",
+      "when": "the pipeline runs its load test",
+      "then": "the test fails on the {{P95_MS}} ms threshold and the release does not deploy",
+      "hubWhen": {
+        "LOADTEST": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "sc-loadtest-scheduled",
+      "type": "scenario",
+      "label": "Breaking point found",
+      "x": 520,
+      "y": 1040,
+      "given": "a production-size environment",
+      "when": "the monthly test ramps the load until latency breaks",
+      "then": "the breaking point is recorded and is at least 1.5 times {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second",
+      "hubWhen": {
+        "LOADTEST": [
+          "scheduled"
+        ]
+      }
+    },
+    {
+      "id": "adr-vertical",
+      "type": "adr",
+      "label": "Fixed fleet sized for the peak",
+      "x": 780,
+      "y": 0,
+      "concern": "capacity",
+      "status": "accepted",
+      "date": "",
+      "context": "This element runs on capacity someone has to provide. The forces: load is not flat (a busy hour, a campaign, a sale day can be several times the usual), and a service sized for the average falls over at the peak; an overloaded service does not slow down gracefully, it queues, times out and retries until it serves nobody (a cascading failure); adding instances takes minutes and only helps when the element keeps no state of its own; whatever it calls (a database, a partner) has limits of its own that scaling out can break; idle capacity costs money every hour; and the only way to know the breaking point is to measure it before users find it.",
+      "decision": "The element runs a fixed number of instances sized so that the peak ({{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second) uses at most 70 % of CPU, memory and connection pools, and losing one instance still carries it (N+1). Capacity changes by a reviewed change in the infrastructure code (Terraform, Pulumi, Helm values), driven by a headroom alert on the weekly busiest hour. Overload: {{OVERLOAD}}. Load tests: {{LOADTEST}}. Choose bigger instances over more of them only while the element keeps state that cannot be split; otherwise add instances.",
+      "consequences": "• Predictable cost and behaviour; nothing scales by surprise.\n• Paying for the peak all the time: at a peak factor of {{PEAK_FACTOR}}, most of the capacity idles most of the day.\n• An unexpected peak above the headroom is handled only by the overload rule, until someone adds capacity.\n• Vertical growth has a ceiling: the largest instance type.",
+      "alternatives": "1. Horizontal autoscaling: follows the load and saves idle cost, but the element must be stateless and start fast.\n2. Serverless: no capacity to plan, but cold starts and per-request cost at steady high load.",
+      "hubWhen": {
+        "SCALING": [
+          "vertical"
+        ]
+      }
+    },
+    {
+      "id": "adr-autoscale",
+      "type": "adr",
+      "label": "Horizontal autoscaling",
+      "x": 780,
+      "y": 130,
+      "concern": "capacity",
+      "status": "accepted",
+      "date": "",
+      "context": "This element runs on capacity someone has to provide. The forces: load is not flat (a busy hour, a campaign, a sale day can be several times the usual), and a service sized for the average falls over at the peak; an overloaded service does not slow down gracefully, it queues, times out and retries until it serves nobody (a cascading failure); adding instances takes minutes and only helps when the element keeps no state of its own; whatever it calls (a database, a partner) has limits of its own that scaling out can break; idle capacity costs money every hour; and the only way to know the breaking point is to measure it before users find it.",
+      "decision": "The element runs stateless instances that the platform adds and removes: on Kubernetes, a HorizontalPodAutoscaler on CPU or on request rate (through KEDA or the Prometheus Adapter); elsewhere ECS Service Auto Scaling, Azure VM scale sets or Container Apps scale rules. Minimum replicas carry {{EXPECTED_RPS}} requests per second with one zone lost; maximum replicas carry 1.5 times the peak ({{PEAK_FACTOR}} times the normal load); scale-in waits 15 minutes. Instances start serving within 60 seconds and hold no session or file of their own. Overload: {{OVERLOAD}}. Load tests: {{LOADTEST}}. Choose the metric that rises first with load: request rate or concurrency for APIs, queue length for workers, CPU only when the work is CPU-bound.",
+      "consequences": "• Capacity follows the load; idle cost drops at night.\n• The element must be stateless and start fast; sessions and uploads live in shared stores.\n• Scaling takes minutes; a spike faster than that is met by the overload rule.\n• The maximum is a deliberate ceiling: at it, an alert asks whether to raise it or shed load.\n• Downstream limits (database connections) cap how far scaling helps.",
+      "alternatives": "1. A fixed fleet sized for the peak: simpler, but pays for the peak all year.\n2. Serverless: scales per request to zero, at the cost of cold starts and platform limits.",
+      "hubWhen": {
+        "SCALING": [
+          "horizontal"
+        ]
+      }
+    },
+    {
+      "id": "adr-serverless",
+      "type": "adr",
+      "label": "Serverless scaling",
+      "x": 780,
+      "y": 260,
+      "concern": "capacity",
+      "status": "accepted",
+      "date": "",
+      "context": "This element runs on capacity someone has to provide. The forces: load is not flat (a busy hour, a campaign, a sale day can be several times the usual), and a service sized for the average falls over at the peak; an overloaded service does not slow down gracefully, it queues, times out and retries until it serves nobody (a cascading failure); adding instances takes minutes and only helps when the element keeps no state of its own; whatever it calls (a database, a partner) has limits of its own that scaling out can break; idle capacity costs money every hour; and the only way to know the breaking point is to measure it before users find it.",
+      "decision": "The element runs on a serverless platform that starts instances per demand: AWS Lambda, Google Cloud Run, Azure Functions (Flex Consumption) or Azure Container Apps. Warm capacity (provisioned concurrency or minimum instances) carries {{EXPECTED_RPS}} requests per second; maximum concurrency is capped at what its database and other dependencies accept, with a connection pooler (Amazon RDS Proxy, PgBouncer) in front of the database. Overload: {{OVERLOAD}}. Load tests: {{LOADTEST}}. Choose the platform by request duration (Lambda up to 15 minutes; Cloud Run and Container Apps for containers and longer requests), cold start of the runtime, and cost at the steady load: above a few million requests a day, compare with containers on autoscaling.",
+      "consequences": "• No capacity to plan or idle fleet to pay for; scaling is per request.\n• Cold starts add latency at the start of every burst; warm capacity costs money.\n• Account and regional concurrency limits apply and must be raised ahead of peaks.\n• Scaling out can flood the database: the concurrency cap and the pooler are not optional.\n• Ties the element to the platform's runtime, limits and pricing.",
+      "alternatives": "1. Containers with horizontal autoscaling: no cold starts and cheaper at steady load, but capacity to manage.\n2. A fixed fleet: predictable, but sized for a peak that rarely comes.",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "adr-shed",
+      "type": "adr",
+      "label": "Shed load at a concurrency limit",
+      "x": 780,
+      "y": 390,
+      "concern": "capacity",
+      "status": "accepted",
+      "date": "",
+      "context": "This element runs on capacity someone has to provide. The forces: load is not flat (a busy hour, a campaign, a sale day can be several times the usual), and a service sized for the average falls over at the peak; an overloaded service does not slow down gracefully, it queues, times out and retries until it serves nobody (a cascading failure); adding instances takes minutes and only helps when the element keeps no state of its own; whatever it calls (a database, a partner) has limits of its own that scaling out can break; idle capacity costs money every hour; and the only way to know the breaking point is to measure it before users find it.",
+      "decision": "Each instance limits the requests in flight and refuses the excess at once with 503 and Retry-After, before doing any work for it. The limit adapts to the measured latency (Envoy's adaptive concurrency filter, Netflix concurrency-limits, or the framework's own limiter such as ASP.NET Core's concurrency limiter), or is set from the load test at the knee of the latency curve. Requests carry a priority: health checks and the paying path are shed last, background and bulk calls first. Clients retry with exponential backoff and jitter, at most 3 times.",
+      "consequences": "• Accepted requests stay fast under overload; the service does not collapse.\n• Some callers see 503 at the peak; that is visible and must be explained to them.\n• The priority of each route is a product decision, written down next to the code.\n• Retries without backoff would undo it; clients are part of the design.",
+      "alternatives": "1. Unbounded queueing: no refusals, but every request slows down until all time out.\n2. Per-client rate limits only: protects against one noisy caller, not against total load.",
+      "hubWhen": {
+        "OVERLOAD": [
+          "shed",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "adr-backpressure",
+      "type": "adr",
+      "label": "Bounded queue with backpressure",
+      "x": 780,
+      "y": 520,
+      "concern": "capacity",
+      "status": "accepted",
+      "date": "",
+      "context": "This element runs on capacity someone has to provide. The forces: load is not flat (a busy hour, a campaign, a sale day can be several times the usual), and a service sized for the average falls over at the peak; an overloaded service does not slow down gracefully, it queues, times out and retries until it serves nobody (a cascading failure); adding instances takes minutes and only helps when the element keeps no state of its own; whatever it calls (a database, a partner) has limits of its own that scaling out can break; idle capacity costs money every hour; and the only way to know the breaking point is to measure it before users find it.",
+      "decision": "Work that the caller does not wait for goes into a bounded queue: Amazon SQS, RabbitMQ (with x-max-length and reject-publish overflow), or Kafka with a consumer group, depending on what the platform already runs. Workers scale on queue length or consumer lag (KEDA scalers) up to what downstream systems accept. When the queue is full, producers get 429 with Retry-After or block with a timeout; accepted work is never dropped, and messages that fail repeatedly go to a dead-letter queue.",
+      "consequences": "• Peaks are absorbed by the queue and processed at a sustainable rate.\n• Results arrive later at the peak; the product must accept that delay for this work.\n• The queue length and the age of the oldest message become the signals to watch.\n• Producers must handle 429 and retry; a producer that drops work on 429 loses it.",
+      "alternatives": "1. Processing everything synchronously: simple, but the caller waits and peaks hit the database directly.\n2. An unbounded queue: never refuses, but hides overload until memory or the delay is unacceptable.",
+      "hubWhen": {
+        "OVERLOAD": [
+          "backpressure",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "ff-loadtest-release",
+      "type": "fitness-fn",
+      "label": "Load test gates release",
+      "x": 1040,
+      "y": 0,
+      "category": "operational",
+      "threshold": "95th percentile under {{P95_MS}} ms and errors under 0.1 % at {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second for 15 minutes",
+      "description": "The pipeline runs a k6 test against a production-like environment for every release candidate; the thresholds fail the run, and the pipeline stops the release.\n\nTool: Grafana k6\n\n```js\n// k6 run peak.js   (in the release pipeline, against staging)\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nconst NORMAL = {{EXPECTED_RPS}}\nconst PEAK = NORMAL * {{PEAK_FACTOR}}\n\nexport const options = {\n  scenarios: {\n    peak: {\n      executor: 'ramping-arrival-rate',\n      startRate: NORMAL, timeUnit: '1s',\n      preAllocatedVUs: 200, maxVUs: 2000,\n      stages: [\n        { target: PEAK, duration: '5m' },   // ramp to the peak\n        { target: PEAK, duration: '15m' },  // hold it\n      ],\n    },\n  },\n  thresholds: {\n    http_req_duration: ['p(95)<{{P95_MS}}'],\n    http_req_failed: ['rate<0.001'],\n  },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders?page=1`)\n  check(res, { 'status 200': (r) => r.status === 200 })\n}\n```",
+      "hubWhen": {
+        "LOADTEST": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "ff-loadtest-scheduled",
+      "type": "fitness-fn",
+      "label": "Breaking point measured",
+      "x": 1040,
+      "y": 130,
+      "category": "operational",
+      "threshold": "Breaking point (95th percentile above {{P95_MS}} ms) at least 1.5 times {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second, measured at most 30 days ago",
+      "description": "A scheduled job runs a Gatling simulation that ramps well past the peak; the assertions fail when latency breaks below 1.5 times the peak. The report is kept, and the job runs again 4 weeks before each announced peak event.\n\nTool: Gatling (Java DSL)\n\n```java\nimport static io.gatling.javaapi.core.CoreDsl.*;\nimport static io.gatling.javaapi.http.HttpDsl.*;\nimport io.gatling.javaapi.core.*;\nimport io.gatling.javaapi.http.*;\n\npublic class BreakingPointSimulation extends Simulation {\n  static final double NORMAL = {{EXPECTED_RPS}};\n  static final double PEAK = NORMAL * {{PEAK_FACTOR}};\n\n  HttpProtocolBuilder protocol = http.baseUrl(System.getenv(\"BASE_URL\"));\n  ScenarioBuilder browse = scenario(\"orders\").exec(http(\"list orders\").get(\"/orders?page=1\"));\n\n  {\n    setUp(browse.injectOpen(\n        rampUsersPerSec(NORMAL).to(PEAK).during(300),\n        rampUsersPerSec(PEAK).to(PEAK * 1.5).during(600),\n        constantUsersPerSec(PEAK * 1.5).during(600)))\n      .protocols(protocol)\n      .assertions(\n        global().responseTime().percentile(95.0).lt({{P95_MS}}),\n        global().failedRequests().percent().lt(0.1));\n  }\n}\n```",
+      "hubWhen": {
+        "LOADTEST": [
+          "scheduled"
+        ]
+      }
+    },
+    {
+      "id": "ff-headroom",
+      "type": "fitness-fn",
+      "label": "Headroom watched",
+      "x": 1040,
+      "y": 260,
+      "category": "operational",
+      "threshold": "CPU and memory at the busiest hour of the week at most 70 % of what is provisioned",
+      "description": "A Prometheus alert compares the highest hourly CPU and memory use of the last 7 days with the requests provisioned for the element, and opens a capacity ticket above 70 %.\n\nTool: Prometheus alerting rule (kube-state-metrics and cAdvisor metrics)\n\n```yaml\ngroups:\n  - name: capacity\n    rules:\n      - alert: OrderApiHeadroomLow\n        expr: |\n          max_over_time(\n            (sum(rate(container_cpu_usage_seconds_total{namespace=\"shop\",pod=~\"order-api-.*\"}[5m]))\n             / sum(kube_pod_container_resource_requests{namespace=\"shop\",pod=~\"order-api-.*\",resource=\"cpu\"}))[7d:1h]\n          ) > 0.70\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Order API used over 70 % of its provisioned CPU at the week's busiest hour: plan a capacity change\"\n```",
+      "hubWhen": {
+        "SCALING": [
+          "vertical"
+        ]
+      }
+    },
+    {
+      "id": "ff-autoscale-ceiling",
+      "type": "fitness-fn",
+      "label": "Autoscaling not at its ceiling",
+      "x": 1040,
+      "y": 390,
+      "category": "operational",
+      "threshold": "The autoscaler sits at its maximum replicas for no more than 15 minutes in a row",
+      "description": "A Prometheus alert fires when the HorizontalPodAutoscaler has run at its maximum for 15 minutes: the ceiling is too low or the load is beyond plan, and someone decides which.\n\nTool: Prometheus alerting rule over kube-state-metrics\n\n```yaml\ngroups:\n  - name: autoscaling\n    rules:\n      - alert: OrderApiAtMaxReplicas\n        expr: |\n          kube_horizontalpodautoscaler_status_current_replicas{namespace=\"shop\",horizontalpodautoscaler=\"order-api\"}\n            >= kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"shop\",horizontalpodautoscaler=\"order-api\"}\n        for: 15m\n        labels: { severity: page }\n        annotations:\n          summary: \"Order API has been at its maximum replicas for 15 minutes\"\n```",
+      "hubWhen": {
+        "SCALING": [
+          "horizontal"
+        ]
+      }
+    },
+    {
+      "id": "ff-serverless-throttles",
+      "type": "fitness-fn",
+      "label": "No throttled invocations",
+      "x": 1040,
+      "y": 520,
+      "category": "operational",
+      "threshold": "0 throttled invocations in any 5 minutes, and concurrency below 80 % of the reserved limit",
+      "description": "CloudWatch alarms on the function's throttles and on its concurrent executions against the reserved concurrency; Cloud Run and Azure Functions have the same metrics in Cloud Monitoring and Azure Monitor.\n\nTool: Amazon CloudWatch alarms (AWS CloudFormation)\n\n```yaml\nOrderApiThrottles:\n  Type: AWS::CloudWatch::Alarm\n  Properties:\n    AlarmName: order-api-throttles\n    Namespace: AWS/Lambda\n    MetricName: Throttles\n    Dimensions: [{ Name: FunctionName, Value: order-api }]\n    Statistic: Sum\n    Period: 300\n    EvaluationPeriods: 1\n    Threshold: 0\n    ComparisonOperator: GreaterThanThreshold\n    TreatMissingData: notBreaching\nOrderApiConcurrencyNearCap:\n  Type: AWS::CloudWatch::Alarm\n  Properties:\n    AlarmName: order-api-concurrency-80pct\n    Namespace: AWS/Lambda\n    MetricName: ConcurrentExecutions\n    Dimensions: [{ Name: FunctionName, Value: order-api }]\n    Statistic: Maximum\n    Period: 60\n    EvaluationPeriods: 5\n    Threshold: 160            # 80 % of a reserved concurrency of 200\n    ComparisonOperator: GreaterThanThreshold\n```",
+      "hubWhen": {
+        "SCALING": [
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "ff-shed",
+      "type": "fitness-fn",
+      "label": "Overload is shed fast",
+      "x": 1040,
+      "y": 650,
+      "category": "operational",
+      "threshold": "At twice the peak: refused requests answered with 503 in under 50 ms (95th percentile), accepted ones under {{P95_MS}} ms",
+      "description": "A k6 overload test drives twice the peak and checks two things separately: refusals are fast 503s, and the requests that were accepted kept their latency. A service that slows everything down instead fails the test.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { Trend } from 'k6/metrics'\n\nconst accepted = new Trend('accepted_duration', true)\nconst refused = new Trend('refused_duration', true)\n\nexport const options = {\n  scenarios: {\n    overload: { executor: 'constant-arrival-rate', rate: 2 * {{PEAK_FACTOR}} * {{EXPECTED_RPS}}, timeUnit: '1s',\n                duration: '10m', preAllocatedVUs: 500, maxVUs: 5000 },\n  },\n  thresholds: {\n    accepted_duration: ['p(95)<{{P95_MS}}'],\n    refused_duration: ['p(95)<50'],\n    http_req_failed: ['rate<0.001'],   // anything but 200 or 503\n  },\n}\n\nhttp.setResponseCallback(http.expectedStatuses(200, 503))\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders?page=1`)\n  ;(res.status === 503 ? refused : accepted).add(res.timings.duration)\n}\n```",
+      "hubWhen": {
+        "OVERLOAD": [
+          "shed",
+          "both"
+        ]
+      }
+    },
+    {
+      "id": "ff-backlog",
+      "type": "fitness-fn",
+      "label": "Backlog drains",
+      "x": 1040,
+      "y": 780,
+      "category": "operational",
+      "threshold": "Consumer lag grows for no more than 15 minutes in a row; 0 accepted messages dropped",
+      "description": "A Prometheus alert fires when the workers' lag has kept growing for 15 minutes, meaning they cannot keep up even after scaling; the dead-letter queue is watched separately.\n\nTool: Prometheus alerting rule over kafka_exporter metrics (for SQS: CloudWatch ApproximateAgeOfOldestMessage)\n\n```yaml\ngroups:\n  - name: backpressure\n    rules:\n      - alert: OrderWorkersFallingBehind\n        expr: deriv(sum(kafka_consumergroup_lag{consumergroup=\"order-workers\"})[15m:1m]) > 0\n        for: 15m\n        labels: { severity: page }\n        annotations:\n          summary: \"Order workers' lag has grown for 15 minutes: they cannot keep up\"\n```",
+      "hubWhen": {
+        "OVERLOAD": [
+          "backpressure",
+          "both"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-peak--derives--need",
+      "sourceId": "req-peak",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-headroom--derives--need",
+      "sourceId": "req-headroom",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-autoscale--derives--need",
+      "sourceId": "req-autoscale",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-cold-start--derives--need",
+      "sourceId": "req-cold-start",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-downstream--derives--need",
+      "sourceId": "req-downstream",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-shed--derives--need",
+      "sourceId": "req-shed",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-backpressure--derives--need",
+      "sourceId": "req-backpressure",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-loadtest-release--derives--need",
+      "sourceId": "req-loadtest-release",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-loadtest-scheduled--derives--need",
+      "sourceId": "req-loadtest-scheduled",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-peak--verifies--req-peak",
+      "sourceId": "sc-peak",
+      "targetId": "req-peak",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-headroom--verifies--req-headroom",
+      "sourceId": "sc-headroom",
+      "targetId": "req-headroom",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-autoscale--verifies--req-autoscale",
+      "sourceId": "sc-autoscale",
+      "targetId": "req-autoscale",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-cold-start--verifies--req-cold-start",
+      "sourceId": "sc-cold-start",
+      "targetId": "req-cold-start",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-downstream--verifies--req-downstream",
+      "sourceId": "sc-downstream",
+      "targetId": "req-downstream",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-shed--verifies--req-shed",
+      "sourceId": "sc-shed",
+      "targetId": "req-shed",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-backpressure--verifies--req-backpressure",
+      "sourceId": "sc-backpressure",
+      "targetId": "req-backpressure",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-loadtest-release--verifies--req-loadtest-release",
+      "sourceId": "sc-loadtest-release",
+      "targetId": "req-loadtest-release",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-loadtest-scheduled--verifies--req-loadtest-scheduled",
+      "sourceId": "sc-loadtest-scheduled",
+      "targetId": "req-loadtest-scheduled",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-loadtest-release--implements--adr-vertical",
+      "sourceId": "ff-loadtest-release",
+      "targetId": "adr-vertical",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-loadtest-release--implements--adr-autoscale",
+      "sourceId": "ff-loadtest-release",
+      "targetId": "adr-autoscale",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-loadtest-release--implements--adr-serverless",
+      "sourceId": "ff-loadtest-release",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-loadtest-scheduled--implements--adr-vertical",
+      "sourceId": "ff-loadtest-scheduled",
+      "targetId": "adr-vertical",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-loadtest-scheduled--implements--adr-autoscale",
+      "sourceId": "ff-loadtest-scheduled",
+      "targetId": "adr-autoscale",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-loadtest-scheduled--implements--adr-serverless",
+      "sourceId": "ff-loadtest-scheduled",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-headroom--implements--adr-vertical",
+      "sourceId": "ff-headroom",
+      "targetId": "adr-vertical",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-autoscale-ceiling--implements--adr-autoscale",
+      "sourceId": "ff-autoscale-ceiling",
+      "targetId": "adr-autoscale",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-serverless-throttles--implements--adr-serverless",
+      "sourceId": "ff-serverless-throttles",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-shed--implements--adr-shed",
+      "sourceId": "ff-shed",
+      "targetId": "adr-shed",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-backlog--implements--adr-backpressure",
+      "sourceId": "ff-backlog",
+      "targetId": "adr-backpressure",
+      "relationType": "implements"
+    }
+  ]
+}

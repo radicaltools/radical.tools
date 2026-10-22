@@ -60,12 +60,12 @@
     },
     "hub": {
       "type": "object",
-      "description": "Radical Hub catalogue metadata — present only in documents published to hub.radical.tools.",
+      "description": "Radical Hub catalogue metadata — present only in documents published to hub.radical.tools: a concern pack (category concern), or a concept of the categories the Hub held before.",
       "required": ["id", "category", "name", "description", "tags"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
-        "category": { "type": "string", "enum": ["pattern", "fitness-function", "requirement", "adr", "blueprint"] },
+        "category": { "type": "string", "enum": ["concern", "pattern", "fitness-function", "requirement", "adr", "blueprint"] },
         "name": { "type": "string" },
         "description": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
@@ -80,11 +80,38 @@
               "label": { "type": "string" },
               "hint": { "type": "string" },
               "type": { "type": "string", "enum": ["text", "number"] },
-              "defaultValue": { "type": "string" }
+              "defaultValue": { "type": "string" },
+              "title": { "type": "string", "description": "A question's name in a word or two, for the wizard's step." },
+              "options": {
+                "type": "array",
+                "description": "The answers to choose from: the value picks the elements whose hubWhen names it, the label fills {{KEY}}.",
+                "items": {
+                  "type": "object",
+                  "required": ["value", "label"],
+                  "properties": { "value": { "type": "string" }, "label": { "type": "string" }, "description": { "type": "string" } }
+                }
+              }
             }
           }
         },
-        "hubRefs": { "type": "array", "items": { "type": "string" } }
+        "hubRefs": { "type": "array", "items": { "type": "string" } },
+        "concern": {
+          "type": "object",
+          "description": "A concern pack: the concern an ADR settles (its `concern` property), the query that finds the elements it applies to, and its group.",
+          "required": ["id", "trigger", "why", "group"],
+          "properties": {
+            "id": { "type": "string" },
+            "trigger": { "type": "string" },
+            "applyTo": { "type": "string", "enum": ["source", "target"] },
+            "why": { "type": "string" },
+            "group": { "type": "string", "enum": ["identity", "security", "data", "integration", "reliability", "operations", "maintainability", "technology"] }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "description": "What a concern pack rests on.",
+          "items": { "type": "object", "required": ["title", "url"], "properties": { "title": { "type": "string" }, "url": { "type": "string" } } }
+        }
       }
     }
   },

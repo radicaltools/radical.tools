@@ -5,5 +5,5 @@ label: "Invalid catalogue stops build"
 action: "The Hub catalogue plugin shall stop the Hub and Studio builds, and fail the dev server's catalogue request, with an error that names each file and its problem."
 ears_type: "unwanted-behaviour"
 rationale: "Keeps a broken concept off hub.radical.tools and out of Studio's import. Evidence: packages/hub-catalogue/src/catalogue.ts (validateCatalogue), packages/hub-catalogue/src/vite.ts, apps/hub/vite.config.ts, apps/studio/vite.web.config.ts, apps/studio/electron.vite.config.ts, packages/hub-catalogue/tests/catalogue.test.ts"
-unwanted_condition: "a concept file lacks its hub block or its elements, sits at a path other than <category>/<id>.radical, repeats another concept's id, uses a {{KEY}} placeholder it does not declare, or names an unknown concept in hubRefs"
+unwanted_condition: "a concept file lacks its hub block or its elements, sits at a path other than <category>/<id>.radical, repeats another concept's id, uses a {{KEY}} placeholder it does not declare, names an unknown concept in hubRefs, or is a concern pack whose trigger does not run, that asks no question with options, or whose slice is not connected"
 ---

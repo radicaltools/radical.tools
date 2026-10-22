@@ -11,6 +11,7 @@
     "adr-superseded-unlinked": "error",
     "fitness-fn-unlinked": "error",
     "fitness-fn-without-threshold": "error",
+    "concern-unbound": "error",
     "requirement-without-scenario": {
       "severity": "error",
       "max": 61

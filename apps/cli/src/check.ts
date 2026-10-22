@@ -1,10 +1,13 @@
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestReport, ratchetConfig, runCheck, serializeTestResults, type CheckConfig, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -129,7 +132,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  const result = runCheck(files, config, tests ? { tests } : {})
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), concerns: concernPacks() })
   if (tests) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited.
@@ -179,4 +182,12 @@ async function writeBeside(path: string, content: string): Promise<void> {
     })
   }
   await writeFile(path, content)
+}
+
+/** The Hub's concern packs, for concern-unaddressed: from the copy the build
+ *  puts beside the bundle (tsup.config.ts), or from source where
+ *  @radical/hub-catalogue keeps them. */
+function concernPacks() {
+  const bundled = join(dirname(fileURLToPath(import.meta.url)), 'hub-catalogue')
+  return concernPacksOf(readCatalogue(existsSync(bundled) ? bundled : CATALOGUE_DIR))
 }

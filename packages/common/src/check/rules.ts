@@ -12,6 +12,7 @@ import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamo
 import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
+import { bindSuggestions, concernStatuses, holdsConcerns, questionLine, suggestedCover, type ConcernPack } from '../concerns'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -45,6 +46,9 @@ export interface CheckModel {
   tests?: TestCase[]
   /** The config's rule settings, for rules that take options. */
   settings?: Record<string, import('./index').RuleSetting>
+  /** The Hub's concern packs, for concern-unaddressed; without them it
+   *  finds nothing. */
+  concerns?: ConcernPack[]
 }
 
 export interface CheckRule {
@@ -242,6 +246,49 @@ export const CHECK_RULES: CheckRule[] = [
       const linkedIds = new Set(out)
       return nodesOf(model, 'fitness-fn').filter((n) => !linkedIds.has(n.id))
         .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} implements no ADR and constrains no element.` }))
+    },
+  },
+  {
+    id: 'concern-unaddressed',
+    description: 'Every concern a Hub concern pack finds in the model is settled by an accepted ADR marked with it (property `concern`) that constrains the elements it applies to, or what contains them.',
+    severity: 'warning',
+    dimension: 'decisions',
+    run: (model) => holdsConcerns(model.metamodel)
+      ? concernStatuses(model.concerns ?? [], model.nodes, model.relations).filter((s) => s.open.length).map(({ pack, open, pending }) => {
+        const names = open.map((id) => quote(model.nodes[id])).join(', ')
+        const being = pending.length ? ` ${pending.map(quote).join(', ')} ${pending.length === 1 ? 'is' : 'are'} proposed: the decision is being made.` : ''
+        return {
+          nodeId: open[0],
+          ...(open.length > 1 ? { relatedIds: open.slice(1) } : {}),
+          code: pack.id,
+          message: `${pack.name}: ${pack.concern.why} No accepted ADR marked "${pack.concern.id}" settles it for ${names}.${being}`,
+          details: (pack.templateParams ?? []).map(questionLine),
+        }
+      })
+      : [],
+  },
+  {
+    id: 'concern-unbound',
+    description: 'Every accepted ADR marked with a concern (property `concern`, set by a Hub concern pack) constrains the elements it settles the concern for.',
+    severity: 'warning',
+    dimension: 'decisions',
+    run: (model) => {
+      if (!holdsConcerns(model.metamodel)) return []
+      const constraining = new Set(linked(model, 'constrains', 'out').keys())
+      const implementedBy = linked(model, 'implements', 'in')
+      return nodesOf(model, 'adr')
+        .filter((n) => prop(n, 'concern') && prop(n, 'status') === 'accepted' && !constraining.has(n.id))
+        .map((n) => {
+          const checks = (implementedBy.get(n.id) ?? []).map((r) => r.sourceId).filter((id) => model.nodes[id]?.type === 'fitness-fn')
+          const pack = model.concerns?.find((p) => p.concern.id === prop(n, 'concern'))
+          const where = pack ? suggestedCover(bindSuggestions(pack, model.nodes, model.relations, model.metamodel)) : []
+          return {
+            nodeId: n.id,
+            ...(checks.length ? { relatedIds: checks } : {}),
+            code: prop(n, 'concern'),
+            message: `ADR ${quote(n)} settles the concern "${prop(n, 'concern')}" but constrains no element, so it settles it for nothing.${where.length ? ` Bind it to ${where.map((id) => quote(model.nodes[id])).join(', ')}, which the concern applies to.` : ''}`,
+          }
+        })
     },
   },
   {

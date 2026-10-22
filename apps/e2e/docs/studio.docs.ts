@@ -266,6 +266,20 @@ test('hub-import', async ({ page, shot }) => {
   await shot('hub-import')
 })
 
+test('concern-wizard', async ({ page, shot }) => {
+  await open(page, 'view-ctx')
+  await menu(page, 'Import from Hub…')
+  const dialog = page.locator('[aria-label="Import from Hub"]')
+  const card = dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  await card.getByRole('button', { name: 'Add to Model' }).click({ timeout: 15_000 })
+  const wizard = page.getByTestId('concern-wizard')
+  await wizard.locator('.nw-step', { hasText: 'Review' }).click()
+  await expect(wizard.getByTestId('concern-brings')).toBeVisible()
+  await page.waitForTimeout(500)
+  await shot('concern-wizard')
+})
+
 test('ai-settings', async ({ page, shot }) => {
   await open(page, 'view-ctx')
   // Radical Forge's hint names it too ("Needs an AI provider: AI providers… above").

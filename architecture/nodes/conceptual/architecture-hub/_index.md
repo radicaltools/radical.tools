@@ -5,4 +5,4 @@ label: "Architecture Hub"
 kind: "supporting"
 ---
 
-The catalogue of curated patterns, ADRs, fitness functions, requirements and blueprints that a model imports.
+The catalogue of concern packs a model imports from: each settles one concern (authentication, personal data, secrets, …) as a connected slice of requirements, a decision, its fitness functions and scenarios, picked by the answers to its questions, with the trigger that tells when it applies. As a critic it finds the concerns a model must decide and has not.

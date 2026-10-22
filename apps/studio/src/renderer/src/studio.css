@@ -953,49 +953,6 @@ div.milestone-option { cursor: default; }
   border-color: color-mix(in srgb, #16a34a 40%, transparent);
   cursor: default;
 }
-.forge-hub-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  background: var(--bg-toolbar, rgba(255,255,255,0.03));
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-.forge-hub-suggestions-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 2px;
-}
-.forge-hub-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 4px;
-  border-top: 1px solid var(--border-color);
-}
-.forge-hub-card:first-of-type { border-top: none; }
-.forge-hub-card-main { flex: 1; min-width: 0; }
-.forge-hub-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
-.forge-hub-card-category {
-  margin-left: 6px;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.forge-hub-card-desc {
-  font-size: 11px;
-  color: var(--text-secondary, var(--text-muted));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 1px;
-}
 .forge-clarify {
   display: flex;
   flex-direction: column;
@@ -3453,6 +3410,8 @@ div.milestone-option { cursor: default; }
 .insp-details { flex-basis: 100%; }
 .insp-details > summary { cursor: pointer; color: var(--accent); font-size: 12px; width: max-content; }
 .insp-details ul { margin: 4px 0 2px; padding-left: 18px; display: grid; gap: 2px; }
+.insp-concern { flex-basis: 100%; display: grid; gap: 6px; justify-items: start; }
+.insp-questions { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12px; color: var(--text-secondary); }
 .insp-details code { color: var(--text-secondary); word-break: break-word; }
 .insp-pad { padding: 12px 14px; margin: 0; }
 .insp-msg { line-height: 1.75; }
@@ -3760,3 +3719,107 @@ div.milestone-option { cursor: default; }
   cursor: pointer;
 }
 .about-copy:hover { border-color: var(--accent, #3b82f6); }
+
+/* ── Concern pack wizard (components/ConcernWizard.tsx) ───────────────────
+   The node wizard's dialog (.nw, packages/ui index.css), a little larger,
+   over the Hub dialog; answers and scopes as single-choice cards. */
+.cw-backdrop { z-index: 9100; }
+.nw.cw { width: min(980px, 100%); height: min(680px, 100%); }
+.cw-step-text { display: flex; flex-direction: column; min-width: 0; }
+.cw-step-answer {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cw-cards { display: flex; flex-direction: column; gap: 8px; }
+.cw-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s, box-shadow 0.12s;
+}
+.cw-card:hover { border-color: var(--border-color-strong); background: var(--hover-bg-faint); }
+.cw-card:focus-visible { outline: none; box-shadow: var(--nw-ring); }
+.cw-card.selected {
+  border-color: rgba(var(--accent-rgb), 0.7);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35);
+}
+.cw-radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1.5px solid var(--border-color-strong);
+  border-radius: 50%;
+  background: var(--bg-panel);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.cw-card.selected .cw-radio { border-color: var(--accent); box-shadow: inset 0 0 0 3.5px var(--bg-panel), inset 0 0 0 8px var(--accent); }
+.cw-box {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1.5px solid var(--border-color-strong);
+  border-radius: 4px;
+  background: var(--bg-panel) center / 12px no-repeat;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.cw-card.selected .cw-box {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.cw-scope { display: flex; flex-direction: column; gap: 22px; }
+.cw-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+.cw-others { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.cw-card-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cw-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 600; }
+.cw-card-tag { font-size: 11.5px; font-weight: 500; color: var(--text-muted); }
+.cw-card-desc { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.cw-badge {
+  padding: 1px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
+  border-radius: 999px;
+}
+
+.cw-review { display: flex; flex-direction: column; gap: 18px; }
+.cw-review-section { display: flex; flex-direction: column; gap: 8px; }
+.cw-review-section h3 { margin: 0; }
+.cw-decision strong { font-size: 14px; }
+.cw-decision p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.cw-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
+.cw-list li { display: flex; align-items: baseline; gap: 10px; line-height: 1.45; }
+.cw-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 2px; transform: translateY(-1px); }
+.cw-muted { color: var(--text-muted); }
+.cw-note {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--radius-md);
+}
+.cw-sources a { color: var(--accent); text-decoration: none; }
+.cw-sources a:hover { text-decoration: underline; }

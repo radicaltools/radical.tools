@@ -177,6 +177,24 @@ describe('runModelQuery', () => {
     expect(result.result).toEqual({ total: 1, rows: [expect.objectContaining({ id: 'r5', relationType: 'derives' })] })
   })
 
+  it('filters relations by whether their source or target is external', () => {
+    const box = { collapsed: false, x: 0, y: 0, width: 100, height: 100 }
+    const outside: Record<string, C4Node> = {
+      user: { id: 'user', type: 'person', label: 'Customer', ...box },
+      bank: { id: 'bank', type: 'system', label: 'Bank', external: true, ...box },
+      web: { id: 'web', type: 'webapp', label: 'Shop', ...box },
+    }
+    const calls: Record<string, C4Relation> = {
+      a: { id: 'a', sourceId: 'user', targetId: 'web', relationType: 'interacts' },
+      b: { id: 'b', sourceId: 'bank', targetId: 'web', relationType: 'interacts' },
+      c: { id: 'c', sourceId: 'web', targetId: 'bank', relationType: 'interacts' },
+    }
+    const ids = (query: string): string[] =>
+      (runModelQuery(query, { nodes: outside, relations: calls }).result as { rows: Array<{ id: string }> }).rows.map((r) => r.id)
+    expect(ids('LIST RELATIONS WHERE source.external = true')).toEqual(['b'])
+    expect(ids('LIST RELATIONS WHERE target.external != true')).toEqual(['a', 'b'])
+  })
+
   it('filters views by kind', () => {
     const viewsWithTable: Record<string, DiagramView> = {
       ...views,

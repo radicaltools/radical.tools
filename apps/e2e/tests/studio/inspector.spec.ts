@@ -4,6 +4,7 @@ import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeTestResults, type TestCase } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
+import { HUB_PORT } from '../../playwright.config'
 
 // The Inspector perspective shows what radical check says about a model
 // kept in a folder: the rules run on the model as it is, the test results
@@ -255,4 +256,63 @@ test('a link to the Inspector of a model with nothing for it opens Viewer, as it
   await expect(page).toHaveURL(/\/m\/viewer/)
   await expect(page.locator('.insp')).toHaveCount(0)
   await expect(inspector).toBeDisabled()
+})
+
+test('the Inspector asks the questions of an unaddressed concern and the import settles it', async ({ page, studio }) => {
+  // The Hub's catalogue, from this build's Hub instead of hub.radical.tools.
+  await page.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
+    const response = await route.fetch({ url: `http://localhost:${HUB_PORT}` + new URL(route.request().url()).pathname })
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-type': 'application/json' } })
+  })
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  const shop: DiagramData = {
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      node('user', 'person', 'Customer', { x: 40, y: 40 }),
+      node('shop', 'system', 'Shop', { x: 40, y: 260, width: 360, height: 220 }),
+      node('web', 'webapp', 'Storefront', { parentId: 'shop', x: 40, y: 60 }),
+    ],
+    relations: [{ id: 'u', relationType: 'interacts', sourceId: 'user', targetId: 'web' }],
+    views: [{ id: 'v-shop', name: 'Shop', nodeIds: [], positions: {} }],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(shop, 'Shop'))) await folder.write(path, content)
+  await folder.write('.radical/test-results.json', results('passed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+
+  const decisions = page.locator('details.insp-dim[data-dimension="decisions"]')
+  await expect(decisions).toBeVisible({ timeout: 10_000 })
+  if ((await decisions.getAttribute('open')) === null) await decisions.locator('summary').click()
+  // Several packs apply to a web app people use; authentication is one.
+  const item = page.locator('.insp-item', { has: page.getByTestId('concern-finding') }).filter({ hasText: 'Authentication:' })
+  await expect(item).toBeVisible({ timeout: 10_000 })
+  const finding = item.getByTestId('concern-finding')
+  await expect(item).toContainText('Authentication: people or external systems reach these elements')
+  await expect(item).toContainText('Storefront')
+  await expect(finding).toContainText('How do people sign in?')
+
+  await finding.getByRole('button', { name: 'Answer the questions…' }).click()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard).toBeVisible()
+  await expect(wizard.getByRole('checkbox', { name: /^Storefront.*Suggested/ })).toHaveAttribute('aria-checked', 'true')
+  const step = (title: string) => wizard.locator('.nw-step', { hasText: title })
+  await step('Sign-in').click()
+  await wizard.getByRole('radio', { name: /^Nobody signs in/ }).click()
+  // Nobody signs in: no second factor to ask about.
+  await expect(step('Second factor')).toHaveCount(0)
+  await step('Other systems').click()
+  await wizard.getByRole('radio', { name: /^None, no other system/ }).click()
+  await step('Review').click()
+  await expect(wizard.getByTestId('concern-brings')).toContainText('1 requirement')
+  await expect(wizard.getByTestId('concern-brings')).toContainText('Public by design')
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+
+  // Still in the Inspector, the concern settled.
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
+  await expect(page.locator('.insp-item').filter({ hasText: 'Authentication:' })).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByTestId('concern-finding').first()).toBeVisible()
 })

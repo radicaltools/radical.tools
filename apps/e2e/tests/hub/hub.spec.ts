@@ -2,14 +2,14 @@ import { readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { test, expect } from '../../support/fixtures'
 
-// Hub (hub.radical.tools): the concept catalogue and its read-only viewer.
+// Hub (hub.radical.tools): the catalogue of concern packs and its read-only viewer.
 // Expected counts come from the catalogue this build publishes, so adding a
 // concept does not break the suite.
 
-interface Concept { id: string; category: string; name: string }
+interface Concept { id: string; category: string; name: string; concern?: { group: string } }
 
-const CONCEPT = 'bp-fintech-ledger-platform'
-const CONCEPT_NAME = 'Fintech Ledger & Payments Platform'
+const CONCEPT = 'concern-authentication'
+const CONCEPT_NAME = 'Authentication'
 
 async function catalogue(page: Page): Promise<Concept[]> {
   const res = await page.request.get('hub/index.json')
@@ -33,8 +33,10 @@ test('landing page', async ({ page, studio }) => {
   const all = await catalogue(page)
   await page.goto('/')
   await studio.until(page.getByRole('button', { name: 'Browse the catalogue' }))
-  for (const [label, category] of [['Patterns', 'pattern'], ['ADRs', 'adr'], ['Blueprints', 'blueprint']]) {
-    const count = all.filter((c) => c.category === category).length
+  // One tile per group, with its number of packs.
+  for (const [label, group] of [['Identity & access', 'identity'], ['Data', 'data'], ['Technology', 'technology']]) {
+    const count = all.filter((c) => c.concern?.group === group).length
+    expect(count).toBeGreaterThan(0)
     await expect(page.getByRole('button', { name: new RegExp(`^${label}\\s*${count}\\b`) })).toBeVisible()
   }
   await studio.settle()
@@ -43,33 +45,35 @@ test('landing page', async ({ page, studio }) => {
 
 test('browse a category and search', async ({ page, studio }) => {
   const all = await catalogue(page)
-  const blueprints = all.filter((c) => c.category === 'blueprint')
+  const packs = all.filter((c) => c.concern?.group === 'data')
   await page.goto('/')
-  await studio.until(page.getByRole('button', { name: /^Blueprints/ }))
-  await page.getByRole('button', { name: /^Blueprints/ }).click()
-  await studio.until(page.getByText(`${blueprints.length} of ${all.length}`))
-  await expect(page).toHaveURL(/#\/cat\/blueprint/)
-  for (const c of blueprints) await expect(page.getByText(c.name, { exact: true })).toBeVisible()
+  await studio.until(page.getByRole('button', { name: /^Data\s*\d/ }))
+  await page.getByRole('button', { name: /^Data\s*\d/ }).click()
+  await studio.until(page.getByText(`${packs.length} of ${all.length}`))
+  await expect(page).toHaveURL(/#\/cat\/data/)
+  for (const c of packs) await expect(page.getByText(c.name, { exact: true })).toBeVisible()
+  await expect(page.getByText('Authentication', { exact: true })).toHaveCount(0)
   await studio.settle()
-  await expect(page).toHaveScreenshot('category-blueprints.png')
+  await expect(page).toHaveScreenshot('category-data.png')
 
-  await page.getByPlaceholder('Search concepts…').fill('ledger')
+  await page.getByPlaceholder('Search concepts…').fill('backup')
   await studio.advance(500)
-  await expect(page.getByText(CONCEPT_NAME, { exact: true })).toBeVisible()
-  await expect(page.getByText('AI Support Assistant Platform', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Backup and recovery', { exact: true })).toBeVisible()
+  await expect(page.getByText('Personal data', { exact: true })).toHaveCount(0)
 })
 
 test('open a concept from the catalogue', async ({ page, studio }) => {
   await page.goto('/#/browse')
   await studio.until(page.getByText(CONCEPT_NAME, { exact: true }))
   await page.getByText(CONCEPT_NAME, { exact: true }).click()
-  await studio.until(studio.nodes)
+  // A concern pack opens on its wiki page.
   await expect(page).toHaveURL(new RegExp(`#/c/${CONCEPT}`))
+  await expect(page.getByText('Callers are who they claim').first()).toBeVisible()
 })
 
 for (const view of ['canvas', 'wiki', 'table'] as const) {
   test(`concept ${view} view`, async ({ page, studio }) => {
-    const concept = await (await page.request.get(`hub/blueprint/${CONCEPT}.radical`)).json()
+    const concept = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
     await page.goto(`/#/c/${CONCEPT}/v/${view}`)
     await studio.until(page.getByText(concept.hub.name, { exact: true }))
     if (view === 'canvas') {
@@ -94,6 +98,15 @@ test('download a concept as a .radical file', async ({ page, studio }) => {
   expect(doc.hub.id).toBe(CONCEPT)
   expect(doc.nodes.length).toBeGreaterThan(0)
   expect(doc.relations.length).toBeGreaterThan(0)
+})
+
+test('a concern pack shows its group and its sources', async ({ page, studio }) => {
+  const pack = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
+  await page.goto(`/#/c/${CONCEPT}/v/wiki`)
+  await studio.until(page.getByText(pack.hub.name, { exact: true }).first())
+  await expect(page.locator('.hub-toolbar-cat')).toHaveText(/Identity & access/)
+  const sources = page.getByRole('navigation', { name: 'Sources' })
+  for (const src of pack.hub.sources) await expect(sources.getByRole('link', { name: src.title })).toHaveAttribute('href', src.url)
 })
 
 test('a concept link followed inside the Hub opens that concept', async ({ page, studio }) => {

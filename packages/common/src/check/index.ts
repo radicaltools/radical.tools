@@ -17,6 +17,7 @@ import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
+import type { ConcernPack } from '../concerns'
 
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
@@ -113,6 +114,8 @@ export interface CheckOptions {
   /** Test cases from the reports (parseTestReport). Without them the rules
    *  that read test outcomes find nothing and there is no evidence. */
   tests?: TestCase[]
+  /** The Hub's concern packs (concerns.ts), for concern-unaddressed. */
+  concerns?: ConcernPack[]
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
@@ -184,6 +187,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const model = {
     nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
     ...(options.tests ? { tests: options.tests } : {}),
+    ...(options.concerns ? { concerns: options.concerns } : {}),
   }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
   const evidence = options.tests ? computeEvidence(model) : undefined

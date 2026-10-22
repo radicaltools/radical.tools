@@ -1,21 +1,13 @@
 /**
- * Hub catalogue — one Radical Studio document per concept.
+ * Hub catalogue — one Radical Studio document per concern pack.
  *
  *   - every catalogue/<category>/<id>.radical is valid (hub block, ids, refs)
  *   - index.json summaries carry what the cards / drop-target check need
  *   - doc ↔ concept mapping round-trips
- *   - blueprint mockups form per-actor screen flows (flow groups linked by
- *     navigates-to), use metamodel-valid relations and carry wireframes that
- *     are already sanitised
- *   - blueprints ship named views (context, containers, governance map,
- *     mockups, one per screen flow, governance / requirements wikis) over
- *     sequences whose steps all exist
  */
 import { describe, it, expect } from 'vitest'
 import { readCatalogue, validateCatalogue, buildIndex } from '../src/catalogue'
 import { conceptToDoc, docToConcept, summarize, type HubRadicalDoc } from '@radical/common/hubFormat'
-import { sanitizeWireframeSvg } from '@radical/common/wireframe'
-import { builtInGovernanceMetamodel, isParentAllowed } from '@radical/common/metamodel'
 
 const doc: HubRadicalDoc = {
   hub: {
@@ -53,7 +45,8 @@ describe('hub catalogue', () => {
   const entries = readCatalogue()
 
   it('contains concepts and passes validation', () => {
-    expect(entries.length).toBeGreaterThan(50)
+    expect(entries.length).toBeGreaterThanOrEqual(10)
+    expect(entries.every((e) => e.doc.hub.category === 'concern')).toBe(true)
     expect(validateCatalogue(entries)).toEqual([])
   })
 
@@ -72,80 +65,5 @@ describe('hub catalogue', () => {
     const errors = validateCatalogue(bad)
     expect(errors.some((e) => e.includes('expected path requirement/req-x.radical'))).toBe(true)
     expect(errors.some((e) => e.includes('unknown concept "nope"'))).toBe(true)
-  })
-})
-
-describe('blueprint mockups', () => {
-  const blueprints = readCatalogue().filter((e) => e.doc.hub.category === 'blueprint')
-  const mm = builtInGovernanceMetamodel()
-
-  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has screen flows with sanitised wireframes', (_file, doc) => {
-    const byId = new Map(doc.nodes.map((n) => [String(n.id), n]))
-    const mockups = doc.nodes.filter((n) => n.type === 'mockup')
-    expect(mockups.length).toBeGreaterThanOrEqual(8)
-    const inFlow = new Set((doc.relations ?? []).filter((r) => r.relationType === 'navigates-to').flatMap((r) => [r.sourceId, r.targetId]))
-
-    for (const m of mockups) {
-      const flow = byId.get(String(m.parentId))
-      expect(flow?.type, `${m.id}: not inside a flow group`).toBe('group')
-      expect(isParentAllowed(mm, 'mockup', 'group')).toBe(true)
-      expect(inFlow.has(String(m.id)), `${m.id}: not linked into its flow`).toBe(true)
-      const wireframe = m.wireframe as string
-      expect(typeof m.screen).toBe('string')
-      expect(sanitizeWireframeSvg(wireframe)).toBe(wireframe)
-      const out = (doc.relations ?? []).filter((r) => r.sourceId === m.id)
-      expect(out.filter((r) => r.relationType === 'presented-by')).toHaveLength(1)
-    }
-
-    for (const r of doc.relations ?? []) {
-      const src = byId.get(String(r.sourceId))
-      const tgt = byId.get(String(r.targetId))
-      expect(src, `${r.id}: missing source`).toBeDefined()
-      expect(tgt, `${r.id}: missing target`).toBeDefined()
-      if (src!.type !== 'mockup') continue
-      const pairs = mm.relationTypes[String(r.relationType ?? '')]?.allowedPairs ?? []
-      expect(pairs.some((p) => p.from === src!.type && p.to === tgt!.type), `${r.id}: ${r.relationType} ${src!.type} → ${tgt!.type}`).toBe(true)
-    }
-  })
-})
-
-describe('blueprint views and sequences', () => {
-  const blueprints = readCatalogue().filter((e) => e.doc.hub.category === 'blueprint')
-
-  it.each(blueprints.map((e) => [e.file, e.doc] as const))('%s has consistent views and sequences', (_file, doc) => {
-    const nodeIds = new Set(doc.nodes.map((n) => String(n.id)))
-    const relIds = new Set((doc.relations ?? []).map((r) => String(r.id)))
-    const sequences = (doc.sequences ?? []) as Array<{ id: string; relationIds: string[]; stepDescriptions?: string[] }>
-    const seqIds = new Set(sequences.map((s) => s.id))
-    const views = (doc.views ?? []) as Array<{ id: string; kind: string; sequenceId?: string; nodeIds: string[]; positions: Record<string, Record<string, unknown>> }>
-
-    for (const s of sequences) {
-      expect(s.relationIds.length).toBeGreaterThan(0)
-      for (const id of s.relationIds) expect(relIds.has(id), `${s.id}: unknown relation ${id}`).toBe(true)
-      expect(s.stepDescriptions ?? []).toHaveLength(s.relationIds.length)
-    }
-    for (const v of views) {
-      expect(['static', 'dynamic', 'wiki']).toContain(v.kind)
-      for (const id of v.nodeIds) expect(nodeIds.has(id), `${v.id}: unknown node ${id}`).toBe(true)
-      if (v.kind === 'dynamic') expect(seqIds.has(v.sequenceId!), `${v.id}: unknown sequence`).toBe(true)
-      for (const [id, p] of Object.entries(v.positions)) {
-        expect(nodeIds.has(id)).toBe(true)
-        for (const k of ['x', 'y', 'width', 'height']) expect(typeof p[k], `${v.id}.${id}.${k}`).toBe('number')
-      }
-    }
-
-    const ids = views.map((v) => v.id)
-    expect(ids).toEqual(expect.arrayContaining([
-      'view-context', 'view-containers', 'view-governance', 'view-mockups', 'view-wiki-governance', 'view-wiki-requirements',
-    ]))
-    const byId = Object.fromEntries(views.map((v) => [v.id, v]))
-    expect(byId['view-mockups'].kind).toBe('static')
-    expect(byId['view-wiki-governance'].kind).toBe('wiki')
-    const reqs = doc.nodes.filter((n) => n.type === 'requirement').map((n) => String(n.id))
-    expect([...byId['view-wiki-requirements'].nodeIds].sort()).toEqual([...reqs].sort())
-    expect(views.some((v) => v.kind === 'dynamic' && !v.id.startsWith('view-flow-')), 'technical flow').toBe(true)
-    for (const g of doc.nodes.filter((n) => n.type === 'group' && String(n.id).startsWith('flow-'))) {
-      expect(ids, `view for ${g.id}`).toContain(`view-${g.id}`)
-    }
   })
 })

@@ -18,6 +18,7 @@ import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
+import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover } from '@radical/common/concerns'
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { computeViewNodeSet, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
@@ -41,7 +42,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_issues',
-    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). Call it after building or changing a state machine, and before you report work as done.',
+    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). After them it lists the concerns of the Hub\'s concern packs the model has not settled (who is calling, …), with the elements, the questions to ask the user and the pack to import. Call it after building or changing a state machine, and before you report work as done.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -259,6 +260,34 @@ function settleViewFolds(before: DiagramData, after: DiagramData): void {
 export class FolderModel {
   private readonly tempIds = new Map<string, string>()
   private readonly forge = new Forge()
+
+  /** The concerns of the Hub's packs the model has not settled, for
+   *  get_issues: each with its elements, its questions and how to settle it. */
+  private openConcerns(data: DiagramData, mm: Metamodel | undefined): string[] {
+    if (!holdsConcerns(mm)) return []
+    const byId = <T extends { id: string }>(items: T[]) => Object.fromEntries(items.map((x) => [x.id, x]))
+    const nodes = byId(data.nodes)
+    const relations = byId(data.relations)
+    const open = concernStatuses(this.forge.concernPacks(), nodes, relations).filter((s) => s.open.length)
+    if (!open.length) return []
+    return ['', 'Unaddressed concerns (warnings of radical check\'s concern-unaddressed). Each is settled by an accepted ADR marked with the concern that constrains the elements, or the system containing them: ask the user the questions, then forge_import_hub_concept with conceptId, their answers and bindTo.',
+      ...open.flatMap(({ pack, open: ids, pending }) => [
+        `- ${pack.name} (conceptId ${pack.id}): ${pack.concern.why}`,
+        `  Elements: ${ids.map((id) => `${nodes[id].label} (${id})`).join(', ')}`,
+        ...(() => {
+          const suggestions = bindSuggestions(pack, nodes, relations, mm)
+          const cover = suggestedCover(suggestions)
+          return [
+            `  Suggested bindTo: ${cover.map((id) => `${nodes[id].label} (${id})`).join(', ')}, which settles all of them`,
+            ...suggestions.filter((b) => !cover.includes(b.id)).slice(0, 3).map((b) =>
+              `  Or: ${nodes[b.id].label} (${b.id}), settles ${b.covers.length} of ${ids.length}`),
+          ]
+        })(),
+        ...(pending.length ? [`  Proposed, being decided: ${pending.map((n) => `${n.label} (${n.id})`).join(', ')}`] : []),
+        '  Questions:',
+        ...(pack.templateParams ?? []).map((p) => `  - ${p.key}: ${p.label}${p.options?.length ? ` [${p.options.map((o) => `${o.value} = ${o.label}`).join('; ')}]` : ''}${p.defaultValue ? ` (default ${p.defaultValue})` : ''}`),
+      ])]
+  }
   private readonly folder: string
   private metamodelKey: string
   /** Every tool the server offers; node/relation schemas follow the metamodel. */
@@ -468,7 +497,8 @@ export class FolderModel {
       if (name === 'get_issues') {
         const mm = facade.getMetamodel?.()
         const issues = mm ? issuesOf(data, mm) : []
-        return { ok: true, text: issues.length ? issues.map(formatIssue).join('\n') : 'No issues: the model follows its metamodel.' }
+        const text = issues.length ? issues.map(formatIssue).join('\n') : 'No issues: the model follows its metamodel.'
+        return { ok: true, text: [text, ...this.openConcerns(data, mm)].join('\n') }
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_changes') {

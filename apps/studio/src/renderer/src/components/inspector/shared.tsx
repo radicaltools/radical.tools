@@ -12,6 +12,7 @@ import {
 import type { C4Node } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
 import { canvasViewsFor, openWikiPage, revealOnCanvas, wikiViewsFor, type ViewChoice } from '../../navigation'
+import { openConcern } from '../../persistence/inspector'
 
 export const RULE_INFO = new Map<string, string>([...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE].map((r) => [r.id, r.description]))
 const RULE_DIMENSION = new Map<string, CheckDimension>([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.dimension]))
@@ -201,7 +202,17 @@ function RuleFindings({ list, ctx }: { list: CheckFinding[]; ctx: Ctx }): React.
         <div key={i} className="insp-item">
           {f.path && !f.nodeId && <code className="insp-path">{f.path}</code>}
           <Message f={f} ctx={ctx} />
-          {f.details && f.details.length > 0 && (
+          {f.rule === 'concern-unaddressed' ? (
+            // The Hub's critic: the elements, the questions that decide the
+            // concern, and the pack that settles it with the answers.
+            <div className="insp-concern" data-testid="concern-finding">
+              {f.relatedIds && f.relatedIds.length > 0 && (
+                <div className="insp-chain">Also: {f.relatedIds.map((id) => <Chip key={id} id={id} ctx={ctx} />)}</div>
+              )}
+              {f.details && f.details.length > 0 && <ul className="insp-questions">{f.details.map((d) => <li key={d}>{d}</li>)}</ul>}
+              {f.code && <button type="button" className="insp-more" onClick={() => openConcern(f.code!, f.nodeId)}>Answer the questions…</button>}
+            </div>
+          ) : f.details && f.details.length > 0 && (
             <details className="insp-details">
               <summary>{f.details.length === 1 ? '1 test' : `${f.details.length} tests`}</summary>
               <ul>{f.details.map((d) => <li key={d}><code>{d}</code></li>)}</ul>

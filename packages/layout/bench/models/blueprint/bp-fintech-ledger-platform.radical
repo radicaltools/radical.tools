@@ -1,0 +1,1701 @@
+{
+  "hub": {
+    "id": "bp-fintech-ledger-platform",
+    "category": "blueprint",
+    "name": "Fintech Ledger & Payments Platform",
+    "description": "A regulated money-movement backend: every financial fact is posted as an immutable, balanced double-entry journal entry; account balances are projections rebuilt from the journal; continuous plus nightly-batch reconciliation against the banking rail catches drift before it ever reaches a customer statement.",
+    "tags": [
+      "fintech",
+      "ledger",
+      "payments",
+      "compliance",
+      "reconciliation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "templateParams": [
+      {
+        "key": "RECONCILIATION_LAG_MIN",
+        "label": "Reconciliation freshness (minutes)",
+        "hint": "15",
+        "type": "number",
+        "defaultValue": "15"
+      },
+      {
+        "key": "STATEMENT_GENERATION_HOURS",
+        "label": "Statement generation SLA (hours)",
+        "hint": "24",
+        "type": "number",
+        "defaultValue": "24"
+      },
+      {
+        "key": "DISPUTE_INVESTIGATION_DAYS",
+        "label": "Dispute investigation SLA (days)",
+        "hint": "10",
+        "type": "number",
+        "defaultValue": "10"
+      },
+      {
+        "key": "MAX_ADJUSTMENT_RATE_PCT",
+        "label": "Max monthly compensating-entry rate (%)",
+        "hint": "0.1",
+        "type": "number",
+        "defaultValue": "0.1"
+      }
+    ],
+    "hubRefs": [
+      "pattern-event-sourced-ledger",
+      "adr-ledger-reconciliation-strategy",
+      "req-ledger-immutability",
+      "ff-ledger-balance-integrity",
+      "req-audit-logging",
+      "req-encryption",
+      "req-disaster-recovery",
+      "adr-data-consistency-model"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "customer",
+      "type": "person",
+      "label": "Customer",
+      "description": "Holds an account, views their statement, and can dispute a transaction on it.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "finance-ops",
+      "type": "person",
+      "label": "Finance Ops",
+      "description": "Investigates the exceptions the reconciliation worker surfaces and is the only role allowed to submit a compensating entry.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 210,
+      "y": 0
+    },
+    {
+      "id": "compliance-officer",
+      "type": "person",
+      "label": "Compliance Officer",
+      "description": "Audits postings and reconciliation exceptions and signs off scheduled regulatory reporting.",
+      "width": 150,
+      "height": 170,
+      "collapsed": false,
+      "x": 420,
+      "y": 0
+    },
+    {
+      "id": "platform",
+      "type": "system",
+      "label": "Ledger Platform",
+      "description": "Posts every financial fact as a balanced, immutable journal entry and keeps it reconciled against the bank.",
+      "width": 1040,
+      "height": 750,
+      "collapsed": false,
+      "x": 0,
+      "y": 290
+    },
+    {
+      "id": "posting-api",
+      "type": "container",
+      "label": "Posting API",
+      "description": "The only entry point into the journal — settlement events and Finance Ops corrections alike pass through the same balanced-entry check.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 110
+    },
+    {
+      "id": "balance-projector",
+      "type": "container",
+      "label": "Balance Projector",
+      "description": "Keeps per-account balances current by subscribing to the journal; if a projection is ever suspected of drifting, it's disposable and rebuilt from genesis.",
+      "technology": "Java worker",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 370,
+      "y": 110
+    },
+    {
+      "id": "reconciliation-worker",
+      "type": "container",
+      "label": "Reconciliation Worker",
+      "description": "Matches posted entries against the bank's settlement feed continuously, and against its end-of-day statement in a nightly batch.",
+      "technology": "Java worker",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 710,
+      "y": 110
+    },
+    {
+      "id": "statement-service",
+      "type": "container",
+      "label": "Statement Service",
+      "description": "Generates customer-facing statements from balance projections as of a fixed cutoff.",
+      "technology": "Java",
+      "parentId": "platform",
+      "width": 300,
+      "height": 200,
+      "collapsed": false,
+      "x": 30,
+      "y": 350
+    },
+    {
+      "id": "finance-ops-console",
+      "type": "webapp",
+      "label": "Finance Ops Console",
+      "description": "Reconciliation exceptions queue, plus the only interface that can submit a compensating entry.",
+      "technology": "React",
+      "parentId": "platform",
+      "width": 210,
+      "height": 140,
+      "collapsed": false,
+      "x": 370,
+      "y": 350
+    },
+    {
+      "id": "settlement-events",
+      "type": "queue",
+      "label": "Settlement Events",
+      "description": "Inbound settlement and webhook events from the bank that drive new postings.",
+      "technology": "Kafka",
+      "parentId": "platform",
+      "width": 220,
+      "height": 95,
+      "collapsed": false,
+      "x": 710,
+      "y": 350
+    },
+    {
+      "id": "journal-store",
+      "type": "database",
+      "label": "Journal Store",
+      "description": "The one table none of this platform's other services are allowed to treat as mutable — every posting this platform has ever accepted, in order.",
+      "technology": "PostgreSQL (append-only)",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 30,
+      "y": 590
+    },
+    {
+      "id": "balance-store",
+      "type": "database",
+      "label": "Balance Store",
+      "description": "What the statement service and the customer actually read — fast and disposable, never the authority on what an account is really worth.",
+      "technology": "PostgreSQL",
+      "parentId": "platform",
+      "width": 190,
+      "height": 130,
+      "collapsed": false,
+      "x": 370,
+      "y": 590
+    },
+    {
+      "id": "bank-rail",
+      "type": "system",
+      "label": "Bank / Payment Rail",
+      "description": "The external counterpart this platform's books are reconciled against, both live and at end of day.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 0,
+      "y": 1160
+    },
+    {
+      "id": "regulator",
+      "type": "system",
+      "label": "Regulator / Audit Reporting",
+      "description": "Receives scheduled compliance extracts and can request an audit trail for any posting.",
+      "width": 360,
+      "height": 260,
+      "collapsed": false,
+      "x": 420,
+      "y": 1160
+    },
+    {
+      "id": "req-balanced-entry-enforcement",
+      "type": "requirement",
+      "label": "Balanced Entry Enforcement",
+      "x": 0,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "unwanted-behaviour",
+      "status": "draft",
+      "priority": "must",
+      "unwanted_condition": "a journal entry's debits and credits do not sum to zero",
+      "action": "reject the entry at the posting API and never persist it to the journal",
+      "rationale": "An unbalanced entry that reaches the journal is no longer a bug that can be fixed — it's a permanent, immutable fact the books now have to carry."
+    },
+    {
+      "id": "req-reconciliation-freshness",
+      "type": "requirement",
+      "label": "Reconciliation Freshness",
+      "x": 320,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "match at least 99.5% of settlement events against journal entries within {{RECONCILIATION_LAG_MIN}} minutes of receipt",
+      "rationale": "The faster a mismatch surfaces, the more context — logs, the originating request, the person who can explain it — is still around to resolve it.",
+      "templateParams": [
+        {
+          "key": "RECONCILIATION_LAG_MIN",
+          "label": "Reconciliation freshness (minutes)",
+          "hint": "15",
+          "type": "number",
+          "defaultValue": "15"
+        }
+      ]
+    },
+    {
+      "id": "req-statement-accuracy-cutoff",
+      "type": "requirement",
+      "label": "Statement Accuracy Cutoff",
+      "x": 640,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "ubiquitous",
+      "status": "draft",
+      "priority": "must",
+      "action": "generate each customer's statement strictly from balances as replayed through a fixed cutoff timestamp, delivered within {{STATEMENT_GENERATION_HOURS}} hours of period close",
+      "rationale": "A statement that mixes balances from different points in time is not wrong by a little — it's internally inconsistent, and inconsistency is what erodes trust in a financial record fastest.",
+      "templateParams": [
+        {
+          "key": "STATEMENT_GENERATION_HOURS",
+          "label": "Statement generation SLA (hours)",
+          "hint": "24",
+          "type": "number",
+          "defaultValue": "24"
+        }
+      ]
+    },
+    {
+      "id": "req-dispute-investigation-sla",
+      "type": "requirement",
+      "label": "Dispute Investigation SLA",
+      "x": 960,
+      "y": 1540,
+      "width": 260,
+      "height": 80,
+      "collapsed": false,
+      "ears_type": "event-driven",
+      "status": "draft",
+      "priority": "must",
+      "trigger": "a customer disputes a transaction on their statement",
+      "action": "open an investigation and provide a resolution or explanation within {{DISPUTE_INVESTIGATION_DAYS}} days",
+      "rationale": "An open-ended dispute process is indistinguishable from an ignored one, both to the customer and to a regulator asking to see the process.",
+      "templateParams": [
+        {
+          "key": "DISPUTE_INVESTIGATION_DAYS",
+          "label": "Dispute investigation SLA (days)",
+          "hint": "10",
+          "type": "number",
+          "defaultValue": "10"
+        }
+      ]
+    },
+    {
+      "id": "ff-settlement-backlog-guard",
+      "type": "fitness-fn",
+      "label": "Settlement Backlog Guard",
+      "description": "Watches how many inbound settlement events are waiting to be matched, and for how long.",
+      "x": 0,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "operational",
+      "automated": true,
+      "trigger": "continuous",
+      "threshold": "Unmatched settlement events never exceed 100 items or 1 hour of age, whichever triggers first",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-manual-adjustment-rate-guard",
+      "type": "fitness-fn",
+      "label": "Manual Adjustment Rate Guard",
+      "description": "Tracks compensating entries as a share of total postings — a rising rate signals an upstream posting defect, not just a one-off correction.",
+      "x": 320,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Compensating entries stay below {{MAX_ADJUSTMENT_RATE_PCT}}% of total posted entries per month",
+      "status": "proposed"
+    },
+    {
+      "id": "ff-regulatory-report-timeliness",
+      "type": "fitness-fn",
+      "label": "Regulatory Report Timeliness",
+      "description": "Confirms scheduled compliance extracts reach the regulator by their filing deadline.",
+      "x": 640,
+      "y": 1740,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "category": "process",
+      "automated": true,
+      "trigger": "periodic",
+      "threshold": "Scheduled compliance extracts are delivered by their filing deadline, 100% of cycles",
+      "status": "proposed"
+    },
+    {
+      "id": "adr-suspense-account-for-unmatched",
+      "type": "adr",
+      "label": "ADR: Suspense account for unmatched settlements",
+      "x": 0,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "Some inbound settlement events won't match any known journal entry — timing differences, partial data, a bank-side correction. Reconciliation has to do something with the amount, not just log a warning.",
+      "decision": "Post unmatched amounts to a suspense account visible on the trial balance, rather than discarding them or blocking the pipeline.",
+      "consequences": "Money is never silently lost from the books, and the suspense balance itself becomes a visible health metric; Finance Ops must actively clear suspense entries, or the account grows unbounded and stops meaning anything.",
+      "alternatives": "1. Drop or log unmatched events — fastest, but money can effectively vanish from the books. 2. Block the whole reconciliation pipeline until matched — safest for correctness, but one bad event halts all reconciliation. 3. Suspense account (chosen). 4. Best-effort fuzzy matching with auto-accept — risks matching the wrong entry, corrupting two accounts instead of flagging one."
+    },
+    {
+      "id": "adr-ledger-as-system-of-record",
+      "type": "adr",
+      "label": "ADR: Ledger is the system of record, not the bank feed",
+      "x": 320,
+      "y": 1912,
+      "width": 260,
+      "height": 52,
+      "collapsed": false,
+      "status": "accepted",
+      "date": "",
+      "context": "The internal journal must remain authoritative for customer-facing balances even though the bank or processor also keeps its own records of the same money movement.",
+      "decision": "The internal journal is the source of truth for what the product shows the customer; the bank feed is an input reconciled against it, not the other way round.",
+      "consequences": "A balance can update the instant a posting is accepted, before the bank settles — which means \"posted\" and \"reconciled\" must be visibly different states, or a customer or support agent will confuse a provisional balance with a settled one.",
+      "alternatives": "1. Bank/processor as source of truth, product waits for their confirmation — correct by construction, but the customer's balance now lags the actual action by the settlement delay. 2. Internal ledger as source of truth (chosen). 3. Dual-write both, resolve conflicts on read — no clear authority, hardest of the three to reason about when they disagree."
+    },
+    {
+      "id": "flow-customer",
+      "type": "group",
+      "label": "Customer journey",
+      "description": "Checking the account, reading the statement and disputing a transaction.",
+      "x": 0,
+      "y": 2084,
+      "width": 1560,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-accounts-overview",
+      "type": "mockup",
+      "label": "Accounts Overview",
+      "description": "Balances (projected from the journal) and recent activity.",
+      "parentId": "flow-customer",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/accounts",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Good morning, Jane</text>\n  <rect x=\"16.0\" y=\"66\" width=\"180.0\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26.0\" y=\"81\" font-size=\"8\" fill=\"#666\">Current account</text>\n  <text x=\"26.0\" y=\"98\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€1,982.13</text>\n  <rect x=\"204.0\" y=\"66\" width=\"180.0\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"214.0\" y=\"81\" font-size=\"8\" fill=\"#666\">Savings</text>\n  <text x=\"214.0\" y=\"98\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">€8,400.00</text>\n  <text x=\"16\" y=\"132\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Recent activity</text>\n  <rect x=\"16\" y=\"140\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"152.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Date</text>\n  <text x=\"82\" y=\"152.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Description</text>\n  <text x=\"272\" y=\"152.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <line x1=\"16\" y1=\"176\" x2=\"384\" y2=\"176\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"170.0\" font-size=\"8\" fill=\"#333\">24 Mar</text>\n  <rect x=\"82\" y=\"164.5\" width=\"120\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"272\" y=\"164.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"16\" y1=\"194\" x2=\"384\" y2=\"194\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"188.0\" font-size=\"8\" fill=\"#333\">18 Mar</text>\n  <rect x=\"82\" y=\"182.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"272\" y=\"182.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"16\" y1=\"212\" x2=\"384\" y2=\"212\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"206.0\" font-size=\"8\" fill=\"#333\">12 Mar</text>\n  <text x=\"82\" y=\"206.0\" font-size=\"8\" fill=\"#333\">Transfer to savings</text>\n  <text x=\"272\" y=\"206.0\" font-size=\"8\" fill=\"#333\">−500.00</text>\n  <line x1=\"16\" y1=\"230\" x2=\"384\" y2=\"230\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"224.0\" font-size=\"8\" fill=\"#333\">07 Mar</text>\n  <text x=\"82\" y=\"224.0\" font-size=\"8\" fill=\"#333\">Salary — Acme Ltd</text>\n  <text x=\"272\" y=\"224.0\" font-size=\"8\" fill=\"#333\">+3,200.00</text>\n  <rect x=\"16\" y=\"254\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"267.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">View statements</text>\n  <rect x=\"254\" y=\"254\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"267.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">New transfer</text>\n</svg>"
+    },
+    {
+      "id": "mockup-statement",
+      "type": "mockup",
+      "label": "Account Statement",
+      "description": "Customer statement generated strictly from balances replayed through a fixed cut-off; each line links to a dispute.",
+      "parentId": "flow-customer",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/accounts/:id/statement",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Statement — March 2026</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Balances as of the cut-off: 31 Mar 2026, 23:59:59 UTC</text>\n  <rect x=\"16\" y=\"80\" width=\"176\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"96\" font-size=\"8\" fill=\"#666\">Opening balance</text>\n  <text x=\"26\" y=\"114\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€2,410.55</text>\n  <rect x=\"208\" y=\"80\" width=\"176\" height=\"42\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"218\" y=\"96\" font-size=\"8\" fill=\"#666\">Closing balance</text>\n  <text x=\"218\" y=\"114\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">€1,982.13</text>\n  <rect x=\"16\" y=\"134\" width=\"368\" height=\"18\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Date</text>\n  <text x=\"82\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Description</text>\n  <text x=\"252\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"322\" y=\"146.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\"></text>\n  <line x1=\"16\" y1=\"170\" x2=\"384\" y2=\"170\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"164.0\" font-size=\"8\" fill=\"#333\">03 Mar</text>\n  <text x=\"82\" y=\"164.0\" font-size=\"8\" fill=\"#333\">Card — Green Grocer</text>\n  <text x=\"252\" y=\"164.0\" font-size=\"8\" fill=\"#333\">−42.10</text>\n  <text x=\"322\" y=\"164.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"188\" x2=\"384\" y2=\"188\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"182.0\" font-size=\"8\" fill=\"#333\">07 Mar</text>\n  <text x=\"82\" y=\"182.0\" font-size=\"8\" fill=\"#333\">Salary — Acme Ltd</text>\n  <text x=\"252\" y=\"182.0\" font-size=\"8\" fill=\"#333\">+3,200.00</text>\n  <text x=\"322\" y=\"182.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"206\" x2=\"384\" y2=\"206\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"200.0\" font-size=\"8\" fill=\"#333\">12 Mar</text>\n  <text x=\"82\" y=\"200.0\" font-size=\"8\" fill=\"#333\">Transfer to savings</text>\n  <text x=\"252\" y=\"200.0\" font-size=\"8\" fill=\"#333\">−500.00</text>\n  <text x=\"322\" y=\"200.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"224\" x2=\"384\" y2=\"224\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"218.0\" font-size=\"8\" fill=\"#333\">18 Mar</text>\n  <rect x=\"82\" y=\"212.5\" width=\"120\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"252\" y=\"212.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"322\" y=\"218.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <line x1=\"16\" y1=\"242\" x2=\"384\" y2=\"242\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"236.0\" font-size=\"8\" fill=\"#333\">24 Mar</text>\n  <rect x=\"82\" y=\"230.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"252\" y=\"230.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"322\" y=\"236.0\" font-size=\"8\" fill=\"#2563eb\">Dispute</text>\n  <rect x=\"16\" y=\"262\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"275.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Download PDF</text>\n</svg>"
+    },
+    {
+      "id": "mockup-transaction-detail",
+      "type": "mockup",
+      "label": "Transaction Detail",
+      "description": "One statement line with its settlement status and the journal entry behind it.",
+      "parentId": "flow-customer",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/transactions/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← March statement</text>\n  <text x=\"16\" y=\"70\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">−€42.10</text>\n  <text x=\"16\" y=\"86\" font-size=\"9\" fill=\"#666\">Card — Green Grocer · 03 Mar 2026, 18:22</text>\n  <rect x=\"16\" y=\"100\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"114.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Detail</text>\n  <text x=\"162\" y=\"114.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\"></text>\n  <line x1=\"16\" y1=\"144\" x2=\"384\" y2=\"144\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"136.0\" font-size=\"8\" fill=\"#333\">Card</text>\n  <text x=\"162\" y=\"136.0\" font-size=\"8\" fill=\"#333\">•••• 4421</text>\n  <line x1=\"16\" y1=\"166\" x2=\"384\" y2=\"166\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"158.0\" font-size=\"8\" fill=\"#333\">Merchant</text>\n  <text x=\"162\" y=\"158.0\" font-size=\"8\" fill=\"#333\">Green Grocer, Berlin</text>\n  <line x1=\"16\" y1=\"188\" x2=\"384\" y2=\"188\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"180.0\" font-size=\"8\" fill=\"#333\">Status</text>\n  <text x=\"162\" y=\"180.0\" font-size=\"8\" fill=\"#333\">Settled 04 Mar</text>\n  <line x1=\"16\" y1=\"210\" x2=\"384\" y2=\"210\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"202.0\" font-size=\"8\" fill=\"#333\">Journal entry</text>\n  <text x=\"162\" y=\"202.0\" font-size=\"8\" fill=\"#333\">JE-2026-03-004218</text>\n  <text x=\"16\" y=\"222\" font-size=\"9\" fill=\"#333\">Don't recognise it or amount is wrong?</text>\n  <rect x=\"16\" y=\"236\" width=\"150\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"91.0\" y=\"249.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Dispute this transaction</text>\n</svg>"
+    },
+    {
+      "id": "mockup-dispute",
+      "type": "mockup",
+      "label": "Dispute a Transaction",
+      "description": "Opens an investigation the moment it is submitted; the customer gets a resolution or explanation within {{DISPUTE_INVESTIGATION_DAYS}} days.",
+      "parentId": "flow-customer",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/disputes/new",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Dispute a transaction</text>\n  <rect x=\"16\" y=\"64\" width=\"368\" height=\"30\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"83\" font-size=\"9\" fill=\"#333\">03 Mar 2026 · Card — Green Grocer · −€42.10</text>\n  <text x=\"16\" y=\"112\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">What went wrong?</text>\n  <circle cx=\"20.5\" cy=\"124.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"128\" font-size=\"8\" fill=\"#333\">I didn't make this payment</text>\n  <circle cx=\"20.5\" cy=\"140.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <circle cx=\"20.5\" cy=\"140.5\" r=\"2.2\" fill=\"#2563eb\"/>\n  <text x=\"31\" y=\"144\" font-size=\"8\" fill=\"#333\">I was charged the wrong amount</text>\n  <circle cx=\"20.5\" cy=\"156.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"31\" y=\"160\" font-size=\"8\" fill=\"#333\">I didn't receive the goods or service</text>\n  <text x=\"16\" y=\"176\" font-size=\"8\" fill=\"#666\">Tell us what happened</text>\n  <rect x=\"16\" y=\"180\" width=\"368\" height=\"46\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"206.0\" font-size=\"8\" fill=\"#999\">Charged €42.10, receipt says €24.10…</text>\n  <text x=\"16\" y=\"244\" font-size=\"8\" fill=\"#666\">We'll open an investigation right away and reply within the investigation window.</text>\n  <rect x=\"16\" y=\"258\" width=\"90\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"271.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"264\" y=\"258\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"271.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Submit dispute</text>\n</svg>"
+    },
+    {
+      "id": "mockup-dispute-status",
+      "type": "mockup",
+      "label": "Dispute Status",
+      "description": "Open dispute with the time left until the {{DISPUTE_INVESTIGATION_DAYS}}-day resolution deadline.",
+      "parentId": "flow-customer",
+      "x": 1310,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/disputes/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Bank</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Help</text>\n  <text x=\"352\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Statements</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Accounts</text>\n  <circle cx=\"34\" cy=\"62\" r=\"12\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <path d=\"M29 62 l3.5 3.5 l6.5 -7\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <text x=\"56\" y=\"60\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">Dispute DSP-8812 is open</text>\n  <text x=\"56\" y=\"76\" font-size=\"9\" fill=\"#666\">Card — Green Grocer · −€42.10</text>\n  <rect x=\"16\" y=\"96\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"47.0\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Submitted ✓</text>\n  <rect x=\"84\" y=\"96\" width=\"71\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"119.5\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Investigating</text>\n  <rect x=\"161\" y=\"96\" width=\"48\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"185.0\" y=\"106\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Resolved</text>\n  <text x=\"16\" y=\"130\" font-size=\"8\" fill=\"#333\">Time to resolution</text>\n  <text x=\"384\" y=\"130\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">day 2 of 10</text>\n  <rect x=\"16\" y=\"134\" width=\"368\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"134\" width=\"73\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n  <text x=\"16\" y=\"170\" font-size=\"8\" fill=\"#666\">We'll write to you with a resolution or explanation before the deadline.</text>\n  <rect x=\"16\" y=\"182\" width=\"368\" height=\"54\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"198\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Latest update</text>\n  <rect x=\"26\" y=\"208\" width=\"300\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"26\" y=\"218\" width=\"180\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"254\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"267.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Add information</text>\n</svg>"
+    },
+    {
+      "id": "flow-finance-ops",
+      "type": "group",
+      "label": "Finance Ops journey",
+      "description": "Clearing reconciliation exceptions without ever editing the journal.",
+      "x": 0,
+      "y": 2494,
+      "width": 1560,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-reconciliation-exceptions",
+      "type": "mockup",
+      "label": "Reconciliation Exceptions",
+      "description": "Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes. Corrections are compensating entries that must balance before they can be submitted — the journal itself is never edited.",
+      "parentId": "flow-finance-ops",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/exceptions",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions (7)</text>\n  <rect x=\"16\" y=\"40\" width=\"62\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"47.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Unmatched 5</text>\n  <rect x=\"84\" y=\"40\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"129.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Amount mismatch 2</text>\n  <rect x=\"180\" y=\"40\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"225.0\" y=\"50\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">Older than 24 h 1</text>\n  <rect x=\"16\" y=\"62\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Settlement ref</text>\n  <text x=\"132\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Amount</text>\n  <text x=\"202\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Age</text>\n  <text x=\"252\" y=\"76.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <rect x=\"16\" y=\"84\" width=\"368\" height=\"22\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"106\" x2=\"384\" y2=\"106\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"98.0\" font-size=\"8\" fill=\"#333\">STL-88213</text>\n  <text x=\"132\" y=\"98.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"202\" y=\"98.0\" font-size=\"8\" fill=\"#333\">42 min</text>\n  <rect x=\"250\" y=\"88.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"276.5\" y=\"98.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched</text>\n  <line x1=\"16\" y1=\"128\" x2=\"384\" y2=\"128\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"120.0\" font-size=\"8\" fill=\"#333\">STL-88207</text>\n  <text x=\"132\" y=\"120.0\" font-size=\"8\" fill=\"#333\">980.40</text>\n  <text x=\"202\" y=\"120.0\" font-size=\"8\" fill=\"#333\">1 h 10</text>\n  <rect x=\"250\" y=\"110.0\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"290.5\" y=\"120.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">amount mismatch</text>\n  <line x1=\"16\" y1=\"150\" x2=\"384\" y2=\"150\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"142.0\" font-size=\"8\" fill=\"#333\">STL-88190</text>\n  <text x=\"132\" y=\"142.0\" font-size=\"8\" fill=\"#333\">75.00</text>\n  <text x=\"202\" y=\"142.0\" font-size=\"8\" fill=\"#333\">26 h</text>\n  <rect x=\"250\" y=\"132.0\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"290.5\" y=\"142.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">older than 24 h</text>\n  <line x1=\"16\" y1=\"172\" x2=\"384\" y2=\"172\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"164.0\" font-size=\"8\" fill=\"#333\">STL-88188</text>\n  <rect x=\"132\" y=\"158.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"202\" y=\"158.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"250\" y=\"154.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"276.5\" y=\"164.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched</text>\n  <line x1=\"16\" y1=\"194\" x2=\"384\" y2=\"194\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"186.0\" font-size=\"8\" fill=\"#333\">STL-88186</text>\n  <rect x=\"132\" y=\"180.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"202\" y=\"180.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"250\" y=\"176.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"276.5\" y=\"186.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched</text>\n  <line x1=\"16\" y1=\"216\" x2=\"384\" y2=\"216\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"208.0\" font-size=\"8\" fill=\"#333\">STL-88181</text>\n  <rect x=\"132\" y=\"202.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"202\" y=\"202.5\" width=\"30\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"250\" y=\"198.0\" width=\"81\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"290.5\" y=\"208.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">amount mismatch</text>\n  <text x=\"16\" y=\"232\" font-size=\"8\" fill=\"#333\">Matched within 15 min (rolling 24 h)</text>\n  <text x=\"384\" y=\"232\" font-size=\"8\" fill=\"#666\" text-anchor=\"end\">99.6%</text>\n  <rect x=\"16\" y=\"236\" width=\"368\" height=\"6\" rx=\"3\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"236\" width=\"366\" height=\"6\" rx=\"3\" fill=\"#2563eb\"/>\n</svg>"
+    },
+    {
+      "id": "mockup-exception-detail",
+      "type": "mockup",
+      "label": "Exception Detail",
+      "description": "Settlement event next to candidate journal entries; a manual match or a compensating entry clears it.",
+      "parentId": "flow-finance-ops",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/exceptions/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions (7)</text>\n  <text x=\"16\" y=\"46\" font-size=\"8\" fill=\"#2563eb\">← Exceptions</text>\n  <text x=\"16\" y=\"66\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">STL-88213 · €1,250.00</text>\n  <rect x=\"196\" y=\"56\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"243.0\" y=\"66\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">unmatched · 42 min</text>\n  <rect x=\"16\" y=\"78\" width=\"176\" height=\"96\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"94\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Bank settlement</text>\n  <text x=\"26\" y=\"112\" font-size=\"8\" fill=\"#333\">Value date 24 Mar</text>\n  <text x=\"26\" y=\"128\" font-size=\"8\" fill=\"#333\">Ref ACME-INV-2231</text>\n  <text x=\"26\" y=\"144\" font-size=\"8\" fill=\"#333\">Counterparty Acme Ltd</text>\n  <rect x=\"208\" y=\"78\" width=\"176\" height=\"96\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"218\" y=\"94\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Candidate journal entries</text>\n  <circle cx=\"222.5\" cy=\"108.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <circle cx=\"222.5\" cy=\"108.5\" r=\"2.2\" fill=\"#2563eb\"/>\n  <text x=\"233\" y=\"112\" font-size=\"8\" fill=\"#333\">JE-…04512 · 1,250.00</text>\n  <circle cx=\"222.5\" cy=\"130.5\" r=\"4.5\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"233\" y=\"134\" font-size=\"8\" fill=\"#333\">JE-…04498 · 1,205.00</text>\n  <text x=\"16\" y=\"196\" font-size=\"8\" fill=\"#666\">No exact match? Post a compensating entry instead of editing the journal.</text>\n  <rect x=\"16\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"81.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Compensating entry…</text>\n  <rect x=\"264\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Confirm match</text>\n</svg>"
+    },
+    {
+      "id": "mockup-compensating-entry",
+      "type": "mockup",
+      "label": "Compensating Entry",
+      "description": "Double-entry form that cannot be submitted unless debits equal credits.",
+      "parentId": "flow-finance-ops",
+      "x": 670,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/entries/new",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions (7)</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Compensating entry for STL-88213</text>\n  <rect x=\"16\" y=\"66\" width=\"368\" height=\"24\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Account</text>\n  <text x=\"192\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Debit</text>\n  <text x=\"282\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Credit</text>\n  <line x1=\"16\" y1=\"114\" x2=\"384\" y2=\"114\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"105.0\" font-size=\"8\" fill=\"#333\">Suspense 1990</text>\n  <text x=\"192\" y=\"105.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"282\" y=\"105.0\" font-size=\"8\" fill=\"#333\"></text>\n  <line x1=\"16\" y1=\"138\" x2=\"384\" y2=\"138\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"129.0\" font-size=\"8\" fill=\"#333\">Customer 4410-22</text>\n  <text x=\"192\" y=\"129.0\" font-size=\"8\" fill=\"#333\"></text>\n  <text x=\"282\" y=\"129.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <line x1=\"16\" y1=\"162\" x2=\"384\" y2=\"162\" stroke=\"#e5e7eb\"/>\n  <rect x=\"22\" y=\"147.5\" width=\"90\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <text x=\"192\" y=\"153.0\" font-size=\"8\" fill=\"#333\"></text>\n  <text x=\"282\" y=\"153.0\" font-size=\"8\" fill=\"#333\"></text>\n  <text x=\"16\" y=\"176\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Totals</text>\n  <text x=\"266\" y=\"176\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">1,250.00</text>\n  <text x=\"384\" y=\"176\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"end\">1,250.00</text>\n  <text x=\"16\" y=\"190\" font-size=\"8\" fill=\"#666\">Reason (required)</text>\n  <rect x=\"16\" y=\"194\" width=\"260\" height=\"36\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"215.0\" font-size=\"8\" fill=\"#999\">Bank ref mismatch — see STL-88213</text>\n  <rect x=\"290\" y=\"206\" width=\"58\" height=\"14\" rx=\"7\" fill=\"#dbeafe\"/>\n  <text x=\"319.0\" y=\"216\" font-size=\"8\" fill=\"#2563eb\" text-anchor=\"middle\">Balanced ✓</text>\n  <rect x=\"16\" y=\"256\" width=\"90\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Cancel</text>\n  <rect x=\"254\" y=\"256\" width=\"130\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"319.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Submit for approval</text>\n</svg>"
+    },
+    {
+      "id": "mockup-entry-approval",
+      "type": "mockup",
+      "label": "Four-Eyes Approval",
+      "description": "A second person approves before the entry is posted; nobody approves their own entries.",
+      "parentId": "flow-finance-ops",
+      "x": 990,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/approvals/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Approvals (1)</text>\n  <text x=\"256\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions (7)</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Approve compensating entry</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">Submitted by M. Weber · 10:14 · you cannot approve your own entries</text>\n  <rect x=\"16\" y=\"80\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Account</text>\n  <text x=\"192\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Debit</text>\n  <text x=\"282\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Credit</text>\n  <line x1=\"16\" y1=\"124\" x2=\"384\" y2=\"124\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"116.0\" font-size=\"8\" fill=\"#333\">Suspense 1990</text>\n  <text x=\"192\" y=\"116.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"282\" y=\"116.0\" font-size=\"8\" fill=\"#333\"></text>\n  <line x1=\"16\" y1=\"146\" x2=\"384\" y2=\"146\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"138.0\" font-size=\"8\" fill=\"#333\">Customer 4410-22</text>\n  <text x=\"192\" y=\"138.0\" font-size=\"8\" fill=\"#333\"></text>\n  <text x=\"282\" y=\"138.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <rect x=\"16\" y=\"154\" width=\"368\" height=\"44\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"170\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Reason</text>\n  <text x=\"26\" y=\"188\" font-size=\"8\" fill=\"#333\">Bank ref mismatch — see STL-88213</text>\n  <text x=\"16\" y=\"218\" font-size=\"8\" fill=\"#666\">Once approved it is posted as a new, immutable journal entry.</text>\n  <rect x=\"16\" y=\"256\" width=\"90\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"61.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Reject</text>\n  <rect x=\"274\" y=\"256\" width=\"110\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"329.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Approve &amp; post</text>\n</svg>"
+    },
+    {
+      "id": "mockup-journal-entry",
+      "type": "mockup",
+      "label": "Journal Entry",
+      "description": "Posted entries are immutable; the only correction is another entry.",
+      "parentId": "flow-finance-ops",
+      "x": 1310,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/ops/journal/:id",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"286\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions</text>\n  <text x=\"16\" y=\"54\" font-size=\"13\" fill=\"#333\" font-weight=\"bold\">JE-2026-03-004731</text>\n  <rect x=\"170\" y=\"44\" width=\"94\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"217.0\" y=\"54\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">posted · immutable</text>\n  <text x=\"16\" y=\"70\" font-size=\"8\" fill=\"#666\">24 Mar 2026 10:21 · compensates STL-88213 · approved by A. Novak</text>\n  <rect x=\"16\" y=\"80\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Account</text>\n  <text x=\"192\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Debit</text>\n  <text x=\"282\" y=\"94.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Credit</text>\n  <line x1=\"16\" y1=\"124\" x2=\"384\" y2=\"124\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"116.0\" font-size=\"8\" fill=\"#333\">Suspense 1990</text>\n  <text x=\"192\" y=\"116.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"282\" y=\"116.0\" font-size=\"8\" fill=\"#333\"></text>\n  <line x1=\"16\" y1=\"146\" x2=\"384\" y2=\"146\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"138.0\" font-size=\"8\" fill=\"#333\">Customer 4410-22</text>\n  <text x=\"192\" y=\"138.0\" font-size=\"8\" fill=\"#333\"></text>\n  <text x=\"282\" y=\"138.0\" font-size=\"8\" fill=\"#333\">1,250.00</text>\n  <text x=\"16\" y=\"158\" font-size=\"10\" fill=\"#333\" font-weight=\"bold\">Audit trail</text>\n  <text x=\"16\" y=\"178\" font-size=\"8\" fill=\"#666\">10:14</text>\n  <text x=\"56\" y=\"178\" font-size=\"8\" fill=\"#333\">Created by M. Weber</text>\n  <text x=\"16\" y=\"194\" font-size=\"8\" fill=\"#666\">10:20</text>\n  <text x=\"56\" y=\"194\" font-size=\"8\" fill=\"#333\">Approved by A. Novak</text>\n  <text x=\"16\" y=\"210\" font-size=\"8\" fill=\"#666\">10:21</text>\n  <text x=\"56\" y=\"210\" font-size=\"8\" fill=\"#333\">Posted; balances re-projected</text>\n  <text x=\"16\" y=\"244\" font-size=\"8\" fill=\"#666\">Entries are never edited — corrections are new entries.</text>\n  <rect x=\"264\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"324.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Reverse entry…</text>\n</svg>"
+    },
+    {
+      "id": "flow-compliance",
+      "type": "group",
+      "label": "Compliance journey",
+      "description": "Auditing postings and signing off regulatory reporting.",
+      "x": 0,
+      "y": 2904,
+      "width": 600,
+      "height": 330,
+      "collapsed": false
+    },
+    {
+      "id": "mockup-audit-trail",
+      "type": "mockup",
+      "label": "Audit Trail",
+      "description": "Who did what to which entry, searchable and exportable.",
+      "parentId": "flow-compliance",
+      "x": 30,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/audit",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Audit</text>\n  <text x=\"296\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"245\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Audit trail</text>\n  <rect x=\"16\" y=\"64\" width=\"180\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"22\" y=\"76.0\" font-size=\"8\" fill=\"#999\">Account, entry or user</text>\n  <rect x=\"204\" y=\"64\" width=\"90\" height=\"18\" rx=\"2\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"210\" y=\"76.0\" font-size=\"8\" fill=\"#999\">Last 30 days</text>\n  <path d=\"M282 71 l4 4 l4 -4\" fill=\"none\" stroke=\"#666\"/>\n  <rect x=\"302\" y=\"64\" width=\"82\" height=\"18\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"343.0\" y=\"76.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Search</text>\n  <rect x=\"16\" y=\"94\" width=\"368\" height=\"22\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">When</text>\n  <text x=\"92\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Who</text>\n  <text x=\"172\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Action</text>\n  <text x=\"322\" y=\"108.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Entry</text>\n  <line x1=\"16\" y1=\"138\" x2=\"384\" y2=\"138\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"130.0\" font-size=\"8\" fill=\"#333\">24 Mar 10:21</text>\n  <text x=\"92\" y=\"130.0\" font-size=\"8\" fill=\"#333\">A. Novak</text>\n  <text x=\"172\" y=\"130.0\" font-size=\"8\" fill=\"#333\">Approved &amp; posted</text>\n  <text x=\"322\" y=\"130.0\" font-size=\"8\" fill=\"#2563eb\">JE-…4731</text>\n  <line x1=\"16\" y1=\"160\" x2=\"384\" y2=\"160\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"152.0\" font-size=\"8\" fill=\"#333\">24 Mar 10:14</text>\n  <text x=\"92\" y=\"152.0\" font-size=\"8\" fill=\"#333\">M. Weber</text>\n  <text x=\"172\" y=\"152.0\" font-size=\"8\" fill=\"#333\">Created compensating</text>\n  <text x=\"322\" y=\"152.0\" font-size=\"8\" fill=\"#2563eb\">JE-…4731</text>\n  <line x1=\"16\" y1=\"182\" x2=\"384\" y2=\"182\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"174.0\" font-size=\"8\" fill=\"#333\">23 Mar 16:02</text>\n  <text x=\"92\" y=\"174.0\" font-size=\"8\" fill=\"#333\">system</text>\n  <text x=\"172\" y=\"174.0\" font-size=\"8\" fill=\"#333\">Nightly reconciliation</text>\n  <text x=\"322\" y=\"174.0\" font-size=\"8\" fill=\"#2563eb\">report</text>\n  <line x1=\"16\" y1=\"204\" x2=\"384\" y2=\"204\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"196.0\" font-size=\"8\" fill=\"#333\">23 Mar 11:40</text>\n  <rect x=\"92\" y=\"190.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"172\" y=\"190.5\" width=\"110\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"322\" y=\"190.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <line x1=\"16\" y1=\"226\" x2=\"384\" y2=\"226\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"218.0\" font-size=\"8\" fill=\"#333\">22 Mar 09:12</text>\n  <rect x=\"92\" y=\"212.5\" width=\"50\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"172\" y=\"212.5\" width=\"100\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"322\" y=\"212.5\" width=\"40\" height=\"5\" rx=\"2\" fill=\"#e5e7eb\"/>\n  <rect x=\"16\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Export CSV</text>\n</svg>"
+    },
+    {
+      "id": "mockup-regulatory-reports",
+      "type": "mockup",
+      "label": "Regulatory Reports",
+      "description": "Scheduled regulatory extracts built from the journal at a fixed cut-off, signed off by Compliance.",
+      "parentId": "flow-compliance",
+      "x": 350,
+      "y": 110,
+      "width": 220,
+      "height": 190,
+      "collapsed": false,
+      "screen": "/reports",
+      "wireframe": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 400 300\" font-family=\"sans-serif\">\n  <rect width=\"400\" height=\"300\" fill=\"#fff\"/>\n  <rect x=\"0\" y=\"0\" width=\"400\" height=\"30\" fill=\"#f3f4f6\" stroke=\"#333\"/>\n  <rect x=\"10\" y=\"8\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#ccc\"/>\n  <text x=\"30\" y=\"20\" font-size=\"11\" fill=\"#333\" font-weight=\"bold\">Finance Ops</text>\n  <text x=\"388\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Reports</text>\n  <text x=\"337\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Audit</text>\n  <text x=\"296\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Journal</text>\n  <text x=\"245\" y=\"19\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">Exceptions</text>\n  <text x=\"16\" y=\"54\" font-size=\"12\" fill=\"#333\" font-weight=\"bold\">Regulatory reports</text>\n  <rect x=\"16\" y=\"66\" width=\"368\" height=\"24\" fill=\"#f3f4f6\"/>\n  <text x=\"22\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Report</text>\n  <text x=\"172\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Period</text>\n  <text x=\"242\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Due</text>\n  <text x=\"302\" y=\"81.0\" font-size=\"8\" fill=\"#333\" font-weight=\"bold\">Status</text>\n  <rect x=\"16\" y=\"90\" width=\"368\" height=\"24\" fill=\"#eef2ff\"/>\n  <line x1=\"16\" y1=\"114\" x2=\"384\" y2=\"114\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"105.0\" font-size=\"8\" fill=\"#333\">Liquidity return</text>\n  <text x=\"172\" y=\"105.0\" font-size=\"8\" fill=\"#333\">Mar 2026</text>\n  <text x=\"242\" y=\"105.0\" font-size=\"8\" fill=\"#333\">10 Apr</text>\n  <rect x=\"300\" y=\"95.0\" width=\"90\" height=\"14\" rx=\"7\" fill=\"#333\"/>\n  <text x=\"345.0\" y=\"105.0\" font-size=\"8\" fill=\"#fff\" text-anchor=\"middle\">awaiting sign-off</text>\n  <line x1=\"16\" y1=\"138\" x2=\"384\" y2=\"138\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"129.0\" font-size=\"8\" fill=\"#333\">Safeguarding recon</text>\n  <text x=\"172\" y=\"129.0\" font-size=\"8\" fill=\"#333\">Mar 2026</text>\n  <text x=\"242\" y=\"129.0\" font-size=\"8\" fill=\"#333\">05 Apr</text>\n  <rect x=\"300\" y=\"119.0\" width=\"53\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"326.5\" y=\"129.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">submitted</text>\n  <line x1=\"16\" y1=\"162\" x2=\"384\" y2=\"162\" stroke=\"#e5e7eb\"/>\n  <text x=\"22\" y=\"153.0\" font-size=\"8\" fill=\"#333\">Large exposures</text>\n  <text x=\"172\" y=\"153.0\" font-size=\"8\" fill=\"#333\">Q1 2026</text>\n  <text x=\"242\" y=\"153.0\" font-size=\"8\" fill=\"#333\">30 Apr</text>\n  <rect x=\"300\" y=\"143.0\" width=\"35\" height=\"14\" rx=\"7\" fill=\"#eee\"/>\n  <text x=\"317.5\" y=\"153.0\" font-size=\"8\" fill=\"#333\" text-anchor=\"middle\">draft</text>\n  <rect x=\"16\" y=\"170\" width=\"368\" height=\"60\" rx=\"3\" fill=\"#fafafa\" stroke=\"#ccc\"/>\n  <text x=\"26\" y=\"186\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\">Liquidity return — Mar 2026</text>\n  <text x=\"26\" y=\"204\" font-size=\"8\" fill=\"#666\">Built from the journal as of cut-off 31 Mar 23:59:59 UTC</text>\n  <text x=\"26\" y=\"220\" font-size=\"8\" fill=\"#333\">Reconciliation exceptions open: 0</text>\n  <rect x=\"16\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#fff\" stroke=\"#999\"/>\n  <text x=\"76.0\" y=\"269.0\" font-size=\"9\" fill=\"#333\" font-weight=\"bold\" text-anchor=\"middle\">Preview extract</text>\n  <rect x=\"264\" y=\"256\" width=\"120\" height=\"20\" rx=\"3\" fill=\"#2563eb\" stroke=\"#2563eb\"/>\n  <text x=\"324.0\" y=\"269.0\" font-size=\"9\" fill=\"#fff\" font-weight=\"bold\" text-anchor=\"middle\">Sign off &amp; submit</text>\n</svg>"
+    }
+  ],
+  "relations": [
+    {
+      "id": "customer--statement-service",
+      "sourceId": "customer",
+      "targetId": "statement-service",
+      "label": "Views statement",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "bank-rail--settlement-events",
+      "sourceId": "bank-rail",
+      "targetId": "settlement-events",
+      "label": "Delivers settlement webhook",
+      "technology": "webhook"
+    },
+    {
+      "id": "settlement-events--posting-api",
+      "sourceId": "settlement-events",
+      "targetId": "posting-api",
+      "label": "Triggers posting of the matched transaction",
+      "technology": "async event"
+    },
+    {
+      "id": "posting-api--journal-store",
+      "sourceId": "posting-api",
+      "targetId": "journal-store",
+      "label": "Appends balanced entry",
+      "technology": "SQL insert-only"
+    },
+    {
+      "id": "balance-projector--journal-store",
+      "sourceId": "balance-projector",
+      "targetId": "journal-store",
+      "label": "Replays / subscribes to the journal",
+      "technology": "SQL"
+    },
+    {
+      "id": "balance-projector--balance-store",
+      "sourceId": "balance-projector",
+      "targetId": "balance-store",
+      "label": "Updates balance projection",
+      "technology": "SQL"
+    },
+    {
+      "id": "statement-service--balance-store",
+      "sourceId": "statement-service",
+      "targetId": "balance-store",
+      "label": "Reads balances as of cutoff",
+      "technology": "SQL"
+    },
+    {
+      "id": "reconciliation-worker--journal-store",
+      "sourceId": "reconciliation-worker",
+      "targetId": "journal-store",
+      "label": "Reads posted entries",
+      "technology": "SQL"
+    },
+    {
+      "id": "reconciliation-worker--bank-rail",
+      "sourceId": "reconciliation-worker",
+      "targetId": "bank-rail",
+      "label": "Fetches settlement statement (nightly batch)",
+      "technology": "SFTP / API"
+    },
+    {
+      "id": "reconciliation-worker--finance-ops-console",
+      "sourceId": "reconciliation-worker",
+      "targetId": "finance-ops-console",
+      "label": "Surfaces unmatched / exception items",
+      "technology": "async event"
+    },
+    {
+      "id": "reconciliation-worker--regulator",
+      "sourceId": "reconciliation-worker",
+      "targetId": "regulator",
+      "label": "Delivers scheduled compliance extract",
+      "technology": "SFTP"
+    },
+    {
+      "id": "finance-ops--finance-ops-console",
+      "sourceId": "finance-ops",
+      "targetId": "finance-ops-console",
+      "label": "Reviews exceptions, authorises compensating entries",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "finance-ops-console--posting-api",
+      "sourceId": "finance-ops-console",
+      "targetId": "posting-api",
+      "label": "Submits a compensating entry",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "compliance-officer--finance-ops-console",
+      "sourceId": "compliance-officer",
+      "targetId": "finance-ops-console",
+      "label": "Audits reconciliation exceptions and postings",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "req-balanced-entry-enforcement--posting-api",
+      "sourceId": "req-balanced-entry-enforcement",
+      "targetId": "posting-api",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-reconciliation-freshness--reconciliation-worker",
+      "sourceId": "req-reconciliation-freshness",
+      "targetId": "reconciliation-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-statement-accuracy-cutoff--statement-service",
+      "sourceId": "req-statement-accuracy-cutoff",
+      "targetId": "statement-service",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-dispute-investigation-sla--finance-ops-console",
+      "sourceId": "req-dispute-investigation-sla",
+      "targetId": "finance-ops-console",
+      "relationType": "constrains"
+    },
+    {
+      "id": "req-reconciliation-freshness--ff-settlement-backlog-guard",
+      "sourceId": "req-reconciliation-freshness",
+      "targetId": "ff-settlement-backlog-guard",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "req-balanced-entry-enforcement--adr-suspense-account-for-unmatched",
+      "sourceId": "req-balanced-entry-enforcement",
+      "targetId": "adr-suspense-account-for-unmatched",
+      "relationType": "traces-to"
+    },
+    {
+      "id": "ff-manual-adjustment-rate-guard--posting-api",
+      "sourceId": "ff-manual-adjustment-rate-guard",
+      "targetId": "posting-api",
+      "relationType": "constrains"
+    },
+    {
+      "id": "ff-regulatory-report-timeliness--reconciliation-worker",
+      "sourceId": "ff-regulatory-report-timeliness",
+      "targetId": "reconciliation-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-suspense-account-for-unmatched--reconciliation-worker",
+      "sourceId": "adr-suspense-account-for-unmatched",
+      "targetId": "reconciliation-worker",
+      "relationType": "constrains"
+    },
+    {
+      "id": "adr-ledger-as-system-of-record--balance-projector",
+      "sourceId": "adr-ledger-as-system-of-record",
+      "targetId": "balance-projector",
+      "relationType": "constrains"
+    },
+    {
+      "id": "mockup-accounts-overview--statement-service",
+      "sourceId": "mockup-accounts-overview",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-accounts-overview--mockup-statement",
+      "sourceId": "mockup-accounts-overview",
+      "targetId": "mockup-statement",
+      "relationType": "navigates-to",
+      "label": "View statements"
+    },
+    {
+      "id": "mockup-statement--req-statement-accuracy-cutoff",
+      "sourceId": "mockup-statement",
+      "targetId": "req-statement-accuracy-cutoff",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-statement--statement-service",
+      "sourceId": "mockup-statement",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-statement--mockup-transaction-detail",
+      "sourceId": "mockup-statement",
+      "targetId": "mockup-transaction-detail",
+      "relationType": "navigates-to",
+      "label": "Open transaction"
+    },
+    {
+      "id": "mockup-transaction-detail--statement-service",
+      "sourceId": "mockup-transaction-detail",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-transaction-detail--mockup-dispute",
+      "sourceId": "mockup-transaction-detail",
+      "targetId": "mockup-dispute",
+      "relationType": "navigates-to",
+      "label": "Dispute"
+    },
+    {
+      "id": "mockup-dispute--req-dispute-investigation-sla",
+      "sourceId": "mockup-dispute",
+      "targetId": "req-dispute-investigation-sla",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-dispute--statement-service",
+      "sourceId": "mockup-dispute",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-dispute--mockup-dispute-status",
+      "sourceId": "mockup-dispute",
+      "targetId": "mockup-dispute-status",
+      "relationType": "navigates-to",
+      "label": "Submit dispute"
+    },
+    {
+      "id": "mockup-dispute-status--req-dispute-investigation-sla",
+      "sourceId": "mockup-dispute-status",
+      "targetId": "req-dispute-investigation-sla",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-dispute-status--statement-service",
+      "sourceId": "mockup-dispute-status",
+      "targetId": "statement-service",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--req-reconciliation-freshness",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "req-reconciliation-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--req-balanced-entry-enforcement",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "req-balanced-entry-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--finance-ops-console",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-reconciliation-exceptions--mockup-exception-detail",
+      "sourceId": "mockup-reconciliation-exceptions",
+      "targetId": "mockup-exception-detail",
+      "relationType": "navigates-to",
+      "label": "Open exception"
+    },
+    {
+      "id": "mockup-exception-detail--req-reconciliation-freshness",
+      "sourceId": "mockup-exception-detail",
+      "targetId": "req-reconciliation-freshness",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-exception-detail--finance-ops-console",
+      "sourceId": "mockup-exception-detail",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-exception-detail--mockup-compensating-entry",
+      "sourceId": "mockup-exception-detail",
+      "targetId": "mockup-compensating-entry",
+      "relationType": "navigates-to",
+      "label": "Compensating entry"
+    },
+    {
+      "id": "mockup-exception-detail--mockup-reconciliation-exceptions",
+      "sourceId": "mockup-exception-detail",
+      "targetId": "mockup-reconciliation-exceptions",
+      "relationType": "navigates-to",
+      "label": "Confirm match"
+    },
+    {
+      "id": "mockup-compensating-entry--req-balanced-entry-enforcement",
+      "sourceId": "mockup-compensating-entry",
+      "targetId": "req-balanced-entry-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-compensating-entry--finance-ops-console",
+      "sourceId": "mockup-compensating-entry",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-compensating-entry--mockup-entry-approval",
+      "sourceId": "mockup-compensating-entry",
+      "targetId": "mockup-entry-approval",
+      "relationType": "navigates-to",
+      "label": "Submit for approval"
+    },
+    {
+      "id": "mockup-entry-approval--req-balanced-entry-enforcement",
+      "sourceId": "mockup-entry-approval",
+      "targetId": "req-balanced-entry-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-entry-approval--finance-ops-console",
+      "sourceId": "mockup-entry-approval",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-entry-approval--mockup-journal-entry",
+      "sourceId": "mockup-entry-approval",
+      "targetId": "mockup-journal-entry",
+      "relationType": "navigates-to",
+      "label": "Approve & post"
+    },
+    {
+      "id": "mockup-journal-entry--req-balanced-entry-enforcement",
+      "sourceId": "mockup-journal-entry",
+      "targetId": "req-balanced-entry-enforcement",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-journal-entry--finance-ops-console",
+      "sourceId": "mockup-journal-entry",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-journal-entry--mockup-reconciliation-exceptions",
+      "sourceId": "mockup-journal-entry",
+      "targetId": "mockup-reconciliation-exceptions",
+      "relationType": "navigates-to",
+      "label": "Exception cleared"
+    },
+    {
+      "id": "mockup-audit-trail--finance-ops-console",
+      "sourceId": "mockup-audit-trail",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    },
+    {
+      "id": "mockup-audit-trail--mockup-regulatory-reports",
+      "sourceId": "mockup-audit-trail",
+      "targetId": "mockup-regulatory-reports",
+      "relationType": "navigates-to",
+      "label": "Reports"
+    },
+    {
+      "id": "mockup-regulatory-reports--req-statement-accuracy-cutoff",
+      "sourceId": "mockup-regulatory-reports",
+      "targetId": "req-statement-accuracy-cutoff",
+      "relationType": "illustrates"
+    },
+    {
+      "id": "mockup-regulatory-reports--finance-ops-console",
+      "sourceId": "mockup-regulatory-reports",
+      "targetId": "finance-ops-console",
+      "relationType": "presented-by"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "bp-fintech-ledger-platform-seq",
+      "name": "Settlement arrives, posts, and reconciles",
+      "relationIds": [
+        "bank-rail--settlement-events",
+        "settlement-events--posting-api",
+        "posting-api--journal-store",
+        "balance-projector--journal-store",
+        "balance-projector--balance-store",
+        "reconciliation-worker--journal-store",
+        "reconciliation-worker--bank-rail"
+      ],
+      "stepDescriptions": [
+        "Bank / payment rail delivers a settlement webhook.",
+        "Settlement event triggers posting of the now-confirmed transaction.",
+        "Posting API checks the entry balances and appends it to the journal.",
+        "Balance projector picks up the new entry from its subscription to the journal.",
+        "Balance projector updates the affected accounts' balance — the customer sees the new balance immediately.",
+        "Reconciliation worker independently reads posted entries from the journal.",
+        "Reconciliation worker also fetches the bank's own end-of-day statement in a nightly batch and matches it against what was posted, catching anything the event stream alone would have missed."
+      ]
+    },
+    {
+      "id": "seq-flow-customer",
+      "name": "Customer journey",
+      "relationIds": [
+        "mockup-accounts-overview--mockup-statement",
+        "mockup-statement--mockup-transaction-detail",
+        "mockup-transaction-detail--mockup-dispute",
+        "mockup-dispute--mockup-dispute-status"
+      ],
+      "stepDescriptions": [
+        "View statements → Account Statement. Customer statement generated strictly from balances replayed through a fixed cut-off; each line links to a dispute.",
+        "Open transaction → Transaction Detail. One statement line with its settlement status and the journal entry behind it.",
+        "Dispute → Dispute a Transaction. Opens an investigation the moment it is submitted; the customer gets a resolution or explanation within {{DISPUTE_INVESTIGATION_DAYS}} days.",
+        "Submit dispute → Dispute Status. Open dispute with the time left until the {{DISPUTE_INVESTIGATION_DAYS}}-day resolution deadline."
+      ]
+    },
+    {
+      "id": "seq-flow-finance-ops",
+      "name": "Finance Ops journey",
+      "relationIds": [
+        "mockup-reconciliation-exceptions--mockup-exception-detail",
+        "mockup-exception-detail--mockup-compensating-entry",
+        "mockup-compensating-entry--mockup-entry-approval",
+        "mockup-entry-approval--mockup-journal-entry",
+        "mockup-journal-entry--mockup-reconciliation-exceptions",
+        "mockup-exception-detail--mockup-reconciliation-exceptions"
+      ],
+      "stepDescriptions": [
+        "Open exception → Exception Detail. Settlement event next to candidate journal entries; a manual match or a compensating entry clears it.",
+        "Compensating entry → Compensating Entry. Double-entry form that cannot be submitted unless debits equal credits.",
+        "Submit for approval → Four-Eyes Approval. A second person approves before the entry is posted; nobody approves their own entries.",
+        "Approve & post → Journal Entry. Posted entries are immutable; the only correction is another entry.",
+        "Exception cleared → Reconciliation Exceptions. Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes.",
+        "Confirm match → Reconciliation Exceptions. Finance Ops queue of settlement events not matched within {{RECONCILIATION_LAG_MIN}} minutes."
+      ]
+    },
+    {
+      "id": "seq-flow-compliance",
+      "name": "Compliance journey",
+      "relationIds": [
+        "mockup-audit-trail--mockup-regulatory-reports"
+      ],
+      "stepDescriptions": [
+        "Reports → Regulatory Reports. Scheduled regulatory extracts built from the journal at a fixed cut-off, signed off by Compliance."
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "view-context",
+      "name": "System context",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "finance-ops",
+        "compliance-officer",
+        "platform",
+        "bank-rail",
+        "regulator"
+      ],
+      "collapsedNodeIds": [
+        "platform"
+      ],
+      "positions": {
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 280,
+          "height": 180
+        },
+        "bank-rail": {
+          "x": 400,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        },
+        "regulator": {
+          "x": 820,
+          "y": 290,
+          "width": 360,
+          "height": 260
+        }
+      }
+    },
+    {
+      "id": "view-containers",
+      "name": "Containers",
+      "kind": "static",
+      "nodeIds": [
+        "customer",
+        "finance-ops",
+        "compliance-officer",
+        "platform",
+        "posting-api",
+        "balance-projector",
+        "reconciliation-worker",
+        "statement-service",
+        "finance-ops-console",
+        "settlement-events",
+        "journal-store",
+        "balance-store",
+        "bank-rail",
+        "regulator"
+      ],
+      "positions": {
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "balance-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "bank-rail": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "journal-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "regulator": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "settlement-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "bp-fintech-ledger-platform-flow",
+      "name": "Settlement arrives, posts, and reconciles",
+      "kind": "dynamic",
+      "sequenceId": "bp-fintech-ledger-platform-seq",
+      "nodeIds": [
+        "customer",
+        "finance-ops",
+        "compliance-officer",
+        "platform",
+        "posting-api",
+        "balance-projector",
+        "reconciliation-worker",
+        "statement-service",
+        "finance-ops-console",
+        "settlement-events",
+        "journal-store",
+        "balance-store",
+        "bank-rail",
+        "regulator"
+      ],
+      "positions": {
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "balance-store": {
+          "x": 370,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "bank-rail": {
+          "x": 0,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "compliance-officer": {
+          "x": 420,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "customer": {
+          "x": 0,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops": {
+          "x": 210,
+          "y": 0,
+          "width": 150,
+          "height": 170
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "journal-store": {
+          "x": 30,
+          "y": 590,
+          "width": 190,
+          "height": 130
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "regulator": {
+          "x": 420,
+          "y": 1160,
+          "width": 360,
+          "height": 260
+        },
+        "settlement-events": {
+          "x": 710,
+          "y": 350,
+          "width": 220,
+          "height": 95
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-governance",
+      "name": "Governance map",
+      "kind": "static",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla",
+        "ff-settlement-backlog-guard",
+        "ff-manual-adjustment-rate-guard",
+        "ff-regulatory-report-timeliness",
+        "adr-suspense-account-for-unmatched",
+        "adr-ledger-as-system-of-record",
+        "posting-api",
+        "reconciliation-worker",
+        "statement-service",
+        "finance-ops-console",
+        "balance-projector"
+      ],
+      "positions": {
+        "adr-ledger-as-system-of-record": {
+          "x": 320,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "adr-suspense-account-for-unmatched": {
+          "x": 0,
+          "y": 1912,
+          "width": 260,
+          "height": 52
+        },
+        "balance-projector": {
+          "x": 370,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "ff-manual-adjustment-rate-guard": {
+          "x": 320,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-regulatory-report-timeliness": {
+          "x": 640,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "ff-settlement-backlog-guard": {
+          "x": 0,
+          "y": 1740,
+          "width": 260,
+          "height": 52
+        },
+        "finance-ops-console": {
+          "x": 370,
+          "y": 350,
+          "width": 210,
+          "height": 140
+        },
+        "platform": {
+          "x": 0,
+          "y": 290,
+          "width": 1040,
+          "height": 750
+        },
+        "posting-api": {
+          "x": 30,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "reconciliation-worker": {
+          "x": 710,
+          "y": 110,
+          "width": 300,
+          "height": 200
+        },
+        "req-balanced-entry-enforcement": {
+          "x": 0,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-dispute-investigation-sla": {
+          "x": 960,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-reconciliation-freshness": {
+          "x": 320,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "req-statement-accuracy-cutoff": {
+          "x": 640,
+          "y": 1540,
+          "width": 260,
+          "height": 80
+        },
+        "statement-service": {
+          "x": 30,
+          "y": 350,
+          "width": 300,
+          "height": 200
+        }
+      }
+    },
+    {
+      "id": "view-mockups",
+      "name": "Mockups",
+      "kind": "static",
+      "nodeIds": [
+        "flow-customer",
+        "flow-finance-ops",
+        "flow-compliance",
+        "mockup-accounts-overview",
+        "mockup-statement",
+        "mockup-transaction-detail",
+        "mockup-dispute",
+        "mockup-dispute-status",
+        "mockup-reconciliation-exceptions",
+        "mockup-exception-detail",
+        "mockup-compensating-entry",
+        "mockup-entry-approval",
+        "mockup-journal-entry",
+        "mockup-audit-trail",
+        "mockup-regulatory-reports"
+      ],
+      "positions": {
+        "flow-compliance": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "flow-finance-ops": {
+          "x": 0,
+          "y": 2494,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-accounts-overview": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-audit-trail": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-compensating-entry": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute-status": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-entry-approval": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-exception-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-journal-entry": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconciliation-exceptions": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-regulatory-reports": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-statement": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-transaction-detail": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-customer",
+      "name": "Customer journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-customer",
+      "nodeIds": [
+        "flow-customer",
+        "mockup-accounts-overview",
+        "mockup-statement",
+        "mockup-transaction-detail",
+        "mockup-dispute",
+        "mockup-dispute-status"
+      ],
+      "positions": {
+        "flow-customer": {
+          "x": 0,
+          "y": 2084,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-accounts-overview": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-dispute-status": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-statement": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-transaction-detail": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-finance-ops",
+      "name": "Finance Ops journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-finance-ops",
+      "nodeIds": [
+        "flow-finance-ops",
+        "mockup-reconciliation-exceptions",
+        "mockup-exception-detail",
+        "mockup-compensating-entry",
+        "mockup-entry-approval",
+        "mockup-journal-entry"
+      ],
+      "positions": {
+        "flow-finance-ops": {
+          "x": 0,
+          "y": 2494,
+          "width": 1560,
+          "height": 330
+        },
+        "mockup-compensating-entry": {
+          "x": 670,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-entry-approval": {
+          "x": 990,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-exception-detail": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-journal-entry": {
+          "x": 1310,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-reconciliation-exceptions": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-flow-compliance",
+      "name": "Compliance journey",
+      "kind": "dynamic",
+      "sequenceId": "seq-flow-compliance",
+      "nodeIds": [
+        "flow-compliance",
+        "mockup-audit-trail",
+        "mockup-regulatory-reports"
+      ],
+      "positions": {
+        "flow-compliance": {
+          "x": 0,
+          "y": 2904,
+          "width": 600,
+          "height": 330
+        },
+        "mockup-audit-trail": {
+          "x": 30,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        },
+        "mockup-regulatory-reports": {
+          "x": 350,
+          "y": 110,
+          "width": 220,
+          "height": 190
+        }
+      }
+    },
+    {
+      "id": "view-wiki-governance",
+      "name": "Governance",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla",
+        "ff-settlement-backlog-guard",
+        "ff-manual-adjustment-rate-guard",
+        "ff-regulatory-report-timeliness",
+        "adr-suspense-account-for-unmatched",
+        "adr-ledger-as-system-of-record"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    },
+    {
+      "id": "view-wiki-requirements",
+      "name": "Requirements",
+      "kind": "wiki",
+      "nodeIds": [
+        "req-balanced-entry-enforcement",
+        "req-reconciliation-freshness",
+        "req-statement-accuracy-cutoff",
+        "req-dispute-investigation-sla"
+      ],
+      "positions": {},
+      "wikiFocusId": null
+    }
+  ]
+}

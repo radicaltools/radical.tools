@@ -4,6 +4,6 @@ type: "scenario"
 label: "Open concept from catalogue"
 given: "the Hub catalogue is open"
 tests: "apps/e2e/tests/hub/hub.spec.ts › open a concept from the catalogue"
-then: "its diagram is drawn and the page link becomes #/c/bp-fintech-ledger-platform"
-when: "the user clicks Fintech Ledger & Payments Platform"
+then: "its wiki page is shown and the page link becomes #/c/concern-authentication"
+when: "the user clicks Authentication"
 ---

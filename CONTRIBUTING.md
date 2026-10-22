@@ -8,7 +8,7 @@ Thank you for your interest in contributing! This document explains how to get i
 - **Request features** — open a [feature request](https://github.com/radicaltools/radical.tools/issues/new?template=feature_request.md)
 - **Submit code** — fork the repo and open a pull request
 - **Improve documentation** — fix typos, clarify explanations, add examples
-- **Share architecture patterns** — contribute to the [Architecture Hub](https://hub.radical.tools) by adding a `.radical` concept under `packages/hub-catalogue/catalogue/`
+- **Share a concern pack** — add one to the [Hub](https://hub.radical.tools) as a spec under `packages/hub-catalogue/packs/<group>/` (see `packs/identity/concern-authentication.ts`) and build it with `npm run build:packs -w @radical/hub-catalogue`, which tells you what it still lacks of the standard
 
 ## Development setup
 
