@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- An invariant fuzz test of the diagram store (`packages/ui/tests/invariants.test.ts`, ADR *Rules checked as invariants*): fast-check runs random sequences of what a user and an agent do — add, delete, rename, move, drag, collapse, rows and columns, Smart Layout, views, milestones, sequence steps, an agent's write merged as Studio merges it, undo, redo, reload — on the bookstore, the sample and a nested model, and checks after every step that undo and redo restore exactly, a save reads back the same, a reload changes nothing, nothing overlaps or leaves its parent, nothing points at nothing and a milestone leaves the live model alone; CI runs fixed seeds, `npm run fuzz -w @radical/ui` 2000 runs per model
 - Architecture Hub — browse and import 120+ curated architecture concepts
 - AI assistant integration (OpenAI, Anthropic, Gemini, Ollama)
 - Smart Layout pipeline with SA-based auto-layout
@@ -49,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run release -- <version | major | minor | patch>` sets the version in the four packages and the lockfile and moves the Unreleased entries of this changelog under it; `npm run release:tag` tags the merged release `v<version>`. The tag's workflows check the four versions, and the GitHub Release takes its notes from the changelog
 
 ### Changed
+- An element you add stays where you drop it, and what it covers (or what the container it grew covers) is pushed just clear, pinned elements too; nothing else moves. The live physics comes to rest by itself at the latest 8 seconds after it starts (4 with a row or column of containers)
 - Wiki pages read as encyclopedia articles instead of forms: a serif title with the element's type and place under it, the short facts in a box beside the lead, a *Contents* box, long fields as sections, and relations as sentences read from the page's element ("Uses Event Bus (publishes payment.completed, Kafka) and Transactions DB. Used by API Gateway."); a sentence that would name more than six elements says how many there are and shows them on request
 - Wiki: the elements under a page are grouped by type under a heading with their count ("Requirements (46)") at every level, in both page modes; a few are a paragraph each (name and the start of the description), more are a run of links. A group is shown by its name and description, never as "Group"
 - Wiki: *Multi page* writes the children as chapters of one article — a heading, the type and short facts in one line, the text, long fields as paragraphs that open with their name — instead of embedding each child's whole page with its own buttons
@@ -68,6 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- Rows and columns through containers hold as drawn after a drop, a fold, a delete or a hide, so a reload no longer snaps them and refits every container; folding a container drawn without its children moves nothing; an expand leaves nothing behind in the physics
+- A move or an add gives the element its place on every laid-out view at once, so opening one later moves nothing; in a milestone, an element with another parent there gets a place of its own
+- Merges with an agent's write take out the rows, folds, view entries and sequence steps of what the other side deleted, and do not stack Studio's and the agent's placements; Undo and Redo after an agent's write, also in a milestone, take back only the user's steps
+- Milestones: an element added in one stays out of the live view; Propagate no longer throws after an agent's write and takes the steps of deleted relations out; Undo in a milestone no longer strips a view of its element
+- Smart Layout logs no ELK error for a relation between an element and its own container
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)
 - Wiki: after writing an element, one click on an "Add: …" link below the line opens its line (the first click was lost)
