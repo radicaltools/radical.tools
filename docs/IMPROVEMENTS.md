@@ -613,6 +613,24 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     arguments; `record` warns about each copied script or helper that names
     the repository's or the round's absolute paths, with its line, and
     copies the screenshot a finding names beside its script (F-0007).
+46. **`radical harden --gate` cannot judge an e2e test.** In the fix round of
+    round 170–175 (2026-10-22) every group with an e2e test found the same:
+    the gate sets the source files back but Playwright serves the web build
+    made before, so the test "without the fix" runs the fixed bundle and
+    passes. Five groups wrote their own runner that rebuilds `build:web`
+    when the sources differ and keeps one preview server for the parallel
+    stage. That stage fails on its own too: five Playwright processes start
+    the webServer on the same fixed ports ("Port 4311 is already in use"),
+    and the first to end stops the server the others use; one process with
+    `--repeat-each 5 --workers 5` works. A runner in `crucible.json` could
+    name a build step run before each stage, and the parallel stage could
+    use the runner's own repeat option. One such wrapper also hung the gate
+    by keeping its pipe open from background subshells.
+47. **`radical harden --test "<file> › <describe> › <name>"` finds no Vitest
+    test.** The gate passes the whole title to Vitest's `-t`, which matches
+    the test's own name, not the describe path that `radical check` and the
+    scenarios use; only the bare name works, so the id the gate prints is
+    not the one a scenario names.
 
 ### Reverse-engineered requirements (2026-10-06)
 

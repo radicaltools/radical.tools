@@ -7,6 +7,9 @@ tests: |
   packages/ui/tests/milestones.test.ts › commitMilestoneChanges mode=propagate propagates sequence additions to later milestones
   packages/ui/tests/milestonePropagate.test.ts › Propagate a change of a sequence › carries forward only the steps and notes the milestone changed
   packages/ui/tests/milestonePropagate.test.ts › Propagate a move into a parent the later models lack › leaves the element where it is in a model without that parent
+  packages/ui/tests/milestonePresenting.test.ts › on a slide that shows the live model carries the milestone's edits, not the slide's model
+  packages/ui/tests/milestonePresenting.test.ts › does not start the presentation
+  apps/e2e/tests/studio/milestones.spec.ts › F5 does not start behind the milestone question, and Propagate after a slide played carries the milestone's edit
 then: "v1, v2 and the live model all contain the added sequence; a note changed in v1 reaches the later models and the live one, each keeping the steps it added; an element moved into a parent a later model lacks stays where it is in that model"
 when: "the user chooses Propagate"
 ---
