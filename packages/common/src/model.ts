@@ -890,6 +890,12 @@ export function viewsOfGroup(views: Record<string, DiagramView>, groupId: string
   return Object.values(views).filter((v) => v.partOf === groupId)
 }
 
+/** The view a group of views per element opens on: its first by name, as
+ *  the list shows them. A group is never a canvas of its own. */
+export function firstViewOfGroup(views: Record<string, DiagramView>, groupId: string): DiagramView | undefined {
+  return viewsOfGroup(views, groupId).sort((a, b) => a.name.localeCompare(b.name))[0]
+}
+
 /** The views that show element `nodeId`, in model order: what viewShownNodes
  *  says each shows, as the view list counts them, a view of the whole model
  *  among them. A group of views per element lists none itself: its views

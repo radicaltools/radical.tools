@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Desktop app's version goes down from the never-released 1.0.0 to 0.2.0, the version of the other packages. One release tag `v<version>` publishes everything: the Desktop installers, the VS Code extension (instead of on `vscode-v*`) and the CLI and the MCP server on npm (instead of by hand), an npm pre-release on the dist-tag `next`
 
 ### Fixed
+- Quick Search opens a group of views per element on its first view, as a click in the list does; it drew the group as a canvas of its own and saved positions into it. A link or Back to a group does the same, and the view a pick or *Show on canvas* chooses is never a group
 - Toolbar: in a window narrower than about 1160 px its buttons no longer lie on top of each other (a click on Designer opened History); Quick Search and the navigation move off the middle and narrow, then the perspectives show only their icons
 - Wiki: a requirement that points at a state reads "While the Order is Confirmed, …" as on the canvas card, not by its precondition text, and rewriting it in the wiki no longer leaves the card saying something else
 - Deleting every element a view lists leaves the view empty; it used to turn into a view of the whole model (51 elements on a wiki that listed 14)

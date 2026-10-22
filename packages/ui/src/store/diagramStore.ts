@@ -4958,6 +4958,14 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       setActiveView(newId) {
+        // A group of views per element is never a canvas of its own: it
+        // opens on its first view (none: nothing opens). Quick Search, a
+        // link and Back drew it as one, and saved positions into it.
+        if (newId && model.isViewGroup(get().views[newId], get().metamodel)) {
+          const first = model.firstViewOfGroup(get().views, newId)
+          if (!first) return
+          newId = first.id
+        }
         const { activeViewId, c4Nodes, appMode } = get()
         if (newId === activeViewId) return
 
