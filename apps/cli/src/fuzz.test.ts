@@ -41,7 +41,7 @@ const settingsOf = (out: string): Record<string, string>[] => [...out.matchAll(/
 
 const record = (signature: string, rule: string, world = 'bookstore') => ({
   suite: 'invariants', file: 'fake.mjs', world, rule, signature, seed: 7, path: '3:1', length: 20,
-  actions: ["{ a: 'add', parent: 1 }", "{ a: 'reload' }"], steps: ['add component into root', 'reload (on All elements)'], detail: `${rule} broke:\n      a.x: 1 → 2`,
+  actions: ["{ a: 'add', parent: 1 }", "{ a: 'reload' }"], sequence: [{ a: 'add', parent: 1 }, { a: 'reload' }], steps: ['add component into root', 'reload (on All elements)'], detail: `${rule} broke:\n      a.x: 1 → 2`,
 })
 
 const finding = (id: string, signature: string, more: Partial<Finding> = {}): Finding => ({
@@ -111,7 +111,7 @@ describe('radical fuzz', () => {
       ['F-0002', 'open', 'reloadKeeps|add|defaultPositions.*'],
       ['F-0003', 'open', 'geometry|drag|overlap'],
     ])
-    expect(all[1]).toMatchObject({ source: 'fuzz', rule: 'reloadKeeps', file: 'fake.mjs', suite: 'invariants', world: 'bookstore', seed: 7, path: '3:1', length: 20, steps: ['add component into root', 'reload (on All elements)'], detail: 'reloadKeeps broke:\n      a.x: 1 → 2' })
+    expect(all[1]).toMatchObject({ source: 'fuzz', rule: 'reloadKeeps', file: 'fake.mjs', suite: 'invariants', world: 'bookstore', seed: 7, path: '3:1', length: 20, sequence: [{ a: 'add', parent: 1 }, { a: 'reload' }], steps: ['add component into root', 'reload (on All elements)'], detail: 'reloadKeeps broke:\n      a.x: 1 → 2' })
     expect(all[1].found).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     const again = await run(cwd, '--survey')
     expect(again.out).toContain('No new findings')

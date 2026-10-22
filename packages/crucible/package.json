@@ -7,7 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./vitest": "./src/vitest.ts",
-    "./findings": "./src/findings.ts"
+    "./findings": "./src/findingFiles.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

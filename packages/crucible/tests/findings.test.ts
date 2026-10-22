@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nextFindingId, readFindings, writeFinding, type Finding } from '../src/findings'
+import { loadFindings, nextFindingId, readFindings, writeFinding, type Finding } from '../src/findingFiles'
 
 const dirs: string[] = []
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
 
 describe('findings', () => {
-  it('writes a finding as a Markdown file and reads it back', () => {
+  it('writes a finding as a Markdown file and reads it back', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'crucible-findings-'))
     dirs.push(dir)
     const finding: Finding = {
@@ -26,6 +26,7 @@ describe('findings', () => {
       length: 20,
       commit: 'abc1234',
       found: '2026-10-22',
+      sequence: [{ a: 'add', parent: 3 }, { a: 'reload' }],
       steps: ['adds component x into API (api)', 'reload'],
       detail: 'the document read again saves differently:\n      defaultPositions.x.x: 1 → 2',
       notes: '## Notes\n\nSeen on the sample too.',
@@ -36,6 +37,7 @@ describe('findings', () => {
     expect(text).toMatch(/^---\nid: "F-0007"\ntitle: "reloadKeeps broken after add \(bookstore\)"\n/)
     expect(text).toContain('## Steps\n\n1. adds component x into API (api)\n2. reload\n')
     expect(readFindings(dir)).toEqual([finding])
+    expect(await loadFindings(dir)).toEqual([finding])
     expect(readFindings(join(dir, 'none'))).toEqual([])
   })
 
