@@ -1,7 +1,10 @@
 /**
  * Explore from here: what an exploration is and how it grows, folds and is
- * laid out, without the store. The store (diagramStore.ts) keeps the one
- * open in `exploration`, never in `views`, and draws it while it is shown.
+ * laid out, without the store. An exploration is a view of type Explore
+ * (`kind: 'explore'`, its growth in `explore`): the temporary one the
+ * store keeps in `exploration`, never in `views`, or one saved as a view
+ * of the document's. The store (diagramStore.ts) draws either the same way
+ * while it is shown.
  *
  * An exploration is flat: each element it lists is drawn on its own, a
  * child apart from its parent (no frame), and while it is shown the
@@ -12,7 +15,7 @@
  * one on the next level that the expansion which added the deeper one
  * chose.
  */
-import type { C4Node, C4Relation, DiagramView, NodePosition } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramView, ExploreExpansion, ExploreState, NodePosition } from '@radical/common/c4'
 import { compoundPadding, drawnSize } from '@radical/layout/geometry'
 import { labelNeed, labelSizeOf } from '@radical/layout/labelRoom'
 
@@ -44,24 +47,38 @@ export interface ExploreChoice {
   children?: boolean
 }
 
-/** One use of an element's +: what it chose. */
-export interface ExplorationExpansion {
-  id: string
-  from: string
-  /** null: every relation, either way. */
-  rows: ExploreRow[] | null
-  parent: boolean
-  children: boolean
+/** One use of an element's +: what it chose (ExploreExpansion). */
+export type ExplorationExpansion = ExploreExpansion
+
+/** An exploration: a view of type Explore, with how it grew from its
+ *  start (the level each element was added on, which expansion added it). */
+export type Exploration = DiagramView & { kind: 'explore'; explore: ExploreState }
+
+/** Whether `view` is an exploration (a view of type Explore with what it
+ *  grew by: a file read is made one by withExploreState). */
+export function isExploration(view: DiagramView | null | undefined): view is Exploration {
+  return !!view && view.kind === 'explore' && !!view.explore && typeof view.explore === 'object'
 }
 
-/** An exploration: the structure view it draws, the level each element
- *  was added on, and which expansion added it. */
-export type Exploration = DiagramView & {
-  levels: Record<string, number>
-  /** Element id → the expansion that added it (none for the start, or for
-   *  one added from the palette). */
-  addedBy: Record<string, string>
-  expansions: Record<string, ExplorationExpansion>
+/** A view of type Explore as an exploration: what a file left out of its
+ *  growth filled in (a hand-written one, one an agent listed elements on).
+ *  Its start is its first element when it names none it lists. Any other
+ *  view is returned as it is. */
+export function withExploreState(view: DiagramView): DiagramView {
+  if (view.kind !== 'explore') return view
+  const raw = (view.explore && typeof view.explore === 'object' ? view.explore : {}) as Partial<ExploreState>
+  const record = <T,>(r: unknown): Record<string, T> => (r && typeof r === 'object' && !Array.isArray(r) ? r as Record<string, T> : {})
+  const nodeIds = Array.isArray(view.nodeIds) ? view.nodeIds : []
+  const start = typeof raw.start === 'string' && nodeIds.includes(raw.start) ? raw.start : nodeIds[0] ?? (typeof raw.start === 'string' ? raw.start : '')
+  const levels = record<number>(raw.levels)
+  const fine = raw.start === start && levels === raw.levels && record(raw.addedBy) === raw.addedBy && record(raw.expansions) === raw.expansions
+  if (fine && nodeIds === view.nodeIds && view.positions) return view
+  return {
+    ...view,
+    nodeIds,
+    positions: view.positions ?? {},
+    explore: { start, levels: start && !(start in levels) ? { ...levels, [start]: 0 } : levels, addedBy: record<string>(raw.addedBy), expansions: record<ExploreExpansion>(raw.expansions) },
+  }
 }
 
 /** How an element is joined to a neighbour it does not list yet. */
@@ -85,7 +102,54 @@ export const isExplorationId = (id: string | null | undefined): boolean => !!id 
 
 /** An exploration of `nodeId` alone. */
 export function newExploration(id: string, node: C4Node): Exploration {
-  return { id: EXPLORATION_ID + id, name: `Explore: ${node.label || 'element'}`, kind: 'static', nodeIds: [node.id], positions: {}, levels: { [node.id]: 0 }, addedBy: {}, expansions: {} }
+  return { id: EXPLORATION_ID + id, name: `Explore: ${node.label || 'element'}`, kind: 'explore', nodeIds: [node.id], positions: {}, explore: { start: node.id, levels: { [node.id]: 0 }, addedBy: {}, expansions: {} } }
+}
+
+/** The exploration a view of another type becomes (its view type switched
+ *  to Explore): the elements `ids` it shows, grown from `start` as if each
+ *  element's + (All) had been used in turn, nearest first, within them: on
+ *  a level one below the nearest element they are joined to (a relation
+ *  either way, a parent, a child); those joined to none on a level below
+ *  the rest. `uid` names the expansions. */
+export function explorationOf(view: DiagramView, ids: string[], start: string, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, uid: () => string): Exploration {
+  const inView = new Set(ids.filter((id) => !!nodes[id]))
+  const order = [start, ...[...inView].filter((id) => id !== start)]
+  const near = new Map<string, Set<string>>()
+  const join = (a: string, b: string): void => {
+    if (a === b || !inView.has(a) || !inView.has(b)) return
+    for (const [x, y] of [[a, b], [b, a]]) {
+      const set = near.get(x)
+      if (set) set.add(y)
+      else near.set(x, new Set([y]))
+    }
+  }
+  for (const r of Object.values(relations)) join(r.sourceId, r.targetId)
+  for (const id of inView) if (nodes[id].parentId) join(id, nodes[id].parentId!)
+  const levels: Record<string, number> = { [start]: 0 }
+  const addedBy: Record<string, string> = {}
+  const expansions: Record<string, ExplorationExpansion> = {}
+  const queue = [start]
+  for (let i = 0; i < queue.length; i++) {
+    const from = queue[i]
+    // In the order the view lists them.
+    const added = order.filter((id) => !(id in levels) && near.get(from)?.has(id))
+    if (!added.length) continue
+    const expansion = uid()
+    expansions[expansion] = { id: expansion, from, rows: null, parent: true, children: true }
+    for (const id of added) {
+      levels[id] = levels[from] + 1
+      addedBy[id] = expansion
+      queue.push(id)
+    }
+  }
+  const last = Math.max(0, ...Object.values(levels))
+  for (const id of order) if (!(id in levels)) levels[id] = last + 1
+  return {
+    ...view,
+    kind: 'explore',
+    nodeIds: [...queue, ...order.filter((id) => !queue.includes(id))],
+    explore: { start, levels, addedBy, expansions },
+  }
 }
 
 /** The elements it lists that the model has. */
@@ -95,8 +159,9 @@ export function listedIds(x: Exploration, nodes: Record<string, C4Node>): string
 
 /** The level of each element (one with none: under the rest). */
 export function levelOf(x: Exploration): (id: string) => number {
-  const last = Math.max(0, ...Object.values(x.levels))
-  return (id) => x.levels[id] ?? last + 1
+  const levels = x.explore.levels
+  const last = Math.max(0, ...Object.values(levels))
+  return (id) => levels[id] ?? (id === x.explore.start ? 0 : last + 1)
 }
 
 /** For each element it lists, how it is joined to each neighbour it does
@@ -188,9 +253,12 @@ export function grown(x: Exploration, from: string, links: ExploreLink[], choice
   return {
     ...x,
     nodeIds: [...x.nodeIds, ...added],
-    levels: { ...x.levels, ...Object.fromEntries(added.map((id) => [id, level])) },
-    addedBy: { ...x.addedBy, ...Object.fromEntries(added.map((id) => [id, expansionId])) },
-    expansions: { ...x.expansions, [expansionId]: expansion },
+    explore: {
+      ...x.explore,
+      levels: { ...x.explore.levels, ...Object.fromEntries(added.map((id) => [id, level])) },
+      addedBy: { ...x.explore.addedBy, ...Object.fromEntries(added.map((id) => [id, expansionId])) },
+      expansions: { ...x.explore.expansions, [expansionId]: expansion },
+    },
   }
 }
 
@@ -198,7 +266,7 @@ export function grown(x: Exploration, from: string, links: ExploreLink[], choice
 export function foldable(x: Exploration, nodes: Record<string, C4Node>): Record<string, true> {
   const out: Record<string, true> = {}
   for (const id of listedIds(x, nodes)) {
-    const by = x.addedBy[id] ? x.expansions[x.addedBy[id]] : undefined
+    const by = x.explore.addedBy[id] ? x.explore.expansions[x.explore.addedBy[id]] : undefined
     if (by && nodes[by.from]) out[by.from] = true
   }
   return out
@@ -207,7 +275,7 @@ export function foldable(x: Exploration, nodes: Record<string, C4Node>): Record<
 /** The exploration without what the + of `from` added, and all that was
  *  added from those since (the − of `from`). */
 export function folded(x: Exploration, from: string): Exploration {
-  return withoutExpansions(x, Object.values(x.expansions).filter((e) => e.from === from).map((e) => e.id))
+  return withoutExpansions(x, Object.values(x.explore.expansions).filter((e) => e.from === from).map((e) => e.id))
 }
 
 /** The exploration without what the expansions `ids` added, and all that
@@ -216,13 +284,14 @@ export function folded(x: Exploration, from: string): Exploration {
 export function withoutExpansions(x: Exploration, ids: string[]): Exploration {
   const gone = new Set<string>()
   const expansionsGone = new Set<string>()
+  const { explore } = x
   const drop = (expansion: string): void => {
-    if (expansionsGone.has(expansion) || !x.expansions[expansion]) return
+    if (expansionsGone.has(expansion) || !explore.expansions[expansion]) return
     expansionsGone.add(expansion)
-    for (const [el, by] of Object.entries(x.addedBy)) {
-      if (by !== expansion || gone.has(el) || el === x.nodeIds[0]) continue
+    for (const [el, by] of Object.entries(explore.addedBy)) {
+      if (by !== expansion || gone.has(el) || el === explore.start) continue
       gone.add(el)
-      for (const e of Object.values(x.expansions)) if (e.from === el) drop(e.id)
+      for (const e of Object.values(explore.expansions)) if (e.from === el) drop(e.id)
     }
   }
   for (const id of ids) drop(id)
@@ -231,9 +300,12 @@ export function withoutExpansions(x: Exploration, ids: string[]): Exploration {
     ...x,
     nodeIds: x.nodeIds.filter((id) => !gone.has(id)),
     positions: keep(x.positions, gone),
-    levels: keep(x.levels, gone),
-    addedBy: keep(x.addedBy, gone),
-    expansions: keep(x.expansions, expansionsGone),
+    explore: {
+      ...explore,
+      levels: keep(explore.levels, gone),
+      addedBy: keep(explore.addedBy, gone),
+      expansions: keep(explore.expansions, expansionsGone),
+    },
   }
 }
 
@@ -247,7 +319,7 @@ export function explorationLines(x: Exploration, nodes: Record<string, C4Node>, 
   const listed = new Set(listedIds(x, nodes))
   const level = levelOf(x)
   const all = fullChoice()
-  const choiceOf = (deeper: string): Omit<ExplorationExpansion, 'id' | 'from'> => x.expansions[x.addedBy[deeper]] ?? all
+  const choiceOf = (deeper: string): Omit<ExplorationExpansion, 'id' | 'from'> => x.explore.expansions[x.explore.addedBy[deeper]] ?? all
   const drawn: string[] = []
   const hidden: string[] = []
   for (const r of Object.values(relations)) {
@@ -319,7 +391,7 @@ export function laidOut(x: Exploration, nodes: Record<string, C4Node>, relations
   for (const l of [...byLevel.keys()].sort((a, b) => a - b)) {
     // Below the element that added each, where that one stands; then as added.
     const key = (id: string): number => {
-      const by = x.expansions[x.addedBy[id]]
+      const by = x.explore.expansions[x.explore.addedBy[id]]
       return by && centre.has(by.from) ? centre.get(by.from)! : Infinity
     }
     const list = byLevel.get(l)!.map((id) => ({ id, key: key(id) }))
@@ -342,7 +414,7 @@ export function laidOut(x: Exploration, nodes: Record<string, C4Node>, relations
       y += height + (start + EXPLORATION_ROW < list.length ? BETWEEN_ROWS : between)
     }
   }
-  const start = ids[0]
+  const start = ids.includes(x.explore.start) ? x.explore.start : ids[0]
   if (startAt && places[start]) {
     const dx = startAt.x - places[start].x
     const dy = startAt.y - places[start].y
@@ -412,8 +484,11 @@ export function prunedExploration(x: Exploration | null, nodes: Record<string, C
     ...x,
     nodeIds,
     positions: Object.fromEntries(Object.entries(x.positions).filter(has)),
-    levels: Object.fromEntries(Object.entries(x.levels).filter(has)),
-    addedBy: Object.fromEntries(Object.entries(x.addedBy).filter(has)),
+    explore: {
+      ...x.explore,
+      levels: Object.fromEntries(Object.entries(x.explore.levels).filter(has)),
+      addedBy: Object.fromEntries(Object.entries(x.explore.addedBy).filter(has)),
+    },
     ...(x.collapsedNodeIds ? { collapsedNodeIds: x.collapsedNodeIds.filter((id) => !!nodes[id]) } : {}),
     ...(x.expandedNodeIds ? { expandedNodeIds: x.expandedNodeIds.filter((id) => !!nodes[id]) } : {}),
   }

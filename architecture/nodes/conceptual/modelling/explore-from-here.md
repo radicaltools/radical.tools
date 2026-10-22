@@ -13,4 +13,5 @@ Then: "Explore from here needs a special layout... more hierarchical, top-down?"
 Then: "It should appear on the screen, the next level in a row below, and so on." And: "In Explore from here do not show the parents, and only the relations between an element and the next level", "because I am only interested in how the selected element is related to others." Settled: no ancestor frames (this replaces the earlier choice); only relations between consecutive levels are drawn.
 Then: "Remember, every expansion is the next level." Settled: an element's level is fixed when it is added, one below the element whose + added it.
 Then, after + 1 level hung the app on a large model: "Remove the +1 button." Settled: no + 1 level button; only the + of each element.
+Then (2026-10-22): "When I save the view, I'd like it not to turn into a structure, but to stay of type explore." Settled: a view type Explore; edited in Designer like any view, explored without saving in Viewer; its type can be switched like any view's.
 Translated from Polish.

@@ -13,7 +13,8 @@
  * another exploration or another model drops it without a question.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import type { C4Node, DiagramData } from '@radical/common/c4'
+import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
+import { mergeModels } from '@radical/common/modelMerge'
 import { viewShownNodes } from '@radical/common/viewPipeline'
 import { labelGaps, pairKey } from '@radical/layout/labelRoom'
 import { historyMark, useDiagramStore, viewById } from '../src/store/diagramStore'
@@ -178,7 +179,7 @@ describe('an explore view', () => {
     s().exploreNeighbours('api', RELATIONS)
     s().exploreNeighbours('web')
     expect(listed()).toEqual(['api', 'bookstore', 'customer', 'db', 'payments', 'web'])
-    expect(s().exploration!.levels).toEqual({ api: 0, web: 1, db: 1, payments: 1, customer: 2, bookstore: 2 })
+    expect(s().exploration!.explore.levels).toEqual({ api: 0, web: 1, db: 1, payments: 1, customer: 2, bookstore: 2 })
     for (const id of ['web', 'db', 'payments']) {
       expect(below(id, 'api')).toBe(true)
       expect(below('customer', id)).toBe(true)
@@ -245,7 +246,7 @@ describe('an explore view', () => {
     // Related to the start since the start's + was used.
     s().addRelation({ sourceId: 'start', targetId: 'p', label: 'pays' })
     s().exploreNeighbours('b')
-    expect(s().exploration!.levels).toEqual({ start: 0, a: 1, b: 2, p: 3 })
+    expect(s().exploration!.explore.levels).toEqual({ start: 0, a: 1, b: 2, p: 3 })
     expect(below('a', 'start')).toBe(true)
     expect(below('b', 'a')).toBe(true)
     expect(below('p', 'b')).toBe(true)
@@ -273,11 +274,11 @@ describe('an explore view', () => {
     s().exploreNeighbours('web')
     s().undo()
     expect(listed()).toEqual(['api', 'db', 'payments', 'web'])
-    expect(s().exploration!.levels).toEqual({ api: 0, web: 1, db: 1, payments: 1 })
+    expect(s().exploration!.explore.levels).toEqual({ api: 0, web: 1, db: 1, payments: 1 })
     expect(drawnPlaces()).toEqual(places)
     s().redo()
     expect(listed()).toContain('customer')
-    expect(s().exploration!.levels.customer).toBe(2)
+    expect(s().exploration!.explore.levels.customer).toBe(2)
     s().undo()
     s().undo()
     expect(listed()).toEqual(['api'])
@@ -379,7 +380,7 @@ describe('an explore view', () => {
     expect(s().activeViewId).toBe(id)
     expect(listed()).toEqual(['api', 'db', 'web'])
     // Each keeps its level.
-    expect(s().exploration!.levels).toEqual({ api: 0, web: 1, db: 1 })
+    expect(s().exploration!.explore.levels).toEqual({ api: 0, web: 1, db: 1 })
     const now = drawnPlaces()
     for (const n of ['api', 'web', 'db']) expect(now[n]).toEqual(places[n])
     expect(now.payments).toBeUndefined()
@@ -446,7 +447,7 @@ describe('choosing the relations of a +', () => {
     s().exploreFrom('api')
     s().exploreNeighbours('api', { rows: [], parent: true })
     expect(listed()).toEqual(['api', 'bookstore'])
-    expect(s().exploration!.levels.bookstore).toBe(1)
+    expect(s().exploration!.explore.levels.bookstore).toBe(1)
     expect(below('bookstore', 'api')).toBe(true)
     const line = s().rfEdges.find((e) => e.id === 'contains:bookstore:api')!
     expect([line.source, line.target, line.data?.label, line.data?.isVirtual]).toEqual(['bookstore', 'api', 'Contains', true])
@@ -464,7 +465,7 @@ describe('choosing the relations of a +', () => {
     expect(menu('bookstore')).toEqual({ out: { children: 2 }, in: {} })
     s().exploreNeighbours('bookstore', { rows: [], children: true })
     expect(listed()).toEqual(['api', 'bookstore', 'db', 'web'])
-    expect(s().exploration!.levels).toMatchObject({ web: 2, db: 2 })
+    expect(s().exploration!.explore.levels).toMatchObject({ web: 2, db: 2 })
     expect(containment()).toEqual(['contains:bookstore:api', 'contains:bookstore:db', 'contains:bookstore:web'])
     for (const child of ['db', 'web']) {
       const line = s().rfEdges.find((e) => e.id === `contains:bookstore:${child}`)!
@@ -480,7 +481,7 @@ describe('choosing the relations of a +', () => {
     expect(s().exploreFoldable?.api).toBe(true)
     s().foldExploration('api')
     expect(listed()).toEqual(['api'])
-    expect(s().exploration!.levels).toEqual({ api: 0 })
+    expect(s().exploration!.explore.levels).toEqual({ api: 0 })
     expect(s().exploreMore?.api).toBe(4)
     expect(s().exploreFoldable?.api).toBeUndefined()
     s().undo()
@@ -491,39 +492,52 @@ describe('choosing the relations of a +', () => {
 })
 
 describe('saving and closing an explore view', () => {
-  it('Save as view keeps it as a structure view in its folder, with its places, as one undo step', () => {
+  it('Save as view keeps it as a view of type Explore in its folder, with its levels, expansions and places, as one undo step', () => {
     s().exploreFrom('api')
     s().exploreNeighbours('api', RELATIONS)
     const places = drawnPlaces()
+    const levels = { ...s().exploration!.explore.levels }
     const mark = historyMark()
     const id = s().saveExploration('API context', 'Explorations')!
     expect(historyMark()).toBe(mark + 1)
     const view = s().views[id]
     expect(view.name).toBe('API context')
     expect(view.folder).toBe('Explorations')
-    expect((view.kind ?? 'static')).toBe('static')
+    expect(view.kind).toBe('explore')
     expect([...view.nodeIds].sort()).toEqual(['api', 'db', 'payments', 'web'])
+    expect(view.explore!.start).toBe('api')
+    expect(view.explore!.levels).toEqual(levels)
+    // What the + added, and what it chose.
+    const expansions = Object.values(view.explore!.expansions)
+    expect(expansions).toEqual([expect.objectContaining({ from: 'api', parent: false, children: false, rows: null })])
+    expect(view.explore!.addedBy).toEqual({ web: expansions[0].id, db: expansions[0].id, payments: expansions[0].id })
     expect(s().exploration).toBeNull()
     expect(s().activeViewId).toBe(id)
-    expect(drawnPlaces()).toMatchObject(places)
+    expect(drawnPlaces()).toEqual(places)
+    // Saved where it draws them, flat.
     const doc = s().saveDiagram().views!.find((v) => v.id === id)!
-    expect(doc.positions.api).toBeDefined()
-    expect(doc.positions.payments).toBeDefined()
+    expect(doc.kind).toBe('explore')
+    for (const n of ['api', 'web', 'db', 'payments']) expect({ x: doc.positions[n].x, y: doc.positions[n].y }).toEqual(places[n])
 
     s().undo()
     expect(s().views[id]).toBeUndefined()
     expect(s().exploration).toBeNull()
+    expect(s().activeViewId).toBeNull()
     s().redo()
     expect(s().views[id].name).toBe('API context')
+    expect(s().views[id].kind).toBe('explore')
     expect(s().activeViewId).toBe(id)
-    expect(drawnPlaces()).toMatchObject(places)
+    expect(drawnPlaces()).toEqual(places)
   })
 
-  it('a child saved with its parent is drawn in it, as a structure view nests', () => {
+  it('a child saved with its parent is drawn apart from it, joined by its containment line, as the exploration drew it', () => {
     s().exploreFrom('api')
     s().exploreNeighbours('api', { rows: [], parent: true })
+    const places = drawnPlaces()
     const id = s().saveExploration('API in Bookstore', null)!
-    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBe('bookstore')
+    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBeUndefined()
+    expect(containment()).toEqual(['contains:bookstore:api'])
+    expect(drawnPlaces()).toEqual(places)
     expect([...s().views[id].nodeIds].sort()).toEqual(['api', 'bookstore'])
   })
 
@@ -541,6 +555,225 @@ describe('saving and closing an explore view', () => {
     expect(s().canUndo).toBe(false)
     expect(saved()).toBe(was)
   })
+})
+
+describe('a saved explore view', () => {
+  /** API explored by its relations, saved as "API context": API on level 0,
+   *  Web App, Orders DB and Payment Provider on level 1. */
+  function apiContext(): string {
+    s().exploreFrom('api')
+    s().exploreNeighbours('api', RELATIONS)
+    return s().saveExploration('API context', 'Explorations')!
+  }
+  /** What the saved document holds of the view. */
+  const savedView = (id: string): DiagramView => s().saveDiagram().views!.find((v) => v.id === id)!
+  /** What the view lists (the elements of the model it lists). */
+  const lists = (id: string): string[] => s().views[id].nodeIds.filter((n) => !!s().c4Nodes[n]).sort()
+
+  it("is drawn as an exploration: flat, by level, each element with its + and −, the lines to the next level only", () => {
+    const id = apiContext()
+    expect(s().exploration).toBeNull()
+    expect(s().activeViewId).toBe(id)
+    for (const n of ['api', 'web', 'db', 'payments']) expect(s().rfNodes.find((r) => r.id === n)!.parentNode).toBeUndefined()
+    expect(drawn('bookstore')).toBe(false)
+    for (const n of ['web', 'db', 'payments']) expect(below(n, 'api')).toBe(true)
+    expect(edges()).toEqual(['r2', 'r3', 'r4'])
+    // Web App's + (Customer, Bookstore), API's + (Bookstore), API's −.
+    expect(s().exploreMore).toMatchObject({ web: 2, api: 1 })
+    expect(s().exploreFoldable).toEqual({ api: true })
+    expect(crowded()).toEqual([])
+  })
+
+  it("in Designer Web App's + adds Customer to the view as an undo step, and is saved; Undo takes it back", () => {
+    const id = apiContext()
+    const places = drawnPlaces()
+    const mark = historyMark()
+    s().exploreNeighbours('web', RELATIONS)
+    expect(historyMark()).toBe(mark + 1)
+    expect(lists(id)).toEqual(['api', 'customer', 'db', 'payments', 'web'])
+    expect(s().views[id].explore!.levels.customer).toBe(2)
+    expect(below('customer', 'web')).toBe(true)
+    expect(edges()).toEqual(['r1', 'r2', 'r3', 'r4'])
+    // In the document as it is saved.
+    expect(savedView(id).nodeIds).toContain('customer')
+    expect(savedView(id).explore!.levels.customer).toBe(2)
+    expect(savedView(id).positions.customer).toBeDefined()
+
+    s().undo()
+    expect(s().activeViewId).toBe(id)
+    expect(lists(id)).toEqual(['api', 'db', 'payments', 'web'])
+    expect(s().views[id].explore!.levels.customer).toBeUndefined()
+    expect(drawnPlaces()).toEqual(places)
+    expect(savedView(id).nodeIds).not.toContain('customer')
+    s().redo()
+    expect(lists(id)).toContain('customer')
+    expect(s().activeViewId).toBe(id)
+
+    // Its − and a drag are undo steps too, and saved.
+    s().foldExploration('api')
+    expect(lists(id)).toEqual(['api'])
+    expect(savedView(id).nodeIds).toEqual(['api'])
+    s().undo()
+    expect(lists(id)).toEqual(['api', 'customer', 'db', 'payments', 'web'])
+    const at = abs('db')
+    drag('db', { x: 60, y: 20 })
+    expect(savedView(id).positions.db).toMatchObject({ x: at.x + 60, y: at.y + 20 })
+    s().undo()
+    expect(abs('db')).toEqual(at)
+  })
+
+  it('read again (saved and loaded) it is drawn the same', () => {
+    const id = apiContext()
+    s().exploreNeighbours('web', RELATIONS)
+    const places = drawnPlaces()
+    const lines = edges()
+    const more = s().exploreMore
+    const data = structuredClone(s().saveDiagram())
+    s().loadDiagram(data)
+    s().setActiveView(id)
+    expect(drawnPlaces()).toEqual(places)
+    expect(edges()).toEqual(lines)
+    expect(s().exploreMore).toEqual(more)
+    expect(s().exploreFoldable).toEqual({ api: true, web: true })
+    // Opened from another view, the same.
+    s().setActiveView('v-containers')
+    s().setActiveView(id)
+    expect(drawnPlaces()).toEqual(places)
+  })
+
+  it('in Viewer its + and − work and are not saved; it is as saved again once it, or Viewer, is left', () => {
+    const id = apiContext()
+    const places = drawnPlaces()
+    const was = saved()
+    const mark = historyMark()
+    s().setAppMode('viewer')
+    expect(s().activeViewId).toBe(id)
+    s().exploreNeighbours('web', RELATIONS)
+    expect(lists(id)).toContain('customer')
+    expect(drawn('customer')).toBe(true)
+    s().foldExploration('api')
+    expect(drawn('web')).toBe(false)
+    expect(historyMark()).toBe(mark)
+    // Left: as saved again.
+    s().setActiveView('v-containers')
+    s().setActiveView(id)
+    expect(lists(id)).toEqual(['api', 'db', 'payments', 'web'])
+    expect(drawnPlaces()).toEqual(places)
+    // Viewer left: as saved too, and nothing was saved meanwhile.
+    s().exploreNeighbours('web', RELATIONS)
+    expect(drawn('customer')).toBe(true)
+    s().setAppMode('designer')
+    expect(s().activeViewId).toBe(id)
+    expect(lists(id)).toEqual(['api', 'db', 'payments', 'web'])
+    expect(drawn('customer')).toBe(false)
+    expect(drawnPlaces()).toEqual(places)
+    expect(historyMark()).toBe(mark)
+    expect(saved()).toBe(was)
+  })
+
+  it('switched to Structure keeps its elements and places, nested in their containers; Undo makes it an exploration again', () => {
+    const id = apiContext()
+    const places = drawnPlaces()
+    s().setViewKind(id, 'static')
+    const view = s().views[id]
+    expect(view.kind).toBe('static')
+    expect(view.explore).toBeUndefined()
+    expect([...view.nodeIds].sort()).toEqual(['api', 'db', 'payments', 'web'])
+    // A structure view: API, Web App and Orders DB in Bookstore's frame,
+    // where they were drawn.
+    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBe('bookstore')
+    expect(drawnPlaces()).toEqual(places)
+    expect(s().exploreMore).toBeNull()
+    expect(savedView(id).kind).toBe('static')
+    s().undo()
+    expect(s().views[id].kind).toBe('explore')
+    expect(drawnPlaces()).toEqual(places)
+    expect(s().exploreMore).not.toBeNull()
+    // With Bookstore listed too, API is drawn in it.
+    s().exploreNeighbours('api', { rows: [], parent: true })
+    s().setViewKind(id, 'static')
+    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBe('bookstore')
+    expect(drawn('bookstore')).toBe(true)
+  })
+
+
+  it('a view switched to Explore grows from the element selected on it, or else its first', () => {
+    s().setActiveView('v-containers')
+    s().selectNode('web')
+    s().setViewKind('v-containers', 'explore')
+    const view = s().views['v-containers']
+    expect(view.kind).toBe('explore')
+    expect(view.explore!.start).toBe('web')
+    // Its elements, a level each step away from Web App.
+    expect(view.explore!.levels).toEqual({ web: 0, customer: 1, api: 1, bookstore: 1, db: 2, payments: 2 })
+    for (const n of ['customer', 'api', 'bookstore']) expect(below(n, 'web')).toBe(true)
+    expect(below('db', 'api')).toBe(true)
+    expect(crowded()).toEqual([])
+    s().setViewKind('v-context', 'explore')
+    expect(s().views['v-context'].explore!.start).toBe('customer')
+  })
+
+  it('a merge with an outside change keeps it: what both sides did is in, what the agent deleted is gone', () => {
+    const id = apiContext()
+    const base = structuredClone(s().saveDiagram())
+    s().exploreNeighbours('web', RELATIONS)
+    const ours = structuredClone(s().saveDiagram())
+    const theirs = structuredClone(base)
+    theirs.views!.find((v) => v.id === id)!.name = 'API neighbours'
+    // An agent deleted Payment Provider (delete_node): gone from the view too.
+    theirs.nodes = theirs.nodes.filter((n) => n.id !== 'payments')
+    theirs.relations = theirs.relations.filter((r) => r.id !== 'r4')
+    const theirView = theirs.views!.find((v) => v.id === id)!
+    theirView.nodeIds = theirView.nodeIds.filter((n) => n !== 'payments')
+    delete theirView.explore!.levels.payments
+    delete theirView.explore!.addedBy.payments
+    delete theirView.positions.payments
+    const { merged } = mergeModels(base, ours, theirs)
+    s().loadDiagram(merged, { outsideChange: true })
+    s().setActiveView(id)
+    const view = s().views[id]
+    expect(view.kind).toBe('explore')
+    expect(view.name).toBe('API neighbours')
+    expect(lists(id)).toEqual(['api', 'customer', 'db', 'web'])
+    expect(view.explore!.levels).toEqual({ api: 0, web: 1, db: 1, customer: 2 })
+    expect(drawn('payments')).toBe(false)
+    expect(drawn('customer')).toBe(true)
+  })
+
+  it('an element listed with no place yet (added outside Studio) is laid out on its level', () => {
+    const id = apiContext()
+    outsideChange((data) => {
+      const view = data.views!.find((v) => v.id === id)!
+      view.nodeIds.push('customer')
+      view.explore!.levels.customer = 2
+    })
+    expect(s().activeViewId).toBe(id)
+    expect(drawn('customer')).toBe(true)
+    expect(below('customer', 'web')).toBe(true)
+    expect(crowded()).toEqual([])
+  })
+
+  it('a milestone that lacks an element it lists draws the rest', () => {
+    const id = apiContext()
+    const before = s().createSnapshot('Before mail')
+    s().setActiveView('v-containers')
+    const mail = s().addNode({ type: 'system', label: 'Mail', x: 0, y: 0, width: 200, height: 120, collapsed: false })
+    s().addRelation({ sourceId: 'api', targetId: mail, label: 'sends' })
+    s().setActiveView(id)
+    s().exploreNeighbours('api', RELATIONS)
+    expect(lists(id)).toContain(mail)
+    expect(drawn(mail)).toBe(true)
+    s().selectMilestone(before)
+    expect(s().activeViewId).toBe(id)
+    expect(drawn(mail)).toBe(false)
+    for (const n of ['api', 'web', 'db', 'payments']) expect(drawn(n)).toBe(true)
+    // Still drawn as an exploration, its + counting in the milestone.
+    expect(s().rfNodes.find((n) => n.id === 'api')!.parentNode).toBeUndefined()
+    expect(s().exploreMore).toMatchObject({ web: 2, api: 1 })
+    s().discardMilestoneChanges()
+    expect(drawn(mail)).toBe(true)
+  })
+
 })
 
 describe('an explore view in Viewer', () => {
@@ -594,10 +827,10 @@ describe('an explore view in Viewer', () => {
     s().exploreNeighbours('ctn2', RELATIONS)
     const designerAdded = listed().filter((n) => n !== 'ctn2')
     expect(designerAdded.length).toBeGreaterThan(0)
-    const levels = { ...s().exploration!.levels }
+    const levels = { ...s().exploration!.explore.levels }
     s().setAppMode('viewer')
     expect(s().activeViewId).toBe(id)
-    expect(s().exploration!.levels).toEqual(levels)
+    expect(s().exploration!.explore.levels).toEqual(levels)
     // In Viewer: the frontend's + (from what Designer's + added), and the
     // start's parent (from the start). No undo steps there.
     s().exploreNeighbours('ctn1', RELATIONS)
@@ -612,7 +845,7 @@ describe('an explore view in Viewer', () => {
     // parent, added from the start, stays.
     s().undo()
     expect(listed()).toEqual(['ctn2', parent].sort())
-    expect(s().exploration!.levels).toEqual({ ctn2: 0, [parent]: 1 })
+    expect(s().exploration!.explore.levels).toEqual({ ctn2: 0, [parent]: 1 })
   })
 
   it('a milestone shown in Viewer, back in Designer the exploration follows the live model', () => {

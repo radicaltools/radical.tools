@@ -13,6 +13,7 @@ const AXIS_ENUM = ['horizontal', 'vertical'] as const
  *  positions (viewCanvasPositions); a table, wiki and the rest draw none. */
 export function noCanvasLayout(tool: string, view: { name: string; kind?: string }): string | null {
   if (!view.kind || view.kind === 'static') return null
+  if (view.kind === 'explore') return `${tool}: "${view.name}" is an explore view, laid out by Studio level by level from its start element; only static views have a canvas layout`
   return `${tool}: "${view.name}" is a ${view.kind} view; only static views have a canvas layout${view.kind === 'dynamic' ? ' (a dynamic view plays its sequence, drawn in order, with no positions of its own)' : ''}`
 }
 

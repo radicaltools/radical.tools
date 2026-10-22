@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { activeLayoutConstraints, childrenInView, hideRefusal, onExploration, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { activeLayoutConstraints, childrenInView, hideRefusal, shownExploration, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '@radical/ui/studioSettings'
 import { isParentAllowed, isPlacementAllowed } from '@radical/common/metamodel'
@@ -44,8 +44,9 @@ export function SelectionActionBar(): React.ReactElement | null {
   // Designer explores the live model (not a milestone it edits), Viewer the
   // model it shows.
   const canExplore = useDiagramStore((s) => (s.appMode === 'designer' && !s.activeSnapshotId) || s.appMode === 'viewer')
-  // An exploration draws what it lists and keeps no alignments.
-  const exploring = useDiagramStore(onExploration)
+  // An exploration (the temporary one, or a view of type Explore) draws
+  // what it lists, level by level: no alignments, no Hide (its − does that).
+  const exploring = useDiagramStore((s) => !!shownExploration(s))
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveMenuOpen, setMoveMenuOpen] = useState(false)

@@ -10,14 +10,15 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { drawnSize } from '@radical/layout/geometry'
+import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
 
-async function connect(): Promise<{ client: Client; folder: string; read: () => Promise<ReturnType<typeof deserializeFromMdFolder>['data']> }> {
+async function connect(data: DiagramData = { nodes: [], relations: [] }): Promise<{ client: Client; folder: string; read: () => Promise<ReturnType<typeof deserializeFromMdFolder>['data']> }> {
   const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-doc-'))
   folders.push(folder)
-  const files = serializeToMdFolder({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() }, 'MCP docs')
+  const files = serializeToMdFolder({ ...data, metamodel: builtInGovernanceMetamodel() }, 'MCP docs')
   for (const [path, content] of Object.entries(files)) {
     await mkdir(dirname(join(folder, path)), { recursive: true })
     await writeFile(join(folder, path), content)
@@ -257,6 +258,35 @@ describe('MCP document tools', () => {
       expect(inUse.isError).toBe(true)
       const builtin = await client.callTool({ name: 'delete_relation_type', arguments: { id: 'interacts' } })
       expect(builtin.isError).toBe(true)
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('lists a view of type Explore with its start, keeps it through an edit, and lays out none of it', async () => {
+    const box = (id: string, type: string): C4Node => ({ id, type, label: id.toUpperCase(), x: 0, y: 0, width: 200, height: 120, collapsed: false } as C4Node)
+    const view: DiagramView = {
+      id: 'v-api', name: 'API context', kind: 'explore', nodeIds: ['api', 'web'],
+      explore: { start: 'api', levels: { api: 0, web: 1 }, addedBy: { web: 'x1' }, expansions: { x1: { id: 'x1', from: 'api', rows: null, parent: true, children: true } } },
+      positions: { api: { x: 0, y: 0, width: 200, height: 120 }, web: { x: 0, y: 200, width: 200, height: 120 } },
+    }
+    const { client, read } = await connect({
+      nodes: [box('api', 'system'), box('web', 'system')],
+      relations: [{ id: 'r1', sourceId: 'web', targetId: 'api', label: 'calls' }],
+      views: [view],
+    })
+    try {
+      const result = await client.callTool({ name: 'get_model_summary', arguments: {} })
+      const text = (result.content as Array<{ text: string }>)[0].text
+      expect(text).toContain('{"id":"v-api","name":"API context","kind":"explore","start":"api"}')
+      // Studio lays it out level by level: smart_layout leaves it alone.
+      const refused = await client.callTool({ name: 'smart_layout', arguments: { viewId: 'v-api' } })
+      expect(refused.isError).toBe(true)
+      expect(JSON.stringify(refused.content)).toContain('explore view')
+      await call(client, 'update_view', { id: 'v-api', name: 'API neighbours' })
+      await call(client, 'add_node', { tempId: 'db', type: 'system', label: 'DB' })
+      const after = (await read()).views![0]
+      expect(after).toEqual({ ...view, name: 'API neighbours' })
     } finally {
       await client.close()
     }

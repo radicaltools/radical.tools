@@ -4,8 +4,9 @@ import { test, expect } from '../../support/fixtures'
 // Explore from here: a temporary structure view grown from one element by
 // the + of each element (All, or the relation types chosen), level by
 // level, and folded back by its −. It is first in the list of views while
-// it is open, never saved, kept as an ordinary view by Save as view, and
-// gone without a question when closed.
+// it is open, never saved, kept as a view of type Explore by Save as view,
+// and gone without a question when closed. A saved one is grown in
+// Designer (saved, undoable) and only looked at in Viewer.
 
 /** Where `node` is on the canvas in flow coordinates (the camera taken out):
  *  Smart fit may move the camera after an element is added. */
@@ -257,20 +258,29 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.explore-bar')).toHaveCount(0)
   await expect(page.locator('.lp-explore-card')).toHaveCount(0)
-  await expect(page.getByText('Structure: API context')).toBeVisible()
+  // A view of type Explore, drawn as the exploration was, with its + and −.
+  await expect(page.getByText('Explore: API context')).toBeVisible()
   await expect(page.locator('.lp-folder-name', { hasText: 'Explorations' })).toBeVisible()
   await expect(page.locator('.lp-view-card.active')).toContainText('API context')
+  await expect(page.locator('.lp-view-card.active .lp-view-kind')).toHaveText('explore')
   await studio.settle()
   expect(await flowBox(page, studio.node('api'))).toEqual(places.api)
   expect(await flowBox(page, studio.node('payments'))).toEqual(places.payments)
-  await expect.poll(async () => (await studio.storedDoc()).views?.find((v) => (v as { name?: string }).name === 'API context')?.nodeIds.sort())
-    .toEqual(['api', 'db', 'payments', 'web'])
+  await expect(page.getByRole('button', { name: /^Show \d+ more related to Web App$/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Fold back what API added', exact: true })).toBeVisible()
+  const savedView = async () => (await studio.storedDoc()).views?.find((v) => (v as { name?: string }).name === 'API context') as { kind?: string; nodeIds: string[] } | undefined
+  await expect.poll(async () => (await savedView())?.nodeIds.sort()).toEqual(['api', 'db', 'payments', 'web'])
+  expect((await savedView())?.kind).toBe('explore')
 
-  // One step: Undo takes the view away, Redo brings it back.
+  // One step: Undo takes the view away and shows All elements, Redo brings
+  // it back and shows it.
   await page.getByTitle('Undo (⌘Z)').click()
   await expect(page.locator('.lp-view-card', { hasText: 'API context' })).toHaveCount(0)
+  await expect(page.locator('.lp-view-card.active')).toContainText('All elements')
   await page.getByTitle(/^Redo/).click()
   await expect(page.locator('.lp-view-card', { hasText: 'API context' })).toHaveCount(1)
+  await expect(page.locator('.lp-view-card.active')).toContainText('API context')
+  await expect(page.getByText('Explore: API context')).toBeVisible()
 
   // Another exploration, closed: gone without a question, the document as it was.
   await expect.poll(async () => (await studio.storedDoc()).views?.some((v) => (v as { name?: string }).name === 'API context')).toBe(true)
@@ -295,6 +305,93 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
   await expect(page.locator('.lp-explore-card')).toHaveCount(1)
   await studio.openSample()
   await expect(page.locator('.lp-explore-card')).toHaveCount(0)
+})
+
+test('a saved exploration stays an explore view, grown in Designer and only looked at in Viewer', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.node('api').click()
+  await page.getByRole('button', { name: 'Explore from here' }).click()
+  // API's relations: Web App, Orders DB and Payment Provider below it.
+  const menu = await plus(page, 'API')
+  for (const [column, text] of [['out', 'reads/writes'], ['out', 'charges card'], ['in', 'calls']] as const) await row(menu, column, text).getByRole('checkbox').check()
+  await menu.getByRole('menuitem', { name: 'Show checked' }).click()
+  await expect(studio.node('payments')).toBeVisible()
+  await studio.settle()
+  const ids = ['api', 'web', 'db', 'payments']
+  const placesNow = async (): Promise<Record<string, { x: number; y: number }>> =>
+    Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await flowBox(page, studio.node(id))] as const)))
+  const places = await placesNow()
+
+  // Saved as "API context": a view of type Explore, drawn as it was.
+  await page.getByRole('button', { name: 'Save as view…' }).click()
+  const form = page.getByRole('form', { name: 'Save as view' })
+  await form.getByLabel('Name').fill('API context')
+  await form.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Explore: API context')).toBeVisible()
+  await expect(page.locator('.lp-view-card.active .lp-view-kind')).toHaveText('explore')
+  await studio.settle()
+  expect(await placesNow()).toEqual(places)
+  await expect(studio.node('customer')).toHaveCount(0)
+  const stored = async () => (await studio.storedDoc()).views?.find((v) => (v as { name?: string }).name === 'API context') as
+    { id: string; kind?: string; nodeIds: string[]; explore?: { start: string; levels: Record<string, number> } } | undefined
+  await expect.poll(async () => (await stored())?.kind).toBe('explore')
+  const view = (await stored())!
+  expect(view.explore?.start).toBe('api')
+  expect(view.explore?.levels).toEqual({ api: 0, web: 1, db: 1, payments: 1 })
+
+  // Web App's +, the people who browse it: Customer, a level below, saved.
+  let more = await plus(page, 'Web App')
+  await row(more, 'in', 'browses and orders').getByRole('menuitem').click()
+  await expect(studio.node('customer')).toBeVisible()
+  await expect.poll(async () => (await stored())?.nodeIds.includes('customer')).toBe(true)
+  expect((await stored())?.explore?.levels.customer).toBe(2)
+  // Undo takes it back, and that is saved too.
+  await page.getByTitle('Undo (⌘Z)').click()
+  await expect(studio.node('customer')).toHaveCount(0)
+  await expect.poll(async () => (await stored())?.nodeIds.includes('customer')).toBe(false)
+
+  // Read again: drawn the same, with its + and −.
+  await page.waitForTimeout(1000)
+  await page.reload()
+  await studio.ready()
+  await studio.open(view.id)
+  await expect(page.getByText('Explore: API context')).toBeVisible()
+  await studio.settle()
+  expect(await placesNow()).toEqual(places)
+  await expect(page.getByRole('button', { name: 'Fold back what API added', exact: true })).toBeVisible()
+
+  // Viewer: its + works, and nothing is saved.
+  await page.waitForTimeout(1000)
+  const before = await studio.storedJson()
+  await page.locator('.toolbar-mode-btn', { hasText: 'Viewer' }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  await expect(page.locator('.lp-view-card.active')).toContainText('API context')
+  more = await plus(page, 'Web App')
+  await row(more, 'in', 'browses and orders').getByRole('menuitem').click()
+  await expect(studio.node('customer')).toBeVisible()
+  await page.waitForTimeout(1000)
+  expect(await studio.storedJson()).toBe(before)
+  // Back in Designer it is as saved.
+  await studio.designer()
+  await expect(page.locator('.lp-view-card.active')).toContainText('API context')
+  await expect(studio.node('customer')).toHaveCount(0)
+  await studio.settle()
+  expect(await placesNow()).toEqual(places)
+  await page.waitForTimeout(1000)
+  expect(await studio.storedJson()).toBe(before)
+
+  // Its view type switched to Structure: its elements, where they were.
+  await page.locator('.lp-view-card.active').getByTitle('View properties').click()
+  await page.getByRole('group', { name: 'View type' }).getByRole('button', { name: 'Explore' }).waitFor()
+  await expect(page.getByRole('group', { name: 'View type' }).getByRole('button', { name: 'Explore' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('group', { name: 'View type' }).getByRole('button', { name: 'Structure' }).click()
+  await expect(page.getByText('Structure: API context')).toBeVisible()
+  await studio.settle()
+  expect(await placesNow()).toEqual(places)
+  await expect(page.locator('[data-explore-more]')).toHaveCount(0)
+  await expect.poll(async () => (await stored())?.kind ?? 'static').toBe('static')
+  expect((await stored())?.nodeIds.sort()).toEqual(['api', 'db', 'payments', 'web'])
 })
 
 test('Explore from here in Viewer follows the milestone shown and saves nothing', async ({ page, studio }) => {
