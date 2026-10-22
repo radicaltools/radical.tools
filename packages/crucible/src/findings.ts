@@ -22,6 +22,12 @@ export interface Finding {
   file?: string
   suite?: string
   world?: string
+  /** Where an exploration found it: the round and the run. */
+  round?: string
+  run?: number
+  /** The script that reproduces an explored finding, copied beside the
+   *  finding ("F-0003/f1-undo.mjs 2"), run from its run's folder. */
+  script?: string
   /** What replays it: the seed, the counterexample's path and the longest sequence. */
   seed?: number
   path?: string
@@ -43,7 +49,7 @@ export interface Finding {
   notes?: string
 }
 
-const FIELDS = ['id', 'title', 'source', 'status', 'rule', 'signature', 'file', 'suite', 'world', 'seed', 'path', 'length', 'commit', 'found', 'scenario', 'test', 'sequence'] as const
+const FIELDS = ['id', 'title', 'source', 'status', 'rule', 'signature', 'file', 'suite', 'world', 'round', 'run', 'script', 'seed', 'path', 'length', 'commit', 'found', 'scenario', 'test', 'sequence'] as const
 
 /** The finding as its Markdown file. */
 export function findingToMarkdown(finding: Finding): string {
