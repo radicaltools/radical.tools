@@ -343,3 +343,6 @@
   color: var(--text-muted);
   line-height: 1.55;
 }
+
+/* Reference tables keep their columns readable on a phone: the wrap scrolls sideways instead of squeezing every cell. */
+.doc-table { min-width: 560px; }

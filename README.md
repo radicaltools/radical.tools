@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Try it in the browser](https://img.shields.io/badge/try%20it-studio.radical.tools-387bf3)](https://studio.radical.tools)
 
-[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html)
+[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html) · [Reference](https://radical.tools/reference.html)
 
 <img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="apps/web/screenshots/demo.gif" width="880">
 
@@ -62,7 +62,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **Time travel**: milestones of the whole model, with a diff against the previous one and edits that propagate to later milestones
 - **Inspector**: what `radical check` says about the model — its quality on its own (consistency, completeness, traceability, decisions), how faithfully the implementation follows it by the tests, and its `check.json` goals and rules as settings — with links to each element
 - **radical check**: a CLI that checks a model folder's metamodel rules, completeness and the tests it names; CI runs it on this repository's own model ([architecture/](architecture))
-- **radical fuzz** (Radical Crucible): runs a project's fuzz files, random sequences of actions with the system's rules checked after every step, by plan; a survey records each new way a rule breaks as a finding to fix or decide, and every rule of a fuzz file is a test case the model can name ([CLI usage](apps/cli/README.md#radical-fuzz)); **radical harden** turns a finding into a test (a fuzz finding replays its own steps) and gates a test: it must fail without the fix, pass with it, and pass several runs at once; **radical explore** prepares an exploratory round of agents (one build, a folder, ports and an area per run, a brief of what changed in the code and the model), re-runs their scripts and records their findings
+- **radical fuzz** (Radical Crucible): runs a project's fuzz files, random sequences of actions with the system's rules checked after every step, by plan; a survey records each new way a rule breaks as a finding to fix or decide, and every rule of a fuzz file is a test case the model can name ([CLI usage](apps/cli/README.md#radical-fuzz), [docs/CRUCIBLE.md](docs/CRUCIBLE.md)); **radical harden** turns a finding into a test (a fuzz finding replays its own steps) and gates a test: it must fail without the fix, pass with it, and pass several runs at once; **radical explore** prepares an exploratory round of agents (one build, a folder, ports and an area per run, a brief of what changed in the code and the model), re-runs their scripts and records their findings
 - **Confluence publication**: export a selected wiki view as Markdown or HTML, or publish a managed Confluence Cloud page tree with requirements, scenarios and links; Radical stays the source of truth ([CLI usage](apps/cli/README.md#radical-export-confluence))
 - **MCP server**: [@radicaltools/mcp](apps/mcp) lets Claude Code, Claude Desktop or Codex read and edit a Markdown model folder, with the same tools as the AI assistant
 - **Models**: kept in the browser, in one `.radical` file or in a folder of Markdown files (git-friendly); Structurizr DSL import

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reference — Radical.Tools</title>
+  <meta name="description" content="Radical.Tools reference: every element and relation type of the Radical and C4 metamodels, the viewpoints, the rules radical check runs, the command line, the MCP tools, file formats, deep links and keyboard shortcuts." />
+  <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
+  <script src="theme.js?v=__BUILD__"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="landing.css?v=__BUILD__" />
+  <link rel="stylesheet" href="style.css?v=__BUILD__" />
+</head>
+<body class="doc-page">
+
+  <!-- Shared site navigation — Home · Docs | Hub · Studio | GitHub · theme. Same on radical.tools, docs and the Hub (SiteNav.tsx). -->
+  <header class="site-nav" id="top">
+    <a class="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span class="site-nav-mark">R</span></a>
+    <nav class="site-nav-links">
+      <a class="site-nav-btn" href="https://radical.tools">Home</a>
+      <a class="site-nav-btn active" href="https://radical.tools/manual.html">Docs</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-btn" href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a class="site-nav-btn primary" href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg></a>
+      <button type="button" class="site-nav-icon" data-theme-toggle aria-label="Toggle theme"></button>
+    </nav>
+  </header>
+
+  <div class="doc-layout">
+
+    <!-- ── Sidebar / TOC ── -->
+    <aside class="doc-sidebar">
+      <nav class="doc-toc" aria-label="Contents">
+        <div class="toc-group">
+          <div class="toc-label">Guide</div>
+          <ul>
+            <li><a href="manual.html">← Back to the guide</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Metamodel</div>
+          <ul>
+            <li><a href="#types">Element types</a></li>
+            <li><a href="#relations">Relation types</a></li>
+            <li><a href="#viewpoints">Viewpoints</a></li>
+            <li><a href="#summaries">Summary templates</a></li>
+            <li><a href="#rules">Rules &amp; checks</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Tools</div>
+          <ul>
+            <li><a href="#cli">radical check</a></li>
+            <li><a href="#base">Changes on branch</a></li>
+            <li><a href="#mcp">MCP server</a></li>
+            <li><a href="#agent">Editing beside an agent</a></li>
+          </ul>
+        </div>
+        <div class="toc-group">
+          <div class="toc-label">Formats</div>
+          <ul>
+            <li><a href="#formats">File formats</a></li>
+            <li><a href="#links">Deep links</a></li>
+            <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+            <li><a href="#install">Install &amp; build</a></li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ── Main ── -->
+    <main class="doc-main">
+
+      <div class="doc-hero">
+        <span class="kicker">Reference</span>
+        <h1>Every type, rule, tool and option</h1>
+        <p class="doc-hero-sub">
+          Tables to look things up in. The <a href="manual.html">guide</a> explains how to use them.
+        </p>
+      </div>
+
+      <!-- ═══════════════ METAMODEL ═══════════════ -->
+
+      <section class="doc-section" id="types">
+        <h2>Element types</h2>
+        <p>The C4 metamodel has the first eight. The Radical metamodel has all of them, lets a Software System sit inside a Domain, and adds the rest. Types of the Radical layers sit at the root, in a system, in a domain or in a group unless the table says otherwise. Every type has a name, a description and a parent.</p>
+        <h3>C4</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Lives in</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Person</strong></td><td>Someone who uses or runs the system: a customer, an operator, another team.</td><td>Root, group. Never inside a system.</td><td>External</td></tr>
+              <tr><td><strong>Software System</strong></td><td>Something that delivers value and is owned by one team: yours, or one you depend on.</td><td>Root, group, system; in Radical also a domain, as the bounded context that realises it.</td><td>External</td></tr>
+              <tr><td><strong>Container</strong></td><td>Something that runs or stores data and is deployed on its own: a service, a worker, a mobile app.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Database</strong></td><td>A container that stores data and never starts an interaction.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Web App</strong></td><td>A container that is a browser front end; it may hold components.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Queue</strong></td><td>A container that carries messages between containers.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Component</strong></td><td>A part of a container behind a clear interface: a controller, an adapter.</td><td>Container, web app, or a group inside one. Never straight in a system.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Group</strong></td><td>A labelled boundary with no meaning of its own: a team, a layer, a zone. No relation starts or ends at a group.</td><td>Root, group, system.</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Domain</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Lives in</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Domain</strong></td><td>A part of the problem space in the language of the business: <em>Payments</em>. A domain in a domain is a subdomain.</td><td>Root, group, domain.</td><td>Kind (core, supporting, generic), Vision</td></tr>
+              <tr><td><strong>Entity</strong></td><td>A thing with an identity over time: an order, a reservation. An aggregate root is a consistency boundary; an entity is part of exactly one root.</td><td>Root, domain, group.</td><td>Kind (aggregate root, entity)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Requirements</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Need</strong></td><td>Raw stakeholder input kept verbatim: a brief, a user story, a regulation. No status; nothing satisfies or verifies it.</td><td>Kind, Source; the text is the description</td></tr>
+              <tr><td><strong>Requirement</strong></td><td>One thing the system shall do, as an EARS sentence. Its subject is the first element that satisfies it.</td><td>EARS type (ubiquitous, event-driven, state-driven, unwanted behaviour, optional, complex), Trigger, Precondition or While in state, Condition, Feature, Action, Rationale</td></tr>
+              <tr><td><strong>Scenario</strong></td><td>An acceptance example in Gherkin.</td><td>Given, When, Then, Extra steps, Tests (one <code>file › title</code> per line)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>States</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Lives in</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>State Machine</strong></td><td>The lifecycle of one entity, drawn as a frame that holds its states.</td><td>Root, system, domain, group.</td><td>—</td></tr>
+              <tr><td><strong>State</strong></td><td>A situation the entity can be in. A state with states is compound.</td><td>Machine, state.</td><td>Kind (normal, parallel, final), Entry, Exit, Do</td></tr>
+              <tr><td><strong>Pseudostate</strong></td><td>A point the machine passes through: initial, shallow or deep history, choice.</td><td>Machine, state.</td><td>Kind</td></tr>
+              <tr><td><strong>Event</strong></td><td>Something that happens and can trigger a transition.</td><td>Root, machine, system, domain, group.</td><td>Source (external, internal, timer), Payload</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Process</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Lives in</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Process</strong></td><td>A procedure made of steps.</td><td>Root, system, domain, group.</td><td>Children run (sequence, choice, concurrent)</td></tr>
+              <tr><td><strong>Step</strong></td><td>One part of a process.</td><td>Process, step.</td><td>Order, Repeat (1, 0..1, 1..n, 0..n), Condition, Children run</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>UX and governance</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Type</th><th>What it is</th><th>Fields</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Mockup</strong></td><td>One screen of the product, with an optional low-fi wireframe (sanitised SVG).</td><td>Screen / route, Design link, Wireframe</td></tr>
+              <tr><td><strong>ADR</strong></td><td>An architecture decision record in the Nygard / MADR shape. A new one starts <em>proposed</em> with today's date.</td><td>Status (proposed, accepted, deprecated, superseded), Date, Context, Decision, Consequences, Alternatives considered, Concern</td></tr>
+              <tr><td><strong>Fitness Function</strong></td><td>An automated check that the architecture keeps a property it was designed for.</td><td>Category (structural, operational, process, holistic), Threshold / success criteria, Tests</td></tr>
+              <tr><td><strong>Blueprint</strong></td><td>A curated reference architecture as the Hub once shipped them. Not in the palette; models that hold one keep it.</td><td>Status, Domain / context, Rationale</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section" id="relations">
+        <h2>Relation types</h2>
+        <p>Each relation has a direction: read it as a sentence from source to target. Studio picks the type the pair of ends allows; where two fit (entity → entity, domain → domain) it asks which.</p>
+        <h3>C4</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Interacts</strong></td><td>Person → system, container, web app, component<br/>System → person, system, container, database, web app, queue, component<br/>Container, Web App → person, system, container, database, web app, queue<br/>Component → component, container, web app, database, queue, system<br/>Queue → container, web app, component</td><td>Technology</td><td>The source calls, uses, sends to or delivers to the target. Draw it from the initiator. A database never initiates; nothing touches a group.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Domain</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Realises</strong></td><td>System, container → domain<br/>System, container, component, web app → entity</td><td>—</td><td>The bounded context that implements the domain; the element that owns the entity's data.</td></tr>
+              <tr><td><strong>Part of</strong></td><td>Entity → entity</td><td>—</td><td>A part of an aggregate points to its root.</td></tr>
+              <tr><td><strong>References</strong></td><td>Entity → entity</td><td>Cardinality (one, many)</td><td>One aggregate refers to another by id.</td></tr>
+              <tr><td><strong>Depends on</strong></td><td>Domain → domain</td><td>—</td><td>The source needs the target to do its work.</td></tr>
+              <tr><td><strong>Partnership</strong></td><td>Domain → domain</td><td>Pattern (partnership, shared kernel, customer–supplier, conformist, anti-corruption layer, open host service, published language, separate ways)</td><td>How the two teams' models meet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Traceability</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Derives from</strong></td><td>Requirement → need<br/>Requirement → requirement<br/>Need → need</td><td>—</td><td>The requirement turns that input into a shall-statement; decomposition; a need inside a broader one. Nothing else may point at a need.</td></tr>
+              <tr><td><strong>Satisfies</strong></td><td>C4 element, domain, entity, state machine, process → requirement</td><td>Note</td><td>This element is what makes the requirement true. The first one is the subject of the EARS sentence.</td></tr>
+              <tr><td><strong>Verifies</strong></td><td>Scenario → requirement, state machine, process</td><td>—</td><td>The scenario is the acceptance test for it.</td></tr>
+              <tr><td><strong>Traces to</strong></td><td>Requirement → ADR, fitness function</td><td>—</td><td>The decision the requirement led to, or the check that keeps it.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Behaviour</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Lifecycle of</strong></td><td>State machine → entity</td><td>—</td><td>One machine per entity.</td></tr>
+              <tr><td><strong>Implements</strong></td><td>System, container, component, web app → state machine<br/>Fitness function → ADR</td><td>—</td><td>This element runs the machine; this check verifies that the decision still holds.</td></tr>
+              <tr><td><strong>Transition</strong></td><td>State, pseudostate → state, pseudostate, within one machine</td><td>Event, Guard, Actions, Raises, Kind (external, internal)</td><td>Labelled <code>event [guard] / actions ^raised</code>. No event means a completion transition.</td></tr>
+              <tr><td><strong>Emits</strong></td><td>Person, system, container, component, web app, queue, state machine, state → event</td><td>On (entry, exit, do) for a state</td><td>This element raises the event.</td></tr>
+              <tr><td><strong>Performed by</strong></td><td>Step → person, system, container, component, web app</td><td>—</td><td>Who does the step.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>UX and governance</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Illustrates</strong></td><td>Mockup → requirement, scenario, state</td><td>—</td><td>The screen shows this being met, or what the user sees in this state.</td></tr>
+              <tr><td><strong>Presented by</strong></td><td>Mockup → web app, container, component, system</td><td>—</td><td>The part of the architecture that renders the screen.</td></tr>
+              <tr><td><strong>Navigates to</strong></td><td>Mockup → mockup</td><td>Trigger</td><td>One step of a screen flow.</td></tr>
+              <tr><td><strong>Constrains</strong></td><td>ADR, fitness function, requirement → person, system, domain, container, component, database, web app, queue</td><td>Note</td><td>The decision, check or requirement applies to that element. An agent reads this before it changes the element.</td></tr>
+              <tr><td><strong>Supersedes</strong></td><td>ADR → ADR</td><td>—</td><td>The newer decision replaces the older one.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section" id="viewpoints">
+        <h2>Viewpoints</h2>
+        <p>The Radical metamodel ships these twenty-five. The C4 metamodel ships the first six. <em>Per element</em> marks a viewpoint that makes a group with a view of each element of its type.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Group</th><th>Viewpoint</th><th>View type</th><th>What it shows</th></tr></thead>
+            <tbody>
+              <tr><td rowspan="6"><strong>C4</strong></td><td>System context</td><td>Structure</td><td>The people and systems, with every relation between them</td></tr>
+              <tr><td>Containers</td><td>Structure</td><td>The containers inside the systems</td></tr>
+              <tr><td>Components</td><td>Structure</td><td>The components inside the containers</td></tr>
+              <tr><td>Containers of a system</td><td>Structure, per element</td><td>One system, its containers and what they are related to: C4's container diagram</td></tr>
+              <tr><td>Components of a container</td><td>Structure, per element</td><td>One container, its components and what they are related to</td></tr>
+              <tr><td>Container dependencies</td><td>Matrix</td><td>Containers, web apps, databases and queues</td></tr>
+              <tr><td rowspan="4"><strong>Domain</strong></td><td>Domain map</td><td>Structure</td><td>Domains and how they depend on and partner with each other</td></tr>
+              <tr><td>Domain model</td><td>Structure</td><td>Entities, what they are part of and reference</td></tr>
+              <tr><td>Entities of a domain</td><td>Structure, per element</td><td>One domain, its entities and the entities they reference</td></tr>
+              <tr><td>Domain realisation</td><td>Table</td><td>Domains, their entities and what realises each</td></tr>
+              <tr><td rowspan="5"><strong>Requirements</strong></td><td>Traceability</td><td>Table</td><td>Needs, the requirements refined from each, the scenarios that verify those</td></tr>
+              <tr><td>Requirement coverage</td><td>Table</td><td>Requirements, what satisfies and verifies each</td></tr>
+              <tr><td>Requirement gaps</td><td>Table</td><td>Requirements no scenario verifies or nothing satisfies</td></tr>
+              <tr><td>Responsibilities</td><td>Table</td><td>Systems, containers and components with the requirements they satisfy</td></tr>
+              <tr><td>Specification</td><td>Wiki</td><td>Needs, their requirements and the scenarios and screens for each</td></tr>
+              <tr><td rowspan="3"><strong>Decisions</strong></td><td>Decisions</td><td>Table</td><td>ADRs, the fitness functions that check each and what it constrains</td></tr>
+              <tr><td>Decision log</td><td>Wiki</td><td>ADRs, newest first, each with the ones it supersedes</td></tr>
+              <tr><td>Fitness functions</td><td>Table</td><td>By category, with what each checks and constrains</td></tr>
+              <tr><td rowspan="2"><strong>UX</strong></td><td>Screen flow</td><td>Structure</td><td>The screens and how users move between them</td></tr>
+              <tr><td>Screens</td><td>Table</td><td>The screens with what they illustrate and what presents them</td></tr>
+              <tr><td rowspan="3"><strong>States</strong></td><td>Entity lifecycles</td><td>Table</td><td>Entities with a state machine, what implements and verifies it</td></tr>
+              <tr><td>State machine</td><td>Structure, per element</td><td>One machine with its states, events and transitions</td></tr>
+              <tr><td>Event catalogue</td><td>Table</td><td>The events and what emits each</td></tr>
+              <tr><td rowspan="2"><strong>Process</strong></td><td>Process (Warnier)</td><td>Warnier</td><td>The processes and their steps as Warnier–Orr diagrams</td></tr>
+              <tr><td>Process</td><td>Structure, per element</td><td>One process and its steps</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section" id="summaries">
+        <h2>Summary templates</h2>
+        <p><em>Summary in tables</em> on a node type is a template of tokens. A part in <code>[ ]</code> is left out when a token in it is empty; the template's own text may use Markdown. Left empty, the built-in template applies, else the description's first sentence.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Token</th><th>What it gives</th></tr></thead>
+            <tbody>
+              <tr><td><code>{key}</code></td><td>A property; also <code>{label}</code>, <code>{description}</code>, <code>{technology}</code>, <code>{type}</code></td></tr>
+              <tr><td><code>{ears}</code></td><td>A requirement's whole EARS sentence</td></tr>
+              <tr><td><code>{obligation}</code> · <code>{condition}</code></td><td>Who shall do what; the when / while / if / where it holds under</td></tr>
+              <tr><td><code>{transitions}</code></td><td>Where a state machine goes from a state or on an event</td></tr>
+              <tr><td><code>{out:type}</code> · <code>{in:type}</code></td><td>The elements linked by relations of a type, out or in</td></tr>
+              <tr><td><code>{key.sentence}</code> · <code>{key.phrase}</code></td><td>The first sentence; the first phrase</td></tr>
+              <tr><td><code>{key.cap}</code> · <code>{key.bold}</code></td><td>Capitalised; bold</td></tr>
+              <tr><td><code>{a|b}</code></td><td>The first of them that has a value</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Built-in templates: <code>[{obligation.bold}][ — {condition}]</code> for a requirement, <code>[{then.phrase.cap.bold}][ — when {when}]</code> for a scenario, <code>[{status.cap.bold}: ]{decision.sentence}</code> for an ADR.</p>
+      </section>
+
+      <section class="doc-section" id="rules">
+        <h2>Rules &amp; checks</h2>
+        <p>The metamodel is enforced in three rings: what Studio refuses at once, what the Validation list and <code>get_issues</code> list as issues, and what only <code>radical check</code> and the Inspector report.</p>
+        <h3>Refused at once</h3>
+        <ul>
+          <li>Placing or moving an element where its type may not sit, or at the root when it needs a parent.</li>
+          <li>One more element of a type that has reached its maximum.</li>
+          <li>A relation type that does not join its two ends, or a pair no relation type allows.</li>
+          <li>Changing an element's type when one of its relations would then not be allowed.</li>
+          <li>Moving a group where something it holds would have no place; moving an element into itself.</li>
+          <li>A transition out of a final state, or into an initial pseudostate.</li>
+        </ul>
+        <p>The same refusals reach the AI assistant, Radical Forge and the MCP server as messages they can act on.</p>
+        <h3>Listed as issues</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Area</th><th>Issues</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Any metamodel</strong></td><td>An unknown type, a misplaced element, a relation to an element that is gone or between types no relation joins, a reference that points at nothing or the wrong type, an empty required field, too few or too many elements of a type; in custom metamodels, two properties of a type with one key.</td></tr>
+              <tr><td><strong>Domain model</strong></td><td>An aggregate root that is part of something; a part of something that is not a root; an entity that belongs to no aggregate or to two.</td></tr>
+              <tr><td><strong>State machines</strong></td><td>A machine with no entity, or an entity with two machines; no initial pseudostate, or more than one; an initial pseudostate without exactly one outgoing transition; a parallel state with fewer than two regions; a final state with children or outgoing transitions; a transition that leaves its machine; two unguarded transitions from one state on one event; a state the initial state cannot reach.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Checked by radical check</h3>
+        <p>Warnings unless <code>check.json</code> says otherwise; <code>radical check --list-rules</code> lists them with their ids.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Area</th><th>Rules</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Requirements</strong></td><td>A requirement without the clauses its EARS type needs; one no scenario verifies; one nothing satisfies; one that derives from nothing; a need no requirement derives from; a scenario that verifies nothing.</td></tr>
+              <tr><td><strong>Concerns</strong></td><td><code>concern-unaddressed</code>: a concern a pack finds in the model that no accepted ADR marked with it covers. <code>concern-unbound</code>: an accepted ADR marked with a concern that constrains no element.</td></tr>
+              <tr><td><strong>Decisions</strong></td><td>An accepted ADR no fitness function implements; one without date, context, decision or consequences; a superseded status and Supersedes links that disagree; a fitness function that implements no ADR and constrains nothing, or has no threshold.</td></tr>
+              <tr><td><strong>Tests</strong></td><td>A scenario or fitness function that names no test. With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
+              <tr><td><strong>The folder</strong></td><td>A missing <code>radical.md</code>, a JSON file that does not parse, git conflict markers, a node file without id or type, two files with one id (errors); views, sequences or slides that point at something gone.</td></tr>
+              <tr><td><strong>Goals</strong></td><td><code>goal-unmet</code>: a metric below the share <code>check.json</code> asks for (requirements with a scenario, accepted ADRs with a fitness function, requirements verified, scenarios passing, …).</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══════════════ TOOLS ═══════════════ -->
+
+      <section class="doc-section" id="cli">
+        <h2>radical check</h2>
+        <p>Checks a Markdown folder: the folder's files, the metamodel rules and the completeness rules above. It never changes the model. Run the published package, or build it from a clone (see <a href="#install">Install &amp; build</a>).</p>
+<pre class="code"><code>npx -y @radicaltools/cli check path/to/my-model --report reports</code></pre>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>[folder]</code></td><td>The model folder. Default: the working directory.</td></tr>
+              <tr><td><code>--config &lt;file&gt;</code></td><td>Rule settings. Default: <code>check.json</code> in the model folder.</td></tr>
+              <tr><td><code>--format text|json|github</code></td><td>Plain text (default), JSON, or GitHub Actions annotations.</td></tr>
+              <tr><td><code>--report &lt;path&gt;</code></td><td>A test report (Vitest or Jest JSON, Playwright JSON, JUnit XML) or a directory of them; repeat for more. The test cases read are kept in <code>.radical/test-results.json</code> for the Inspector. A report with no test case stops the check with status 2.</td></tr>
+              <tr><td><code>--evidence &lt;file&gt;</code></td><td>With <code>--report</code>: writes what the reports say about each scenario, fitness function, requirement and ADR as JSON.</td></tr>
+              <tr><td><code>--ratchet</code></td><td>Lowers each <code>max</code> in the config to the count found now and writes the config back. Never raises one.</td></tr>
+              <tr><td><code>--verbose</code></td><td>Lists every warning, not the first five of each rule.</td></tr>
+              <tr><td><code>--list-rules</code></td><td>Lists the rules, their default severity, and the metrics goals can set.</td></tr>
+              <tr><td><code>radical --version</code></td><td>Prints the version, with the commit when the build is not a release (<code>0.3.0+1a2b3c4</code>).</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Exit status: 0 no errors (warnings allowed), 1 errors, 2 the check could not run.</p>
+        <h3>check.json</h3>
+        <p><code>rules</code> sets a rule by its id, or one kind of metamodel issue by <code>metamodel/&lt;code&gt;</code>, to <code>error</code>, <code>warning</code> or <code>off</code>. With <code>max</code>, up to that many findings pass as warnings and one more fails the check, so an existing model can adopt a rule before every gap is closed. <code>goals</code> sets the least share of a metric, in percent; a metric below its goal is <code>goal-unmet</code>, an error unless set otherwise.</p>
+<pre class="code"><code>{
+  "rules": {
+    "adr-incomplete": "off",
+    "requirement-without-scenario": { "severity": "error", "max": 104 }
+  },
+  "goals": {
+    "requirements-with-scenario": { "min": 85 },
+    "requirements-verified": { "min": 80 }
+  }
+}</code></pre>
+        <p>The Inspector's Settings tab edits the same file.</p>
+      </section>
+
+      <section class="doc-section" id="base">
+        <h2>Changes on branch</h2>
+        <p><code>radical diff &lt;folder&gt;</code> prints the elements and relations added, removed and changed since the branch left <code>main</code>, with old and new values. Views and layout are left out. <code>--since &lt;ref&gt;</code> compares with another commit, tag or branch.</p>
+        <p>The <strong>base</strong> is the model at <code>git merge-base HEAD origin/main</code>, saved to <code>.radical/base.json</code>. Studio reads the file every few seconds and compares the model with it as you edit. Only the command line and the MCP server save it:</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Saves the base</th><th>Through</th></tr></thead>
+            <tbody>
+              <tr><td>A checkout or switch of branch</td><td>the <code>post-checkout</code> hook</td></tr>
+              <tr><td>A commit, amended too</td><td>the <code>post-commit</code> hook</td></tr>
+              <tr><td>A pull that merges or fast-forwards, a merge</td><td>the <code>post-merge</code> hook</td></tr>
+              <tr><td>A rebase, <code>git pull --rebase</code>, an amend</td><td>the <code>post-rewrite</code> hook</td></tr>
+              <tr><td>An agent's <code>get_changes</code> without <code>since</code></td><td>the MCP server</td></tr>
+              <tr><td>By hand</td><td><code>radical diff &lt;folder&gt; --save-base</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><code>radical hooks install &lt;folder&gt;</code> adds the four hooks. A fetch, a reset or a stash runs no hook.</li>
+          <li>Committing keeps the base, so the list holds the whole branch's work. After the pull request is merged, switch to <code>main</code> and pull: the list empties.</li>
+          <li>To see only what is not committed yet: <code>radical diff &lt;folder&gt; --save-base --since HEAD</code>.</li>
+          <li>A folder outside git has no base from git. A Radical Forge run on such a folder saves the model before it as the base; the next run replaces it.</li>
+          <li>A base older than a day is marked in the Inspector with the commands that save it again.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="mcp">
+        <h2>MCP server</h2>
+        <p>Runs locally over stdio, bound to one Markdown folder. Node.js 20.11 or newer.</p>
+<pre class="code"><code>npx -y @radicaltools/mcp --folder /absolute/path/to/my-model   <span class="cm"># waits for MCP messages on stdin</span>
+radical-mcp --version</code></pre>
+        <p>Claude Desktop: add it under <code>mcpServers</code> in <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code>) and restart the app. Give the full path to <code>node</code>, because the app does not see your shell's PATH.</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "radical-folder": {
+      "command": "/usr/local/bin/node",
+      "args": ["/path/to/radical.tools/apps/mcp/dist/index.js", "--folder", "/path/to/my-model"]
+    }
+  }
+}</code></pre>
+        <ul>
+          <li><code>--metamodel radical|c4</code> picks the metamodel of a new folder (default <code>radical</code>). A folder with other files and no <code>radical.md</code> is refused.</li>
+          <li>Studio warns once when the server's version differs from its own; update the older one.</li>
+          <li>Not supported: single <code>.radical</code> files, driving Studio's canvas, loading a milestone over the model, clearing the model, remote HTTP connections.</li>
+        </ul>
+        <h3>Tools</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Group</th><th>Tools</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> (counts, views, sequences, milestones, the modelling rules and the metamodel rules) · <code>get_issues</code> · <code>search_model</code> (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>) · <code>get_selection</code> · <code>get_changes</code></td></tr>
+              <tr><td><strong>Elements &amp; relations</strong></td><td><code>add_node</code>, <code>update_node</code>, <code>delete_node</code>, <code>move_node</code> · <code>add_relation</code>, <code>update_relation</code>, <code>delete_relation</code></td></tr>
+              <tr><td><strong>Views</strong></td><td><code>create_view</code>, <code>update_view</code>, <code>set_view_nodes</code>, <code>order_views</code>, <code>delete_view</code> · <code>smart_layout</code> · <code>align_nodes</code>, <code>grid_nodes</code>, <code>remove_alignment</code></td></tr>
+              <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code> (a slide shows a view or zooms onto elements with <code>focus</code>, from the model or a milestone)</td></tr>
+              <tr><td><strong>Milestones</strong></td><td><code>list_milestones</code>, <code>create_milestone</code>, <code>update_milestone</code>, <code>delete_milestone</code>, <code>compare_milestones</code></td></tr>
+              <tr><td><strong>Metamodel</strong></td><td><code>upsert_node_type</code>, <code>delete_node_type</code>, <code>upsert_relation_type</code>, <code>delete_relation_type</code>, <code>upsert_viewpoint</code>, <code>delete_viewpoint</code></td></tr>
+              <tr><td><strong>Radical Forge</strong></td><td><code>forge_start</code> · <code>forge_clarify</code> → <code>forge_generate</code> (with <code>forge_propose_refinement</code> → <code>forge_answer_refinement</code> when a stage finds what an earlier one lacks) → <code>forge_complete_stage</code> → <code>forge_arrange</code>, per stage · <code>forge_wireframe</code> · <code>forge_import_hub_concept</code> · <code>forge_finish</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>Writes go through the same schemas and metamodel rules as Studio. An invalid parent, type or pair is refused with a message; warnings come back with the result. A tool reports success only after the files are written.</li>
+          <li>A reference such as a transition's event takes an element's id, or a <code>tempId</code> from the same session.</li>
+          <li>Changing a built-in metamodel saves a <em>-custom</em> copy and re-announces the tools with the new types.</li>
+          <li>The server keeps a Forge run in <code>.radical/forge-run.json</code>, and refuses direct writes to earlier stages while a proposal waits. In Claude Code, <code>/mcp__radical-folder__forge</code> starts a run.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="agent">
+        <h2>Editing beside an agent</h2>
+        <p>Studio and an agent can work on one folder at the same time; neither overwrites the other.</p>
+        <ul>
+          <li><strong>Turns.</strong> After each write the server marks the folder as being written (<code>.radical/agent-activity.json</code>) for 15 seconds. Studio holds its saves meanwhile, keeps your edits on top of the agent's, and saves them when the agent pauses. A reload keeps them in the browser until the folder has them.</li>
+          <li><strong>Merges.</strong> Changes are merged element by element and field by field. Where both sides changed one value, what is in the folder is kept and a notice names it. What one side deleted stays deleted, with what the other side built on it, and the notice names that too. Two agents on one folder take turns through <code>.radical/write.lock</code>.</li>
+          <li><strong>What stays.</strong> An agent's change leaves your view, selection, camera and milestone as they were. While you drag, the change waits for the drop; while a presentation plays, until it stops.</li>
+          <li><strong>Undo.</strong> Your Undo and Redo take back your own steps only. Where a step meets a value or an element the agent changed since, the agent's version stays and a notice names it.</li>
+          <li><strong>Files.</strong> A file that does not read as a model (conflict markers, a trailing comma) is never merged over: Studio says which file and saves nothing until it reads again.</li>
+        </ul>
+      </section>
+
+      <!-- ═══════════════ FORMATS ═══════════════ -->
+
+      <section class="doc-section" id="formats">
+        <h2>File formats</h2>
+        <h3>.radical (JSON)</h3>
+        <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (positions, camera and layout constraints per view), <code>defaultEdgeStyle</code>, <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
+        <h3>Markdown folder</h3>
+<pre class="code"><code>my-model/
+├─ radical.md                 <span class="cm"># manifest</span>
+├─ nodes/
+│  ├─ retail-customer.md       <span class="cm"># one element = one file</span>
+│  └─ core-banking-platform/   <span class="cm"># an element with children becomes a directory</span>
+│     ├─ _index.md             <span class="cm"># the element itself</span>
+│     └─ payments-service/
+│        ├─ _index.md
+│        └─ fx-engine.md
+├─ relations.json
+├─ views.json · sequences.json · snapshots.json · presentations.json
+├─ metamodel.json · hubTemplates.json
+├─ _layout.json               <span class="cm"># positions, camera, line style — the only noisy file</span>
+├─ check.json                 <span class="cm"># optional: rule settings for radical check and the Inspector</span>
+└─ .radical/                  <span class="cm"># editor state, kept out of git by its own .gitignore</span>
+   ├─ selection.json          <span class="cm"># what is selected in Studio, for the MCP server</span>
+   ├─ base.json               <span class="cm"># the model where the branch left main</span>
+   ├─ forge-run.json          <span class="cm"># where an agent's Forge run stands</span>
+   ├─ agent-activity.json     <span class="cm"># an agent is writing</span>
+   └─ test-results.json       <span class="cm"># test cases from the last radical check --report</span></code></pre>
+        <ul>
+          <li>Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the properties, sorted) and the description as body. Hierarchy is the directory tree.</li>
+          <li>Output is deterministic: sorted keys, stable file names. A file is named after its element and keeps its name until the element is renamed or moved; two of one name are <code>orders-db.md</code> and <code>orders-db-2.md</code>.</li>
+          <li>Edit the files by hand or through the MCP server; Studio picks them up and merges what you have not saved yet. A file with a byte-order mark reads as any other.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="links">
+        <h2>Deep links</h2>
+        <p>Studio keeps the place on screen in the URL hash, so any place can be bookmarked or shared.</p>
+<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/t/&lt;tab&gt;][/f/&lt;elementId&gt;][/e/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
+#/d/&lt;docId&gt;/m/&lt;mode&gt;/v/&lt;viewId&gt;[/p/&lt;presentationId&gt;/play/1/sl/&lt;n&gt;]</code></pre>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>m</code></td><td><code>designer</code> · <code>viewer</code> · <code>presenter</code> · <code>metamodel</code> · <code>inspector</code></td></tr>
+              <tr><td><code>v</code></td><td>A view id, or <code>canvas</code> for the default structure view</td></tr>
+              <tr><td><code>t</code></td><td>The Inspector's tab: <code>changes</code> · <code>model</code> · <code>implementation</code> · <code>settings</code></td></tr>
+              <tr><td><code>f</code> · <code>e</code></td><td>The wiki page shown · the selected element</td></tr>
+              <tr><td><code>s</code></td><td>The active milestone</td></tr>
+              <tr><td><code>p</code> · <code>sl</code></td><td>The presentation and the 0-based slide while presenting</td></tr>
+              <tr><td><code>d</code></td><td>Which model: <code>ls:&lt;id&gt;</code>, <code>fs:&lt;path&gt;</code> or <code>md:&lt;folder&gt;</code>, local to this machine</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>File and folder paths open only in the desktop app; in the browser a folder is identified by its id, so its links work in the browser that opened it. The Hub uses <code>#/browse</code> for the catalogue and <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> for one pack; <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those packs queued for import.</p>
+      </section>
+
+      <section class="doc-section" id="shortcuts">
+        <h2>Keyboard shortcuts</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Keys</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td><kbd>⌘/Ctrl+P</kbd></td><td>Quick Search (and AI prompt)</td></tr>
+              <tr><td><kbd>Tab</kbd> / <kbd>⌘/Ctrl+Enter</kbd></td><td>In Quick Search: switch to AI mode / send to AI</td></tr>
+              <tr><td><kbd>⌘/Ctrl+Z</kbd> · <kbd>⌘/Ctrl+⇧+Z</kbd></td><td>Undo · Redo (Designer)</td></tr>
+              <tr><td><kbd>Alt</kbd> + drag (configurable)</td><td>Connect two elements</td></tr>
+              <tr><td><kbd>⌘/Ctrl</kbd> + drag</td><td>Drag with the live physics making room</td></tr>
+              <tr><td><kbd>Shift</kbd> + click</td><td>Add to selection (<kbd>⌘</kbd> + click when the connect key is Shift)</td></tr>
+              <tr><td><kbd>Shift</kbd> + drag on the background</td><td>Select with a box</td></tr>
+              <tr><td><kbd>Delete</kbd></td><td>Delete the selection (Designer; <kbd>fn+⌫</kbd> on a Mac)</td></tr>
+              <tr><td>Double-click the canvas</td><td>New Software System at the pointer</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Cancel a connection, close dialogs, leave edit mode, stop the presentation; go up a level in a Hierarchy view</td></tr>
+              <tr><td><kbd>F5</kbd></td><td>Start / stop the presentation</td></tr>
+              <tr><td><kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> · <kbd>←</kbd> <kbd>↑</kbd></td><td>Next · previous slide</td></tr>
+              <tr><td><kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>Back / forward (<kbd>⌘+[</kbd> / <kbd>⌘+]</kbd> on a Mac)</td></tr>
+              <tr><td><kbd>⌘/Ctrl++</kbd> / <kbd>−</kbd> · <kbd>⌘/Ctrl+0</kbd></td><td>Zoom in / out · fit (Flow views)</td></tr>
+              <tr><td><kbd>⌘/Ctrl+Enter</kbd></td><td>In a wizard: create the element (<kbd>Esc</kbd> discards it)</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>Confirm inline edits (names, notes, table cells)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The Warnier view's outline keys are in the <a href="manual.html#view-warnier">guide</a>.</p>
+      </section>
+
+      <section class="doc-section" id="install">
+        <h2>Install &amp; build</h2>
+        <h3>VS Code extension</h3>
+        <p>The Radical.Tools extension opens <code>.radical</code> files in a Radical.Tools editor inside VS Code, keeps the file and the editor in sync both ways, and follows the editor's theme. Commands: <em>Radical.Tools: Open current file</em>, <em>Open app</em>, <em>Stop</em> and <em>Show output log</em>. Markdown folders open in Studio, not in VS Code.</p>
+        <h3>Desktop app and a clone</h3>
+<pre class="code"><code><span class="cm"># Node.js 20.11 or newer</span>
+git clone https://github.com/radicaltools/radical.tools.git
+cd radical.tools
+npm install
+npm run dev                          <span class="cm"># Electron, hot reload</span>
+npm run build &amp;&amp; npm start           <span class="cm"># desktop app</span>
+npm run dist                         <span class="cm"># packaged desktop app</span>
+npm run dev:web                      <span class="cm"># browser build of Studio</span>
+npm run dev:hub                      <span class="cm"># Concern Hub</span>
+npm run build -w @radicaltools/mcp   <span class="cm"># MCP server:  node apps/mcp/dist/index.js --folder …</span>
+npm run build -w @radicaltools/cli   <span class="cm"># radical:     node apps/cli/dist/index.js check …</span>
+npm test                             <span class="cm"># unit tests of every workspace</span>
+npm run e2e                          <span class="cm"># browser tests</span>
+npm run check:architecture           <span class="cm"># radical check on this repository's own model</span></code></pre>
+        <p>The desktop app adds native file dialogs, Markdown folders without browser permissions and <code>--file</code> watching (or the <code>RADICAL_FILE</code> variable). Everything else is identical to the browser build. Studio, the desktop app, the VS Code extension, the MCP server and the command line share one version; a build that is not a release shows the commit after it.</p>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="footer">
+    <span>Radical.Tools — MIT licensed. Built on the <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a>.</span>
+    <span class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="manual.html">Docs</a>
+      <a href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </footer>
+
+  <script src="docs.js?v=__BUILD__"></script>
+</body>
+</html>
