@@ -34,6 +34,7 @@ export function importConcernPackIntoDiagram(concept: HubConcept, answers: Recor
   const insert = buildConcernInsert(concept, {
     answers,
     elements: elementIds.map((id) => store.c4Nodes[id]).filter(Boolean),
+    nodes: store.c4Nodes,
     metamodel: store.metamodel,
     today: new Date().toISOString().slice(0, 10),
     newId: () => crypto.randomUUID(),
@@ -46,6 +47,8 @@ export function importConcernPackIntoDiagram(concept: HubConcept, answers: Recor
   useDiagramStore.setState((state) => {
     Object.assign(state.c4Nodes, insert.nodes)
     Object.assign(state.c4Relations, insert.relations)
+    // The pack's own view, in the folder Concerns.
+    for (const v of insert.views) state.views[v.id] = v
     if (state.activeViewId && state.views[state.activeViewId]) {
       addToViewList(state.views[state.activeViewId], Object.keys(insert.nodes))
     }

@@ -5,4 +5,4 @@ label: "Architecture Hub"
 technology: "React, Vite"
 ---
 
-hub.radical.tools (apps/hub): read-only viewer of the concern packs, listed and filtered by concern group, each with its group and sources, which Studio imports. Served from S3 + CloudFront.
+hub.radical.tools (apps/hub): read-only viewer of the concern packs, listed and filtered by concern group, each with its group, which Studio imports. Served from S3 + CloudFront.

@@ -13,3 +13,5 @@ Decisions after trying the concern pack prototype (2026-10-22, translated from P
 - Let me bind a pack to several elements, chosen from a list in the wizard; the system should propose them.
 - Clean the Hub of the other things: I want only concerns.
 - Add 8-10 typical concerns.
+
+Later the same day, asked whether Forge answers some questions itself or asks them all: through Studio (the concern wizard) all the questions; through Forge, Forge should already fill them in if it can answer them, but the user has to accept them.

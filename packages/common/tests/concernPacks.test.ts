@@ -37,7 +37,7 @@ function good(): HubRadicalDoc {
 describe('concernPackProblems', () => {
   it('passes a pack that meets the standard', () => {
     expect(concernPackProblems(good())).toEqual([])
-    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['identity', 'security', 'data', 'integration', 'reliability', 'operations', 'maintainability', 'technology'])
+    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['architecture', 'identity', 'security', 'data', 'integration', 'reliability', 'operations', 'maintainability', 'technology'])
   })
 
   it('names each way a pack falls below the standard', () => {
@@ -48,7 +48,7 @@ describe('concernPackProblems', () => {
     doc.nodes[4].description = 'Checked somehow.'
     const problems = concernPackProblems(doc)
     expect(problems).toEqual(expect.arrayContaining([
-      expect.stringContaining('hub.concern.group must be one of identity, security'),
+      expect.stringContaining('hub.concern.group must be one of architecture, identity, security'),
       'a concern pack asks at least three questions with options (it asks 2)',
       'question B: option "b" does not say what it means and when to pick it',
       'a concern pack names at least two sources (it names 1)',

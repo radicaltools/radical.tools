@@ -24,9 +24,8 @@ test('a concept added from a Hub link in Viewer reaches the model', async ({ pag
   await studio.ready()
   const before = (await studio.storedDoc()).nodes.length
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
-  const dialog = page.locator('[aria-label="Import from Hub"]')
-  await dialog.getByRole('button', { name: 'Add to Model' }).first().click()
-  // The wizard, at its default answers: the decision for an identity provider.
+  // The link's pack opens in its wizard by itself; at its default answers:
+  // the decision for an identity provider.
   await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 16)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
@@ -133,7 +132,7 @@ test('the import dialog filters concern packs by group', async ({ page, studio }
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   const groups = dialog.getByRole('group', { name: 'Concern groups' })
-  await expect(groups.getByRole('button')).toHaveText(['All', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
+  await expect(groups.getByRole('button')).toHaveText(['All', 'Architecture', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
   await groups.getByRole('button', { name: 'Data', exact: true }).click()
   await expect(dialog.getByRole('heading', { name: 'Personal data', exact: true })).toBeVisible()
@@ -143,4 +142,24 @@ test('the import dialog filters concern packs by group', async ({ page, studio }
   for (const name of await cards.allInnerTexts()) {
     await expect(dialog.locator('div', { has: page.getByRole('heading', { name, exact: true }) }).last()).toContainText('Data')
   }
+})
+
+test('several concern packs from a Hub link open their wizards one after another, each with its view', async ({ page, studio }) => {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await page.goto(`/?hub=concern-authentication,concern-secrets#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/designer/v/v-containers`)
+  await studio.ready()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard.locator('.nw-title')).toHaveText('Authentication')
+  await expect(wizard.getByTestId('concern-position')).toHaveText('Pack 1 of 2')
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+  await expect(wizard.locator('.nw-title')).toHaveText('Secrets')
+  await expect(wizard.getByTestId('concern-position')).toHaveText('Pack 2 of 2')
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+  await expect(page.locator('[aria-label="Import from Hub"]')).toBeHidden()
+  await expect.poll(async () => {
+    const stored = await studio.storedDoc() as unknown as { nodes: Array<{ type: string; concern?: string }>; views: Array<{ name: string; folder?: string }> }
+    return [stored.nodes.filter((n) => n.type === 'adr').map((n) => n.concern).sort(), stored.views.filter((v) => v.folder === 'Concerns').map((v) => v.name).sort()]
+  }).toEqual([['authentication', 'secrets'], ['Authentication', 'Secrets']])
 })

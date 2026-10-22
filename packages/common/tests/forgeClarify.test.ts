@@ -73,7 +73,7 @@ describe('buildClarifyPrompt', () => {
   it("in 'ask' mode tells the model to ask the user, the packs' questions included, instead of answering with JSON", () => {
     const ask = buildClarifyPrompt('Requirements', 'desc', [PACK], undefined, 'ask')
     expect(ask).toContain('Ask the user those questions')
-    expect(ask).toContain('pass the packs with the user\'s answers to forge_generate as concerns')
+    expect(ask).toContain('Pass the packs with the answers the user accepted or gave to')
     expect(ask).toContain('  - IDENTITY: How do people sign in? [idp = a provider; none = nobody] (default idp)')
     expect(ask).not.toContain('JSON')
     expect(ask).not.toContain(`"${CONCERNS_QUESTION_ID}"`)

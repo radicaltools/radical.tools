@@ -15,14 +15,15 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
 
-/** A working directory holding `model/`: one requirement no scenario verifies. */
+/** A working directory holding `model/`: one requirement no scenario verifies,
+ *  satisfied by an outside system, which no concern pack asks about. */
 async function workspace(data: Partial<DiagramData> = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'radical-cli-'))
   dirs.push(cwd)
   const files = serializeToMdFolder({
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
-      node('sys', 'system', 'Shop'),
+      node('sys', 'system', 'Shop', { external: true }),
       node('need', 'need', 'Brief'),
       node('req', 'requirement', 'Pay', { action: 'take the payment' }),
     ],

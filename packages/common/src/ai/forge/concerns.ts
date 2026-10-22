@@ -1,8 +1,9 @@
 // ─── Radical Forge — concern packs ──────────────────────────────────────────
 // How a Forge run settles the concerns of the Hub's packs (../../concerns.ts):
 // the Requirements stage's clarify step offers the packs and the model
-// picks those the description calls for; their questions join the stage's
-// questions; once answered, each picked pack comes into the model whole and
+// picks those the description calls for, answering the questions the
+// description settles; their questions join the stage's questions, those
+// answers proposed for the user to accept or change; once answered, each picked pack comes into the model whole and
 // unbound before the stage is generated; every later stage is told what is
 // decided, and the C4 stage what to link; after it, what is still unbound
 // is bound where the pack's trigger points. Studio's wizard and the MCP
@@ -20,6 +21,16 @@ export const CONCERNS_QUESTION_ID = 'concerns'
 /** The ids of a picked pack's questions: `concern:<pack id>:<KEY>`. */
 export const CONCERN_QUESTION_PREFIX = 'concern:'
 
+/** A picked pack's question the model answered from the description. */
+export interface ConcernProposal {
+  pack: string
+  key: string
+  /** One of the question's option values (or labels). */
+  answer: string
+  /** The description's words the answer rests on. */
+  because?: string
+}
+
 const packLine = (p: ConcernPack): string => `- ${p.id} | ${p.name}: ${p.description}`
 
 /** What the Requirements stage's clarify prompt says about the packs. */
@@ -36,20 +47,28 @@ export function concernsClarifyLines(packs: ConcernPack[], mode: 'json' | 'ask')
   ]
   if (mode === 'ask') {
     lines.push(
-      'Ask the user to confirm your picks, then ask each confirmed pack\'s questions (forge_clarify lists them',
-      'below) with their options, and pass the packs with the user\'s answers to forge_generate as concerns.',
+      'Ask the user to confirm your picks. Where the description clearly settles one of a confirmed pack\'s',
+      'questions (listed below), propose the answer, quoting the words of the description it rests on, and ask',
+      'the user to accept or change those answers; ask the other questions with their options. Answer only what',
+      'the description says, not what is usual. Pass the packs with the answers the user accepted or gave to',
+      'forge_generate as concerns.',
     )
   } else {
     lines.push(
       `Include one question with id "${CONCERNS_QUESTION_ID}", kind "select", multiSelect true, whose options are the`,
       'names of your picks exactly as written above, asking which of them to settle now. Leave it out if none fits.',
-      'Do not ask the packs\' own questions: they are added for the picks.',
+      'Do not ask the packs\' own questions (listed below): they are added for the picks. Where the description',
+      `clearly settles one of a pick's questions, add to the "${CONCERNS_QUESTION_ID}" question an "answers" array of`,
+      '{"pack": pack id, "key": question key, "answer": option value, "because": the words of the description it',
+      'rests on, quoted as written}. Answer only what the description says, not what is usual: the user sees',
+      'each answer with its words and accepts or changes it.',
     )
   }
   return lines
 }
 
-/** A pack's questions for MCP's 'ask' mode: key, question, options. */
+/** The packs' questions, for the model to answer what the description
+ *  settles (and, over MCP, to ask the rest): key, question, options. */
 export function concernQuestionLines(packs: ConcernPack[]): string[] {
   if (!packs.length) return []
   return [
@@ -64,28 +83,44 @@ export function concernQuestionLines(packs: ConcernPack[]): string[] {
 
 /** The packs the model picked in its clarify reply (the concerns question's
  *  options, by name or id), with that question taken out, and the picked
- *  packs' questions with options added after the rest. */
+ *  packs' questions with options added after the rest; a question the model
+ *  answered from the description starts at that answer, marked with its
+ *  words, and an answer that is none of its options is dropped. */
 export function withConcernQuestions(
   questions: ClarifyStageQuestion[], packs: ConcernPack[],
 ): { questions: ClarifyStageQuestion[]; picked: ConcernPack[] } {
   const picked: ConcernPack[] = []
   const rest: ClarifyStageQuestion[] = []
+  const proposals: ConcernProposal[] = []
   for (const q of questions) {
     if (q.id !== CONCERNS_QUESTION_ID) { rest.push(q); continue }
+    if (Array.isArray(q.answers)) proposals.push(...q.answers.filter(isProposal))
     for (const option of q.options ?? []) {
       const key = option.trim().toLowerCase()
       const p = packs.find((x) => x.name.toLowerCase() === key || x.id === option.trim())
       if (p && !picked.includes(p)) picked.push(p)
     }
   }
-  const asked = picked.flatMap((p) => (p.templateParams ?? []).filter((q) => q.options?.length).map((q): ClarifyStageQuestion => ({
-    id: `${CONCERN_QUESTION_PREFIX}${p.id}:${q.key}`,
-    question: `${p.name} — ${q.label}`,
-    kind: 'select',
-    options: q.options!.map((o) => o.label),
-    ...(q.defaultValue ? { defaultOption: q.options!.find((o) => o.value === q.defaultValue)?.label } : {}),
-  })))
+  const asked = picked.flatMap((p) => (p.templateParams ?? []).filter((q) => q.options?.length).map((q): ClarifyStageQuestion => {
+    const proposal = proposals.find((a) => (a.pack === p.id || a.pack === p.name) && a.key === q.key)
+    const proposed = proposal && q.options!.find((o) => o.value === proposal.answer || o.label === proposal.answer)
+    return {
+      id: `${CONCERN_QUESTION_PREFIX}${p.id}:${q.key}`,
+      question: `${p.name} — ${q.label}`,
+      kind: 'select',
+      options: q.options!.map((o) => o.label),
+      ...(proposed
+        ? { defaultOption: proposed.label, fromDescription: proposal.because?.trim() ?? '' }
+        : q.defaultValue ? { defaultOption: q.options!.find((o) => o.value === q.defaultValue)?.label } : {}),
+    }
+  }))
   return { questions: [...rest, ...asked], picked }
+}
+
+function isProposal(v: unknown): v is ConcernProposal {
+  const a = v as Partial<ConcernProposal> | null
+  return !!a && typeof a.pack === 'string' && typeof a.key === 'string' && typeof a.answer === 'string'
+    && (a.because === undefined || typeof a.because === 'string')
 }
 
 /** A picked pack's answers from the clarify form (option labels) as values

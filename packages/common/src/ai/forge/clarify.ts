@@ -11,7 +11,7 @@
 // asks the user itself (apps/mcp's forge_clarify).
 
 import type { ConcernPack } from '../../concerns'
-import { CONCERNS_QUESTION_ID, CONCERN_QUESTION_PREFIX, concernQuestionLines, concernsClarifyLines } from './concerns'
+import { CONCERNS_QUESTION_ID, CONCERN_QUESTION_PREFIX, concernQuestionLines, concernsClarifyLines, type ConcernProposal } from './concerns'
 
 export interface ClarifyStageQuestion {
   id: string
@@ -19,8 +19,16 @@ export interface ClarifyStageQuestion {
   kind: 'text' | 'select'
   options?: string[]
   multiSelect?: boolean
-  /** The option chosen to begin with (a concern pack's default answer). */
+  /** The option chosen to begin with (a concern pack's default answer, or
+   *  the one the model proposed). */
   defaultOption?: string
+  /** Set when the model answered a concern pack's question from the
+   *  description: the words the answer rests on. The user accepts or
+   *  changes it before the pack comes in. */
+  fromDescription?: string
+  /** On the concerns question: the picked packs' questions the description
+   *  settles, as the model answers them (./concerns.ts). */
+  answers?: ConcernProposal[]
 }
 
 function isValidQuestion(v: unknown): v is ClarifyStageQuestion {
@@ -116,7 +124,7 @@ export function buildClarifyPrompt(
     'If nothing needs clarifying, respond with exactly: []',
   )
 
-  lines.push(...concernsClarifyLines(concernPacks ?? [], 'json'))
+  lines.push(...concernsClarifyLines(concernPacks ?? [], 'json'), ...concernQuestionLines(concernPacks ?? []))
   return lines.join('\n')
 }
 

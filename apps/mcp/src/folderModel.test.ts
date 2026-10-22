@@ -467,7 +467,7 @@ describe('warnier', () => {
     expect(saved.nodes.find((n) => n.label === 'Pay')).toMatchObject({ children: 'choice' })
     expect(saved.nodes.find((n) => n.label === 'By card')).toMatchObject({ repeat: '1', children: 'sequence' })
     expect(saved.views?.find((v) => v.name === 'Checkout')).toMatchObject({ kind: 'warnier', viewpoint: 'process-warnier' })
-    expect((await model.call('get_issues', {})).text).toBe('No issues: the model follows its metamodel.')
+    expect((await model.call('get_issues', {})).text).toMatch(/^No issues: the model follows its metamodel\./)
     const summary = (await model.call('get_model_summary', {})).text
     expect(summary).toContain('Process (Warnier)')
     expect(model.tools.find((tool) => tool.name === 'update_view')?.inputSchema).toMatchObject({ properties: { kind: { enum: expect.arrayContaining(['warnier']) } } })

@@ -646,5 +646,3 @@
   .hub-hero { padding: 40px 0 32px; }
   .hub-hero-search { flex-direction: column; }
 }
-/* A concern pack's sources, where the Related bar would be (packs refer to none). */
-.hub-sources .hub-related-chip { --cat-color: var(--accent); text-decoration: none; }

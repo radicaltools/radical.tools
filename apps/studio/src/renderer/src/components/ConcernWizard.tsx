@@ -26,6 +26,8 @@ interface Props {
   nodes: Record<string, C4Node>
   onImport: (answers: Record<string, string>, elementIds: string[]) => void
   onCancel: () => void
+  /** Its place among several packs answered one after another ("2 of 3"). */
+  position?: string
 }
 
 type Step =
@@ -36,7 +38,7 @@ type Step =
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function ConcernWizard({ concept, suggestions, others, nodes, onImport, onCancel }: Props): React.ReactElement {
+export function ConcernWizard({ concept, suggestions, others, nodes, onImport, onCancel, position }: Props): React.ReactElement {
   const params = concept.templateParams ?? []
   const [answers, setAnswers] = useState<Record<string, string>>(() =>
     Object.fromEntries(params.map((p) => [p.key, p.defaultValue ?? ''])))
@@ -134,6 +136,7 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
             <div className="nw-type-text">
               <div className="nw-type-label">{concept.concern ? `${CONCERN_GROUPS.find((g) => g.id === concept.concern!.group)?.label ?? 'Concern'} · concern pack` : 'Concern pack'}</div>
               <div className="nw-title" title={concept.name}>{concept.name}</div>
+              {position && <div className="cw-position" data-testid="concern-position">Pack {position}</div>}
             </div>
           </div>
 
@@ -269,7 +272,7 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
               </div>
             )}
 
-            {step.kind === 'review' && <Review picked={picked} fill={fill} sources={concept.sources ?? []} />}
+            {step.kind === 'review' && <Review picked={picked} fill={fill} />}
           </div>
 
           <footer className="nw-foot">
@@ -340,7 +343,7 @@ function Card({ selected, onSelect, title, tag, badge, text, multi }: {
   )
 }
 
-function Review({ picked, fill, sources }: { picked: Array<Record<string, unknown>>; fill: (v: unknown) => string; sources: Array<{ title: string; url: string }> }): React.ReactElement {
+function Review({ picked, fill }: { picked: Array<Record<string, unknown>>; fill: (v: unknown) => string }): React.ReactElement {
   const of = (type: string) => picked.filter((n) => n.type === type)
   const adr = of('adr')[0]
   const requirements = of('requirement')
@@ -373,14 +376,6 @@ function Review({ picked, fill, sources }: { picked: Array<Record<string, unknow
                 <span><strong>{fill(f.label)}</strong><span className="cw-muted"> — {fill(f.threshold)}</span></span>
               </li>
             ))}
-          </ul>
-        </section>
-      )}
-      {sources.length > 0 && (
-        <section className="cw-review-section">
-          <h3 className="nw-label">Sources</h3>
-          <ul className="cw-list cw-sources">
-            {sources.map((src) => <li key={src.url}><a href={src.url} target="_blank" rel="noopener noreferrer">{src.title}</a></li>)}
           </ul>
         </section>
       )}

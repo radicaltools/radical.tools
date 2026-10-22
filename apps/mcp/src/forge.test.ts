@@ -68,10 +68,10 @@ describe('Radical Forge over MCP', () => {
       // The Hub's concern packs to pick from, with their questions.
       expect(clarify).toContain('Concern packs of the Hub')
       expect(clarify).toContain('- concern-authentication | Authentication: ')
-      expect(clarify).toContain('pass the packs with the user\'s answers to forge_generate as concerns')
+      expect(clarify).toContain('propose the answer, quoting the words of the description it rests on')
       expect(clarify).toContain('  - IDENTITY: How do people sign in? [idp = ')
       expect(clarify).toContain('Ask the user those questions')
-      expect(clarify).not.toContain('JSON')
+      expect(clarify).not.toContain('Respond with ONLY a JSON array')
 
       const brief = await call(client, 'forge_generate', { stage: 'requirements', answers: [{ question: 'Which stores?', answer: 'All of them' }] })
       expect(brief).toContain('stage 1 of 9: Requirements')
@@ -799,6 +799,11 @@ describe('forge_import_hub_concept', () => {
     for (const ff of data.nodes.filter((n) => n.type === 'fitness-fn')) expect(has('constrains', ff.id, web)).toBe(true)
     for (const req of data.nodes.filter((n) => n.type === 'requirement')) expect(has('satisfies', web, req.id)).toBe(true)
     expect(JSON.stringify(data.nodes)).not.toMatch(/\{\{[A-Z_]+\}\}|hubWhen/)
+    // Its own view, in the folder Concerns, with the web app it is bound to.
+    const view = data.views?.find((v) => v.folder === 'Concerns')
+    expect(view).toMatchObject({ name: 'Authentication', kind: 'static' })
+    expect(view!.nodeIds).toEqual(expect.arrayContaining([adr.id, web]))
+    expect(result.text).toContain('and its view "Authentication"')
   })
 
   it('binds a concern pack to several elements', async () => {

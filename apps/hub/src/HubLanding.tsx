@@ -65,11 +65,11 @@ export function HubLanding({
           Decisions every system needs,<br /><span className="accent">settled in a few answers.</span>
         </h1>
         <p className="hub-hero-sub">
-          Each concern pack covers one concern — authentication, personal data, secrets, backups — with the
-          questions that decide it and the requirements, decision, fitness functions and scenarios your answers
-          bring. Radical Forge and AI agents ask the questions while they model your system, and
-          <code>radical check</code> and the Inspector validate the model against the packs, naming every
-          concern it has not decided yet.
+          A pack covers one concern, such as authentication, personal data, secrets or backups. You answer a few
+          questions and the pack adds the requirements, the decision, the fitness functions and the scenarios
+          that fit your answers. Import packs into your model in Radical Studio, or let Radical Forge or an AI
+          agent ask the questions while it models the system. <code>radical check</code> and the Inspector
+          list the concerns your model has not decided yet.
         </p>
         <form className="hub-hero-search" onSubmit={submitSearch} role="search">
           <input

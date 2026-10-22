@@ -711,9 +711,11 @@ export class Forge {
           const insert = buildConcernInsert(concept, {
             answers: pick.answers, elements: [], metamodel: facade.getMetamodel?.(), today: new Date().toISOString().slice(0, 10),
             newId: () => crypto.randomUUID(), place: ({ height }) => { const at = { x: 0, y: top }; top += height + IMPORT_GAP; return at },
+            takenNames: { views: (data.views ?? []).map((v) => v.name) },
           })
           data.nodes.push(...Object.values(insert.nodes))
           data.relations.push(...Object.values(insert.relations))
+          data.views = [...(data.views ?? []), ...insert.views]
           decided.push(decidedConcern(this.concernPacks().find((p) => p.id === pick.id)!, insert))
         }
         readOnly = false
@@ -991,6 +993,7 @@ export class Forge {
       insert = buildConcernInsert(concept, {
         answers: answers as Record<string, string>, elements, metamodel: facade.getMetamodel?.(), today: new Date().toISOString().slice(0, 10),
         newId: () => crypto.randomUUID(), place: () => ({ x: right, y: top }),
+        nodes: Object.fromEntries(data.nodes.map((n) => [n.id, n])), takenNames: { views: (data.views ?? []).map((v) => v.name) },
       })
     } catch (error) {
       return fail(`forge_import_hub_concept: ${(error as Error).message}`)
@@ -1002,9 +1005,10 @@ export class Forge {
       : `Bound to ${names}: the ADR and ${count('fitness-fn')} fitness functions constrain ${elements.length === 1 ? 'it' : 'each'} and ${elements.length === 1 ? 'it satisfies' : 'each satisfies'} ${count('requirement')} requirements. Left to the team: name the tests of ${count('scenario')} scenarios and ${count('fitness-fn')} fitness functions.`
     data.nodes.push(...Object.values(insert.nodes))
     data.relations.push(...Object.values(insert.relations))
+    data.views = [...(data.views ?? []), ...insert.views]
     const added = Object.values(insert.nodes).map((n) => `- ${n.id} ${n.type} "${n.label}"`)
     return ok([
-      `Imported ${concept.name}: +${added.length} nodes, +${Object.keys(insert.relations).length} relations.`,
+      `Imported ${concept.name}: +${added.length} nodes, +${Object.keys(insert.relations).length} relations, and its view ${insert.views.map((v) => `"${v.name}" (${v.id})`).join(', ')} in the folder Concerns.`,
       bound,
       ...added,
     ].join('\n'), { data })
