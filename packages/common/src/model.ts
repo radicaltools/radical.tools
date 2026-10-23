@@ -304,8 +304,10 @@ export function renameViewsOf(state: ModelState, id: string, label: string): voi
 }
 
 /** Why `ids` cannot move under `newParentId` (null = the root), or null.
- *  The nodes must be siblings, the target must exist and sit outside the
- *  moved subtrees, and every moved type must be allowed inside it. */
+ *  The nodes must be siblings, the target must exist, sit outside the
+ *  moved subtrees and not be external (a box that holds nothing of this
+ *  model, but what it holds already), and every moved type must be allowed
+ *  inside it. */
 export function checkReparent(state: ModelState, ids: string[], newParentId: string | null): string | null {
   const nodes = ids.map((id) => state.c4Nodes[id]).filter((n): n is C4Node => !!n)
   if (nodes.length === 0) return 'Nothing to move: no such node.'
@@ -317,6 +319,10 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
   if (newParentId && !newParent) return 'Target parent no longer exists.'
   const moved = new Set(nodes.flatMap((n) => [n.id, ...descendantIds(n.id, state.c4Nodes)]))
   if (newParentId && moved.has(newParentId)) return 'Cannot move a node into itself or one of its descendants.'
+  if (newParent?.external && oldParentId !== newParentId) {
+    const n = nodes[0]
+    return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${typeLabel(state.metamodel, newParent.type)} "${newParent.label}": it is external, a box that holds nothing of this model.`
+  }
   for (const n of nodes) {
     if (!isPlacementAllowed(state.metamodel, n.type, newParent, state.c4Nodes)) {
       return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${placementError(state.metamodel, n.type, newParent, state.c4Nodes)}`
@@ -347,17 +353,11 @@ export function parentCandidates(state: ModelState, id: string): C4Node[] {
 /** Why the elements `ids`, whatever holds each now, may not all be moved
  *  into `newParentId` (null = the top of the model), or null: the one rule
  *  of the card's and the wiki's Parent pickers (parentCandidates) and of
- *  the canvas's special key. What checkReparent takes, for those of each
- *  parent, and no external element, which the model leaves as a box. Those
- *  already there are left out (they stay where they are). */
+ *  the canvas's special key: what checkReparent takes, for those of each
+ *  parent. Those already there are left out (they stay where they are). */
 export function nestRefusal(state: ModelState, ids: string[], newParentId: string | null): string | null {
   const moving = ids.map((id) => state.c4Nodes[id]).filter((n): n is C4Node => !!n && (n.parentId ?? null) !== newParentId)
   if (moving.length === 0) return null
-  const parent = newParentId ? state.c4Nodes[newParentId] : undefined
-  if (parent?.external) {
-    const n = moving[0]
-    return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${typeLabel(state.metamodel, parent.type)} "${parent.label}": it is external, a box that holds nothing of this model.`
-  }
   const byParent = new Map<string, string[]>()
   for (const n of moving) byParent.set(n.parentId ?? '', [...(byParent.get(n.parentId ?? '') ?? []), n.id])
   for (const siblings of byParent.values()) {
