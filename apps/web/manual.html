@@ -204,7 +204,7 @@
         </ul>
         <h3>Containment</h3>
         <ul>
-          <li>Change a parent with the <em>Parent</em> field in the card or <em>Move to…</em> among the actions, or as you connect: hold the special key with an element selected, and every element it may go into reads <em>inside</em> (beside any relation it could take), its container <em>holds</em>. Drag onto one to nest the element there; drop on the empty canvas to take it out to the top. With several elements selected, the gesture relates each of them to the target, or nests them all, at once. A plain drag moves an element on the canvas; it does not re-parent it.</li>
+          <li>Change a parent with the <em>Parent</em> field in the card or <em>Move to…</em> among the actions, or as you connect: hold the special key with an element selected, and every element it may go into reads <em>inside</em> (beside any relation it could take): the places its <em>Parent</em> field lists, never an external element. Its container reads <em>holds</em>. Drag onto one to nest the element there; drop on the empty canvas to take it out to the top, where the metamodel lets it stand there (else it stays, and a notice says where it may go). With several elements selected, the gesture relates each of them to the target, or nests them all, at once, as one step for <em>Undo</em>. In Viewer and Presenter the special key only selects. A plain drag moves an element on the canvas; it does not re-parent it.</li>
           <li>Collapse a container with <em>−</em> in its header. Its relations re-attach to the container, so a context view stays readable while the detail is one click away. Collapsing is per view.</li>
           <li>A <em>Group</em> is a labelled boundary with no meaning of its own, as in Structurizr. It holds only what its place allows.</li>
         </ul>
@@ -212,7 +212,7 @@
         <ul>
           <li>Hold the special key (<kbd>Alt</kbd>/<kbd>⌥ Option</kbd> by default, <em>Settings → Special key</em>), press on the source, drag to the target, release. <kbd>Esc</kbd> cancels.</li>
           <li>With an element selected, holding the key marks every element a relation from it can go to, with the relation's type over it, and dims the rest; on a view with a filter, only where the filter would draw it.</li>
-          <li>An element is not connected to what holds it (a container to its system): containment already joins them. A state machine's transition to a state that holds its source is the exception.</li>
+          <li>An element is not connected to what holds it by a structural relation (a container does not <em>use</em> its system): containment already joins them, and moving an element into one it relates to removes such relations. A governance relation says what containment does not, so it may join them and stays on a move: a requirement inside the system that <em>satisfies</em> it, an ADR inside the system it <em>constrains</em>. The metamodel editor marks a relation type as <em>Governance</em>. A state machine's transition to a state that holds its source is allowed too.</li>
           <li>Over each element it can go to, a pill names each way: the relation's type, <em>inside</em> where it may go in. Drop on a pill to make that one; where one way fits, drop anywhere on the element.</li>
           <li>A relation goes by how its type reads from its source, on its line, in menus and in the card: <em>uses</em>, <em>delivers to</em> (to a person, as in Structurizr), <em>partners with</em>. A metamodel can give a pair of types its own reading.</li>
           <li>Select a relation and drag one of its ends onto another element to move it; it keeps its type, and a place where the type does not fit is refused. Hold the special key while you drag to see where the end can go.</li>
@@ -335,11 +335,11 @@
           <li>One element's actions are in its card. With several selected, the <strong>selection bar</strong> over the canvas offers what applies to them all.</li>
         </ul>
         <ul>
-          <li><strong>Wrap into…</strong> — a new container around the selection. What it wraps stays where it is; the new container fits snugly round it, and the containers it is in grow only as far as needed to hold it. Only what the new container lies on is pushed clear. <strong>Unwrap</strong> removes a container and keeps its children.</li>
+          <li><strong>Wrap into…</strong> — a new container around the selection. What it wraps stays where it is; the new container fits snugly round it, and the containers it is in grow only as far as needed to hold it. Only what the new container lies on is pushed clear. Other views keep their layout: there the new container goes round the same elements where they stand. <strong>Unwrap</strong> removes a container and keeps its children.</li>
           <li><strong>Move to…</strong> — re-parent the selection.</li>
           <li><strong>Align…</strong> — keep the elements in a row, a column or a grid on this canvas (see <a href="#layout">Layout</a>).</li>
           <li><strong>Hide from view</strong> — take them out of this view only.</li>
-          <li><strong>Delete</strong> — remove from the model, with children. The <kbd>Delete</kbd> key asks first: remove from the model, hide from this view, or cancel.</li>
+          <li><strong>Delete</strong> — remove from the model, with children. The <kbd>Delete</kbd> key asks first: remove from the model, hide from this view, or cancel. On a dashed line drawn to a folded container, it asks about the relations the line stands for, by name.</li>
         </ul>
       </section>
 
@@ -382,7 +382,7 @@
         <ul>
           <li>A view of a viewpoint follows it: change the viewpoint in the metamodel editor and every view of it changes. Its filter is read-only; <em>Detach</em> makes it the view's own.</li>
           <li><em>Save as viewpoint…</em> in any view's filter keeps that view type and filter in the metamodel under a name.</li>
-          <li>Some viewpoints are a <strong>view per element</strong>: <em>Components of a container</em>, <em>State machine</em>, <em>Process</em>. Pick one and the list gets a group with a view of each such element, named after it. Add a container and its view appears; delete it and its view goes.</li>
+          <li>Some viewpoints are a <strong>view per element</strong>: <em>Components of a container</em>, <em>State machine</em>, <em>Process</em>. Pick one and the list gets a group with a view of each such element, named after it. Add a container and its view appears; delete it and its view goes. A group is never a canvas of its own: it opens on its first view. Picked for a view you have, the view becomes the group; when you picked its elements by hand, Studio asks first, as they are no longer listed.</li>
         </ul>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/viewpoint-group-light.png?v=__BUILD__" alt="The list of views with the group Components of a container, view per element, open on a view of each of the sample's eight containers; Payments Service is on the canvas with its two components, the database, queue and systems it is related to" loading="lazy" />
@@ -403,7 +403,7 @@
           <li><strong>Start with</strong> — the first level: every element, or the elements of one type.</li>
           <li><strong>Level under</strong> — the next level, along a relation in either direction (<em>Refined into → Requirement</em>), along any relation, or the children it contains.</li>
           <li><strong>or</strong> — another way to a level's elements: a second type, or a second relation.</li>
-          <li><strong>Filter</strong> — keep a level's elements by property (<em>EARS type is event-driven</em>), relation (<em>Has no Verified by</em>), place (<em>Inside Billing</em>) or text. Each one shows how many come in and go through; its dot switches it off to try without it.</li>
+          <li><strong>Filter</strong> — keep a level's elements by property (<em>EARS type is event-driven</em>), relation (<em>Has no Verified by</em>), place (<em>Inside Billing</em>) or text. Each one shows how many come in and go through; its dot switches it off to try without it. An element that stores no value of a property has its type's default, as its card shows (a step's <em>Repeat</em> is 1).</li>
           <li><strong>Sort</strong> — by name, type or a property, within each level.</li>
         </ul>
         <p>A table and a wiki show the chain as a tree. A canvas, a matrix and a hierarchy draw its elements and only the relations the chain follows; tick <em>Draw every relation between them</em> for all of them. Every change applies at once and is one undo step; <em>Reset</em> removes the filter.</p>
@@ -474,7 +474,7 @@
         <ul>
           <li>A click on a row selects the element, a double-click opens its card; <kbd>F2</kbd> or <kbd>Enter</kbd> renames it in place.</li>
           <li>Elements are added where they will show: a <strong>+ row</strong> after the rows under each element (<em>+ Requirement · refined into</em>) and one at the end for the top level. The new element is linked the way the level hangs under its parent, and gets the values the level's filters ask for.</li>
-          <li>Where there is a choice, the + row opens <em>Add or link</em>: a sentence says what goes there (<em>Account is realised by a software system ▾</em>), the field names a new element and searches the model, <em>New</em> adds one by that name and <em>Existing</em> lists the elements the model has that may be linked there instead; picking one adds only the relation.</li>
+          <li>Where there is a choice, the + row opens <em>Add or link</em>: a sentence says what goes there (<em>Account is realised by a software system ▾</em>), the field names a new element and searches the model, <em>New</em> adds one by that name and <em>Existing</em> lists the elements the model has that may be linked there instead; picking one adds only the relation. <em>Existing</em> lists only what the model accepts linked that way (not what holds the element by a structural relation, no aggregate root as part of another), and follows edits made meanwhile, by an agent or another program.</li>
           <li>A table of hundreds of rows opens at once: only the rows in sight are drawn.</li>
         </ul>
       </section>
@@ -506,6 +506,7 @@
         <ul>
           <li>Every text is edited in place. <em>[edit]</em> beside a title, or a right click, offers <em>Add or link…</em>, <em>Edit facts</em> and <em>Delete</em>.</li>
           <li>Each group of elements ends with an empty line: type in it and press <kbd>Enter</kbd>, and the next element is there. A requirement is written as its sentence and split into its EARS fields; <em>[rewrite]</em> opens it as text again.</li>
+          <li>A page offers what the view's filter shows under its element, linked the way that level hangs under it: a requirement's page in the <em>Specification</em> wiki writes its scenarios and mockups. The Overview offers the first level's types; one its filter shows only once it is named or linked (a text or relation filter) is offered all the same, with <em>the filter won't show it</em>, as the table's + row says.</li>
           <li>Paste a list and the page shows what its lines will become before it adds them, as one undo step.</li>
           <li><em>Add or link…</em> opens the same panel as the table's + row: a new child or one the model has, linked; its list also holds the element's other relationships (<em>uses…</em>, <em>is constrained by…</em>), each with the elements it may name. Only what the metamodel allows, and the view's filter shows, is offered.</li>
           <li>The empty line under a heading suggests the elements of its type whose name holds what is written: pick one to link it instead of writing a new one.</li>
@@ -587,7 +588,7 @@
         <p>A milestone is a named snapshot of the whole model: elements, relations and sequences. Keep an <em>As-is</em> and a <em>Target 2027</em>, or show how the architecture grew.</p>
         <ul>
           <li><strong>Capture.</strong> <em>+ New milestone</em> in the left panel, name it, <kbd>Enter</kbd>. It always saves the live model.</li>
-          <li><strong>Travel.</strong> Click a milestone to see the model as it was. Every view still works; the chip at the top names the milestone.</li>
+          <li><strong>Travel.</strong> Click a milestone to see the model as it was. Every view still works, and shows what the milestone holds, also elements deleted since; the chip at the top names the milestone.</li>
           <li><strong>Diff.</strong> The toggle on the chip colours what changed since the previous milestone. Removed elements are drawn as ghosts.</li>
           <li><strong>Present.</strong> A slide can be pinned to a milestone, so a presentation tells the story in order.</li>
           <li><strong>Restore or delete.</strong> Both in the milestone's properties (the gear on its card).</li>
@@ -677,7 +678,7 @@
         <ul>
           <li><strong>Node types</strong> — colours, description, size, min and max instances, allowed parents, and properties: text, long text, number, boolean, enum or reference. <em>Summary in tables</em> is the template the table makes an element's one-line summary from.</li>
           <li><strong>Relation types</strong> — the allowed pairs of source and target, their own properties, and how the relation reads in a sentence from each end (<em>Constrains</em> / <em>Constrained by</em>), which the wiki uses.</li>
-          <li><strong>Viewpoints</strong> — name, group, view type and description. The filter itself is set in a view and saved with <em>Save as viewpoint…</em>.</li>
+          <li><strong>Viewpoints</strong> — name, group, view type, description and <em>View per element</em>. The filter itself is set in a view and saved with <em>Save as viewpoint…</em>. A viewpoint deleted leaves its views with their view type and filter; deleting one whose views are a group, or taking away what it draws a view per element of, deletes the group's views per element, so it asks first and lists them. Undo brings them back.</li>
           <li><strong>Validation</strong> — everything the model breaks now, each with <em>Open in Designer</em>. Built-in types can be extended but not deleted.</li>
         </ul>
         <div class="doc-tip">

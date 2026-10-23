@@ -62,6 +62,7 @@ export function buildMetamodelMessage(
     label: r.label,
     allowedPairs: r.allowedPairs,
     properties: r.properties,
+    ...(r.governance ? { governance: true } : {}),
   }))
   const viewpoints = viewpointsOf(mm).map((t) => ({ id: t.id, label: t.label, ...(t.group ? { group: t.group } : {}), kind: t.kind, ...(t.subject ? { subjectTypes: t.subject.types } : {}), ...(t.description ? { description: t.description } : {}) }))
   return [
@@ -70,7 +71,10 @@ export function buildMetamodelMessage(
     '`cardinality.max`, and `allowedPairs`. A `group` only gathers elements and',
     'holds what its place allows: at the root, the types with `allowedAtRoot`;',
     'inside a system, what a system can hold at any depth (a component fits in a',
-    'group inside a system, not in a group at the root). Each type\'s `properties` array (where',
+    'group inside a system, not in a group at the root). Between an element and one that',
+    'holds it, only a relation type with `governance: true` may be added (a requirement',
+    'inside the system that satisfies it); move_node removes the other relations',
+    'between an element and what then holds it. Each type\'s `properties` array (where',
     'present) is the exact set of keys valid in that type\'s `properties` tool-call',
     'bag — key, label, type, and (for enums) the allowed `options`. A type with no',
     '`properties` array here still exists and can be created — its property schema',

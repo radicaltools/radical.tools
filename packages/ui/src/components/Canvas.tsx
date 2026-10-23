@@ -18,7 +18,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore, viewById, milestoneOnCanvas } from '../store/diagramStore'
+import { useDiagramStore, viewById, milestoneOnCanvas, editsModel } from '../store/diagramStore'
 import { openCard } from '../store/showInView'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
@@ -33,9 +33,10 @@ import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, holderOf, nodeTypeSize, type C4Node } from '@radical/common/c4'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { allowedPlacesText, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName, type Metamodel } from '@radical/common/metamodel'
+import { nestRefusal } from '@radical/common/model'
 
 /** The viewport that fits `bounds` in the part of the canvas (`rect`) the
  *  elements palette on its left leaves free — and, framing a selection
@@ -112,15 +113,60 @@ function connectSources(state: { selectedNodeIds: string[] }, from: string): str
   return state.selectedNodeIds.length > 1 && state.selectedNodeIds.includes(from) ? [...state.selectedNodeIds] : [from]
 }
 
-/** Moves `ids` into `parentId` (null: the top of the model), those of one
- *  parent at a time (reparentNodes takes siblings). */
-function nestAll(state: { c4Nodes: Record<string, C4Node>; reparentNodes: (ids: string[], parentId: string | null, options?: { quiet?: boolean }) => void }, ids: string[], parentId: string | null): void {
-  const byParent = new Map<string, string[]>()
+/** Moves `ids` into `parentId` (null: the top of the model): one gesture,
+ *  so one undo step and one notice, those of one parent at a time
+ *  (reparentNodes takes siblings). Those the move is refused for
+ *  (nestRefusal, the card's Parent rule) stay, and a notice names them and
+ *  says why: a take-out the metamodel refuses did nothing and said nothing. */
+function nestAll(ids: string[], parentId: string | null): void {
+  const s = useDiagramStore.getState()
+  const moving: string[] = []
+  const refused: Array<{ node: C4Node; why: string }> = []
   for (const id of ids) {
-    const key = state.c4Nodes[id]?.parentId ?? ''
-    byParent.set(key, [...(byParent.get(key) ?? []), id])
+    const node = s.c4Nodes[id]
+    if (!node || (node.parentId ?? null) === parentId) continue
+    const why = nestRefusal(s, [id], parentId)
+    if (why) refused.push({ node, why })
+    else moving.push(id)
   }
-  for (const group of byParent.values()) state.reparentNodes(group, parentId)
+  if (moving.length) {
+    const byParent = new Map<string, string[]>()
+    for (const id of moving) {
+      const key = s.c4Nodes[id]?.parentId ?? ''
+      byParent.set(key, [...(byParent.get(key) ?? []), id])
+    }
+    s.runAsOneStep(() => { for (const group of byParent.values()) useDiagramStore.getState().reparentNodes(group, parentId, { quiet: true }) })
+  }
+  const now = useDiagramStore.getState()
+  const moved = moving.filter((id) => (now.c4Nodes[id]?.parentId ?? null) === parentId)
+  if (moved.length) {
+    now.setSelectedNodeIds(moved)
+    const parent = parentId ? now.c4Nodes[parentId] : undefined
+    const where = parent ? (now.metamodel?.nodeTypes[parent.type]?.label ?? parent.type) : 'the canvas root'
+    now.pushNotification(`Moved ${moved.length} ${moved.length === 1 ? 'node' : 'nodes'} into ${where}.`, 'info')
+  }
+  if (refused.length) now.pushNotification(refusalsText(refused), 'error')
+}
+
+/** The refusals of several elements, one sentence for those refused alike:
+ *  'Cannot place Container "API", "Orders DB" inside the canvas root.
+ *  Allowed parents: …'. */
+function refusalsText(refused: Array<{ node: C4Node; why: string }>): string {
+  const alike = new Map<string, string[]>()
+  for (const { node, why } of refused) {
+    const name = `"${node.label}"`
+    const key = why.includes(name) ? why.replace(name, '\u0000') : why
+    alike.set(key, [...(alike.get(key) ?? []), name])
+  }
+  return [...alike].map(([key, names]) => key.replace('\u0000', names.join(', '))).join(' ')
+}
+
+/** Relates each of `sources` to `targetId` (of `type`, '' for none), as
+ *  one undo step: one gesture. */
+function relateAll(sources: string[], targetId: string, type: string | undefined): void {
+  useDiagramStore.getState().runAsOneStep(() => {
+    for (const from of sources) useDiagramStore.getState().addRelation({ sourceId: from, targetId, ...(type ? { relationType: type } : {}) })
+  })
 }
 
 // The special key as React Flow names it.
@@ -769,6 +815,13 @@ function StructuralCanvas(): React.ReactElement {
     fitWindowUntilRef.current = 0
   }, [stopFit])
   const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
+  // When the user last moved the camera by hand (a wheel, a drag of the
+  // pane, the zoom buttons or keys). A press on the pane alone is no move,
+  // though React Flow reports it as a move start: the press of a click on
+  // the empty canvas must not count as moving the camera it brings back.
+  const userMovedCameraAtRef = useRef(0)
+  const markUserCamera = useCallback(() => { userMovedCameraAtRef.current = performance.now() }, [])
+  const onUserMove = useCallback((event: unknown) => { if (event) markUserCamera() }, [markUserCamera])
 
   /**
    * The camera for a view just opened (or a document just loaded), in one
@@ -825,9 +878,10 @@ function StructuralCanvas(): React.ReactElement {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    el.addEventListener('wheel', takeCamera, { capture: true, passive: true })
-    return () => el.removeEventListener('wheel', takeCamera, { capture: true })
-  }, [takeCamera])
+    const onWheel = () => { markUserCamera(); takeCamera() }
+    el.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    return () => el.removeEventListener('wheel', onWheel, { capture: true })
+  }, [takeCamera, markUserCamera])
 
   // The camera functions this canvas put on window: taken off when it goes
   // (a slide without a canvas unmounts it), so no one moves a camera that
@@ -900,22 +954,49 @@ function StructuralCanvas(): React.ReactElement {
   // next element to pick must stay where it is). Only clicks on the canvas move it: a
   // search, a view switch or a slide that selects sets its own camera. Not
   // in a presentation, whose slides set the camera. A camera the user moved
-  // after the framing stays.
+  // after the framing stays. With Focus off a click moves no camera at all.
   const preFocusCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
   const framedCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
+  // The framing's flight, and when the pointer last went down on the canvas:
+  // a press during the flight stops it half-way (d3 interrupts it), and the
+  // camera there is still the framing's, not one the user chose.
+  const framingFlightRef = useRef<{ from: number; until: number }>({ from: 0, until: 0 })
+  const pressedAtRef = useRef(0)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onPress = () => { pressedAtRef.current = performance.now() }
+    el.addEventListener('pointerdown', onPress, { capture: true, passive: true })
+    return () => el.removeEventListener('pointerdown', onPress, { capture: true })
+  }, [])
+  /** Whether the camera `now` is still the one the last framing set: where
+   *  it flew to, or on its way there when the click came, and not moved by
+   *  the user since. */
+  const stillFramed = useCallback((now: { x: number; y: number; zoom: number }) => {
+    const framed = framedCameraRef.current
+    const flight = framingFlightRef.current
+    if (!framed || userMovedCameraAtRef.current >= flight.from) return false
+    return sameCamera(now, framed) || (pressedAtRef.current >= flight.from && pressedAtRef.current <= flight.until)
+  }, [])
   const frameSelection = useCallback(() => {
     // After the click's selection has reached the store.
     requestAnimationFrame(() => {
       const instance = rfInstanceRef.current
       const s = useDiagramStore.getState()
       if (!instance || s.presentationActive) return
+      if (!s.selectionFocus) {
+        // Focus off: no framing, and no camera to bring back either.
+        preFocusCameraRef.current = null
+        framedCameraRef.current = null
+        return
+      }
       const focus = selectCanvasFocus(s)
       if (!focus) {
         const back = preFocusCameraRef.current
-        const framed = framedCameraRef.current
+        const framed = stillFramed(instance.getViewport())
         preFocusCameraRef.current = null
         framedCameraRef.current = null
-        if (back && framed && sameCamera(instance.getViewport(), framed)) {
+        if (back && framed) {
           suppressAutoFit(SELECTION_CAMERA_MS + 1800)
           instance.setViewport(back, { duration: SELECTION_CAMERA_MS })
         }
@@ -934,13 +1015,17 @@ function StructuralCanvas(): React.ReactElement {
         if (left >= paletteCover() && top >= 0 && left + b.width * now.zoom <= free && top + b.height * now.zoom <= rect.height) return
       }
       // Framing again from the framed camera keeps the one from before.
-      if (!preFocusCameraRef.current || !framedCameraRef.current || !sameCamera(now, framedCameraRef.current)) {
+      if (!preFocusCameraRef.current || !stillFramed(now)) {
         preFocusCameraRef.current = now
       }
       framedCameraRef.current = null
-      frameNodes([...focus.frame], SELECTION_CAMERA_MS, Math.max(now.zoom, SELECTION_MAX_ZOOM), (vp) => { framedCameraRef.current = vp })
+      frameNodes([...focus.frame], SELECTION_CAMERA_MS, Math.max(now.zoom, SELECTION_MAX_ZOOM), (vp) => {
+        framedCameraRef.current = vp
+        const from = performance.now()
+        framingFlightRef.current = { from, until: from + SELECTION_CAMERA_MS }
+      })
     })
-  }, [frameNodes, suppressAutoFit])
+  }, [frameNodes, suppressAutoFit, stillFramed])
   // The camera to go back to belongs to the canvas it was taken on.
   useEffect(() => {
     preFocusCameraRef.current = null
@@ -1083,8 +1168,8 @@ function StructuralCanvas(): React.ReactElement {
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
     if (unmountedRef.current) return
-    const zoomIn = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
-    const zoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    const zoomIn = () => { markUserCamera(); takeCamera(); instance.zoomIn({ duration: 300 }) }
+    const zoomOut = () => { markUserCamera(); takeCamera(); instance.zoomOut({ duration: 300 }) }
     registeredZoom.current = { zoomIn, zoomOut }
     ;(window as any).__radicalZoomIn  = zoomIn
     ;(window as any).__radicalZoomOut = zoomOut
@@ -1092,7 +1177,7 @@ function StructuralCanvas(): React.ReactElement {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera, frameNodes, computeFitTarget])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, markUserCamera, placeCamera, frameNodes, computeFitTarget])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -1158,6 +1243,9 @@ function StructuralCanvas(): React.ReactElement {
   // Use a native mousedown/mouseup flow on the container to handle
   // drag-to-connect: modifier+mousedown on source → drag → mouseup on target.
   const connectingRef = useRef(false) // true while actively dragging a connection
+  // In Viewer and Presenter: the element pressed with the key, which a
+  // release on it adds to the selection or takes out.
+  const selectOnlyRef = useRef<string | null>(null)
   const [connectMouse, setConnectMouse] = useState<{ x: number; y: number } | null>(null)
   // The element the line is drawn over: its panel of relation types shows.
   const [connectOver, setConnectOver] = useState<string | null>(null)
@@ -1191,6 +1279,10 @@ function StructuralCanvas(): React.ReactElement {
       e.preventDefault()
 
       const state = useDiagramStore.getState()
+      // Viewer and Presenter do not edit: the key only adds the element to
+      // the selection or takes it out (no line, no pills, no relation or
+      // nesting, which were shown there and lost on the way back).
+      if (!editsModel(state)) { selectOnlyRef.current = nodeId; return }
       state.startConnection(nodeId)
       connectingRef.current = true
       setConnectMouse({ x: e.clientX, y: e.clientY })
@@ -1206,6 +1298,12 @@ function StructuralCanvas(): React.ReactElement {
     }
 
     const onMouseUp = (e: MouseEvent) => {
+      const pressed = selectOnlyRef.current
+      selectOnlyRef.current = null
+      if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
+        const ids = useDiagramStore.getState().selectedNodeIds
+        useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
+      }
       if (!connectingRef.current) return
       connectingRef.current = false
       setConnectMouse(null)
@@ -1221,8 +1319,8 @@ function StructuralCanvas(): React.ReactElement {
       const sources = connectSources(state, src)
       if (field) {
         const type = field.dataset.connectType
-        if (type === NEST_INSIDE) nestAll(state, sources, field.dataset.connectTarget!)
-        else for (const from of sources) state.addRelation({ sourceId: from, targetId: field.dataset.connectTarget!, ...(type ? { relationType: type } : {}) })
+        if (type === NEST_INSIDE) nestAll(sources, field.dataset.connectTarget!)
+        else relateAll(sources, field.dataset.connectTarget!, type)
         state.cancelConnection()
         return
       }
@@ -1230,20 +1328,18 @@ function StructuralCanvas(): React.ReactElement {
       // On the panel beside its fields: the element it stands over.
       const nodeId = (e.target as HTMLElement).closest('.connect-pills') ? connectOverRef.current : findNodeId(e.target as HTMLElement)
       const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
-      // On the empty canvas: out of its container, where it may stand there.
+      // On the empty canvas: out of its container, where it may stand there;
+      // where it may not, it stays and a notice says why.
       // (Holding the selection key, React Flow lays its selection pane over it.)
       const onCanvas = (e.target as HTMLElement).closest('.react-flow') && !(e.target as HTMLElement).closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
-      if (!nodeId && onCanvas) {
-        const out = sources.filter((id) => { const n = state.c4Nodes[id]; return n?.parentId && isParentAllowed(state.metamodel as Metamodel, n.type, undefined) })
-        if (out.length) nestAll(state, out, null)
-      }
+      if (!nodeId && onCanvas) nestAll(sources, null)
       // Inside the target, its only offer; nothing on its container.
-      else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(state, sources, nodeId)
+      else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(sources, nodeId)
       else if (nodeId && offered.length === 1 && offered[0] === NEST_HOLDS) { /* where they are */ }
       // Several: of the one type that fits each (several types ask by the panel).
       else if (nodeId && sources.length > 1) {
         const types = offered.filter((t) => t !== NEST_INSIDE)
-        if (types.length === 1) for (const from of sources) state.addRelation({ sourceId: from, targetId: nodeId, ...(types[0] ? { relationType: types[0] } : {}) })
+        if (types.length === 1) relateAll(sources, nodeId, types[0])
       }
       // Refused, of the type the view's chain follows, or asked about where
       // several types fit (connectNodes).
@@ -1533,11 +1629,12 @@ function StructuralCanvas(): React.ReactElement {
   // the view's filter draws it (connectTypes).
   // An end of a relation dragged with the key held: where it can go, its
   // other end staying (marked as the source).
-  const relink = relinking && modifierHeld && appMode === 'designer' ? relinking : null
+  const edits = editsModel({ appMode, presentationActive })
+  const relink = relinking && modifierHeld && edits ? relinking : null
   const relinkRelation = relink ? useDiagramStore.getState().c4Relations[relink.relationId] : undefined
   const connectFrom = relinkRelation
     ? (relink!.end === 'target' ? relinkRelation.sourceId : relinkRelation.targetId)
-    : connectSource ?? (modifierHeld && appMode === 'designer' ? selectedNodeId : null)
+    : connectSource ?? (modifierHeld && edits ? selectedNodeId : null)
   const connectTargets = useMemo(() => {
     if (!connectFrom) return null
     const s = useDiagramStore.getState()
@@ -1582,7 +1679,11 @@ function StructuralCanvas(): React.ReactElement {
     for (const id of shown) {
       const target = s.c4Nodes[id]
       if (!target || fromSet.has(id)) continue
-      if (!sources.every((n) => id !== n.parentId && holderOf(s.c4Nodes, n, target) !== n && isPlacementAllowed(metamodel, n.type, target, s.c4Nodes))) continue
+      // The card's Parent rule (nestRefusal): not into an external element,
+      // nor where the move would then be refused; the metamodel's types
+      // first, which rule out most at once.
+      if (!sources.every((n) => id !== n.parentId && isPlacementAllowed(metamodel, n.type, target, s.c4Nodes))) continue
+      if (nestRefusal(s, [...fromSet], id)) continue
       targets.set(id, [...(targets.get(id) ?? []), { type: NEST_INSIDE, text: 'inside' }])
     }
     const holder = sources[0]?.parentId
@@ -1780,6 +1881,7 @@ function StructuralCanvas(): React.ReactElement {
         onPaneClick={onPaneClick}
         onInit={onInit}
         onMoveStart={onUserMoveStart}
+        onMove={onUserMove}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!presentationActive}

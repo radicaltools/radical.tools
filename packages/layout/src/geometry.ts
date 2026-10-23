@@ -197,18 +197,21 @@ export type CanvasBox = { x: number; y: number; w: number; h: number }
 export interface CanvasShape {
   shown: (n: C4Node) => boolean
   boxOf: (n: C4Node) => CanvasBox
+  /** A container the canvas draws only to hold what it shows (a view's
+   *  frame): invisible, it makes no room when it grows. */
+  frame?: (n: C4Node) => boolean
 }
 
 /** A canvas as the model draws it: the nodes in `shownIds` (every node when
  *  undefined) under no folded ancestor, at their drawn size (drawnSize). */
-export function modelCanvas(nodes: Record<string, C4Node>, shownIds?: ReadonlySet<string>): CanvasShape {
+export function modelCanvas(nodes: Record<string, C4Node>, shownIds?: ReadonlySet<string>, frames?: ReadonlySet<string>): CanvasShape {
   const shown = (n: C4Node): boolean => (!shownIds || shownIds.has(n.id)) && isVisible(n, nodes)
   const parents = new Set(Object.values(nodes).filter(shown).map((n) => n.parentId).filter((id): id is string => !!id))
   const boxOf = (n: C4Node): CanvasBox => {
     const size = drawnSize(n, parents.has(n.id))
     return { x: n.x, y: n.y, w: size.width, h: size.height }
   }
-  return { shown, boxOf }
+  return frames?.size ? { shown, boxOf, frame: (n) => frames.has(n.id) } : { shown, boxOf }
 }
 
 const boxesOverlap = (a: CanvasBox, b: CanvasBox): boolean =>
@@ -307,6 +310,10 @@ export function growWithRoom(
     fit(cur.id)
     const now = canvas.boxOf(nodes[cur.id])
     if (now.w <= was.w && now.h <= was.h) continue
+    // Not drawn: what it now reaches over is in no way of it. As a box, a
+    // view's undrawn domain grown round an entity pushed the next domain,
+    // with what the view draws in it (F-0048).
+    if (canvas.frame?.(cur)) continue
     for (const [id, at] of Object.entries(makeRoomAround(cur.id, nodes, canvas))) {
       nodes[id].x = at.x
       nodes[id].y = at.y
@@ -455,30 +462,46 @@ export function makeRoomAround(
  * it knows) lies mostly outside their parent's frame there: the middle of
  * the box outside it. A place kept relative to another parent (a node file
  * moved by hand into another container's folder, a model edited outside
- * Studio) reads so; such a node is placed afresh (placeUnplaced).
+ * Studio) reads so; such a node is placed afresh (placeUnplaced). Measured
+ * as the canvas draws it: a container folded there, or with nothing in it
+ * on the canvas (`shown`: what a view draws), at its folded size. Not in a
+ * container the canvas draws only to hold what it shows (`frames`): it has
+ * no frame to stray from.
  */
 export function strayNodeIds(
   nodes: Record<string, C4Node>,
   positions: Record<string, unknown>,
   folded: (n: C4Node) => boolean = (n) => n.collapsed,
+  shown?: ReadonlySet<string>,
+  frames?: ReadonlySet<string>,
 ): Set<string> {
   const out = new Set<string>()
+  const parents = new Set<string>()
+  for (const n of Object.values(nodes)) if (n.parentId && (!shown || shown.has(n.id))) parents.add(n.parentId)
   for (const n of Object.values(nodes)) {
     const parent = n.parentId ? nodes[n.parentId] : undefined
     // A folded parent may keep the size it is drawn at, smaller than what
     // it holds: opened, it is fit to it.
-    if (!parent || folded(parent) || !(n.id in positions) || !(parent.id in positions)) continue
+    if (!parent || folded(parent) || frames?.has(parent.id) || !(n.id in positions) || !(parent.id in positions)) continue
     // Measured as the canvas draws it: folded there (in a view, by the
     // view's own folds), at its folded size. At its open size the middle
     // of a container folded at its parent's edge lay outside the parent
-    // fit to the fold, and a view switch placed it afresh.
-    const fold = isContainerType(n.type) && folded(n)
-    const cx = n.x + (fold ? COLLAPSED_WIDTH[n.type] : (n.width ?? NODE_SIZES[n.type].width)) / 2
-    const cy = n.y + (fold ? COLLAPSED_HEIGHT[n.type] : (n.height ?? NODE_SIZES[n.type].height)) / 2
+    // fit to the fold, and a view switch placed it afresh. So is one with
+    // nothing in it: a state dragged to the bottom of its machine, which
+    // grew to hold the folded box, lay outside it by its stored 220 px
+    // height, and the next opening rearranged the machine (F-0049).
+    const fold = isContainerType(n.type) && (folded(n) || !parents.has(n.id))
+    const cx = n.x + (fold ? COLLAPSED_WIDTH[n.type] : FIXED_SIZE_TYPES.has(n.type) ? NODE_SIZES[n.type].width : (n.width ?? NODE_SIZES[n.type].width)) / 2
+    const cy = n.y + (fold ? COLLAPSED_HEIGHT[n.type] : FIXED_SIZE_TYPES.has(n.type) ? NODE_SIZES[n.type].height : (n.height ?? NODE_SIZES[n.type].height)) / 2
     if (cx < 0 || cy < 0 || cx > parent.width || cy > parent.height) out.add(n.id)
   }
   return out
 }
+
+/** The room "Wrap into…" leaves round what it wraps: on each side, and
+ *  for the header above it. */
+export const WRAP_PAD = 30
+export const WRAP_HEADER = 40
 
 /**
  * Gives the nodes a canvas has no place for a place on it. `nodes` hold the
@@ -492,6 +515,17 @@ export function strayNodeIds(
  * placed this way keeps its place in it. Only nodes in `shown` (the ones a
  * view lists) are placed, when given; `folded` says which containers the
  * canvas draws folded (a view's own folds), the model's when not given.
+ *
+ * A new parent "Wrap into…" made on another canvas (`wrap`), with no place
+ * here round children that have one (in the parent it went into), goes
+ * round them where they are, as the wrap put it round them there: with its
+ * room and header, its siblings making room where it now covers them;
+ * tightly, where the canvas draws it only to hold what it shows (`frames`:
+ * it has no frame there). Placed beside its siblings, it took them along,
+ * and the live layout, freeing it, rearranged its surroundings (F-0047).
+ * Their ids go into `wrapped`, not the result: the result names what the
+ * live layout settles.
+ *
  * Mutates `nodes`; returns the ids it placed. A canvas with no positions at all has not been laid out and is
  * left as it is.
  */
@@ -500,9 +534,11 @@ export function placeUnplaced(
   positions: Record<string, unknown> | undefined,
   shown?: Set<string>,
   folded?: (n: C4Node) => boolean,
+  options: { frames?: ReadonlySet<string>; wrap?: ReadonlySet<string>; wrapped?: string[] } = {},
 ): string[] {
   if (!positions || Object.keys(positions).length === 0) return []
-  const strays = strayNodeIds(nodes, positions, folded)
+  const { frames } = options
+  const strays = strayNodeIds(nodes, positions, folded, shown, frames)
   const known = (id: string): boolean => id in positions && !strays.has(id)
   const depth = (n: C4Node): number => {
     let d = 0
@@ -523,20 +559,73 @@ export function placeUnplaced(
   const waiting = new Set(unplaced.map((n) => n.id))
   // What is still to be placed lies where another canvas had it: not yet
   // on this one.
-  const drawn = modelCanvas(nodes, shown)
-  const canvas: CanvasShape = { shown: (n) => !waiting.has(n.id) && drawn.shown(n), boxOf: drawn.boxOf }
+  const drawn = modelCanvas(nodes, shown, frames)
+  const canvas: CanvasShape = { ...drawn, shown: (n) => !waiting.has(n.id) && drawn.shown(n) }
   // A new node has the size another canvas gave it: here it wraps what it
   // holds.
   for (const node of fresh) if (!waiting.has(node.id)) fitShown(nodes, node.id, canvas)
+  const placed: string[] = []
   for (const node of unplaced) {
+    const held = options.wrap?.has(node.id) ? Object.values(nodes).filter((c) => c.parentId === node.id && known(c.id) && drawn.shown(c)) : []
+    if (held.length) {
+      waiting.delete(node.id)
+      wrapRound(nodes, node, held, canvas, !!frames?.has(node.id))
+      options.wrapped?.push(node.id)
+      continue
+    }
     fitShown(nodes, node.id, canvas)
     const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== node.id && !waiting.has(s.id) && (!shown || shown.has(s.id)))
     node.x = at.x
     node.y = at.y
     waiting.delete(node.id)
+    placed.push(node.id)
     if (node.parentId && nodes[node.parentId]) growWithRoom(nodes, node.parentId, canvas)
   }
-  return unplaced.map((n) => n.id)
+  return placed
+}
+
+/**
+ * Puts `node` round `held` (its children, with places relative to the
+ * parent `node` is in), where they stand: they keep their places on the
+ * canvas. Drawn, with "Wrap into…"'s room and header; where the canvas
+ * draws it only as a frame, tightly. A drawn one pushes what it now covers
+ * out of its way, and its parents grow for it (growWithRoom). Mutates
+ * `nodes`.
+ */
+function wrapRound(nodes: Record<string, C4Node>, node: C4Node, held: C4Node[], canvas: CanvasShape, frame: boolean): void {
+  const boxes = held.map((c) => canvas.boxOf(c))
+  const left = Math.min(...boxes.map((b) => b.x))
+  const top = Math.min(...boxes.map((b) => b.y))
+  const right = Math.max(...boxes.map((b) => b.x + b.w))
+  const bottom = Math.max(...boxes.map((b) => b.y + b.h))
+  const pad = frame ? 0 : WRAP_PAD
+  const header = frame ? 0 : WRAP_HEADER
+  node.x = left - pad
+  node.y = top - pad - header
+  node.width = right - left + 2 * pad
+  node.height = bottom - top + 2 * pad + header
+  for (const c of Object.values(nodes)) {
+    if (c.parentId !== node.id) continue
+    c.x -= node.x
+    c.y -= node.y
+  }
+  if (frame) return
+  for (const [id, at] of Object.entries(makeRoomAround(node.id, nodes, canvas))) {
+    nodes[id].x = at.x
+    nodes[id].y = at.y
+  }
+  const parentId = node.parentId
+  if (!parentId || !nodes[parentId]) return
+  // The parents grow as far as they must to hold it, and keep the size
+  // they had otherwise: refit, one laid out with room to spare shrank.
+  growFrameLeftUp(nodes, parentId, canvas.shown)
+  growWithRoom(nodes, parentId, canvas, (id) => {
+    const p = nodes[id]
+    const was = { width: p.width, height: p.height }
+    fitShown(nodes, id, canvas)
+    p.width = Math.max(was.width, p.width)
+    p.height = Math.max(was.height, p.height)
+  })
 }
 
 /**

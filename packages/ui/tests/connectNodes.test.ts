@@ -96,3 +96,33 @@ describe('a relation drawn with an any-pair type in the metamodel', () => {
     expect(s().relationTypeChoice).toEqual({ sourceId: 'user', targetId: 'shop', types: ['interacts', 'misc'] })
   })
 })
+
+// F-0035 (decided 2026-10-23): a governance relation to what holds an
+// element may be drawn, and a move keeps it; a structural one is refused.
+describe('a relation drawn between an element and what holds it', () => {
+  beforeEach(() => {
+    s().loadDiagram({
+      nodes: [node('shop', 'system'), node('req', 'requirement'), node('api', 'container', { parentId: 'shop' })],
+      relations: [],
+      views: [],
+      metamodel: builtInGovernanceMetamodel(),
+    })
+  })
+
+  it('is added when it is a governance one, and stays when the requirement is moved into the system', () => {
+    connect('shop', 'req')
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ sourceId: 'shop', targetId: 'req', relationType: 'satisfies' })])
+    s().reparentNodes(['req'], 'shop')
+    expect(s().c4Nodes.req.parentId).toBe('shop')
+    expect(Object.values(s().c4Relations)).toEqual([expect.objectContaining({ sourceId: 'shop', targetId: 'req', relationType: 'satisfies' })])
+  })
+
+  it('is refused, with the reason, when it is a structural one', () => {
+    connect('api', 'shop')
+    expect(Object.values(s().c4Relations)).toEqual([])
+    expect(lastNotice()).toMatch(/shop holds api, and containment already joins them/)
+    expect(s().addRelation({ sourceId: 'api', targetId: 'shop', relationType: 'interacts' })).toBeNull()
+    expect(s().addRelation({ sourceId: 'api', targetId: 'gone' })).toBeNull()
+    expect(lastNotice()).toMatch(/"gone" is no element of the model/)
+  })
+})

@@ -368,4 +368,75 @@ describe('viewpoint tools', () => {
     expect(viewpointsOf(facade.getMetamodel!()).find((t) => t.id === 'domain-map')!.subject).toEqual({ types: ['domain'] })
     expect((await call('upsert_viewpoint', { id: 'domain-map', subjectTypes: ['spaceship'] })).resultText).toContain('unknown node type')
   })
+
+  it('name the views per element they delete: delete_viewpoint, and upsert_viewpoint taking a subject away', async () => {
+    const { facade, view, call } = setup([el('order', 'state-machine', 'Order'), el('pay', 'state-machine', 'Payment')])
+    expect((await call('create_view', { tempId: 'g', name: 'Machines', viewpoint: 'state-machine' })).ok).toBe(true)
+    const [order, pay] = [view('Order').id, view('Payment').id]
+    const narrowed = await call('upsert_viewpoint', { id: 'state-machine', subjectTypes: [] })
+    expect(narrowed.ok, narrowed.resultText).toBe(true)
+    expect(narrowed.resultText).toContain(`Deleted 2 views per element with their group: "Order" (${order}), "Payment" (${pay})`)
+    expect(Object.values(facade.getViews!()).map((v) => v.name)).toEqual(['Machines'])
+    // Its subject back, the group fills again; deleting the viewpoint deletes its views.
+    expect((await call('upsert_viewpoint', { id: 'state-machine', subjectTypes: ['state-machine'] })).ok).toBe(true)
+    const again = [view('Order').id, view('Payment').id]
+    const deleted = await call('delete_viewpoint', { id: 'state-machine' })
+    expect(deleted.ok, deleted.resultText).toBe(true)
+    expect(deleted.resultText).toContain(`Deleted 2 views per element with their group: "Order" (${again[0]}), "Payment" (${again[1]})`)
+    expect(deleted.deleted).toEqual({ views: 2 })
+    expect(view('Machines')).toMatchObject({ kind: 'static' })
+    expect(view('Machines').viewpoint).toBeUndefined()
+  })
+
+  it('say when update_view makes a view a group of views per element, and that its picked elements go', async () => {
+    const { view, call } = setup([el('order', 'state-machine', 'Order'), el('pay', 'state-machine', 'Payment')])
+    expect((await call('create_view', { tempId: 'p', name: 'Picked', nodeIds: ['order', 'pay'] })).ok).toBe(true)
+    const made = await call('update_view', { id: 'p', viewpoint: 'state-machine' })
+    expect(made.ok, made.resultText).toBe(true)
+    expect(made.resultText).toContain('It is now a group holding a view per element (2: Order, Payment), and no longer lists the 2 element(s) picked for it.')
+    expect(view('Picked').nodeIds).toEqual([])
+  })
+})
+
+describe('what a change of viewpoints takes from the views per element', () => {
+  it('deleting the viewpoint of a group: its views; a view becoming a group: the elements picked for it', () => {
+    const state = modelOf([el('order', 'state-machine', 'Order'), el('pay', 'state-machine', 'Payment'), el('x', 'domain', 'Payments')])
+    model.insertView(state, 'g', 'Machines')
+    expect(model.applyViewpoint(state, 'g', 'state-machine', null)).toBe(true)
+    model.syncViewGroups(state, (() => { let i = 0; return () => `m${++i}` })())
+    model.insertView(state, 'p', 'Picked')
+    state.views.p.nodeIds = ['x', 'order']
+    const before = JSON.stringify(state.views)
+
+    const deleting = model.groupLossesOf(state, (d) => { d.metamodel = withoutViewpoint(d.metamodel!, 'state-machine'); model.syncViewpoints(d) })
+    expect(deleting.removed.map((v) => v.name).sort()).toEqual(['Order', 'Payment'])
+    expect(deleting.unlisted).toEqual([])
+    const question = model.groupLossesQuestion('Delete viewpoint State machine?', deleting)!
+    expect(question).toContain('These 2 views per element are deleted with their group:')
+    expect(question).toContain('• Order')
+
+    const choosing = model.groupLossesOf(state, (d) => { model.applyViewpoint(d, 'p', 'state-machine') })
+    expect(choosing.removed).toEqual([])
+    expect(choosing.unlisted.map((v) => v.id)).toEqual(['p'])
+    expect(model.groupLossesQuestion('Make Picked a view of State machine?', choosing)).toContain('the 2 elements picked for it by hand are no longer listed')
+    // Nothing taken: no question. And the state is left as it was.
+    expect(model.groupLossesQuestion('Make Picked a view of Traceability?', model.groupLossesOf(state, (d) => { model.applyViewpoint(d, 'p', 'traceability') }))).toBeNull()
+    expect(JSON.stringify(state.views)).toBe(before)
+  })
+
+  it('a group keeps no places and no camera of a canvas', () => {
+    const state = modelOf([el('order', 'state-machine', 'Order')])
+    model.insertView(state, 'g', 'Machines')
+    state.views.g.positions = { order: { x: 1, y: 2, width: 3, height: 4 } }
+    state.views.g.viewport = { x: 1, y: 1, zoom: 1 }
+    model.applyViewpoint(state, 'g', 'state-machine', null)
+    expect(model.planViewGroups(state).unlist).toEqual(['g'])
+    model.syncViewGroups(state, () => 'm1')
+    expect(state.views.g.positions).toEqual({})
+    expect(state.views.g.viewport).toBeUndefined()
+    // A view of the group keeps its own.
+    expect(state.views.m1.positions).toEqual({})
+    state.views.m1.positions = { order: { x: 1, y: 2, width: 3, height: 4 } }
+    expect(model.planViewGroups(state).unlist).toEqual([])
+  })
 })

@@ -9,7 +9,6 @@ import {
   wizardLinksOf,
   wizardMissingRequired,
   wizardPrefill,
-  wizardRelationCandidates,
   wizardStepFields,
   type NodeTypeDef,
   type NodeWizardDef,
@@ -19,6 +18,7 @@ import {
   type WizardStep,
 } from '@radical/common/metamodel'
 import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS, TYPE_LABELS, type C4Node, type C4Relation } from '@radical/common/c4'
+import { wizardLinkCandidates } from '@radical/common/relationRules'
 import { useDiagramStore, type NodeWizardSession } from '../store/diagramStore'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { RefPicker } from './RefPicker'
@@ -92,12 +92,18 @@ function WizardDialog({ session, wizard, typeDef, type }: {
   const [stepIndex, setStepIndex] = useState(0)
   const [furthest, setFurthest] = useState(0)
   const [values, setValues] = useState(() => initialValues(session, wizard, typeDef))
-  const [links, setLinks] = useState<WizardLink[]>(() =>
+  // The links it has when it opens: offered to untick even where the model
+  // would not take them now.
+  const [openingLinks] = useState<WizardLink[]>(() =>
     session.mode === 'create'
       ? session.initialLinks
       : wizardLinksOf(wizard, session.nodeId, useDiagramStore.getState().c4Relations)
           .map(({ relationType, direction, otherId }) => ({ relationType, direction, otherId })),
   )
+  const [links, setLinks] = useState<WizardLink[]>(openingLinks)
+  // The element as the model will check its links: the one edited, or the
+  // new one of its type where it will be made.
+  const self = session.mode === 'edit' ? { id: session.nodeId, type } : { type, label: session.draft.label, parentId: session.draft.parentId }
 
   const step = steps[Math.min(stepIndex, steps.length - 1)]
   const isLast = stepIndex >= steps.length - 1
@@ -226,7 +232,7 @@ function WizardDialog({ session, wizard, typeDef, type }: {
             {step.kind === 'relations' && (
               <RelationsStep
                 step={step}
-                candidates={wizardRelationCandidates(metamodel, step, type, c4Nodes, selfId)}
+                candidates={wizardLinkCandidates({ nodes: c4Nodes, relations: c4Relations, metamodel }, step, self, openingLinks)}
                 links={links}
                 setLinks={setLinks}
                 typeMetaOf={typeMetaOf}

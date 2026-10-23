@@ -33,13 +33,16 @@
 //   deleted: the delete wins here too, and the drop is reported (dropStrays).
 //   So does what one side added to a view or a layout rule of an element,
 //   relation or sequence the other deleted: a fold, an entry in the list, a
-//   row, a hidden relation, a dynamic view's sequence (forgetDeleted).
+//   row, a hidden relation, a dynamic view's sequence (forgetDeleted). And
+//   a reference one side made to an element the other deleted (a
+//   transition's event, a requirement's state) lets go of it, as a delete
+//   does.
 //
 // The merged model may break another rule each side kept on its own;
 // validation shows it.
 
 import { trimStepBackward, type DiagramData } from './c4'
-import { forgetNodesInViews, modelValue, type ModelState } from './model'
+import { documentMetamodel, forgetNodesInReferences, forgetNodesInViews, modelValue, type ModelState } from './model'
 
 export interface ModelMergeResult {
   merged: DiagramData
@@ -605,7 +608,15 @@ function forgetDeleted(merged: DiagramData, sides: DiagramData[]): void {
   // Copies: a view the merge took whole is the side's own object.
   const views = Object.fromEntries((merged.views ?? []).map((v) => [v.id, { ...v }]))
   const state = { views, defaultLayoutConstraints: merged.defaultLayoutConstraints, activeViewId: null } as unknown as ModelState
-  if (nodes.size) forgetNodesInViews(state, nodes)
+  if (nodes.size) {
+    forgetNodesInViews(state, nodes)
+    // Copies: the sides keep theirs.
+    const things = { c4Nodes: Object.fromEntries(merged.nodes.map((n) => [n.id, { ...n }])), c4Relations: Object.fromEntries(merged.relations.map((r) => [r.id, { ...r }])), metamodel: documentMetamodel(merged.metamodel, merged.nodes) } as unknown as ModelState
+    forgetNodesInReferences(things, nodes)
+    const changed = <T extends { id: string }>(list: T[], now: Record<string, T>): T[] => list.map((e) => JSON.stringify(now[e.id]) === JSON.stringify(e) ? e : now[e.id])
+    merged.nodes = changed(merged.nodes, things.c4Nodes)
+    merged.relations = changed(merged.relations, things.c4Relations)
+  }
   for (const view of Object.values(state.views)) {
     if (view.hiddenRelationIds?.some((id) => relations.has(id))) view.hiddenRelationIds = view.hiddenRelationIds.filter((id) => !relations.has(id))
     if (view.sequenceId && sequences.has(view.sequenceId)) delete view.sequenceId

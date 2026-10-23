@@ -5,7 +5,7 @@
 // from the metamodel, so callers rebuild them after these run.
 
 import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
-import { checkRemoveNodeTypeFromMetamodel, checkRemoveRelationTypeFromMetamodel, forkPresetMetamodel, metamodelWithoutNodeType, milestoneHoldsType, viewNamesType } from '../../model'
+import { checkRemoveNodeTypeFromMetamodel, checkRemoveRelationTypeFromMetamodel, forkPresetMetamodel, isViewGroup, metamodelWithoutNodeType, milestoneHoldsType, viewNamesType } from '../../model'
 import { pipelineOf } from '../../viewPipeline'
 import { isViewpointKind, newViewpointId, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '../../viewpoints'
 import { fail, type ToolDef, type ToolHandler, type ToolResult, type ToolRunContext } from './types'
@@ -87,6 +87,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           forwardLabel: { type: 'string', description: 'How it reads in a sentence from source to target, when the label is a name rather than a verb ("Uses" for "Interacts"). "" clears it.' },
           inverseLabel: { type: 'string', description: 'How it reads from target to source: "Constrained by". The wiki view uses it; the canvas does not show it. "" clears it.' },
           color: { type: 'string' },
+          governance: { type: 'boolean', description: 'true for a governance relation, which ties a requirement, decision, check or screen to the element it is about (satisfies, constrains, verifies): it may join an element and what holds it, and moving an element into the other keeps it. false (the default) for a structural one (uses, part of), which containment already says: refused between an element and what holds it, and removed when one is moved into the other.' },
           allowedPairs: {
             type: 'array',
             description: 'The complete list of allowed source → target node-type pairs. [] allows any pair. A pair may read its own way: forwardLabel ("Delivers to" for Interacts to a person) and inverseLabel ("Receives from").',
@@ -126,14 +127,14 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           kind: { type: 'string', enum: [...VIEWPOINT_KINDS], description: "How its views show the chain: 'table', 'wiki', 'treemap' (hierarchy), 'matrix', 'warnier' (a Warnier–Orr diagram of the hierarchy) or 'static' (canvas)." },
           pipeline: { ...PIPELINE_SCHEMA, type: 'object' },
           fromViewId: { type: 'string', description: 'A view whose kind and filter chain the viewpoint takes (kind and pipeline given here win).' },
-          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: create_view with the viewpoint makes a group holding a view of each such element, named after it, its first level kept to the element and what lies inside it. [] makes it draw the whole model again.' },
+          subjectTypes: { type: 'array', items: { type: 'string' }, description: 'Node types it draws one element of: create_view with the viewpoint makes a group holding a view of each such element, named after it, its first level kept to the element and what lies inside it; a view of it already there becomes such a group and lists no elements picked by hand. [] makes it draw the whole model again: each group becomes one view, and its views per element are deleted (the reply names them).' },
         },
         additionalProperties: false,
       },
     },
     {
       name: 'delete_viewpoint',
-      description: 'Delete a viewpoint from the metamodel. Its views keep their kind and filter chain, of no viewpoint.',
+      description: 'Delete a viewpoint from the metamodel. Its views keep their kind and filter chain, of no viewpoint; a group of views per element (a viewpoint with subjectTypes) becomes one such view, and its views per element are deleted (the reply names them).',
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },
@@ -207,9 +208,22 @@ function editable(current: Metamodel): { mm: Metamodel; note: string } {
   return { mm, note: fork ? ` The built-in metamodel was copied to the custom metamodel "${mm.name}" (${mm.id}).` : '' }
 }
 
+/** Sets the metamodel, and says what it took from the views: a viewpoint
+ *  deleted or without its subject ends its groups of views per element, and
+ *  their views are deleted; a viewpoint given a subject makes its views
+ *  groups, which list no elements picked by hand. */
 function save(ctx: ToolRunContext, mm: Metamodel, text: string): ToolResult {
+  // Copies: a facade edits its views in place.
+  const before = Object.values(ctx.diagram.getViews?.() ?? {}).map((v) => ({ id: v.id, name: v.name, listed: v.nodeIds.length }))
   ctx.diagram.setMetamodel!(mm)
-  return { ok: true, resultText: text }
+  const after = ctx.diagram.getViews?.() ?? {}
+  const gone = before.filter((v) => !(v.id in after))
+  const unlisted = before.filter((v) => v.listed > 0 && after[v.id] && after[v.id].nodeIds.length === 0 && isViewGroup(after[v.id], mm))
+  const notes = [
+    ...(gone.length ? [`Deleted ${gone.length} ${gone.length === 1 ? 'view per element with its group' : 'views per element with their group'}: ${gone.map((v) => `"${v.name}" (${v.id})`).join(', ')}.`] : []),
+    ...unlisted.map((v) => `${v.name} (${v.id}) is now a group of views per element and no longer lists the ${v.listed} element(s) picked for it.`),
+  ]
+  return { ok: true, resultText: [text, ...notes].join(' '), ...(gone.length ? { deleted: { views: gone.length } } : {}) }
 }
 
 export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
@@ -320,6 +334,11 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         else delete def[key]
       }
       if (typeof input.color === 'string') def.color = input.color
+      if (input.governance !== undefined) {
+        if (typeof input.governance !== 'boolean') return fail('upsert_relation_type: governance must be true or false')
+        if (input.governance) def.governance = true
+        else delete def.governance
+      }
       if (pairs) def.allowedPairs = pairs
       if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
       mm.relationTypes[id] = def

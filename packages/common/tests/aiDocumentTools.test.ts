@@ -562,9 +562,10 @@ describe('update_node label', () => {
 describe('update_relation types and properties', () => {
   const entities = async () => {
     const s = setup()
+    // A line is a part (kind entity), which may be part of the order (a root).
+    await s.call('add_node', { tempId: 'l', type: 'entity', label: 'Line', properties: { kind: 'entity' } })
     await s.call('add_node', { tempId: 'o', type: 'entity', label: 'Order' })
-    await s.call('add_node', { tempId: 'l', type: 'entity', label: 'Line' })
-    await s.call('add_relation', { sourceId: 'o', targetId: 'l', relationType: 'references', properties: { cardinality: 'many', description: 'lines' } })
+    await s.call('add_relation', { sourceId: 'l', targetId: 'o', relationType: 'references', properties: { cardinality: 'many', description: 'lines' } })
     const id = Object.keys(s.facade.getRelations())[0]
     const rel = () => s.facade.getRelations()[id] as unknown as Record<string, unknown>
     return { ...s, id, rel }

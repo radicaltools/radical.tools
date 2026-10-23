@@ -137,6 +137,23 @@ export interface LiveColaModel {
   alignments?: Alignment[]
   /** Elements the physics leaves where they stand (PinConstraint). */
   pinned?: string[]
+  /** Containers the canvas draws only to hold what it shows (a view's
+   *  frames, viewFrames): invisible, they take no part in the layout. What
+   *  is in one is laid out with the nearest container drawn round it (or on
+   *  the canvas), and the frame keeps its place, grown to hold what moved
+   *  in it. As groups of their own, the undrawn domains of a view of
+   *  entities pushed each other on a drop, and the physics kept them apart,
+   *  moving what the view draws (F-0048). */
+  frames?: string[]
+}
+
+/** A frame (LiveColaModel.frames) as the model had it at the last build,
+ *  with the leaves inside it and where they stood. */
+interface FrameBase {
+  box: Box
+  leaves: { node: ColaNode; x: number; y: number }[]
+  /** What is directly in it and laid out (or a frame in it). */
+  children: string[]
 }
 
 /**
@@ -339,6 +356,8 @@ export class LiveColaEngine {
   private pinnedMembers = new Set<string>()
   /** Group (or '' for the canvas) → the elements directly in it, as laid out. */
   private childrenOf = new Map<string, string[]>()
+  /** The canvas's frames (LiveColaModel.frames), as the last build had them. */
+  private frameBases = new Map<string, FrameBase>()
   /** Position of each cola node in colaNodes (WebCoLa's solver arrays). */
   private nodeIndexOf = new Map<ColaNode, number>()
   private calm: CalmDrag | null = null
@@ -1068,7 +1087,37 @@ export class LiveColaEngine {
     }
   }
 
-  /** The group an element is laid out in, or '' for the canvas. */
+  /** A frame's box (LiveColaModel.frames): moved with what is in it when
+   *  all of that moved alike (a drag of the group round it), else the
+   *  model's grown to hold what is in it as drawn. */
+  private frameBox(id: string, memo: Map<string, Box | undefined>): Box | undefined {
+    if (memo.has(id)) return memo.get(id)
+    memo.set(id, undefined)
+    const base = this.frameBases.get(id)
+    if (!base) return undefined
+    const first = base.leaves[0]
+    const dx = first.node.x - first.x
+    const dy = first.node.y - first.y
+    let box: Box
+    if (movedAlike(base.leaves, dx, dy, RIGID_PX)) {
+      box = { x: base.box.x + dx, X: base.box.X + dx, y: base.box.y + dy, Y: base.box.Y + dy }
+    } else {
+      box = { ...base.box }
+      for (const c of base.children) {
+        const inner = this.frameBases.has(c) ? this.frameBox(c, memo) : this.boxOf(c)
+        if (!inner) continue
+        box.x = Math.min(box.x, inner.x)
+        box.X = Math.max(box.X, inner.X)
+        box.y = Math.min(box.y, inner.y)
+        box.Y = Math.max(box.Y, inner.Y)
+      }
+    }
+    memo.set(id, box)
+    return box
+  }
+
+  /** The group an element is laid out in, or '' for the canvas: a frame
+   *  (LiveColaModel.frames) is none. */
   private levelOf(id: string): string {
     for (let p = this.allNodes[id]?.parentId; p; p = this.allNodes[p]?.parentId) {
       if (this.idToGroup.has(p)) return p
@@ -1369,12 +1418,21 @@ export class LiveColaEngine {
     this.reportedAbs.clear()
     this.arrivals = []
 
-    const { nodes, relations, alignments = [], pinned = [] } = this.callbacks.getModel()
+    const { nodes, relations, alignments = [], pinned = [], frames = [] } = this.callbacks.getModel()
     this.allNodes = nodes
     this.alignments = alignments
     this.pinnedIds = new Set(pinned)
+    this.frameBases.clear()
 
-    const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes))
+    // A frame is no element of the layout: what is in it is laid out in the
+    // container round it that is drawn (its holder), or on the canvas.
+    const frameIds = new Set(frames.filter((id) => nodes[id]))
+    const holderOf = (n: C4Node): string | undefined => {
+      let p = n.parentId
+      while (p && frameIds.has(p)) p = nodes[p]?.parentId
+      return p
+    }
+    const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes) && !frameIds.has(n.id))
     if (visibleNodes.length === 0) {
       this.cola = null
       this.seedPositions.clear()
@@ -1384,8 +1442,9 @@ export class LiveColaEngine {
     // Which visible nodes are parents (have visible children)?
     const parentIds = new Set<string>()
     for (const n of visibleNodes) {
-      if (n.parentId && nodes[n.parentId] && !nodes[n.parentId].collapsed) {
-        parentIds.add(n.parentId)
+      const holder = holderOf(n)
+      if (holder && nodes[holder] && !nodes[holder].collapsed) {
+        parentIds.add(holder)
       }
     }
 
@@ -1490,7 +1549,10 @@ export class LiveColaEngine {
       this.neighbours.get(a)!.add(b)
       this.neighbours.get(b)!.add(a)
     }
-    for (const n of visibleNodes) if (n.parentId) link(n.id, n.parentId)
+    for (const n of visibleNodes) {
+      const holder = holderOf(n)
+      if (holder) link(n.id, holder)
+    }
     const colaLinks: Link<ColaNode>[] = []
     for (const rel of Object.values(relations)) {
       const src = this.findLeaf(rel.sourceId, visibleNodes)
@@ -1517,7 +1579,7 @@ export class LiveColaEngine {
       if (!parentIds.has(n.id)) continue
       if (NESTING_TYPES.has(n.type)) continue
       const leafIndices = leafNodes
-        .filter((c) => c.parentId === n.id)
+        .filter((c) => holderOf(c) === n.id)
         .map((c) => nodeIndex.get(c.id))
         .filter((i) => i !== undefined) as number[]
       if (leafIndices.length > 0) {
@@ -1554,7 +1616,7 @@ export class LiveColaEngine {
     for (const n of outerContainerNodes) {
       const childLeafIndices: number[] = []
       const childGroupIndices: number[] = []
-      for (const c of visibleNodes.filter((v) => v.parentId === n.id)) {
+      for (const c of visibleNodes.filter((v) => holderOf(v) === n.id)) {
         const gi = groupIndex.get(c.id)
         if (gi !== undefined) childGroupIndices.push(gi)
         else {
@@ -1662,7 +1724,7 @@ export class LiveColaEngine {
     const externalIdx: number[] = []
     this.colaNodes.forEach((cn, i) => {
       const n = this.allNodes[cn.c4id]
-      if (!n || n.parentId) return
+      if (!n || holderOf(n)) return
       if (n.type === 'person') personIdx.push(i)
       else if (n.external) externalIdx.push(i)
       else internalIdx.push(i)
@@ -1774,7 +1836,7 @@ export class LiveColaEngine {
     for (const rel of Object.values(relations)) {
       for (const [id, groupId] of [[rel.sourceId, rel.targetId], [rel.targetId, rel.sourceId]]) {
         const leaf = this.idToNode.get(id)
-        if (!leaf || linked.has(leaf) || nodes[id].parentId || this.alignedWith.has(id) || !this.idToGroup.has(groupId)) continue
+        if (!leaf || linked.has(leaf) || holderOf(nodes[id]) || this.alignedWith.has(id) || !this.idToGroup.has(groupId)) continue
         if (!groupsOf.has(leaf)) groupsOf.set(leaf, new Set())
         groupsOf.get(leaf)!.add(groupId)
       }
@@ -1890,6 +1952,21 @@ export class LiveColaEngine {
         const at = toAbsoluteTopLeft(n, nodes)
         this.keepFrame(g, { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height })
       }
+    }
+    // The frames as the model has them, with what moves in them.
+    for (const id of frameIds) {
+      const n = nodes[id]
+      const at = toAbsoluteTopLeft(n, nodes)
+      const leaves: FrameBase['leaves'] = []
+      const inside = (c: C4Node): boolean => {
+        for (let p = c.parentId; p; p = nodes[p]?.parentId) if (p === id) return true
+        return false
+      }
+      for (const cn of this.colaNodes) if (inside(nodes[cn.c4id])) leaves.push({ node: cn, x: cn.x, y: cn.y })
+      const children = Object.values(nodes)
+        .filter((c) => c.parentId === id && (this.idToNode.has(c.id) || this.idToGroup.has(c.id) || frameIds.has(c.id)))
+        .map((c) => c.id)
+      if (leaves.length) this.frameBases.set(id, { box: { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height }, leaves, children })
     }
     if (dropped.length) {
       this.clearOverlaps(dropped, dropped, covered)
@@ -2202,6 +2279,16 @@ export class LiveColaEngine {
       if (skip.has(g.c4id)) continue
       const frame = this.frameOf(g)
       if (frame) abs[g.c4id] = { x: frame.x, y: frame.y, width: frame.X - frame.x, height: frame.Y - frame.y }
+    }
+    // The frames: what is in them is reported relative to them. One inside
+    // a dragged group moves with it, as React Flow draws it.
+    const memo = new Map<string, Box | undefined>()
+    for (const id of this.frameBases.keys()) {
+      let carried = false
+      for (let p = this.allNodes[id]?.parentId; p && !carried; p = this.allNodes[p]?.parentId) carried = skip.has(p)
+      if (carried) continue
+      const box = this.frameBox(id, memo)
+      if (box) abs[id] = { x: box.x, y: box.y, width: box.X - box.x, height: box.Y - box.y }
     }
 
     // 2. Convert to RF-relative (subtract parent's absolute position)

@@ -163,6 +163,14 @@ export interface RelationTypeDef {
   /** Empty list ⇒ "any pair allowed". */
   allowedPairs: RelationPair[]
   properties?: PropertyDef[]
+  /** A governance relation: it ties a requirement, decision, check or
+   *  screen to the element it is about (satisfies, constrains, verifies)
+   *  rather than saying how the model is built (uses, part of). Containment
+   *  says nothing of that, so one may join an element and what holds it (a
+   *  requirement inside the system that satisfies it), and a move into that
+   *  element keeps it; a structural relation there is refused, and goes on
+   *  such a move (relationRefusal, relationsToNewHolders). */
+  governance?: boolean
   /** Optional visual hint for the relation. */
   color?: string
   builtin?: boolean

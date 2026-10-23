@@ -391,8 +391,17 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         changes.push(() => ctx.diagram.setViewPipeline!(vId, chain.pipeline))
       }
       if (!changes.length) return fail('update_view: nothing to change')
+      // Read before: a facade edits the view in place.
+      const listed = view.nodeIds.length
+      const wasGroup = isViewGroup(view, ctx.diagram.getMetamodel?.())
       for (const change of changes) change()
-      return { ok: true, resultText: `Updated view ${vId}.`, updated: { views: 1 } }
+      // A viewpoint of one element makes the view a group: it lists no
+      // elements of its own, and holds a view of each such element.
+      const now = ctx.diagram.getViews()[vId]
+      const group = !wasGroup && !!now && isViewGroup(now, ctx.diagram.getMetamodel?.())
+      const held = group ? Object.values(ctx.diagram.getViews()).filter((v) => v.partOf === vId).map((v) => v.name).sort() : []
+      const note = group ? ` It is now a group holding a view per element (${held.length}${held.length ? `: ${held.join(', ')}` : ''})${listed ? `, and no longer lists the ${listed} element(s) picked for it` : ''}.` : ''
+      return { ok: true, resultText: `Updated view ${vId}.${note}`, updated: { views: 1 } }
     },
 
     set_view_nodes: (rawInput, ctx) => {

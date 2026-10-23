@@ -433,3 +433,61 @@ describe('a relation to what holds it', () => {
     expect(s.c4Nodes.api.parentId).toBe('shop')
   })
 })
+
+// F-0035 (decided 2026-10-23): governance relations (satisfies, constrains,
+// verifies…) say what containment does not, so they are outside the holder
+// rule; putting a requirement into the system that satisfies it deleted
+// `satisfies`, and radical check then said nothing satisfied it.
+describe('a governance relation to what holds it', () => {
+  it('may be drawn, stays when an element moves into what it relates to, and the structural ones do not', () => {
+    const s = state()
+    s.c4Nodes.req = node('req', 'requirement')
+    s.c4Nodes.inner = { ...node('inner', 'requirement'), parentId: 'shop' }
+    s.c4Nodes.adrIn = { ...node('adrIn', 'adr'), parentId: 'shop' }
+    s.c4Nodes.api = node('api', 'container')
+    s.c4Relations.sat = { id: 'sat', sourceId: 'shop', targetId: 'req', relationType: 'satisfies' }
+    s.c4Relations.a1 = { id: 'a1', sourceId: 'api', targetId: 'shop', relationType: 'interacts' }
+    // Drawn between an element and what holds it.
+    expect(checkAddRelation(s, { sourceId: 'shop', targetId: 'inner', relationType: 'satisfies' })).toBeNull()
+    expect(checkAddRelation(s, { sourceId: 'shop', targetId: 'inner' })).toBeNull()
+    expect(checkAddRelation(s, { sourceId: 'adrIn', targetId: 'shop', relationType: 'constrains' })).toBeNull()
+    // Kept by a move into the element it relates to; a structural one goes.
+    expect(reparentNodes(s, ['req'], 'shop')).toEqual([])
+    expect(s.c4Relations.sat).toBeDefined()
+    expect(reparentNodes(s, ['api'], 'shop').map((r) => r.id)).toEqual(['a1'])
+    expect(checkAddRelation(s, { sourceId: 'api', targetId: 'shop', relationType: 'interacts' })).toMatch(/shop holds api/)
+    expect(validateModel(s.c4Nodes, s.c4Relations, s.metamodel!).filter((i) => i.relationId === 'sat')).toEqual([])
+  })
+})
+
+// F-0045: a picker kept offering a requirement an outside edit removed, and
+// picking it wrote a relation to nothing, which Validation then flagged.
+describe('a relation whose end is not in the model', () => {
+  it('is refused, new or moved there', () => {
+    const s = state()
+    expect(checkAddRelation(s, { sourceId: 'gone', targetId: 'shop', relationType: 'interacts' })).toMatch(/"gone" is no element of the model/)
+    expect(checkAddRelation(s, { sourceId: 'user', targetId: 'gone' })).toMatch(/"gone" is no element of the model/)
+    expect(checkPatchRelation(s, 'uses', { targetId: 'gone' })).toMatch(/"gone" is no element of the model/)
+  })
+})
+
+// F-0044: Add or link under an aggregate root linked another root, or a
+// part of another aggregate, as part of it, and Validation then flagged it.
+describe('a part-of that breaks the aggregate rules', () => {
+  const entity = (id: string, kind: string): C4Node => ({ ...node(id, 'entity'), kind } as unknown as C4Node)
+  const domain = (): ModelState => ({
+    ...state(),
+    c4Nodes: { payment: entity('payment', 'aggregate-root'), account: entity('account', 'aggregate-root'), customer: entity('customer', 'aggregate-root'), line: entity('line', 'entity'), owner: entity('owner', 'entity') },
+    c4Relations: { p1: { id: 'p1', sourceId: 'owner', targetId: 'customer', relationType: 'part-of' } },
+  })
+  it('is refused: a root is part of none, a part belongs to a root, and to one only', () => {
+    const s = domain()
+    expect(checkAddRelation(s, { sourceId: 'account', targetId: 'payment', relationType: 'part-of' })).toMatch(/"account" is an aggregate root/)
+    expect(checkAddRelation(s, { sourceId: 'line', targetId: 'owner', relationType: 'part-of' })).toMatch(/"owner" is not an aggregate root/)
+    expect(checkAddRelation(s, { sourceId: 'owner', targetId: 'payment', relationType: 'part-of' })).toMatch(/"owner" is part of "customer" already/)
+    // A part of no aggregate yet joins one; the one it is in may be changed.
+    expect(checkAddRelation(s, { sourceId: 'line', targetId: 'payment', relationType: 'part-of' })).toBeNull()
+    expect(checkPatchRelation(s, 'p1', { targetId: 'payment' })).toBeNull()
+    expect(checkAddRelation(s, { sourceId: 'account', targetId: 'payment', relationType: 'references' })).toBeNull()
+  })
+})

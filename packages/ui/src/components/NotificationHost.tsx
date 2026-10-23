@@ -70,7 +70,10 @@ function ToastItem({ id, severity, message }: ToastItemProps): React.ReactElemen
   return (
     <div
       className={`toast toast-${severity}${leaving ? ' toast-leaving' : ''}`}
-      onMouseEnter={() => setPaused(true)}
+      // The pointer moved onto it pauses it; a notice that appears under a
+      // pointer resting there (the browser then reports an enter, and a move
+      // that moves nothing) still goes.
+      onMouseMove={(e) => { if (!paused && (e.movementX !== 0 || e.movementY !== 0)) setPaused(true) }}
       onMouseLeave={() => setPaused(false)}
       role={severity === 'error' ? 'alert' : 'status'}
     >
@@ -105,8 +108,9 @@ function ToastItem({ id, severity, message }: ToastItemProps): React.ReactElemen
 
 /**
  * Renders transient toast notifications (metamodel violations etc.)
- * in the bottom-right corner. Each toast shows an animated countdown
- * bar; hovering pauses the auto-dismiss timer.
+ * in the bottom-right corner, above the canvas controls. Each toast shows
+ * an animated countdown bar; moving the pointer onto it pauses the
+ * auto-dismiss timer.
  */
 export function NotificationHost(): React.ReactElement | null {
   const notifications = useDiagramStore((s) => s.notifications)

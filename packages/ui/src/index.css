@@ -4172,9 +4172,12 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 
 /* ─── Toast notifications (modern) ────────────────────────────────────── */
+/* Above the canvas controls (Smart Layout, Focus…), which stand at the
+   bottom centre of the canvas: at 1280 px a notice 420 px wide at the right
+   reached over them and took their clicks. */
 .toast-host {
   position: fixed;
-  bottom: 24px;
+  bottom: 60px;
   right: 24px;
   z-index: 10000;
   display: flex;

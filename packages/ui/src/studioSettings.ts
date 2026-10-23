@@ -72,3 +72,20 @@ export function saveStudioSettings(settings: StudioSettings, storage?: MinimalSt
     /* quota or similar — silently ignore */
   }
 }
+
+/**
+ * Changes some settings and keeps the rest as they are stored now: every
+ * writer goes through this, so none puts back a setting another one has
+ * changed since it read them (a Settings menu holding the ones it read at
+ * mount turned Focus and Smart fit back on). Tells the mounted views.
+ */
+export function updateStudioSettings(patch: Partial<StudioSettings>, storage?: MinimalStorage | null): StudioSettings {
+  const next = { ...loadStudioSettings(storage), ...patch }
+  saveStudioSettings(next, storage)
+  try {
+    globalThis.dispatchEvent?.(new Event(STUDIO_SETTINGS_CHANGED_EVENT))
+  } catch {
+    /* no window (tests, workers) */
+  }
+  return next
+}

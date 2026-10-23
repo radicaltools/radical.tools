@@ -137,6 +137,28 @@ describe('createModelFacade', () => {
     expect(f.getViews!()[view].nodeIds).toEqual([b])
   })
 
+  it('removing a node a milestone holds leaves it on that milestone\'s view (delete_node, F-0053)', () => {
+    const f = facade()
+    const a = f.addNode(node('system', 'A'))
+    const b = f.addNode(node('system', 'B'))
+    const view = f.addView!('Context')
+    f.setViewNodes!(view, [a, b])
+    f.getViews!()[view].positions = { [a]: { x: 0, y: 0, width: 200, height: 100 } }
+    f.createMilestone!('As-is')
+    f.removeNode(a)
+    expect(f.getViews!()[view].nodeIds).toEqual([b])
+    const [milestone] = f.toDiagramData().snapshots!
+    expect(milestone.views?.[view]?.nodeIds).toEqual([a, b])
+    // Its list only: the places stay the view's, for every milestone.
+    expect(milestone.views?.[view]?.positions).toEqual({})
+    // An element added since a milestone: it has nothing to keep.
+    f.createMilestone!('To-be')
+    const c = f.addNode(node('requirement', 'C'))
+    f.setViewNodes!(view, [b, c])
+    f.removeNode(c)
+    expect(f.toDiagramData().snapshots![1].views).toBeUndefined()
+  })
+
   it('keeps view node lists to known ids, deduplicated, and adds new nodes to the active view', () => {
     const f = facade()
     const a = f.addNode(node('system', 'A'))
