@@ -3944,6 +3944,17 @@ export const useDiagramStore = create<DiagramStore>()(
             set((state) => { model.syncViewGroups(state as unknown as model.ModelState, uid) })
           }
         }
+        // A group of views per element is never a canvas of its own: the
+        // view shown that has become one (its viewpoint chosen in View
+        // properties, a subject given to its viewpoint, an outside change)
+        // opens its first view, or All elements while it has none. Drawn as
+        // a canvas, it saved positions into the group, and a reload showed
+        // another view.
+        const shownGroup = get().activeViewId
+        if (shownGroup && model.isViewGroup(get().views[shownGroup], get().metamodel)) {
+          get().setActiveView(model.firstViewOfGroup(get().views, shownGroup)?.id ?? null)
+          return
+        }
         // The exploration shown: flat, its lines only, each element's + and −.
         const s0 = get()
         const x = shownExploration(s0)
@@ -5338,8 +5349,9 @@ export const useDiagramStore = create<DiagramStore>()(
             state.defaultPositions = currentPos as any
             const camera = allElementsCamera(currentViewport)
             if (camera) state.defaultViewport = camera
-          } else if (viewById(state as DiagramStore, activeViewId)) {
-            // A view of the document's, or the exploration.
+          } else if (viewById(state as DiagramStore, activeViewId) && !model.isViewGroup(state.views[activeViewId] as DiagramView | undefined, state.metamodel as Metamodel)) {
+            // A view of the document's, or the exploration (never a group
+            // of views per element: it is no canvas, and keeps no places).
             const view = viewById(state as DiagramStore, activeViewId)!
             if (activeViewId !== _firstLayoutOf) view.positions = viewCanvasPositions(view, c4Nodes, currentPos, viewDrawnIds(view as DiagramView, c4Nodes as Record<string, C4Node>, state.c4Relations as Record<string, C4Relation>)) as any
             if (currentViewport) view.viewport = currentViewport
@@ -7934,7 +7946,11 @@ export const useDiagramStore = create<DiagramStore>()(
       _syncViewpoints() {
         let changed: string[] = []
         set((state) => { changed = syncViewpointsOfLive(state as DiagramStore) })
-        if (changed.length) get()._sync()
+        // A viewpoint given a subject changes none of its views' chains, yet
+        // makes each of them a group to fill (and the one shown to leave).
+        const plan = model.planViewGroups(get() as unknown as model.ModelState)
+        const groupShown = !!get().activeViewId && model.isViewGroup(get().views[get().activeViewId!], get().metamodel)
+        if (changed.length || groupShown || plan.add.length || plan.remove.length || plan.unlist.length || plan.refolder.length || plan.rename.length) get()._sync()
       },
       resetMetamodelToC4(confirm) {
         // On a model with governance elements this left them as unknown

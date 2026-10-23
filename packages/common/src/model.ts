@@ -1015,7 +1015,10 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
     // Its name is its element's: nobody renames it by hand.
     if (v.name !== subjectViewName(node, def)) rename.push(v.id)
   }
-  const unlist = views.filter((v) => (v.partOf ? !remove.includes(v.id) : groups.has(v.id)) && (v.nodeIds.length > 0 || v.empty)).map((v) => v.id)
+  // A group is never a canvas either: it keeps no places and no camera.
+  const unlist = views.filter((v) => (v.partOf
+    ? !remove.includes(v.id) && (v.nodeIds.length > 0 || v.empty)
+    : groups.has(v.id) && (v.nodeIds.length > 0 || v.empty || Object.keys(v.positions ?? {}).length > 0 || v.viewport))).map((v) => v.id)
   for (const group of groups.values()) {
     const def = defs.get(group.viewpoint!)!
     const has = members.get(group.id) ?? new Set<string>()
@@ -1024,6 +1027,50 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
     }
   }
   return { add, remove, refolder, unlist, rename }
+}
+
+/** What bringing the groups of views per element in step would take from
+ *  `state`: the views it deletes, and the views whose elements picked by
+ *  hand it lets go (a view that has become a group lists none). */
+export function groupLosses(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>): { removed: DiagramView[]; unlisted: DiagramView[] } {
+  const { remove, unlist } = planViewGroups(state)
+  return {
+    removed: remove.map((id) => state.views[id]),
+    unlisted: unlist.map((id) => state.views[id]).filter((v) => v.nodeIds.length > 0),
+  }
+}
+
+/** groupLosses after `change` made on a copy of the views: what a change of
+ *  the metamodel's viewpoints, or of a view's viewpoint, would take, so that
+ *  Studio can ask before it. `state` is left as it is. */
+export function groupLossesOf(state: Pick<ModelState, 'c4Nodes' | 'views' | 'metamodel'>, change: (draft: ModelState) => void): { removed: DiagramView[]; unlisted: DiagramView[] } {
+  const draft = { c4Nodes: state.c4Nodes, c4Relations: {}, views: structuredClone(state.views), metamodel: state.metamodel, activeViewId: null } as ModelState
+  change(draft)
+  const { removed, unlisted } = groupLosses(draft)
+  // As the views are now: their names and what they list before the change.
+  return {
+    removed: removed.map((v) => state.views[v.id] ?? v),
+    unlisted: unlisted.map((v) => state.views[v.id] ?? v),
+  }
+}
+
+/** The question to ask before a change that takes `losses`, under
+ *  `question` ("Delete viewpoint State machine?"); null when it takes
+ *  nothing. */
+export function groupLossesQuestion(question: string, losses: { removed: DiagramView[]; unlisted: DiagramView[] }): string | null {
+  const { removed, unlisted } = losses
+  if (!removed.length && !unlisted.length) return null
+  const parts = [question]
+  if (removed.length) {
+    const shown = removed.slice(0, 12).map((v) => `• ${v.name}`).join('\n')
+    const more = removed.length > 12 ? `\n…and ${removed.length - 12} more` : ''
+    parts.push(`${removed.length === 1 ? 'This view per element is' : `These ${removed.length} views per element are`} deleted with ${removed.length === 1 ? 'its' : 'their'} group:\n${shown}${more}`)
+  }
+  for (const v of unlisted) {
+    parts.push(`${v.name} becomes a group of views per element, opened on its first view: the ${v.nodeIds.length} ${v.nodeIds.length === 1 ? 'element' : 'elements'} picked for it by hand are no longer listed.`)
+  }
+  parts.push('Undo brings them back.')
+  return parts.join('\n\n')
 }
 
 /** Brings every group of views of one element in step with the model: a
@@ -1038,8 +1085,13 @@ export function syncViewGroups(state: ModelState, newId: () => string): boolean 
     view.name = subjectViewName(state.c4Nodes[view.subject!], def)
   }
   for (const id of unlist) {
-    state.views[id].nodeIds = []
-    delete state.views[id].empty
+    const view = state.views[id]
+    view.nodeIds = []
+    delete view.empty
+    if (!view.partOf) {
+      view.positions = {}
+      delete view.viewport
+    }
   }
   for (const { groupId, subjectId } of add) {
     const group = state.views[groupId]
