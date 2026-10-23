@@ -3,7 +3,7 @@ import type { C4Node, C4Relation, DiagramView, ViewPipeline } from '../src/c4'
 import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
   applyFilters, chainDrawn, chainRelationFor, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
-  suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
+  suggestNextWays, suggestSorts, suggestStartWays, viewShownNodes, readPipeline,
   typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, chainTypes, linkCandidates, connectTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
 import { checkAddRelation, setViewPipeline, type ModelState } from '../src/model'
@@ -133,7 +133,9 @@ describe('view pipeline: filters and order', () => {
     ], ctx)
     expect(counts).toEqual([4, 2, 2, 1])
     expect(kept.map((n) => n.id)).toEqual(['r2'])
-    expect(applyFilters(all, [{ kind: 'property', key: 'ears_type', op: 'unset' }, { kind: 'type', types: ['requirement'] }], ctx).nodes.map((n) => n.id)).toEqual(['r4'])
+    // r4 stores no EARS type: it reads as the default, ubiquitous, as its card does.
+    expect(applyFilters(all, [{ kind: 'property', key: 'ears_type', op: 'unset' }, { kind: 'type', types: ['requirement'] }], ctx).nodes.map((n) => n.id)).toEqual([])
+    expect(applyFilters(all, [{ kind: 'property', key: 'ears_type', op: 'is', values: ['ubiquitous'] }], ctx).nodes.map((n) => n.id)).toEqual(['r1', 'r4'])
     expect(applyFilters(all, [{ kind: 'text', text: 'N-PA' }], ctx).nodes.map((n) => n.id)).toEqual(['n-pay'])
     expect(applyFilters(all, [{ kind: 'type', types: ['need'], off: true }], ctx).counts).toEqual([all.length])
   })
@@ -163,7 +165,26 @@ describe('view pipeline: filters and order', () => {
 
   it('orders by name, type or a property, those without the value last', () => {
     expect(sortNodes(requirements, { by: 'property', key: 'ears_type' }, ctx).map((n) => n.id)).toEqual(['r2', 'r3', 'r1', 'r4'])
-    expect(sortNodes(requirements, { by: 'property', key: 'ears_type', desc: true }, ctx).map((n) => n.id)).toEqual(['r1', 'r2', 'r3', 'r4'])
+    expect(sortNodes(requirements, { by: 'property', key: 'ears_type', desc: true }, ctx).map((n) => n.id)).toEqual(['r1', 'r4', 'r2', 'r3'])
+  })
+
+  it("reads an element that stores no value as its type's default, as the card does", () => {
+    const steps = [
+      node('s-default', 'step'), node('s-once', 'step', { repeat: '1' }), node('s-many', 'step', { repeat: '1..n' }),
+      node('s-cleared', 'step', { repeat: '' }),
+    ]
+    const stepCtx: PipelineContext = { nodes: Object.fromEntries(steps.map((n) => [n.id, n])), relations: [], metamodel: ctx.metamodel }
+    const kept = (f: Parameters<typeof applyFilters>[1]) => applyFilters(steps, f, stepCtx).nodes.map((n) => n.id)
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'is', values: ['1'] }])).toEqual(['s-default', 's-once'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'is-not', values: ['1'] }])).toEqual(['s-many', 's-cleared'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'unset' }])).toEqual(['s-cleared'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'set' }])).toEqual(['s-default', 's-once', 's-many'])
+    const labels = suggestFilters(steps, stepCtx).map((s) => `${s.label} (${s.count})`)
+    expect(labels).toContain('Repeat is 1 (2)')
+    expect(labels).toContain('Repeat is not set (1)')
+    expect(propertyChoices(steps, stepCtx).find((c) => c.key === 'repeat')!.values.find((v) => v.value === '1')!.count).toBe(2)
+    expect(sortNodes(steps, { by: 'property', key: 'repeat', desc: true }, stepCtx).map((n) => n.id)).toEqual(['s-many', 's-default', 's-once', 's-cleared'])
+    expect(suggestSorts([steps[0]], stepCtx).map((s) => s.label)).toContain('Repeat')
   })
 
   it('suggests filters that narrow the rows, with how many each keeps', () => {

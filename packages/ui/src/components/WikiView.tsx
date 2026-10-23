@@ -46,7 +46,7 @@ import {
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
-import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, runPipeline, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
+import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
@@ -58,7 +58,14 @@ type UpdateNode = ReturnType<typeof useDiagramStore.getState>['updateNode']
 type UpdateRelation = ReturnType<typeof useDiagramStore.getState>['updateRelation']
 type TypeMeta = (type: string) => { label: string; color: string; fg: string; iconPath: string }
 
-type TypeOption = { id: string; label: string; color: string }
+type TypeOption = {
+  id: string
+  label: string
+  color: string
+  /** The view's filter will not show a new one all the same (until, say,
+   *  its name passes a text filter), as the table's + says. */
+  hidden?: boolean
+}
 
 // All node types known to the document, preferring the metamodel and falling
 // back to the built-in C4 type list when no metamodel is present.
@@ -87,7 +94,9 @@ function childTypeOptions(
 // The types that may be added at the top of the view: in a chain only the
 // first level's (addChoices, as the table's + at the top offers), so a type
 // further down is added under an element of the level above it; else what
-// may stand at the top of the model.
+// may stand at the top of the model. A type the level's filters will not
+// show new (a name or a relation it must have first) is offered all the
+// same, marked, as the table offers it.
 function topTypeOptions(
   metamodel: Metamodel,
   nodes: Record<string, C4Node>,
@@ -96,7 +105,10 @@ function topTypeOptions(
 ): TypeOption[] {
   if (!actions.topChoices) return childTypeOptions(metamodel, undefined, nodes, typeMeta, actions.viewTypes)
   return [...new Set(actions.topChoices.map((c) => c.type))]
-    .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
+    .map((t) => ({
+      id: t, label: typeMeta(t).label, color: typeMeta(t).color,
+      ...(actions.topChoices!.every((c) => c.type !== t || c.hidden) ? { hidden: true } : {}),
+    }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
@@ -241,6 +253,9 @@ interface WikiActions {
   /** What the top of a view with a chain offers, its first level's types
    *  and where each goes (addChoices); null for a view without a chain. */
   topChoices: AddChoice[] | null
+  /** The types that may be written under `under`: what its page offers to
+   *  add (Add or link…), on the next level of a chain. */
+  childTypes: (under: C4Node) => TypeOption[]
   /** The elements of `type` that could be linked under `under` instead of a
    *  new one, and the link they would get; null where a child of that type
    *  is held inside (a move, not a link). */
@@ -456,6 +471,14 @@ export function WikiView(): React.ReactElement {
   const shownSet = wikiDocument.visibleSet
   const nodeList = wikiDocument.nodeList
   const childrenOf = wikiDocument.navigationChildren
+  // The level of the view's chain each element is (first) on; null for a
+  // view without a chain.
+  const chainDepth = useMemo(() => {
+    if (!pipelineOf(view ?? undefined)?.levels?.length) return null
+    const depth = new Map<string, number>()
+    for (const row of wikiDocument.rows) if (!depth.has(row.node.id)) depth.set(row.node.id, row.depth)
+    return depth
+  }, [view, wikiDocument])
   const glossary = focusId === GLOSSARY_FOCUS
   const focusNode = focusId && !glossary ? c4Nodes[focusId] : null
   const focus = focusNode && (!shownSet || shownSet.has(focusNode.id)) ? focusNode : null
@@ -513,16 +536,17 @@ export function WikiView(): React.ReactElement {
   // of page, so that the next one can be written at once. Where they go
   // follows from the page, as "Add child" of its menu has it.
   const writeElements: WikiActions['write'] = (type, lines, under) => {
-    const hierarchy = under ? metamodel?.nodeTypes[under.type]?.hierarchyRelation : undefined
-    const parentId = under ? (hierarchy ? under.parentId : under.id) : undefined
-    const links: WizardLink[] = under && hierarchy ? [{ relationType: hierarchy, direction: 'out', otherId: under.id }] : []
+    // Under an element, as Add or link… adds it there (childChoicesOf): on
+    // the chain's next level, linked its way, with the values its filters
+    // ask for; at the top, where the chain's first level puts it
+    // (topChoices), or in the element a filter "inside" asks for.
+    const choice = under ? childChoicesOf(under).find((c) => c.type === type) : undefined
+    const links: WizardLink[] = choice?.link ? [choice.link] : []
     // The values the view's filter asks for, as the table gives them; what
     // the line says wins (a sentence's own EARS type).
     const filtered = newElementFilters(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }, type, under ? { node: under, link: links[0] } : undefined)
-    // At the top, where the chain's first level puts it (topChoices), or in
-    // the element a filter "inside" asks for.
     const top = under ? undefined : topChoices?.find((c) => c.type === type)
-    const placed = under ? parentId : top ? top.parentId : filtered?.within
+    const placed = under ? choice?.parentId : top ? top.parentId : filtered?.within
     const ids = addNodes(lines.map((line) => ({
       node: {
         type: type as C4ElementType,
@@ -530,7 +554,7 @@ export function WikiView(): React.ReactElement {
         technology: '',
         collapsed: false,
         external: false,
-        ...(top?.properties ?? filtered?.properties),
+        ...(top?.properties ?? choice?.properties ?? filtered?.properties),
         ...elementFromLine(type, line),
         parentId: placed,
         x: 0,
@@ -550,11 +574,13 @@ export function WikiView(): React.ReactElement {
 
   const viewTypes = useMemo(() => chainTypes(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }), [view, c4Nodes, c4Relations, metamodel])
   const topChoices = useMemo(() => pipelineOf(view ?? undefined)?.levels?.length
-    ? addChoices(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }).filter((c) => !c.hidden && (!viewTypes || viewTypes.has(c.type)))
+    ? addChoices(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }).filter((c) => !viewTypes || viewTypes.has(c.type))
     : null, [view, c4Nodes, c4Relations, metamodel, viewTypes])
   const actions: WikiActions = {
     viewTypes,
     topChoices,
+    childTypes: (under) => [...new Set(childChoicesOf(under).map((c) => c.type))]
+      .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color })),
     existingFor: (type, under) => existingFor(type, under),
     linkExisting: (nodeId, link) => linkExisting(nodeId, link),
     readOnly,
@@ -619,11 +645,11 @@ export function WikiView(): React.ReactElement {
   type ChildChoice = { type: string; group: string; parentId?: string; link?: WizardLink; properties?: Record<string, string>; filters?: ViewFilter[] }
   const childChoicesOf = (node: C4Node): ChildChoice[] => {
     const ctx = { nodes: c4Nodes, relations: c4Relations, metamodel }
-    const row = pipelineOf(view ?? undefined)?.levels?.length ? runPipeline(view ?? undefined, ctx).rows?.find((r) => r.node.id === node.id) : undefined
-    if (row) {
+    const depth = chainDepth?.get(node.id)
+    if (depth !== undefined) {
       // The level's filters: an element linked there must pass them to show.
-      const filters = pipelineOf(view ?? undefined)?.levels?.[row.depth + 1]?.filters
-      return addChoices(view ?? undefined, ctx, { node, depth: row.depth })
+      const filters = pipelineOf(view ?? undefined)?.levels?.[depth + 1]?.filters
+      return addChoices(view ?? undefined, ctx, { node, depth })
         .filter((c) => !c.hidden && (!viewTypes || viewTypes.has(c.type)))
         .map((c) => ({ type: c.type, group: c.group, parentId: c.parentId, link: c.link, properties: c.properties, filters }))
     }
@@ -1341,7 +1367,7 @@ function WikiChildren({
   // divided, not something a line of text names: it is added from the menu.
   const writable = writeUnder === undefined || actions.readOnly
     ? []
-    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta, actions.viewTypes) : topTypeOptions(metamodel, nodes, typeMeta, actions))
+    : (writeUnder ? actions.childTypes(writeUnder) : topTypeOptions(metamodel, nodes, typeMeta, actions))
         .filter((t) => t.id !== GROUP_TYPE)
         .sort((a, b) => rank(a.id) - rank(b.id))
   // The headings opened to write the first element of a type under.
@@ -1762,8 +1788,8 @@ function WikiOverview({
           {!readOnly && (
             <AddMenu
               label="Add element"
-              options={rootTypes}
-              emptyHint="No root types in metamodel"
+              options={rootTypes.map((t) => ({ ...t, ...(t.hidden ? { sub: "the filter won't show it" } : {}) }))}
+              emptyHint={topChoices ? "The first level of this view's chain takes no type that can stand at the top" : 'No root types in metamodel'}
               onPick={onCreateRoot}
             />
           )}

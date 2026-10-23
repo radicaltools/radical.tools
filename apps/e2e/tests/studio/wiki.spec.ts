@@ -293,6 +293,81 @@ test('a wiki with a filter offers only the types its chain shows, at the top onl
   await expect(page.locator('.wiki-title')).toHaveText('New Need')
 })
 
+// The chain of the viewpoint Specification: needs, the requirements derived
+// from them, their scenarios and mockups.
+const SPECIFICATION = { levels: [
+  { ways: [{ types: ['need'] }] },
+  { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+  { ways: [{ via: { relationType: 'verifies', direction: 'in' }, types: ['scenario'] }, { via: { relationType: 'illustrates', direction: 'in' }, types: ['mockup'] }] },
+] }
+
+test("an element's page offers what the chain shows under it, and what is written there is linked the chain's way", async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify({
+    nodes: [
+      { id: 'n-pay', type: 'need', label: 'Pay by card', kind: 'brief', x: 0, y: 0, width: 200, height: 80, collapsed: false },
+      { id: 'r-why', type: 'requirement', label: 'Tell the customer why', ears_type: 'ubiquitous', action: 'tell the customer why', x: 0, y: 200, width: 200, height: 80, collapsed: false },
+    ],
+    relations: [{ id: 'd1', sourceId: 'r-why', targetId: 'n-pay', relationType: 'derives' }],
+    views: [{ id: 'v-spec', kind: 'wiki', name: 'Specification', nodeIds: [], positions: {}, pipeline: SPECIFICATION }],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  // A need's page: the requirements derived from it, not more needs.
+  await studio.open('v-spec/f/n-pay')
+  const start = page.locator('.wiki-write-start')
+  await expect(page.getByRole('textbox', { name: 'Write a requirement' })).toBeVisible()
+  await expect(start.getByRole('button', { name: 'Needs', exact: true })).toHaveCount(0)
+
+  // A requirement's page: its scenarios and mockups, not more requirements.
+  await studio.open('v-spec/f/r-why')
+  await expect(start.getByRole('button', { name: 'Scenarios', exact: true })).toBeVisible()
+  await expect(start.getByRole('button', { name: 'Mockups', exact: true })).toBeVisible()
+  await expect(start.getByRole('button', { name: 'Requirements', exact: true })).toHaveCount(0)
+  await start.getByRole('button', { name: 'Scenarios', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Write a scenario' }).fill('Log every failed payment')
+  await page.getByRole('textbox', { name: 'Write a scenario' }).press('Enter')
+  await expect(page.locator('.wiki-doc .wiki-part-name', { hasText: 'Log every failed payment' })).toBeVisible()
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc() as unknown as { nodes: Array<{ id: string; type: string; label: string }>; relations: Array<{ sourceId: string; targetId: string; relationType?: string }> }
+    const added = doc.nodes.find((n) => n.label === 'Log every failed payment')
+    return added && `${added.type} ${doc.relations.filter((r) => r.sourceId === added.id).map((r) => `${r.relationType} → ${r.targetId}`).join(', ')}`
+  }).toBe('scenario verifies → r-why')
+})
+
+test("a wiki whose first level filters by name or relation still offers its types at the top, saying the filter won't show a new one", async ({ page, studio }) => {
+  const need = (id: string, label: string) => ({ id, type: 'need', label, kind: 'brief', x: 0, y: 0, width: 200, height: 80, collapsed: false })
+  await studio.seedDocument(JSON.stringify({
+    nodes: [need('n-pay', 'Pay by card'), need('n-audit', 'Audit')],
+    relations: [],
+    views: [
+      { id: 'v-pay', kind: 'wiki', name: 'Payment needs', nodeIds: [], positions: {}, pipeline: { levels: [
+        { ways: [{ types: ['need'] }], filters: [{ kind: 'text', text: 'Pay' }] },
+        { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+      ] } },
+      { id: 'v-resp', kind: 'wiki', name: 'Responsibilities', nodeIds: [], positions: {}, pipeline: { levels: [
+        { ways: [{ types: ['system', 'container', 'webapp', 'component', 'database', 'queue'] }], filters: [{ kind: 'relation', relationType: 'satisfies', direction: 'out', has: true }] },
+        { ways: [{ via: { relationType: 'satisfies', direction: 'out' }, types: ['requirement'] }] },
+      ] } },
+    ],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  await studio.open('v-pay')
+  await page.getByRole('button', { name: 'Add element' }).click()
+  await expect(page.locator('.wiki-add-item', { hasText: /^Need/ })).toContainText("the filter won't show it")
+  await expect(page.locator('.wiki-view')).not.toContainText('No root types in metamodel')
+  await page.getByRole('button', { name: 'Add element' }).click()
+  // A need written at the top shows when its name passes the filter.
+  const line = page.getByRole('textbox', { name: 'Write a need' })
+  await expect(line).toBeVisible()
+  await line.fill('Payment refunds')
+  await line.press('Enter')
+  await expect(page.locator('.wiki-doc').getByRole('link', { name: 'Payment refunds' })).toBeVisible()
+
+  await studio.open('v-resp')
+  await page.getByRole('button', { name: 'Add element' }).click()
+  await expect(page.locator('.wiki-add-item', { hasText: /^Software system/i })).toContainText("the filter won't show it")
+  await expect(page.locator('.wiki-view')).not.toContainText('No root types in metamodel')
+})
+
 // Needs, and a requirement derived from Audit, in a view of the chain
 // needs → requirements.
 const linkingModel = (view: Record<string, unknown>) => JSON.stringify({
