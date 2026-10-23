@@ -18,7 +18,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore, viewById, milestoneOnCanvas } from '../store/diagramStore'
+import { useDiagramStore, viewById, milestoneOnCanvas, editsModel } from '../store/diagramStore'
 import { openCard } from '../store/showInView'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
@@ -33,9 +33,10 @@ import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, holderOf, nodeTypeSize, type C4Node } from '@radical/common/c4'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { allowedPlacesText, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName, type Metamodel } from '@radical/common/metamodel'
+import { nestRefusal } from '@radical/common/model'
 
 /** The viewport that fits `bounds` in the part of the canvas (`rect`) the
  *  elements palette on its left leaves free — and, framing a selection
@@ -112,15 +113,60 @@ function connectSources(state: { selectedNodeIds: string[] }, from: string): str
   return state.selectedNodeIds.length > 1 && state.selectedNodeIds.includes(from) ? [...state.selectedNodeIds] : [from]
 }
 
-/** Moves `ids` into `parentId` (null: the top of the model), those of one
- *  parent at a time (reparentNodes takes siblings). */
-function nestAll(state: { c4Nodes: Record<string, C4Node>; reparentNodes: (ids: string[], parentId: string | null, options?: { quiet?: boolean }) => void }, ids: string[], parentId: string | null): void {
-  const byParent = new Map<string, string[]>()
+/** Moves `ids` into `parentId` (null: the top of the model): one gesture,
+ *  so one undo step and one notice, those of one parent at a time
+ *  (reparentNodes takes siblings). Those the move is refused for
+ *  (nestRefusal, the card's Parent rule) stay, and a notice names them and
+ *  says why: a take-out the metamodel refuses did nothing and said nothing. */
+function nestAll(ids: string[], parentId: string | null): void {
+  const s = useDiagramStore.getState()
+  const moving: string[] = []
+  const refused: Array<{ node: C4Node; why: string }> = []
   for (const id of ids) {
-    const key = state.c4Nodes[id]?.parentId ?? ''
-    byParent.set(key, [...(byParent.get(key) ?? []), id])
+    const node = s.c4Nodes[id]
+    if (!node || (node.parentId ?? null) === parentId) continue
+    const why = nestRefusal(s, [id], parentId)
+    if (why) refused.push({ node, why })
+    else moving.push(id)
   }
-  for (const group of byParent.values()) state.reparentNodes(group, parentId)
+  if (moving.length) {
+    const byParent = new Map<string, string[]>()
+    for (const id of moving) {
+      const key = s.c4Nodes[id]?.parentId ?? ''
+      byParent.set(key, [...(byParent.get(key) ?? []), id])
+    }
+    s.runAsOneStep(() => { for (const group of byParent.values()) useDiagramStore.getState().reparentNodes(group, parentId, { quiet: true }) })
+  }
+  const now = useDiagramStore.getState()
+  const moved = moving.filter((id) => (now.c4Nodes[id]?.parentId ?? null) === parentId)
+  if (moved.length) {
+    now.setSelectedNodeIds(moved)
+    const parent = parentId ? now.c4Nodes[parentId] : undefined
+    const where = parent ? (now.metamodel?.nodeTypes[parent.type]?.label ?? parent.type) : 'the canvas root'
+    now.pushNotification(`Moved ${moved.length} ${moved.length === 1 ? 'node' : 'nodes'} into ${where}.`, 'info')
+  }
+  if (refused.length) now.pushNotification(refusalsText(refused), 'error')
+}
+
+/** The refusals of several elements, one sentence for those refused alike:
+ *  'Cannot place Container "API", "Orders DB" inside the canvas root.
+ *  Allowed parents: …'. */
+function refusalsText(refused: Array<{ node: C4Node; why: string }>): string {
+  const alike = new Map<string, string[]>()
+  for (const { node, why } of refused) {
+    const name = `"${node.label}"`
+    const key = why.includes(name) ? why.replace(name, '\u0000') : why
+    alike.set(key, [...(alike.get(key) ?? []), name])
+  }
+  return [...alike].map(([key, names]) => key.replace('\u0000', names.join(', '))).join(' ')
+}
+
+/** Relates each of `sources` to `targetId` (of `type`, '' for none), as
+ *  one undo step: one gesture. */
+function relateAll(sources: string[], targetId: string, type: string | undefined): void {
+  useDiagramStore.getState().runAsOneStep(() => {
+    for (const from of sources) useDiagramStore.getState().addRelation({ sourceId: from, targetId, ...(type ? { relationType: type } : {}) })
+  })
 }
 
 // The special key as React Flow names it.
@@ -1158,6 +1204,9 @@ function StructuralCanvas(): React.ReactElement {
   // Use a native mousedown/mouseup flow on the container to handle
   // drag-to-connect: modifier+mousedown on source → drag → mouseup on target.
   const connectingRef = useRef(false) // true while actively dragging a connection
+  // In Viewer and Presenter: the element pressed with the key, which a
+  // release on it adds to the selection or takes out.
+  const selectOnlyRef = useRef<string | null>(null)
   const [connectMouse, setConnectMouse] = useState<{ x: number; y: number } | null>(null)
   // The element the line is drawn over: its panel of relation types shows.
   const [connectOver, setConnectOver] = useState<string | null>(null)
@@ -1191,6 +1240,10 @@ function StructuralCanvas(): React.ReactElement {
       e.preventDefault()
 
       const state = useDiagramStore.getState()
+      // Viewer and Presenter do not edit: the key only adds the element to
+      // the selection or takes it out (no line, no pills, no relation or
+      // nesting, which were shown there and lost on the way back).
+      if (!editsModel(state)) { selectOnlyRef.current = nodeId; return }
       state.startConnection(nodeId)
       connectingRef.current = true
       setConnectMouse({ x: e.clientX, y: e.clientY })
@@ -1206,6 +1259,12 @@ function StructuralCanvas(): React.ReactElement {
     }
 
     const onMouseUp = (e: MouseEvent) => {
+      const pressed = selectOnlyRef.current
+      selectOnlyRef.current = null
+      if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
+        const ids = useDiagramStore.getState().selectedNodeIds
+        useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
+      }
       if (!connectingRef.current) return
       connectingRef.current = false
       setConnectMouse(null)
@@ -1221,8 +1280,8 @@ function StructuralCanvas(): React.ReactElement {
       const sources = connectSources(state, src)
       if (field) {
         const type = field.dataset.connectType
-        if (type === NEST_INSIDE) nestAll(state, sources, field.dataset.connectTarget!)
-        else for (const from of sources) state.addRelation({ sourceId: from, targetId: field.dataset.connectTarget!, ...(type ? { relationType: type } : {}) })
+        if (type === NEST_INSIDE) nestAll(sources, field.dataset.connectTarget!)
+        else relateAll(sources, field.dataset.connectTarget!, type)
         state.cancelConnection()
         return
       }
@@ -1230,20 +1289,18 @@ function StructuralCanvas(): React.ReactElement {
       // On the panel beside its fields: the element it stands over.
       const nodeId = (e.target as HTMLElement).closest('.connect-pills') ? connectOverRef.current : findNodeId(e.target as HTMLElement)
       const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
-      // On the empty canvas: out of its container, where it may stand there.
+      // On the empty canvas: out of its container, where it may stand there;
+      // where it may not, it stays and a notice says why.
       // (Holding the selection key, React Flow lays its selection pane over it.)
       const onCanvas = (e.target as HTMLElement).closest('.react-flow') && !(e.target as HTMLElement).closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
-      if (!nodeId && onCanvas) {
-        const out = sources.filter((id) => { const n = state.c4Nodes[id]; return n?.parentId && isParentAllowed(state.metamodel as Metamodel, n.type, undefined) })
-        if (out.length) nestAll(state, out, null)
-      }
+      if (!nodeId && onCanvas) nestAll(sources, null)
       // Inside the target, its only offer; nothing on its container.
-      else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(state, sources, nodeId)
+      else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(sources, nodeId)
       else if (nodeId && offered.length === 1 && offered[0] === NEST_HOLDS) { /* where they are */ }
       // Several: of the one type that fits each (several types ask by the panel).
       else if (nodeId && sources.length > 1) {
         const types = offered.filter((t) => t !== NEST_INSIDE)
-        if (types.length === 1) for (const from of sources) state.addRelation({ sourceId: from, targetId: nodeId, ...(types[0] ? { relationType: types[0] } : {}) })
+        if (types.length === 1) relateAll(sources, nodeId, types[0])
       }
       // Refused, of the type the view's chain follows, or asked about where
       // several types fit (connectNodes).
@@ -1533,11 +1590,12 @@ function StructuralCanvas(): React.ReactElement {
   // the view's filter draws it (connectTypes).
   // An end of a relation dragged with the key held: where it can go, its
   // other end staying (marked as the source).
-  const relink = relinking && modifierHeld && appMode === 'designer' ? relinking : null
+  const edits = editsModel({ appMode, presentationActive })
+  const relink = relinking && modifierHeld && edits ? relinking : null
   const relinkRelation = relink ? useDiagramStore.getState().c4Relations[relink.relationId] : undefined
   const connectFrom = relinkRelation
     ? (relink!.end === 'target' ? relinkRelation.sourceId : relinkRelation.targetId)
-    : connectSource ?? (modifierHeld && appMode === 'designer' ? selectedNodeId : null)
+    : connectSource ?? (modifierHeld && edits ? selectedNodeId : null)
   const connectTargets = useMemo(() => {
     if (!connectFrom) return null
     const s = useDiagramStore.getState()
@@ -1582,7 +1640,11 @@ function StructuralCanvas(): React.ReactElement {
     for (const id of shown) {
       const target = s.c4Nodes[id]
       if (!target || fromSet.has(id)) continue
-      if (!sources.every((n) => id !== n.parentId && holderOf(s.c4Nodes, n, target) !== n && isPlacementAllowed(metamodel, n.type, target, s.c4Nodes))) continue
+      // The card's Parent rule (nestRefusal): not into an external element,
+      // nor where the move would then be refused; the metamodel's types
+      // first, which rule out most at once.
+      if (!sources.every((n) => id !== n.parentId && isPlacementAllowed(metamodel, n.type, target, s.c4Nodes))) continue
+      if (nestRefusal(s, [...fromSet], id)) continue
       targets.set(id, [...(targets.get(id) ?? []), { type: NEST_INSIDE, text: 'inside' }])
     }
     const holder = sources[0]?.parentId

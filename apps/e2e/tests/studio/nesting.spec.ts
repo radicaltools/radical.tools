@@ -108,7 +108,10 @@ test('containers dropped into a system fill a grid, the first centred', async ({
 })
 
 test('nesting an element removes its relations with its new container, with a warning', async ({ page, studio }) => {
-  await studio.seed()
+  // Payment Provider made one of the model's own: an external one holds nothing.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.nodes.find((n: { id: string }) => n.id === 'payments').external = false
+  await studio.seedDocument(JSON.stringify(doc))
   await studio.open('v-containers')
   await studio.settle()
   // The API charges cards at Payment Provider (r4); it goes into it.
@@ -130,4 +133,139 @@ test('nesting an element removes its relations with its new container, with a wa
     const doc = await studio.storedDoc()
     return [(doc.nodes as Array<{ id: string; parentId?: string }>).find((n) => n.id === 'api')?.parentId, doc.relations.some((r) => r.id === 'r4')]
   }).toEqual(['payments', false])
+})
+
+// Alt-drag from the centre of `from` to `to` (a point, or the centre of an element).
+async function altDrag(page: import('@playwright/test').Page, from: import('@playwright/test').Locator, to: import('@playwright/test').Locator | { x: number; y: number }) {
+  const a = (await from.boundingBox())!
+  const b = 'x' in to ? to : await (async () => { const r = (await to.boundingBox())!; return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x, b.y, { steps: 8 })
+  await page.mouse.up()
+}
+
+test.describe('the special key', () => {
+  // A person in a group, a clerk and an empty group at the top of the model.
+  const shoppers = () => {
+    const doc = JSON.parse(fixture('bookstore'))
+    doc.nodes.push({ id: 'shoppers', type: 'group', label: 'Shoppers', x: -400, y: -40, width: 300, height: 260, collapsed: false })
+    doc.nodes.push({ id: 'staff', type: 'group', label: 'Staff', x: -400, y: 700, width: 300, height: 260, collapsed: false })
+    doc.nodes.push({ id: 'clerk', type: 'person', label: 'Clerk', x: -400, y: 400, width: 150, height: 170, collapsed: false })
+    doc.nodes.find((n: { id: string }) => n.id === 'customer').parentId = 'shoppers'
+    doc.views.find((v: { id: string }) => v.id === 'v-containers').nodeIds.push('shoppers', 'staff', 'clerk')
+    return JSON.stringify(doc)
+  }
+  const parents = async (studio: { storedDoc: () => Promise<{ nodes: Array<{ id: string; parentId?: string }> }> }, ...ids: string[]) => {
+    const nodes = (await studio.storedDoc()).nodes
+    return ids.map((id) => nodes.find((n) => n.id === id)?.parentId ?? null)
+  }
+
+  test('a take-out the metamodel refuses says why, naming the allowed parents and the elements refused', async ({ page, studio }) => {
+    await studio.seedDocument(shoppers())
+    await studio.open('v-containers')
+    await studio.settle()
+    const pane = (await studio.pane.boundingBox())!
+    const empty = { x: pane.x + pane.width - 60, y: pane.y + 60 }
+    // The API alone: a container stands only in a system or a group.
+    await studio.node('api').click()
+    await page.keyboard.down('Alt')
+    await altDrag(page, studio.node('api'), empty)
+    await page.keyboard.up('Alt')
+    await expect(page.getByText('Cannot place Container "API" inside the canvas root. Allowed parents: Software System, Group.')).toBeVisible()
+    expect(await parents(studio, 'api')).toEqual(['bookstore'])
+    // With the Customer: the Customer goes, the API is named.
+    await studio.settle()
+    await studio.node('customer').click()
+    await studio.node('api').click({ modifiers: ['Alt'] })
+    await page.keyboard.down('Alt')
+    await altDrag(page, studio.node('customer'), empty)
+    await page.keyboard.up('Alt')
+    await expect.poll(() => parents(studio, 'customer', 'api')).toEqual([null, 'bookstore'])
+    await expect(page.getByText('Moved 1 node into the canvas root.')).toBeVisible()
+    await expect(page.getByText('Cannot place Container "API" inside the canvas root. Allowed parents: Software System, Group.')).toHaveCount(2)
+  })
+
+  test('one gesture on several selected elements is one undo step, relations and nests alike', async ({ page, studio }) => {
+    await studio.seedDocument(shoppers())
+    await studio.open('v-containers')
+    await studio.settle()
+    const relations = async () => (await studio.storedDoc()).relations.length
+    // The Web App and Payment Provider, both related to the Orders DB.
+    await studio.node('web').click()
+    await studio.node('payments').click({ modifiers: ['Alt'] })
+    await page.keyboard.down('Alt')
+    await altDrag(page, studio.node('payments'), studio.node('db'))
+    await page.keyboard.up('Alt')
+    await expect.poll(relations).toBe(6)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(relations).toBe(4)
+    // The Customer (in Shoppers) and the Clerk (at the top), both into Staff: one notice, one Undo.
+    await studio.settle()
+    await studio.node('customer').click()
+    await studio.node('clerk').click({ modifiers: ['Alt'] })
+    await page.keyboard.down('Alt')
+    await altDrag(page, studio.node('clerk'), studio.node('staff'))
+    await page.keyboard.up('Alt')
+    await expect.poll(() => parents(studio, 'customer', 'clerk')).toEqual(['staff', 'staff'])
+    await expect(page.getByText('Moved 2 nodes into Group.')).toBeVisible()
+    await expect(page.getByText('Moved 1 node into Group.')).toHaveCount(0)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(() => parents(studio, 'customer', 'clerk')).toEqual(['shoppers', null])
+  })
+
+  for (const mode of ['viewer', 'presenter'] as const) {
+    test(`in ${mode === 'viewer' ? 'Viewer' : 'Presenter'} it only selects: no pills, no line, no relation, no nesting`, async ({ page, studio }) => {
+      await studio.seed()
+      await studio.open('v-containers', mode)
+      await studio.settle()
+      const edges = await page.locator('.react-flow__edge').count()
+      await studio.node('web').click()
+      await page.keyboard.down('Alt')
+      // A click with the key still adds to the selection.
+      await studio.node('api').click()
+      if (mode === 'viewer') await expect(page.locator('.react-flow__node.selected')).toHaveCount(2)
+      await expect(page.locator('.connect-pills, .react-flow__node.connect-target')).toHaveCount(0)
+      const web = (await studio.node('web').boundingBox())!
+      const pay = (await studio.node('payments').boundingBox())!
+      await page.mouse.move(web.x + web.width / 2, web.y + web.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(pay.x + pay.width / 2, pay.y + pay.height / 2, { steps: 8 })
+      await expect(page.getByText(/Connecting from/)).toHaveCount(0)
+      await expect(page.locator('.connect-pills, .react-flow__node.connect-target')).toHaveCount(0)
+      await page.mouse.up()
+      await page.keyboard.up('Alt')
+      await studio.settle()
+      await expect(page.locator('.react-flow__edge')).toHaveCount(edges)
+      await expect(page.getByText(/^Moved \d+ nodes? into/)).toHaveCount(0)
+    })
+  }
+
+  test('offers "inside" only where the card\'s Parent field would let the elements go', async ({ page, studio }) => {
+    // A group of the Bookstore's holding the Web App, and a group at the top of the model.
+    const doc = JSON.parse(fixture('bookstore'))
+    doc.nodes.push({ id: 'zone', type: 'group', label: 'Zone', x: 960, y: -60, width: 320, height: 220, collapsed: false })
+    doc.nodes.push({ id: 'front', type: 'group', label: 'Front', parentId: 'bookstore', x: 10, y: 60, width: 250, height: 230, collapsed: false })
+    Object.assign(doc.nodes.find((n: { id: string }) => n.id === 'web'), { parentId: 'front', x: 20, y: 60 })
+    doc.views.find((v: { id: string }) => v.id === 'v-containers').nodeIds.push('zone', 'front')
+    await studio.seedDocument(JSON.stringify(doc))
+    await studio.open('v-containers')
+    await studio.settle()
+    const label = (id: string) => page.locator(`.react-flow__node.connect-target[data-id="${id}"]`)
+    // The API: a relation to the external Payment Provider, not a place in it.
+    await studio.node('api').click()
+    await page.keyboard.down('Alt')
+    await expect(label('payments')).toHaveAttribute('style', /--connect-label: "[^"]+"/)
+    expect(await label('payments').getAttribute('style')).not.toMatch(/inside/)
+    await page.keyboard.up('Alt')
+    // The group Front: its Web App would have no place in Zone.
+    await studio.settle()
+    const front = (await studio.node('front').boundingBox())!
+    await page.mouse.click(front.x + 30, front.y + front.height - 12)
+    await expect(page.locator('.react-flow__node.selected[data-id="front"]')).toHaveCount(1)
+    await page.keyboard.down('Alt')
+    await expect(label('bookstore')).toHaveAttribute('style', /--connect-label: "holds"/)
+    await expect(page.locator('.react-flow__node[data-id="zone"]')).not.toHaveClass(/connect-target/)
+    await page.keyboard.up('Alt')
+  })
 })
