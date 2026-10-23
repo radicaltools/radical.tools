@@ -294,6 +294,20 @@ for (const dx of [30, 120]) {
   })
 }
 
+test('a short drag inside a group leaves the frames round it, and everything else, where they are', async ({ page, studio }) => {
+  // F-0028: API Gateway 20 px right inside Access & Security, which has
+  // room for it, moved and resized Core Banking Platform's frame (x 30 →
+  // -78, 1230 → 1468 wide) and Access & Security's, and pushed Risk & Data
+  // with its children; saved so.
+  await studio.openSample('view-core')
+  const before = await studio.positions()
+  await dragBy(page, studio.node('ctn-apigw'), 20, 0)
+  await page.waitForTimeout(1500)
+  const after = await studio.positions()
+  expect(after['ctn-apigw']).not.toEqual(before['ctn-apigw'])
+  expect(Object.keys(after).filter((id) => id !== 'ctn-apigw' && after[id] !== before[id]).map((id) => `${id}: ${before[id]} → ${after[id]}`)).toEqual([])
+})
+
 test('a large diagram keeps its positions on open and suggests Smart Layout when it is not laid out', async ({ page, studio }) => {
   await studio.seedDocument(gridDocument({ x: 120, y: 60 }))
   // The hint is a toast that dismisses itself: watch for it while opening.
