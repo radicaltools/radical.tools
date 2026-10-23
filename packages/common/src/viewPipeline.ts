@@ -131,8 +131,12 @@ function ancestorsOf(node: C4Node, ctx: PipelineContext): string[] {
   return out
 }
 
-function propertyValues(node: C4Node, key: string): string[] {
-  const raw = (node as unknown as Record<string, unknown>)[key]
+/** The values `node` has for `key`, as its card shows them: one that stores
+ *  none (undefined) reads as its type's default; a stored '' is no value
+ *  (a cleared default). */
+function propertyValues(node: C4Node, key: string, ctx: PipelineContext): string[] {
+  let raw = (node as unknown as Record<string, unknown>)[key]
+  if (raw === undefined || raw === null) raw = ctx.metamodel?.nodeTypes[node.type]?.properties?.find((p) => p.key === key)?.default
   if (raw === undefined || raw === null || raw === '') return []
   return (Array.isArray(raw) ? raw : [raw]).map((v) => String(v))
 }
@@ -142,7 +146,7 @@ export function matchesFilter(filter: ViewFilter, node: C4Node, ctx: PipelineCon
   switch (filter.kind) {
     case 'type': return filter.types.includes(node.type)
     case 'property': {
-      const values = propertyValues(node, filter.key)
+      const values = propertyValues(node, filter.key, ctx)
       if (filter.op === 'set') return values.length > 0
       if (filter.op === 'unset') return values.length === 0
       const hit = values.some((v) => filter.values?.includes(v))
@@ -264,7 +268,7 @@ export function suggestFilters(rows: C4Node[], ctx: PipelineContext, typesHere: 
   }
   for (const p of props.values()) {
     const values = new Set<string>()
-    for (const n of rows) for (const v of propertyValues(n, p.key)) values.add(v)
+    for (const n of rows) for (const v of propertyValues(n, p.key, ctx)) values.add(v)
     for (const v of values) push({ kind: 'property', key: p.key, op: 'is', values: [v] })
     push({ kind: 'property', key: p.key, op: 'unset' })
   }
@@ -295,7 +299,7 @@ export function sortNodes(nodes: C4Node[], sort: ViewSort | undefined, ctx: Pipe
   const key = (n: C4Node): string =>
     !sort || sort.by === 'label' ? n.label
     : sort.by === 'type' ? typeLabel(ctx, n.type)
-    : propertyValues(n, sort.key ?? '').map((v) => ctx.nodes[v]?.label ?? v).join(', ')
+    : propertyValues(n, sort.key ?? '', ctx).map((v) => ctx.nodes[v]?.label ?? v).join(', ')
   // Each element's key once, not once per comparison.
   const keys = new Map(nodes.map((n) => [n, key(n)]))
   const cmp = (a: C4Node, b: C4Node) => {
@@ -322,7 +326,7 @@ export function suggestSorts(rows: C4Node[], ctx: PipelineContext): { sort: View
   const keys = new Set<string>()
   for (const n of rows) {
     for (const p of ctx.metamodel.nodeTypes[n.type]?.properties ?? []) {
-      if (p.type !== 'textarea' && propertyValues(n, p.key).length) keys.add(p.key)
+      if (p.type !== 'textarea' && propertyValues(n, p.key, ctx).length) keys.add(p.key)
     }
   }
   for (const key of keys) out.push({ sort: { by: 'property', key }, label: propertyLabel(key, ctx) })
@@ -1097,7 +1101,7 @@ export function propertyChoices(nodes: C4Node[], ctx: PipelineContext, types: st
   const keys = [...defs.keys(), 'id']
   return keys.map((key) => {
     const counts = new Map<string, number>()
-    for (const n of nodes) for (const v of propertyValues(n, key)) counts.set(v, (counts.get(v) ?? 0) + 1)
+    for (const n of nodes) for (const v of propertyValues(n, key, ctx)) counts.set(v, (counts.get(v) ?? 0) + 1)
     for (const o of defs.get(key)?.options ?? []) if (!counts.has(String(o))) counts.set(String(o), 0)
     const values = [...counts.entries()]
       .map(([v, count]) => ({ value: v, label: ctx.nodes[v]?.label ?? v, count }))
