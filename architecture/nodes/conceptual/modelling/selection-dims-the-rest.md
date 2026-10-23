@@ -14,6 +14,7 @@ tests: |
   packages/ui/tests/canvasFocus.test.ts › a selected relation focuses itself and its two ends
   packages/ui/tests/canvasFocus.test.ts › a selection that is not on this canvas focuses nothing
   packages/ui/tests/canvasFocus.test.ts › elements the view hides take no part
-then: "Accounts Service, its relations and their other ends stay as they are and every other element and relation is dimmed; the click on the empty canvas undims everything; the selected relation alone stays with its two ends; the camera zooms onto Accounts Service and its neighbours to at most 120 % and goes back to the camera from before, but stays where the user zoomed"
-when: "the user selects Accounts Service, clicks the empty canvas, then selects one of its relations; and, far zoomed out, clicks Accounts Service, clicks the empty canvas, clicks it again and zooms in before clicking the empty canvas"
+  apps/e2e/tests/studio/selection-focus.spec.ts › a click on the empty canvas during the framing flight brings back the camera from before
+then: "Accounts Service, its relations and their other ends stay as they are and every other element and relation is dimmed; the click on the empty canvas undims everything; the selected relation alone stays with its two ends; the camera zooms onto Accounts Service and its neighbours to at most 120 % and goes back to the camera from before, but stays where the user zoomed; a click during the flight brings back the camera from before too"
+when: "the user selects Accounts Service, clicks the empty canvas, then selects one of its relations; and, far zoomed out, clicks Accounts Service, clicks the empty canvas, clicks it again and zooms in before clicking the empty canvas; and clicks the empty canvas while a framing is still on its way"
 ---
