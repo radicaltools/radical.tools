@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *+ New milestone* always captures the live model, also while an older milestone is shown, and files it after the last one; it saved the milestone shown again as the newest one
 
 ### Fixed
+- A view's filter by property, its suggestions, its counts and its sort read an element that stores no value as its type's default, as the card does: *Repeat is 1* found none of the sample's steps whose card says Repeat 1, and called them *not set*
+- The wiki's writing line under an element offers what the view's filter shows under it and links it that way, as *Add or link…* and the table's + row do: a requirement's page in a Specification wiki offered requirements, which the view then hid, and never its scenarios or mockups
+- A wiki whose first level filters by name or relation offers its types at the top, marked *the filter won't show it*, as the table does; it offered nothing and *Add element* said *No root types in metamodel*
 - A relation can no longer join an element and what holds it (a container and its system), in Studio and over MCP, nor an end be moved there; containment already joins them. A state machine's transition to a state that holds its source stays allowed
 - A Structure view that shows no element yet (a new model's views) no longer says on opening that Smart Layout produced no result
 - Presenter: clicking a slide's card while a milestone is picked shows the slide's milestone as the one shown, and none for a slide of the live model or of its own copy; the chip, the URL and the Milestones list went on naming the picked milestone over the slide's model. A milestone picked after a slide with its own copy keeps the live model under it (it took the copy for the live model)

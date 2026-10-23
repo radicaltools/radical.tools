@@ -403,7 +403,7 @@
           <li><strong>Start with</strong> — the first level: every element, or the elements of one type.</li>
           <li><strong>Level under</strong> — the next level, along a relation in either direction (<em>Refined into → Requirement</em>), along any relation, or the children it contains.</li>
           <li><strong>or</strong> — another way to a level's elements: a second type, or a second relation.</li>
-          <li><strong>Filter</strong> — keep a level's elements by property (<em>EARS type is event-driven</em>), relation (<em>Has no Verified by</em>), place (<em>Inside Billing</em>) or text. Each one shows how many come in and go through; its dot switches it off to try without it.</li>
+          <li><strong>Filter</strong> — keep a level's elements by property (<em>EARS type is event-driven</em>), relation (<em>Has no Verified by</em>), place (<em>Inside Billing</em>) or text. Each one shows how many come in and go through; its dot switches it off to try without it. An element that stores no value of a property has its type's default, as its card shows (a step's <em>Repeat</em> is 1).</li>
           <li><strong>Sort</strong> — by name, type or a property, within each level.</li>
         </ul>
         <p>A table and a wiki show the chain as a tree. A canvas, a matrix and a hierarchy draw its elements and only the relations the chain follows; tick <em>Draw every relation between them</em> for all of them. Every change applies at once and is one undo step; <em>Reset</em> removes the filter.</p>
@@ -506,6 +506,7 @@
         <ul>
           <li>Every text is edited in place. <em>[edit]</em> beside a title, or a right click, offers <em>Add or link…</em>, <em>Edit facts</em> and <em>Delete</em>.</li>
           <li>Each group of elements ends with an empty line: type in it and press <kbd>Enter</kbd>, and the next element is there. A requirement is written as its sentence and split into its EARS fields; <em>[rewrite]</em> opens it as text again.</li>
+          <li>A page offers what the view's filter shows under its element, linked the way that level hangs under it: a requirement's page in the <em>Specification</em> wiki writes its scenarios and mockups. The Overview offers the first level's types; one its filter shows only once it is named or linked (a text or relation filter) is offered all the same, with <em>the filter won't show it</em>, as the table's + row says.</li>
           <li>Paste a list and the page shows what its lines will become before it adds them, as one undo step.</li>
           <li><em>Add or link…</em> opens the same panel as the table's + row: a new child or one the model has, linked; its list also holds the element's other relationships (<em>uses…</em>, <em>is constrained by…</em>), each with the elements it may name. Only what the metamodel allows, and the view's filter shows, is offered.</li>
           <li>The empty line under a heading suggests the elements of its type whose name holds what is written: pick one to link it instead of writing a new one.</li>
