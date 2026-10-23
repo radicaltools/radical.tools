@@ -24,7 +24,8 @@ Turns a finding into a test bound to the model (Radical Crucible).
                       several runs at once. The working tree is left as it was,
                       also when the gate is interrupted (Ctrl+C, kill)
   --test "<f> › <n>"  the test to gate: a file from the folder crucible.json
-                      is in, and the test's name
+                      is in, and the test's title (its describe blocks too:
+                      "<file> › <describe> › <name>")
   --base <ref>        the commit without the fix (default: the merge base
                       with origin/main, else main)
   --runs <n>          runs at once for the flakiness check (default 5)
@@ -33,8 +34,12 @@ Turns a finding into a test bound to the model (Radical Crucible).
 A test runs through the runner crucible.json gives for its folder
 ("runners": [{ "files": "apps/e2e/", "cwd": "apps/e2e",
 "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }]),
-else with npx vitest run {file} -t {name} in the file's package. Tests,
-findings and crucible.json are not set back.
+else with npx vitest run {file} -t {name} in the file's package. A runner's
+"build" (commands run from crucible.json's folder) is made before the run
+without the fix and before the run with it, for a test of a build; its
+"repeat" (with {runs}) makes the runs at once one run, for a runner whose
+runs cannot go side by side (fixed ports). Tests, findings and
+crucible.json are not set back.
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
 could not run or was interrupted.`
@@ -43,6 +48,10 @@ interface Runner {
   files: string
   cwd?: string
   command: string[]
+  /** Made before the run without the fix and before the run with it. */
+  build?: string[][]
+  /** One run that is the runs at once ({runs} the number). */
+  repeat?: string[]
 }
 
 interface HardenConfig {
@@ -51,12 +60,15 @@ interface HardenConfig {
   runners: Runner[]
 }
 
-/** What a gated test runs: a command in a folder. */
+/** What a gated test runs: a command in a folder, what it is built with
+ *  first, and the one run that is its runs at once, if it has those. */
 interface TestRun {
   label: string
   command: string
   args: string[]
   cwd: string
+  build?: { command: string; args: string[]; cwd: string }[]
+  repeat?: { command: string; args: string[] }
 }
 
 /** Files the gate never sets back: tests, findings, Crucible's settings. */
@@ -69,7 +81,9 @@ function readConfig(file: string): HardenConfig | string {
     return {
       findings: typeof raw.findings === 'string' ? raw.findings : 'crucible/findings',
       fuzz: Array.isArray(raw.fuzz) ? raw.fuzz : [],
-      runners: Array.isArray(raw.runners) ? raw.runners.filter((r) => r && typeof r.files === 'string' && Array.isArray(r.command) && r.command.length > 0) : [],
+      runners: Array.isArray(raw.runners) ? raw.runners.filter((r) => r && typeof r.files === 'string' && Array.isArray(r.command) && r.command.length > 0
+        && (r.build === undefined || (Array.isArray(r.build) && r.build.every((b) => Array.isArray(b) && b.length > 0)))
+        && (r.repeat === undefined || (Array.isArray(r.repeat) && r.repeat.length > 0))) : [],
     }
   } catch (error) {
     return `${file} is no JSON: ${(error as Error).message}`
@@ -165,6 +179,7 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
     return await gate(run, runs, io, async () => {
       putBack = setBack(top, base, changed)
       try {
+        if (!await build(run, 'without the fix', io)) return BUILD_FAILED
         return await runTest(run, io)
       } finally {
         const done = putBack
@@ -180,17 +195,29 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
 /** The gate's three steps, the first run by `withoutFix`. */
 async function gate(run: TestRun, runs: number, io: Io, withoutFix: () => Promise<number>): Promise<number> {
   const without = await withoutFix()
+  if (without === BUILD_FAILED) return 2
   if (without === 0) {
     io.out('1. Without the fix: passed. ✖ The test does not fail without the fix, so it does not prove it.')
     return 1
   }
   io.out(`1. Without the fix: failed (exit ${without}), as it should.`)
+  if (!await build(run, 'with the fix', io)) return 2
   const withFix = await runTest(run, io)
   if (withFix !== 0) {
     io.out(`2. With the fix: failed (exit ${withFix}). ✖`)
     return 1
   }
   io.out('2. With the fix: passed.')
+  if (run.repeat) {
+    const code = await runTest({ ...run, ...run.repeat, args: run.repeat.args.map((a) => a.replace('{runs}', String(runs))) }, { ...io, out: () => {}, err: () => {} })
+    if (code !== 0) {
+      io.out(`3. ${runs} runs at once, as one run of the repeat command: failed (exit ${code}). ✖ The test is flaky under load.`)
+      return 1
+    }
+    io.out(`3. ${runs} runs at once, as one run of the repeat command: passed.`)
+    io.out('The gate passed.')
+    return 0
+  }
   const codes = await Promise.all(Array.from({ length: runs }, () => runTest(run, { ...io, out: () => {}, err: () => {} })))
   const failed = codes.filter((c) => c !== 0).length
   if (failed) {
@@ -216,19 +243,26 @@ function findingRun(finding: Finding, config: HardenConfig, root: string): TestR
 function testRun(spec: string, config: HardenConfig, root: string): TestRun | string {
   const at = spec.indexOf(' › ')
   if (at < 0) return `--test takes "<file> › <name>", not "${spec}".`
-  const file = spec.slice(0, at).trim(), name = spec.slice(at + 3).trim()
+  const file = spec.slice(0, at).trim()
+  // Vitest's -t and Playwright's -g match the title with its describe
+  // blocks joined by spaces.
+  const name = spec.slice(at + 3).split(' › ').map((part) => escapeRegExp(part.trim())).join(' ')
   if (!existsSync(resolve(root, file))) return `No test file ${file}.`
   const runner = config.runners.find((r) => file.startsWith(r.files))
   if (runner) {
     const cwd = resolve(root, runner.cwd ?? '.')
     const rel = relative(cwd, resolve(root, file))
-    const fill = (part: string) => part.replace('{file}', rel).replace('{name}', escapeRegExp(name))
-    return { label: spec, command: runner.command[0], args: runner.command.slice(1).map(fill), cwd }
+    const fill = (part: string) => part.replace('{file}', rel).replace('{name}', name)
+    return {
+      label: spec, command: runner.command[0], args: runner.command.slice(1).map(fill), cwd,
+      build: runner.build?.map((b) => ({ command: b[0], args: b.slice(1), cwd: root })),
+      repeat: runner.repeat && { command: runner.repeat[0], args: runner.repeat.slice(1).map(fill) },
+    }
   }
   let dir = dirname(resolve(root, file))
   while (dir.startsWith(root) && !existsSync(join(dir, 'package.json'))) dir = dirname(dir)
   if (!existsSync(join(dir, 'package.json'))) return `No package.json above ${file}: give a runner for it in crucible.json.`
-  return { label: spec, command: 'npx', args: ['vitest', 'run', relative(dir, resolve(root, file)), '-t', escapeRegExp(name)], cwd: dir }
+  return { label: spec, command: 'npx', args: ['vitest', 'run', relative(dir, resolve(root, file)), '-t', name], cwd: dir }
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -301,6 +335,26 @@ function setBack(root: string, base: string, files: string[]): () => void {
     throw error
   }
   return putBack
+}
+
+/** What the run without the fix returns when its build failed. */
+const BUILD_FAILED = -1
+
+/** Makes the run's build, if it has one, saying so; false when a step
+ *  fails, with the end of what it printed. */
+async function build(run: TestRun, stage: string, io: Io): Promise<boolean> {
+  for (const step of run.build ?? []) {
+    const line = [step.command, ...step.args].join(' ')
+    io.out(`Building ${stage}: ${line}`)
+    let printed = ''
+    const code = await runTest({ label: line, ...step }, { ...io, out: (t) => { printed += t + '\n' }, err: (t) => { printed += t + '\n' } })
+    if (code !== 0) {
+      io.err(printed.split('\n').slice(-20).join('\n'))
+      io.err(`The build ${stage} failed (exit ${code}): ${line}. The gate could not run.`)
+      return false
+    }
+  }
+  return true
 }
 
 /** The tests running now, stopped when the gate is interrupted. */

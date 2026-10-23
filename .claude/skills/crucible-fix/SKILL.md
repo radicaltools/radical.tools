@@ -31,7 +31,11 @@ file per group (its findings, the decisions that stand). The brief says:
   `node apps/cli/dist/index.js harden --gate --test "<file> › <name>"` (or
   `harden --gate F-NNNN` for a fuzz finding, whose test is its own steps
   after `harden F-NNNN`); the gate sets the changed source files back, so it
-  never needs a stash (never use git stash);
+  never needs a stash (never use git stash); name a test with its describe
+  blocks as the report does (`<file> › <describe> › <name>`); an e2e test's
+  gate rebuilds the web and Hub builds before each run (the runner's `build`
+  in `crucible.json`) and runs the runs at once as one Playwright run, so it
+  takes minutes, and it takes the e2e lock like any e2e run;
 - remove the finding's KNOWN entry from the fuzz file with the fix, and run
   the fuzzer more (`node apps/cli/dist/index.js fuzz night --world <model> --runs 300`):
   a new violation of the same rule elsewhere is the same pattern, fix it too;

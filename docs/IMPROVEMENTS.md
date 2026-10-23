@@ -613,7 +613,7 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     arguments; `record` warns about each copied script or helper that names
     the repository's or the round's absolute paths, with its line, and
     copies the screenshot a finding names beside its script (F-0007).
-46. **`radical harden --gate` cannot judge an e2e test.** In the fix round of
+46. ~~**`radical harden --gate` cannot judge an e2e test.**~~ In the fix round of
     round 170–175 (2026-10-22) every group with an e2e test found the same:
     the gate sets the source files back but Playwright serves the web build
     made before, so the test "without the fix" runs the fixed bundle and
@@ -626,11 +626,28 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     name a build step run before each stage, and the parallel stage could
     use the runner's own repeat option. One such wrapper also hung the gate
     by keeping its pipe open from background subshells.
-47. **`radical harden --test "<file> › <describe> › <name>"` finds no Vitest
-    test.** The gate passes the whole title to Vitest's `-t`, which matches
+    Fixed 2026-10-23: a runner in `crucible.json` names a `build`, made
+    before the run without the fix and before the run with it, and a
+    `repeat` command that is the runs at once in one run; the e2e runner
+    builds the web and Hub builds and repeats with `--repeat-each {runs}
+    --workers {runs}`.
+47. ~~**`radical harden --test "<file> › <describe> › <name>"` finds no Vitest
+    test.**~~ The gate passes the whole title to Vitest's `-t`, which matches
     the test's own name, not the describe path that `radical check` and the
     scenarios use; only the bare name works, so the id the gate prints is
     not the one a scenario names.
+    Fixed 2026-10-23: the title's parts go to `-t` and `-g` joined by
+    spaces, as Vitest and Playwright match them.
+48. ~~**A gate's e2e runs overwrite `reports/e2e.json`.**~~ Gating one e2e
+    test (2026-10-23) left a report of that one test where the full run's
+    was, so `npm run check:architecture` afterwards found 244 scenarios not
+    run and the goals unmet, until `npm run e2e` ran again. The Playwright
+    config writes its JSON report there on every run. The gate could keep
+    the reports folder aside and put it back with the source files, or give
+    its runs a report path of their own (`PLAYWRIGHT_JSON_OUTPUT_NAME`).
+    Fixed 2026-10-23: the e2e runner in `crucible.json` passes `--reporter
+    line`, which takes the place of the config's reporters, so the gate's
+    runs write no report.
 
 ### Reverse-engineered requirements (2026-10-06)
 

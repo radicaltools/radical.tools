@@ -363,8 +363,19 @@ runs through the runner `crucible.json` gives for its folder, else with
 
 ```json
 { "runners": [{ "files": "apps/e2e/", "cwd": "apps/e2e",
-                "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }] }
+                "command": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--reporter", "line"],
+                "build": [["npm", "run", "build:web"], ["npm", "run", "build:hub"]],
+                "repeat": ["npx", "playwright", "test", "{file}", "-g", "{name}",
+                           "--repeat-each", "{runs}", "--workers", "{runs}", "--reporter", "line"] }] }
 ```
+
+A runner's `build` (commands run from `crucible.json`'s folder) is made before
+the run without the fix and before the run with it, so a test of a build (an
+e2e test) runs on what the files are at each step; its `repeat` (with
+`{runs}`) makes the runs at once one run of that command, for runs that
+cannot go side by side (web servers on fixed ports). `--test` takes the
+test's title with its describe blocks (`"<file> › <describe> › <name>"`);
+Vitest and Playwright get the parts joined by spaces, as they match them.
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 radical harden
 could not run or was interrupted.
