@@ -4715,7 +4715,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── relations ────────────────────────────────────────────────────────
       addRelation(rel) {
-        if (!editsModel(get())) return
+        if (!editsModel(get())) return null
         // Enforce metamodel relation rules: refuse to create a relation
         // whose (from, to) type pair is not permitted by the active
         // metamodel. Existing in-memory relations are left untouched and
