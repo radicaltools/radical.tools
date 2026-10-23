@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, relationTypeOnMove, type ModelState } from '../src/model'
+import { checkAddNode, checkAddRelation, checkRemoveNodeType, checkRemoveNodeTypeFromMetamodel, checkRemoveRelationType, checkRemoveRelationTypeFromMetamodel, deleteNode, documentMetamodel, metamodelWithoutNodeType, checkNodeUpdate, checkPatchRelation, checkReplaceMetamodel, checkUnwrap, parentCandidates, patchNode, patchRelation, relationTypeOnMove, reparentNodes, type ModelState } from '../src/model'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel } from '../src/metamodel'
 import { viewShowsEveryNode, type C4Node } from '../src/c4'
 
@@ -397,5 +397,39 @@ describe('the type of a relation whose end moves', () => {
   it('is kept where it still fits, or the move gives one', () => {
     expect(relationTypeOnMove(moved(), 'ref', { targetId: 'customer' })).toEqual({})
     expect(relationTypeOnMove(moved(), 'sat', { targetId: 'order', relationType: 'part-of' })).toEqual({})
+  })
+})
+
+describe('a relation to what holds it', () => {
+  it('is refused either way round and when an end moves there, but a transition to an enclosing state is not', () => {
+    const s = state()
+    s.c4Nodes.api = { ...node('api', 'container'), parentId: 'shop' }
+    s.c4Nodes.db = { ...node('db', 'database'), parentId: 'shop' }
+    s.c4Relations.calls = { id: 'calls', sourceId: 'api', targetId: 'db', relationType: 'interacts' }
+    expect(checkAddRelation(s, { sourceId: 'api', targetId: 'shop' })).toMatch(/shop holds api, and containment already joins them/)
+    expect(checkAddRelation(s, { sourceId: 'shop', targetId: 'api', relationType: 'interacts' })).toMatch(/shop holds api/)
+    expect(checkPatchRelation(s, 'calls', { targetId: 'shop' })).toMatch(/shop holds api/)
+    // Siblings and an outside element are joined as before.
+    expect(checkAddRelation(s, { sourceId: 'api', targetId: 'db' })).toBeNull()
+    expect(checkAddRelation(s, { sourceId: 'user', targetId: 'api' })).toBeNull()
+    // A state machine: Active holds Paying; leaving Paying for Active is SCXML.
+    s.c4Nodes.sm = node('sm', 'state-machine')
+    s.c4Nodes.active = { ...node('active', 'state'), parentId: 'sm' }
+    s.c4Nodes.paying = { ...node('paying', 'state'), parentId: 'active' }
+    expect(checkAddRelation(s, { sourceId: 'paying', targetId: 'active', relationType: 'transition' })).toBeNull()
+  })
+  it('goes when an element moves into what it relates to, with those of what it holds', () => {
+    const s = state()
+    s.c4Nodes.api = node('api', 'container')
+    s.c4Nodes.ctl = { ...node('ctl', 'component'), parentId: 'api' }
+    s.c4Nodes.pay = node('pay', 'system')
+    s.c4Relations.a1 = { id: 'a1', sourceId: 'api', targetId: 'shop', relationType: 'interacts' }
+    s.c4Relations.a2 = { id: 'a2', sourceId: 'ctl', targetId: 'shop', relationType: 'interacts' }
+    s.c4Relations.a3 = { id: 'a3', sourceId: 'api', targetId: 'pay', relationType: 'interacts' }
+    const removed = reparentNodes(s, ['api'], 'shop')
+    expect(removed.map((r) => r.id).sort()).toEqual(['a1', 'a2'])
+    expect(Object.keys(s.c4Relations)).not.toContain('a1')
+    expect(Object.keys(s.c4Relations)).toContain('a3')
+    expect(s.c4Nodes.api.parentId).toBe('shop')
   })
 })

@@ -99,14 +99,14 @@ test('designer', async ({ page, shot }) => {
 
 test('properties', async ({ page, studio, shot }) => {
   await open(page, 'view-core')
-  await studio.node('ctn-payments').locator('.c4-node-label').first().click()
+  await studio.node('ctn-payments').locator('.c4-node-label').first().dblclick()
   await settle(page)
   await shot('properties')
 })
 
 test('mockups', async ({ page, studio, shot }) => {
   await open(page, 'view-screens')
-  await studio.nodeByLabel('Review & FX Quote').first().click()
+  await studio.nodeByLabel('Review & FX Quote').first().dblclick()
   await settle(page)
   await shot('mockups')
 })
@@ -127,7 +127,7 @@ test('explore', async ({ page, studio, shot }) => {
   await page.goto(`/#/d/${encodeURIComponent('ls:docs-bookstore')}/m/designer/v/v-containers`)
   await expect(page.locator('.app-layout')).toBeVisible()
   await settle(page)
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   const api = page.getByRole('menu', { name: 'Add to API' })
   for (const text of ['reads/writes', 'charges card', 'calls']) await api.locator('.explore-menu-row', { hasText: text }).getByRole('checkbox').check()
@@ -150,7 +150,7 @@ test('explore', async ({ page, studio, shot }) => {
 /** The Processes view with a step selected: its actions in its type line and its properties card. */
 test('warnier', async ({ page, shot }) => {
   await open(page, 'view-processes')
-  await page.getByLabel('Warnier diagram').getByLabel('step Quote FX').click()
+  await page.getByLabel('Warnier diagram').getByLabel('step Quote FX').dblclick()
   await settle(page)
   await shot('warnier')
 })

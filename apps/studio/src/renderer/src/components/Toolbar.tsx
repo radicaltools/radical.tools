@@ -512,8 +512,8 @@ function AppMenu({
           <div className="app-menu-divider" />
           <div className="app-menu-section">
             <div className="app-menu-label">Editing</div>
-            <div className="app-menu-row">
-              <span className="app-menu-row-label">Connect key</span>
+            <div className="app-menu-row" title="Held on the canvas: drag from an element to another to connect them, click elements to pick several, drop a type from the palette without its wizard">
+              <span className="app-menu-row-label">Special key</span>
               <select
                 className="app-menu-select"
                 value={connectionModifier}

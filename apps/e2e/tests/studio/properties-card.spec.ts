@@ -8,11 +8,11 @@ test.beforeEach(async ({ studio }) => {
   await expect(studio.nodes).toHaveCount(3)
 })
 
-test('the properties card slides over the canvas on a selection and leaves its size alone', async ({ page, studio }) => {
+test('the properties card slides over the canvas on a double-click and leaves its size alone', async ({ page, studio }) => {
   const before = await studio.canvas.boundingBox()
   await expect(studio.properties).toHaveCount(0)
 
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('Payment Provider')
   await expect(studio.properties.locator('.pp-type')).toHaveText(/system/i)
   expect(await studio.canvas.boundingBox()).toEqual(before)
@@ -21,42 +21,52 @@ test('the properties card slides over the canvas on a selection and leaves its s
   await studio.pane.click({ position: { x: 20, y: 20 } })
   await expect(studio.properties).toHaveCount(0)
 
-  // ✕ hides it while the element stays selected; the next selection brings it back.
-  await studio.node('payments').click()
+  // ✕ hides it while the element stays selected, until a double-click opens it again.
+  await studio.node('payments').dblclick()
   await studio.properties.getByRole('button', { name: 'Close properties' }).click()
   await expect(studio.properties).toHaveCount(0)
   await expect(page.locator('.react-flow__node.selected')).toHaveCount(1)
   await studio.node('customer').click()
+  await expect(studio.properties).toHaveCount(0)
+  await studio.node('customer').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('Customer')
   expect(await studio.canvas.boundingBox()).toEqual(before)
 })
 
-test('after ✕ the card opens again for the element once something else was selected', async ({ studio }) => {
-  // The card stayed hidden for that element until another ✕.
-  const close = () => studio.properties.getByRole('button', { name: 'Close properties' }).click()
+test('a click selects, a double-click opens the card, which then follows the selection', async ({ page, studio }) => {
   await studio.node('customer').click()
-  await close()
+  await expect(studio.node('customer')).toHaveClass(/selected/)
   await expect(studio.properties).toHaveCount(0)
-  await studio.node('payments').click()
-  await expect(studio.attribute('Name')).toHaveValue('Payment Provider')
-  await studio.node('customer').click()
+  await studio.node('customer').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('Customer')
-
-  // Nothing selected in between, and a view switch, count too.
-  await close()
-  await expect(studio.properties).toHaveCount(0)
+  // Open, it shows what a click selects next, until nothing is selected.
+  await studio.node('bookstore').click()
+  await expect(studio.attribute('Name')).toHaveValue('Bookstore')
   await studio.pane.click({ position: { x: 20, y: 20 } })
-  await studio.node('customer').click()
-  await expect(studio.attribute('Name')).toHaveValue('Customer')
-  await close()
+  await expect(studio.properties).toHaveCount(0)
+  await studio.node('bookstore').click()
+  await expect(studio.properties).toHaveCount(0)
+
+  // A relation opens its card on a double-click too.
   await studio.open('v-containers')
-  await studio.open('v-context')
-  await studio.node('customer').click()
-  await expect(studio.attribute('Name')).toHaveValue('Customer')
+  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().dblclick({ force: true })
+  await expect(studio.properties.getByRole('region', { name: 'Actions' }).getByRole('button', { name: /^Change source…/ })).toBeVisible()
+
+  // A table row: a click selects, F2 renames, a double-click opens the card.
+  await studio.open('v-table')
+  const api = page.locator('tr.tv-row[data-node-id="api"]')
+  await api.click()
+  await expect(api).toHaveClass(/tv-row-selected/)
+  await expect(studio.properties).toHaveCount(0)
+  await page.keyboard.press('F2')
+  await expect(page.locator('.tv-cell-input')).toHaveValue('API')
+  await page.keyboard.press('Escape')
+  await api.dblclick()
+  await expect(studio.attribute('Name')).toHaveValue('API')
 })
 
 test('a long field reads as Markdown and edits on a click', async ({ page, studio }) => {
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   const description = studio.properties.getByRole('button', { name: 'Edit Description' })
   await expect(description).toHaveText('Card payments')
   await description.click()
@@ -72,7 +82,7 @@ test('a long field reads as Markdown and edits on a click', async ({ page, studi
 })
 
 test('the card\'s head explores from the element, in Designer and Viewer, and Viewer cannot delete it', async ({ page, studio }) => {
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   const head = studio.properties.locator('.pp-head-actions')
   const buttons = () => head.getByRole('button').evaluateAll((all) => all.map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim()))
   await expect.poll(buttons).toEqual(['Explore', 'Close properties'])
@@ -80,14 +90,14 @@ test('the card\'s head explores from the element, in Designer and Viewer, and Vi
   await expect(page.locator('.explore-bar')).toContainText('Explore: Payment Provider')
 
   await studio.open('v-context', 'viewer')
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await expect.poll(buttons).toEqual(['Explore', 'Close properties'])
   await expect(studio.properties.getByRole('button', { name: 'Delete element' })).toHaveCount(0)
 })
 
 test('a name or a description typed letter by letter is one undo step', async ({ page, studio }) => {
   const undo = page.getByRole('button', { name: 'Undo', exact: true })
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   const name = studio.attribute('Name')
   await name.click()
   await page.keyboard.press('ControlOrMeta+A')
@@ -107,7 +117,7 @@ test('a name or a description typed letter by letter is one undo step', async ({
 })
 
 test('the card is as wide as it was dragged, also after a reload', async ({ page, studio }) => {
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   const card = studio.properties
   await page.waitForTimeout(400) // done sliding in
   const width = (await card.boundingBox())!.width
@@ -120,8 +130,10 @@ test('the card is as wide as it was dragged, also after a reload', async ({ page
 
   await page.reload()
   await studio.ready()
-  // The route names the selection: the reload selects it again and opens its card.
+  // The route names the selection: the reload selects it again; its card
+  // opens on a double-click, as wide as it was.
   await expect(studio.node('payments')).toHaveClass(/selected/)
+  await studio.node('payments').dblclick()
   await expect.poll(async () => Math.round((await studio.properties.boundingBox())!.width)).toBe(Math.round(width + 100))
 })
 
@@ -129,12 +141,12 @@ test('the card is as wide as it was dragged, also after a reload', async ({ page
 // move then refused, and external systems, which the model leaves a box.
 test('the card\'s Parent lists only where the element can go', async ({ studio }) => {
   await studio.open('v-containers')
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await expect(studio.attribute('Parent').locator('option')).toHaveText(['—', 'Bookstore'])
 })
 
 test('the card lists the views that show the element and opens one', async ({ page, studio }) => {
-  await studio.node('bookstore').click()
+  await studio.node('bookstore').dblclick()
   const views = studio.properties.getByRole('region', { name: 'Views' })
   await expect(views.locator('.pp-section-title')).toHaveText('Views · 3')
   // Place Order Flow lists the containers, not Bookstore; Element Table shows the whole model.
@@ -155,7 +167,7 @@ test('the card lists the views that show the element and opens one', async ({ pa
 
 test('one element\'s actions are in its card, several elements\' in a bar over the top of the canvas', async ({ page, studio }) => {
   const bar = page.getByRole('toolbar', { name: 'Selection actions' })
-  await studio.node('bookstore').click()
+  await studio.node('bookstore').dblclick()
   await expect(bar).toHaveCount(0)
   const actions = studio.properties.getByRole('region', { name: 'Actions' })
   await expect(actions.getByRole('button', { name: 'Unwrap' })).toBeVisible()
@@ -169,7 +181,7 @@ test('one element\'s actions are in its card, several elements\' in a bar over t
 
   // Two elements: the bar, at the top of the canvas, and no card.
   await studio.node('customer').click()
-  await studio.node('payments').click({ modifiers: ['Shift'] })
+  await studio.node('payments').click({ modifiers: ['Alt'] })
   await expect(bar.locator('.sel-bar-badge')).toHaveText('2')
   await expect(studio.properties).toHaveCount(0)
   const canvas = (await studio.canvas.boundingBox())!
@@ -180,15 +192,15 @@ test('one element\'s actions are in its card, several elements\' in a bar over t
   // Viewer: no bar, no actions; Explore is on the card's head.
   await studio.open('v-containers', 'viewer')
   await studio.node('web').click()
-  await studio.node('db').click({ modifiers: ['Shift'] })
+  await studio.node('db').click({ modifiers: ['Alt'] })
   await expect(bar).toHaveCount(0)
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await expect(studio.properties.getByRole('region', { name: 'Actions' })).toHaveCount(0)
 })
 
 test('a relation\'s card changes its ends and hides it from the view', async ({ page, studio }) => {
   await studio.open('v-containers')
-  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().click({ force: true })
+  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().dblclick({ force: true })
   const actions = studio.properties.getByRole('region', { name: 'Actions' })
   await actions.getByRole('button', { name: /^Change source…/ }).click()
   await actions.getByRole('menuitem', { name: /^Web App/ }).click()

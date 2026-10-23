@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
+import { openCard } from '@radical/ui/store/showInView'
 import {
   useDiagramStore,
   computeViewCollapsedSet,
@@ -7,7 +8,7 @@ import {
 } from '@radical/ui/store/diagramStore'
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
-import { isRelationAllowed, relationTypeKeepsAggregates, relationTypesFitting } from '@radical/common/metamodel'
+import { isRelationAllowed, relationTypeKeepsAggregates, relationTypeName, relationTypesFitting } from '@radical/common/metamodel'
 import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
@@ -183,10 +184,8 @@ export function MatrixView(): React.ReactElement {
   )
 
   const relLabel = useCallback(
-    (relationType: string | undefined): string => {
-      if (relationType && metamodel?.relationTypes[relationType]?.label)
-        return metamodel.relationTypes[relationType]!.label
-      return relationType ?? 'relation'
+    (relationType: string | undefined, from?: C4Node, to?: C4Node): string => {
+      return relationType ? relationTypeName(metamodel, relationType, false, from && to ? { from: from.type, to: to.type } : undefined) : 'relation'
     },
     [metamodel],
   )
@@ -220,7 +219,7 @@ export function MatrixView(): React.ReactElement {
       // the view, or not one its chain follows): another would be a copy.
       const undrawn = Object.values(relations).find((r) => r.sourceId === source.id && r.targetId === target.id)
       if (undrawn) {
-        pushNotification(`${source.label} \u2192 ${target.label} has a relation (${relLabel(undrawn.relationType)}) that this matrix does not show.`, 'info')
+        pushNotification(`${source.label} \u2192 ${target.label} has a relation (${relLabel(undrawn.relationType, source, target)}) that this matrix does not show.`, 'info')
         return
       }
       if (!isRelationAllowed(metamodel, source.type, target.type)) {
@@ -293,6 +292,7 @@ export function MatrixView(): React.ReactElement {
                   className={`mx-colhead${hover?.col === ci ? ' mx-axis-hl' : ''}`}
                   title={`${TYPE_LABELS[col.type] ?? col.type}: ${col.label}`}
                   onClick={() => selectNode(col.id)}
+                  onDoubleClick={() => { selectNode(col.id); openCard() }}
                 >
                   <div className="mx-colhead-inner">
                     <span className="mx-swatch" style={{ background: NODE_COLORS[col.type] }} />
@@ -309,6 +309,7 @@ export function MatrixView(): React.ReactElement {
                   className={`mx-rowhead${hover?.row === ri ? ' mx-axis-hl' : ''}`}
                   title={`${TYPE_LABELS[row.type] ?? row.type}: ${row.label}`}
                   onClick={() => selectNode(row.id)}
+                  onDoubleClick={() => { selectNode(row.id); openCard() }}
                 >
                   <span className="mx-swatch" style={{ background: NODE_COLORS[row.type] }} />
                   <span className="mx-rowhead-text">{row.label}</span>
@@ -340,7 +341,7 @@ export function MatrixView(): React.ReactElement {
                         isDiag
                           ? ''
                           : rel
-                            ? `${row.label} \u2192 ${col.label}${count > 1 ? ` · ${count} relations` : `  (${relLabel(rel.relationType)})${rel.label ? ' · ' + rel.label : ''}`}`
+                            ? `${row.label} \u2192 ${col.label}${count > 1 ? ` · ${count} relations` : `  (${relLabel(rel.relationType, row, col)})${rel.label ? ' · ' + rel.label : ''}`}`
                             : readonly
                               ? `${row.label} \u2192 ${col.label}`
                               : `Create relation: ${row.label} \u2192 ${col.label}`
@@ -386,7 +387,7 @@ export function MatrixView(): React.ReactElement {
                   }}
                 >
                   <span className="mx-popup-dot" style={{ background: relColor(t) }} />
-                  <span className="mx-popup-rel-label">{relLabel(t)}</span>
+                  <span className="mx-popup-rel-label">{relLabel(t, popup.sourceNode, popup.targetNode)}</span>
                 </button>
               </li>
             ))}
@@ -402,9 +403,9 @@ export function MatrixView(): React.ReactElement {
                   >
                     <span className="mx-popup-dot" style={{ background: relColor(r.relationType) }} />
                     <span className="mx-popup-rel-label">
-                      {r.label || relLabel(r.relationType)}
+                      {r.label || relLabel(r.relationType, nodes[r.sourceId], nodes[r.targetId])}
                       {r.label && r.relationType && (
-                        <span className="mx-popup-rel-type"> ({relLabel(r.relationType)})</span>
+                        <span className="mx-popup-rel-type"> ({relLabel(r.relationType, nodes[r.sourceId], nodes[r.targetId])})</span>
                       )}
                     </span>
                   </button>

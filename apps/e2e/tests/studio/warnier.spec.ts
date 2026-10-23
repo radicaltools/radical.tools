@@ -54,7 +54,7 @@ async function openModel(page: Page, studio: { ready(): Promise<void>; designer(
   return folder
 }
 
-test('a process is drawn as a Warnier diagram and a click opens the step', async ({ page, studio }) => {
+test('a process is drawn as a Warnier diagram and a double-click opens the step', async ({ page, studio }) => {
   await openModel(page, studio)
   const diagram = page.getByLabel('Warnier diagram')
 
@@ -74,8 +74,11 @@ test('a process is drawn as a Warnier diagram and a click opens the step', async
   // An alternative happens at most once: (0,1) under each (Warnier–Orr).
   await expect(diagram.locator('.wn-label[data-node-id="card"] .wn-repeat')).toHaveText('(0,1)')
 
-  // A click selects the step and opens its card.
+  // A click selects the step; a double-click opens its card.
   await diagram.locator('.wn-label[data-node-id="card"]').click()
+  await expect(diagram.locator('.wn-label[data-node-id="card"]')).toHaveClass(/selected/)
+  await expect(studio.properties).toHaveCount(0)
+  await diagram.locator('.wn-label[data-node-id="card"]').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('By card')
   await expect(diagram.locator('.wn-label[data-node-id="card"]')).toHaveClass(/selected/)
 

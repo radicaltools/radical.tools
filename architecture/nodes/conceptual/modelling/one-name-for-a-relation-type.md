@@ -1,0 +1,8 @@
+---
+id: "d0764314-9e61-47cc-9b60-1e95bb4f2a05"
+type: "requirement"
+label: "One name for a relation type"
+action: "Studio shall name a relation's type by how it reads from its source for its pair of element types (the pair's own reading where the metamodel gives one, else the type's forward label, else its name: \"Uses\" for Interacts, \"Delivers to\" for Interacts to a person, \"Partners with\" for Partnership), and from its target by the pair's or the type's inverse reading, wherever a relation is shown or made: on the line of a relation with no label, on the pills over the targets while connecting, in the menu that asks for the type, in the Type of the properties card and of the wiki's relation editor, in the wiki's sentences and Add or link…, on the selection bar and in the matrix; in lower case on the canvas. The metamodel editor and upsert_relation_type shall let each allowed pair carry its own forward and inverse reading."
+ears_type: "ubiquitous"
+rationale: "A relation of type Interacts read \"uses\" in the wiki and while connecting, but its line showed \"interacts\", and \"depends-on\" with the id's hyphen: one relation went by three names. And C4 lets a system relate to a person (\"Sends e-mails to\"), which read \"System uses Customer\": Structurizr names a relation to a person delivers(), \"Delivers to\". The metamodel editor keeps the type's name and id, where the type itself is defined. Evidence: packages/common/src/metamodel/prose.ts (relationPhrase, relationTypeName); packages/common/src/metamodel/presets/c4.ts (interacts pairs); packages/ui/src/components/edges/RelationEdge.tsx; packages/ui/src/store/diagramStore.ts (deriveRFEdges typeName)"
+---

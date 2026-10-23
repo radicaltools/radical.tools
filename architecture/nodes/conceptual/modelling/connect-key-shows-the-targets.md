@@ -1,0 +1,9 @@
+---
+id: "ebfe2e99-e122-4bf8-ad76-a5841c1865d7"
+type: "requirement"
+label: "Connect key shows the targets"
+action: "Studio shall mark every element on the canvas that a relation from that element (from each of the selected ones, where several are) could go to (for a relation's end, every element the end could move to with the relation keeping its type, its other end staying), as the metamodel allows and the view's filter would draw it, with a pill over it for each way (each relation type, as \"uses\", \"inside\" where it may go in, \"holds\" on its container) at the same size on screen at any zoom, and dim the other elements, until the key is released or the line is dropped; a drop on a pill shall make a relation of that type, or nest it there, and a drop anywhere on the element where one way fits, make it, or move the end there. A relation's end dragged with its reconnect handle shall keep the relation's type: a drop where that type does not fit the new pair is refused with a message, and no other type is offered."
+ears_type: "state-driven"
+precondition: "the special key (Settings, Option by default) is held on a canvas with an element selected, or a line is being drawn from an element, or an end of the selected relation is dragged with the key held"
+rationale: "A drop on an element the metamodel or the view's filter refuses was only told after the fact, which type a relation would take showed only when it was made, and where several fit a menu asked after the drop. Marked beforehand, and chosen by where the line is dropped, the user sees where a line can go and makes the relation they mean in one move. Evidence: packages/common/src/viewPipeline.ts (connectTypes); packages/ui/src/components/Canvas.tsx (connect-target, ConnectPills)"
+---

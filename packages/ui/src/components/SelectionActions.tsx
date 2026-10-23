@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activeLayoutConstraints, childrenInView, hideRefusal, shownExploration, useDiagramStore } from '../store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
-import { isParentAllowed, isPlacementAllowed, isRelationAllowed } from '@radical/common/metamodel'
+import { isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName } from '@radical/common/metamodel'
 import { defaultGridColumns, type C4Node } from '@radical/common/c4'
 import { checkPatchRelation, relationTypeOnMove } from '@radical/common/model'
 import { useMenuKeys } from '../hooks/menuKeys'
@@ -364,7 +364,7 @@ function RelationEndItems({ relationId, end, candidates, close }: {
 }): React.ReactElement {
   const updateRelation = useDiagramStore((s) => s.updateRelation)
   const metamodel = useDiagramStore((s) => s.metamodel)
-  const [asking, setAsking] = useState<{ nodeId: string; title: string; types: string[] } | null>(null)
+  const [asking, setAsking] = useState<{ nodeId: string; title: string; types: string[]; ends?: { from: string; to: string } } | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => { if (asking) listRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus() }, [asking])
   const pick = (nodeId: string): void => {
@@ -375,7 +375,7 @@ function RelationEndItems({ relationId, end, candidates, close }: {
     if (rel && fit.ask && !checkPatchRelation(s, relationId, { [end]: nodeId })) {
       const ends = { sourceId: rel.sourceId, targetId: rel.targetId, [end]: nodeId }
       const name = (id: string) => s.c4Nodes[id]?.label || id
-      setAsking({ nodeId, title: `${name(ends.sourceId)} → ${name(ends.targetId)}: which relation?`, types: fit.ask })
+      setAsking({ nodeId, title: `${name(ends.sourceId)} → ${name(ends.targetId)}: which relation?`, types: fit.ask, ends: s.c4Nodes[ends.sourceId] && s.c4Nodes[ends.targetId] ? { from: s.c4Nodes[ends.sourceId].type, to: s.c4Nodes[ends.targetId].type } : undefined })
       return
     }
     close()
@@ -386,7 +386,7 @@ function RelationEndItems({ relationId, end, candidates, close }: {
       <div ref={listRef}>
         <div className="relation-type-menu-title">{asking.title}</div>
         {asking.types.map((t) => (
-          <MenuItem key={t} label={metamodel?.relationTypes[t]?.label ?? t}
+          <MenuItem key={t} label={relationTypeName(metamodel, t, false, asking.ends)}
             onClick={() => { close(); updateRelation(relationId, { [end]: asking.nodeId, relationType: t }) }} />
         ))}
       </div>

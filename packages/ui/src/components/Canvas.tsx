@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -18,6 +19,7 @@ import ReactFlow, {
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
 import { useDiagramStore, viewById, milestoneOnCanvas } from '../store/diagramStore'
+import { openCard } from '../store/showInView'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
 import { RelationEdge } from './edges/RelationEdge'
@@ -31,9 +33,9 @@ import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
-import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
-import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
-import { allowedPlacesText, isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
+import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, holderOf, nodeTypeSize, type C4Node } from '@radical/common/c4'
+import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
+import { allowedPlacesText, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName, type Metamodel } from '@radical/common/metamodel'
 
 /** The viewport that fits `bounds` in the part of the canvas (`rect`) the
  *  elements palette on its left leaves free — and, framing a selection
@@ -97,6 +99,74 @@ function focusDimmed(n: RFNode): RFNode {
     focusDimmedCopies.set(n, copy)
   }
   return copy
+}
+
+// What the connect gesture offers besides relation types: the element moved
+// inside the target, and its container ("holds", where it is).
+const NEST_INSIDE = '@inside'
+const NEST_HOLDS = '@holds'
+
+/** What the connect gesture goes from: the selected elements where the one
+ *  pressed (or marked from) is one of several selected, else that one. */
+function connectSources(state: { selectedNodeIds: string[] }, from: string): string[] {
+  return state.selectedNodeIds.length > 1 && state.selectedNodeIds.includes(from) ? [...state.selectedNodeIds] : [from]
+}
+
+/** Moves `ids` into `parentId` (null: the top of the model), those of one
+ *  parent at a time (reparentNodes takes siblings). */
+function nestAll(state: { c4Nodes: Record<string, C4Node>; reparentNodes: (ids: string[], parentId: string | null, options?: { quiet?: boolean }) => void }, ids: string[], parentId: string | null): void {
+  const byParent = new Map<string, string[]>()
+  for (const id of ids) {
+    const key = state.c4Nodes[id]?.parentId ?? ''
+    byParent.set(key, [...(byParent.get(key) ?? []), id])
+  }
+  for (const group of byParent.values()) state.reparentNodes(group, parentId)
+}
+
+// The special key as React Flow names it.
+const SPECIAL_KEY_CODE = { alt: 'Alt', shift: 'Shift', ctrl: 'Control', meta: 'Meta' } as const
+
+// A target of the relation being drawn: marked, its type over it (CSS
+// ::before reads --connect-label). One copy per node object and label.
+const connectCopies = new WeakMap<RFNode, { label: string; copy: RFNode }>()
+function connectTarget(n: RFNode, label: string): RFNode {
+  const known = connectCopies.get(n)
+  if (known?.label === label) return known.copy
+  const copy = { ...n, className: (n.className ?? '') + ' connect-target', style: { ...n.style, ['--connect-label' as string]: JSON.stringify(label) } }
+  connectCopies.set(n, { label, copy })
+  return copy
+}
+
+// Over each element a relation (or nesting) can go to, a pill for each way:
+// the relation's type ("uses"), "inside", or "holds" on the container the
+// element stands in. A drop on a pill makes that relation or nests it there
+// (the canvas's mouseup reads data-connect-target and data-connect-type).
+// Rendered into the element's own node, they move and zoom with it, at the
+// same size on screen at any zoom (--canvas-unzoom).
+function ConnectPills({ containerRef, targets, nameOf }: {
+  containerRef: React.RefObject<HTMLDivElement>
+  targets: Map<string, Array<{ type: string; text: string }>>
+  nameOf: (id: string) => string
+}): React.ReactElement | null {
+  const container = containerRef.current
+  if (!container) return null
+  return (
+    <>
+      {[...targets].map(([id, types]) => {
+        const node = container.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)
+        if (!node) return null
+        return createPortal(
+          <div className="connect-pills" role="group" aria-label={`Drop on ${nameOf(id)}`} data-connect-over={id}>
+            {types.map((t) => t.type === NEST_HOLDS
+              ? <span key={t.type} className="connect-pill holds">{t.text}</span>
+              : <span key={t.type || 'relation'} className="connect-pill" data-connect-target={id} data-connect-type={t.type}>{t.text}</span>)}
+          </div>,
+          node,
+          `pills-${id}`,
+        )
+      })}
+    </>
+  )
 }
 
 // When the grabbed element's parent is selected too, React Flow drags the
@@ -208,6 +278,9 @@ function StructuralCanvas(): React.ReactElement {
 
   // Connection mode
   const connectSource = useDiagramStore((s) => s.connectSource)
+  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
+  const relinking = useDiagramStore((s) => s.relinking)
+  const selectedKey = useDiagramStore((s) => s.selectedNodeIds.join('\u0000'))
   const connectionModifier = useDiagramStore((s) => s.connectionModifier)
   const cancelConnection = useDiagramStore((s) => s.cancelConnection)
 
@@ -293,6 +366,9 @@ function StructuralCanvas(): React.ReactElement {
   useEffect(() => {
     const record = (transform: [number, number, number]): void => {
       ;(window as any).__rfCurrentViewport = { x: transform[0], y: transform[1], zoom: transform[2] }
+      // The relation types over the targets of a connection keep their size
+      // on screen at any zoom (.connect-target::before).
+      containerRef.current?.style.setProperty('--canvas-unzoom', String(1 / (transform[2] || 1)))
     }
     record(rfStore.getState().transform)
     return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) record(s.transform) })
@@ -1039,10 +1115,31 @@ function StructuralCanvas(): React.ReactElement {
     [cancelConnection, selectNode, frameSelection]
   )
 
+  // A double-click opens the element's or the relation's properties card
+  // (a click only selects; an open card then follows the selection).
+  const onNodeDoubleClick: NodeMouseHandler = useCallback((_e, node) => {
+    const s = useDiagramStore.getState()
+    if (s.presentationActive || !s.c4Nodes[node.id]) return
+    if (s.selectedNodeId !== node.id) selectNode(node.id)
+    openCard()
+  }, [selectNode])
+  const onEdgeDoubleClick = useCallback((_e: React.MouseEvent, edge: { id: string }) => {
+    const s = useDiagramStore.getState()
+    // A step's arrow is no relation; a sequence being edited takes clicks.
+    if (s.presentationActive || edge.id.startsWith('flow:') || edge.id.startsWith('virtual-') || !s.c4Relations[edge.id]) return
+    if (s.activeSequenceId && s.appMode === 'designer') return
+    if (s.selectedEdgeId !== edge.id) selectEdge(edge.id)
+    openCard()
+  }, [selectEdge])
+
   // Use a native mousedown/mouseup flow on the container to handle
   // drag-to-connect: modifier+mousedown on source → drag → mouseup on target.
   const connectingRef = useRef(false) // true while actively dragging a connection
   const [connectMouse, setConnectMouse] = useState<{ x: number; y: number } | null>(null)
+  // The element the line is drawn over: its panel of relation types shows.
+  const [connectOver, setConnectOver] = useState<string | null>(null)
+  const connectOverRef = useRef<string | null>(null)
+  connectOverRef.current = connectOver
 
   useEffect(() => {
     const el = containerRef.current
@@ -1079,30 +1176,79 @@ function StructuralCanvas(): React.ReactElement {
     const onMouseMove = (e: MouseEvent) => {
       if (!connectingRef.current) return
       setConnectMouse({ x: e.clientX, y: e.clientY })
+      // Over the panel the element stays the one it stands over.
+      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      if (under?.closest('.connect-pills')) return
+      setConnectOver(under ? findNodeId(under) : null)
     }
 
     const onMouseUp = (e: MouseEvent) => {
       if (!connectingRef.current) return
       connectingRef.current = false
       setConnectMouse(null)
+      setConnectOver(null)
 
       const state = useDiagramStore.getState()
       const src = state.connectSource
       if (!src) return
 
-      const nodeId = findNodeId(e.target as HTMLElement)
+      // Dropped on a field of the target's panel: a relation of that type,
+      // or the element moved inside the target.
+      const field = (e.target as HTMLElement).closest<HTMLElement>('[data-connect-target]')
+      const sources = connectSources(state, src)
+      if (field) {
+        const type = field.dataset.connectType
+        if (type === NEST_INSIDE) nestAll(state, sources, field.dataset.connectTarget!)
+        else for (const from of sources) state.addRelation({ sourceId: from, targetId: field.dataset.connectTarget!, ...(type ? { relationType: type } : {}) })
+        state.cancelConnection()
+        return
+      }
+
+      // On the panel beside its fields: the element it stands over.
+      const nodeId = (e.target as HTMLElement).closest('.connect-pills') ? connectOverRef.current : findNodeId(e.target as HTMLElement)
+      const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
+      // On the empty canvas: out of its container, where it may stand there.
+      // (Holding the selection key, React Flow lays its selection pane over it.)
+      const onCanvas = (e.target as HTMLElement).closest('.react-flow') && !(e.target as HTMLElement).closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
+      if (!nodeId && onCanvas) {
+        const out = sources.filter((id) => { const n = state.c4Nodes[id]; return n?.parentId && isParentAllowed(state.metamodel as Metamodel, n.type, undefined) })
+        if (out.length) nestAll(state, out, null)
+      }
+      // Inside the target, its only offer; nothing on its container.
+      else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(state, sources, nodeId)
+      else if (nodeId && offered.length === 1 && offered[0] === NEST_HOLDS) { /* where they are */ }
+      // Several: of the one type that fits each (several types ask by the panel).
+      else if (nodeId && sources.length > 1) {
+        const types = offered.filter((t) => t !== NEST_INSIDE)
+        if (types.length === 1) for (const from of sources) state.addRelation({ sourceId: from, targetId: nodeId, ...(types[0] ? { relationType: types[0] } : {}) })
+      }
       // Refused, of the type the view's chain follows, or asked about where
       // several types fit (connectNodes).
-      if (nodeId && nodeId !== src) state.connectNodes(src, nodeId)
+      else if (nodeId && nodeId !== src) state.connectNodes(src, nodeId)
+      // Let go where it was pressed: a click with the special key, which
+      // adds the element to the selection or takes it out.
+      else if (nodeId === src) {
+        const ids = state.selectedNodeIds
+        state.setSelectedNodeIds(ids.includes(src) ? ids.filter((id) => id !== src) : [...ids, src])
+      }
       state.cancelConnection()
+    }
+
+    // The click that follows a special-key press on a node is the mouseup's
+    // to handle (it adds the element to the selection): React Flow's own
+    // multi-selection would take it out again.
+    const onClick = (e: MouseEvent) => {
+      if (isModHeld(e) && findNodeId(e.target as HTMLElement)) e.stopPropagation()
     }
 
     // Capture phase so we intercept before ReactFlow
     el.addEventListener('mousedown', onMouseDown, true)
+    el.addEventListener('click', onClick, true)
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
     return () => {
       el.removeEventListener('mousedown', onMouseDown, true)
+      el.removeEventListener('click', onClick, true)
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
@@ -1222,7 +1368,10 @@ function StructuralCanvas(): React.ReactElement {
       const s = useDiagramStore.getState()
       const view = s.activeViewId ? s.views[s.activeViewId] : undefined
       const filtered = newElementFilters(view, { nodes: s.c4Nodes, relations: s.c4Relations, metamodel: s.metamodel }, typeStr)
-      // Opens the type's wizard instead, when it has one.
+      // Opens the type's wizard instead, when it has one; with the special
+      // key held, it is added at once.
+      const mod = s.connectionModifier
+      const skipWizard = mod === 'alt' ? event.altKey : mod === 'shift' ? event.shiftKey : mod === 'ctrl' ? event.ctrlKey : event.metaKey
       requestCreateNode({
         type: typeStr,
         label: typeStr[0].toUpperCase() + typeStr.slice(1),
@@ -1236,6 +1385,7 @@ function StructuralCanvas(): React.ReactElement {
         y: relY - size.height / 2,
         ...size,
       } as Omit<C4Node, 'id'>, {
+        skipWizard,
         onCreated: (id) => {
           const now = useDiagramStore.getState()
           const shown = viewShownNodes(now.activeViewId ? now.views[now.activeViewId] : undefined, now.c4Nodes, now.c4Relations)
@@ -1354,9 +1504,98 @@ function StructuralCanvas(): React.ReactElement {
   if (modifierHeld) canvasClasses.push('connect-ready')
   if (autoFitActive) canvasClasses.push('autofit-active')
 
-  // Annotate nodes: connecting-source class when in connect mode, focus-dim
-  // on the nodes a selection leaves out (canvasFocus.ts).
-  const annotatedNodes = connectSource || focus
+  // Where a relation from the element being connected may go: the one a
+  // line is drawn from, or the selected one while the connection key is
+  // held. Each target with the relation's type, as the metamodel allows and
+  // the view's filter draws it (connectTypes).
+  // An end of a relation dragged with the key held: where it can go, its
+  // other end staying (marked as the source).
+  const relink = relinking && modifierHeld && appMode === 'designer' ? relinking : null
+  const relinkRelation = relink ? useDiagramStore.getState().c4Relations[relink.relationId] : undefined
+  const connectFrom = relinkRelation
+    ? (relink!.end === 'target' ? relinkRelation.sourceId : relinkRelation.targetId)
+    : connectSource ?? (modifierHeld && appMode === 'designer' ? selectedNodeId : null)
+  const connectTargets = useMemo(() => {
+    if (!connectFrom) return null
+    const s = useDiagramStore.getState()
+    const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+    const metamodel = s.metamodel as Metamodel | undefined
+    const ctx = { nodes: s.c4Nodes, relations: s.c4Relations, metamodel: metamodel! }
+    const shown = rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+    // Each target's relation types, '' for a relation with no type.
+    const targets = new Map<string, Array<{ type: string; text: string }>>()
+    const put = (id: string, types: string[], ends: { from: string; to: string }): void => {
+      targets.set(id, types.length ? types.map((type) => ({ type, text: relationTypeName(metamodel, type, true, ends) })) : [{ type: '', text: 'relation' }])
+    }
+    const fixedType = s.c4Nodes[connectFrom]?.type ?? ''
+    if (relink && relinkRelation) {
+      // Where the end can move, the relation keeping its type: not onto
+      // the other end, nor where it is, nor where its type does not fit.
+      const moving = relink.end === 'target' ? relinkRelation.targetId : relinkRelation.sourceId
+      const kept = relinkRelation.relationType
+      const keep = (types: string[] | undefined): string[] | undefined =>
+        !types ? undefined : !kept ? types : types.includes(kept) ? [kept] : undefined
+      for (const id of shown.filter((id) => id !== moving)) {
+        const types = keep(relink.end === 'target'
+          ? connectTypes(view, connectFrom, [id], ctx).get(id)
+          : connectTypes(view, id, [connectFrom], ctx).get(connectFrom))
+        if (types) put(id, types, relink.end === 'target' ? { from: fixedType, to: s.c4Nodes[id].type } : { from: s.c4Nodes[id].type, to: fixedType })
+      }
+      return targets
+    }
+    // The elements it goes from: the selected ones where it is one of several.
+    const sources = connectSources(s, connectFrom).map((id) => s.c4Nodes[id]).filter(Boolean)
+    const fromSet = new Set(sources.map((n) => n.id))
+    // What fits every one of them.
+    const each = sources.map((n) => connectTypes(view, n.id, shown.filter((id) => !fromSet.has(id)), ctx))
+    for (const [id, types] of each[0] ?? new Map()) {
+      const common = types.filter((t) => each.every((m) => m.get(id)?.includes(t)))
+      if (each.every((m) => m.has(id)) && (common.length || !types.length)) put(id, common, { from: fixedType, to: s.c4Nodes[id].type })
+    }
+    // Nesting is the other way two elements belong together: "inside" where
+    // the elements may be placed (not where they are, nor in what they hold),
+    // and their container marked "holds" (a drop on the empty canvas takes
+    // them out).
+    for (const id of shown) {
+      const target = s.c4Nodes[id]
+      if (!target || fromSet.has(id)) continue
+      if (!sources.every((n) => id !== n.parentId && holderOf(s.c4Nodes, n, target) !== n && isPlacementAllowed(metamodel, n.type, target, s.c4Nodes))) continue
+      targets.set(id, [...(targets.get(id) ?? []), { type: NEST_INSIDE, text: 'inside' }])
+    }
+    const holder = sources[0]?.parentId
+    if (holder && shown.includes(holder) && sources.every((n) => n.parentId === holder)) targets.set(holder, [{ type: NEST_HOLDS, text: 'holds' }])
+    return targets
+  }, [connectFrom, rfNodes, relink, relinkRelation, selectedKey])
+  const connectTargetsRef = useRef(connectTargets)
+  connectTargetsRef.current = connectTargets
+
+  // While an end is dragged with the key held, the element under the
+  // pointer shows its panel of types (as connectOver does for a line).
+  useEffect(() => {
+    if (!relink) return
+    const onMove = (e: MouseEvent): void => {
+      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      if (under?.closest('.connect-pills')) return
+      setConnectOver(under?.closest('.react-flow__node')?.getAttribute('data-id') ?? null)
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => { window.removeEventListener('mousemove', onMove); setConnectOver(null) }
+  }, [relink])
+  const connectLabels = useMemo(() => connectTargets
+    ? new Map([...connectTargets].map(([id, types]) => [id, types.map((t) => t.text).join(' · ')]))
+    : null, [connectTargets])
+
+  // Annotate nodes: connecting-source class when in connect mode, the
+  // targets of a relation from it marked and the other elements dimmed,
+  // focus-dim on the nodes a selection leaves out (canvasFocus.ts).
+  const annotatedNodes = connectLabels
+    ? rfNodes.map((n) => {
+        if (n.id === connectFrom) return { ...n, className: (n.className ?? '') + ' connecting-source' }
+        const label = connectLabels.get(n.id)
+        if (label) return connectTarget(n, label)
+        return focusDimmed(n)
+      })
+    : connectSource || focus
     ? rfNodes.map((n) =>
         n.id === connectSource
           ? { ...n, className: (n.className ?? '') + ' connecting-source' }
@@ -1506,6 +1745,7 @@ function StructuralCanvas(): React.ReactElement {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
@@ -1513,6 +1753,7 @@ function StructuralCanvas(): React.ReactElement {
         onSelectionDrag={onSelectionDrag}
         onSelectionDragStop={onSelectionDragStop}
         onEdgeClick={onEdgeClick as any}
+        onEdgeDoubleClick={onEdgeDoubleClick as any}
         onPaneClick={onPaneClick}
         onInit={onInit}
         onMoveStart={onUserMoveStart}
@@ -1532,7 +1773,10 @@ function StructuralCanvas(): React.ReactElement {
         // container): React Flow's keyboard moves are off.
         deleteKeyCode={isViewMode || presentationActive ? null : 'Delete'}
         disableKeyboardA11y
-        multiSelectionKeyCode={connectionModifier === 'shift' ? 'Meta' : 'Shift'}
+        // The special key picks several: a click adds or takes out (the
+        // mouseup above), a drag over the empty canvas draws a box.
+        multiSelectionKeyCode={SPECIAL_KEY_CODE[connectionModifier]}
+        selectionKeyCode={SPECIAL_KEY_CODE[connectionModifier]}
         selectNodesOnDrag={false}
         elevateEdgesOnSelect
         elevateNodesOnSelect
@@ -1558,6 +1802,10 @@ function StructuralCanvas(): React.ReactElement {
           mouseX={connectMouse.x}
           mouseY={connectMouse.y}
         />
+      )}
+
+      {connectTargets && (
+        <ConnectPills containerRef={containerRef} targets={connectTargets} nameOf={(id) => useDiagramStore.getState().c4Nodes[id]?.label ?? id} />
       )}
 
       {connectSource && (
@@ -1675,7 +1923,7 @@ function RelationTypeMenu({ containerRef }: { containerRef: React.RefObject<HTML
               const i = items.indexOf(e.currentTarget)
               items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus()
             }}>
-            {def?.label ?? t}
+            {relationTypeName(metamodel, t, false, nodes[choice.sourceId] && nodes[choice.targetId] ? { from: nodes[choice.sourceId].type, to: nodes[choice.targetId].type } : undefined)}
           </button>
         )
       })}

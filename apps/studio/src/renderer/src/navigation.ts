@@ -124,10 +124,11 @@ export function pickViewFor(nodeId: string | readonly string[], activeViewId: st
 /** A model just opened (from a file, a folder, a list, a Hub link) shows
  *  its first view in model order, rather than All elements, the table of
  *  everything, which it landed on. All elements stays when it has no view,
- *  or when a view is shown already (the address named one). */
+ *  when it has no element (a new model: the table offers its + row), or
+ *  when a view is shown already (the address named one). */
 export function openFirstView(): void {
   const store = useDiagramStore.getState()
-  if (store.activeViewId) return
+  if (store.activeViewId || !Object.keys(store.c4Nodes).length) return
   const first = Object.values(store.views).find((v) => !isViewGroup(v, store.metamodel))
   if (first) store.setActiveView(first.id)
 }

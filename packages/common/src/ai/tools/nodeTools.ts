@@ -2,7 +2,7 @@
 
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
-import { checkNodeUpdate, checkReparent } from '../../model'
+import { checkNodeUpdate, checkReparent, relationsToNewHolders } from '../../model'
 import { fail, sequenceStepCount, stepsGone, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
@@ -183,8 +183,11 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
         metamodel: ctx.diagram.getMetamodel?.(),
       }, [realId], parentReal)
       if (refused) return fail(`move_node: ${refused}`)
+      // Its relations with what will hold it go with the move (reparentNodes).
+      const gone = relationsToNewHolders({ c4Nodes: nodes, c4Relations: ctx.diagram.getRelations() }, [realId], parentReal)
       ctx.diagram.moveNodes([realId], parentReal)
-      return { ok: true, resultText: `Moved node ${realId} to ${parentReal ?? 'the root'}.`, updated: { nodes: 1 } }
+      const goneText = gone.length ? ` Removed ${gone.length} relation${gone.length === 1 ? '' : 's'} to what now holds it (containment already joins them): ${gone.map((r) => r.id).join(', ')}.` : ''
+      return { ok: true, resultText: `Moved node ${realId} to ${parentReal ?? 'the root'}.${goneText}`, updated: { nodes: 1 }, ...(gone.length ? { deleted: { relations: gone.length } } : {}) }
     },
 
     delete_node: (rawInput, ctx) => {

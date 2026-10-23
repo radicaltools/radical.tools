@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { useShowRequest } from '../store/showInView'
+import { openCard, useShowRequest } from '../store/showInView'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { TYPE_LABELS, nodeTypeSize, type C4ElementType, type C4Node } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
@@ -79,7 +79,6 @@ interface ItemProps {
   selectedId: string | null
   renaming: { id: string; draft: string } | null
   onSelect: (id: string) => void
-  onRename: (id: string) => void
   onDraft: (draft: string) => void
   onCommit: () => void
   onCancel: () => void
@@ -126,7 +125,7 @@ function RepeatPopover({ node, onPick, onClose }: {
 }
 
 function Item(props: ItemProps): React.ReactElement {
-  const { item, selectedId, renaming, onSelect, onRename, onDraft, onCommit, onCancel, typeOf, edit } = props
+  const { item, selectedId, renaming, onSelect, onDraft, onCommit, onCancel, typeOf, edit } = props
   const { node } = item
   const type = typeOf(node.type)
   const operator = item.mode === 'sequence' ? null : OPERATORS[item.mode]
@@ -155,7 +154,8 @@ function Item(props: ItemProps): React.ReactElement {
           aria-label={`${type.label} ${name}`}
           data-node-id={node.id}
           onClick={(e) => { e.stopPropagation(); onSelect(node.id) }}
-          onDoubleClick={(e) => { e.stopPropagation(); onRename(node.id) }}
+          // A double-click opens its properties card; F2 renames it.
+          onDoubleClick={(e) => { e.stopPropagation(); onSelect(node.id); openCard() }}
         >
           <span className="wn-head">
             <span className="wn-type">{type.label}</span>
@@ -497,7 +497,6 @@ export function WarnierView(): React.ReactElement {
               selectedId={selectedId}
               renaming={renaming}
               onSelect={(id) => { if (renaming && renaming.id !== id) commitRename(); if (repeatOpen && repeatOpen !== id) setRepeatOpen(null); selectNode(id) }}
-              onRename={startRename}
               onDraft={(draft) => setRenaming((r) => (r ? { ...r, draft } : r))}
               onCommit={commitRename}
               onCancel={cancelRename}

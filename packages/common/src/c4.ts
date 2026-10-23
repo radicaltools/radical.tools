@@ -567,6 +567,9 @@ export interface C4EdgeRFData {
   label?: string
   technology?: string
   relationType?: string
+  /** How its type reads (relationTypeName, in lower case): what a relation
+   *  with no label shows on its line. */
+  typeName?: string
   isVirtual: boolean
   /** An arrow from a step to the next (warnier.ts, processFlow): no
    *  relation of the model, drawn dashed, never selected. */
@@ -719,6 +722,20 @@ export function wikiDepthOf(view: Pick<DiagramView, 'wikiDepth'> | null | undefi
   const d = view?.wikiDepth
   if (typeof d !== 'number' || !Number.isFinite(d)) return WIKI_DEPTH_MIN
   return Math.min(WIKI_DEPTH_MAX, Math.max(WIKI_DEPTH_MIN, Math.floor(d)))
+}
+
+/** Of `a` and `b`, the one that holds the other at any depth (a system and
+ *  a container in it), or undefined when neither does. */
+export function holderOf(nodes: Record<string, C4Node>, a: C4Node, b: C4Node): C4Node | undefined {
+  const holds = (outer: C4Node, inner: C4Node): boolean => {
+    const seen = new Set<string>()
+    for (let id = inner.parentId; id && !seen.has(id); id = nodes[id]?.parentId) {
+      if (id === outer.id) return true
+      seen.add(id)
+    }
+    return false
+  }
+  return holds(a, b) ? a : holds(b, a) ? b : undefined
 }
 
 /** Whether a view shows every node of the model: it lists none and was not

@@ -1,7 +1,7 @@
 ---
 id: "86fde16e-eb28-466b-af52-b8a3a67278eb"
 type: "scenario"
-label: "Shift-click adds selection"
+label: "Special-key click adds selection"
 given: "one element selected on the canvas"
 tests: |
   apps/e2e/tests/studio/alignment.spec.ts › a row on a canvas of the whole model holds through a drag, Smart Layout and a reload

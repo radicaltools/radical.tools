@@ -46,13 +46,17 @@ test.describe('bookstore views', () => {
     // A + row where an element can go: inside Bookstore and its containers, and at the top.
     await expect(page.getByRole('button', { name: 'Add under Bookstore' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add at the top' })).toBeVisible()
-    // Its name and its summary, by its type's template; a click on its row opens its attributes.
+    // Its name and its summary, by its type's template; a click on its row
+    // selects it, a double-click opens its attributes.
     await expect(page.locator('thead th')).toHaveText(['Name', 'Summary'])
     const provider = rows.filter({ hasText: 'Payment Provider' })
     await expect(provider).toContainText('Card payments')
     await provider.click()
+    await expect(provider).toHaveClass(/tv-row-selected/)
+    await expect(studio.properties).toHaveCount(0)
+    await provider.dblclick()
     await expect(studio.attribute('Name')).toHaveValue('Payment Provider')
-    // One click does not rename it: a double-click does (next test).
+    // Neither renames it: F2 does (next test).
     await expect(page.locator('.tv-cell-input')).toHaveCount(0)
     // A C4 type has no wizard.
     await expect(studio.properties.getByRole('button', { name: 'Wizard', exact: true })).toHaveCount(0)
@@ -64,7 +68,8 @@ test.describe('bookstore views', () => {
 
   test('a name is renamed in place in the table', async ({ page, studio }) => {
     await studio.open('v-table')
-    await page.locator('tr[data-node-id="payments"] .tv-chain-cell').dblclick()
+    await page.locator('tr[data-node-id="payments"] .tv-chain-cell').click()
+    await page.keyboard.press('F2')
     const input = page.locator('tr[data-node-id="payments"] input.tv-cell-input')
     await input.fill('Card Gateway')
     await input.press('Enter')
@@ -225,7 +230,7 @@ test.describe('perspectives', () => {
     await studio.open('v-containers', 'viewer')
     await expect(page.getByRole('button', { name: 'Viewer', exact: true })).toBeVisible()
     await expect(page.locator('.palette-item')).toHaveCount(0)
-    await studio.node('api').click()
+    await studio.node('api').dblclick()
     await studio.advance(500)
     // The name is text, and no attribute takes typing.
     await expect(studio.properties.locator('.pp-title')).toHaveText('API')
@@ -415,4 +420,35 @@ test('blank views are named View 1, View 2…', async ({ page, studio }) => {
     await expect(page.locator('.lp-view-card', { hasText: name })).toHaveCount(1)
     await page.locator('.left-panel .rp-back-btn').click()
   }
+})
+
+test("a line dropped on a pill over the target makes a relation of that type", async ({ page, studio }) => {
+  await studio.openSample('view-domain-map')
+  const center = async (label: string) => {
+    const box = (await studio.nodeByLabel(label).boundingBox())!
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  }
+  const from = await center('Payments')
+  const to = await center('Customers')
+  // Payments: only the other domains take a relation, as the chain draws them.
+  await studio.nodeByLabel('Payments').click()
+  await page.keyboard.down('Alt')
+  await expect(page.locator('.react-flow__node.connect-target')).toHaveCount(3)
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(to.x, to.y, { steps: 8 })
+  const fields = page.getByRole('group', { name: 'Drop on Customers' }).locator('.connect-pill')
+  // Its relation types, and "inside": a domain may also go into another.
+  await expect(fields).toHaveText(['depends on', 'partners with', 'inside'])
+  const field = (await fields.nth(1).boundingBox())!
+  await page.mouse.move(field.x + field.width / 2, field.y + field.height / 2, { steps: 3 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  // No question: the field said which.
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await studio.advance(1000)
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc(studio.activeDocId())
+    return doc.relations.some((r) => r.sourceId === 'f89f2316-42e0-4de0-875f-ad1a489f3090' && r.targetId === 'ded61f2f-567d-4a14-9b18-d81c6dda6ffd' && (r as { relationType?: string }).relationType === 'partnership')
+  }).toBe(true)
 })

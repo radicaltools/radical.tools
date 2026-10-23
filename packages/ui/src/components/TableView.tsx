@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
-import { useShowRequest } from '../store/showInView'
+import { openCard, useShowRequest } from '../store/showInView'
 import type { C4Node, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
-import { addChoices, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
-import { WikiMenu, type WikiMenuPage } from './WikiMenu'
+import { addChoices, linkCandidates, pipelineActive, pipelineOf, structureRows, viewShownNodes, type AddChoice, type ChainRow, type PipelineContext } from '@radical/common/viewPipeline'
+import { typeNoun } from '@radical/common/metamodel'
+import { AddPicker, type PickerWay } from './AddPicker'
 import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
 import { MarkdownText } from './MarkdownText'
 
@@ -122,9 +123,10 @@ export function TableView(): React.ReactElement {
   const metamodel        = useDiagramStore((s) => s.metamodel)
   const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
+  const addRelation      = useDiagramStore((s) => s.addRelation)
 
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
-  const [addMenu, setAddMenu] = useState<{ at: { x: number; y: number }; root: WikiMenuPage } | null>(null)
+  const [picker, setPicker] = useState<{ at: { x: number; y: number }; under: C4Node | null; ways: PickerWay[] } | null>(null)
 
   // The rows: the chain's tree; without a chain, the containment of what
   // the steps give (flat in their order when they set one).
@@ -218,11 +220,11 @@ export function TableView(): React.ReactElement {
     c.hidden ? "the filter won't show it" : '',
   ].filter(Boolean).join(' · ')
 
-  // A new element, named "New <type>" with its name open to be written
-  // (a type with a wizard opens it instead), and the row it went under
-  // unfolded.
-  const add = (choice: AddChoice, underPath?: string) => {
-    const label = `New ${typeName(choice.type)}`
+  // A new element, named `name`, or "New <type>" with its name open to be
+  // written (a type with a wizard opens it instead), and the row it went
+  // under unfolded.
+  const add = (choice: AddChoice, underPath?: string, name = '') => {
+    const label = name || `New ${typeName(choice.type)}`
     if (underPath) setFoldedRows((prev) => { const next = new Set(prev); next.delete(underPath); return next })
     const id = requestCreateNode({
       type: choice.type as C4ElementType,
@@ -246,29 +248,48 @@ export function TableView(): React.ReactElement {
         if (shown && !shown.has(created)) pushNotification(`${s.c4Nodes[created]?.label ?? label} was added, but this view's filter does not show it.`, 'warning')
       },
     })
-    if (id) setEditCell({ rowId: id, draft: label, initial: label })
+    if (id && !name) setEditCell({ rowId: id, draft: label, initial: label })
   }
 
-  // One choice is added at once; several open the menu of them.
+  // An element the model has already, linked under the row the way the
+  // choice hangs there: the link only, the element stays where it is.
+  const linkExisting = (choice: AddChoice, nodeId: string, underPath?: string) => {
+    const link = choice.link!
+    if (underPath) setFoldedRows((prev) => { const next = new Set(prev); next.delete(underPath); return next })
+    const [sourceId, targetId] = link.direction === 'out' ? [nodeId, link.otherId] : [link.otherId, nodeId]
+    addRelation({ sourceId, targetId, relationType: link.relationType })
+    const s = useDiagramStore.getState()
+    const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+    const shown = viewShownNodes(view, s.c4Nodes, s.c4Relations)
+    if (shown && !shown.has(nodeId)) pushNotification(`${s.c4Nodes[nodeId]?.label ?? nodeId} was linked, but this view's filter does not show it.`, 'warning')
+    selectNode(nodeId)
+  }
+
+  // One choice with nothing to link is added at once; otherwise the picker
+  // offers each type, a new one by name or one the model has, linked.
   const onAdd = (e: React.MouseEvent, choices: AddChoice[], under?: ChainRow) => {
     e.stopPropagation()
-    if (choices.length === 1) { add(choices[0], under?.path); return }
+    // Those the level's filters let through, so that the table shows them.
+    const filters = pipeline?.levels?.[under ? under.depth + 1 : 0]?.filters
+    const existing = choices.map((c) => linkCandidates(c.type, c.link, pipelineCtx, filters))
+    if (choices.length === 1 && !existing[0].length) { add(choices[0], under?.path); return }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setAddMenu({
+    setPicker({
       at: { x: rect.left, y: rect.bottom + 4 },
-      root: {
-        items: choices.map((c) => ({
-          id: `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`,
-          label: typeName(c.type),
-          color: NODE_COLORS[c.type as C4ElementType] ?? metamodel.nodeTypes[c.type]?.color,
-          hint: choiceHint(c, under) || undefined,
-          group: c.group === 'Add' ? undefined : c.group,
-          onSelect: () => add(c, under?.path),
-        })),
-        emptyHint: under ? `Nothing can be added under ${under.node.label}` : 'Nothing can be added here',
-      },
+      under: under?.node ?? null,
+      ways: choices.map((c, i) => ({
+        key: `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`,
+        label: typeName(c.type),
+        caption: c.group === 'Add' ? undefined : c.group.toLowerCase(),
+        kind: 'child' as const,
+        create: { noun: typeNoun(typeName(c.type)), hint: choiceHint(c, under) || undefined, run: (name: string) => add(c, under?.path, name) },
+        linkable: !!c.link,
+        candidates: existing[i],
+        link: (nodeId: string) => linkExisting(c, nodeId, under?.path),
+      })),
     })
   }
+
 
   const commitEdit = useCallback(() => {
     if (!editCell) return
@@ -290,11 +311,12 @@ export function TableView(): React.ReactElement {
     setEditCell({ rowId, draft: current, initial: current })
   }, [readOnly])
 
-  // A click on a row shows the element's attributes in the properties card
-  // (brought back if ✕ hid it); a double-click on its name renames it here.
+  // A click on a row selects the element; a double-click shows its
+  // attributes in the properties card (brought back if ✕ hid it); F2 or
+  // Enter on the row renames it here.
   const openProperties = (id: string) => {
     selectNode(id)
-    ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
+    openCard()
   }
 
   // Read only: it is made of several fields, edited in the properties panel or the wizard.
@@ -340,8 +362,7 @@ export function TableView(): React.ReactElement {
     return (
       <span
         className="tv-cell-value tv-chain-cell"
-        onDoubleClick={(e) => { e.stopPropagation(); startEdit(node.id, rawVal) }}
-        title={readOnly ? rawVal : `${rawVal ? `${rawVal} · ` : ''}Double-click to rename`}
+        title={readOnly ? rawVal : `${rawVal ? `${rawVal} · ` : ''}F2 to rename`}
       >
         {Array.from({ length: row.depth }, (_, i) => <span key={i} className="tv-tree-guide" aria-hidden />)}
         {row.hasChildren ? (
@@ -354,7 +375,7 @@ export function TableView(): React.ReactElement {
         <span className="tv-chain-type" style={{ background: NODE_COLORS[node.type] ?? metamodel.nodeTypes[node.type]?.color ?? '#555', color: NODE_FG[node.type] ?? '#fff' }}>
           {metamodel.nodeTypes[node.type]?.label ?? TYPE_LABELS[node.type] ?? node.type}
         </span>
-        {rawVal || <span className="tv-cell-placeholder">{readOnly ? '—' : 'Double-click to name…'}</span>}
+        {rawVal || <span className="tv-cell-placeholder">{readOnly ? '—' : 'F2 to name…'}</span>}
         {row.alsoIn > 0 && (
           <span className="tv-also-in" title={`Also under ${row.alsoIn} other element${row.alsoIn === 1 ? '' : 's'}`}>+{row.alsoIn}</span>
         )}
@@ -382,9 +403,10 @@ export function TableView(): React.ReactElement {
                 data-node-id={line.row.node.id}
                 className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}`}
                 tabIndex={-1}
-                onClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}
-                // Enter on the row (where a rename leaves the keyboard) renames it again.
-                onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); startEdit(line.row.node.id, line.row.node.label) } }}
+                onClick={(e) => { e.stopPropagation(); selectNode(line.row.node.id) }}
+                onDoubleClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}
+                // F2, or Enter (where a rename leaves the keyboard), renames it.
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === 'F2') && e.target === e.currentTarget) { e.preventDefault(); startEdit(line.row.node.id, line.row.node.label) } }}
               >
                 <td className="tv-td">{renderName(line.row)}</td>
                 <td className="tv-td">{renderSummary(line.row.node)}</td>
@@ -415,10 +437,16 @@ export function TableView(): React.ReactElement {
           </tbody>
         </table>
       </div>
-      {/* A choice in the menu opens the new row's name: its click must not reach the table, which closes it. */}
-      {addMenu && (
+      {/* A choice in the picker opens the new row's name: its click must not reach the table, which closes it. */}
+      {picker && (
         <div onClick={(e) => e.stopPropagation()}>
-          <WikiMenu at={addMenu.at} root={addMenu.root} onClose={() => setAddMenu(null)} />
+          <AddPicker
+            at={picker.at}
+            under={picker.under}
+            ways={picker.ways}
+            typeLabel={typeName}
+            onClose={() => setPicker(null)}
+          />
         </div>
       )}
     </div>

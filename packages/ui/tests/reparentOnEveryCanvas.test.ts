@@ -177,13 +177,13 @@ const violations = (): string[] => {
 describe('Move to… a container', () => {
   beforeEach(() => s().loadDiagram(roots()))
 
-  it('places what lies outside it inside, beside what it holds, and makes room for it', () => {
-    const b = abs('b')
+  it('places what lies outside it inside, in the next cell of the grid of what it holds, and makes room for it', () => {
     s().reparentNodes(['loose'], 'a', { quiet: true })
     expect(violations()).toEqual([])
-    // A grew to the right, over where B stood: B moved out of its way.
-    expect(abs('b').x).toBeGreaterThan(b.x)
-    expect(abs('b').y).toBe(b.y)
+    // A1 and A2 fill a row: the grid, wider than tall, goes on under A1.
+    const n = s().c4Nodes
+    expect(n.loose.x).toBe(n.a1.x)
+    expect(n.loose.y).toBeGreaterThanOrEqual(n.a1.y + n.a1.height)
   })
 
   it('does so on the other canvases too', () => {

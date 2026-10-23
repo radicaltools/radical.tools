@@ -7,6 +7,7 @@ import {
   relationDetails,
   relationPhrase,
   relationSentences,
+  relationTypeName,
   typeNoun,
 } from '../src/metamodel/index'
 import type { C4Node, C4Relation } from '../src/c4'
@@ -136,5 +137,31 @@ describe('firstParagraph', () => {
   it('stops at the first blank line', () => {
     expect(firstParagraph('  One line\nstill one.\n\nSecond.')).toBe('One line\nstill one.')
     expect(firstParagraph(undefined)).toBe('')
+  })
+})
+
+describe('relationTypeName', () => {
+  it('names a type by how it reads from its source, its name else, the id for one the metamodel lacks', () => {
+    expect(relationTypeName(mm, 'interacts')).toBe('Uses')
+    expect(relationTypeName(mm, 'partnership')).toBe('Partners with')
+    expect(relationTypeName(mm, 'part-of')).toBe('Part of')
+    expect(relationTypeName(mm, 'interacts', true)).toBe('uses')
+    expect(relationTypeName(mm, 'no-such-type')).toBe('no-such-type')
+    expect(relationTypeName(undefined, 'interacts')).toBe('interacts')
+  })
+
+  it('reads a pair the metamodel gives its own reading by it, in sentences too', () => {
+    expect(relationTypeName(mm, 'interacts', false, { from: 'system', to: 'system' })).toBe('Uses')
+    expect(relationTypeName(mm, 'interacts', false, { from: 'system', to: 'person' })).toBe('Delivers to')
+    expect(relationPhrase(mm.relationTypes.interacts, 'in', { from: 'system', to: 'person' }).text).toBe('Receives from')
+    expect(relationPhrase(mm.relationTypes.interacts, 'in', { from: 'person', to: 'system' }).text).toBe('Used by')
+    // A person who uses the shop and gets its e-mails: two sentences.
+    const nodes = Object.fromEntries([node('c', 'person', 'Customer'), node('shop', 'system', 'Shop'), node('mail', 'system', 'Mailer')].map((n) => [n.id, n]))
+    const relations = [
+      { id: 'r1', sourceId: 'c', targetId: 'shop', relationType: 'interacts' },
+      { id: 'r2', sourceId: 'mail', targetId: 'c', relationType: 'interacts' },
+    ] as C4Relation[]
+    expect(relationSentences('c', relations, nodes, mm).map((s) => [s.direction, s.phrase.text, s.relations.map((r) => r.id)]))
+      .toEqual([['out', 'Uses', ['r1']], ['in', 'Receives from', ['r2']]])
   })
 })

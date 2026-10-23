@@ -2,13 +2,15 @@
 // Models dialog so both create and open models the same way. Styled with the
 // theme variables (.msteps-*); the welcome card pins them to its light look.
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { documents, StorageFullError, type DocumentMeta } from '../store/documentStore'
 import { buildFintechSampleRaw } from '../store/fintechSample'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { formatRoute, openInDesigner } from '../route'
 import { openFirstView } from '../navigation'
 import { availableMetamodels } from '@radical/common/metamodel'
+import { radicalViewpoints } from '@radical/common/ai/forge'
+import { metamodelViews } from '@radical/common/viewStructure'
 import { parseStructurizrDsl } from '@radical/common/formats/structurizrDsl'
 import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
@@ -184,16 +186,29 @@ export function ModelRow({ doc, onOpen, autoFocus }: {
 
 // ─── New model ───────────────────────────────────────────────────────────────
 
-/** Metamodel and storage for a new model, then Create (or Radical Forge once
- *  AI is set up). `onDone` runs once the model is open. */
+/** Metamodel, its views and storage for a new model, then Create (or
+ *  Radical Forge once AI is set up). `onDone` runs once the model is open. */
 export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactElement {
   const presets = availableMetamodels()
   const [presetId, setPresetId] = useState('c4-ddd-governance-builtin')
   const preset = presets.find(p => p.id === presetId) ?? presets[0]
+  const metamodel = useMemo(() => preset.build(), [preset])
+  // The metamodel's views: the Radical structure of a Forge run, made at
+  // once (viewStructure.ts). The list follows the metamodel picked.
+  const viewpointChoices = useMemo(() => radicalViewpoints(metamodel), [metamodel])
+  const [withViews, setWithViews] = useState(true)
+  const [chosenViewpoints, setChosenViewpoints] = useState<string[]>(() => viewpointChoices.filter(c => c.chosen).map(c => c.id))
+  const [customising, setCustomising] = useState(false)
   const [storage, setStorage] = useState<Storage>(loadStorageChoice)
   // Forge needs a model to talk to, so it shows only once AI is set up
   // (logo menu → AI providers…).
   const [forgeAvailable] = useState(() => aiReady(loadAISettings()))
+
+  function choosePreset(id: string): void {
+    setPresetId(id)
+    const next = presets.find(p => p.id === id) ?? presets[0]
+    setChosenViewpoints(radicalViewpoints(next.build()).filter(c => c.chosen).map(c => c.id))
+  }
 
   function chooseStorage(next: Storage): void {
     setStorage(next)
@@ -203,7 +218,8 @@ export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactEle
   /** An empty model where the user chose to keep it. False when the pick was
    *  cancelled or the model could not be stored. */
   async function createBlank(): Promise<boolean> {
-    const data: DiagramData = { nodes: [], relations: [], metamodel: preset.build() }
+    const views = withViews ? metamodelViews(metamodel, chosenViewpoints) : []
+    const data: DiagramData = { nodes: [], relations: [], metamodel, ...(views.length ? { views } : {}) }
     try {
       if (storage === 'folder') return !!(await documents.createFolderDocument(data, confirmForeignFolder))
       if (storage === 'file') return !!(await documents.createFileDocument(data, 'Untitled model'))
@@ -230,12 +246,58 @@ export function NewModelStep({ onDone }: { onDone: () => void }): React.ReactEle
         <select
           className="msteps-select"
           value={preset.id}
-          onChange={e => setPresetId(e.target.value)}
+          onChange={e => choosePreset(e.target.value)}
           title={preset.description}
         >
           {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </label>
+
+      {viewpointChoices.length > 0 && (
+        <div className="msteps-options" role="radiogroup" aria-label="Views">
+          <p className="msteps-label">Views</p>
+          <label className={`msteps-option${withViews ? ' selected' : ''}`}>
+            <input type="radio" name="msteps-views" checked={withViews} onChange={() => setWithViews(true)} />
+            <span className="msteps-option-name">Views of the metamodel</span>
+            <span className="msteps-option-desc">
+              All elements as a structure, and {chosenViewpoints.length} views in {[...new Set(viewpointChoices.filter(c => chosenViewpoints.includes(c.id)).map(c => c.folder.split('/')[0]))].join(', ') || 'no folder'}, one per viewpoint; empty until elements arrive.
+            </span>
+          </label>
+          {withViews && (
+            <div className="msteps-viewpoints">
+              <button type="button" className="msteps-link" aria-expanded={customising} onClick={() => setCustomising(c => !c)}>
+                {customising ? 'Hide the viewpoints' : `Customise… (${chosenViewpoints.length} of ${viewpointChoices.length} viewpoints)`}
+              </button>
+              {customising && (
+                <div className="msteps-viewpoint-list">
+                  {[...new Set(viewpointChoices.map(c => c.folder))].map(folder => (
+                    <div key={folder} className="msteps-viewpoint-folder" role="group" aria-label={folder}>
+                      <div className="msteps-viewpoint-folder-name">{folder}</div>
+                      {viewpointChoices.filter(c => c.folder === folder).map(c => (
+                        <label key={c.id} className="msteps-viewpoint">
+                          <input
+                            type="checkbox"
+                            checked={chosenViewpoints.includes(c.id)}
+                            onChange={e => setChosenViewpoints(v => (e.target.checked
+                              ? viewpointChoices.map(x => x.id).filter(id => id === c.id || v.includes(id))
+                              : v.filter(id => id !== c.id)))}
+                          />
+                          {c.label}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <label className={`msteps-option${withViews ? '' : ' selected'}`}>
+            <input type="radio" name="msteps-views" checked={!withViews} onChange={() => setWithViews(false)} />
+            <span className="msteps-option-name">Empty</span>
+            <span className="msteps-option-desc">No views yet: All elements only. Add views with New view.</span>
+          </label>
+        </div>
+      )}
 
       {STORAGE_OPTIONS.length > 1 && (
         <div className="msteps-options" role="radiogroup" aria-label="Storage">

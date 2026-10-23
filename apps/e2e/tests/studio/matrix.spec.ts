@@ -13,7 +13,7 @@ test.describe('the bookstore matrix', () => {
     // The matrix removed a relation on a click when it was the one selected,
     // also when it had been selected on a canvas before the matrix opened.
     await studio.open('v-containers')
-    await page.getByTestId('rf__edge-r2').locator('path').first().click({ force: true })
+    await page.getByTestId('rf__edge-r2').locator('path').first().dblclick({ force: true })
     await expect(studio.properties.locator('.pp-type')).toHaveText(/relation/i)
     await page.locator('.lp-view-card', { hasText: 'Matrix' }).click()
     const cell = page.locator('.mx-cell.mx-has-rel[title*="calls"]')
@@ -68,10 +68,10 @@ test('an empty cell where several relation types fit asks which', async ({ page,
   await studio.open('v-matrix')
   await page.locator('.mx-cell[title="Create relation: Ordering → Billing"]').click()
   const popup = page.locator('.mx-popup')
-  await expect(popup.getByRole('button')).toHaveText(['Depends on', 'Partnership'])
+  await expect(popup.getByRole('button')).toHaveText(['Depends on', 'Partners with'])
   await page.waitForTimeout(300)
   expect((await studio.storedDoc()).relations).toEqual([])
-  await popup.getByRole('button', { name: 'Partnership' }).click()
+  await popup.getByRole('button', { name: 'Partners with' }).click()
   await expect.poll(async () => ((await studio.storedDoc()).relations as Array<{ sourceId: string; targetId: string; relationType?: string }>).map((r) => [r.sourceId, r.targetId, r.relationType]))
     .toEqual([['d1', 'd2', 'partnership']])
 })

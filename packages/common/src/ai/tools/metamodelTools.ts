@@ -89,10 +89,10 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           color: { type: 'string' },
           allowedPairs: {
             type: 'array',
-            description: 'The complete list of allowed source → target node-type pairs. [] allows any pair.',
+            description: 'The complete list of allowed source → target node-type pairs. [] allows any pair. A pair may read its own way: forwardLabel ("Delivers to" for Interacts to a person) and inverseLabel ("Receives from").',
             items: {
               type: 'object',
-              properties: { from: { type: 'string' }, to: { type: 'string' } },
+              properties: { from: { type: 'string' }, to: { type: 'string' }, forwardLabel: { type: 'string' }, inverseLabel: { type: 'string' } },
               required: ['from', 'to'],
               additionalProperties: false,
             },
@@ -298,10 +298,12 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       if (input.allowedPairs !== undefined) {
         if (!Array.isArray(input.allowedPairs)) return fail('upsert_relation_type: allowedPairs must be an array')
         pairs = []
-        for (const pair of input.allowedPairs as Array<{ from?: unknown; to?: unknown }>) {
+        for (const pair of input.allowedPairs as Array<{ from?: unknown; to?: unknown; forwardLabel?: unknown; inverseLabel?: unknown }>) {
           if (typeof pair?.from !== 'string' || !current.nodeTypes[pair.from]) return fail(`upsert_relation_type: unknown source type "${String(pair?.from)}"`)
           if (typeof pair.to !== 'string' || !current.nodeTypes[pair.to]) return fail(`upsert_relation_type: unknown target type "${String(pair.to)}"`)
-          pairs.push({ from: pair.from, to: pair.to })
+          const reads = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+          const forwardLabel = reads(pair.forwardLabel), inverseLabel = reads(pair.inverseLabel)
+          pairs.push({ from: pair.from, to: pair.to, ...(forwardLabel ? { forwardLabel } : {}), ...(inverseLabel ? { inverseLabel } : {}) })
         }
       }
       const properties = input.properties === undefined ? undefined : parseProperties('upsert_relation_type', input.properties, 'relation')

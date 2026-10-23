@@ -27,7 +27,7 @@ const apart = (a: Box, b: Box): boolean =>
 
 /** Selects an element by its corner: a relation's line can run across
  *  its middle once the exploration is laid out in layers. */
-const pick = (node: Locator): Promise<void> => node.click({ position: { x: 8, y: 8 } })
+const pick = (node: Locator): Promise<void> => node.dblclick({ position: { x: 8, y: 8 } })
 
 /** The canvas camera's zoom. */
 async function zoomOf(page: Page): Promise<number> {
@@ -98,7 +98,7 @@ test('Explore from here grows level by level from each +', async ({ page, studio
   await studio.seed()
   await studio.open('v-containers')
   const stored = await studio.storedJson()
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
 
   // A view of API alone, no Bookstore frame, listed first, named after it.
@@ -171,7 +171,7 @@ test('the + of an element adds the relations of the types and direction chosen',
   await studio.seed()
   await studio.open('v-containers')
   const stored = await studio.storedJson()
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
 
   // The menu: Show all, then what goes out from API and what comes in,
@@ -237,7 +237,7 @@ test('the + of an element adds the relations of the types and direction chosen',
 test('an exploration is saved as a view, and dropped when closed', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   // Its relations (not its parent).
   const menu = await plus(page, 'API')
@@ -310,7 +310,7 @@ test('an exploration is saved as a view, and dropped when closed', async ({ page
 test('a saved exploration stays an explore view, grown in Designer and only looked at in Viewer', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   // API's relations: Web App, Orders DB and Payment Provider below it.
   const menu = await plus(page, 'API')
@@ -406,7 +406,7 @@ test('Explore from here in Viewer follows the milestone shown and saves nothing'
   await studio.settle()
 
   // In v1 the API gateway serves the web app, accounts and auth only.
-  await studio.node('ctn-apigw').click()
+  await studio.node('ctn-apigw').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(page.locator('.explore-bar')).toContainText('Explore: API Gateway')
   await expect(page.locator('.explore-bar').getByRole('button', { name: 'Save as view…' })).toHaveCount(0)
@@ -455,7 +455,7 @@ test('a click on an element\'s + opens its menu even where a relation\'s line li
   // the elements, lay over its +: a click there selected the relation.
   await studio.seed()
   await studio.open('v-containers')
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await all(page, 'API')
   await studio.settle()

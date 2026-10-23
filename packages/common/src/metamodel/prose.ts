@@ -19,13 +19,31 @@ export interface RelationPhrase {
   reads: boolean
 }
 
+/** The types of a relation's two ends: its pair. */
+export interface RelationEnds { from: string; to: string }
+
 /** How relations of one type read from the element at the `direction` end:
- *  "Constrains" from the source, "Constrained by" from the target. */
-export function relationPhrase(def: RelationTypeDef | undefined, direction: RelationDirection): RelationPhrase {
+ *  "Constrains" from the source, "Constrained by" from the target. With
+ *  the types of its two ends, the reading the metamodel gives that pair
+ *  where it has one of its own ("Delivers to" for Interacts to a person). */
+export function relationPhrase(def: RelationTypeDef | undefined, direction: RelationDirection, ends?: RelationEnds): RelationPhrase {
   if (!def) return { text: direction === 'out' ? 'Relates to' : 'Linked from', reads: true }
-  if (direction === 'out') return { text: def.forwardLabel?.trim() || def.label, reads: true }
-  const inverse = def.inverseLabel?.trim()
+  const pair = ends ? def.allowedPairs.find((p) => p.from === ends.from && p.to === ends.to) : undefined
+  if (direction === 'out') return { text: pair?.forwardLabel?.trim() || def.forwardLabel?.trim() || def.label, reads: true }
+  const inverse = pair?.inverseLabel?.trim() || def.inverseLabel?.trim()
   return inverse ? { text: inverse, reads: true } : { text: def.label, reads: false }
+}
+
+/** How a relation of type `typeId` reads from its source ("Uses",
+ *  "Partners with"), for the pair `ends` where given (relationPhrase): its
+ *  forward label, else its name; the id for a type the metamodel does not
+ *  have. The one name a relation's type goes by wherever
+ *  a relation is shown or made: on its line, in menus and in the card.
+ *  `lower` starts it in lower case, inside a sentence or on the canvas. */
+export function relationTypeName(metamodel: Metamodel | null | undefined, typeId: string, lower = false, ends?: RelationEnds): string {
+  const def = metamodel?.relationTypes[typeId]
+  const text = def ? relationPhrase(def, 'out', ends).text : typeId
+  return lower ? text.charAt(0).toLowerCase() + text.slice(1) : text
 }
 
 export interface RelationSentence {
@@ -67,21 +85,25 @@ export function relationSentences(
   }
   const sentences: RelationSentence[] = []
   for (const direction of ['out', 'in'] as const) {
-    const byType = new Map<string | undefined, C4Relation[]>()
+    // One sentence per type and reading: a pair may read its own way.
+    const byReading = new Map<string, { typeId: string | undefined; phrase: RelationPhrase; relations: C4Relation[] }>()
     for (const r of relations) {
       if ((direction === 'out' ? r.sourceId : r.targetId) !== nodeId) continue
       const typeId = relationTypeForProse(r, nodes, metamodel)
-      const list = byType.get(typeId) ?? []
-      list.push(r)
-      byType.set(typeId, list)
+      const source = nodes[r.sourceId], target = nodes[r.targetId]
+      const phrase = relationPhrase(typeId ? metamodel?.relationTypes[typeId] : undefined, direction, source && target ? { from: source.type, to: target.type } : undefined)
+      const key = `${typeId ?? ''}\u0000${phrase.text}`
+      const entry = byReading.get(key) ?? { typeId, phrase, relations: [] }
+      entry.relations.push(r)
+      byReading.set(key, entry)
     }
     const otherLabel = (r: C4Relation): string => nodes[direction === 'out' ? r.targetId : r.sourceId]?.label ?? ''
-    for (const typeId of [...byType.keys()].sort((a, b) => rank(a) - rank(b))) {
+    for (const entry of [...byReading.values()].sort((a, b) => rank(a.typeId) - rank(b.typeId) || a.phrase.text.localeCompare(b.phrase.text))) {
       sentences.push({
         direction,
-        typeId,
-        phrase: relationPhrase(typeId ? metamodel?.relationTypes[typeId] : undefined, direction),
-        relations: byType.get(typeId)!.sort((a, b) => otherLabel(a).localeCompare(otherLabel(b))),
+        typeId: entry.typeId,
+        phrase: entry.phrase,
+        relations: entry.relations.sort((a, b) => otherLabel(a).localeCompare(otherLabel(b))),
       })
     }
   }

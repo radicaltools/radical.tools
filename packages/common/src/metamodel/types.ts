@@ -135,6 +135,12 @@ export interface RelationPair {
   /** Optional cardinality on this pair. */
   min?: number
   max?: number
+  /** How a relation of this pair reads from its source, where it differs
+   *  from the type's forwardLabel ("Delivers to" for Interacts to a person). */
+  forwardLabel?: string
+  /** How it reads from its target, where it differs from the type's
+   *  inverseLabel ("Receives from"). */
+  inverseLabel?: string
 }
 
 export interface RelationTypeDef {

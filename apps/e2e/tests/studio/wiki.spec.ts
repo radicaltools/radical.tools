@@ -1,4 +1,5 @@
 import { test, expect, fixture } from '../../support/fixtures'
+import { addPicker } from '../../support/addPicker'
 import { ModelFolder, test as folderTest } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 
@@ -72,15 +73,17 @@ test.describe('wiki', () => {
     await expect(page.getByRole('heading', { name: 'Not used here' })).toBeVisible()
   })
 
-  test('the element menu adds a relationship in two steps, edits one and opens the facts', async ({ page, studio }) => {
+  test('the element menu adds a relationship in the picker, edits one and opens the facts', async ({ page, studio }) => {
     const doc = studio.activeDocId()
     await studio.open('view-wiki/f/ctn-payments', 'designer', doc)
 
     // How it reads from this element, then the element it names.
     await page.getByRole('button', { name: 'Edit Payments Service' }).click()
-    await page.getByRole('menuitem', { name: 'Add relationship' }).click()
-    await page.getByRole('menuitem', { name: 'Uses…' }).click()
-    await page.getByRole('menuitem', { name: 'Accounts Service' }).click()
+    await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+    const picker = addPicker(page, 'Payments Service')
+    await picker.choose('uses…')
+    await picker.field().fill('accounts')
+    await picker.option(/Accounts Service/).click()
     await expect(page.locator('.wiki-relations')).toContainText('Uses Accounts Service')
     await expect.poll(async () => {
       const saved = await studio.storedDoc(doc) as unknown as {
@@ -258,6 +261,82 @@ test.describe('writing in the wiki', () => {
   })
 })
 
+test('a wiki with a filter offers only the types its chain shows', async ({ page, studio }) => {
+  // The chain of the viewpoint Specification: needs, the requirements
+  // derived from them, their scenarios and mockups.
+  await studio.seedDocument(JSON.stringify({
+    nodes: [],
+    relations: [],
+    views: [{
+      id: 'v-spec', kind: 'wiki', name: 'Specification', nodeIds: [], positions: {},
+      pipeline: { levels: [
+        { ways: [{ types: ['need'] }] },
+        { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+        { ways: [{ via: { relationType: 'verifies', direction: 'in' }, types: ['scenario'] }, { via: { relationType: 'illustrates', direction: 'in' }, types: ['mockup'] }] },
+      ] },
+    }],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  await studio.open('v-spec')
+  const start = page.locator('.wiki-write-start')
+  await expect(start.getByRole('button', { name: 'Needs', exact: true })).toBeVisible()
+  await expect(start.getByRole('button', { name: 'Software systems', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Add element' }).click()
+  await expect(page.locator('.wiki-add-item', { hasText: /^Need$/ })).toBeVisible()
+  await expect(page.locator('.wiki-add-item', { hasText: /^Software System$/ })).toHaveCount(0)
+  await expect(page.locator('.wiki-add-item', { hasText: /^Group$/ })).toHaveCount(0)
+})
+
+// Needs, and a requirement derived from Audit, in a view of the chain
+// needs → requirements.
+const linkingModel = (view: Record<string, unknown>) => JSON.stringify({
+  nodes: [
+    { id: 'n-pay', type: 'need', label: 'Pay by card', kind: 'brief', x: 0, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'n-audit', type: 'need', label: 'Audit', kind: 'brief', x: 300, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'n-refunds', type: 'need', label: 'Refunds', kind: 'brief', x: 600, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'r-trail', type: 'requirement', label: 'Keep an audit trail', ears_type: 'ubiquitous', action: 'keep an audit trail', x: 300, y: 200, width: 200, height: 80, collapsed: false },
+  ],
+  relations: [{ id: 'd1', sourceId: 'r-trail', targetId: 'n-audit', relationType: 'derives' }],
+  views: [{ id: 'v-spec', name: 'Specification', nodeIds: [], positions: {}, ...view, pipeline: { levels: [
+    { ways: [{ types: ['need'] }] },
+    { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+  ] } }],
+  metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+})
+
+test('Add or link… links an existing element, and the writing line suggests one', async ({ page, studio }) => {
+  await studio.seedDocument(linkingModel({ kind: 'wiki' }))
+  await studio.open('v-spec/f/n-pay')
+  const derivesFrom = async (need: string) => {
+    const doc = await studio.storedDoc() as unknown as { nodes: Array<{ id: string }>; relations: Array<{ sourceId: string; targetId: string; relationType?: string }> }
+    return doc.relations.some((r) => r.sourceId === 'r-trail' && r.targetId === need && r.relationType === 'derives') && doc.nodes.length
+  }
+  // Add or link… offers a requirement new, or one the model has, linked.
+  await page.getByRole('button', { name: 'Edit Pay by card' }).click()
+  await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+  const picker = addPicker(page, 'Pay by card')
+  await expect(picker.dialog).toContainText('Pay by card is refined into a requirement')
+  await expect(picker.option(/^New requirement/)).toBeVisible()
+  await picker.option(/Keep an audit trail/).click()
+  await expect(picker.dialog).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Keep an audit trail' })).toBeVisible()
+  await expect.poll(() => derivesFrom('n-pay')).toBe(4)
+
+  // The writing line under another need suggests it by name; Enter still adds a new one.
+  await studio.open('v-spec/f/n-refunds')
+  await page.locator('.wiki-write-start').getByRole('button', { name: 'Requirements', exact: true }).click()
+  await page.keyboard.type('audit')
+  const suggest = page.getByRole('group', { name: 'Link an existing requirement' })
+  await suggest.getByRole('button', { name: /Keep an audit trail/ }).click()
+  await expect.poll(() => derivesFrom('n-refunds')).toBe(4)
+  const line = page.getByRole('textbox', { name: 'Write a requirement' })
+  await expect(line).toHaveValue('')
+  await line.fill('Refund within a week')
+  await expect(suggest).toHaveCount(0)
+  await line.press('Enter')
+  await expect.poll(() => derivesFrom('n-refunds')).toBe(5)
+})
+
 // Open points and items of runs 35 to 64 on a wiki of the bookstore.
 test.describe('a wiki of the bookstore', () => {
   const T = ['container', 'webapp', 'database']
@@ -297,8 +376,10 @@ test.describe('a wiki of the bookstore', () => {
     await seedWiki(studio, {})
     await studio.open('v-wiki/f/bookstore')
     await page.getByRole('button', { name: 'Edit Bookstore' }).click()
-    await page.getByRole('menuitem', { name: 'Add child' }).click()
-    await page.getByRole('menuitem', { name: 'Container' }).click()
+    await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+    const picker = addPicker(page, 'Bookstore')
+    await picker.choose('holds a container')
+    await picker.option(/^New container/).click()
     await expect(page).not.toHaveURL(/\/f\/bookstore$/)
     await expect(page).toHaveURL(/\/v\/v-wiki\/f\/[^/]+$/)
     await page.keyboard.press('Escape')
@@ -420,17 +501,19 @@ test.describe('the wiki keeps the metamodel', () => {
     await page.getByRole('menuitem', { name: 'Edit relationship' }).click()
     const pill = page.locator('.wiki-rel-editor .wiki-rel-pill')
     await pill.locator('.wiki-inline-view').click()
-    await expect(pill.locator('select option')).toHaveText(['Depends on', 'Partnership'])
+    // Named as they read from the source, as everywhere a relation is.
+    await expect(pill.locator('select option')).toHaveText(['Depends on', 'Partners with'])
   })
 
   // Item 241: Add relationship offered Part of… from one aggregate root to
   // another (the canvas and the card leave it out there).
-  test('Add relationship offers Part of only from a part to an aggregate root', async ({ page, studio }) => {
+  test('Add or link… offers Part of only from a part to an aggregate root', async ({ page, studio }) => {
     await studio.open('v-wiki/f/e2')
     await page.getByRole('button', { name: 'Edit Invoice' }).click()
-    await page.getByRole('menuitem', { name: 'Add relationship' }).click()
-    await expect(page.getByRole('menuitem').first()).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: /part of/i })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+    const relationships = addPicker(page, 'Invoice').dialog.locator('optgroup[label="Other relationships"] option')
+    await expect(relationships.first()).toBeAttached()
+    await expect(relationships.filter({ hasText: /part of/i })).toHaveCount(0)
   })
 
   // Decided 2026-10-21 (runs 65 to 69): the wiki's Delete asks as the

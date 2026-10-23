@@ -14,10 +14,11 @@ test.describe('first visit', () => {
     await expect(page).toHaveScreenshot('welcome.png')
   })
 
-  test('New model asks for the metamodel and storage, Open for the source', async ({ page }) => {
+  test('New model asks for the metamodel, its views and storage, Open for the source', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'New model' }).click()
     await expect(page.getByRole('combobox', { name: 'Metamodel' })).toHaveValue('c4-ddd-governance-builtin')
+    await expect(page.getByRole('radio', { name: /Views of the metamodel/ })).toBeChecked()
     await expect(page.getByRole('radio', { name: /In this browser/ })).toBeChecked()
     // Forge needs an AI provider, and none is set up on a first visit.
     await expect(page.getByRole('button', { name: 'Create with Radical Forge' })).toHaveCount(0)
@@ -72,6 +73,47 @@ test.describe('first visit', () => {
     await expect(page.locator('.tv-empty')).toHaveText('No nodes.')
     await expect(page.getByRole('button', { name: 'Add at the top' })).toBeVisible()
   })
+
+  test("a new model starts with the metamodel's views in their folders, or with none", async ({ page, studio }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'New model' }).click()
+    await page.getByRole('button', { name: /Customise…/ }).click()
+    const list = page.locator('.msteps-viewpoint-list')
+    await expect(list.getByRole('group')).toHaveText([/^Conceptual/, /^Logical/, /^Governance/])
+    const radical = await list.getByRole('checkbox').count()
+    // The list follows the metamodel: C4 has its four C4 viewpoints, and
+    // the two whole-model ones a view per element stands in for.
+    const metamodel = page.getByRole('combobox', { name: 'Metamodel' })
+    await metamodel.selectOption('c4-builtin')
+    await expect(list.getByRole('group')).toHaveText([/^Logical/])
+    await expect(list.getByRole('checkbox')).toHaveCount(6)
+    await metamodel.selectOption('c4-ddd-governance-builtin')
+    await expect(list.getByRole('checkbox')).toHaveCount(radical)
+    await list.getByRole('checkbox', { name: 'Decision log' }).uncheck()
+    await page.getByRole('button', { name: 'Create model' }).click()
+    await studio.ready()
+    // Still All elements first: the model has no element yet.
+    await expect(page.locator('.lp-view-card.active')).toContainText('All elements')
+    await expect(page.locator('.tv-empty')).toHaveText('No nodes.')
+    // Under the All elements table, All elements as a structure, first.
+    const cards = page.locator('.lp-view-card')
+    await expect(cards.nth(1)).toContainText('All elements')
+    await expect(cards.nth(1)).toContainText(/structure/i)
+    await expect(page.locator('.lp-folder-name')).toHaveText(['Conceptual', 'Logical', 'Governance'])
+    // Domain entities, State machine, Process, System containers and
+    // Container components: groups of views per element.
+    await expect(page.locator('.lp-view-group')).toHaveCount(5)
+    await expect(page.locator('.lp-view-card', { hasText: 'Decision log' })).toHaveCount(0)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'New model' }).click()
+    await page.getByRole('radio', { name: /Empty/ }).check()
+    await page.getByRole('button', { name: 'Create model' }).click()
+    await studio.ready()
+    await expect(page.locator('.lp-view-card.active')).toContainText('All elements')
+    await expect(page.locator('.lp-folder-name')).toHaveCount(0)
+    await expect(page.locator('.lp-view-card')).toHaveCount(1)
+  })
 })
 
 test.describe('returning visit', () => {
@@ -111,7 +153,7 @@ test.describe('Models dialog', () => {
     await expect(models.locator('.docmgr-item')).toContainText('This browser')
 
     await models.getByRole('button', { name: '+ New model' }).click()
-    await expect(models.getByLabel('Metamodel')).toHaveValue('c4-ddd-governance-builtin')
+    await expect(models.getByRole('combobox', { name: 'Metamodel' })).toHaveValue('c4-ddd-governance-builtin')
     await models.getByRole('button', { name: 'Create model' }).click()
     await expect(models).toBeHidden()
     await expect(studio.nodes).toHaveCount(0)
