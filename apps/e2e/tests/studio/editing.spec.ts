@@ -345,7 +345,9 @@ test('Wrap into… leaves what it wraps where it is, hugged by the new parent, a
     const [b, a] = [box(before[id]), box(after[id])]
     expect(a.x, id).toBeLessThanOrEqual(b.x)
     expect(a.y, id).toBeLessThanOrEqual(b.y)
-    expect({ right: a.x + a.w, bottom: a.y + a.h }, id).toEqual({ right: b.x + b.w, bottom: b.y + b.h })
+    // Within a pixel: the sample's frames have fractional sizes.
+    expect(Math.abs(a.x + a.w - (b.x + b.w)), `${id} right`).toBeLessThan(1)
+    expect(Math.abs(a.y + a.h - (b.y + b.h)), `${id} bottom`).toBeLessThan(1)
   }
   // Nothing else moves, Auth Service beside it least of all.
   expect(Object.keys(before).filter((id) => !['dom-access', 'sys-core'].includes(id) && after[id] !== before[id])
