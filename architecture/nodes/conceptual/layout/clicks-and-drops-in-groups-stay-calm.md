@@ -8,6 +8,10 @@ tests: |
   packages/ui/tests/calmDrag.test.ts › A drag and the open containers it does not touch › keeps the groups beside the one dragged in below their system's header (item 218)
   packages/ui/tests/calmDrag.test.ts › Calm drag › leaves nothing overlapping when a child is dragged far out of its container, past the one below
   packages/ui/tests/calmDrag.test.ts › Calm drag › leaves nothing overlapping when the pushes run out
+  packages/ui/tests/calmDrag.test.ts › leaves the frames round an element dragged a little inside its group as they were (F-0028, 20 px)
+  packages/ui/tests/calmDrag.test.ts › leaves a container where it stands when its only child is dragged a little inside it (F-0028)
+  packages/ui/tests/physicsStands.test.ts › moves only API Gateway when it is dragged 20 px right inside Access & Security
+  apps/e2e/tests/studio/physics.spec.ts › a short drag inside a group leaves the frames round it, and everything else, where they are
 then: "the click moves nothing and the physics does not start; after the drop the groups beside it stay below their system's header and the group's frame holds its child groups as drawn; after each drop nothing overlaps"
 when: "the user Cmd/Ctrl-clicks an element without moving it, drops an element inside one of the groups, drags a child far out of its container past the one below, and drops an element onto more elements than the pushes can clear"
 ---

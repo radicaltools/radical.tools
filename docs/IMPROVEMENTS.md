@@ -657,6 +657,14 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     Fixed 2026-10-23: the e2e runner in `crucible.json` passes `--reporter
     line`, which takes the place of the config's reporters, so the gate's
     runs write no report.
+49. **A preview server another worktree left behind serves its build to
+    the next.** Outside CI the Playwright config reuses a server already on
+    its port (`reuseExistingServer`). In the fix round of run 176
+    (2026-10-23) one worktree's first e2e run got another worktree's sample
+    layout from a server left on 4310, and showed the old behaviour of a bug
+    it had fixed. Worktrees running e2e tests one after another need the
+    port free first, or a port of their own (an env variable for the base
+    port), or the reuse off when a run's build is not the one served.
 
 ### Reverse-engineered requirements (2026-10-06)
 
