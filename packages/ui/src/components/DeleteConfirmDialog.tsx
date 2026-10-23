@@ -1,6 +1,29 @@
 import React, { useEffect } from 'react'
 import { hideRefusal, useDiagramStore } from '../store/diagramStore'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { descendantIds, sequenceStepsRemovedBy } from '@radical/common/model'
+
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+
+/** The prompt's title: what is to be deleted, by name where it is one
+ *  element or up to three relations (a rolled-up line stands for several),
+ *  else counted. A relation with no label is named by its ends. */
+export function deletePromptTitle(
+  pending: { nodeIds: string[]; edgeIds: string[] },
+  nodes: Record<string, C4Node>,
+  relations: Record<string, C4Relation>,
+): string {
+  const nodeCount = pending.nodeIds.length
+  const edgeCount = pending.edgeIds.length
+  const firstNode = pending.nodeIds[0] ? nodes[pending.nodeIds[0]] : null
+  const named = pending.edgeIds.map((id) => relations[id]).filter((r): r is C4Relation => !!r).map((r) =>
+    `"${r.label || `${nodes[r.sourceId]?.label ?? '?'} → ${nodes[r.targetId]?.label ?? '?'}`}"`)
+  const summary = nodeCount === 1 && edgeCount === 0 && firstNode ? `"${firstNode.label}"`
+    : nodeCount === 0 && named.length === edgeCount && edgeCount > 0 && edgeCount <= 3
+      ? `${edgeCount === 1 ? 'relation' : 'relations'} ${named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`}`
+      : [nodeCount ? plural(nodeCount, 'element', 'elements') : '', edgeCount ? plural(edgeCount, 'relation', 'relations') : ''].filter(Boolean).join(' and ')
+  return `Delete ${summary}?`
+}
 
 /**
  * Confirmation modal that appears when the user presses Delete on the canvas.
@@ -36,12 +59,6 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   const edgeCount = pending.edgeIds.length
   if (nodeCount + edgeCount === 0) return null
 
-  const firstNode = pending.nodeIds[0] ? c4Nodes[pending.nodeIds[0]] : null
-  const firstEdge = pending.edgeIds[0] ? c4Relations[pending.edgeIds[0]] : null
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-  const summary = nodeCount + edgeCount === 1
-    ? (firstNode ? `"${firstNode.label}"` : firstEdge ? `relation "${firstEdge.label || '(unnamed)'}"` : '1 element')
-    : [nodeCount ? plural(nodeCount, 'element', 'elements') : '', edgeCount ? plural(edgeCount, 'relation', 'relations') : ''].filter(Boolean).join(' and ')
   // What Remove from model takes: the elements with what lies inside them,
   // and every relation of any of them (the prompt counted the selection
   // only: "8 node(s) + 10 relation(s)" removed 10 and 30).
@@ -54,12 +71,14 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   const removedRelations = Object.values(c4Relations).filter((r) => pending.edgeIds.includes(r.id) || removedNodes.has(r.sourceId) || removedNodes.has(r.targetId)).length
   const removes = [removedNodes.size ? plural(removedNodes.size, 'element', 'elements') : '', removedRelations ? plural(removedRelations, 'relation', 'relations') : ''].filter(Boolean).join(' and ')
 
-  const canHide = !!activeViewId && nodeCount > 0 && !refusal
+  // Relations alone are hidden from the view as the card's Hide from view
+  // does (hiddenRelationIds), whatever the view shows of elements.
+  const canHide = !!activeViewId && (nodeCount > 0 ? !refusal : edgeCount > 0)
 
   return (
     <div className="milestone-modal-backdrop" onClick={() => resolve('cancel')}>
       <div className="milestone-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="milestone-modal-title">Delete {summary}?</h3>
+        <h3 className="milestone-modal-title">{deletePromptTitle(pending, c4Nodes, c4Relations)}</h3>
         <p className="milestone-modal-text">
           Choose how to handle this delete request.
         </p>
@@ -68,8 +87,7 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             <div className="milestone-option-title">Remove from model</div>
             <div className="milestone-option-desc">
               Permanently delete from the model (and from every view that
-              references it): {removes}, with what lies inside the elements
-              and their relations.
+              references it): {removes}{removedNodes.size ? ', with what lies inside the elements and their relations' : ''}.
               {steps > 0 && (steps === 1 ? ' The sequence step along its relations goes too.' : ` ${steps} sequence steps along its relations go too.`)}
             </div>
           </button>
@@ -84,7 +102,9 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
             </div>
             <div className="milestone-option-desc">
               {canHide
-                ? 'Keep the element in the model — just remove it from the active view.'
+                ? nodeCount === 0
+                  ? 'Keep the relation in the model — just hide it from the active view.'
+                  : 'Keep the element in the model — just remove it from the active view.'
                 : refusal === 'group'
                   ? 'A view per element shows everything its element holds; nothing can be hidden from it.'
                   : refusal === 'filter'

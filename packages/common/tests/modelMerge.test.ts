@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
 import { mergeModelEdits, mergeModels, mergeNotices, modelEdits } from '../src/modelMerge'
+import { builtInGovernanceMetamodel } from '../src/metamodel'
 
 const node = (id: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as C4Node
@@ -280,6 +281,31 @@ describe('mergeModels', () => {
     theirs.nodes[0].label = 'Bookshop'
     expect(mergeModels(base, clone(base), theirs).merged).toEqual(theirs)
     expect(mergeModels(base, theirs, clone(base)).merged).toEqual(theirs)
+  })
+
+  it('lets go of an element one side deleted in what the other side made to name it (a transition\'s event), as a delete does', () => {
+    // The agent deleted the event "approved" while Studio drew a transition
+    // triggered by it: merged, the transition named an event that was gone,
+    // and Validation flagged it.
+    const machine = (id: string, type: string, parentId?: string): C4Node => ({ ...node(id, id), type, ...(parentId ? { parentId } : {}) }) as C4Node
+    const b: DiagramData = {
+      nodes: [machine('m', 'state-machine'), machine('held', 'state', 'm'), machine('booked', 'state', 'm'), machine('approved', 'event', 'm'), machine('audited', 'event', 'm')],
+      relations: [],
+      views: [],
+      metamodel: builtInGovernanceMetamodel(),
+    }
+    const drawn = clone(b)
+    drawn.relations.push({ ...rel('t', 'held', 'booked'), relationType: 'transition', event: 'approved', raises: ['approved', 'audited'] } as C4Relation)
+    const deleted = clone(b)
+    deleted.nodes = deleted.nodes.filter((n) => n.id !== 'approved')
+    for (const [o, t] of [[drawn, deleted], [deleted, drawn]] as const) {
+      const { merged } = mergeModels(b, o, t)
+      const transition = byId(merged.relations, 't') as unknown as Record<string, unknown>
+      expect(transition.event).toBeUndefined()
+      expect(transition.raises).toEqual(['audited'])
+      // The sides keep what they had.
+      expect((byId(drawn.relations, 't') as unknown as Record<string, unknown>).event).toBe('approved')
+    }
   })
 })
 

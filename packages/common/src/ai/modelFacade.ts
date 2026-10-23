@@ -102,6 +102,10 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       syncGroups()
     },
     removeNode(id: string) {
+      // A milestone that holds it keeps it on the views that list it now.
+      if (carried.snapshots?.length && state.c4Nodes[id]) {
+        carried.snapshots = model.keepViewsInMilestones(carried.snapshots, state.views, new Set([id, ...model.descendantIds(id, state.c4Nodes)]))
+      }
       model.deleteNode(state, id)
       syncGroups()
     },
