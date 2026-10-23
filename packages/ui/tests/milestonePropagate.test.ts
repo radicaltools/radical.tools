@@ -2,7 +2,8 @@
  * Editing in the past and carrying the edit forward (Propagate).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import type { C4Node, DiagramData } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
+import { builtInGovernanceMetamodel, validateModel } from '@radical/common/metamodel'
 import { NODE_SIZES } from '@radical/common/c4'
 import { useDiagramStore } from '../src/store/diagramStore'
 
@@ -170,5 +171,40 @@ describe('Propagate a delete of relations later sequences step through', () => {
     expect(steps(s().liveBackup!.sequences)).toEqual(['r2:passes on'])
     s().discardMilestoneChanges()
     expect(steps(s().saveDiagram().sequences!.reduce((all, q) => ({ ...all, [q.id]: q }), {}))).toEqual(['r2:passes on'])
+  })
+})
+
+describe('Propagate a delete of an element a later reference names (F-0054)', () => {
+  // An event deleted in an early milestone and propagated left a later
+  // transition triggered by it (one the early milestone never had): the
+  // live model kept the event's id, and Validation flagged it. A delete on
+  // the live model takes it out (forgetNodesInReferences).
+  it('takes it out of the references of the later milestones and the live model', () => {
+    const nodes = [
+      node('m', 'state-machine', 0, 0), node('open', 'state', 0, 0, 'm'), node('held', 'state', 0, 0, 'm'), node('booked', 'state', 0, 0, 'm'),
+      node('approved', 'event', 0, 0, 'm'), node('audited', 'event', 0, 0, 'm'),
+    ]
+    const early = { id: 't1', sourceId: 'open', targetId: 'held', relationType: 'transition', label: '', event: 'approved' } as unknown as C4Relation
+    const later = { id: 't2', sourceId: 'held', targetId: 'booked', relationType: 'transition', label: '', event: 'approved', raises: ['approved', 'audited'] } as unknown as C4Relation
+    const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((x) => [x.id, x]))
+    s().loadDiagram({
+      nodes, relations: [early, later], views: [], metamodel: builtInGovernanceMetamodel(),
+      snapshots: [
+        { id: 'first', name: 'first', timestamp: 1, nodes: byId(nodes), relations: byId([early]) },
+        { id: 'second', name: 'second', timestamp: 2, nodes: byId(nodes), relations: byId([early, later]) },
+      ],
+    } as DiagramData)
+    s().selectMilestone('first')
+    s().removeNode('approved')
+    s().commitMilestoneChanges('propagate')
+    const t2 = (relations: unknown) => (relations as Record<string, Record<string, unknown>>).t2
+    for (const [name, relations] of [['second', s().snapshots[1].relations], ['live', s().liveBackup!.relations]] as const) {
+      expect(t2(relations).event, name).toBeUndefined()
+      expect(t2(relations).raises, name).toEqual(['audited'])
+    }
+    s().discardMilestoneChanges()
+    const saved = s().saveDiagram()
+    const issues = validateModel(Object.fromEntries(saved.nodes.map((n) => [n.id, n])), Object.fromEntries(saved.relations.map((r) => [r.id, r])), builtInGovernanceMetamodel())
+    expect(issues.filter((i) => i.id.startsWith('bad-ref:')).map((i) => i.message)).toEqual([])
   })
 })

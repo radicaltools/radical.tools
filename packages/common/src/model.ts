@@ -540,6 +540,42 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   return removed
 }
 
+/** What a milestone keeps of a view its own way (DiagramSnapshot.views):
+ *  all but where it is looked at. Its places and camera are the view's one
+ *  layout for every milestone, and what it is focused on is like a camera. */
+export function milestoneOwnView(view: DiagramView): DiagramView {
+  const { positions: _positions, viewport: _viewport, treemapFocusId: _treemap, wikiFocusId: _wiki, tableActiveTab: _tab, ...rest } = view
+  return { ...rest, positions: {} } as DiagramView
+}
+
+/** The milestones (`snapshots`) as they are once the `removed` elements
+ *  leave the live `views` (call it with the views before the delete): a
+ *  milestone shows the model as it was, so one that holds an element a
+ *  view lists keeps that view's list as it was, as a view of its own
+ *  (DiagramSnapshot.views, milestoneOwnView: without the places, which stay
+ *  the view's for every milestone). Left to the live view, the milestone's
+ *  view and the slide showing it lost the element deleted since. A view the
+ *  milestone keeps its own way already keeps its list, and a view of one of
+ *  the `removed` goes with it. Returns `snapshots` itself when no milestone
+ *  changes, else a new array with new milestones where they changed. */
+export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Record<string, DiagramView>, removed: Set<string>): DiagramSnapshot[] {
+  if (!snapshots.length || !removed.size) return snapshots
+  const listing = Object.values(views).filter((v) => !(v.subject && removed.has(v.subject)) && v.nodeIds.some((id) => removed.has(id)))
+  if (!listing.length) return snapshots
+  let out = snapshots
+  snapshots.forEach((snap, i) => {
+    const own: Record<string, DiagramView> = {}
+    for (const view of listing) {
+      if (snap.views?.[view.id] || !view.nodeIds.some((id) => removed.has(id) && snap.nodes[id])) continue
+      own[view.id] = milestoneOwnView(view)
+    }
+    if (!Object.keys(own).length) return
+    if (out === snapshots) out = [...snapshots]
+    out[i] = { ...snap, views: { ...snap.views, ...own } }
+  })
+  return out
+}
+
 /** Takes the `removed` elements out of the reference properties of what is
  *  left (a transition's trigger event and the events it raises, a
  *  requirement's precondition state): left in, each pointed at nothing and

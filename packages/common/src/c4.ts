@@ -571,6 +571,10 @@ export interface C4EdgeRFData {
    *  with no label shows on its line. */
   typeName?: string
   isVirtual: boolean
+  /** A rolled-up line (isVirtual, drawn to a folded container or to what
+   *  holds its ends): the relations it stands for. Delete on it deletes
+   *  them. */
+  relationIds?: string[]
   /** An arrow from a step to the next (warnier.ts, processFlow): no
    *  relation of the model, drawn dashed, never selected. */
   flow?: boolean
