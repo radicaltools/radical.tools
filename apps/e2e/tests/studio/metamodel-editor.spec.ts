@@ -55,7 +55,7 @@ test.describe('custom properties of a type', () => {
     await row.locator('.mm-prop-label').click()
     await closeEditor(page)
 
-    await studio.node('api').click()
+    await studio.node('api').dblclick()
     const tier = studio.attribute('Tier')
     // It showed "gold" as if set; picking gold then changed nothing.
     await expect(tier).toHaveValue('')
@@ -181,7 +181,7 @@ test('a value that is no option any more shows as it is in the card', async ({ p
   await expect.poll(() => asked).toContain('"Tier" is "silver"')
   await expect(page.locator('.mm-editor-side')).toContainText('"Tier" is "silver", which is not one of its options (gold, bronze)')
   await closeEditor(page)
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   const tier = studio.attribute('Tier')
   await expect(tier).toHaveValue('silver')
   await expect(tier.locator('option:checked')).toHaveText('silver (not an option)')

@@ -18,7 +18,7 @@ async function spread(studio: Studio, ids: string[], axis: 'x' | 'y'): Promise<n
 
 async function select(studio: Studio, ids: string[]): Promise<void> {
   await studio.node(ids[0]).click()
-  for (const id of ids.slice(1)) await studio.node(id).click({ modifiers: ['Shift'] })
+  for (const id of ids.slice(1)) await studio.node(id).click({ modifiers: ['Alt'] })
   await expect(studio.page.locator('.sel-bar-badge')).toHaveText(String(ids.length))
 }
 
@@ -52,8 +52,6 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
   await studio.settle()
   await studio.node('customer').click()
   await expect(page.getByTestId('alignment-guides').locator('line').first()).toBeAttached()
-  // The properties card lies over the canvas's right side, where Payment Provider may be.
-  await studio.properties.getByRole('button', { name: 'Close properties' }).click()
   await studio.settle()
   // The click framed Customer too, which can leave Payment Provider off the
   // canvas: the empty canvas brings back the camera before the drag.
@@ -99,7 +97,7 @@ test('dragging a child of an aligned container keeps the alignment', async ({ pa
   const row = ['bookstore', 'payments']
   // A container is picked by its header: its middle is its children.
   await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
-  await studio.node('payments').click({ modifiers: ['Shift'] })
+  await studio.node('payments').click({ modifiers: ['Alt'] })
   await expect(page.locator('.sel-bar-badge')).toHaveText('2')
   await page.getByRole('button', { name: /^Align/ }).click()
   await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
@@ -224,7 +222,7 @@ test('a selected container aligns its children, in the order they stand', async 
   const xs = await Promise.all(children.map(centreX))
   const leftToRight = [...children].sort((a, b) => xs[children.indexOf(a)] - xs[children.indexOf(b)])
 
-  await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
+  await studio.node('bookstore').dblclick({ position: { x: 24, y: 12 } })
   await page.getByRole('button', { name: /^Align children/ }).click()
   await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
   await expect.poll(() => spread(studio, children, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
@@ -242,7 +240,7 @@ test('a collapsed container aligns its children, which line up when it is expand
   const toggle = studio.node('bookstore').locator('.c4-node-collapse-btn').first()
   await toggle.click({ force: true })
   await expect(studio.node('web')).toBeHidden()
-  await studio.node('bookstore').click({ force: true })
+  await studio.node('bookstore').dblclick({ force: true })
   await page.getByRole('button', { name: /^Align children/ }).click()
   await expect(page.getByText(/its children line up when you expand it/)).toBeVisible()
   await page.getByRole('menuitem', { name: /Keep in a row/ }).click()

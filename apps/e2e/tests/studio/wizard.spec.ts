@@ -50,3 +50,16 @@ test('cancelling the wizard creates nothing', async ({ page, studio }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(studio.nodes).toHaveCount(3)
 })
+
+test('dropping an ADR with the special key held adds it without its wizard', async ({ page, studio }) => {
+  await studio.open('v-context')
+  await expect(studio.nodes).toHaveCount(3)
+  await page.keyboard.down('Alt')
+  await studio.addFromPalette('ADR', await studio.nearBottom())
+  await page.keyboard.up('Alt')
+  await expect(page.getByRole('dialog', { name: /New ADR/ })).toHaveCount(0)
+  await expect(studio.nodes).toHaveCount(4)
+  // Without the key, the wizard asks.
+  await studio.addFromPalette('ADR', await studio.nearBottom(400))
+  await expect(page.getByRole('dialog', { name: /New ADR/ })).toBeVisible()
+})

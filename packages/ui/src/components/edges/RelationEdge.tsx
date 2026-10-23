@@ -43,6 +43,8 @@ function ReconnectHandle({
   otherNodeId: string
 }) {
   const moveRelationEnd = useDiagramStore((s) => s.moveRelationEnd)
+  const setRelinking = useDiagramStore((s) => s.setRelinking)
+  const updateRelation = useDiagramStore((s) => s.updateRelation)
   const [dragging, setDragging] = useState(false)
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null)
   const svgRef = useRef<SVGElement | null>(null)
@@ -53,8 +55,10 @@ function ReconnectHandle({
       e.preventDefault()
       setDragging(true)
       setMouse({ x: e.clientX, y: e.clientY })
+      // The canvas marks where the end can go while the connection key is held.
+      if (!edgeId.startsWith('virtual-')) setRelinking({ relationId: edgeId, end })
     },
-    []
+    [edgeId, end, setRelinking]
   )
 
   useEffect(() => {
@@ -67,14 +71,23 @@ function ReconnectHandle({
     const onUp = (e: MouseEvent) => {
       setDragging(false)
       setMouse(null)
+      setRelinking(null)
 
-      // Find node under cursor
-      const el = document.elementFromPoint(e.clientX, e.clientY)
-      const nodeEl = (el as HTMLElement)?.closest?.('.react-flow__node') as HTMLElement | null
-      const nodeId = nodeEl?.getAttribute('data-id')
+      // Find node under cursor: a field of the drop panel (Canvas:
+      // ConnectDropPanel) names it and the type; the panel beside its
+      // fields, the element it stands over.
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      const field = el?.closest?.<HTMLElement>('[data-connect-target]')
+      const panel = el?.closest?.<HTMLElement>('.connect-pills')
+      const nodeEl = el?.closest?.('.react-flow__node') as HTMLElement | null
+      const nodeId = field?.dataset.connectTarget ?? panel?.dataset.connectOver ?? nodeEl?.getAttribute('data-id')
 
+      // The relation keeps its type: refused where it does not fit there.
       if (nodeId && nodeId !== otherNodeId && !edgeId.startsWith('virtual-')) {
-        moveRelationEnd(edgeId, end === 'source' ? { sourceId: nodeId } : { targetId: nodeId })
+        const updates = end === 'source' ? { sourceId: nodeId } : { targetId: nodeId }
+        const kept = useDiagramStore.getState().c4Relations[edgeId]?.relationType
+        if (kept) moveRelationEnd(edgeId, updates, kept)
+        else updateRelation(edgeId, updates)
       }
     }
 
@@ -84,7 +97,7 @@ function ReconnectHandle({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [dragging, edgeId, end, otherNodeId, moveRelationEnd])
+  }, [dragging, edgeId, end, otherNodeId, moveRelationEnd, updateRelation, setRelinking])
 
   // Compute preview line endpoint in SVG coordinates
   const previewPt = useMemo(() => {
@@ -128,8 +141,10 @@ function ReconnectHandle({
             strokeWidth={2}
             strokeDasharray="6 4"
             opacity={0.6}
+            pointerEvents="none"
           />
-          <circle cx={previewPt.x} cy={previewPt.y} r={4} fill="var(--accent)" opacity={0.6} />
+          {/* Under the pointer: what is below it is where the end goes. */}
+          <circle cx={previewPt.x} cy={previewPt.y} r={4} fill="var(--accent)" opacity={0.6} pointerEvents="none" />
         </>
       )}
     </>
@@ -182,7 +197,7 @@ export const RelationEdge = memo(
     const { x: labelX, y: labelY } = geometry.label
     // A label-less relation shows its type, except a transition: one without
     // an event is a completion transition and is drawn bare.
-    const typeName = data?.relationType === 'transition' ? undefined : data?.relationType
+    const typeName = data?.relationType === 'transition' ? undefined : data?.typeName ?? data?.relationType
 
     // A step's arrow to the next is the steps' colour, finely dashed.
     const strokeColor = data?.flow ? '#14b8a6' : selected || focus === 'focus' ? 'var(--accent)' : data?.isVirtual ? '#6b7280' : '#94a3b8'

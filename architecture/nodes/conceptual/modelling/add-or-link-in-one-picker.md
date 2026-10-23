@@ -1,0 +1,9 @@
+---
+id: "41fad17d-dab5-456e-9943-f8bf4cd3f764"
+type: "requirement"
+label: "Add or link in one picker"
+action: "Studio shall open one picker headed by the element (Add under <type> <name>), with a chip for each type that may hang under it (the next level of the view's chain, or else what the metamodel lets it hold or nest by its hierarchy relation), captioned with how it hangs there, and in a wiki a chip for each other relationship the element may have; a field that names a new element and searches the model; Create <type> \"<name>\" to add one of the chosen type, Enter by default; and the elements the model has that may be linked that way (of that type, not linked so yet, passing the level's filters), each with its type's badge, picking one adding only that relation; a type held by containment shall be offered new only. The writing line shall suggest the elements of its type whose name holds what is written and link the one picked, Enter still adding a new one."
+ears_type: "event-driven"
+rationale: "Under an element of a view, a child is often an element the model has already (a requirement that a second need also calls for): adding a new one made a duplicate, and linking it took Add relationship and a relation picked by hand. Menus of three levels (Add child, the type, new or existing, the element) read badly; one picker shows at once what will be added or linked, and how. Evidence: packages/ui/src/components/AddPicker.tsx; packages/common/src/viewPipeline.ts (linkCandidates); packages/ui/src/components/WikiView.tsx (childChoicesOf, WikiWriteLine); packages/ui/src/components/TableView.tsx (onAdd)"
+trigger: "the user presses the + under a row of a table where there is a choice to make, picks Add or link… in a wiki element's menu, or names an element in a wiki's writing line"
+---

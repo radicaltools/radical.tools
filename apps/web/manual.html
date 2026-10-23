@@ -141,7 +141,7 @@
           The Welcome screen asks one thing: a new model or an existing one.
         </p>
         <ul>
-          <li><strong>New model</strong> — pick the metamodel (<em>Radical</em>, or plain <em>C4</em>) and where to keep it: this browser, one <code>.radical</code> file, or a folder of Markdown files. With an AI provider set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
+          <li><strong>New model</strong> — pick the metamodel (<em>Radical</em>, or plain <em>C4</em>), its views and where to keep it: this browser, one <code>.radical</code> file, or a folder of Markdown files. <em>Views of the metamodel</em> (the default) starts the model with <em>All elements</em> as a structure and a view of each of the metamodel's viewpoints in the folders <em>Conceptual</em>, <em>Logical</em> and <em>Governance</em>, a viewpoint that draws one element as a group of views per element; <em>Customise…</em> leaves any out, and <em>Empty</em> starts with none. With an AI provider set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
           <li><strong>Open</strong> — a recent model, a file, a folder, a Structurizr DSL workspace or the sample.</li>
           <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used in this guide: 283 elements, with a domain model and two state machines, needs, requirements, scenarios, ADRs, eight concern packs from the Hub, mockups, a process, 36 views in four folders, four milestones and a presentation.</li>
         </ul>
@@ -165,7 +165,7 @@
           <li><strong>Activity rail</strong> — along the left edge, as in VS Code. At the top the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot the menus: <em>Models</em>, the <em>metamodel editor</em>, <em>AI</em>, <em>Export</em> (PNG, SVG, clipboard) and <em>Settings</em> (theme, Smart fit, line style, the connect key, wizards on create).</li>
           <li><strong>Left panel</strong> — the open section. <em>Views</em> starts with <em>All elements</em>, the whole model as a table, then one card per view, in folders if you made any. Drag its inner edge to widen it.</li>
           <li><strong>Canvas</strong> — the palette stands down its left side: drag a type onto the canvas. At the bottom: <em>Fit All</em>, zoom and <em>Smart Layout</em>. The chip in the top-left names the view, or the milestone you are looking at. Zoomed far out, elements are drawn as coloured blocks with large names so a big model stays readable.</li>
-          <li><strong>Properties card</strong> — select one element, relation or sequence and its card slides over the right side. The head has the type, the name and where it sits; each attribute is a row you edit in place; long texts are Markdown sections. The foot stays in sight: <em>Views</em> lists every view that shows the element (a click opens it there), then the element's <em>Actions</em>, then <em>Delete</em>.</li>
+          <li><strong>Properties card</strong> — double-click an element, a relation or a row (or pick a sequence) and its card slides over the right side; a click only selects, and an open card then shows what you select, until <em>✕</em> or a click on the empty canvas. The head has the type, the name and where it sits; each attribute is a row you edit in place; long texts are Markdown sections. The foot stays in sight: <em>Views</em> lists every view that shows the element (a click opens it there), then the element's <em>Actions</em>, then <em>Delete</em>.</li>
         </ul>
         <div class="doc-tip">
           <strong>Good to know.</strong> Every edit in Designer is one undo step (<kbd>⌘/Ctrl+Z</kbd>), views, sequences and metamodel edits included. Viewer and Presenter change nothing in the saved model.
@@ -198,21 +198,25 @@
         <p>The metamodel decides what may sit where and which pairs a relation may join. Studio refuses what it does not allow, with a message, so the model stays valid.</p>
         <h3>Add an element</h3>
         <ul>
-          <li>Drag a type from the palette onto the canvas. Drop it on a container (a system, a domain, a group) to make it a child.</li>
+          <li>Drag a type from the palette onto the canvas. Drop it on a container (a system, a domain, a group) to make it a child. On a view with a filter, the types it would not show are greyed out. Hold the special key as you drop to add it without its wizard. In a container it goes to the next cell of a grid of what the container holds: the first centred, the next beside it, then a new row.</li>
           <li>Double-click an empty spot for a new Software System.</li>
           <li>Add a row in a <a href="#view-table">table</a>, write a line on a <a href="#view-wiki">wiki page</a>, import a pack from the <a href="#hub">Hub</a>, or ask the <a href="#ai">AI assistant</a>.</li>
         </ul>
         <h3>Containment</h3>
         <ul>
-          <li>Change a parent with the <em>Parent</em> field in the card or <em>Move to…</em> among the actions. Dragging moves an element on the canvas; it does not re-parent it.</li>
+          <li>Change a parent with the <em>Parent</em> field in the card or <em>Move to…</em> among the actions, or as you connect: hold the special key with an element selected, and every element it may go into reads <em>inside</em> (beside any relation it could take), its container <em>holds</em>. Drag onto one to nest the element there; drop on the empty canvas to take it out to the top. With several elements selected, the gesture relates each of them to the target, or nests them all, at once. A plain drag moves an element on the canvas; it does not re-parent it.</li>
           <li>Collapse a container with <em>−</em> in its header. Its relations re-attach to the container, so a context view stays readable while the detail is one click away. Collapsing is per view.</li>
           <li>A <em>Group</em> is a labelled boundary with no meaning of its own, as in Structurizr. It holds only what its place allows.</li>
         </ul>
         <h3>Connect</h3>
         <ul>
-          <li>Hold the connect key (<kbd>Alt</kbd> by default), press on the source, drag to the target, release. <kbd>Esc</kbd> cancels.</li>
-          <li>The relation type follows from the two ends. Where several fit, a menu asks which.</li>
-          <li>Select a relation to edit its label, type and fields in the card, or drag one of its ends onto another element.</li>
+          <li>Hold the special key (<kbd>Alt</kbd>/<kbd>⌥ Option</kbd> by default, <em>Settings → Special key</em>), press on the source, drag to the target, release. <kbd>Esc</kbd> cancels.</li>
+          <li>With an element selected, holding the key marks every element a relation from it can go to, with the relation's type over it, and dims the rest; on a view with a filter, only where the filter would draw it.</li>
+          <li>An element is not connected to what holds it (a container to its system): containment already joins them. A state machine's transition to a state that holds its source is the exception.</li>
+          <li>Over each element it can go to, a pill names each way: the relation's type, <em>inside</em> where it may go in. Drop on a pill to make that one; where one way fits, drop anywhere on the element.</li>
+          <li>A relation goes by how its type reads from its source, on its line, in menus and in the card: <em>uses</em>, <em>delivers to</em> (to a person, as in Structurizr), <em>partners with</em>. A metamodel can give a pair of types its own reading.</li>
+          <li>Select a relation and drag one of its ends onto another element to move it; it keeps its type, and a place where the type does not fit is refused. Hold the special key while you drag to see where the end can go.</li>
+          <li>Double-click a relation to edit its label, type and fields in the card.</li>
         </ul>
         <h3>Visibility per view</h3>
         <p>An element exists once in the model and appears in as many views as you like. An element created while a view is open joins that view. <em>Hide from view</em> takes it out of the view without touching the model. A view's <a href="#view-steps">filter</a> decides the rest.</p>
@@ -326,7 +330,7 @@
       <section class="doc-section" id="selection">
         <h2>Selections &amp; actions</h2>
         <ul>
-          <li>Click selects one element. <kbd>Shift</kbd>-click adds more; <kbd>Shift</kbd>-drag on the empty canvas draws a box.</li>
+          <li>Click selects one element. A click with the special key adds more (or takes one out); a drag with it on the empty canvas draws a box.</li>
           <li>A selection brings its relations forward: the rest of the canvas dims, and the camera frames what stays. A click on the empty canvas clears it.</li>
           <li>One element's actions are in its card. With several selected, the <strong>selection bar</strong> over the canvas offers what applies to them all.</li>
         </ul>
@@ -468,8 +472,9 @@
         </figure>
         <p>A table lists what the filter gives, as a tree. Each row has the element's type, its name and a one-line summary its type's template makes of its data: a requirement's obligation first, a scenario's outcome, an ADR's status and decision. Hover for the whole text.</p>
         <ul>
-          <li>A click on a row opens the element's card; a double-click on the name renames it in place.</li>
+          <li>A click on a row selects the element, a double-click opens its card; <kbd>F2</kbd> or <kbd>Enter</kbd> renames it in place.</li>
           <li>Elements are added where they will show: a <strong>+ row</strong> after the rows under each element (<em>+ Requirement · refined into</em>) and one at the end for the top level. The new element is linked the way the level hangs under its parent, and gets the values the level's filters ask for.</li>
+          <li>Where there is a choice, the + row opens <em>Add or link</em>: a sentence says what goes there (<em>Account is realised by a software system ▾</em>), the field names a new element and searches the model, <em>New</em> adds one by that name and <em>Existing</em> lists the elements the model has that may be linked there instead; picking one adds only the relation.</li>
           <li>A table of hundreds of rows opens at once: only the rows in sight are drawn.</li>
         </ul>
       </section>
@@ -499,10 +504,11 @@
         </ul>
         <h3>Writing the model on a page</h3>
         <ul>
-          <li>Every text is edited in place. <em>[edit]</em> beside a title, or a right click, offers <em>Add child</em>, <em>Add relationship</em>, <em>Edit facts</em> and <em>Delete</em>.</li>
+          <li>Every text is edited in place. <em>[edit]</em> beside a title, or a right click, offers <em>Add or link…</em>, <em>Edit facts</em> and <em>Delete</em>.</li>
           <li>Each group of elements ends with an empty line: type in it and press <kbd>Enter</kbd>, and the next element is there. A requirement is written as its sentence and split into its EARS fields; <em>[rewrite]</em> opens it as text again.</li>
           <li>Paste a list and the page shows what its lines will become before it adds them, as one undo step.</li>
-          <li>A relationship is added in two steps that read as the sentence the page will write: how it reads from this element, then the element it names. Only what the metamodel allows is offered.</li>
+          <li><em>Add or link…</em> opens the same panel as the table's + row: a new child or one the model has, linked; its list also holds the element's other relationships (<em>uses…</em>, <em>is constrained by…</em>), each with the elements it may name. Only what the metamodel allows, and the view's filter shows, is offered.</li>
+          <li>The empty line under a heading suggests the elements of its type whose name holds what is written: pick one to link it instead of writing a new one.</li>
         </ul>
       </section>
 

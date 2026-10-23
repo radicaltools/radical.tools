@@ -26,7 +26,7 @@ test.beforeEach(async ({ studio }) => {
 })
 
 test('a table opened from the card scrolls to the element\'s row, again on a second click', async ({ page, studio }) => {
-  await studio.node('target').click()
+  await studio.node('target').dblclick()
   const views = studio.properties.getByRole('region', { name: 'Views' })
   await views.getByRole('button', { name: /^Element Table/ }).click()
   await expect(page).toHaveURL(/\/v\/v-table/)
@@ -45,7 +45,7 @@ test('a table opened from the card scrolls to the element\'s row, again on a sec
 })
 
 test('a view opened from the card is scrolled into sight in the list of views', async ({ page, studio }) => {
-  await studio.node('target').click()
+  await studio.node('target').dblclick()
   const views = studio.properties.getByRole('region', { name: 'Views' })
   const listed = page.locator('.lp-view-card', { hasText: 'More 29' })
   await expect(listed).not.toBeInViewport()
@@ -60,7 +60,7 @@ test('a view opened from the card is scrolled into sight in the list of views', 
 test('a view opened while another section is open is in sight in the list when Views opens', async ({ page, studio }) => {
   await page.getByRole('tab', { name: 'Milestones' }).click()
   await expect(page.locator('#lp-sec-views')).toBeHidden()
-  await studio.node('target').click()
+  await studio.node('target').dblclick()
   const views = studio.properties.getByRole('region', { name: 'Views' })
   await views.getByRole('button', { name: /^More 29/ }).click()
   await expect(page).toHaveURL(/\/v\/v-more-29/)
@@ -71,7 +71,7 @@ test('a view opened while another section is open is in sight in the list when V
 })
 
 test('a wiki opened from the card shows the element\'s page from its top, also after another wiki', async ({ page, studio }) => {
-  await studio.node('target').click()
+  await studio.node('target').dblclick()
   const views = studio.properties.getByRole('region', { name: 'Views' })
   await views.getByRole('button', { name: /^Wiki A/ }).click()
   await expect(page).toHaveURL(/\/v\/v-wiki-a/)
@@ -121,7 +121,7 @@ test.describe('a wiki nested by its chain', () => {
   })
 
   test('the Pages open the way to the element and mark it, also through a branch closed by hand', async ({ page, studio }) => {
-    await studio.node('req-pickup').click()
+    await studio.node('req-pickup').dblclick()
     const views = studio.properties.getByRole('region', { name: 'Views' })
     await views.getByRole('button', { name: /^Trace Wiki/ }).click()
     await expect(page).toHaveURL(/\/v\/v-trace/)
@@ -183,7 +183,7 @@ test('in a milestone, a view opened from the card opens the element\'s container
   await expect(page).toHaveURL(/\/v\/view-payments/)
   await studio.settle()
   await expect(page.getByText(/^Milestone: v3/)).toBeVisible()
-  await studio.node('ctn-payments').click({ position: { x: 30, y: 10 } })
+  await studio.node('ctn-payments').dblclick({ position: { x: 30, y: 10 } })
   await studio.properties.getByRole('region', { name: 'Views' }).getByRole('button', { name: /^Core Banking/ }).click()
   await expect(page).toHaveURL(/\/v\/view-core/)
   await expect(studio.node('ctn-payments')).toHaveCount(1)

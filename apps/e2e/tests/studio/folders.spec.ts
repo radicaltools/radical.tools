@@ -77,7 +77,7 @@ test('save as folder writes one Markdown file per element', async ({ page }) => 
 
 test('a folder-backed model survives a reload', async ({ page, studio }) => {
   await saveAsFolder(page)
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect.poll(() => folder.paths()).toContain('nodes/card-gateway/_index.md')
 
@@ -134,7 +134,7 @@ test('moving files keeps the elements\' descriptions', async ({ page, studio }) 
 
   // Renaming the system moves its children's files; a second save must not
   // lose their descriptions. (Click Bookstore by its header.)
-  await studio.node('bookstore').click({ position: { x: 24, y: 12 } })
+  await studio.node('bookstore').dblclick({ position: { x: 24, y: 12 } })
   await rename(page, 'Bookstore', 'Online Shop')
   await expect.poll(() => folder.paths()).toContain('nodes/online-shop/api/_index.md')
   await studio.node('customer').click()
@@ -211,7 +211,7 @@ test('an edit made while an agent writes the folder survives a reload', async ({
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
   // The agent's mark: Studio holds its saves for 15 s.
   await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code'))
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
   expect(await folder.paths()).not.toContain('nodes/card-gateway/_index.md')
@@ -229,7 +229,7 @@ test('an agent mark far ahead of Studio\'s clock holds the saves for one period,
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
   await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code', Date.now() + 3_600_000))
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
   await expect.poll(() => folder.paths(), { timeout: 25_000 }).toContain('nodes/card-gateway/_index.md')
@@ -237,7 +237,7 @@ test('an agent mark far ahead of Studio\'s clock holds the saves for one period,
 
 test('Undo after an outside edit takes back the user\'s edit and keeps the outside one', async ({ page, studio }) => {
   await saveAsFolder(page)
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect.poll(() => folder.paths()).toContain('nodes/card-gateway/_index.md')
 
@@ -310,7 +310,7 @@ test('files the model does not own are left alone', async ({ page, studio }) => 
   await asked
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
 
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await studio.properties.getByRole('button', { name: /^Delete element/ }).click()
   await expect.poll(() => folder.paths()).not.toContain('nodes/payment-provider/_index.md')
 
@@ -513,6 +513,7 @@ test('an outside write keeps the selected relation\'s card open, and what is typ
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
   await page.locator('[data-testid="rf__edge-r3"] .react-flow__edge-interaction').dispatchEvent('click')
+  await page.locator('[data-testid="rf__edge-r3"] .react-flow__edge-interaction').dispatchEvent('dblclick')
   const technology = page.locator('.right-panel.open').getByLabel('Technology', { exact: true })
   await technology.click()
   await page.keyboard.press('End')

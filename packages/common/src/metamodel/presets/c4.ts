@@ -133,17 +133,19 @@ export function builtInC4Metamodel(): Metamodel {
   // "Interacts" — any meaningful interaction between C4 elements:
   //   initiator calls/uses/delivers-to a target.
   //   Forbids database → * (passive store, never initiates).
+  const DELIVERS = { forwardLabel: 'Delivers to', inverseLabel: 'Receives from' }
   const interactsPairs: RelationPair[] = [
     // Person interacts with the system surface, and with other people (a
     // customer asks the support staff: Structurizr models it)
-    { from: 'person', to: 'person' },
+    { from: 'person', to: 'person', forwardLabel: 'Interacts with', inverseLabel: 'Interacts with' },
     { from: 'person', to: 'system' },
     { from: 'person', to: 'container' },
     { from: 'person', to: 'webapp' },
     { from: 'person', to: 'component' },
 
-    // System-level dependencies
-    { from: 'system', to: 'person' },
+    // System-level dependencies; to a person a relation delivers (Structurizr's
+    // delivers(): "Sends e-mails to")
+    { from: 'system', to: 'person', ...DELIVERS },
     { from: 'system', to: 'system' },
     { from: 'system', to: 'container' },
     { from: 'system', to: 'database' },
@@ -152,7 +154,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'system', to: 'component' },
 
     // Container-level calls
-    { from: 'container', to: 'person' },
+    { from: 'container', to: 'person', ...DELIVERS },
     { from: 'container', to: 'system' },
     { from: 'container', to: 'container' },
     { from: 'container', to: 'database' },
@@ -163,7 +165,7 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'container', to: 'component' },
 
     // Web / UI container
-    { from: 'webapp', to: 'person' },
+    { from: 'webapp', to: 'person', ...DELIVERS },
     { from: 'webapp', to: 'system' },
     { from: 'webapp', to: 'container' },
     { from: 'webapp', to: 'database' },

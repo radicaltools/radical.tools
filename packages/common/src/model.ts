@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes } from './viewPipeline'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -354,7 +354,40 @@ export function parentCandidates(state: ModelState, id: string): C4Node[] {
  *  new parent's frame there and on none of its new siblings; where it does
  *  not, its place there is dropped, and that canvas gives it one inside the
  *  parent, beside its siblings, when it shows (placeUnplaced). */
-export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): void {
+/** The relations that would join an element of `ids` (or one it holds) to
+ *  what holds it once they are moved into `newParentId`: containment then
+ *  joins them, so the move takes them (not a transition, which may go to a
+ *  state holding its source). */
+export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Relations'>, ids: string[], newParentId: string | null): C4Relation[] {
+  const moved = new Set(ids.filter((id) => state.c4Nodes[id]))
+  const parentOf = (id: string): string | undefined => (moved.has(id) ? newParentId ?? undefined : state.c4Nodes[id]?.parentId)
+  const holds = (outer: string, inner: string): boolean => {
+    const seen = new Set<string>()
+    for (let p = parentOf(inner); p && !seen.has(p); p = parentOf(p)) {
+      if (p === outer) return true
+      seen.add(p)
+    }
+    return false
+  }
+  // Only what the move changes: an end at or under a moved element.
+  const under = (id: string): boolean => {
+    const seen = new Set<string>()
+    for (let cur: string | undefined = id; cur && !seen.has(cur); cur = state.c4Nodes[cur]?.parentId) {
+      if (moved.has(cur)) return true
+      seen.add(cur)
+    }
+    return false
+  }
+  return Object.values(state.c4Relations).filter((r) => r.relationType !== 'transition'
+    && (under(r.sourceId) || under(r.targetId))
+    && (holds(r.sourceId, r.targetId) || holds(r.targetId, r.sourceId)))
+}
+
+/** Moves `ids` into `newParentId` (null: the top of the model). Returns the
+ *  relations it removed: those joining a moved element, or one it holds,
+ *  to what now holds it (relationsToNewHolders). */
+export function reparentNodes(state: ModelState, ids: string[], newParentId: string | null): C4Relation[] {
+  const joining = relationsToNewHolders(state, ids, newParentId)
   const absOf = (id: string | null, positions?: Record<string, NodePosition>): { x: number; y: number } => {
     let x = 0, y = 0
     let cur: C4Node | undefined = id ? state.c4Nodes[id] : undefined
@@ -414,6 +447,9 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     else delete positions[id]
   }
   leaveAncestorAlignments(state, moving)
+  for (const r of joining) delete state.c4Relations[r.id]
+  if (joining.length) forgetRelationsInSequences(state, new Set(joining.map((r) => r.id)))
+  return joining
 }
 
 /** Takes the `moved` elements (and what they hold) out of the rows, columns
@@ -759,6 +795,10 @@ function relationRefusal(state: ModelState, rel: Omit<C4Relation, 'id'>, exceptI
   // The type it will have (insertRelation and patchRelation infer one).
   const keptDef = kept ? state.metamodel?.relationTypes[kept] : undefined
   const type = rel.relationType ?? (keptDef && relationTypeAllows(keptDef, src.type, dst.type) ? kept : inferRelationType(state.metamodel, src.type, dst.type))
+  // Containment already joins an element and what holds it. A transition to
+  // a state that holds its source is SCXML: it leaves and enters that state.
+  const holder = type === 'transition' ? undefined : holderOf(state.c4Nodes, src, dst)
+  if (holder) return `Relation not allowed: ${holder.label} holds ${(holder === src ? dst : src).label}, and containment already joins them.`
   if (hasStatecharts(state.metamodel)) {
     const why = type === 'transition' ? transitionRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
       : type === 'lifecycle-of' ? lifecycleRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import { C4ElementType, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type Metamodel } from '@radical/common/metamodel'
+import { chainTypes } from '@radical/common/viewPipeline'
 
 // ── Elements palette ─────────────────────────────────────────────────────────
 // A bar down the left side of the canvas, always there in Designer: one chip
@@ -9,7 +10,9 @@ import { NODE_TYPE_CATEGORIES, CUSTOM_CATEGORY, type Metamodel } from '@radical/
 // canvas to add an element. One type to a row, its icon and its name beside
 // it, the description in the tooltip; each group has its name above its
 // types. It lies over the canvas, as the properties card does
-// on the right; a canvas taller than it has it scroll.
+// on the right; a canvas taller than it has it scroll. On a view with a
+// filter chain the types it would not show are greyed out and cannot be
+// dragged (chainTypes).
 
 // Descriptions for built-in C4/DDD types. Custom types fall back to def.description.
 const PALETTE_SUBLABELS: Record<string, string> = {
@@ -65,14 +68,16 @@ function paletteGroups(metamodel: Metamodel | null | undefined): Array<{ label: 
   return groups
 }
 
-function PaletteItem({ typeId, label, sublabel, color, iconPath }: PaletteEntry) {
+function PaletteItem({ typeId, label, sublabel, color, iconPath, shown }: PaletteEntry & { shown: boolean }) {
   const onDragStart = (event: React.DragEvent) => {
     event.dataTransfer.setData('application/c4-type', typeId)
     event.dataTransfer.effectAllowed = 'copy'
   }
+  const what = sublabel ? `${label} — ${sublabel}.` : `${label}.`
   return (
-    <div className="palette-item" draggable onDragStart={onDragStart}
-      title={sublabel ? `${label} — ${sublabel}. Drag onto the canvas.` : `${label}. Drag onto the canvas.`}>
+    <div className={`palette-item${shown ? '' : ' disabled'}`} draggable={shown} onDragStart={shown ? onDragStart : undefined}
+      aria-disabled={!shown || undefined}
+      title={shown ? `${what} Drag onto the canvas.` : `${what} This view's filter does not show it: add it on a view that does, or on All elements.`}>
       <div className="palette-badge" style={{ background: color }}>
         <svg viewBox="0 0 16 16" width="12" height="12" fill="#fff">
           <path d={iconPath} />
@@ -86,6 +91,10 @@ function PaletteItem({ typeId, label, sublabel, color, iconPath }: PaletteEntry)
 export function ElementPalette(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const groups = useMemo(() => paletteGroups(metamodel), [metamodel])
+  const view = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
+  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const relations = useDiagramStore((s) => s.c4Relations)
+  const shown = useMemo(() => chainTypes(view, { nodes, relations, metamodel: metamodel as Metamodel }), [view, nodes, relations, metamodel])
   return (
     <div className="element-palette" role="toolbar" aria-label="Elements" aria-orientation="vertical">
       {groups.map((group) => (
@@ -93,7 +102,7 @@ export function ElementPalette(): React.ReactElement {
           <div className="palette-group-label">{group.label}</div>
           <div className="palette-group-items">
             {group.items.map((item) => (
-              <PaletteItem key={item.typeId} {...item} />
+              <PaletteItem key={item.typeId} {...item} shown={!shown || shown.has(item.typeId)} />
             ))}
           </div>
         </div>

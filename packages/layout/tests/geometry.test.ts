@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, placeGhosts, placeNewNode, placeUnplaced } from '../src/geometry'
+import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, modelCanvas, placeGhosts, placeNewNode, placeUnplaced, settleMovedNodes, gridSlotIn } from '../src/geometry'
 import { NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -217,5 +217,36 @@ describe('placeGhosts', () => {
     expect(clear(nodes, 'hooks', ['diff', 'check', 'fill'])).toBe(true)
     expect(nodes.hooks.x).toBe(30)
     expect(nodes.hooks.y).toBeGreaterThanOrEqual(240)
+  })
+})
+
+describe('settleMovedNodes', () => {
+  it('centres an element moved alone into an empty parent across it, below its header', () => {
+    // System A moved into System B from beside it: its place, read in B, lies outside B.
+    const nodes: Record<string, C4Node> = {
+      b: node('b', 'system', { x: 600, y: 0 }),
+      a: node('a', 'system', { parentId: 'b', x: -600, y: 0 }),
+    }
+    const canvas = modelCanvas(nodes)
+    settleMovedNodes(nodes, ['a'], canvas)
+    // As the canvas draws them.
+    const frame = canvas.boxOf(nodes.b), box = canvas.boxOf(nodes.a)
+    // Below the header (120), centred in what is left down to the bottom padding.
+    expect(nodes.a.y).toBe(120 + Math.max(0, Math.round((frame.h - 120 - 30 - box.h) / 2)))
+    expect(box.x - 0).toBe(frame.w - (box.x + box.w))
+    expect(frame.h).toBeGreaterThanOrEqual(box.y + box.h)
+  })
+
+  it('puts one moved among the parent\'s children in the first free cell of their grid', () => {
+    const nodes: Record<string, C4Node> = {
+      b: node('b', 'system', { x: 600, y: 0, width: 400, height: 330 }),
+      c: node('c', 'container', { parentId: 'b', x: 30, y: 120 }),
+      a: node('a', 'container', { parentId: 'b', x: -600, y: 0 }),
+    }
+    settleMovedNodes(nodes, ['a'], modelCanvas(nodes))
+    // Beside the first, in its row; the grid grows wider than tall, so a
+    // third starts the next row.
+    expect([nodes.a.x, nodes.a.y]).toEqual([nodes.c.x + nodes.c.width + 20, nodes.c.y])
+    expect(gridSlotIn(nodes, 'b', { width: nodes.a.width, height: nodes.a.height })).toEqual({ x: nodes.c.x, y: nodes.c.y + nodes.c.height + 20 })
   })
 })

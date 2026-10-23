@@ -17,7 +17,7 @@ test('a transition shows its events by name and picks them by reference', async 
   const label = page.locator('.relation-label', { hasText: '[ok]' })
   await expect(label).toHaveText('PaymentReceived [ok] / reserve ^OrderPaid')
 
-  await page.locator('[data-testid="rf__edge-t-pay"] path').first().click({ force: true })
+  await page.locator('[data-testid="rf__edge-t-pay"] path').first().dblclick({ force: true })
   const panel = studio.properties
   await expect(panel.locator('.pp-type')).toHaveText(/transition/i)
   await panel.getByLabel(/^Event \(trigger/).selectOption({ label: 'Cancel' })
@@ -41,7 +41,7 @@ test('a transition shows its events by name and picks them by reference', async 
 // [ok] / reserve ^OrderPaid"; Event (none) stored event: ""; the prompt
 // counted the selection, not what goes with it.
 test('a transition\'s card reads as its line, and Event (none) stores no event', async ({ page, studio }) => {
-  await page.locator('[data-testid="rf__edge-t-pay"] path').first().click({ force: true })
+  await page.locator('[data-testid="rf__edge-t-pay"] path').first().dblclick({ force: true })
   const panel = studio.properties
   await expect(panel.getByRole('textbox').first()).toHaveAttribute('placeholder', 'PaymentReceived [ok] / reserve ^OrderPaid')
   await panel.getByLabel(/^Event \(trigger/).selectOption({ index: 0 })
@@ -77,6 +77,6 @@ test('the card\'s sentence of a requirement in a state names the state', async (
   })
   await page.reload()
   await studio.ready()
-  await studio.node('hold').click()
+  await studio.node('hold').dblclick()
   await expect(studio.properties.locator('.ears-sentence-sm')).toHaveText('While the Order is Confirmed, the system shall hold the stock.')
 })

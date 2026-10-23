@@ -80,9 +80,9 @@ test('dragging an element whose container is also selected moves and saves them'
   await studio.seed()
   await studio.open('v-containers')
   await studio.node('bookstore').click({ position: { x: 40, y: 12 } })
-  await page.keyboard.down('Shift')
+  await page.keyboard.down('Alt')
   await studio.node('web').click()
-  await page.keyboard.up('Shift')
+  await page.keyboard.up('Alt')
   const before = await studio.positions()
   const box = (await studio.node('web').boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -104,12 +104,12 @@ test('dragging a child of a box-selected container moves and saves them, as one 
   await studio.seed()
   await studio.open('v-containers')
   const frame = (await studio.node('bookstore').boundingBox())!
-  await page.keyboard.down('Shift')
+  await page.keyboard.down('Alt')
   await page.mouse.move(frame.x - 20, frame.y - 20)
   await page.mouse.down()
   for (let i = 1; i <= 10; i++) await page.mouse.move(frame.x - 20 + (frame.width + 40) * i / 10, frame.y - 20 + (frame.height + 40) * i / 10)
   await page.mouse.up()
-  await page.keyboard.up('Shift')
+  await page.keyboard.up('Alt')
   await expect(studio.node('bookstore')).toHaveClass(/selected/)
   await expect(studio.node('db')).toHaveClass(/selected/)
   const before = await studio.positions()
@@ -140,7 +140,7 @@ test('a number property is a number field and saves a number, on elements and re
   type Saved = { nodes: Array<Record<string, unknown>>; relations: Array<Record<string, unknown>> }
   const saved = async (): Promise<Saved> => JSON.parse(await studio.storedJson()) as Saved
 
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   const replicas = studio.attribute('Replicas')
   await expect(replicas).toHaveAttribute('type', 'number')
   await replicas.fill('3')
@@ -149,7 +149,7 @@ test('a number property is a number field and saves a number, on elements and re
   await expect.poll(async () => 'replicas' in (await saved()).nodes.find((n) => n.id === 'api')!).toBe(false)
 
   const edge = page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first()
-  await edge.click({ force: true })
+  await edge.dblclick({ force: true })
   const weight = studio.attribute('Weight')
   await expect(weight).toHaveAttribute('type', 'number')
   await weight.fill('5')

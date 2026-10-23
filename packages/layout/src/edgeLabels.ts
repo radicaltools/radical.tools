@@ -89,6 +89,8 @@ export const RELATION_LABEL_BOX: LabelBoxStyle & { fontSize: number; techFontSiz
 export interface RelationLabelText {
   label?: string
   relationType?: string
+  /** How the type reads, shown in its stead (C4EdgeRFData.typeName). */
+  typeName?: string
   technology?: string
 }
 
@@ -101,7 +103,7 @@ export interface RelationLabelText {
 export function relationLabelLines(r: RelationLabelText, nodes?: Record<string, C4Node>): LabelTextLine[] {
   const lines: LabelTextLine[] = []
   const name = r.label
-    || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.relationType)
+    || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.typeName ?? r.relationType)
   if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows })
   if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize, maxRows: 1 })
   return lines

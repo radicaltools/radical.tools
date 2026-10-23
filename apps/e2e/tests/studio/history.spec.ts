@@ -100,7 +100,7 @@ test('the history lists the places and goes to the one picked', async ({ page, s
 test('an exploration is named in the history, and Back passes over it once it is closed', async ({ page, studio }) => {
   await studio.seed()
   await studio.open('v-containers')
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   await expect(page).toHaveURL(/\/v\/v-containers\/e\/api$/)
   await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
   await expect(page.locator('.explore-bar')).toContainText('Explore: API')

@@ -1,4 +1,5 @@
-import { test, expect } from '../../support/fixtures'
+import { test, expect, fixture } from '../../support/fixtures'
+import { addPicker } from '../../support/addPicker'
 
 // Editing on the flat System Context view of the bookstore fixture
 // (Customer, Bookstore, Payment Provider; 2 relations shown).
@@ -14,6 +15,80 @@ test('add an element from the palette', async ({ studio }) => {
   await expect(studio.nodes).toHaveCount(4)
   await expect(studio.nodeByLabel('System')).toBeVisible()
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
+})
+
+test('holding the connection key marks where a relation from the selected element can go, with its type', async ({ page, studio }) => {
+  await studio.nodeByLabel('Customer').click()
+  await page.keyboard.down('Alt')
+  const targets = page.locator('.react-flow__node.connect-target')
+  // Bookstore and Payment Provider, each with the type over it; Customer is the source.
+  await expect(targets).toHaveCount(2)
+  await expect(targets.first()).toHaveAttribute('style', /--connect-label: "[^"]+"/)
+  await expect(page.locator('.react-flow__node.connecting-source')).toContainText('Customer')
+  await page.keyboard.up('Alt')
+  await expect(targets).toHaveCount(0)
+})
+
+test('a relation\'s end dragged with the special key shows where it can go, keeping its type', async ({ page, studio }) => {
+  await studio.open('v-containers')
+  // API → Payment Provider, selected: its ends show their handles.
+  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().click({ force: true })
+  await studio.settle() // the camera frames the selection first
+  const handle = page.locator('[data-testid="rf__edge-r4"] circle[r="10"]').nth(1)
+  const at = (await handle.boundingBox())!
+  await page.keyboard.down('Alt')
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2)
+  await page.mouse.down()
+  // Where the target can go, API staying the source.
+  await expect(page.locator('.react-flow__node.connecting-source')).toHaveAttribute('data-id', 'api')
+  await expect(page.locator('.react-flow__node.connect-target[data-id="customer"]')).toHaveAttribute('style', /--connect-label: "delivers to"/)
+  // One type fits: its pill over Customer, and the drop anywhere on it moves the end.
+  await expect(page.getByRole('group', { name: 'Drop on Customer' }).locator('.connect-pill')).toHaveText(['delivers to'])
+  const customer = (await studio.node('customer').boundingBox())!
+  await page.mouse.move(customer.x + customer.width / 2, customer.y + customer.height / 2, { steps: 8 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  await expect.poll(async () => (await studio.storedDoc()).relations.find((r) => r.id === 'r4')?.targetId).toBe('customer')
+  await expect(page.locator('.react-flow__node.connect-target')).toHaveCount(0)
+})
+
+test('a container is not connected to the system that holds it, only marked as where it is', async ({ page, studio }) => {
+  await studio.open('v-containers')
+  await studio.nodeByLabel('API').click()
+  await page.keyboard.down('Alt')
+  const targets = page.locator('.react-flow__node.connect-target')
+  await expect(targets.filter({ hasText: 'Web App' })).toHaveCount(1)
+  await expect(targets.filter({ hasText: 'Orders DB' })).toHaveCount(1)
+  // The system is marked only as where it is: "holds", no relation.
+  await expect(page.locator('.react-flow__node.connect-target[data-id="bookstore"]')).toHaveAttribute('style', /--connect-label: "holds"/)
+  // A line drawn onto the system's frame, beside its containers.
+  const api = (await studio.nodeByLabel('API').boundingBox())!
+  const frame = (await page.locator('.react-flow__node[data-id="bookstore"]').boundingBox())!
+  await page.mouse.move(api.x + api.width / 2, api.y + api.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(frame.x + 16, frame.y + 12, { steps: 8 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  // Where it is already: nothing happens.
+  await page.waitForTimeout(300)
+  expect((await studio.storedDoc()).relations).toHaveLength(4)
+  expect(((await studio.storedDoc()).nodes as Array<{ id: string; parentId?: string }>).find((n) => n.id === 'api')?.parentId).toBe('bookstore')
+})
+
+test('the palette greys out the types a view\'s filter does not show', async ({ page, studio }) => {
+  const palette = page.locator('.canvas-column .element-palette')
+  // System Context lists its elements: it has no chain, and takes every type.
+  await expect(palette.locator('.palette-item').first()).toBeVisible()
+  await expect(palette.locator('.palette-item.disabled')).toHaveCount(0)
+
+  // The sample's Domain map shows the domains only.
+  await studio.openSample()
+  await page.locator('.lp-view-card', { hasText: 'Domain map' }).click()
+  await expect(palette.locator('.palette-item:not(.disabled)')).toHaveText(['Domain'])
+  const person = palette.locator('.palette-item', { hasText: 'Person' })
+  await expect(person).toHaveAttribute('aria-disabled', 'true')
+  await expect(person).toHaveAttribute('draggable', 'false')
+  await expect(person).toHaveAttribute('title', /This view's filter does not show it/)
 })
 
 test('the palette stands down the canvas\'s left side, always there, and not on the table', async ({ page, studio }) => {
@@ -45,14 +120,18 @@ test('the table adds an element at the top and inside a row', async ({ page, stu
   await studio.open('v-table')
   // Many types may go at the top: the + row at the end offers them.
   await page.getByRole('button', { name: 'Add at the top' }).click()
-  await page.locator('.wiki-menu').getByRole('menuitem', { name: /Software System/ }).click()
+  const top = addPicker(page, null)
+  await top.choose('a software system')
+  await top.option(/^New software system/).click()
   await page.locator('.tv-cell-input').fill('Warehouse')
   await page.keyboard.press('Enter')
   const warehouse = page.locator('.tv-row', { hasText: 'Warehouse' })
   await expect(warehouse).toBeVisible()
   // Inside it go the types a system may hold, from the + row under it.
   await page.getByRole('button', { name: 'Add under Warehouse' }).click()
-  await page.locator('.wiki-menu').getByRole('menuitem', { name: /^Container/ }).click()
+  const inside = addPicker(page, 'Warehouse')
+  await inside.choose('a container')
+  await inside.option(/^New container/).click()
   await page.locator('.tv-cell-input').fill('Stock API')
   await page.keyboard.press('Enter')
   await expect(page.locator('.tv-row.depth-1', { hasText: 'Stock API' })).toBeVisible()
@@ -116,7 +195,7 @@ test('the left panel\'s sections are tabs on the activity rail, one open beside 
 })
 
 test('rename an element in the properties panel', async ({ page, studio }) => {
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   const label = studio.attribute('Name')
   await expect(label).toHaveValue('Payment Provider')
   await label.fill('Card Gateway')
@@ -130,6 +209,14 @@ test('connect two elements with Alt-drag', async ({ studio }) => {
   await expect(studio.edges).toHaveCount(3)
   await expect.poll(async () => (await studio.storedDoc()).relations
     .some((r) => r.sourceId === 'payments' && r.targetId === 'customer')).toBe(true)
+})
+
+test('a relation with no label shows how its type reads, as its card names it', async ({ page, studio }) => {
+  await studio.connect(studio.node('payments'), studio.node('customer'))
+  // Interacts to a person reads "delivers to" (Structurizr's delivers()),
+  // not its id, nor "uses".
+  await expect(page.locator('.relation-label', { hasText: /^delivers to$/ })).toHaveCount(1)
+  await expect(page.locator('.relation-label', { hasText: /interacts|^uses$/ })).toHaveCount(0)
 })
 
 test('a connection the metamodel forbids is refused', async ({ page, studio }) => {
@@ -180,7 +267,7 @@ test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor 
 test('undoing the add of the selected element leaves no card and no selection', async ({ page, studio }) => {
   // The card stayed, empty, with "1 node selected" for an element that was gone.
   await studio.addFromPalette('Software System', await studio.nearBottom())
-  await studio.nodeByLabel('System').click()
+  await studio.nodeByLabel('System').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('System')
   await page.keyboard.press('ControlOrMeta+z')
   await expect(studio.nodes).toHaveCount(3)
@@ -230,7 +317,7 @@ for (const perspective of ['Viewer', 'Presenter']) {
 test('the Parent field moves an element into its new parent, and offers no loop', async ({ page, studio }) => {
   await studio.open('v-containers')
   const parent = studio.attribute('Parent')
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await parent.selectOption({ label: 'Bookstore' })
   await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'payments')?.parentId).toBe('bookstore')
   // It lies inside Bookstore's frame (it kept its old offset and lay outside).
@@ -250,7 +337,7 @@ test('the Parent field moves an element into its new parent, and offers no loop'
 })
 
 test('delete an element', async ({ page, studio }) => {
-  await studio.node('payments').click()
+  await studio.node('payments').dblclick()
   await studio.properties.getByRole('button', { name: /^Delete element/ }).click()
   await expect(studio.node('payments')).toHaveCount(0)
   await expect(studio.edges).toHaveCount(1)
@@ -301,7 +388,7 @@ test('Wrap into… makes room for the new parent beside what it wraps, also afte
   await studio.seed()
   await studio.open('v-containers')
   expect(await studio.layoutViolations()).toEqual([])
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   const actions = studio.properties.getByRole('region', { name: 'Actions' })
   await actions.getByRole('button', { name: /^Wrap into…/ }).click()
   await actions.getByRole('menu').getByRole('menuitem', { name: 'Group', exact: true }).click()
@@ -322,7 +409,7 @@ test('Wrap into… leaves what it wraps where it is, hugged by the new parent, a
   await studio.openSample('view-core')
   const docId = studio.activeDocId()
   const before = await studio.positions()
-  await studio.node('ctn-apigw').click()
+  await studio.node('ctn-apigw').dblclick()
   const actions = studio.properties.getByRole('region', { name: 'Actions' })
   await actions.getByRole('button', { name: /^Wrap into…/ }).click()
   await actions.getByRole('menu').getByRole('menuitem', { name: 'Group', exact: true }).click()
@@ -615,7 +702,7 @@ test('a menu of the activity rail answers ↑ and ↓ and closes when Tab leaves
 })
 
 test('Escape clears the selection on the canvas', async ({ page, studio }) => {
-  await studio.node('customer').click()
+  await studio.node('customer').dblclick()
   await expect(studio.attribute('Name')).toHaveValue('Customer')
   await studio.node('customer').focus()
   await page.keyboard.press('Escape')
@@ -666,7 +753,7 @@ test('Move to… with many parents stays in the window and scrolls', async ({ pa
   // Item 168: at 1280×720 its first item stood above the window.
   await page.setViewportSize({ width: 1280, height: 720 })
   await studio.openSample('view-payment-process')
-  await studio.nodeByLabel('Book the ledger').first().click()
+  await studio.nodeByLabel('Book the ledger').first().dblclick()
   // In the card, under its row.
   await studio.properties.getByRole('button', { name: /Move to…/ }).click()
   const menu = studio.properties.getByRole('menu')
@@ -684,7 +771,8 @@ test('Move to… with many parents stays in the window and scrolls', async ({ pa
 test('a name written in the table leaves the keyboard on its row', async ({ page, studio }) => {
   await studio.open('v-table')
   const row = page.locator('tr.tv-row[data-node-id="api"]')
-  await row.locator('.tv-chain-cell').dblclick()
+  await row.locator('.tv-chain-cell').click()
+  await page.keyboard.press('F2')
   await page.locator('.tv-cell-input').fill('Orders API')
   await page.keyboard.press('Enter')
   await expect(row).toBeFocused()

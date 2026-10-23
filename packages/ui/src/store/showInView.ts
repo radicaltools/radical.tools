@@ -13,10 +13,18 @@ import { useDiagramStore } from './diagramStore'
  *  view in the card's Views). */
 export const useShowRequest = create<{ nodeId: string | null; seq: number }>()(() => ({ nodeId: null, seq: 0 }))
 
-/** Whether the properties card is open over the view (RightPanel says): a
- *  wiki takes an open card along to the page read, and leaves a closed one
- *  closed. */
-export const useCardOpen = create<{ open: boolean }>()(() => ({ open: false }))
+/** The properties card: `requested` once it is asked for (a double-click on
+ *  an element, a relation or a row; Quick Search, the Inspector, a wiki
+ *  page's [properties]), until ✕ or nothing is selected; a click only
+ *  selects, and an open card follows it. `open` says whether it is open
+ *  over the view (RightPanel sets it): a wiki takes an open card along to
+ *  the page read, and leaves a closed one closed. */
+export const useCardOpen = create<{ open: boolean; requested: boolean }>()(() => ({ open: false, requested: false }))
+
+/** Opens the properties card on what is selected. */
+export function openCard(): void {
+  useCardOpen.setState({ requested: true })
+}
 
 /** Puts `nodeId` in sight on a view picked for it: the wiki shows its page,
  *  the hierarchy the level that draws it, a table or Warnier scrolls to it.

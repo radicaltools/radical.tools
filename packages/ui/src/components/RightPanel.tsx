@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
 import { MarkdownText } from './MarkdownText'
@@ -19,7 +19,7 @@ import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from
 import { firstViewOfGroup, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
-import { showNodeInView, useCardOpen } from '../store/showInView'
+import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
@@ -2769,7 +2769,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
                     onChange={(e) => { if (e.target.value) set('relationType', e.target.value) }}>
                     {!currentType && <option value="" disabled>— choose a type —</option>}
                     {!fitsNow && <option value={currentType}>{`${relTypeDef?.label ?? currentType} (does not connect these)`}</option>}
-                    {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.label}</option>)}
+                    {compatibleTypes.map(rt => <option key={rt.id} value={rt.id}>{relationTypeName(metamodel, rt.id, false, srcNode && dstNode ? { from: srcNode.type, to: dstNode.type } : undefined)}</option>)}
                   </select>
                 </AttrRow>
               )}
@@ -2847,32 +2847,39 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   // which would show one of them, stays out of the way of the next pick.
   const several = useDiagramStore((s) => s.selectedNodeIds.length > 1)
 
-  // What the card is about; ✕ hides it until something else is selected.
+  // What the card is about. A click only selects: the card opens when it
+  // is asked for (openCard: a double-click, Quick Search, …) and then
+  // follows the selection until ✕, or until nothing is selected. A
+  // sequence picked in its list shows at once.
   const subject = several ? null
     : selectedNodeId ? `node:${selectedNodeId}`
     : selectedEdgeId ? `edge:${selectedEdgeId}`
     : activeSequenceId ? `sequence:${activeSequenceId}`
     : null
-  const [dismissed, setDismissed] = useState<string | null>(null)
-  const open = !!subject && dismissed !== subject
-  const close = useCallback(() => setDismissed(subject), [subject])
+  const requested = useCardOpen((s) => s.requested)
+  const open = !!subject && (requested || subject.startsWith('sequence:'))
+  const close = useCallback(() => useCardOpen.setState({ requested: false }), [])
   useEffect(() => {
     useCardOpen.setState({ open })
     return () => useCardOpen.setState({ open: false })
   }, [open])
-  // Anything else selected, or nothing, ends it: the element picked again
-  // has its card. Kept until another ✕, the card never opened for it again.
+  // Nothing selected ends it, once the selection settles: a click on
+  // another element passes through none on its way.
   useEffect(() => {
-    if (dismissed !== null && dismissed !== subject) setDismissed(null)
-  }, [dismissed, subject])
+    if (subject) return
+    const timer = setTimeout(() => {
+      const s = useDiagramStore.getState()
+      if (!s.selectedNodeId && !s.selectedEdgeId && !s.activeSequenceId) useCardOpen.setState({ requested: false })
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [subject])
 
-  // An explicit "show its properties" (Quick Search, a table row's button)
-  // brings back a card that ✕ hid.
+  // An explicit "show its properties" from outside the views (Quick Search,
+  // the Inspector, a wiki page's [properties]) opens the card.
   useEffect(() => {
     const w = window as unknown as { __radicalExpandRightPanel?: () => void }
-    const reopen = () => setDismissed(null)
-    w.__radicalExpandRightPanel = reopen
-    return () => { if (w.__radicalExpandRightPanel === reopen) delete w.__radicalExpandRightPanel }
+    w.__radicalExpandRightPanel = openCard
+    return () => { if (w.__radicalExpandRightPanel === openCard) delete w.__radicalExpandRightPanel }
   }, [])
 
   const [width, setWidth] = useState<number>(() => {

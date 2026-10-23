@@ -54,6 +54,8 @@ import {
   wizardLinksOf,
   type WizardLink,
   relationDisplayLabel,
+  relationTypeForProse,
+  relationTypeName,
 } from '@radical/common/metamodel'
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
@@ -67,7 +69,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
@@ -93,7 +95,7 @@ export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
-import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, addToViewList, holderOf, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -2523,6 +2525,7 @@ function deriveRFEdges(
   viewCollapsedSet?: Set<string>,
   hiddenRelationIds?: Set<string>,
   expandedSet?: Set<string>,
+  metamodel?: Metamodel,
 ): Edge<C4EdgeRFData>[] {
   const rfEdges: Edge<C4EdgeRFData>[] = []
   // Track virtual edges already emitted to avoid duplicates
@@ -2605,6 +2608,7 @@ function deriveRFEdges(
         label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
+        ...(rel.relationType ? { typeName: relationTypeName(metamodel, rel.relationType, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined) } : {}),
         isVirtual,
       },
     })
@@ -2810,6 +2814,10 @@ interface DiagramStore {
 
   // ── connect mode ──
   connectSource: string | null
+  /** The end of a relation being dragged by its reconnect handle: the
+   *  canvas marks where it can go while the connection key is held. */
+  relinking: { relationId: string; end: 'source' | 'target' } | null
+  setRelinking: (relinking: { relationId: string; end: 'source' | 'target' } | null) => void
   connectionModifier: 'shift' | 'ctrl' | 'alt' | 'meta'
   /** A relation drawn between two elements that several relation types
    *  fit, or one whose end is moved onto such a pair (`relationId`): the
@@ -2868,8 +2876,9 @@ interface DiagramStore {
   updateRelation: (id: string, updates: Partial<Omit<C4Relation, 'id'>>) => void
   /** An end of a relation moved on the canvas (its reconnect handle): as
    *  updateRelation, and where the type it has does not fit the new pair
-   *  and several do, asked about first (relationTypeChoice). */
-  moveRelationEnd: (id: string, updates: Pick<Partial<C4Relation>, 'sourceId' | 'targetId'>) => void
+   *  and several do, asked about first (relationTypeChoice); with
+   *  `relationType` (a field of the drop panel), of that type. */
+  moveRelationEnd: (id: string, updates: Pick<Partial<C4Relation>, 'sourceId' | 'targetId'>, relationType?: string) => void
   removeRelation: (id: string) => void
   onConnect: (connection: Connection) => void
   /** A relation drawn on the canvas (a handle, Alt-drag): refused where the
@@ -3703,6 +3712,28 @@ export const useDiagramStore = create<DiagramStore>()(
       return { ...node, x: Math.max(node.x, pad.side), y: Math.max(node.y, pad.top) }
     }
 
+    /**
+     * An element the user adds (the palette, a wizard, a + row): a container
+     * holds nothing yet, so the canvas draws it at its folded size, and it is
+     * stored at that size (its parent then frames what is drawn; it grows
+     * once something goes in it); in a parent it goes to the next cell of the
+     * grid of the parent's children, the first centred in the parent as it
+     * will be fitted to hold it, whatever the drop point. What other callers
+     * add (a paste, an import, an agent) keeps the place and size it has.
+     */
+    const _placeInGrid = <T extends Omit<C4Node, 'id'>>(node: T): T => {
+      const sized = isContainerType(node.type) && !node.collapsed ? { ...node, ...drawnSize(node as unknown as C4Node, false) } : node
+      const { c4Nodes, activeViewId } = get()
+      const parent = sized.parentId ? c4Nodes[sized.parentId] : undefined
+      const view = viewById(get(), activeViewId)
+      if (!parent || nodeEffectivelyCollapsedInView(parent, activeViewId, view)) return sized
+      const shown = view ? computeViewNodeSet(view, c4Nodes, get().c4Relations) : null
+      const size = { width: sized.width, height: sized.height }
+      const pad = compoundPadding(parent.type)
+      const fitted = fittedParentSize(parent, [{ x: pad.side, y: pad.top, ...size }])
+      return { ...sized, ...gridSlotIn(c4Nodes, parent.id, size, (c) => !shown || shown.has(c.id), fitted) }
+    }
+
     /** An undo step of the exploration's undone or redone: it is as it was
      *  (`x`, its places included), shown. */
     const _restoreExploration = (x: Exploration): void => {
@@ -3854,6 +3885,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (get().lowDetail !== low) set((state) => { state.lowDetail = low })
       },
       connectSource: null,
+      relinking: null,
       relationTypeChoice: null,
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
@@ -3954,7 +3986,7 @@ export const useDiagramStore = create<DiagramStore>()(
             : undefined
           // Lines end only at elements the view shows, not at its frames.
           const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
-          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet)
+          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet, state.metamodel as Metamodel | undefined)
           // The exploration's containment lines: a child and its parent on
           // the next level, joined (it draws them apart). Not relations of
           // the model: drawn only.
@@ -4123,6 +4155,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── node wizard ──────────────────────────────────────────────────────
       requestCreateNode(node, opts = {}) {
+        node = _placeInGrid(node)
         const links = opts.links ?? []
         const wizard = wizardFor(get().metamodel, node.type, 'create')
         if (wizard && !opts.skipWizard && loadStudioSettings().nodeWizardOnCreate) {
@@ -4675,8 +4708,17 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
       },
 
-      moveRelationEnd(id, updates) {
+      moveRelationEnd(id, updates, relationType) {
         const s = get()
+        if (relationType) {
+          // Kept: the type must join the new pair itself (checkPatchRelation
+          // asks only whether some type does).
+          const rel = s.c4Relations[id]
+          const refusal = rel && model.checkAddRelation(s, { sourceId: updates.sourceId ?? rel.sourceId, targetId: updates.targetId ?? rel.targetId, relationType })
+          if (refusal) { s.pushNotification(refusal, 'error'); return }
+          s.updateRelation(id, rel?.relationType === relationType ? updates : { ...updates, relationType })
+          return
+        }
         const refused = model.checkPatchRelation(s, id, updates)
         if (refused) { s.pushNotification(refused, 'error'); return }
         const fit = model.relationTypeOnMove(s, id, updates)
@@ -4710,6 +4752,13 @@ export const useDiagramStore = create<DiagramStore>()(
         const label = (type: string) => s.metamodel?.nodeTypes[type]?.label ?? type
         if (!isRelationAllowed(s.metamodel, source.type, target.type)) {
           s.pushNotification(`Relation not allowed: ${label(source.type)} → ${label(target.type)}. The metamodel does not permit this connection.`, 'error')
+          return
+        }
+        // Containment already joins an element and what holds it (but a
+        // transition to an enclosing state): asked for no type first.
+        const holder = holderOf(s.c4Nodes, source, target)
+        if (holder && !relationTypesFitting(s.metamodel, source.type, target.type).some((rt) => rt.id === 'transition')) {
+          s.pushNotification(`Relation not allowed: ${holder.label} holds ${(holder === source ? target : source).label}, and containment already joins them.`, 'error')
           return
         }
         // On a canvas whose filter is a chain, the relation is one the chain
@@ -5119,7 +5168,16 @@ export const useDiagramStore = create<DiagramStore>()(
         // It rebases the element's place on every canvas: in a milestone,
         // on the live views too, which Discard and Save as new left so.
         get()._milestoneViewEdit('every')
-        set((state) => { model.reparentNodes(state, ids, newParentId) })
+        // Its relations with what now holds it go: containment joins them.
+        let removed: string[] = []
+        set((state) => {
+          const label = (id: string): string => state.c4Nodes[id]?.label || id
+          removed = model.reparentNodes(state, ids, newParentId).map((r) =>
+            `${label(r.sourceId)} ${(() => { const type = relationTypeForProse(r as C4Relation, state.c4Nodes as Record<string, C4Node>, state.metamodel as Metamodel | undefined); return type ? relationTypeName(state.metamodel as Metamodel | undefined, type, true) : 'relates to' })()} ${label(r.targetId)}`)
+        })
+        if (removed.length) {
+          get().pushNotification(`Removed ${removed.length === 1 ? 'the relation' : `${removed.length} relations`} ${removed.join('; ')}: containment already joins ${removed.length === 1 ? 'them' : 'each pair'}.`, 'warning')
+        }
 
         // On the canvas shown (model.reparentNodes saw to the others).
         const shownNodes = settleMoveOnShownCanvas(get(), ids, oldParentId ? [oldParentId] : [])
@@ -6573,6 +6631,12 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = { phase: 'candidates', done: 0, total: 10 } })
         try {
           const input = layoutInputForView(get())
+          // A view that shows nothing yet (a new model's views) has nothing
+          // to lay out, and nothing to warn about: its first layout waits.
+          if (!Object.keys(input.nodes).length) {
+            if (firstOpen && _firstLayoutOf === firstOpen) _firstLayoutOf = null
+            return
+          }
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
           const present = parentsOf(get().c4Nodes)
@@ -6874,6 +6938,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
       setConnectionModifier(mod) {
         set((state) => { state.connectionModifier = mod })
+      },
+
+      setRelinking(relinking) {
+        set((state) => { state.relinking = relinking })
       },
 
       startConnection(sourceId) {

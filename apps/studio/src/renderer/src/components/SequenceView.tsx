@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { openCard } from '@radical/ui/store/showInView'
 import { computeStepDiff, milestoneOnCanvas, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, isBackwardStep } from '@radical/common/c4'
 import type { C4Node, C4Relation } from '@radical/common/c4'
@@ -286,6 +287,7 @@ export function SequenceView(): React.ReactElement {
           key={`hd-${yTop}-${p.id}`}
           style={{ cursor: 'pointer', opacity: dk === 'removed' ? 0.65 : 1 }}
           onClick={(e) => { e.stopPropagation(); selectNode(p.id) }}
+          onDoubleClick={(e) => { e.stopPropagation(); selectNode(p.id); openCard() }}
         >
           {shape}
           <text

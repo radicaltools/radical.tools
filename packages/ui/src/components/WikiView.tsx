@@ -19,6 +19,7 @@ import {
   nodeTypeCategory,
   propertyText,
   relationPhrase,
+  relationTypeName,
   countedNoun,
   typeNoun,
   firstParagraph,
@@ -27,6 +28,7 @@ import {
 } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { WikiMenu, type WikiMenuItem, type WikiMenuPage } from './WikiMenu'
+import { AddPicker, type PickerWay } from './AddPicker'
 import { fieldTitle, wikiSearchHit, type WikiSearchHit } from './wikiSearch'
 import { elementFromLine, writtenLines } from './wikiWrite'
 import { EarsQuickEntry } from './EarsQuickEntry'
@@ -45,8 +47,8 @@ import {
   TYPE_LABELS,
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
-import { wikiDepthOf, type ViewSort } from '@radical/common/c4'
-import { newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
+import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
+import { addChoices, chainTypes, linkCandidates, newElementFilters, pipelineOf, runPipeline, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
@@ -69,14 +71,16 @@ function allNodeTypeIds(metamodel: Metamodel): string[] {
 
 // Node types that may be created as a child of `parent` (undefined → root),
 // where it stands in the model: a group holds only what its place allows.
+// With `viewTypes` (chainTypes), only those the view's filter shows.
 function childTypeOptions(
   metamodel: Metamodel,
   parent: C4Node | undefined,
   nodes: Record<string, C4Node>,
   typeMeta: TypeMeta,
+  viewTypes: Set<string> | null,
 ): TypeOption[] {
   return allNodeTypeIds(metamodel)
-    .filter((t) => isPlacementAllowed(metamodel, t, parent, nodes))
+    .filter((t) => (!viewTypes || viewTypes.has(t)) && isPlacementAllowed(metamodel, t, parent, nodes))
     .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
@@ -216,6 +220,15 @@ interface WikiActions {
   setEditingRelation: (editing: { ownerId: string; relationId: string } | null) => void
   factsFor: string | null
   setFactsFor: (nodeId: string | null) => void
+  /** The types the view's filter shows (chainTypes), the only ones offered
+   *  to add; null for a view without a chain. */
+  viewTypes: Set<string> | null
+  /** The elements of `type` that could be linked under `under` instead of a
+   *  new one, and the link they would get; null where a child of that type
+   *  is held inside (a move, not a link). */
+  existingFor: (type: string, under: C4Node | null) => { link: WizardLink; candidates: C4Node[] } | null
+  /** Links an existing element under the element `link` names. */
+  linkExisting: (nodeId: string, link: WizardLink) => void
 }
 
 const WikiActionsContext = createContext<WikiActions | null>(null)
@@ -260,15 +273,15 @@ function menuUnderButton(
 // normally, or via the hierarchyRelation's allowedPairs (whichever types may
 // derive from this node's type) when its type nests by a relation. Such a
 // child sits beside `node`, in its container, and must be allowed there.
-function childTypesOf(node: C4Node, nodes: Record<string, C4Node>, metamodel: Metamodel, typeMeta: TypeMeta): TypeOption[] {
+function childTypesOf(node: C4Node, nodes: Record<string, C4Node>, metamodel: Metamodel, typeMeta: TypeMeta, viewTypes: Set<string> | null): TypeOption[] {
   const hierarchy = metamodel?.nodeTypes[node.type]?.hierarchyRelation
-  if (!hierarchy) return childTypeOptions(metamodel, node, nodes, typeMeta)
+  if (!hierarchy) return childTypeOptions(metamodel, node, nodes, typeMeta, viewTypes)
   const fromTypes = new Set(
     (metamodel?.relationTypes[hierarchy]?.allowedPairs ?? []).filter((p) => p.to === node.type).map((p) => p.from),
   )
   const container = node.parentId ? nodes[node.parentId] : undefined
   return [...fromTypes]
-    .filter((t) => isPlacementAllowed(metamodel, t, container, nodes))
+    .filter((t) => (!viewTypes || viewTypes.has(t)) && isPlacementAllowed(metamodel, t, container, nodes))
     .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
@@ -342,15 +355,22 @@ function relationReadingsOf(
         return (def.allowedPairs.length === 0 || def.allowedPairs.some((pair) => pair.from === from.type && pair.to === to.type))
           && relationTypeKeepsAggregates(def.id, from, to)
       })
-      if (partners.length === 0) continue
-      const phrase = relationPhrase(def, direction)
-      readings.push({
-        key: `${direction}:${def.id}`,
-        typeId: def.id,
-        direction,
-        text: phrase.reads ? capitalise(phrase.text) : `← ${def.label}`,
-        partners,
-      })
+      // One reading per way the pair reads ("Uses…", "Delivers to…").
+      const byText = new Map<string, C4Node[]>()
+      for (const n of partners) {
+        const phrase = relationPhrase(def, direction, direction === 'out' ? { from: node.type, to: n.type } : { from: n.type, to: node.type })
+        const text = phrase.reads ? capitalise(phrase.text) : `← ${def.label}`
+        byText.set(text, [...(byText.get(text) ?? []), n])
+      }
+      for (const [text, those] of byText) {
+        readings.push({
+          key: `${direction}:${def.id}${byText.size > 1 ? `:${text}` : ''}`,
+          typeId: def.id,
+          direction,
+          text,
+          partners: those,
+        })
+      }
     }
   }
   return readings
@@ -463,6 +483,8 @@ export function WikiView(): React.ReactElement {
 
   // The one menu of the view, and the editors a menu opens in a page.
   const [menu, setMenu] = useState<{ target: MenuTarget; at: MenuPoint } | null>(null)
+  // Add or link…, opened from an element's menu where that menu stood.
+  const [picker, setPicker] = useState<{ at: MenuPoint; nodeId: string } | null>(null)
   const [editingRelation, setEditingRelation] = useState<WikiActions['editingRelation']>(null)
   const [factsFor, setFactsFor] = useState<string | null>(null)
   // The elements written in a line under a heading: no wizard and no change
@@ -502,7 +524,11 @@ export function WikiView(): React.ReactElement {
     return ids
   }
 
+  const viewTypes = useMemo(() => chainTypes(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }), [view, c4Nodes, c4Relations, metamodel])
   const actions: WikiActions = {
+    viewTypes,
+    existingFor: (type, under) => existingFor(type, under),
+    linkExisting: (nodeId, link) => linkExisting(nodeId, link),
     readOnly,
     openMenu: (target, at) => setMenu({ target, at }),
     write: writeElements,
@@ -518,9 +544,9 @@ export function WikiView(): React.ReactElement {
   // `link` is created along with the node (and offered pre-checked by the
   // wizard) — e.g. the hierarchyRelation edge for a Requirement "deriving
   // from" the one it's a child of (see WikiElementPage's onCreateChild).
-  const createNode = (type: string, parentId: string | undefined, link?: WizardLink) => {
+  const createNode = (type: string, parentId: string | undefined, link?: WizardLink, properties?: Record<string, string>, name = '') => {
     const def = metamodel?.nodeTypes[type]
-    const label = `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
+    const label = name || `New ${def?.label ?? TYPE_LABELS[type as C4ElementType] ?? type}`
     const size = nodeTypeSize(type, metamodel)
     requestCreateNode({
       type: type as C4ElementType,
@@ -533,6 +559,7 @@ export function WikiView(): React.ReactElement {
       x: 0,
       y: 0,
       ...size,
+      ...properties,
     }, {
       links: link ? [link] : [],
       onCreated: (id) => {
@@ -557,6 +584,56 @@ export function WikiView(): React.ReactElement {
     addRelation({ sourceId, targetId, ...(relationType ? { relationType } : {}) })
   }
 
+  // What may be added under `node`: on the next level of the view's chain
+  // when the page's element is on it (as the table's + offers), else the
+  // types it may hold or that nest under it by their hierarchy relation. A
+  // choice with a link hangs under it by a relation, so an element the
+  // model has already can be linked instead of a new one.
+  type ChildChoice = { type: string; group: string; parentId?: string; link?: WizardLink; properties?: Record<string, string>; filters?: ViewFilter[] }
+  const childChoicesOf = (node: C4Node): ChildChoice[] => {
+    const ctx = { nodes: c4Nodes, relations: c4Relations, metamodel }
+    const row = pipelineOf(view ?? undefined)?.levels?.length ? runPipeline(view ?? undefined, ctx).rows?.find((r) => r.node.id === node.id) : undefined
+    if (row) {
+      // The level's filters: an element linked there must pass them to show.
+      const filters = pipelineOf(view ?? undefined)?.levels?.[row.depth + 1]?.filters
+      return addChoices(view ?? undefined, ctx, { node, depth: row.depth })
+        .filter((c) => !c.hidden && (!viewTypes || viewTypes.has(c.type)))
+        .map((c) => ({ type: c.type, group: c.group, parentId: c.parentId, link: c.link, properties: c.properties, filters }))
+    }
+    const categoryRank = (type: string): number => NODE_TYPE_CATEGORIES.findIndex((c) => c.types.includes(type))
+    const hierarchy = metamodel?.nodeTypes[node.type]?.hierarchyRelation
+    // How a child that nests by the relation reads from `node`: "Refined into".
+    const nests = hierarchy ? relationPhrase(metamodel?.relationTypes[hierarchy], 'in') : undefined
+    return childTypesOf(node, c4Nodes, metamodel, typeMeta, viewTypes)
+      .sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
+      .map((t) => ({
+        type: t.id,
+        group: nests?.reads ? nests.text : nodeTypeCategory(t.id).label,
+        // A type that nests by a relation (a requirement under a need)
+        // becomes a child through that relation, in the same container as
+        // `node`; any other is placed inside `node`.
+        ...(hierarchy
+          ? { parentId: node.parentId, link: { relationType: hierarchy, direction: 'out' as const, otherId: node.id } }
+          : { parentId: node.id }),
+      }))
+  }
+
+  const existingFor: WikiActions['existingFor'] = (type, under) => {
+    const choice = under ? childChoicesOf(under).find((c) => c.type === type) : undefined
+    return choice?.link ? { link: choice.link, candidates: linkCandidates(type, choice.link, { nodes: c4Nodes, relations: c4Relations, metamodel }, choice.filters) } : null
+  }
+
+  // The link only: the element stays where it is.
+  const linkExisting = (nodeId: string, link: WizardLink) => {
+    const [source, target] = link.direction === 'out' ? [nodeId, link.otherId] : [link.otherId, nodeId]
+    createRelation(source, target, link.relationType)
+    const s = useDiagramStore.getState()
+    const label = s.c4Nodes[nodeId]?.label ?? nodeId
+    const shown = viewShownNodes(s.activeViewId ? s.views[s.activeViewId] : undefined, s.c4Nodes, s.c4Relations)
+    if (shown && !shown.has(nodeId)) pushNotification(`${label} was linked, but this view's filter does not show it.`, 'warning')
+    else pushNotification(`${label} linked to ${s.c4Nodes[link.otherId]?.label ?? link.otherId}.`, 'info')
+  }
+
   const deleteRelation = (id: string) => {
     removeRelation(id)
   }
@@ -569,36 +646,35 @@ export function WikiView(): React.ReactElement {
     )
   }
 
-  // Elements by type as the pages list them, for the lists of a menu.
-  const byTypeThenName = (a: C4Node, b: C4Node): number => {
-    const rank = (type: string): number => (typeOrder.indexOf(type) < 0 ? typeOrder.length : typeOrder.indexOf(type))
-    return rank(a.type) - rank(b.type) || a.label.localeCompare(b.label)
-  }
 
-  // "Add relationship", in two steps that read as the sentence the page
-  // will then write: how the relation reads from this element ("Uses…",
-  // "Constrained by…"), then the element it names.
-  const relationshipPage = (node: C4Node): WikiMenuPage => ({
-    title: 'Add relationship',
-    emptyHint: 'No relation is allowed from here',
-    items: relationReadingsOf(node, c4Nodes, c4Relations, shownSet, metamodel).map((reading) => ({
-      id: reading.key,
+  // What Add or link… offers under `node`: each type that may hang under
+  // it, new or one the model has, linked; then each other relationship it
+  // may have, how it reads from it ("Uses…"), to an element on the view.
+  const pickerWays = (node: C4Node): PickerWay[] => {
+    const ctx = { nodes: c4Nodes, relations: c4Relations, metamodel }
+    const children = childChoicesOf(node).map((choice): PickerWay => ({
+      key: `child|${choice.type}|${choice.link?.relationType ?? ''}`,
+      label: typeMeta(choice.type).label,
+      caption: choice.group && choice.group !== 'Add' && !NODE_TYPE_CATEGORIES.some((c) => c.label === choice.group) ? choice.group.toLowerCase() : undefined,
+      kind: 'child',
+      create: { noun: typeNoun(typeMeta(choice.type).label), run: (name) => createNode(choice.type, choice.parentId, choice.link, choice.properties, name) },
+      linkable: !!choice.link,
+      candidates: linkCandidates(choice.type, choice.link, ctx, choice.filters),
+      link: (nodeId) => linkExisting(nodeId, choice.link!),
+    }))
+    const rank = (type: string): number => (typeOrder.indexOf(type) < 0 ? typeOrder.length : typeOrder.indexOf(type))
+    const relations = relationReadingsOf(node, c4Nodes, c4Relations, shownSet, metamodel).map((reading): PickerWay => ({
+      key: `relation|${reading.key}`,
       label: `${reading.text}…`,
-      page: () => ({
-        title: reading.text,
-        items: [...reading.partners].sort(byTypeThenName).map((other) => ({
-          id: other.id,
-          label: other.label,
-          color: typeMeta(other.type).color,
-          group: capitalise(typeNoun(typeMeta(other.type).label, true)),
-          onSelect: () =>
-            reading.direction === 'out'
-              ? createRelation(node.id, other.id, reading.typeId)
-              : createRelation(other.id, node.id, reading.typeId),
-        })),
-      }),
-    })),
-  })
+      kind: 'relation',
+      linkable: true,
+      candidates: [...reading.partners].sort((a, b) => rank(a.type) - rank(b.type) || a.label.localeCompare(b.label)),
+      link: (otherId) => (reading.direction === 'out'
+        ? createRelation(node.id, otherId, reading.typeId)
+        : createRelation(otherId, node.id, reading.typeId)),
+    }))
+    return [...children, ...relations]
+  }
 
   const menuPage = (target: MenuTarget): WikiMenuPage => {
     const node = target.nodeId ? c4Nodes[target.nodeId] : undefined
@@ -621,38 +697,20 @@ export function WikiView(): React.ReactElement {
       })
     }
     if (node && !relation) {
-      const categoryRank = (type: string): number => NODE_TYPE_CATEGORIES.findIndex((c) => c.types.includes(type))
-      const childTypes = childTypesOf(node, c4Nodes, metamodel, typeMeta).sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
-      if (childTypes.length > 0) {
+      const ways = pickerWays(node)
+      if (ways.length > 0) {
         items.push({
-          id: 'add-child',
-          label: 'Add child',
+          id: 'add-or-link',
+          label: 'Add or link…',
           separated: true,
-          page: () => ({
-            title: 'Add child',
-            items: childTypes.map((type) => ({
-              id: type.id,
-              label: type.label,
-              color: type.color,
-              group: nodeTypeCategory(type.id).label,
-              onSelect: () => {
-                // A type that nests by a relation (a requirement under a
-                // need) becomes a child through that relation, in the same
-                // container as `node`; any other is placed inside `node`.
-                const hierarchy = metamodel?.nodeTypes[node.type]?.hierarchyRelation
-                if (hierarchy) createNode(type.id, node.parentId, { relationType: hierarchy, direction: 'out', otherId: node.id })
-                else createNode(type.id, node.id)
-              },
-            })),
-          }),
+          onSelect: () => {
+            const at = menu?.at ?? { x: 0, y: 0 }
+            // The picker is wider than the menu: one under a button at the
+            // right of a page ends where the button does.
+            setPicker({ at: at.alignRight ? { x: at.x - PICKER_WIDTH, y: at.y } : at, nodeId: node.id })
+          },
         })
       }
-      items.push({
-        id: 'add-relationship',
-        label: 'Add relationship',
-        separated: childTypes.length === 0,
-        page: () => relationshipPage(node),
-      })
       items.push({
         id: 'facts',
         label: 'Edit facts',
@@ -750,6 +808,15 @@ export function WikiView(): React.ReactElement {
           at={menu.at}
           root={menuPage(menu.target)}
           onClose={() => setMenu(null)}
+        />
+      )}
+      {picker && !readOnly && c4Nodes[picker.nodeId] && (
+        <AddPicker
+          at={picker.at}
+          under={c4Nodes[picker.nodeId]}
+          ways={pickerWays(c4Nodes[picker.nodeId])}
+          typeLabel={(type) => typeMeta(type).label}
+          onClose={() => setPicker(null)}
         />
       )}
       <DeleteConfirmDialog />
@@ -1241,7 +1308,7 @@ function WikiChildren({
   // divided, not something a line of text names: it is added from the menu.
   const writable = writeUnder === undefined || actions.readOnly
     ? []
-    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta) : childTypeOptions(metamodel, undefined, nodes, typeMeta))
+    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta, actions.viewTypes) : childTypeOptions(metamodel, undefined, nodes, typeMeta, actions.viewTypes))
         .filter((t) => t.id !== GROUP_TYPE)
         .sort((a, b) => rank(a.id) - rank(b.id))
   // The headings opened to write the first element of a type under.
@@ -1440,6 +1507,12 @@ function WikiStartRow({ hint, types, under, nodes, metamodel, folded, onStart }:
 // its lines, once that is confirmed.
 const WRITE_PREVIEW = 5
 
+// The width of Add or link… (.add-picker), to open it left of a button.
+const PICKER_WIDTH = 360
+
+// At most this many elements are suggested to link under a writing line.
+const SUGGEST_MAX = 5
+
 function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }: {
   type: string
   typeLabel: string
@@ -1489,6 +1562,24 @@ function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }:
     inputRef.current?.focus()
   }
 
+  // The elements of the type the model has already whose name holds what
+  // is being written: one is linked here instead of a new one made.
+  const suggestRef = useRef<HTMLDivElement | null>(null)
+  const query = draft.trim().toLowerCase()
+  const existing = query.length >= 2 && !draft.includes('\n') ? actions.existingFor(type, under) : null
+  const matches = existing ? existing.candidates.filter((n) => n.label.toLowerCase().includes(query)).slice(0, SUGGEST_MAX) : []
+  const link = (nodeId: string): void => {
+    if (!existing) return
+    actions.linkExisting(nodeId, existing.link)
+    onWritten([nodeId])
+    setWrites((n) => n + 1)
+    setDraft('')
+    if (inputRef.current) {
+      inputRef.current.style.height = ''
+      inputRef.current.focus()
+    }
+  }
+
   const noun = typeNoun(typeLabel)
   return (
     <div className="wiki-write">
@@ -1516,6 +1607,10 @@ function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }:
             setDraft('')
             e.currentTarget.blur()
           }
+          if (e.key === 'ArrowDown' && matches.length) {
+            e.preventDefault()
+            suggestRef.current?.querySelector<HTMLElement>('button')?.focus()
+          }
         }}
         onPaste={(e) => {
           const lines = writtenLines(e.clipboardData.getData('text/plain'))
@@ -1525,6 +1620,28 @@ function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }:
         }}
       />
       <span className="wiki-write-hint">Enter adds it. Paste a list to add one for each line.</span>
+      {matches.length > 0 && (
+        <div
+          ref={suggestRef}
+          className="wiki-write-suggest"
+          role="group"
+          aria-label={`Link an existing ${noun}`}
+          onKeyDown={(e) => {
+            const items = [...(suggestRef.current?.querySelectorAll<HTMLElement>('button') ?? [])]
+            const at = items.indexOf(document.activeElement as HTMLElement)
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(at + 1, items.length - 1)]?.focus() }
+            if (e.key === 'ArrowUp') { e.preventDefault(); (at <= 0 ? inputRef.current : items[at - 1])?.focus() }
+            if (e.key === 'Escape') inputRef.current?.focus()
+          }}
+        >
+          <span className="wiki-write-suggest-hint">Or link one the model has:</span>
+          {matches.map((n) => (
+            <button key={n.id} className="wiki-write-suggest-item" onClick={() => link(n.id)}>
+              ↗ {n.label}
+            </button>
+          ))}
+        </div>
+      )}
       {pasted && (
         <div
           className="wiki-write-pasted"
@@ -1597,9 +1714,10 @@ function WikiOverview({
   pageMode: 'single' | 'multi'
   remainingDepth?: number
 }): React.ReactElement {
+  const { viewTypes } = useWikiActions()
   const rootTypes = useMemo(
-    () => childTypeOptions(metamodel, undefined, nodes, typeMeta),
-    [metamodel, typeMeta],
+    () => childTypeOptions(metamodel, undefined, nodes, typeMeta, viewTypes),
+    [metamodel, typeMeta, viewTypes],
   )
   const articleRef = useRef<HTMLElement | null>(null)
   useFirstMentions(articleRef)
@@ -2582,7 +2700,7 @@ function WikiRelationLine({
                 options={[
                   ...(!currentType ? [{ value: '', label: '— choose a type —', disabled: true }] : []),
                   ...(!fitsNow ? [{ value: currentType, label: `${relTypeDef?.label ?? currentType} (does not connect these)` }] : []),
-                  ...compatibleTypes.map((rt) => ({ value: rt.id, label: rt.label })),
+                  ...compatibleTypes.map((rt) => ({ value: rt.id, label: relationTypeName(metamodel, rt.id, false, srcNode && dstNode ? { from: srcNode.type, to: dstNode.type } : undefined) })),
                 ]}
                 display={<span>{relTypeDef?.label ?? 'no type'}</span>}
                 onCommit={(v) => {

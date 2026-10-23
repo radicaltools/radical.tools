@@ -90,7 +90,7 @@ test('the changes since the base show on the canvas, in the list of views and on
   await expect(studio.node('shop')).not.toContainText(/NEW|CHANGED|REMOVED/)
 
   // The card names what changed, word by word.
-  await studio.node('api').click()
+  await studio.node('api').dblclick()
   const changes = studio.properties.getByRole('region', { name: 'Changes on branch' })
   await expect(changes).toContainText('Changed')
   await expect(changes.locator('.pp-branch-name')).toHaveText(['Description'])

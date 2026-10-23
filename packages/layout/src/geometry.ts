@@ -137,6 +137,55 @@ export function placeBesideSiblings(
   }
 }
 
+/** Where a lone child of `size` stands in a frame of `frame`: centred
+ *  across it, and down it below the header (`pad.top`), never nearer an
+ *  edge than the padding. */
+export function centredIn(frame: { width: number; height: number }, size: { width: number; height: number }, pad: { top: number; side: number; bottom: number }): { x: number; y: number } {
+  return {
+    x: Math.max(pad.side, Math.round((frame.width - size.width) / 2)),
+    y: pad.top + Math.max(0, Math.round((frame.height - pad.top - pad.bottom - size.height) / 2)),
+  }
+}
+
+/** The gap between the cells of a container's grid of children. */
+const GRID_GAP = 20
+
+/**
+ * Where an element of `size` goes in `parentId`: the first free cell of a
+ * grid of the children `counts` accepts, as wide as their widest and as
+ * high as their highest, growing wider than tall (landscapeSlot), from
+ * where the children start (below the header, inside the padding); in an
+ * empty parent, centred in its
+ * frame (`frame`, the parent's size where not given) below the header. The
+ * children stay where they are: a cell any of them lies on is taken.
+ * Sizes are as the canvas draws them.
+ */
+export function gridSlotIn(
+  nodes: Record<string, C4Node>,
+  parentId: string,
+  size: { width: number; height: number },
+  counts: (child: C4Node) => boolean = () => true,
+  frame?: { width: number; height: number },
+): { x: number; y: number } {
+  const parent = nodes[parentId]
+  const pad = compoundPadding(parent?.type ?? 'system')
+  const kids = Object.values(nodes).filter((c) => c.parentId === parentId && counts(c))
+  if (!kids.length) return centredIn(frame ?? { width: parent?.width ?? 0, height: parent?.height ?? 0 }, size, pad)
+  const cellW = Math.max(size.width, ...kids.map(effectiveWidth))
+  const cellH = Math.max(size.height, ...kids.map(effectiveHeight))
+  const taken = kids.map((c) => ({ x: c.x, y: c.y, w: effectiveWidth(c), h: effectiveHeight(c) }))
+  // From where the children start (the first may stand centred), so the
+  // next goes beside it.
+  const left = Math.max(pad.side, Math.min(...kids.map((c) => c.x)))
+  const top = Math.max(pad.top, Math.min(...kids.map((c) => c.y)))
+  for (let i = 0; i < 10_000; i++) {
+    const { column, row } = landscapeSlot(i)
+    const box = { x: left + column * (cellW + GRID_GAP), y: top + row * (cellH + GRID_GAP), w: size.width, h: size.height }
+    if (!taken.some((t) => boxesOverlap(box, t))) return { x: box.x, y: box.y }
+  }
+  return placeBesideSiblings(nodes, parentId, counts)
+}
+
 /** A box as a canvas draws it. */
 export type CanvasBox = { x: number; y: number; w: number; h: number }
 
@@ -207,18 +256,32 @@ export function settleMovedNodes(
   const touched: string[] = []
   const settle = (moved: string[], on: CanvasShape): void => {
     const waiting = new Set(moved)
+    // Placed alone in its parent: centred across it once the parent fits.
+    const alone: string[] = []
     for (const id of moved) {
       const node = nodes[id]
       if (!liesClearInParent(node, nodes, on, (s) => waiting.has(s.id))) {
-        const at = placeBesideSiblings(nodes, node.parentId, (s) => s.id !== id && !waiting.has(s.id) && on.shown(s))
+        const counts = (s: C4Node): boolean => s.id !== id && !waiting.has(s.id) && on.shown(s)
+        // In a parent, the next cell of its children's grid.
+        const box = on.boxOf(node)
+        const at = node.parentId && nodes[node.parentId]
+          ? gridSlotIn(nodes, node.parentId, { width: box.w, height: box.h }, (s) => counts(s), { width: on.boxOf(nodes[node.parentId]).w, height: on.boxOf(nodes[node.parentId]).h })
+          : placeBesideSiblings(nodes, node.parentId, counts)
         node.x = at.x
         node.y = at.y
         touched.push(id)
+        if (node.parentId && !Object.values(nodes).some((s) => s.parentId === node.parentId && counts(s)) && moved.filter((m) => nodes[m]?.parentId === node.parentId).length === 1) alone.push(id)
       }
       waiting.delete(id)
     }
     const parents = [...new Set(moved.map((id) => nodes[id].parentId).filter((p): p is string => !!p && !!nodes[p]))]
     for (const parentId of parents) touched.push(...growWithRoom(nodes, parentId, on, fit))
+    for (const id of alone) {
+      const node = nodes[id]
+      const frame = on.boxOf(nodes[node.parentId!])
+      const box = on.boxOf(node)
+      Object.assign(node, centredIn({ width: frame.w, height: frame.h }, { width: box.w, height: box.h }, compoundPadding(nodes[node.parentId!].type)))
+    }
   }
   settle(ids.filter((id) => nodes[id] && canvas.shown(nodes[id])), canvas)
   if (opened) settle(ids.filter((id) => nodes[id] && !canvas.shown(nodes[id]) && opened.shown(nodes[id])), opened)

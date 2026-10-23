@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react'
+import { openCard } from '@radical/ui/store/showInView'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
@@ -504,7 +505,8 @@ export function TreemapView(): React.ReactElement {
   // properties should be reachable without having to drill into it.
   // Double-click is the drilling gesture: on a node with children it zooms
   // in; on the currently-focused node's own tile (the sliver still visible
-  // behind its children) it zooms out one level, mirroring the breadcrumb.
+  // behind its children) it zooms out one level, mirroring the breadcrumb;
+  // on one without children it opens its properties card.
   const handleClick = useCallback((n: TNode) => {
     // Nothing is selected on a playing slide, as on a canvas slide: the
     // selection stayed in the address for the slides after it.
@@ -515,7 +517,9 @@ export function TreemapView(): React.ReactElement {
   const handleDoubleClick = useCallback((n: TNode) => {
     if (n.id === focusId) setFocus(drawnParentOf(n.id, c4Nodes, viewFilter) ?? null)
     else if (n.hasKids) setFocus(n.id)
-  }, [focusId, c4Nodes, setFocus, viewFilter])
+    // One with nothing to drill into opens its properties card.
+    else if (!useDiagramStore.getState().presentationActive) { selectNode(n.id); openCard() }
+  }, [focusId, c4Nodes, setFocus, viewFilter, selectNode])
 
   return (
     <div className="treemap-wrap-outer">

@@ -1,4 +1,5 @@
 import { test, expect, fixture } from '../../support/fixtures'
+import { addPicker } from '../../support/addPicker'
 
 // The governance `need` type — raw free-text input that EARS requirements
 // derive from — and Radical Forge storing / reusing its description as one.
@@ -111,13 +112,15 @@ test('needs nest under a broader need: a tree in the table\'s chain, and Add chi
   await expect(page.locator('tr.depth-1[data-node-id="need-shop"]')).toBeVisible()
   await expect(page.locator('tr.depth-2[data-node-id="req-pickup"]')).toBeVisible()
 
-  // Wiki: the sub-need is listed under "Needs" on the page of its parent, and Add child offers a Need, linked on creation.
+  // Wiki: the sub-need is listed under "Needs" on the page of its parent, and Add or link… offers a Need, linked on creation.
   await studio.open('v-wiki/f/need-discovery')
   await expect(page.getByRole('heading', { name: /^Needs \(1\)/ })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Shop staff interviews' })).toBeVisible()
   await page.getByRole('button', { name: 'Edit Click & collect discovery' }).click()
-  await page.getByRole('menuitem', { name: 'Add child' }).click()
-  await page.getByRole('menuitem', { name: 'Need' }).click()
+  await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+  const picker = addPicker(page, 'Click & collect discovery')
+  await picker.choose('a need')
+  await picker.option(/^New need/).click()
   const wizard = page.getByRole('dialog', { name: /New Need/ })
   await expect(wizard).toBeVisible()
   await wizard.getByLabel('Name').fill('Customer survey')

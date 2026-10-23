@@ -1,4 +1,5 @@
 import { test, expect, fixture } from '../../support/fixtures'
+import { addPicker } from '../../support/addPicker'
 import type { Page } from '@playwright/test'
 
 /** Opens view `name` and its properties, where its Filter is. */
@@ -47,8 +48,8 @@ test('needs → requirements → scenarios, built in the Filter panel, shown as 
   const card = page.locator('.lp-view-card', { hasText: 'Requirements Register' }).locator('.lp-card-meta')
   await expect(card).toContainText(/\d+ nodes/)
   await expect(card).not.toContainText('All nodes')
-  // A click on a row opens the element's attributes over the table; ✕ closes them.
-  await row(2, 'Same signatory cannot approve twice').click()
+  // A double-click on a row opens the element's attributes over the table; ✕ closes them.
+  await row(2, 'Same signatory cannot approve twice').dblclick()
   await expect(studio.properties.locator('.pp-type')).toContainText(/scenario/i)
   await studio.properties.getByRole('button', { name: 'Close properties' }).click()
   await expect(studio.properties).toHaveCount(0)
@@ -96,12 +97,13 @@ test('the table adds an element under a row, on the next level of the chain as i
   const row = (depth: number, name: string) => page.locator(`.tv-chain-row.depth-${depth}`, { hasText: name })
 
   // The + row after a need's requirements: one refined from it, event-driven
-  // as the filter asks, straight into its wizard (the only choice).
+  // as the filter asks, into its wizard (the menu offers existing ones too).
   const addUnder = page.getByRole('button', { name: 'Add under Corporate treasurer feedback' })
   await expect(addUnder).toContainText('Requirement')
   await expect(addUnder).toContainText('refined into')
   await expect(addUnder).toContainText('EARS type: event-driven')
   await addUnder.click()
+  await addPicker(page, 'Corporate treasurer feedback').option(/^New requirement/).click()
   const wizard = page.getByRole('dialog', { name: /New Requirement/ })
   await wizard.getByLabel('Name').fill('Export the audit trail')
   await page.keyboard.press('ControlOrMeta+Enter')
@@ -155,7 +157,7 @@ test('a chain is built from the metamodel before its elements, and the table the
   await page.keyboard.press('ControlOrMeta+Enter')
   await expect(page.locator('.tv-chain-row.depth-1', { hasText: 'Redeem a gift card' })).toBeVisible()
   // Its attributes open its element's wizard again.
-  await need.click()
+  await need.dblclick()
   await studio.properties.getByRole('button', { name: 'Wizard', exact: true }).click()
   await expect(page.getByRole('dialog', { name: /Gift cards/ })).toBeVisible()
   await page.keyboard.press('Escape')
@@ -393,7 +395,7 @@ test('every kind of view follows its chain, again when the chain or the model ch
   await expect(rowHead('Same signatory cannot approve twice')).toBeVisible()
   // A change to the model runs the chain again: renamed, the requirement no
   // longer passes the filter, and its scenario goes with it.
-  await rowHead('Four-eyes approval').click()
+  await rowHead('Four-eyes approval').dblclick()
   const label = studio.attribute('Name')
   await label.fill('Four-eyes sign-off')
   await label.press('Tab')
@@ -503,7 +505,8 @@ test.describe('a canvas whose filter is a chain', () => {
 })
 
 // D5: where several relation types fit a pair, the canvas asks for one (an
-// Alt-drag between two entities added a relation with none, nothing flagged).
+// Alt-drag between two entities added a relation with none, nothing flagged):
+// a field for each over the target, the drop on one making that type.
 test('a relation drawn between two entities asks for its type', async ({ page, studio }) => {
   const node = (id: string, kind: string, x: number) => ({ id, type: 'entity', kind, label: id, x, y: 0, width: 220, height: 90, collapsed: false })
   await studio.seedDocument(JSON.stringify({
@@ -513,14 +516,24 @@ test('a relation drawn between two entities asks for its type', async ({ page, s
     views: [{ id: 'dom', name: 'Domain', nodeIds: [], positions: {} }],
   }))
   await studio.open('dom')
-  await studio.connect(studio.node('Line'), studio.node('Order'))
-  const menu = page.getByRole('menu', { name: 'Relation from Line to Order' })
-  await expect(menu.getByRole('menuitem')).toHaveText(['Part of', 'References'])
-  await menu.getByRole('menuitem', { name: 'Part of' }).click()
-  await expect(menu).toHaveCount(0)
+  await studio.settle()
+  const from = (await studio.node('Line').boundingBox())!
+  const to = (await studio.node('Order').boundingBox())!
+  await page.keyboard.down('Alt')
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  // Over the target: a pill for each type that fits.
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 })
+  const fields = page.getByRole('group', { name: 'Drop on Order' }).locator('.connect-pill')
+  await expect(fields).toHaveText(['part of', 'references'])
+  const field = (await fields.first().boundingBox())!
+  await page.mouse.move(field.x + field.width / 2, field.y + field.height / 2, { steps: 3 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
   await expect.poll(async () => (await studio.storedDoc()).relations.map((r) => (r as { relationType?: string }).relationType)).toEqual(['part-of'])
   // Its card: the type can be changed to the other one; no "(generic)".
   await page.locator('.react-flow__edge-interaction').first().dispatchEvent('click')
+  await page.locator('.react-flow__edge-interaction').first().dispatchEvent('dblclick')
   const type = page.locator('.right-panel.open').getByLabel('Type', { exact: true })
   await expect(type.locator('option')).toHaveText(['Part of', 'References'])
 })
@@ -541,7 +554,9 @@ test.describe('a relation\'s end moved onto a pair where several types fit', () 
       views: [{ id: 'dom', name: 'Domain', nodeIds: [], positions: {} }],
     }))
     await studio.open('dom')
+    // Selected (its ends show their handles), its card open.
     await page.locator('.react-flow__edge-interaction').first().dispatchEvent('click')
+    await page.locator('.react-flow__edge-interaction').first().dispatchEvent('dblclick')
     await expect(page.getByRole('button', { name: /Change destination/ })).toBeVisible()
   })
   const storedType = async (studio: import('../../support/fixtures').Studio) =>
@@ -559,7 +574,9 @@ test.describe('a relation\'s end moved onto a pair where several types fit', () 
     await expect.poll(() => storedType(studio)).toEqual([['Order', 'references']])
   })
 
-  test('the reconnect handle asks for the type where it is let go', async ({ page, studio }) => {
+  // A relation's end dragged keeps its type: no other is offered, and a
+  // place where it does not fit is refused.
+  test('the reconnect handle keeps the type, refused where it does not fit', async ({ page, studio }) => {
     await studio.settle()
     const handle = (await page.locator('circle.nodrag.nopan').nth(1).boundingBox())!
     const order = (await studio.node('Order').boundingBox())!
@@ -568,11 +585,9 @@ test.describe('a relation\'s end moved onto a pair where several types fit', () 
     await page.mouse.move(handle.x + 5, handle.y + 5, { steps: 3 })
     await page.mouse.move(order.x + order.width / 2, order.y + order.height / 2, { steps: 20 })
     await page.mouse.up()
-    const menu = page.getByRole('menu', { name: 'Relation from Line to Order' })
-    await expect(menu.getByRole('menuitem')).toHaveText(['Part of', 'References'])
+    await expect(page.getByText(/Relation not allowed: "Satisfies" does not connect Entity → Entity/)).toBeVisible()
+    await expect(page.getByRole('menu', { name: 'Relation from Line to Order' })).toHaveCount(0)
     expect(await storedType(studio)).toEqual([['Kept', 'satisfies']])
-    await menu.getByRole('menuitem', { name: 'Part of' }).click()
-    await expect.poll(() => storedType(studio)).toEqual([['Order', 'part-of']])
   })
 })
 
@@ -589,4 +604,42 @@ test('the table\'s + row names each type it adds once', async ({ page, studio })
   }))
   await studio.open('both')
   await expect(page.getByRole('button', { name: 'Add under req' }).first()).toHaveText(/Requirement \/ Need…/)
+})
+
+test('the + under a row adds one by name or links an existing element', async ({ page, studio }) => {
+  await studio.seedDocument((((view: Record<string, unknown>) => JSON.stringify({
+  nodes: [
+    { id: 'n-pay', type: 'need', label: 'Pay by card', kind: 'brief', x: 0, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'n-audit', type: 'need', label: 'Audit', kind: 'brief', x: 300, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'n-refunds', type: 'need', label: 'Refunds', kind: 'brief', x: 600, y: 0, width: 200, height: 80, collapsed: false },
+    { id: 'r-trail', type: 'requirement', label: 'Keep an audit trail', ears_type: 'ubiquitous', action: 'keep an audit trail', x: 300, y: 200, width: 200, height: 80, collapsed: false },
+  ],
+  relations: [{ id: 'd1', sourceId: 'r-trail', targetId: 'n-audit', relationType: 'derives' }],
+  views: [{ id: 'v-spec', name: 'Specification', nodeIds: [], positions: {}, ...view, pipeline: { levels: [
+    { ways: [{ types: ['need'] }] },
+    { ways: [{ via: { relationType: 'derives', direction: 'in' }, types: ['requirement'] }] },
+  ] } }],
+  metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+}))({ kind: 'table' })))
+  await studio.open('v-spec')
+  const trail = page.locator('.tv-chain-row.depth-1', { hasText: 'Keep an audit trail' })
+  await expect(trail).toHaveCount(1)
+  // A name and Enter: a new requirement of that name under the need.
+  await page.getByRole('button', { name: 'Add under Pay by card' }).click()
+  const picker = addPicker(page, 'Pay by card')
+  await picker.field().fill('Take card payments')
+  await expect(picker.option(/^New requirement “Take card payments”/)).toHaveAttribute('aria-selected', 'true')
+  await picker.field().press('Enter')
+  const wizard = page.getByRole('dialog', { name: /New Requirement/ })
+  await expect(wizard.getByLabel('Name')).toHaveValue('Take card payments')
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await expect(page.locator('.tv-chain-row.depth-1', { hasText: 'Take card payments' })).toBeVisible()
+  // One the model has, linked: under both needs now, and no new element.
+  await page.getByRole('button', { name: 'Add under Pay by card' }).click()
+  await picker.option(/Keep an audit trail/).click()
+  await expect(trail).toHaveCount(2)
+  await expect.poll(async () => {
+    const doc = await studio.storedDoc()
+    return [doc.nodes.length, doc.relations.some((r) => r.sourceId === 'r-trail' && r.targetId === 'n-pay')]
+  }).toEqual([5, true])
 })

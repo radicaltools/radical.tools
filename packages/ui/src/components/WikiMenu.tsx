@@ -16,6 +16,9 @@ export interface WikiMenuItem {
   hint?: string
   /** A dot before the label, in the colour of a type. */
   color?: string
+  /** Instead of the dot, in the same colour: a plus for a new element, a
+   *  link for one the model has, linked. */
+  icon?: 'new' | 'link'
   danger?: boolean
   /** Items of one group follow each other under this heading. */
   group?: string
@@ -155,7 +158,13 @@ export function WikiMenu({ at, root, onClose }: {
               className={`wiki-menu-item ${item.danger ? 'danger' : ''}`}
               onClick={() => choose(item)}
             >
-              {item.color && <span className="wiki-menu-dot" style={{ background: item.color }} />}
+              {item.icon ? (
+                <svg className="wiki-menu-icon" viewBox="0 0 16 16" width="13" height="13" aria-hidden style={{ color: item.color }}>
+                  {item.icon === 'new'
+                    ? <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                    : <path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />}
+                </svg>
+              ) : item.color && <span className="wiki-menu-dot" style={{ background: item.color }} />}
               <span className="wiki-menu-label">{item.label}</span>
               {item.hint && <span className="wiki-menu-hint">{item.hint}</span>}
               {item.page && <span className="wiki-menu-more" aria-hidden>›</span>}

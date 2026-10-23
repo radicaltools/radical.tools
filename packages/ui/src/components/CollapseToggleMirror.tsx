@@ -78,6 +78,10 @@ export function CollapseToggleMirror(): React.ReactElement | null {
       const b = button.getBoundingClientRect()
       const n = nodeEl.getBoundingClientRect()
       if (!b.width || !b.height) continue
+      // The copy is what shows: the button under it, a fraction of a pixel
+      // off, read as a shadow through the copy's see-through background. It
+      // stays where it is to be clicked (opacity leaves its colours to read).
+      button.dataset.mirrored = ''
       const cs = getComputedStyle(button)
       out.push({
         key: `${id} ${out.filter((t) => t.id === id).length}`,

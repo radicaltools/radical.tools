@@ -42,7 +42,7 @@ test('a selected relation brings forward itself and its two ends', async ({ page
 test('leaving a view clears its selection', async ({ page, studio }) => {
   await studio.openSampleWhole()
   const selected = page.locator('.react-flow__node.selected')
-  await studio.nodeByLabel('Accounts Service').first().click()
+  await studio.nodeByLabel('Accounts Service').first().dblclick()
   await expect(selected).toHaveCount(1)
   await expect(studio.properties).toBeVisible()
 
@@ -93,14 +93,17 @@ test('the camera frames a selection and goes back when it is cleared', async ({ 
 test('the hierarchy\'s Size, Levels and Up stay clear of the properties card', async ({ page, studio }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await studio.openSample('view-treemap')
+  // Mobile App has no children: a double-click opens its card (on one with
+  // children it drills in).
   const at = await page.evaluate(() => {
     const t = Array.from(document.querySelectorAll('.treemap-wrap svg text'))
-      .find((el) => (el as SVGTextElement).style.display !== 'none' && el.textContent === 'Core Banking Platform')
+      .find((el) => (el as SVGTextElement).style.display !== 'none' && el.textContent === 'Mobile App')
     const r = t!.getBoundingClientRect()
     return { x: r.x + Math.min(10, r.width / 2), y: r.y + r.height / 2 }
   })
-  await page.mouse.click(at.x, at.y)
+  await page.mouse.dblclick(at.x, at.y)
   await expect(studio.properties).toBeVisible()
+  await expect(studio.attribute('Name')).toHaveValue('Mobile App')
   await expect.poll(async () => {
     const card = (await studio.properties.boundingBox())!
     const levels = (await page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).boundingBox())!

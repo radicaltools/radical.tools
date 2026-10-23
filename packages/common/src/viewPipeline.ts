@@ -11,10 +11,11 @@
 // the steps that fit, with how many elements each concerns.
 
 import type { C4Node, C4Relation, ChainLevel, ChainVia, ChainWay, DiagramView, ViewFilter, ViewPipeline, ViewSort } from './c4'
-import { viewShowsEveryNode } from './c4'
+import { holderOf, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
-import { inferRelationType, isParentAllowed, isPlacementAllowed } from './metamodel/lookup'
+import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
+import { relationTypeKeepsAggregates } from './metamodel/domainModel'
 
 export interface PipelineContext {
   nodes: Record<string, C4Node>
@@ -560,6 +561,36 @@ export function chainRelationFor(
   return null
 }
 
+/** Where a relation from `sourceId` may go among `targetIds`, and of which
+ *  types, as Studio would make it (connectNodes): the metamodel allows the
+ *  pair, and on a view whose filter is a chain, the chain would draw it
+ *  (chainRelationFor); then the one type it gives, or else the types that
+ *  fit the pair and keep the aggregates, for the user to choose from. An
+ *  empty list: a relation with no type. Targets left out take no relation
+ *  from it. */
+export function connectTypes(view: DiagramView | undefined, sourceId: string, targetIds: string[], ctx: PipelineContext): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  const source = ctx.nodes[sourceId]
+  if (!source) return out
+  const chain = !!pipelineOf(view)?.levels?.length
+  for (const id of targetIds) {
+    const target = ctx.nodes[id]
+    if (!target || id === sourceId || !isRelationAllowed(ctx.metamodel, source.type, target.type)) continue
+    const made = chain ? chainRelationFor(view, sourceId, id, ctx) : {}
+    if (!made) continue
+    // The one the chain draws, or each that fits, to choose from; between an
+    // element and what holds it only a transition (checkAddRelation).
+    const held = !!holderOf(ctx.nodes, source, target)
+    const types = (made.relationType ? [made.relationType] : relationTypesFitting(ctx.metamodel, source.type, target.type)
+      .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
+      .map((rt) => rt.id))
+      .filter((type) => !held || type === 'transition')
+    if (held && !types.length) continue
+    out.set(id, types)
+  }
+  return out
+}
+
 const NO_METAMODEL: Metamodel = { id: '', name: '', nodeTypes: {}, relationTypes: {} }
 
 /** The elements a view shows, or undefined when it shows every element:
@@ -841,6 +872,28 @@ export function addChoices(view: DiagramView | undefined, ctx: PipelineContext, 
   return out
 }
 
+/** The elements that could hang under `link.otherId` the way `link` says
+ *  (a WizardLink: `out` when the child is the source), instead of a new
+ *  one of `type`: of that type, not the element itself, not linked to it
+ *  that way yet, of a pair the relation type allows, and passing `filters`
+ *  (the level's they go on, so that the view shows them); by name. None
+ *  without a link (a child held inside, which is a move, not a link). */
+export function linkCandidates(type: string, link: WizardLink | undefined, ctx: PipelineContext, filters?: ViewFilter[]): C4Node[] {
+  const other = link ? ctx.nodes[link.otherId] : undefined
+  if (!link || !other) return []
+  const list = Array.isArray(ctx.relations) ? ctx.relations : Object.values(ctx.relations)
+  const linked = new Set(list
+    .filter((r) => r.relationType === link.relationType && (link.direction === 'out' ? r.targetId === other.id : r.sourceId === other.id))
+    .map((r) => (link.direction === 'out' ? r.sourceId : r.targetId)))
+  const fits = (n: C4Node): boolean => {
+    const [from, to] = link.direction === 'out' ? [n.type, other.type] : [other.type, n.type]
+    return relationTypesFitting(ctx.metamodel, from, to).some((rt) => rt.id === link.relationType)
+  }
+  const candidates = Object.values(ctx.nodes).filter((n) => n.type === type && n.id !== other.id && !linked.has(n.id) && fits(n))
+  return (filters?.length ? applyFilters(candidates, filters, ctx).nodes : candidates)
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
 /** What a new element of `type` needs to pass the filters of the level it
  *  goes on in `view`'s chain (meetFilters): the first level, or, `under` an
  *  element, the level after the one that element is on; a chain of one
@@ -868,6 +921,22 @@ export function newElementFilters(
   const meet = meetFilters(type, level.filters, under?.link, ctx)
   if (meet.excluded) return { properties: {}, hidden: true }
   return { properties: meet.properties, ...(meet.within ? { within: meet.within } : {}), ...(meet.hidden ? { hidden: true as const } : {}) }
+}
+
+/** The types `view`'s chain can show a new element of: those some level's
+ *  ways take and its filters do not leave out (meetFilters). What Studio
+ *  offers to add on the view. Null for a view without a chain, which takes
+ *  any type. */
+export function chainTypes(view: DiagramView | undefined, ctx: PipelineContext): Set<string> | null {
+  const levels = pipelineOf(view)?.levels ?? []
+  if (!levels.length) return null
+  const types = new Set<string>()
+  for (const level of levels) {
+    for (const type of levelTypes(level, ctx)) {
+      if (!meetFilters(type, level.filters, undefined, ctx).excluded) types.add(type)
+    }
+  }
+  return types
 }
 
 // ─── Suggestions for levels ─────────────────────────────────────────────────

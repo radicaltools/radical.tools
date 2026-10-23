@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
+import { checkAddRelation, type ModelState } from '@radical/common/model'
+
+type Store = ReturnType<typeof useDiagramStore.getState>
+
+/** The `nth` pair of elements a relation may join (not one that holds the
+ *  other, of a pair the metamodel allows). */
+function connectablePair(store: Store, nth: number): [string, string] {
+  const ids = Object.keys(store.c4Nodes)
+  const pairs = ids.flatMap((a) => ids.filter((b) => b !== a && !checkAddRelation(store as unknown as ModelState, { sourceId: a, targetId: b })).map((b): [string, string] => [a, b]))
+  return pairs[nth]
+}
 
 describe('Connection via store actions', () => {
   it('startConnection sets connectSource', () => {
@@ -18,8 +29,7 @@ describe('Connection via store actions', () => {
     const nodeIds = Object.keys(store.c4Nodes)
     expect(nodeIds.length).toBeGreaterThanOrEqual(2)
 
-    const sourceId = nodeIds[0]
-    const targetId = nodeIds[1]
+    const [sourceId, targetId] = connectablePair(store, 0)
     const edgesBefore = store.rfEdges.length
     const relsBefore = Object.keys(store.c4Relations).length
 
@@ -34,8 +44,7 @@ describe('Connection via store actions', () => {
   it('full connect flow: startConnection → addRelation → cancelConnection', () => {
     const store = useDiagramStore.getState()
     const nodeIds = Object.keys(store.c4Nodes)
-    const src = nodeIds[0]
-    const tgt = nodeIds[2]
+    const [src, tgt] = connectablePair(store, 1)
 
     // Simulate first click (modifier held)
     store.startConnection(src)

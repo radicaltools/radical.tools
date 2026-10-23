@@ -34,7 +34,7 @@ test('Open → File… keeps the model in the file and saves changes to it', asy
   // It opens on its first view (decided 2026-10-21; it landed on All elements).
   await expect(page).toHaveURL(/\/v\/v-context$/)
   await page.locator('.lp-view-card', { hasText: 'All elements' }).click()
-  await studio.row('customer').click()
+  await studio.row('customer').dblclick()
   await expect(labelField(page)).toHaveValue('Customer')
   await labelField(page).fill('Shopper')
   await labelField(page).press('Tab')
@@ -217,7 +217,7 @@ test('Move to browser keeps a file model in this browser and leaves the file as 
   await expect(models).toBeHidden()
   const onDisk = await file.read()
   await studio.designer()
-  await studio.node('customer').click()
+  await studio.node('customer').dblclick()
   await labelField(page).fill('Shopper')
   await labelField(page).press('Tab')
   await expect.poll(async () => JSON.stringify(await studio.storedDoc(studio.activeDocId()))).toContain('"Shopper"')

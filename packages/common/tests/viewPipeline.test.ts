@@ -4,7 +4,7 @@ import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
   applyFilters, chainDrawn, chainRelationFor, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
   suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
-  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, type ChainRow, type PipelineContext,
+  typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, chainTypes, linkCandidates, connectTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
 import { setViewPipeline, type ModelState } from '../src/model'
 import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
@@ -371,5 +371,57 @@ describe('view pipeline: a chain built before its elements', () => {
     expect(levelTypes(level, bare)).toEqual(['requirement'])
     expect(suggestFilters([], bare, levelTypes(level, bare)).map((f) => f.label)).toContain('EARS type is event-driven')
     expect(propertyChoices([], bare, ['requirement']).map((p) => p.key)).toContain('ears_type')
+  })
+})
+
+describe('chainTypes', () => {
+  const viewOf = (pipeline?: ViewPipeline): DiagramView => ({ id: 'v', name: 'V', nodeIds: [], positions: {}, ...(pipeline ? { pipeline } : {}) })
+
+  it('gives the types some level of a chain shows, without those its filters leave out, and null without a chain', () => {
+    expect([...chainTypes(viewOf(traceability), ctx)!]).toEqual(['need', 'requirement', 'scenario'])
+    // A way that takes any element, kept to two types by a filter.
+    const filtered: ViewPipeline = { levels: [{ ways: [{}], filters: [{ kind: 'type', types: ['domain', 'entity'] }] }] }
+    expect([...chainTypes(viewOf(filtered), ctx)!].sort()).toEqual(['domain', 'entity'])
+    // A filter switched off leaves every type in.
+    const off: ViewPipeline = { levels: [{ ways: [{}], filters: [{ kind: 'type', types: ['domain'], off: true }] }] }
+    expect(chainTypes(viewOf(off), ctx)!.size).toBe(Object.keys(ctx.metamodel!.nodeTypes).length)
+    expect(chainTypes(viewOf(), ctx)).toBeNull()
+    expect(chainTypes(undefined, ctx)).toBeNull()
+  })
+})
+
+describe('linkCandidates', () => {
+  it("lists the elements of a choice's type not yet linked to the element that way, and none for one that goes inside", () => {
+    // Under n-pay a requirement derives from it (the child is the source).
+    const under = (id: string) => ({ relationType: 'derives', direction: 'out' as const, otherId: id })
+    expect(linkCandidates('requirement', under('n-pay'), ctx).map((n) => n.id)).toEqual(['r3', 'r4'])
+    expect(linkCandidates('requirement', under('n-audit'), ctx).map((n) => n.id)).toEqual(['r1', 'r4'])
+    // Scenarios verify a requirement: s1 verifies r1 already.
+    expect(linkCandidates('scenario', { relationType: 'verifies', direction: 'out', otherId: 'r1' }, ctx).map((n) => n.id)).toEqual(['s2'])
+    // A pair the relation type does not allow: no domain derives from a need.
+    expect(linkCandidates('domain', under('n-pay'), ctx)).toEqual([])
+    expect(linkCandidates('requirement', undefined, ctx)).toEqual([])
+    // Only those the level's filters let through, so that the view shows them.
+    expect(linkCandidates('requirement', under('n-pay'), ctx, [{ kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven'] }]).map((n) => n.id)).toEqual(['r3'])
+  })
+})
+
+describe('connectTypes', () => {
+  it("gives each target the types a relation from the element may take, as the view's chain draws them", () => {
+    const viewOf = (pipeline?: ViewPipeline): DiagramView => ({ id: 'v', name: 'V', nodeIds: [], positions: {}, ...(pipeline ? { pipeline } : {}) })
+    const ids = Object.keys(nodes)
+    // Without a chain: every pair the metamodel allows, with the types that fit.
+    const free = connectTypes(viewOf(), 'r4', ids, ctx)
+    expect(free.get('n-pay')).toEqual(['derives'])
+    expect(free.get('r1')).toEqual(['derives'])
+    expect(free.has('s1')).toBe(false)
+    expect(free.has('r4')).toBe(false)
+    // Traceability draws needs, the requirements derived from them and their
+    // scenarios: a requirement links only to a need, and only by derives.
+    expect([...connectTypes(viewOf(traceability), 'r4', ids, ctx)]).toEqual([['n-pay', ['derives']], ['n-audit', ['derives']]])
+    // Domains among themselves: the types that fit, to choose from.
+    const domains: ViewPipeline = { edges: 'all', levels: [{ ways: [{ types: ['domain'] }] }] }
+    expect(connectTypes(viewOf(domains), 'Billing', ids, ctx).get('Ledger')!.length).toBeGreaterThan(1)
+    expect(connectTypes(viewOf(), 'gone', ids, ctx).size).toBe(0)
   })
 })

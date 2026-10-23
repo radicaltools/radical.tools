@@ -673,6 +673,23 @@ function RelationTypeCard({
                     updatePair(i, { max: e.target.value === '' ? undefined : Number(e.target.value) })
                   }
                 />
+                {/* How this pair reads where it differs from the type ("Delivers to"). */}
+                <input
+                  className="mm-input mm-pair-reads"
+                  placeholder={def.forwardLabel || def.label}
+                  title="How a relation of this pair reads from its source, where it differs from the type"
+                  aria-label={`Reads as, ${pair.from} → ${pair.to}`}
+                  value={pair.forwardLabel ?? ''}
+                  onChange={(e) => updatePair(i, { forwardLabel: e.target.value || undefined })}
+                />
+                <input
+                  className="mm-input mm-pair-reads"
+                  placeholder={def.inverseLabel || 'backwards'}
+                  title="How it reads from its target, where it differs from the type"
+                  aria-label={`Reads backwards as, ${pair.from} → ${pair.to}`}
+                  value={pair.inverseLabel ?? ''}
+                  onChange={(e) => updatePair(i, { inverseLabel: e.target.value || undefined })}
+                />
                 <button className="mm-icon-btn danger" onClick={() => removePair(i)} title="Remove">
                   <IconTrash />
                 </button>
