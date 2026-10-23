@@ -5,7 +5,7 @@
  * where the move was then refused (F-0038).
  */
 import { describe, it, expect } from 'vitest'
-import { nestRefusal, parentCandidates, type ModelState } from '../src/model'
+import { checkReparent, nestRefusal, parentCandidates, reparentNodes, type ModelState } from '../src/model'
 import { builtInC4Metamodel } from '../src/metamodel'
 import type { C4Node } from '../src/c4'
 
@@ -68,3 +68,20 @@ describe('where elements may be nested (nestRefusal)', () => {
     expect(parentCandidates(s, 'api').map((n) => n.id)).toContain('bank')
   })
 })
+
+describe('a move into an external element (checkReparent)', () => {
+  it('is refused by the engine too, so the store and move_node refuse what the card does not offer', () => {
+    const s = bookstore()
+    expect(checkReparent(s, ['api'], 'bank')).toMatch(/Cannot place Container "api" inside Software System "bank": it is external/)
+    expect(checkReparent(s, ['api'], 'other')).toBeNull()
+  })
+
+  it('leaves what an external element already holds where it is', () => {
+    const s = bookstore()
+    s.c4Nodes.gateway = node('gateway', 'container', { parentId: 'bank' })
+    expect(checkReparent(s, ['gateway'], 'bank')).toBeNull()
+    reparentNodes(s, ['gateway'], 'bank')
+    expect(s.c4Nodes.gateway.parentId).toBe('bank')
+  })
+})
+
