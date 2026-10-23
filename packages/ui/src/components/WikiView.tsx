@@ -48,7 +48,7 @@ import {
   TYPE_ICON_PATHS,
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
-import { addChoices, chainTypes, linkCandidates, newElementFilters, pipelineOf, runPipeline, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
+import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, runPipeline, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
@@ -81,6 +81,22 @@ function childTypeOptions(
 ): TypeOption[] {
   return allNodeTypeIds(metamodel)
     .filter((t) => (!viewTypes || viewTypes.has(t)) && isPlacementAllowed(metamodel, t, parent, nodes))
+    .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// The types that may be added at the top of the view: in a chain only the
+// first level's (addChoices, as the table's + at the top offers), so a type
+// further down is added under an element of the level above it; else what
+// may stand at the top of the model.
+function topTypeOptions(
+  metamodel: Metamodel,
+  nodes: Record<string, C4Node>,
+  typeMeta: TypeMeta,
+  actions: Pick<WikiActions, 'viewTypes' | 'topChoices'>,
+): TypeOption[] {
+  if (!actions.topChoices) return childTypeOptions(metamodel, undefined, nodes, typeMeta, actions.viewTypes)
+  return [...new Set(actions.topChoices.map((c) => c.type))]
     .map((t) => ({ id: t, label: typeMeta(t).label, color: typeMeta(t).color }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
@@ -223,6 +239,9 @@ interface WikiActions {
   /** The types the view's filter shows (chainTypes), the only ones offered
    *  to add; null for a view without a chain. */
   viewTypes: Set<string> | null
+  /** What the top of a view with a chain offers, its first level's types
+   *  and where each goes (addChoices); null for a view without a chain. */
+  topChoices: AddChoice[] | null
   /** The elements of `type` that could be linked under `under` instead of a
    *  new one, and the link they would get; null where a child of that type
    *  is held inside (a move, not a link). */
@@ -497,8 +516,10 @@ export function WikiView(): React.ReactElement {
     // The values the view's filter asks for, as the table gives them; what
     // the line says wins (a sentence's own EARS type).
     const filtered = newElementFilters(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }, type, under ? { node: under, link: links[0] } : undefined)
-    // At the top, in the element a filter "inside" asks for.
-    const placed = under ? parentId : filtered?.within
+    // At the top, where the chain's first level puts it (topChoices), or in
+    // the element a filter "inside" asks for.
+    const top = under ? undefined : topChoices?.find((c) => c.type === type)
+    const placed = under ? parentId : top ? top.parentId : filtered?.within
     const ids = addNodes(lines.map((line) => ({
       node: {
         type: type as C4ElementType,
@@ -506,7 +527,7 @@ export function WikiView(): React.ReactElement {
         technology: '',
         collapsed: false,
         external: false,
-        ...filtered?.properties,
+        ...(top?.properties ?? filtered?.properties),
         ...elementFromLine(type, line),
         parentId: placed,
         x: 0,
@@ -525,8 +546,12 @@ export function WikiView(): React.ReactElement {
   }
 
   const viewTypes = useMemo(() => chainTypes(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }), [view, c4Nodes, c4Relations, metamodel])
+  const topChoices = useMemo(() => pipelineOf(view ?? undefined)?.levels?.length
+    ? addChoices(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }).filter((c) => !c.hidden && (!viewTypes || viewTypes.has(c.type)))
+    : null, [view, c4Nodes, c4Relations, metamodel, viewTypes])
   const actions: WikiActions = {
     viewTypes,
+    topChoices,
     existingFor: (type, under) => existingFor(type, under),
     linkExisting: (nodeId, link) => linkExisting(nodeId, link),
     readOnly,
@@ -790,7 +815,11 @@ export function WikiView(): React.ReactElement {
             updateNode={updateNode}
             updateRelation={updateRelation}
             onNavigate={goTo}
-            onCreateRoot={(type) => createNode(type, undefined)}
+            onCreateRoot={(type) => {
+              // In the element and with the values the chain's first level asks for.
+              const choice = topChoices?.find((c) => c.type === type)
+              createNode(type, choice?.parentId, choice?.link, choice?.properties)
+            }}
             onDeleteRelation={deleteRelation}
             readOnly={readOnly}
             totalNodes={nodeList.length}
@@ -1308,7 +1337,7 @@ function WikiChildren({
   // divided, not something a line of text names: it is added from the menu.
   const writable = writeUnder === undefined || actions.readOnly
     ? []
-    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta, actions.viewTypes) : childTypeOptions(metamodel, undefined, nodes, typeMeta, actions.viewTypes))
+    : (writeUnder ? childTypesOf(writeUnder, nodes, metamodel, typeMeta, actions.viewTypes) : topTypeOptions(metamodel, nodes, typeMeta, actions))
         .filter((t) => t.id !== GROUP_TYPE)
         .sort((a, b) => rank(a.id) - rank(b.id))
   // The headings opened to write the first element of a type under.
@@ -1714,10 +1743,10 @@ function WikiOverview({
   pageMode: 'single' | 'multi'
   remainingDepth?: number
 }): React.ReactElement {
-  const { viewTypes } = useWikiActions()
+  const { viewTypes, topChoices } = useWikiActions()
   const rootTypes = useMemo(
-    () => childTypeOptions(metamodel, undefined, nodes, typeMeta, viewTypes),
-    [metamodel, typeMeta, viewTypes],
+    () => topTypeOptions(metamodel, nodes, typeMeta, { viewTypes, topChoices }),
+    [metamodel, nodes, typeMeta, viewTypes, topChoices],
   )
   const articleRef = useRef<HTMLElement | null>(null)
   useFirstMentions(articleRef)

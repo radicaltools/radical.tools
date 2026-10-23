@@ -367,6 +367,35 @@ test('Smart fit brings the diagram back when it has left the screen', async ({ p
   await expect.poll(onScreen, { timeout: 5000 }).toBeGreaterThan(0)
 })
 
+test('modelling from nothing, Smart fit shows the first element at its size and leaves the camera alone while what is added stays in sight', async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify({ nodes: [], relations: [], views: [{ id: 'v', name: 'Start', nodeIds: [], positions: {} }] }))
+  await studio.open('v')
+  await expect(page.locator('.autofit-active')).toHaveCount(1)
+  const camera = () => page.evaluate(() => {
+    const m = new DOMMatrix(getComputedStyle(document.querySelector('.react-flow__viewport')!).transform)
+    return { x: m.e, y: m.f, zoom: m.a }
+  })
+  const pane = (await studio.pane.boundingBox())!
+  await studio.addFromPalette('Software System', { x: pane.width * 0.4, y: pane.height * 0.4 })
+  await expect(studio.nodes).toHaveCount(1)
+  await page.waitForTimeout(1500)
+  // It filled the canvas, zoomed in to 400 %, and the next one added threw
+  // the camera far out.
+  const first = await camera()
+  expect(first.zoom).toBeLessThanOrEqual(1)
+  const box = (await studio.nodes.first().boundingBox())!
+  expect(box.width).toBeLessThan(pane.width / 2)
+
+  // A second one in sight: the camera stays where it was.
+  await studio.addFromPalette('Software System', { x: pane.width * 0.7, y: pane.height * 0.65 })
+  await expect(studio.nodes).toHaveCount(2)
+  await page.waitForTimeout(1500)
+  const second = await camera()
+  expect(Math.abs(second.x - first.x)).toBeLessThan(2)
+  expect(Math.abs(second.y - first.y)).toBeLessThan(2)
+  expect(second.zoom).toBeCloseTo(first.zoom, 3)
+})
+
 test('opening a view with Smart fit frames it at once, without a camera flight', async ({ page, studio }) => {
   // Views keep their own coordinates: the camera used to fly over from the
   // previous view's (the diagram gone, then sliding in from an edge), then

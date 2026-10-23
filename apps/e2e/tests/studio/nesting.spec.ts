@@ -104,7 +104,7 @@ test('containers dropped into a system fill a grid, the first centred', async ({
   await expect.poll(async () => (await kids()).length).toBe(2)
   const second = (await kids()).find((k) => k.id !== first.id)!
   expect(second.y).toBe(first.y)
-  expect(second.x).toBe(first.x + first.width + 20)
+  expect(second.x).toBe(first.x + first.width + 60)
 })
 
 test('nesting an element removes its relations with its new container, with a warning', async ({ page, studio }) => {

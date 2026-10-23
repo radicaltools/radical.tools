@@ -6,7 +6,7 @@ given: "the bookstore's System Context, which lists its elements; the sample's D
 tests: |
   packages/common/tests/viewPipeline.test.ts › chainTypes › gives the types some level of a chain shows, without those its filters leave out, and null without a chain
   apps/e2e/tests/studio/editing.spec.ts › the palette greys out the types a view's filter does not show
-  apps/e2e/tests/studio/wiki.spec.ts › a wiki with a filter offers only the types its chain shows
-then: "on System Context no type is greyed out; on Domain map only Domain is draggable and the other types are greyed out with a tooltip saying the view's filter does not show them; the wiki offers Needs and no Software systems to start with, and Need but neither Software System nor Group under Add element; the engine gives the types of every level not left out by its filters (all of them for a filter switched off), and nothing for a view without a chain"
+  apps/e2e/tests/studio/wiki.spec.ts › a wiki with a filter offers only the types its chain shows, at the top only its first level's
+then: "on System Context no type is greyed out; on Domain map only Domain is draggable and the other types are greyed out with a tooltip saying the view's filter does not show them; the wiki offers Needs to start with, and neither Software systems nor Requirements nor Scenarios, and Add element offers Need alone, which adds a need; the engine gives the types of every level not left out by its filters (all of them for a filter switched off), and nothing for a view without a chain"
 when: "the user looks at the palette on System Context and on Domain map, and at what the wiki offers to start with and under Add element; and the engine reads which types each chain can show"
 ---

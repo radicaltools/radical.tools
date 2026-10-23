@@ -147,8 +147,10 @@ export function centredIn(frame: { width: number; height: number }, size: { widt
   }
 }
 
-/** The gap between the cells of a container's grid of children. */
-const GRID_GAP = 20
+/** The gap between the cells of a container's grid of children: room for a
+ *  short relation label between two of them (20 px left it squeezed), as
+ *  the grid layout keeps (constraints.ts). */
+const GRID_GAP = 60
 
 /**
  * Where an element of `size` goes in `parentId`: the first free cell of a

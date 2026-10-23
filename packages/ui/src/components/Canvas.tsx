@@ -186,6 +186,10 @@ const EXPLORE_MIN_ZOOM = 0.6
 /** Framing a selection zooms in no further than this, or than the zoom in
  *  use when that is closer already. */
 const SELECTION_MAX_ZOOM = 1
+/** A fit of the view (on open, Fit All, Smart fit) zooms in no further than
+ *  this: a model of a few elements stands at its size, not over the whole
+ *  canvas, so the next one added does not throw the camera far out. */
+const FIT_MAX_ZOOM = 1
 
 /** Whether two cameras show the same (to a pixel and a fraction of zoom). */
 function sameCamera(a: { x: number; y: number; zoom: number }, b: { x: number; y: number; zoom: number }): boolean {
@@ -491,7 +495,7 @@ function StructuralCanvas(): React.ReactElement {
       width: bounds.width + FIT_MARGIN * 2,
       height: bounds.height + FIT_MARGIN * 2,
     }
-    return viewportInFree(padded, rect, 0.05, 4, 0.18)
+    return viewportInFree(padded, rect, 0.05, FIT_MAX_ZOOM, 0.18)
   }, [])
 
   /**
@@ -519,6 +523,25 @@ function StructuralCanvas(): React.ReactElement {
     }
     const currentIds = new Set(visible.map((n) => n.id))
     const prev = prevVisibleIdsRef.current
+    // An element added or removed where all of them stay in sight leaves the
+    // camera where it is: refitting a few elements on each one jumped.
+    const vp = inst.getViewport()
+    const view = { x: -vp.x / vp.zoom, y: -vp.y / vp.zoom, width: rect.width / vp.zoom, height: rect.height / vp.zoom }
+    const IN_VIEW_MARGIN = 24 / vp.zoom
+    const inView = visible.every((n) => {
+      const p = n.positionAbsolute ?? n.position
+      return p.x >= view.x + IN_VIEW_MARGIN && p.y >= view.y + IN_VIEW_MARGIN
+        && p.x + (n.width ?? 0) <= view.x + view.width - IN_VIEW_MARGIN
+        && p.y + (n.height ?? 0) <= view.y + view.height - IN_VIEW_MARGIN
+    })
+    const changed = visible.some((n) => !prev.has(n.id)) || [...prev].some((id) => !currentIds.has(id))
+    // That ends a refit in progress too (after a view opened, for a while).
+    if (changed && inView && !snapIdsRef.current) {
+      prevVisibleIdsRef.current = currentIds
+      trackUntilRef.current = 0
+      fitWindowUntilRef.current = 0
+      return null
+    }
     // First-tick bootstrap: no prior memory → behave like fit-all so the
     // diagram is correctly framed when auto-fit first turns on.
     if (prev.size === 0) {
@@ -531,7 +554,7 @@ function StructuralCanvas(): React.ReactElement {
         width: bounds.width + FIT_MARGIN * 2,
         height: bounds.height + FIT_MARGIN * 2,
       }
-      return viewportInFree(padded, rect, 0.05, 4, 0.18)
+      return viewportInFree(padded, rect, 0.05, FIT_MAX_ZOOM, 0.18)
     }
     const newlyVisible = visible.filter((n) => !prev.has(n.id))
     const removedCount = [...prev].filter((id) => !currentIds.has(id)).length
@@ -587,7 +610,7 @@ function StructuralCanvas(): React.ReactElement {
       width: bounds.width + FIT_MARGIN * 2,
       height: bounds.height + FIT_MARGIN * 2,
     }
-    return viewportInFree(padded, rect, 0.05, 4, 0.18)
+    return viewportInFree(padded, rect, 0.05, FIT_MAX_ZOOM, 0.18)
   }, [])
 
   /** Puts the camera on `target`, then refits it every frame while the live

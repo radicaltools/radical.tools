@@ -16,10 +16,13 @@ export interface StudioSettings {
   smartFit: boolean
   /** Align… keeps the elements' current order along the new row or column. */
   alignKeepsOrder: boolean
+  /** Focus: a selection on the canvas dims what it is not related to and
+   *  the camera frames it (canvasFocus.ts). The switch is on the canvas. */
+  selectionFocus: boolean
 }
 
 export function defaultStudioSettings(): StudioSettings {
-  return { nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true }
+  return { nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true, selectionFocus: true }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
@@ -30,6 +33,7 @@ export function normalizeStudioSettings(raw: unknown): StudioSettings {
     nodeWizardOnCreate: typeof r.nodeWizardOnCreate === 'boolean' ? r.nodeWizardOnCreate : base.nodeWizardOnCreate,
     smartFit: typeof r.smartFit === 'boolean' ? r.smartFit : base.smartFit,
     alignKeepsOrder: typeof r.alignKeepsOrder === 'boolean' ? r.alignKeepsOrder : base.alignKeepsOrder,
+    selectionFocus: typeof r.selectionFocus === 'boolean' ? r.selectionFocus : base.selectionFocus,
   }
 }
 
