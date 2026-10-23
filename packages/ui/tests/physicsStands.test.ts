@@ -16,7 +16,8 @@
  *     the merge of groups A to E)
  *   - on the sample's Core Banking, a small drag inside a group and a
  *     "Wrap into…" leave the frames round them where they stand, grown
- *     only as far as needed (F-0028)
+ *     only as far as needed (F-0028); what is wrapped stays where it is
+ *     drawn, hugged by its new parent, and nothing beside it moves
  *
  * The physics' timer is stepped by hand on a 16 ms frame clock, as the
  * fuzzer steps it, so every run is the same on every machine.
@@ -479,27 +480,35 @@ describe('the sample\'s Core Banking (F-0028)', () => {
     expect(changed(before, after, ['ctn-apigw'])).toEqual([])
   })
 
-  it('moves nothing but what makes room when API Gateway is wrapped into a group', () => {
+  it('keeps API Gateway where it is drawn when it is wrapped into a group, hugged by it, and moves nothing beside it', () => {
     // Core Banking Platform moved 144 px up and left and 13 elements moved:
-    // the frames round the new group took the physics' bounds.
+    // the frames round the new group took the physics' bounds. Then the
+    // group went below Access & Security's header with API Gateway in it
+    // (+40, +80), at the group's 520 × 360, over Auth Service, which was
+    // pushed 174 px up, and Access & Security and Core Banking grew up
+    // after it.
     open()
     const before = drawn()
     s().setSelectedNodeIds(['ctn-apigw'])
     s().wrapSelectionInNewParent('group')
     rest()
     const after = drawn()
-    // The new group's parents grow round it, and only grow.
+    expect(after['ctn-apigw']).toEqual(before['ctn-apigw'])
+    // The new group hugs it: its padding, and room for its header.
+    const group = Object.values(s().c4Nodes).find((n) => n.type === 'group' && n.parentId === 'dom-access')!
+    const [g, gw] = [after[group.id], before['ctn-apigw']]
+    expect(g).toEqual({ x: gw.x - 30, y: gw.y - 70, width: gw.width + 60, height: gw.height + 100 })
+    // Its parents grow round it as far as needed, left and up, and only grow.
     for (const id of ['dom-access', 'sys-core']) {
       const [b, a] = [before[id], after[id]]
-      expect(a.x, id).toBeLessThanOrEqual(b.x + 0.5)
-      expect(a.y, id).toBeLessThanOrEqual(b.y + 0.5)
-      expect(a.x + a.width, id).toBeGreaterThanOrEqual(b.x + b.width - 0.5)
-      expect(a.y + a.height, id).toBeGreaterThanOrEqual(b.y + b.height - 0.5)
+      expect(a.x, id).toBeLessThanOrEqual(b.x)
+      expect(a.y, id).toBeLessThanOrEqual(b.y)
+      expect(a.x + a.width, id).toBe(b.x + b.width)
+      expect(a.y + a.height, id).toBe(b.y + b.height)
     }
-    // What the new group covered (Auth Service) is pushed clear; the rest stays.
-    expect(changed(before, after, ['ctn-apigw', 'ctn-auth', 'dom-access', 'sys-core'])).toEqual([])
-    const group = Object.values(s().c4Nodes).find((n) => n.type === 'group' && n.parentId === 'dom-access')!
-    const [g, auth] = [after[group.id], after['ctn-auth']]
-    expect(g.x < auth.x + auth.width && auth.x < g.x + g.width && g.y < auth.y + auth.height && auth.y < g.y + g.height).toBe(false)
+    expect(after['dom-access'].x).toBeLessThanOrEqual(g.x)
+    expect(after['dom-access'].y).toBeLessThanOrEqual(g.y)
+    // Nothing else moves: Auth Service beside it least of all.
+    expect(changed(before, after, ['ctn-apigw', 'dom-access', 'sys-core'])).toEqual([])
   })
 })

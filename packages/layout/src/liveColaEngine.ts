@@ -419,9 +419,11 @@ export class LiveColaEngine {
   /** The model changed (an element added, removed, expanded, collapsed):
    *  what is new finds its place, the rest stays. `added`: elements new to
    *  the model, which stay where they were put, and the parents they went
-   *  into; what they cover is pushed clear (rebuild). */
-  invalidate(added: string[] = []): void {
-    if (this._running) this.rebuild('local', [], added)
+   *  into; what they cover is pushed clear (rebuild). `covered`: only what
+   *  they lie on, not what stands nearer to them than a drop leaves (a new
+   *  parent round what stood there: "Wrap into…"). */
+  invalidate(added: string[] = [], covered = false): void {
+    if (this._running) this.rebuild('local', [], added, covered)
   }
 
   /**
@@ -1085,9 +1087,11 @@ export class LiveColaEngine {
    * it instead. What still covers another when the pushes run out
    * (CALM_MAX_PUSHES) goes beside the rest (clearLeftovers): a drop leaves
    * nothing overlapping. `dropped`: the seeds that stay where they are put
-   * (all of them unless said); the others push and are pushed.
+   * (all of them unless said); the others push and are pushed. `covered`:
+   * those, and the groups they grew, push only what they lie on; what that
+   * pushes pushes as a drop does.
    */
-  private clearOverlaps(seeds: string[], dropped: string[] = seeds): void {
+  private clearOverlaps(seeds: string[], dropped: string[] = seeds, covered = false): void {
     this.refreshBounds()
     // A push moves a group whole from the frame the drop left it with.
     this.keepFramesAsDrawn()
@@ -1124,6 +1128,9 @@ export class LiveColaEngine {
           const ox = Math.min(A.X, B.X) - Math.max(A.x, B.x) + CALM_GAP
           const oy = Math.min(A.Y, B.Y) - Math.max(A.y, B.y) + CALM_GAP
           if (ox <= 0 || oy <= 0) continue
+          // Near is not on: a new parent 20 px from an element beside what
+          // it wraps pushed it 4 px, and its parent along.
+          if (covered && held.has(a) && (ox <= CALM_GAP || oy <= CALM_GAP)) continue
           // A group a calm drag grew or moved pushes what it came nearer to,
           // not what stood as near to it before: a group grown 5 px to the
           // left pushed the elements 10 px above and below it, and those
@@ -1352,7 +1359,7 @@ export class LiveColaEngine {
    * 'whole' leaves everything free (relax, relaxLive). Of the new ones,
    * those in `added` (new to the model) stay where they are put.
    */
-  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = [], added: string[] = []): void {
+  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = [], added: string[] = [], covered = false): void {
     const newIds = new Set(added)
     if (this.cola) this.cola.stop()
     this.resetPace()
@@ -1885,7 +1892,7 @@ export class LiveColaEngine {
       }
     }
     if (dropped.length) {
-      this.clearOverlaps(dropped)
+      this.clearOverlaps(dropped, dropped, covered)
       this.emitPositions()
     }
     // Nothing to move: it is at rest as built.

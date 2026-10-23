@@ -4866,15 +4866,20 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         }
 
-        // Bounding box (relative to common parent) + padding & header room.
+        // Bounding box (relative to common parent) + padding & header room,
+        // of what the canvas draws: a container with nothing in it is drawn
+        // at its folded size.
+        const sets = activeCanvasSets(state0)
+        const canvas = canvasBoxes(state0.c4Nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
         const PAD = 30
         const HEADER = 40
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
         for (const n of nodes) {
-          minX = Math.min(minX, n.x)
-          minY = Math.min(minY, n.y)
-          maxX = Math.max(maxX, n.x + (n.width ?? 0))
-          maxY = Math.max(maxY, n.y + (n.height ?? 0))
+          const b = canvas.boxOf(n)
+          minX = Math.min(minX, b.x)
+          minY = Math.min(minY, b.y)
+          maxX = Math.max(maxX, b.x + b.w)
+          maxY = Math.max(maxY, b.y + b.h)
         }
         const newX = minX - PAD
         const newY = minY - PAD - HEADER
@@ -4883,6 +4888,26 @@ export const useDiagramStore = create<DiagramStore>()(
         // overflow its own parent.
         const newW = maxX - minX + 2 * PAD
         const newH = maxY - minY + 2 * PAD + HEADER
+
+        // The room each parent round the selection leaves round its children
+        // on each side, up to what the store leaves when it fits a parent
+        // (as the live layout keeps a frame): what it keeps as it grows to
+        // hold the new parent.
+        const ancestors: { id: string; frame: CanvasBox; room: { x: number; X: number; y: number; Y: number } }[] = []
+        for (let cur = commonParent; cur && !ancestors.some((a) => a.id === cur!.id); cur = cur.parentId ? state0.c4Nodes[cur.parentId] : undefined) {
+          const pad = compoundPadding(cur.type)
+          const room = { x: pad.side, X: pad.side, y: LIVE_CHILD_TOP_MIN, Y: pad.bottom }
+          const frame = canvas.boxOf(cur)
+          for (const c of Object.values(state0.c4Nodes)) {
+            if (c.parentId !== cur.id || !canvas.shown(c)) continue
+            const b = canvas.boxOf(c)
+            room.x = Math.min(room.x, b.x)
+            room.X = Math.min(room.X, frame.w - b.x - b.w)
+            room.y = Math.min(room.y, b.y)
+            room.Y = Math.min(room.Y, frame.h - b.y - b.h)
+          }
+          ancestors.push({ id: cur.id, frame, room: { x: Math.max(0, room.x), X: Math.max(0, room.X), y: Math.max(0, room.y), Y: Math.max(0, room.Y) } })
+        }
 
         // One undo step for the whole wrap. addNode and each updateNode below
         // push their own, so one Undo used to leave part of the selection in
@@ -4913,8 +4938,8 @@ export const useDiagramStore = create<DiagramStore>()(
         } as Omit<C4Node, 'id'>)
         if (!newId) return
 
-        // Reparent each selected node into the wrapper, converting coords to
-        // be relative to it. updateNode also re-validates.
+        // Reparent each selected node into the wrapper. updateNode also
+        // re-validates.
         for (const n of nodes) {
           get().updateNode(n.id, {
             parentId: newId,
@@ -4923,18 +4948,50 @@ export const useDiagramStore = create<DiagramStore>()(
           } as Partial<Omit<C4Node, 'id'>>)
         }
 
-        // Tighten the wrapper around its new children, then expand all
-        // ancestors bottom-up so each containing system grows to fit. With
-        // arbitrary nesting depth (system → system → system) we can't just
-        // fit one level — every ancestor needs to recompute.
-        get().fitParentToChildren(newId)
-        let cur: string | undefined = commonParentId ?? undefined
-        const seen = new Set<string>()
-        while (cur && !seen.has(cur)) {
-          seen.add(cur)
-          get().fitParentToChildren(cur)
-          cur = get().c4Nodes[cur]?.parentId
-        }
+        // What it wraps stays where it is drawn, and the wrapper hugs it
+        // there. addNode kept the wrapper below its parent's header (a place
+        // for an element dropped there) and fitted it to its type's size:
+        // the selection moved down with it, and the wrapper, 520×360 round
+        // one container, lay over the elements beside it, which were pushed
+        // away and grew the frames round them (F-0028). Each parent grows
+        // only as far as it needs to hold the one in it that grew, with the
+        // room it had, left and up included (moving its children back by as
+        // much); the parents above it the same, up to the canvas.
+        const grown: string[] = []
+        set((state) => {
+          const all = state.c4Nodes as Record<string, C4Node>
+          const w = all[newId]
+          if (!w) return
+          w.x = newX
+          w.y = newY
+          w.width = newW
+          w.height = newH
+          for (const n of nodes) {
+            const c = all[n.id]
+            if (c) { c.x = n.x - newX; c.y = n.y - newY }
+          }
+          let inner = { x: newX, y: newY, w: newW, h: newH }
+          // From the frames as they were: addNode fitted them to the
+          // wrapper it placed.
+          for (const { id, frame, room } of ancestors) {
+            const a = all[id]
+            if (!a) break
+            const dx = Math.max(0, room.x - inner.x)
+            const dy = Math.max(0, room.y - inner.y)
+            if (dx || dy) {
+              for (const c of Object.values(all)) {
+                if (c.parentId === id) { c.x += dx; c.y += dy }
+              }
+            }
+            a.x = frame.x - dx
+            a.y = frame.y - dy
+            a.width = Math.max(frame.w + dx, inner.x + dx + inner.w + room.X)
+            a.height = Math.max(frame.h + dy, inner.y + dy + inner.h + room.Y)
+            if (a.width !== frame.w || a.height !== frame.h) grown.push(id)
+            inner = { x: a.x, y: a.y, w: a.width, h: a.height }
+          }
+        })
+        get()._sync()
 
         // Promote the new wrapper to the active selection.
         get().setSelectedNodeIds([newId])
@@ -4942,14 +4999,16 @@ export const useDiagramStore = create<DiagramStore>()(
           `Wrapped ${nodes.length} ${nodes.length === 1 ? 'node' : 'nodes'} into ${wrapperLabel}.`,
           'info',
         )
-        wrapped = commonParentId ? [newId, commonParentId] : [newId]
+        wrapped = [newId, ...grown]
         })
         } finally {
           _liveLayout = layout
         }
         // It makes room as an element added does: what the new parent, or
-        // the parent it grew, covers is pushed clear, and nothing else moves.
-        if (wrapped.length) _liveLayout?.invalidate(wrapped)
+        // a parent it grew, covers is pushed clear, and nothing else moves.
+        // Only what it lies on: an element 50 px beside the selection, 20
+        // px from the new parent's frame, went 4 px aside with its parent.
+        if (wrapped.length) _liveLayout?.invalidate(wrapped, true)
       },
 
       unwrapNode(id) {
