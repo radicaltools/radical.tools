@@ -49,9 +49,9 @@ function withFillers(nodes: Nodes, relations: Record<string, C4Relation>, count 
   for (let i = 1; i < count; i++) relations[`fr${i}`] = { id: `fr${i}`, sourceId: `f${i - 1}`, targetId: `f${i}` } as C4Relation
 }
 
-function engineFor(nodes: Nodes, relations: Record<string, C4Relation>, alignments: Alignment[] = [], pinned: string[] = []): LiveColaEngine {
+function engineFor(nodes: Nodes, relations: Record<string, C4Relation>, alignments: Alignment[] = [], pinned: string[] = [], frames: string[] = []): LiveColaEngine {
   return new LiveColaEngine({
-    getModel: () => ({ nodes, relations, alignments, pinned }),
+    getModel: () => ({ nodes, relations, alignments, pinned, frames }),
     applyPositions: (positions) => {
       for (const [id, pos] of Object.entries(positions)) {
         const n = nodes[id]
@@ -409,6 +409,58 @@ describe('Calm drag', () => {
     }
     expect(overlapping).toEqual([])
     expect(absOf(nodes, 'a')).toEqual({ x: 0, y: -100 })
+  })
+})
+
+describe('A drag on a view that does not draw the containers its elements are in (F-0048)', () => {
+  // The sample's Domain model: entities, drawn without the domains they are
+  // in. Payment, dropped on an empty spot 190 px from Account and Ledger
+  // Entry, pushed them 422 px left: its domain grew round the drop and
+  // pushed theirs, with them in it.
+  const domainModel = (): Nodes => ({
+    acc: node('acc', 'domain', { x: 0, y: 0, width: 700, height: 400 }),
+    account: node('account', 'entity', { parentId: 'acc', x: 30, y: 120 }),
+    ledger: node('ledger', 'entity', { parentId: 'acc', x: 300, y: 120 }),
+    pay: node('pay', 'domain', { x: 800, y: 0, width: 700, height: 400 }),
+    payment: node('payment', 'entity', { parentId: 'pay', x: 30, y: 120 }),
+    batch: node('batch', 'entity', { parentId: 'pay', x: 300, y: 120 }),
+  })
+  const drawnIds = ['account', 'ledger', 'payment', 'batch']
+
+  it('moves only the dropped element where it covers nothing', () => {
+    const nodes = domainModel()
+    const relations: Record<string, C4Relation> = { r: { id: 'r', sourceId: 'payment', targetId: 'account' } as C4Relation }
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations, [], [], ['acc', 'pay'])
+    engine.start(true)
+    const before = snapshot(nodes)
+    const gap = 420 - (120 + NODE_SIZES.entity.height)
+    expect(gap).toBeGreaterThan(200)
+    calmDrag(engine, nodes, 'payment', { x: 150, y: 420 })
+    engine.release('payment')
+    engine.stop()
+    const after = snapshot(nodes)
+    expect(after.payment).toBe('150,420')
+    for (const id of drawnIds.filter((id) => id !== 'payment')) expect(after[id], id).toBe(before[id])
+  })
+
+  it('pushes what the drop covers, across the containers the view does not draw', () => {
+    const nodes = domainModel()
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations, [], [], ['acc', 'pay'])
+    engine.start(true)
+    const before = snapshot(nodes)
+    // Onto Ledger Entry, a little to its right.
+    calmDrag(engine, nodes, 'payment', { x: 320, y: 125 })
+    engine.release('payment')
+    engine.stop()
+    const after = snapshot(nodes)
+    expect(after.payment).toBe('320,125')
+    expect(overlaps(nodes, 'payment', 'ledger')).toBe(false)
+    expect(after.ledger).not.toBe(before.ledger)
+    expect(after.account).toBe(before.account)
+    expect(after.batch).toBe(before.batch)
   })
 })
 
