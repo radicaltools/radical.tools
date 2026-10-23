@@ -4,7 +4,8 @@ import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName } from '@radical/common/metamodel'
 import { defaultGridColumns, type C4Node } from '@radical/common/c4'
-import { checkPatchRelation, relationTypeOnMove } from '@radical/common/model'
+import { relationTypeOnMove } from '@radical/common/model'
+import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { useMenuKeys } from '../hooks/menuKeys'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 
@@ -371,8 +372,9 @@ function RelationEndItems({ relationId, end, candidates, close }: {
     const s = useDiagramStore.getState()
     const rel = s.c4Relations[relationId]
     const fit = relationTypeOnMove(s, relationId, { [end]: nodeId })
-    // A refused move is said so by updateRelation, not asked about.
-    if (rel && fit.ask && !checkPatchRelation(s, relationId, { [end]: nodeId })) {
+    // The types asked about are those the model accepts there
+    // (relationTypeOnMove); a refused move is said so by updateRelation.
+    if (rel && fit.ask) {
       const ends = { sourceId: rel.sourceId, targetId: rel.targetId, [end]: nodeId }
       const name = (id: string) => s.c4Nodes[id]?.label || id
       setAsking({ nodeId, title: `${name(ends.sourceId)} → ${name(ends.targetId)}: which relation?`, types: fit.ask, ends: s.c4Nodes[ends.sourceId] && s.c4Nodes[ends.targetId] ? { from: s.c4Nodes[ends.sourceId].type, to: s.c4Nodes[ends.targetId].type } : undefined })
@@ -400,6 +402,7 @@ function RelationEndItems({ relationId, end, candidates, close }: {
 export function RelationActions({ relationId }: { relationId: string }): React.ReactElement | null {
   const rel = useDiagramStore((s) => s.c4Relations[relationId])
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const c4Relations = useDiagramStore((s) => s.c4Relations)
   const metamodel = useDiagramStore((s) => s.metamodel)
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
@@ -408,16 +411,23 @@ export function RelationActions({ relationId }: { relationId: string }): React.R
   const source = rel ? c4Nodes[rel.sourceId] : undefined
   const target = rel ? c4Nodes[rel.targetId] : undefined
 
-  // Every element but its two ends that the metamodel lets it start from
-  // (to its target), or end at (from its source).
+  // Every element but its two ends that it may start from (to its target),
+  // or end at (from its source): of a type the model accepts there, or of
+  // none where none fits (relationRefusal: the metamodel's pairs, no
+  // structural relation to what holds an end, the aggregate rules).
   const candidates = useCallback((end: 'source' | 'target') => {
     if (!rel || !source || !target) return [] as { id: string; label: string; path: string }[]
+    const ctx = { nodes: c4Nodes, relations: c4Relations, metamodel }
+    const accepts = (ends: { sourceId: string; targetId: string }): boolean =>
+      relationTypesAccepted(ctx, ends.sourceId, ends.targetId, rel.id).length > 0
+      || !relationRefusal(ctx, { ...rel, ...ends, relationType: undefined }, rel.id, rel.relationType)
     return Object.values(c4Nodes)
       .filter((n) => n.id !== rel.sourceId && n.id !== rel.targetId
-        && (end === 'source' ? isRelationAllowed(metamodel, n.type, target.type) : isRelationAllowed(metamodel, source.type, n.type)))
+        && (end === 'source' ? isRelationAllowed(metamodel, n.type, target.type) : isRelationAllowed(metamodel, source.type, n.type))
+        && accepts(end === 'source' ? { sourceId: n.id, targetId: rel.targetId } : { sourceId: rel.sourceId, targetId: n.id }))
       .map((n) => ({ id: n.id, label: `${n.label || n.type} (${metamodel?.nodeTypes[n.type]?.label ?? n.type})`, path: pathOf(c4Nodes, n.id) }))
       .sort((a, b) => a.path.localeCompare(b.path))
-  }, [rel, source, target, c4Nodes, metamodel])
+  }, [rel, source, target, c4Nodes, c4Relations, metamodel])
   const sources = useMemo(() => candidates('source'), [candidates])
   const targets = useMemo(() => candidates('target'), [candidates])
   if (!rel || !source || !target) return null

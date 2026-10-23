@@ -10,8 +10,9 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes } from './viewPipeline'
+import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
   builtInC4Metamodel,
@@ -27,14 +28,10 @@ import {
   isPlacementAllowed,
   isRelationAllowed,
   placeOf,
-  relationTypeKeepsAggregates,
-  relationTypesFitting,
   initialPseudostateRefusal,
   isInitialPseudostate,
-  lifecycleRefusal,
   newPseudostateKind,
   outgoingTransitionCount,
-  transitionRefusal,
   refIds,
   type Metamodel,
   type PropertyDef,
@@ -356,9 +353,11 @@ export function parentCandidates(state: ModelState, id: string): C4Node[] {
  *  parent, beside its siblings, when it shows (placeUnplaced). */
 /** The relations that would join an element of `ids` (or one it holds) to
  *  what holds it once they are moved into `newParentId`: containment then
- *  joins them, so the move takes them (not a transition, which may go to a
- *  state holding its source). */
-export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Relations'>, ids: string[], newParentId: string | null): C4Relation[] {
+ *  joins them, so the move takes them; not those that may join an element
+ *  and what holds it (relationMayJoinHolder: a requirement's `satisfies`
+ *  to the system it is moved into stays, as does a transition to a state
+ *  holding its source). */
+export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Relations' | 'metamodel'>, ids: string[], newParentId: string | null): C4Relation[] {
   const moved = new Set(ids.filter((id) => state.c4Nodes[id]))
   const parentOf = (id: string): string | undefined => (moved.has(id) ? newParentId ?? undefined : state.c4Nodes[id]?.parentId)
   const holds = (outer: string, inner: string): boolean => {
@@ -378,7 +377,7 @@ export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Rel
     }
     return false
   }
-  return Object.values(state.c4Relations).filter((r) => r.relationType !== 'transition'
+  return Object.values(state.c4Relations).filter((r) => !relationMayJoinHolder(state.metamodel, r.relationType)
     && (under(r.sourceId) || under(r.targetId))
     && (holds(r.sourceId, r.targetId) || holds(r.targetId, r.sourceId)))
 }
@@ -775,42 +774,12 @@ export function checkRemoveRelationType(state: ModelState, typeId: string, miles
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {
-  return relationRefusal(state, rel)
+  return relationRefusal(relationContext(state), rel)
 }
 
-/** checkAddRelation for a new relation, or for the relation `exceptId`
- *  changed into `rel` (its type `kept` stays where it still has the pair). */
-function relationRefusal(state: ModelState, rel: Omit<C4Relation, 'id'>, exceptId?: string, kept?: string): string | null {
-  const src = state.c4Nodes[rel.sourceId]
-  const dst = state.c4Nodes[rel.targetId]
-  if (!src || !dst) return null
-  if (!isRelationAllowed(state.metamodel, src.type, dst.type)) {
-    return `Relation not allowed: ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}. The metamodel does not permit this connection.`
-  }
-  // A relation that names its type must be one that type has between the two.
-  const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
-  if (def && !relationTypeAllows(def, src.type, dst.type)) {
-    return `Relation not allowed: "${def.label}" does not connect ${typeLabel(state.metamodel, src.type)} → ${typeLabel(state.metamodel, dst.type)}.`
-  }
-  // The type it will have (insertRelation and patchRelation infer one).
-  const keptDef = kept ? state.metamodel?.relationTypes[kept] : undefined
-  const type = rel.relationType ?? (keptDef && relationTypeAllows(keptDef, src.type, dst.type) ? kept : inferRelationType(state.metamodel, src.type, dst.type))
-  // Containment already joins an element and what holds it. A transition to
-  // a state that holds its source is SCXML: it leaves and enters that state.
-  const holder = type === 'transition' ? undefined : holderOf(state.c4Nodes, src, dst)
-  if (holder) return `Relation not allowed: ${holder.label} holds ${(holder === src ? dst : src).label}, and containment already joins them.`
-  if (hasStatecharts(state.metamodel)) {
-    const why = type === 'transition' ? transitionRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
-      : type === 'lifecycle-of' ? lifecycleRefusal(src, dst, state.c4Nodes, state.c4Relations, exceptId)
-      : null
-    if (why) return `Relation not allowed: ${why}`
-  }
-  return null
-}
-
-function relationTypeAllows(def: { allowedPairs: { from: string; to: string }[] }, from: string, to: string): boolean {
-  return def.allowedPairs.length === 0 || def.allowedPairs.some((p) => p.from === from && p.to === to)
-}
+/** The model as relationRefusal checks a relation against it. */
+const relationContext = (state: Pick<ModelState, 'c4Nodes' | 'c4Relations' | 'metamodel'>): RelationContext =>
+  ({ nodes: state.c4Nodes, relations: state.c4Relations, metamodel: state.metamodel })
 
 /** Gives a relation whose type no longer has its pair (an end moved, an end
  *  was retyped) the one type that does, or none when several could. */
@@ -842,7 +811,7 @@ export function checkPatchRelation(state: ModelState, id: string, updates: Parti
   if (!rel) return null
   const retyped = updates.relationType !== undefined && updates.relationType !== rel.relationType
   if (updates.sourceId === undefined && updates.targetId === undefined && !retyped) return null
-  return relationRefusal(state, { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)
+  return relationRefusal(relationContext(state), { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)
 }
 
 /** What moving an end of relation `id` (`updates`) does to its type: none
@@ -858,10 +827,9 @@ export function relationTypeOnMove(state: ModelState, id: string, updates: Parti
   const dst = state.c4Nodes[updates.targetId ?? rel.targetId]
   if (!src || !dst || (src.id === rel.sourceId && dst.id === rel.targetId)) return {}
   const def = rel.relationType ? state.metamodel?.relationTypes[rel.relationType] : undefined
-  if (def && relationTypeAllows(def, src.type, dst.type) && relationTypeKeepsAggregates(def.id, src, dst)) return {}
-  const types = relationTypesFitting(state.metamodel, src.type, dst.type)
-    .filter((rt) => relationTypeKeepsAggregates(rt.id, src, dst))
-    .map((rt) => rt.id)
+  const ctx = relationContext(state)
+  if (def && !relationRefusal(ctx, { sourceId: src.id, targetId: dst.id, relationType: def.id }, id)) return {}
+  const types = relationTypesAccepted(ctx, src.id, dst.id, id)
   if (types.length > 1) return { ask: types }
   return types.length === 1 && rel.relationType ? { type: types[0] } : {}
 }

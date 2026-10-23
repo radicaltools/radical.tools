@@ -3,7 +3,7 @@ import { buildToolDefs, buildToolHandlers } from '../src/ai/tools/index'
 import type { ToolRunContext } from '../src/ai/tools/types'
 import type { DiagramFacade } from '../src/ai/diagramFacade'
 import type { C4Node, C4Relation, DiagramView } from '../src/c4'
-import type { Metamodel } from '../src/metamodel/index'
+import { builtInGovernanceMetamodel, type Metamodel } from '../src/metamodel/index'
 import { createModelFacade } from '../src/ai/modelFacade'
 
 function makeFacade(mm?: Metamodel): DiagramFacade & {
@@ -173,6 +173,28 @@ describe('node tools', () => {
     expect(forbidden.resultText).toContain('Allowed parents: System')
     expect(handlers.get('move_node')!({ id: 'sys', parentId: 'api' }, ctx).ok).toBe(false)
     expect(facade.getNodes()[ctx.resolveId('api')].parentId).toBe(ctx.resolveId('sys'))
+  })
+
+  // F-0035 (decided 2026-10-23): governance relations are outside the
+  // holder rule, over MCP as in Studio.
+  it('move_node keeps a governance relation with what then holds the element, and add_relation takes one there', () => {
+    const facade = createModelFacade({ nodes: [], relations: [], metamodel: builtInGovernanceMetamodel() })
+    const ctx = makeCtx(facade)
+    const handlers = buildToolHandlers()
+    handlers.get('add_node')!({ tempId: 'shop', type: 'system', label: 'Shop' }, ctx)
+    handlers.get('add_node')!({ tempId: 'req', type: 'requirement', label: 'Pay by card' }, ctx)
+    handlers.get('add_node')!({ tempId: 'legacy', type: 'system', label: 'Legacy' }, ctx)
+    handlers.get('add_node')!({ tempId: 'api', type: 'container', label: 'API', parentId: 'legacy' }, ctx)
+    handlers.get('add_node')!({ tempId: 'adr', type: 'adr', label: 'Use Postgres', parentId: 'shop' }, ctx)
+    expect(handlers.get('add_relation')!({ sourceId: 'shop', targetId: 'req', relationType: 'satisfies' }, ctx).ok).toBe(true)
+    expect(handlers.get('add_relation')!({ sourceId: 'api', targetId: 'shop', relationType: 'interacts' }, ctx).ok).toBe(true)
+    const kept = handlers.get('move_node')!({ id: 'req', parentId: 'shop' }, ctx)
+    expect(kept.resultText).not.toMatch(/Removed/)
+    const gone = handlers.get('move_node')!({ id: 'api', parentId: 'shop' }, ctx)
+    expect(gone.resultText).toMatch(/Removed 1 relation/)
+    expect(Object.values(facade.getRelations()).map((r) => r.relationType)).toEqual(['satisfies'])
+    expect(handlers.get('add_relation')!({ sourceId: 'adr', targetId: 'shop', relationType: 'constrains' }, ctx).ok).toBe(true)
+    expect(handlers.get('add_relation')!({ sourceId: 'api', targetId: 'shop', relationType: 'interacts' }, ctx).ok).toBe(false)
   })
 
   it('add_node fails cleanly when the store rejects it (empty id)', () => {

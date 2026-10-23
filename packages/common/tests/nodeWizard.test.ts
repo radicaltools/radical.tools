@@ -9,8 +9,11 @@ import {
   wizardPrefill,
   wizardRelationCandidates,
   wizardStepFields,
+  type WizardLink,
   type WizardRelationsStep,
 } from '../src/metamodel/index'
+import { linkRefusal, wizardLinkCandidates } from '../src/relationRules'
+import type { C4Node } from '../src/c4'
 
 const mm = builtInGovernanceMetamodel()
 
@@ -122,5 +125,32 @@ describe('relation steps', () => {
       { relationType: 'constrains', direction: 'out', otherId: 'sys', relationId: 'r1' },
       { relationType: 'supersedes', direction: 'out', otherId: 'old', relationId: 'r2' },
     ])
+  })
+})
+
+// F-0033: an ADR dropped onto a system offered only that system, and Create
+// was refused ("System holds ADR"). The step offers what the model accepts:
+// constrains is governance, which may join an element and what holds it; a
+// structural step offers no element that holds the new one.
+describe('a relation step and what holds the element', () => {
+  const nodes = {
+    sys: { id: 'sys', type: 'system', label: 'Shop', x: 0, y: 0, width: 1, height: 1 },
+    pay: { id: 'pay', type: 'system', label: 'Pay', x: 0, y: 0, width: 1, height: 1 },
+    api: { id: 'api', type: 'container', label: 'API', parentId: 'sys', x: 0, y: 0, width: 1, height: 1 },
+  } as unknown as Record<string, C4Node>
+  const ctx = { nodes, relations: {}, metamodel: mm }
+  const step = (relationType: string, direction: 'out' | 'in'): WizardRelationsStep => ({ kind: 'relations', title: '', relationType, direction })
+  it('offers what the model accepts linked so, and keeps what is linked already', () => {
+    const ids = (s: WizardRelationsStep, self: { id?: string; type: string; parentId?: string }, links: WizardLink[] = []) =>
+      wizardLinkCandidates(ctx, s, self, links).map((n) => n.id)
+    // A new ADR in the Shop constrains the Shop, too.
+    expect(ids(step('constrains', 'out'), { type: 'adr', parentId: 'sys' })).toEqual(['api', 'pay', 'sys'])
+    expect(linkRefusal(ctx, { type: 'adr', parentId: 'sys' }, { relationType: 'constrains', direction: 'out', otherId: 'sys' })).toBeNull()
+    // A new container in the Shop uses another system, not the Shop.
+    expect(ids(step('interacts', 'out'), { type: 'container', parentId: 'sys' })).toEqual(['api', 'pay'])
+    expect(linkRefusal(ctx, { type: 'container', parentId: 'sys' }, { relationType: 'interacts', direction: 'out', otherId: 'sys' })).toMatch(/Shop holds/)
+    // The API (in the Shop) edited: the Shop stays while it is linked so.
+    expect(ids(step('interacts', 'out'), { id: 'api', type: 'container' })).toEqual(['pay'])
+    expect(ids(step('interacts', 'out'), { id: 'api', type: 'container' }, [{ relationType: 'interacts', direction: 'out', otherId: 'sys' }])).toEqual(['pay', 'sys'])
   })
 })

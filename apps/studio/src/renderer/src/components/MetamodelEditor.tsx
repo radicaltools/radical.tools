@@ -624,6 +624,16 @@ function RelationTypeCard({
               />
             </label>
           </div>
+          <div className="mm-row">
+            <label className="mm-checkbox" title="A governance relation ties a requirement, decision, check or screen to the element it is about (satisfies, constrains): it may join an element and what holds it, and moving one into the other keeps it. A structural one (uses, part of) is refused there, and goes on such a move.">
+              <input
+                type="checkbox"
+                checked={!!def.governance}
+                onChange={(e) => onChange({ governance: e.target.checked || undefined })}
+              />
+              Governance: may join an element and what holds it
+            </label>
+          </div>
 
           <div className="mm-section-label">
             Allowed pairs

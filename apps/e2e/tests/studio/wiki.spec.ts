@@ -369,6 +369,25 @@ test.describe('a wiki of the bookstore', () => {
     expect(errors).toEqual([])
   })
 
+  // F-0033: Add or link… under the API offered "uses……" the Bookstore that
+  // holds it (the ellipsis doubled), and picking it was refused.
+  test('Add or link… offers no relation to what holds the element, and reads each way with one ellipsis', async ({ page, studio }) => {
+    await seedWiki(studio, {})
+    await studio.open('v-wiki/f/api')
+    await page.getByRole('button', { name: 'Edit API' }).click()
+    await page.getByRole('menuitem', { name: 'Add or link…' }).click()
+    const picker = addPicker(page, 'API')
+    const ways = picker.dialog.locator('optgroup[label="Other relationships"] option')
+    await expect(ways.first()).toBeAttached()
+    const texts = await ways.allTextContents()
+    expect(texts.filter((t) => t.includes('……'))).toEqual([])
+    expect(texts.every((t) => t.endsWith('…'))).toBe(true)
+    for (const text of texts) {
+      await picker.choose(text)
+      await expect(picker.option('Bookstore')).toHaveCount(0)
+    }
+  })
+
   // Open point (35–44): the Pages list stayed A–Z under a descending sort.
   test('the pages list in the view\'s order', async ({ page, studio }) => {
     await seedWiki(studio, { pipeline: { levels: [{ ways: [{ types: ['person', 'system'] }] }], sort: { by: 'label', desc: true } } })

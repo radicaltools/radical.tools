@@ -12,8 +12,6 @@ import {
   earsActionIsClause,
   refLabels,
   relationTypeForProse,
-  relationTypeKeepsAggregates,
-  relationTypesFitting,
   NODE_TYPE_CATEGORIES,
   CUSTOM_CATEGORY,
   nodeTypeCategory,
@@ -49,6 +47,7 @@ import {
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
 import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, runPipeline, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
+import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
@@ -352,6 +351,7 @@ function relationReadingsOf(
     if (r.sourceId === node.id) related.add(`out:${type}:${r.targetId}`)
     if (r.targetId === node.id) related.add(`in:${type}:${r.sourceId}`)
   }
+  const ctx = { nodes, relations, metamodel }
   const defs = Object.values(metamodel?.relationTypes ?? {})
   // A model without relation types has one kind of relation, either way.
   if (defs.length === 0) {
@@ -360,7 +360,8 @@ function relationReadingsOf(
       typeId: undefined,
       direction,
       text: relationPhrase(undefined, direction).text,
-      partners: others.filter((n) => !related.has(`${direction}::${n.id}`)),
+      partners: others.filter((n) => !related.has(`${direction}::${n.id}`)
+        && !relationRefusal(ctx, direction === 'out' ? { sourceId: node.id, targetId: n.id } : { sourceId: n.id, targetId: node.id })),
     }))
   }
   const readings: RelationReading[] = []
@@ -369,10 +370,12 @@ function relationReadingsOf(
       const partners = others.filter((n) => {
         if (related.has(`${direction}:${def.id}:${n.id}`)) return false
         const [from, to] = direction === 'out' ? [node, n] : [n, node]
-        // The aggregate rules too: Part of… from one aggregate root to
-        // another was offered, and Validation then flagged it.
+        // What the model accepts (relationRefusal): Part of… from one
+        // aggregate root to another was offered, and Validation then
+        // flagged it; Uses… to the system holding the element was offered,
+        // and refused when picked.
         return (def.allowedPairs.length === 0 || def.allowedPairs.some((pair) => pair.from === from.type && pair.to === to.type))
-          && relationTypeKeepsAggregates(def.id, from, to)
+          && !relationRefusal(ctx, { sourceId: from.id, targetId: to.id, relationType: def.id })
       })
       // One reading per way the pair reads ("Uses…", "Delivers to…").
       const byText = new Map<string, C4Node[]>()
@@ -605,9 +608,8 @@ export function WikiView(): React.ReactElement {
     requestDelete([id])
   }
 
-  const createRelation = (sourceId: string, targetId: string, relationType?: string) => {
+  const createRelation = (sourceId: string, targetId: string, relationType?: string): string | null =>
     addRelation({ sourceId, targetId, ...(relationType ? { relationType } : {}) })
-  }
 
   // What may be added under `node`: on the next level of the view's chain
   // when the page's element is on it (as the table's + offers), else the
@@ -651,7 +653,8 @@ export function WikiView(): React.ReactElement {
   // The link only: the element stays where it is.
   const linkExisting = (nodeId: string, link: WizardLink) => {
     const [source, target] = link.direction === 'out' ? [nodeId, link.otherId] : [link.otherId, nodeId]
-    createRelation(source, target, link.relationType)
+    // Refused (the reason is shown): nothing was linked.
+    if (!createRelation(source, target, link.relationType)) return
     const s = useDiagramStore.getState()
     const label = s.c4Nodes[nodeId]?.label ?? nodeId
     const shown = viewShownNodes(s.activeViewId ? s.views[s.activeViewId] : undefined, s.c4Nodes, s.c4Relations)
@@ -690,7 +693,8 @@ export function WikiView(): React.ReactElement {
     const rank = (type: string): number => (typeOrder.indexOf(type) < 0 ? typeOrder.length : typeOrder.indexOf(type))
     const relations = relationReadingsOf(node, c4Nodes, c4Relations, shownSet, metamodel).map((reading): PickerWay => ({
       key: `relation|${reading.key}`,
-      label: `${reading.text}…`,
+      // How it reads ("Uses"); the picker adds the ellipsis.
+      label: reading.text,
       kind: 'relation',
       linkable: true,
       candidates: [...reading.partners].sort((a, b) => rank(a.type) - rank(b.type) || a.label.localeCompare(b.label)),
@@ -2681,12 +2685,15 @@ function WikiRelationLine({
     : undefined
   const srcNode = nodes[relation.sourceId]
   const dstNode = nodes[relation.targetId]
-  // As the properties card offers them: the types that connect these two
-  // under the aggregate rules. "generic" made a relation with no type,
-  // which Validation flags where types fit.
+  // As the properties card offers them: the types the model accepts
+  // between these two (relationTypesAccepted: the aggregate rules kept, no
+  // structural one to what holds an end). "generic" made a relation with no
+  // type, which Validation flags where types fit.
+  const relations = useDiagramStore((s) => s.c4Relations)
   const compatibleTypes = useMemo(
-    () => relationTypesFitting(metamodel, srcNode?.type, dstNode?.type).filter((rt) => relationTypeKeepsAggregates(rt.id, srcNode, dstNode)),
-    [metamodel, srcNode, dstNode],
+    () => relationTypesAccepted({ nodes, relations, metamodel }, relation.sourceId, relation.targetId, relation.id)
+      .map((id) => metamodel.relationTypes[id]),
+    [metamodel, nodes, relations, relation.sourceId, relation.targetId, relation.id],
   )
   const currentType = relation.relationType ?? ''
   const fitsNow = !currentType || compatibleTypes.some((rt) => rt.id === currentType)

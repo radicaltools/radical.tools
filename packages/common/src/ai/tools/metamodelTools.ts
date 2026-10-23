@@ -87,6 +87,7 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           forwardLabel: { type: 'string', description: 'How it reads in a sentence from source to target, when the label is a name rather than a verb ("Uses" for "Interacts"). "" clears it.' },
           inverseLabel: { type: 'string', description: 'How it reads from target to source: "Constrained by". The wiki view uses it; the canvas does not show it. "" clears it.' },
           color: { type: 'string' },
+          governance: { type: 'boolean', description: 'true for a governance relation, which ties a requirement, decision, check or screen to the element it is about (satisfies, constrains, verifies): it may join an element and what holds it, and moving an element into the other keeps it. false (the default) for a structural one (uses, part of), which containment already says: refused between an element and what holds it, and removed when one is moved into the other.' },
           allowedPairs: {
             type: 'array',
             description: 'The complete list of allowed source → target node-type pairs. [] allows any pair. A pair may read its own way: forwardLabel ("Delivers to" for Interacts to a person) and inverseLabel ("Receives from").',
@@ -320,6 +321,11 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         else delete def[key]
       }
       if (typeof input.color === 'string') def.color = input.color
+      if (input.governance !== undefined) {
+        if (typeof input.governance !== 'boolean') return fail('upsert_relation_type: governance must be true or false')
+        if (input.governance) def.governance = true
+        else delete def.governance
+      }
       if (pairs) def.allowedPairs = pairs
       if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
       mm.relationTypes[id] = def
