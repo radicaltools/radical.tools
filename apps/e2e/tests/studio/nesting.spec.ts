@@ -174,16 +174,17 @@ test.describe('the special key', () => {
     await page.keyboard.up('Alt')
     await expect(page.getByText('Cannot place Container "API" inside the canvas root. Allowed parents: Software System, Group.')).toBeVisible()
     expect(await parents(studio, 'api')).toEqual(['bookstore'])
-    // With the Customer: the Customer goes, the API is named.
+    // With the Customer and the Orders DB: the Customer goes, the other two are named.
     await studio.settle()
     await studio.node('customer').click()
     await studio.node('api').click({ modifiers: ['Alt'] })
+    await studio.node('db').click({ modifiers: ['Alt'] })
     await page.keyboard.down('Alt')
     await altDrag(page, studio.node('customer'), empty)
     await page.keyboard.up('Alt')
-    await expect.poll(() => parents(studio, 'customer', 'api')).toEqual([null, 'bookstore'])
+    await expect.poll(() => parents(studio, 'customer', 'api', 'db')).toEqual([null, 'bookstore', 'bookstore'])
     await expect(page.getByText('Moved 1 node into the canvas root.')).toBeVisible()
-    await expect(page.getByText('Cannot place Container "API" inside the canvas root. Allowed parents: Software System, Group.')).toHaveCount(2)
+    await expect(page.getByText(/^Cannot place Container "API" inside the canvas root\. Allowed parents: [^.]+\. Cannot place Database "Orders DB" inside the canvas root\. Allowed parents: [^.]+\.$/)).toBeVisible()
   })
 
   test('one gesture on several selected elements is one undo step, relations and nests alike', async ({ page, studio }) => {
