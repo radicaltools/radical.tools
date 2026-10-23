@@ -855,10 +855,26 @@ describe('metamodel changes over MCP', () => {
     await model.call('add_node', { tempId: 'api', type: 'container', label: 'API', parentId: 'shop' })
     const narrowed = await model.call('upsert_node_type', { id: 'container', allowedParents: ['group'] })
     expect(narrowed.ok, narrowed.text).toBe(true)
-    expect(narrowed.text).toContain('Warning: the metamodel now flags what the model holds (1 issue')
+    expect(narrowed.text).toContain('Warning: the metamodel change brings in 1 issue')
     expect(narrowed.text).toContain('Container "API" cannot be inside Software System. Allowed parents: group.')
     const limited = await model.call('upsert_node_type', { id: 'system', maxCount: 1 })
     expect(limited.text).not.toContain('Warning')
+  })
+
+  // F-0032: a type left with no place at all is a warning of its own, also
+  // while no element of it exists; the agent hears of it with the result,
+  // and get_issues lists it.
+  it('leaving a type no place is written, with the warning that nothing can be placed as it', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const placeless = await model.call('upsert_node_type', { id: 'queue', allowedParents: [], allowedAtRoot: false })
+    expect(placeless.ok, placeless.text).toBe(true)
+    expect(placeless.text).toContain('Warning: the metamodel change brings in 1 issue')
+    expect(placeless.text).toContain('Queue has no place in the metamodel: no allowed parent, and not at the root, so nothing can be placed as a Queue.')
+    expect((await model.call('get_issues', {})).text).toContain('Queue has no place in the metamodel')
+    const refused = await model.call('add_node', { type: 'queue', label: 'Orders' })
+    expect(refused.ok).toBe(false)
+    expect(refused.text).not.toContain('Allowed parents: the canvas root')
   })
 })
 

@@ -678,7 +678,7 @@ export class FolderModel {
     const warnings = retyped ? fresh : fresh.filter((issue) => issue.severity === 'warning')
     const list = `${warnings.slice(0, MAX_WARNINGS).map((issue) => `\n- ${issue.message}`).join('')}${warnings.length > MAX_WARNINGS ? `\n- …and ${warnings.length - MAX_WARNINGS} more` : ''}`
     const warned = !warnings.length ? ''
-      : retyped ? ` Warning: the metamodel now flags what the model holds (${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'}; change those elements or the metamodel back, see get_issues):${list}`
+      : retyped ? ` Warning: the metamodel change brings in ${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'} (fix them or change the metamodel back, see get_issues):${list}`
       : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
     // Each element's file where the folder has it (the session keeps them
     // too; here so that the files named as changed are the ones written).

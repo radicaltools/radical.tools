@@ -124,7 +124,65 @@ describe('a type with no allowed parents', () => {
     })
     it(`(${JSON.stringify(allowedParents)}) is a change that breaks what the model holds`, () => {
       expect(metamodelChangeBreaks(nodes, {}, before, after).map((i) => i.message))
-        .toEqual(['Database "db" cannot be inside Software System. Allowed parents: (none).'])
+        .toEqual([
+          'Database "db" cannot be inside Software System. Allowed parents: (none).',
+          // Not at the root either: it has no place at all (F-0032).
+          'Database has no place in the metamodel: no allowed parent, and not at the root, so nothing can be placed as a Database.',
+        ])
     })
   }
+})
+
+// F-0031, F-0032: a type with no allowed parents and At the root unticked has
+// no place at all. Its refusal said "Allowed parents: the canvas root" while
+// the root refused it too, and nothing warned of a type nothing can be
+// placed as.
+describe('a type with no place at all', () => {
+  const node = (id: string, type: string, parentId?: string): C4Node =>
+    ({ id, type: type as C4Node['type'], label: id, parentId, collapsed: false, x: 0, y: 0, width: 100, height: 60 })
+  const nodes: Record<string, C4Node> = Object.fromEntries([node('shop', 'system')].map((n) => [n.id, n]))
+  const placeless = (): ReturnType<typeof builtInC4Metamodel> => {
+    const mm = builtInC4Metamodel()
+    mm.nodeTypes.queue = { ...mm.nodeTypes.queue, allowedParents: [], allowedAtRoot: false }
+    return mm
+  }
+  const state = (mm: ReturnType<typeof builtInC4Metamodel>): ModelState => ({
+    c4Nodes: structuredClone(nodes), c4Relations: {}, sequences: {}, views: {}, activeViewId: null, metamodel: mm,
+  } as unknown as ModelState)
+  const queue = (parentId?: string) => ({ type: 'queue', label: 'q', parentId, collapsed: false, x: 0, y: 0, width: 100, height: 60 }) as Omit<C4Node, 'id'>
+
+  it('is refused at the root and in an element, and the refusal never names the canvas root as its place', () => {
+    const mm = placeless()
+    const atRoot = checkAddNode(state(mm), queue())
+    const inShop = checkAddNode(state(mm), queue('shop'))
+    for (const why of [atRoot, inShop]) {
+      expect(why).not.toBeNull()
+      expect(why).not.toContain('Allowed parents: the canvas root')
+      expect(why).toContain('Queue has no place in the metamodel')
+    }
+  })
+
+  it('names the canvas root beside its parents when the root takes it too', () => {
+    const mm = builtInC4Metamodel()
+    mm.nodeTypes.queue = { ...mm.nodeTypes.queue, allowedParents: ['system'], allowedAtRoot: true }
+    expect(checkAddNode(state(mm), { ...queue(), type: 'queue' } as Omit<C4Node, 'id'>)).toBeNull()
+    mm.nodeTypes.person = { ...mm.nodeTypes.person, allowedParents: [] }
+    expect(checkAddNode(state(mm), { ...queue('shop'), type: 'person' } as Omit<C4Node, 'id'>))
+      .toBe('Cannot place Person inside Software System. Allowed parents: the canvas root.')
+  })
+
+  it('is a warning of the validation, also while no element of it exists', () => {
+    expect(validateModel(nodes, {}, placeless()).filter((i) => i.nodeTypeId === 'queue')).toEqual([{
+      id: 'no-place:queue',
+      severity: 'warning',
+      message: 'Queue has no place in the metamodel: no allowed parent, and not at the root, so nothing can be placed as a Queue.',
+      nodeTypeId: 'queue',
+    }])
+    expect(validateModel(nodes, {}, builtInC4Metamodel()).filter((i) => i.id.startsWith('no-place:'))).toEqual([])
+    expect(validateModel(nodes, {}, builtInGovernanceMetamodel()).filter((i) => i.id.startsWith('no-place:'))).toEqual([])
+  })
+
+  it('is what taking its last place breaks, so the editor asks and the MCP server warns', () => {
+    expect(metamodelChangeBreaks(nodes, {}, builtInC4Metamodel(), placeless()).map((i) => i.id)).toEqual(['no-place:queue'])
+  })
 })

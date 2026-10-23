@@ -44,6 +44,7 @@ import {
   isRelationAllowed,
   relationTypeKeepsAggregates,
   relationTypesFitting,
+  allowedPlacesText,
   isParentAllowed,
   isPlacementAllowed,
   canAddMoreOfType,
@@ -4840,10 +4841,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
         // Wrapper must be allowed inside the common parent.
         if (!isPlacementAllowed(mm, parentTypeId, commonParent, state0.c4Nodes)) {
-          const allowed = parentDef.allowedParents
-          const allowedStr = allowed && allowed.length
-            ? allowed.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
-            : 'the canvas root'
+          const allowedStr = allowedPlacesText(mm, parentTypeId)
           const where = commonParent
             ? (mm?.nodeTypes[commonParent.type]?.label ?? commonParent.type)
             : 'the canvas root'
@@ -4859,10 +4857,7 @@ export const useDiagramStore = create<DiagramStore>()(
           if (!isParentAllowed(mm, n.type, parentTypeId)) {
             const childDef = mm?.nodeTypes[n.type]
             const childLabel = childDef?.label ?? n.type
-            const allowed = childDef?.allowedParents
-            const allowedStr = allowed && allowed.length
-              ? allowed.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
-              : 'the canvas root'
+            const allowedStr = allowedPlacesText(mm, n.type)
             state0.pushNotification(
               `Cannot place ${childLabel} "${n.label}" inside ${wrapperLabel}. Allowed parents: ${allowedStr}.`,
               'error',
@@ -7039,10 +7034,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // positions in the nodes until it is left; save them first, as
         // nothing of the milestone will be saved into the live views.
         if (!activeSnapshotId && get().appMode === 'designer') get()._saveShownCanvas()
-        // Backup live HEAD if we don't already have one.
+        // Backup live HEAD if we don't already have one: in Presenter, the
+        // live model under a slide card's copy of it, not the copy.
+        const live = !activeSnapshotId && _beforeSlidePreview
+        _beforeSlidePreview = null
         const backup = activeSnapshotId
           ? get().liveBackup
-          : { nodes: c4Nodes, relations: c4Relations, sequences, hubTemplates: get().hubTemplates as Record<string, HubImportRecord> }
+          : { nodes: live ? live.nodes : c4Nodes, relations: live ? live.relations : c4Relations, sequences, hubTemplates: get().hubTemplates as Record<string, HubImportRecord> }
 
         // In viewer (explore mode) keep the user's currently-arranged
         // positions for any node that still exists in the new milestone
@@ -8203,23 +8201,32 @@ export const useDiagramStore = create<DiagramStore>()(
         const slide = presentationSlides[i]
         set((state) => { state.presentationSlideIndex = i })
 
-        const shown = slideModel(slide, get().snapshots, liveUnderMilestone(get()))
-        if (shown) {
-          _beforeSlidePreview ??= { nodes: get().c4Nodes, relations: get().c4Relations }
-          set((state) => {
-            state.c4Nodes = shown.nodes as any
-            state.c4Relations = shown.relations as any
-          })
-        } else if (_beforeSlidePreview) {
-          // A slide without its own model shows the live one: put back what
-          // the card of a milestone slide replaced. It stayed, so every
-          // other slide showed the milestone and the presentation played
-          // with it.
+        // The live model the card of a slide with its own copy replaced
+        // goes back first: every slide's model is set from it.
+        if (_beforeSlidePreview) {
           const live = _beforeSlidePreview
           _beforeSlidePreview = null
           set((state) => {
             state.c4Nodes = live.nodes as any
             state.c4Relations = live.relations as any
+          })
+        }
+        // The milestone a slide shows is the one shown: the chip, the
+        // address and the Milestones list name it, and none over a slide
+        // that shows the live model or its own copy. A milestone picked
+        // before stayed named over the slide's model (F-0029).
+        const own = slide.snapshotId && get().snapshots.some((m) => m.id === slide.snapshotId) ? slide.snapshotId : null
+        if (own) {
+          if (get().activeSnapshotId !== own) get().selectMilestone(own)
+        } else if (get().activeSnapshotId) {
+          get().discardMilestoneChanges()
+        }
+        const shown = slideModel(slide, get().snapshots)
+        if (shown && !own) {
+          _beforeSlidePreview = { nodes: get().c4Nodes, relations: get().c4Relations }
+          set((state) => {
+            state.c4Nodes = shown.nodes as any
+            state.c4Relations = shown.relations as any
           })
         }
 

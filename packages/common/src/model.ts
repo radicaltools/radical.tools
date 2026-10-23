@@ -21,6 +21,7 @@ import {
   GROUP_TYPE,
   hasPlaceUnder,
   inferRelationType,
+  allowedPlacesText,
   isParentAllowed,
   isFinalState,
   isPlacementAllowed,
@@ -143,7 +144,6 @@ function typeLabel(mm: Metamodel | undefined, type: string): string {
 const FINAL_HOLDS_NOTHING = 'a final state cannot contain other states.'
 
 function placementError(mm: Metamodel | undefined, type: string, parent: C4Node | undefined, nodes: Record<string, C4Node>): string {
-  const allowed = mm?.nodeTypes[type]?.allowedParents
   const parentLabel = parent ? typeLabel(mm, parent.type) : 'the canvas root'
   if (parent && isParentAllowed(mm, type, parent.type) && isFinalState(parent)) {
     return `Final ${parentLabel.toLowerCase()} "${parent.label}": ${FINAL_HOLDS_NOTHING}`
@@ -153,10 +153,7 @@ function placementError(mm: Metamodel | undefined, type: string, parent: C4Node 
     const where = place ? `inside ${typeLabel(mm, place.type)} "${place.label}"` : 'at the top of the model'
     return `${parentLabel} "${parent.label}": the group is ${where}, where a ${typeLabel(mm, type)} has no place. A group holds only what its place allows.`
   }
-  const allowedStr = allowed && allowed.length
-    ? allowed.map((t) => typeLabel(mm, t)).join(', ')
-    : 'the canvas root'
-  return `${parentLabel}. Allowed parents: ${allowedStr}.`
+  return `${parentLabel}. Allowed parents: ${allowedPlacesText(mm, type)}.`
 }
 
 /** The first element inside the group `node` that would have no place if

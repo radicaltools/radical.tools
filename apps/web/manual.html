@@ -607,6 +607,7 @@
         <ul>
           <li>Pick or create a presentation, then <em>Add slide</em> to capture what is on screen: the view, the camera, the collapse state, the wiki page or drill level, and the milestone shown.</li>
           <li>Double-click a slide's name to rename it; <em>Capture</em> takes what is on screen now; link a slide to another view or milestone from its card.</li>
+          <li>Click a slide's card to show it: its milestone becomes the one shown, and a slide of the live model (or of its own copy) shows no milestone. The chip, the URL and the Milestones list name what the canvas draws.</li>
           <li><em>Present</em> (or <kbd>F5</kbd>) fills the window. <kbd>→</kbd> <kbd>Space</kbd> advance, <kbd>←</kbd> goes back, <kbd>Esc</kbd> exits. The URL follows the slide, so a listener can open the same one.</li>
         </ul>
       </section>
@@ -673,7 +674,7 @@
           <li><strong>Validation</strong> — everything the model breaks now, each with <em>Open in Designer</em>. Built-in types can be extended but not deleted.</li>
         </ul>
         <div class="doc-tip">
-          <strong>Good to know.</strong> A change that leaves the model against the metamodel (a parent unticked, an enum option removed) asks first and lists what it breaks. Every type, relation, pair and rule is tabled in the <a href="reference.html#types">Reference</a>.
+          <strong>Good to know.</strong> A change that leaves the model against the metamodel (a parent unticked, an enum option removed), or takes a type's last place (its last allowed parent, or <em>At the root</em> when it has none), asks first and lists what it breaks. Validation warns of a type nothing can be placed as, also while the model holds none. An emptied name, of the metamodel, a type, a relation type or a property, goes back to the one it had. Every type, relation, pair and rule is tabled in the <a href="reference.html#types">Reference</a>.
         </div>
       </section>
 

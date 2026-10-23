@@ -83,6 +83,31 @@ export function isParentAllowed(
   return !!allowed && allowed.includes(parentType)
 }
 
+/** True when an element of `type` may stand somewhere: inside an element
+ *  of some type, or at the root. A type with no allowed parents and At the
+ *  root unticked has no place, and nothing can be placed as it. */
+export function hasAnyPlace(metamodel: Metamodel | undefined, type: string): boolean {
+  const def = metamodel?.nodeTypes[type]
+  if (!def) return true
+  return (def.allowedParents?.length ?? 0) > 0 || isParentAllowed(metamodel, type, undefined)
+}
+
+/** Where an element of `type` may stand, as a refusal's "Allowed parents: …"
+ *  ends: its parent types, and the canvas root when the root takes it; for a
+ *  type with no place, that it has none (the canvas root was named for it,
+ *  while the root refused it too). */
+export function allowedPlacesText(metamodel: Metamodel | undefined, type: string): string {
+  const label = (t: string): string => metamodel?.nodeTypes[t]?.label ?? t
+  const places = (metamodel?.nodeTypes[type]?.allowedParents ?? []).map(label)
+  if (isParentAllowed(metamodel, type, undefined)) places.push('the canvas root')
+  return places.length ? places.join(', ') : `none (${noPlaceText(metamodel, type)})`
+}
+
+/** Says that `type` has no place, for a refusal or a warning. */
+export function noPlaceText(metamodel: Metamodel | undefined, type: string): string {
+  return `${metamodel?.nodeTypes[type]?.label ?? type} has no place in the metamodel`
+}
+
 /** The type that only gathers other elements and says nothing about them. */
 export const GROUP_TYPE = 'group'
 

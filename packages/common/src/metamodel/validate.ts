@@ -2,7 +2,7 @@
 
 import { C4Node, C4Relation } from '../c4'
 import { Metamodel, PropertyDef } from './types'
-import { chainTypeNames, GROUP_TYPE, hasPlaceUnder, isParentAllowed, placeOf, propertyKeyProblem, relationTypesFitting } from './lookup'
+import { chainTypeNames, GROUP_TYPE, hasAnyPlace, hasPlaceUnder, isParentAllowed, noPlaceText, placeOf, propertyKeyProblem, relationTypesFitting } from './lookup'
 import { validateStateMachines } from './statechart'
 import { validateDomainModel } from './domainModel'
 import { refIds, refProblem } from './refs'
@@ -130,6 +130,19 @@ export function validateModel(
         nodeTypeId: def.id,
       })
     }
+  }
+
+  // A type with no allowed parent and not at the root has no place: nothing
+  // can be placed as it, also while no element of it exists (the palette
+  // offered it, and every drop was refused).
+  for (const def of Object.values(metamodel.nodeTypes)) {
+    if (hasAnyPlace(metamodel, def.id)) continue
+    issues.push({
+      id: `no-place:${def.id}`,
+      severity: 'warning',
+      message: `${noPlaceText(metamodel, def.id)}: no allowed parent, and not at the root, so nothing can be placed as a ${def.label}.`,
+      nodeTypeId: def.id,
+    })
   }
 
   // Two properties of a type with one key are one field of the element.

@@ -33,7 +33,7 @@ import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
-import { isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
+import { allowedPlacesText, isParentAllowed, isRelationAllowed } from '@radical/common/metamodel'
 
 /** The viewport that fits `bounds` in the part of the canvas (`rect`) the
  *  elements palette on its left leaves free — and, framing a selection
@@ -1197,22 +1197,19 @@ function StructuralCanvas(): React.ReactElement {
           // Dropped on a node that is NOT a permitted parent for this type
           // (e.g. dragging a System onto a Container). Refuse the drop.
           const hoveredLabel = mm?.nodeTypes[hoveredType]?.label ?? hoveredType
-          const allowedStr = allowedParents.length
-            ? allowedParents.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
-            : 'the canvas root'
           useDiagramStore.getState().pushNotification(
-            `Cannot place ${typeLabel} inside ${hoveredLabel}. Allowed parents: ${allowedStr}.`,
+            `Cannot place ${typeLabel} inside ${hoveredLabel}. Allowed parents: ${allowedPlacesText(mm, typeStr)}.`,
             'error',
           )
           return
         }
       } else if (!isParentAllowed(mm, typeStr, undefined)) {
-        // Dropped on empty canvas but this type cannot live at the root.
-        const allowedStr = allowedParents.length
-          ? allowedParents.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')
-          : 'a parent'
+        // Dropped on empty canvas but this type cannot live at the root
+        // (nor anywhere, when it has no allowed parent either).
         useDiagramStore.getState().pushNotification(
-          `${typeLabel} must be placed inside ${allowedStr}.`,
+          allowedParents.length
+            ? `${typeLabel} must be placed inside ${allowedParents.map(t => mm?.nodeTypes[t]?.label ?? t).join(', ')}.`
+            : `Cannot place ${typeLabel} at the canvas root. Allowed parents: ${allowedPlacesText(mm, typeStr)}.`,
           'error',
         )
         return
