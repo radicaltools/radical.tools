@@ -1015,8 +1015,11 @@ and import, Forge, a model of exactly 150 elements.
    group at its own bounds with the first drag. A group now keeps the
    frame the model has until something in it moves (`keptFrames`), and
    moves with it when it is dragged as a whole. The container an element
-   is dragged or added inside of is still refit to the physics' padding
-   (the leftover under item 1).
+   is added inside of is still refit to the physics' padding where the
+   physics moves its children (the leftover under item 1). Since F-0028
+   (run 176, 2026-10-23) one an element is dragged inside of stays and
+   grows only as far as needed to hold it, and pushes only what it comes
+   nearer to.
 
 Decided after the run: a drag is an undo step of its own (it had none:
 the toolbar's Undo stayed disabled after one, and one undo after "add an

@@ -14,6 +14,9 @@
  *   - a drop leaves a row a milestone shows off its line as it is, and
  *     pushes clear what a line through a group moved onto (the fuzzer, on
  *     the merge of groups A to E)
+ *   - on the sample's Core Banking, a small drag inside a group and a
+ *     "Wrap into…" leave the frames round them where they stand, grown
+ *     only as far as needed (F-0028)
  *
  * The physics' timer is stepped by hand on a 16 ms frame clock, as the
  * fuzzer steps it, so every run is the same on every machine.
@@ -449,5 +452,54 @@ describe('an unfold on a view that does not draw the children', () => {
     const after = drawn()
     expect(after.k1).toEqual(before.k1)
     expect(after.k2).toEqual(before.k2)
+  })
+})
+
+describe('the sample\'s Core Banking (F-0028)', () => {
+  /** What moved or resized besides `except`, as drawn. */
+  const changed = (before: Record<string, Box>, after: Record<string, Box>, except: string[]): string[] =>
+    Object.keys(after).filter((id) => !except.includes(id) && before[id] && (['x', 'y', 'width', 'height'] as const)
+      .some((k) => Math.abs(after[id][k] - before[id][k]) > 0.5))
+      .map((id) => `${id}: ${JSON.stringify(before[id])} → ${JSON.stringify(after[id])}`)
+  const open = (): void => {
+    const sample = JSON.parse(sampleText) as DiagramData
+    sample.metamodel ??= builtInGovernanceMetamodel()
+    s().loadDiagram(sample)
+    rest()
+    s().setActiveView('view-core')
+    rest()
+  }
+
+  it('moves only API Gateway when it is dragged 20 px right inside Access & Security', () => {
+    open()
+    const before = drawn()
+    drag('ctn-apigw', 20, 0)
+    const after = drawn()
+    expect(after['ctn-apigw'].x).toBeCloseTo(before['ctn-apigw'].x + 20, 0)
+    expect(changed(before, after, ['ctn-apigw'])).toEqual([])
+  })
+
+  it('moves nothing but what makes room when API Gateway is wrapped into a group', () => {
+    // Core Banking Platform moved 144 px up and left and 13 elements moved:
+    // the frames round the new group took the physics' bounds.
+    open()
+    const before = drawn()
+    s().setSelectedNodeIds(['ctn-apigw'])
+    s().wrapSelectionInNewParent('group')
+    rest()
+    const after = drawn()
+    // The new group's parents grow round it, and only grow.
+    for (const id of ['dom-access', 'sys-core']) {
+      const [b, a] = [before[id], after[id]]
+      expect(a.x, id).toBeLessThanOrEqual(b.x + 0.5)
+      expect(a.y, id).toBeLessThanOrEqual(b.y + 0.5)
+      expect(a.x + a.width, id).toBeGreaterThanOrEqual(b.x + b.width - 0.5)
+      expect(a.y + a.height, id).toBeGreaterThanOrEqual(b.y + b.height - 0.5)
+    }
+    // What the new group covered (Auth Service) is pushed clear; the rest stays.
+    expect(changed(before, after, ['ctn-apigw', 'ctn-auth', 'dom-access', 'sys-core'])).toEqual([])
+    const group = Object.values(s().c4Nodes).find((n) => n.type === 'group' && n.parentId === 'dom-access')!
+    const [g, auth] = [after[group.id], after['ctn-auth']]
+    expect(g.x < auth.x + auth.width && auth.x < g.x + g.width && g.y < auth.y + auth.height && auth.y < g.y + g.height).toBe(false)
   })
 })
