@@ -673,6 +673,15 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     "Deleted elements leave views" answers "Unsupported query"; only the
     query language works (`LIST NODES WHERE label CONTAINS …`). A query
     that is not the language could be searched as text.
+53. **Smart Layout on the sample's All elements takes half a minute.** The
+    refreshed sample has 283 elements and 450 relations (78 and 125
+    before); one Smart Layout on All elements takes ~30 s on an M-series
+    Mac and ~60 s on a CI runner, and it is the model new users open.
+    `smartLayoutKeeps.test.ts` timed out at 120 s on CI and now runs on a
+    fixture of the old sample (`apps/studio/tests/fixtures/fintech-sample-78-nodes.json`).
+    It no longer fails without the fix it was written for (the relaxed
+    candidate scored with fitted frames, PR #180), on the old sample or the
+    new: that fix has no test that guards it now.
 
 ### Reverse-engineered requirements (2026-10-06)
 
