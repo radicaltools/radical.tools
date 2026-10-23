@@ -36,7 +36,9 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
   await expect(filter.locator('.rp-viewpoint')).toContainText('Set by the viewpoint')
   await expect(filter.locator('.rp-level')).toHaveCount(3)
   await expect(filter.getByRole('button', { name: '+ Level under' })).toHaveCount(0)
-  await expect(page.locator('.tv-chain-row.depth-0')).toHaveCount(3)
+  // The sample's needs: its own three and those of its Hub concern packs.
+  await expect.poll(() => page.locator('.tv-chain-row.depth-0').count()).toBeGreaterThanOrEqual(3)
+  await expect(page.locator('.tv-chain-row.depth-0').first()).toContainText('Need')
   await expect(page.locator('.tv-chain-row.depth-2', { hasText: 'Same signatory cannot approve twice' })).toBeVisible()
   await expect(page.locator('.lp-view-card.active')).toContainText('Traceability')
 
@@ -80,9 +82,9 @@ test('New view offers the metamodel\'s viewpoints; a view of one follows the vie
 })
 
 // Every built-in viewpoint opens in the sample: a view of its type, named
-// after it, showing what the sample has for it (it has no domains, entities
-// or state machines, so those show nothing — but still open; it has one
-// process).
+// after it, showing what the sample has for it (it has every node type but
+// Blueprint, so each shows something; one process, one container with
+// components and so on).
 test('every viewpoint of the Radical metamodel opens as a view of its type', async ({ page, studio }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -96,13 +98,13 @@ test('every viewpoint of the Radical metamodel opens as a view of its type', asy
     ['System context', 'STRUCTURE VIEW', true], ['Containers', 'STRUCTURE VIEW', true], ['Containers of a system', 'STRUCTURE VIEW', ONE],
     ['Components', 'STRUCTURE VIEW', true], ['Components of a container', 'STRUCTURE VIEW', ONE],
     ['Container dependencies', 'MATRIX VIEW', true],
-    ['Domain map', 'STRUCTURE VIEW', false], ['Domain model', 'STRUCTURE VIEW', false], ['Entities of a domain', 'STRUCTURE VIEW', NONE],
-    ['Domain realisation', 'TABLE VIEW', false],
+    ['Domain map', 'STRUCTURE VIEW', true], ['Domain model', 'STRUCTURE VIEW', true], ['Entities of a domain', 'STRUCTURE VIEW', ONE],
+    ['Domain realisation', 'TABLE VIEW', true],
     ['Traceability', 'TABLE VIEW', true], ['Requirement coverage', 'TABLE VIEW', true], ['Requirement gaps', 'TABLE VIEW', true],
     ['Responsibilities', 'TABLE VIEW', true], ['Specification', 'WIKI VIEW', true],
     ['Decisions', 'TABLE VIEW', true], ['Decision log', 'WIKI VIEW', true], ['Fitness functions', 'TABLE VIEW', true],
     ['Screen flow', 'STRUCTURE VIEW', true], ['Screens', 'TABLE VIEW', true],
-    ['Entity lifecycles', 'TABLE VIEW', false], ['State machine', 'STRUCTURE VIEW', NONE], ['Event catalogue', 'TABLE VIEW', false],
+    ['Entity lifecycles', 'TABLE VIEW', true], ['State machine', 'STRUCTURE VIEW', ONE], ['Event catalogue', 'TABLE VIEW', true],
     ['Process (Warnier)', 'WARNIER VIEW', true], ['Process', 'WARNIER VIEW', ONE],
   ]
   for (const [name, badge, shows] of expected) {
