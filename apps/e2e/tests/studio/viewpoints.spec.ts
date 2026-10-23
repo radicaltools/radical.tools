@@ -196,6 +196,98 @@ test('a viewpoint that draws one element makes a group with a view of each, whic
   await expect(members).toHaveCount(0)
 })
 
+/** Two state machines, Order and Payment, and the view Picked listing both, laid out. */
+async function seedMachines(studio: { seedDocument(json: string): Promise<void> }, views: unknown[] = []): Promise<void> {
+  const at = (x: number) => ({ x, y: 0, width: 300, height: 200, collapsed: false })
+  const machine = (id: string, label: string, states: string[], x: number) => [
+    { id, type: 'state-machine', label, ...at(x) },
+    ...states.map((s, i) => ({ id: `${id}-${i}`, type: 'state', label: s, parentId: id, ...at(x + 20 + i * 120), y: 60, width: 100, height: 60 })),
+  ]
+  await studio.seedDocument(JSON.stringify({
+    nodes: [...machine('order', 'Order', ['Placed', 'Paid'], 0), ...machine('payment', 'Payment', ['Pending'], 400)],
+    relations: [], views,
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+}
+
+type StoredViews = { views: Array<{ id: string; name: string; nodeIds: string[]; positions?: object; viewport?: object; viewpoint?: string; partOf?: string }> }
+
+// F-0051: a view given a viewpoint that draws one element becomes a group,
+// which is never a canvas of its own: Studio asks before the elements picked
+// for it go, then opens the group's first view, and a reload shows that view.
+test('a view given a viewpoint of one element asks first, then opens the group\'s first view, also after a reload', async ({ page, studio }) => {
+  await seedMachines(studio, [{
+    id: 'picked', name: 'Picked', nodeIds: ['order', 'payment'],
+    positions: { order: { x: 0, y: 0, width: 300, height: 200 }, payment: { x: 400, y: 0, width: 300, height: 200 } },
+  }])
+  await studio.open('picked')
+  await openProps(page, 'Picked')
+  const viewpoint = page.getByRole('combobox', { name: 'Viewpoint' })
+  const stored = async () => ((await studio.storedDoc()) as unknown as StoredViews).views
+
+  // Asked, and No: nothing changes.
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await viewpoint.selectOption({ label: 'State machine · Structure' })
+  await expect.poll(() => asked).toContain('Make Picked a view of State machine?')
+  expect(asked).toContain('the 2 elements picked for it by hand are no longer listed')
+  await expect(viewpoint.locator('option:checked')).toHaveText(/None/)
+  expect((await stored()).map((v) => [v.name, v.nodeIds.length])).toEqual([['Picked', 2]])
+
+  // Yes: the group opens on its first view, and keeps no canvas.
+  page.once('dialog', (d) => { void d.accept() })
+  await viewpoint.selectOption({ label: 'State machine · Structure' })
+  await expect(page.locator('.lp-view-card.active .lp-card-title')).toHaveText('Order')
+  await studio.settle()
+  await expect.poll(async () => (await stored()).find((v) => v.name === 'Order')?.partOf).toBe('picked')
+  const order = (await stored()).find((v) => v.name === 'Order')!
+  await expect(page).toHaveURL(new RegExp(`/v/${order.id}$`))
+  await expect.poll(async () => {
+    const group = (await stored()).find((v) => v.id === 'picked')!
+    return [group.nodeIds.length, Object.keys(group.positions ?? {}).length, group.viewport ?? null]
+  }).toEqual([0, 0, null])
+
+  // A reload shows the same view.
+  await page.reload()
+  await studio.ready()
+  await expect(page).toHaveURL(new RegExp(`/v/${order.id}$`))
+  await expect(page.locator('.lp-view-card.active .lp-card-title')).toHaveText('Order')
+  expect(Object.keys((await stored()).find((v) => v.id === 'picked')!.positions ?? {})).toEqual([])
+})
+
+// F-0052: deleting a viewpoint whose views are a group deletes the group's
+// views per element; Studio asks first and names them, and Undo brings them back.
+test('deleting a viewpoint whose views are a group asks first and names the views that go', async ({ page, studio }) => {
+  await seedMachines(studio)
+  await studio.open('all')
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByRole('menu', { name: 'New view' }).getByRole('menuitem', { name: /^State machine\s*Structure/ }).click()
+  await expect(page.locator('.lp-view-card.active .lp-card-title')).toHaveText('Order')
+  const names = async () => ((await studio.storedDoc()) as unknown as StoredViews).views.map((v) => v.name)
+  await expect.poll(names).toEqual(['State machine', 'Order', 'Payment'])
+
+  await studio.open('all', 'metamodel', studio.activeDocId())
+  const editor = page.getByRole('dialog', { name: 'Metamodel editor' })
+  await editor.getByRole('tab', { name: 'List' }).click()
+  const remove = editor.getByRole('button', { name: 'Delete viewpoint State machine' })
+  await expect(remove).toHaveAttribute('title', /the views per element in it are deleted \(asks first\)/)
+
+  // Asked, and No: the viewpoint and its views stay.
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await remove.click()
+  await expect.poll(() => asked).toContain('Delete viewpoint State machine?')
+  expect(asked).toContain('These 2 views per element are deleted with their group:\n• Order\n• Payment')
+  await expect(remove).toBeVisible()
+  expect(await names()).toEqual(['State machine', 'Order', 'Payment'])
+
+  // Yes: they go, the group is one view of its own.
+  page.once('dialog', (d) => { void d.accept() })
+  await remove.click()
+  await expect(remove).toHaveCount(0)
+  await expect.poll(names).toEqual(['State machine'])
+})
+
 // In a new model the New view button is near the top: the menu opens below
 // it, inside the window, not above it out of sight.
 test('the New view menu stays inside the window in a model without views', async ({ page, studio }) => {

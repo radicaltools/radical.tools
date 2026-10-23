@@ -382,7 +382,7 @@
         <ul>
           <li>A view of a viewpoint follows it: change the viewpoint in the metamodel editor and every view of it changes. Its filter is read-only; <em>Detach</em> makes it the view's own.</li>
           <li><em>Save as viewpoint…</em> in any view's filter keeps that view type and filter in the metamodel under a name.</li>
-          <li>Some viewpoints are a <strong>view per element</strong>: <em>Components of a container</em>, <em>State machine</em>, <em>Process</em>. Pick one and the list gets a group with a view of each such element, named after it. Add a container and its view appears; delete it and its view goes.</li>
+          <li>Some viewpoints are a <strong>view per element</strong>: <em>Components of a container</em>, <em>State machine</em>, <em>Process</em>. Pick one and the list gets a group with a view of each such element, named after it. Add a container and its view appears; delete it and its view goes. A group is never a canvas of its own: it opens on its first view. Picked for a view you have, the view becomes the group; when you picked its elements by hand, Studio asks first, as they are no longer listed.</li>
         </ul>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/viewpoint-group-light.png?v=__BUILD__" alt="The list of views with the group Components of a container, view per element, open on a view of each of the sample's eight containers; Payments Service is on the canvas with its two components, the database, queue and systems it is related to" loading="lazy" />
@@ -677,7 +677,7 @@
         <ul>
           <li><strong>Node types</strong> — colours, description, size, min and max instances, allowed parents, and properties: text, long text, number, boolean, enum or reference. <em>Summary in tables</em> is the template the table makes an element's one-line summary from.</li>
           <li><strong>Relation types</strong> — the allowed pairs of source and target, their own properties, and how the relation reads in a sentence from each end (<em>Constrains</em> / <em>Constrained by</em>), which the wiki uses.</li>
-          <li><strong>Viewpoints</strong> — name, group, view type and description. The filter itself is set in a view and saved with <em>Save as viewpoint…</em>.</li>
+          <li><strong>Viewpoints</strong> — name, group, view type, description and <em>View per element</em>. The filter itself is set in a view and saved with <em>Save as viewpoint…</em>. A viewpoint deleted leaves its views with their view type and filter; deleting one whose views are a group, or taking away what it draws a view per element of, deletes the group's views per element, so it asks first and lists them. Undo brings them back.</li>
           <li><strong>Validation</strong> — everything the model breaks now, each with <em>Open in Designer</em>. Built-in types can be extended but not deleted.</li>
         </ul>
         <div class="doc-tip">

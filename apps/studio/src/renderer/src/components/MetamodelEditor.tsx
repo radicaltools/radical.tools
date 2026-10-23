@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { builtInC4Metamodel, metamodelChangeBreaks, propertyKeyProblem, validateModel, type Metamodel } from '@radical/common/metamodel'
-import { forkPresetMetamodel } from '@radical/common/model'
+import { forkPresetMetamodel, groupLossesOf, groupLossesQuestion, syncViewpoints, type ModelState } from '@radical/common/model'
 import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '@radical/common/viewpoints'
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -755,7 +755,9 @@ function ViewpointCard({
         <span className="mm-pair-count">{viewCount} view(s)</span>
         <button
           className="mm-icon-btn danger"
-          title="Delete viewpoint; its views keep their kind and filter"
+          title={def.subject
+            ? 'Delete viewpoint; each of its groups becomes one view with its view type and filter, and the views per element in it are deleted (asks first)'
+            : 'Delete viewpoint; its views keep their view type and filter'}
           aria-label={`Delete viewpoint ${def.label}`}
           onClick={(e) => {
             e.stopPropagation()
@@ -932,6 +934,16 @@ export function MetamodelEditor(): React.ReactElement {
     const shown = breaks.slice(0, 10).map((i) => `• ${i.message}`).join('\n')
     const more = breaks.length > 10 ? `\n…and ${breaks.length - 10} more` : ''
     return window.confirm(`${question ? `${question}\n\n` : ''}This change brings in ${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}:\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
+  }
+  /** Sets the metamodel's viewpoints to `next`'s: at once, unless it deletes
+   *  views per element (a viewpoint deleted, or its subject taken away, ends
+   *  its groups) or lets go of a view's picked elements (a subject given
+   *  makes its views groups); then after the user has seen which. */
+  const changeViewpoints = (next: Metamodel, question: string): void => {
+    const losses = groupLossesOf(useDiagramStore.getState() as unknown as ModelState, (d) => { d.metamodel = next; syncViewpoints(d) })
+    const asked = groupLossesQuestion(question, losses)
+    if (asked && !window.confirm(asked)) return
+    setMetamodel(next)
   }
   const changeNodeType = (def: NodeTypeDef): void => {
     if (confirmNarrowing({ ...metamodel, nodeTypes: { ...metamodel.nodeTypes, [def.id]: def } })) upsertNodeType(def)
@@ -1143,8 +1155,10 @@ export function MetamodelEditor(): React.ReactElement {
                 summary={chainSummary(t.pipeline, viewpointCtx)}
                 viewCount={Object.values(views).filter((v) => v.viewpoint === t.id).length}
                 nodeTypes={Object.entries(metamodel.nodeTypes).map(([id, n]) => ({ id, label: n.label }))}
-                onChange={(next) => setMetamodel(withViewpoint(metamodel, next))}
-                onDelete={() => setMetamodel(withoutViewpoint(metamodel, t.id))}
+                onChange={(next) => (JSON.stringify(next.subject ?? null) === JSON.stringify(t.subject ?? null)
+                  ? setMetamodel(withViewpoint(metamodel, next))
+                  : changeViewpoints(withViewpoint(metamodel, next), `Change View per element of viewpoint ${t.label}?`))}
+                onDelete={() => changeViewpoints(withoutViewpoint(metamodel, t.id), `Delete viewpoint ${t.label}?`)}
               />
             ))}
           </div>
