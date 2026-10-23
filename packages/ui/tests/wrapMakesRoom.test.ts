@@ -7,6 +7,10 @@
  * Transactions DB; the bookstore's API on the database), also after a
  * reload (F-0020). It pushes what it covers clear, pinned elements too, as
  * a drop and an added element do; nothing else moves.
+ *
+ * What it wraps stays where it is drawn, and the new parent hugs it: it
+ * went below the header of the parent round it (the bookstore's API down
+ * 70 px), at its type's size, over what stood beside it.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { pinnedNodeIds, type C4Node, type DiagramData } from '@radical/common/c4'
@@ -52,14 +56,15 @@ const violations = (): string[] => {
 }
 
 /** The bookstore's Containers: Web App, API and the database in a row in
- *  Bookstore, a person above it, a system beside it. */
-const bookstore = (pinned: string[] = []): DiagramData => ({
+ *  Bookstore, a person above it, a system beside it. The database `dbX`
+ *  from Bookstore's left. */
+const bookstore = (pinned: string[] = [], dbX = 640): DiagramData => ({
   nodes: [
     { id: 'customer', type: 'person', label: 'Customer', x: 355, y: 0, width: 150, height: 170, collapsed: false },
     { id: 'shop', type: 'system', label: 'Bookstore', x: 0, y: 270, width: 860, height: 350, collapsed: false },
     { id: 'web', type: 'webapp', label: 'Web App', parentId: 'shop', x: 30, y: 120, width: 210, height: 140, collapsed: false },
     { id: 'api', type: 'container', label: 'API', parentId: 'shop', x: 290, y: 120, width: 300, height: 200, collapsed: false },
-    { id: 'db', type: 'database', label: 'Database', parentId: 'shop', x: 640, y: 155, width: 190, height: 130, collapsed: false },
+    { id: 'db', type: 'database', label: 'Database', parentId: 'shop', x: dbX, y: 155, width: 190, height: 130, collapsed: false },
     { id: 'bank', type: 'system', label: 'Payments', x: 960, y: 355, width: 300, height: 180, collapsed: false },
   ] as C4Node[],
   relations: [
@@ -92,8 +97,37 @@ describe('"Wrap into…"', () => {
     expect(violations()).toEqual([])
   })
 
+  it('keeps what it wraps where it is drawn, hugs it, and moves nothing it does not cover', () => {
+    // API went 70 px down with its group, below Bookstore's header, and the
+    // group, at 520 × 360, lay over the database.
+    for (const selection of [['api'], ['web', 'api']]) {
+      s().loadDiagram(bookstore())
+      s().setActiveView('v')
+      const before = drawn()
+      s().setSelectedNodeIds(selection)
+      s().wrapSelectionInNewParent('group')
+      const after = drawn()
+      const g = after[wrapper().id]
+      const left = Math.min(...selection.map((id) => before[id].x))
+      const top = Math.min(...selection.map((id) => before[id].y))
+      const right = Math.max(...selection.map((id) => before[id].x + before[id].width))
+      const bottom = Math.max(...selection.map((id) => before[id].y + before[id].height))
+      expect(g, selection.join()).toEqual({ x: left - 30, y: top - 70, width: right - left + 60, height: bottom - top + 100 })
+      for (const id of Object.keys(before)) {
+        if (id !== 'shop') expect(after[id], `${id} (${selection.join()})`).toEqual(before[id])
+      }
+      // Bookstore grows left as far as it must to hold the group, with the
+      // room it had round Web App; the rest of its frame stays.
+      const [b, a] = [before.shop, after.shop]
+      expect({ x: a.x, y: a.y, right: a.x + a.width, bottom: a.y + a.height }, selection.join())
+        .toEqual({ x: Math.min(b.x, g.x - 30), y: b.y, right: b.x + b.width, bottom: b.y + b.height })
+      expect(violations()).toEqual([])
+    }
+  })
+
   it('pushes a pinned neighbour clear too, and moves nothing out of its way', () => {
-    s().loadDiagram(bookstore(['db']))
+    // The database 20 px right of API: inside the group's padding.
+    s().loadDiagram(bookstore(['db'], 550))
     s().setActiveView('v')
     const before = drawn()
     s().setSelectedNodeIds(['api'])

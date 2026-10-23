@@ -23,7 +23,7 @@ import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
 import { C4Node, C4Relation } from '@radical/common/c4'
-import { drawnSize, effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
+import { compoundPadding, drawnSize, effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
 import { alongAxis, type Alignment } from '@radical/layout/constraints'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -173,6 +173,9 @@ export interface LiveColaCallbacks {
 
 /** A node is reported again once it moved or resized by more than this. */
 const REPORT_PX = 0.5
+/** Leaves moved alike to within this much moved as one: a group dragged or
+ *  pushed whole (every leaf by the same delta). */
+const RIGID_PX = 1e-6
 /** A leaf the model has this much away from where it had it is taken as
  *  moved by the store (reported places are relative to parents reported
  *  within REPORT_PX). */
@@ -221,6 +224,21 @@ function clearing(a: Box, b: Box, axis: 'x' | 'y'): number {
   const ahead = (axis === 'x' ? a.X - b.x : a.Y - b.y) + CALM_GAP
   const behind = (axis === 'x' ? b.X - a.x : b.Y - a.y) + CALM_GAP
   return ahead <= behind ? ahead : -behind
+}
+
+/** A group's frame kept as the model has it (LiveColaEngine.keptFrames). */
+interface KeptFrame {
+  frame: Box
+  /** Its leaves, and where they stood when the frame was kept. */
+  leaves: { node: ColaNode; x: number; y: number }[]
+  /** The room it had round its children on each side, up to the least the
+   *  store leaves when it fits a parent: what it keeps as it grows. */
+  room: Box
+}
+
+/** True when every leaf moved by (dx, dy) since it was noted, within `tolerance`. */
+function movedAlike(leaves: KeptFrame['leaves'], dx: number, dy: number, tolerance: number): boolean {
+  return leaves.every((l) => Math.abs(l.node.x - l.x - dx) <= tolerance && Math.abs(l.node.y - l.y - dy) <= tolerance)
 }
 
 /** A calm drag in progress (DragMode). */
@@ -285,16 +303,21 @@ export class LiveColaEngine {
   private offLinesAtGrab = new Set<string>()
   /** What lines through a group moved along with a calm drag (followCarriers). */
   private followedInDrag = new Set<string>()
+  /** The frames of the open groups when a calm drag started: its drop
+   *  pushes from a group only what the group came nearer to (clearOverlaps). */
+  private framesAtGrab = new Map<string, Box>()
   /**
    * Open groups still drawn with the frame the model has, and where their
-   * leaves stood when the layout was built. A layout leaves more room
-   * around a container's children than the bounds here do (120 px above
-   * them, where the physics keeps about 60), so reporting every group's own
-   * bounds re-framed every open container of a laid-out diagram at the
-   * first drag or added element, wherever it was. A group keeps the model's
-   * frame until one of its leaves moves against the others (frameOf).
+   * leaves stood when it was kept (built, or kept as drawn: a calm drag, a
+   * drop's pushes). A layout leaves more room around a container's
+   * children than the bounds here do (120 px above them, where the physics
+   * keeps about 60), so reporting every group's own bounds re-framed every
+   * open container of a laid-out diagram at the first drag or added
+   * element, wherever it was. A group keeps its frame, moved with it or
+   * grown round what moves in it (frameOf), until the physics moves its
+   * leaves (framesOfPhysics).
    */
-  private keptFrames = new Map<string, { frame: Box; leaves: { node: ColaNode; x: number; y: number }[] }>()
+  private keptFrames = new Map<string, KeptFrame>()
   /** Leaves no link holds, with the open groups they are related to (holdByGroups). */
   private heldByGroups: { leaf: ColaNode; groupIds: string[] }[] = []
   /** The separations WebCoLa keeps, by node index (roomFor). */
@@ -396,9 +419,11 @@ export class LiveColaEngine {
   /** The model changed (an element added, removed, expanded, collapsed):
    *  what is new finds its place, the rest stays. `added`: elements new to
    *  the model, which stay where they were put, and the parents they went
-   *  into; what they cover is pushed clear (rebuild). */
-  invalidate(added: string[] = []): void {
-    if (this._running) this.rebuild('local', [], added)
+   *  into; what they cover is pushed clear (rebuild). `covered`: only what
+   *  they lie on, not what stands nearer to them than a drop leaves (a new
+   *  parent round what stood there: "Wrap into…"). */
+  invalidate(added: string[] = [], covered = false): void {
+    if (this._running) this.rebuild('local', [], added, covered)
   }
 
   /**
@@ -532,6 +557,12 @@ export class LiveColaEngine {
     // overlaps it leaves.
     if (mode === 'push' && this.colaNodes.length >= WHOLE_DIAGRAM_MAX_NODES) mode = 'calm'
     if (mode === 'calm') {
+      // The frames as drawn: what the drag moves inside one grows it from there.
+      this.keepFramesAsDrawn()
+      this.framesAtGrab = new Map(this.colaGroups.flatMap((g) => {
+        const frame = this.frameOf(g)
+        return frame ? [[g.c4id, frame] as const] : []
+      }))
       // Held while the physics may still run, until it moves (calmDrag).
       for (const leaf of this.leavesOf(nodeId)) Layout.dragStart(leaf)
       this.calm = this.calmDrag(nodeId, withIds, abs ?? { x: rfX, y: rfY }, { x: 0, y: 0 })
@@ -543,6 +574,7 @@ export class LiveColaEngine {
     // React Flow reports as a drag that goes nowhere, woke it, and it
     // rearranged the whole view, saved and with no undo step.
     this.calm = null
+    this.framesAtGrab.clear()
     this.pushFrom = { x: rfX, y: rfY, moved: false }
   }
 
@@ -648,9 +680,13 @@ export class LiveColaEngine {
     this._grabbedId = null
     this.runStartedAt = 0
     const calm = this.calm
+    // The frames the drag grew, while it still tells what it carried: a
+    // container's only child moved alike with all of it.
+    if (calm?.moving) this.keepFramesAsDrawn()
     this.calm = null
     if (calm && !calm.moving) {
       // A click: as it was.
+      this.framesAtGrab.clear()
       for (const leaf of this.leavesOf(calm.id)) Layout.dragEnd(leaf)
       this.applyPins()
       return
@@ -677,6 +713,7 @@ export class LiveColaEngine {
         const lined = new Set([...this.followedInDrag, ...shifted])
         if (lined.size) this.clearOverlaps([...lined])
       }
+      this.framesAtGrab.clear()
       // React Flow drew what it dragged where the pointer took it, relative
       // to the parent as it knew it: reported again, as it stands now, even
       // where that is the place reported last. A parent's edge that moved
@@ -908,7 +945,9 @@ export class LiveColaEngine {
   /**
    * A group's frame as the canvas draws it. The model's, while nothing in
    * the group has moved since the layout was built (keptFrames); moved with
-   * the group when all of it moved alike; else the group's bounds here,
+   * the group when all of it moved alike; where it stands, grown just
+   * enough to hold what moved inside it on its own (heldIn); else (the
+   * physics moved its leaves: framesOfPhysics) the group's bounds here,
    * drawn smaller than the room overlap removal keeps (visualShrink), so
    * that sibling groups do not share a border.
    */
@@ -917,21 +956,20 @@ export class LiveColaEngine {
     if (!b || !Number.isFinite(b.x)) return undefined
     const kept = this.keptFrames.get(g.c4id)
     if (kept) {
-      // Still as built, or moved as one (a drag of the group, a push)?
       const first = kept.leaves[0]
       const dx = first ? first.node.x - first.x : 0
       const dy = first ? first.node.y - first.y : 0
-      const rigid = kept.leaves.every((l) => Math.abs(l.node.x - l.x - dx) <= REPORT_PX && Math.abs(l.node.y - l.y - dy) <= REPORT_PX)
-      if (rigid) {
-        // However little: a frame left behind by a third of a pixel showed
-        // a row through it off its line by that much.
-        if (dx !== 0 || dy !== 0) {
-          kept.frame = { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
-          for (const l of kept.leaves) { l.x = l.node.x; l.y = l.node.y }
-        }
-        return kept.frame
+      // Moved as one (a drag of the group, a push), however little: a frame
+      // left behind by a third of a pixel showed a row through it off its
+      // line by that much.
+      if (!this.carriedInside(g.c4id) && movedAlike(kept.leaves, dx, dy, RIGID_PX)) {
+        return { x: kept.frame.x + dx, X: kept.frame.X + dx, y: kept.frame.y + dy, Y: kept.frame.Y + dy }
       }
-      this.keptFrames.delete(g.c4id)
+      // Something in it moved on its own: the frame stays and grows as far
+      // as needed to hold it. Taken from the bounds here, with the physics'
+      // padding, a component nudged inside a group moved and resized the
+      // frames round it and pushed their neighbours (F-0028).
+      return this.heldIn(g, kept)
     }
     const s = g.visualShrink ?? 0
     const box = { x: b.x + s, X: b.X - s, y: b.y + s, Y: b.Y - s }
@@ -954,6 +992,82 @@ export class LiveColaEngine {
     return box
   }
 
+  /** A kept frame grown to hold the children of `g` that moved since it
+   *  was kept, as drawn, with the room it had round its children on each
+   *  side (KeptFrame.room). It does not grow for what did not move. */
+  private heldIn(g: C4Group, kept: KeptFrame): Box {
+    const box = { ...kept.frame }
+    const moved = new Set(kept.leaves.filter((l) => l.node.x !== l.x || l.node.y !== l.y).map((l) => l.node))
+    if (!moved.size) return box
+    for (const id of this.childrenOf.get(g.c4id) ?? []) {
+      if (!this.leavesOf(id).some((leaf) => moved.has(leaf))) continue
+      const inner = this.boxOf(id)
+      if (!inner) continue
+      box.x = Math.min(box.x, inner.x - kept.room.x)
+      box.X = Math.max(box.X, inner.X + kept.room.X)
+      box.y = Math.min(box.y, inner.y - kept.room.y)
+      box.Y = Math.max(box.Y, inner.Y + kept.room.Y)
+    }
+    return box
+  }
+
+  /** Keeps `frame` for group `g` from here on, from where its leaves stand
+   *  now; the room it leaves round its children on each side, up to what
+   *  the store leaves when it fits a parent (compoundPadding, and
+   *  LIVE_CHILD_TOP_MIN above), is what it keeps when it grows. */
+  private keepFrame(g: C4Group, frame: Box): void {
+    const pad = compoundPadding(this.allNodes[g.c4id]?.type ?? 'system')
+    const room = { x: pad.side, X: pad.side, y: LIVE_CHILD_TOP_MIN, Y: pad.bottom }
+    for (const id of this.childrenOf.get(g.c4id) ?? []) {
+      const inner = this.boxOf(id)
+      if (!inner) continue
+      room.x = Math.min(room.x, inner.x - frame.x)
+      room.X = Math.min(room.X, frame.X - inner.X)
+      room.y = Math.min(room.y, inner.y - frame.y)
+      room.Y = Math.min(room.Y, frame.Y - inner.Y)
+    }
+    this.keptFrames.set(g.c4id, {
+      frame,
+      leaves: this.groupLeaves(g.c4id).map((node) => ({ node, x: node.x, y: node.y })),
+      room: { x: Math.max(0, room.x), X: Math.max(0, room.X), y: Math.max(0, room.y), Y: Math.max(0, room.Y) },
+    })
+  }
+
+  /** The kept frames as drawn now become the ones kept: a calm drag grows
+   *  them from there, a push moves them whole. Children first. */
+  private keepFramesAsDrawn(): void {
+    for (const g of this.colaGroups) {
+      if (!this.keptFrames.has(g.c4id)) continue
+      const frame = this.frameOf(g)
+      if (frame) this.keepFrame(g, frame)
+    }
+  }
+
+  /** True when a calm drag moves something inside group `id` but not the
+   *  group itself: its frame holds what moves, and does not go along with
+   *  it (a container's only child, dragged, took the container along). */
+  private carriedInside(id: string): boolean {
+    if (!this.calm?.moving) return false
+    const carried = [this.calm.id, ...this.calm.with, ...this.calm.partners]
+    const within = (child: string, ancestor: string): boolean => {
+      for (let p: string | undefined = child; p; p = this.allNodes[p]?.parentId) {
+        if (p === ancestor) return true
+      }
+      return false
+    }
+    if (carried.some((c) => within(id, c))) return false
+    return carried.some((c) => c !== id && within(c, id))
+  }
+
+  /** The tick handler: groups whose leaves the physics moved are framed by
+   *  it from here on, at their bounds (frameOf). */
+  private framesOfPhysics(): void {
+    for (const [id, kept] of this.keptFrames) {
+      const first = kept.leaves[0]
+      if (!first || !movedAlike(kept.leaves, first.node.x - first.x, first.node.y - first.y, REPORT_PX)) this.keptFrames.delete(id)
+    }
+  }
+
   /** The group an element is laid out in, or '' for the canvas. */
   private levelOf(id: string): string {
     for (let p = this.allNodes[id]?.parentId; p; p = this.allNodes[p]?.parentId) {
@@ -973,10 +1087,14 @@ export class LiveColaEngine {
    * it instead. What still covers another when the pushes run out
    * (CALM_MAX_PUSHES) goes beside the rest (clearLeftovers): a drop leaves
    * nothing overlapping. `dropped`: the seeds that stay where they are put
-   * (all of them unless said); the others push and are pushed.
+   * (all of them unless said); the others push and are pushed. `covered`:
+   * those, and the groups they grew, push only what they lie on; what that
+   * pushes pushes as a drop does.
    */
-  private clearOverlaps(seeds: string[], dropped: string[] = seeds): void {
+  private clearOverlaps(seeds: string[], dropped: string[] = seeds, covered = false): void {
     this.refreshBounds()
+    // A push moves a group whole from the frame the drop left it with.
+    this.keepFramesAsDrawn()
     const pending = new Map<string, Set<string>>()
     const held = new Set(dropped)
     const push = (id: string): void => {
@@ -1010,6 +1128,19 @@ export class LiveColaEngine {
           const ox = Math.min(A.X, B.X) - Math.max(A.x, B.x) + CALM_GAP
           const oy = Math.min(A.Y, B.Y) - Math.max(A.y, B.y) + CALM_GAP
           if (ox <= 0 || oy <= 0) continue
+          // Near is not on: a new parent 20 px from an element beside what
+          // it wraps pushed it 4 px, and its parent along.
+          if (covered && held.has(a) && (ox <= CALM_GAP || oy <= CALM_GAP)) continue
+          // A group a calm drag grew or moved pushes what it came nearer to,
+          // not what stood as near to it before: a group grown 5 px to the
+          // left pushed the elements 10 px above and below it, and those
+          // theirs.
+          const A0 = this.framesAtGrab.get(a)
+          if (A0) {
+            const ox0 = Math.min(A0.X, B.X) - Math.max(A0.x, B.x) + CALM_GAP
+            const oy0 = Math.min(A0.Y, B.Y) - Math.max(A0.y, B.y) + CALM_GAP
+            if (ox0 > 0 && oy0 > 0 && ox <= ox0 + REPORT_PX && oy <= oy0 + REPORT_PX) continue
+          }
           const sx = clearing(A, B, 'x')
           const sy = clearing(A, B, 'y')
           const preferred = Math.abs(sx) <= Math.abs(sy) ? 'x' : 'y'
@@ -1042,6 +1173,7 @@ export class LiveColaEngine {
       }
     }
     this.refreshBounds()
+    this.keepFramesAsDrawn()
   }
 
   /**
@@ -1227,7 +1359,7 @@ export class LiveColaEngine {
    * 'whole' leaves everything free (relax, relaxLive). Of the new ones,
    * those in `added` (new to the model) stay where they are put.
    */
-  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = [], added: string[] = []): void {
+  private rebuild(run: 'first' | 'local' | 'rest' | 'whole', free: string[] = [], added: string[] = [], covered = false): void {
     const newIds = new Set(added)
     if (this.cola) this.cola.stop()
     this.resetPace()
@@ -1658,6 +1790,7 @@ export class LiveColaEngine {
       this.projectGroupAlignments()
       this.holdByGroups()
       this.pinFrozen()
+      this.framesOfPhysics()
       const now = performance.now()
       const heavy = this.lastTickAt > 0 && now - this.lastTickAt > HEAVY_TICK_MS
       this.lastTickAt = now
@@ -1755,14 +1888,11 @@ export class LiveColaEngine {
         const b = (g as any).bounds as Box | undefined
         if (!n || !b || !Number.isFinite(b.x)) continue
         const at = toAbsoluteTopLeft(n, nodes)
-        this.keptFrames.set(g.c4id, {
-          frame: { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height },
-          leaves: this.groupLeaves(g.c4id).map((node) => ({ node, x: node.x, y: node.y })),
-        })
+        this.keepFrame(g, { x: at.x, X: at.x + n.width, y: at.y, Y: at.y + n.height })
       }
     }
     if (dropped.length) {
-      this.clearOverlaps(dropped)
+      this.clearOverlaps(dropped, dropped, covered)
       this.emitPositions()
     }
     // Nothing to move: it is at rest as built.

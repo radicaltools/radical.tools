@@ -497,6 +497,15 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     pane click that restores the camera may land while the fit to the
     selection still moves it; waiting for the camera to rest before the
     click would make it steady.
+    The test has waited for the camera to rest since, and it failed again
+    on 2026-10-22, once in three full local runs (back at 0.345, the
+    overview read at 0.292); it then passed 3 of 3 alone, 56 of 56 with up
+    to 20 workers, and 12 of 12 with Chrome's CPU slowed 6 and 20 times.
+    Another guess: the overview is read before the fit that follows the
+    physics' settling (it waits for the next frame, then animates 300 ms),
+    so two equal readings 150 ms apart can catch the earlier fit. Marking
+    the canvas once that fit has ended, and waiting for the mark, would
+    settle it.
 33. **Renaming a test means hunting the scenarios that name it.** On
     2026-10-16 eight e2e tests were renamed or moved onto other views (All
     elements became a table). The scenarios and fitness functions naming them
@@ -682,6 +691,14 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     It no longer fails without the fix it was written for (the relaxed
     candidate scored with fitted frames, PR #180), on the old sample or the
     new: that fix has no test that guards it now.
+54. **A preview server another worktree left behind serves its build to
+    the next.** Outside CI the Playwright config reuses a server already on
+    its port (`reuseExistingServer`). In the fix round of run 176
+    (2026-10-23) one worktree's first e2e run got another worktree's sample
+    layout from a server left on 4310, and showed the old behaviour of a bug
+    it had fixed. Worktrees running e2e tests one after another need the
+    port free first, or a port of their own (an env variable for the base
+    port), or the reuse off when a run's build is not the one served.
 
 ### Reverse-engineered requirements (2026-10-06)
 
@@ -1040,8 +1057,11 @@ and import, Forge, a model of exactly 150 elements.
    group at its own bounds with the first drag. A group now keeps the
    frame the model has until something in it moves (`keptFrames`), and
    moves with it when it is dragged as a whole. The container an element
-   is dragged or added inside of is still refit to the physics' padding
-   (the leftover under item 1).
+   is added inside of is still refit to the physics' padding where the
+   physics moves its children (the leftover under item 1). Since F-0028
+   (run 176, 2026-10-23) one an element is dragged inside of stays and
+   grows only as far as needed to hold it, and pushes only what it comes
+   nearer to.
 
 Decided after the run: a drag is an undo step of its own (it had none:
 the toolbar's Undo stayed disabled after one, and one undo after "add an

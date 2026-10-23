@@ -24,6 +24,9 @@
  *     item 2)
  *   - a rebuild takes the place of an element the store moved since from
  *     the model (item 261)
+ *   - an element dragged inside its container leaves the frames round it
+ *     where they stand, grown only as far as needed to hold it; a
+ *     container's only child does not take the container along (F-0028)
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { LIVE_CHILD_TOP_MIN, LiveColaEngine, relaxLayout } from '@radical/layout/liveColaEngine'
@@ -440,9 +443,8 @@ describe('A drag and the open containers it does not touch', () => {
     for (const id of ['shop', 'web', 'api', 'bank']) expect(frame(nodes, id)).toEqual(frame(before, id))
   })
 
-  it('keeps the groups beside the one dragged in below their system\'s header (item 218)', () => {
-    // The sample's Core Banking view: Risk & Data holds its first child
-    // 110 px below its top, more than the physics leaves.
+  /** The sample's Core Banking view, as Smart Layout leaves it. */
+  const coreBanking = (): { nodes: Nodes; links: Record<string, C4Relation> } => {
     const nodes: Nodes = Object.fromEntries([
       node('sys-core', 'system', { x: 30, y: 120, width: 1230, height: 1440 }),
       node('dom-access', 'group', { parentId: 'sys-core', x: 20, y: 110, width: 690, height: 330 }),
@@ -463,6 +465,13 @@ describe('A drag and the open containers it does not touch', () => {
       ['ctn-apigw', 'ctn-auth'], ['ctn-apigw', 'ctn-payments'], ['ctn-apigw', 'ctn-accounts'], ['ctn-payments', 'ctn-db-tx'],
       ['ctn-accounts', 'ctn-db-acc'], ['ctn-payments', 'ctn-evtbus'], ['ctn-accounts', 'ctn-evtbus'], ['ctn-evtbus', 'ctn-fraud'],
     ].map(([sourceId, targetId], i) => [`r${i}`, { id: `r${i}`, sourceId, targetId } as C4Relation]))
+    return { nodes, links }
+  }
+
+  it('keeps the groups beside the one dragged in below their system\'s header (item 218)', () => {
+    // Risk & Data holds its first child 110 px below its top, more than the
+    // physics leaves.
+    const { nodes, links } = coreBanking()
     const engine = engineFor(nodes, links)
     engine.start(true)
     const at = absOf(nodes, 'ctn-apigw')
@@ -472,6 +481,51 @@ describe('A drag and the open containers it does not touch', () => {
     // The canvas draws a child nearer its parent's top at that distance:
     // the model must not say less.
     for (const id of ['dom-access', 'dom-risk', 'dom-banking']) expect(nodes[id].y, id).toBeGreaterThanOrEqual(LIVE_CHILD_TOP_MIN)
+  })
+
+  for (const dx of [5, 20]) {
+    it(`leaves the frames round an element dragged a little inside its group as they were (F-0028, ${dx} px)`, () => {
+      // API Gateway a few px right inside Access & Security, which has room
+      // for it: Core Banking Platform took the physics' bounds (x 30 → -78,
+      // width 1230 → 1468), Access & Security's top dropped 52 px and Risk
+      // & Data moved 22 px with its children.
+      const { nodes, links } = coreBanking()
+      const engine = engineFor(nodes, links)
+      engine.start(true)
+      /** Every element's frame as drawn: absolute top-left and size. */
+      const frames = (): Record<string, string> => Object.fromEntries(Object.keys(nodes).map((id) => {
+        const a = absOf(nodes, id)
+        return [id, `${Math.round(a.x)},${Math.round(a.y)} ${Math.round(nodes[id].width)}×${Math.round(nodes[id].height)}`]
+      }))
+      const before = frames()
+      const at = absOf(nodes, 'ctn-apigw')
+      calmDrag(engine, nodes, 'ctn-apigw', { x: at.x + dx, y: at.y })
+      engine.release('ctn-apigw')
+      engine.stop()
+      expect(absOf(nodes, 'ctn-apigw')).toEqual({ x: at.x + dx, y: at.y })
+      const after = frames()
+      expect(Object.keys(after).filter((id) => id !== 'ctn-apigw' && after[id] !== before[id]).map((id) => `${id}: ${before[id]} → ${after[id]}`)).toEqual([])
+    })
+  }
+
+  it('leaves a container where it stands when its only child is dragged a little inside it (F-0028)', () => {
+    // All of its leaves moved alike, which read as the container moving.
+    const nodes: Nodes = {
+      box: node('box', 'system', { x: 0, y: 0, width: 640, height: 600 }),
+      ctn: node('ctn', 'container', { parentId: 'box', x: 30, y: 120, width: 400, height: 400 }),
+      cmp: node('cmp', 'component', { parentId: 'ctn', x: 40, y: 120 }),
+    }
+    const relations: Record<string, C4Relation> = {}
+    withFillers(nodes, relations)
+    const engine = engineFor(nodes, relations)
+    engine.start(true)
+    const before = structuredClone(nodes)
+    const at = absOf(nodes, 'cmp')
+    calmDrag(engine, nodes, 'cmp', { x: at.x + 20, y: at.y + 10 })
+    engine.release('cmp')
+    engine.stop()
+    expect(absOf(nodes, 'cmp')).toEqual({ x: at.x + 20, y: at.y + 10 })
+    for (const id of ['box', 'ctn']) expect(frame(nodes, id), id).toEqual(frame(before, id))
   })
 
   it('moves a dragged container with the frame it had', () => {
@@ -498,15 +552,17 @@ describe('A drag and the open containers it does not touch', () => {
     for (const id of ['shop', 'web', 'api', 'bank', 'user']) expect(frame(nodes, id)).toEqual(frame(before, id))
   })
 
-  it('refits the container an element is dragged inside of', () => {
+  it('grows the container an element is dragged inside of, where it stands, to hold it', () => {
     const nodes = laidOut()
     const engine = engineFor(nodes, relations)
     engine.start(true)
     calmDrag(engine, nodes, 'api', { x: 400, y: 700 })
     engine.release('api')
     engine.stop()
-    // It grew down to hold the element where it was dropped.
-    expect(nodes.shop.y + nodes.shop.height).toBeGreaterThan(700 + nodes.api.height)
+    // It grew down to hold the element where it was dropped, as drawn (a
+    // container without children is drawn folded), and only down.
+    expect(nodes.shop.y + nodes.shop.height).toBeGreaterThan(700 + drawnSize(nodes.api, false).height)
+    expect(frame(nodes, 'shop')).toMatchObject({ x: 0, y: 300, width: 760 })
   })
 })
 

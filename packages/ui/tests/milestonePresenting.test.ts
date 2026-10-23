@@ -128,3 +128,52 @@ describe('The milestone chip over a playing slide (F-0027)', () => {
     expect(milestoneOnCanvas(s())).toBe(v1)
   })
 })
+
+describe('A slide card clicked in Presenter, not playing, with a milestone picked (F-0029)', () => {
+  // The card put the slide's model on the canvas (the live model, another
+  // milestone, its copy) and left the picked milestone named: the chip, the
+  // address and the Milestones list said v1 over the live model or v2.
+  const copy = { nodes: { x: sys('x', 0) }, relations: {} }
+  beforeEach(() => {
+    s().discardMilestoneChanges()
+    s().setPresentations([{ id: 'q', name: 'Q', slides: [
+      { id: 'live', name: 'Live', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } },
+      { id: 'later', name: 'On v2', snapshotId: v2, viewId: null, viewport: { x: 0, y: 0, zoom: 0 } },
+      { id: 'own', name: 'Own copy', snapshotId: null, viewId: null, viewport: { x: 0, y: 0, zoom: 0 }, modelSnapshot: copy },
+    ] }])
+    s().setActivePresentation('q')
+    s().setAppMode('presenter')
+    s().selectMilestone(v1)
+    expect(milestoneOnCanvas(s())).toBe(v1)
+  })
+
+  it('of a slide that shows the live model names no milestone', () => {
+    s().previewSlide(0)
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b', 'c', 'd'])
+    expect(milestoneOnCanvas(s())).toBeNull()
+    expect(s().activeSnapshotId).toBeNull()
+  })
+
+  it('of a slide linked to another milestone names that one', () => {
+    s().previewSlide(1)
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b', 'c'])
+    expect(milestoneOnCanvas(s())).toBe(v2)
+    expect(s().activeSnapshotId).toBe(v2)
+    // Current (live) then is the live model.
+    s().discardMilestoneChanges()
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('of a slide with its own copy names no milestone, and a milestone picked after it keeps the live model under it', () => {
+    s().previewSlide(2)
+    expect(labels(s().c4Nodes)).toEqual(['x'])
+    expect(milestoneOnCanvas(s())).toBeNull()
+    s().selectMilestone(v1)
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b'])
+    s().previewSlide(1)
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b', 'c'])
+    s().previewSlide(0)
+    expect(labels(s().c4Nodes)).toEqual(['a', 'b', 'c', 'd'])
+    expect(milestoneOnCanvas(s())).toBeNull()
+  })
+})

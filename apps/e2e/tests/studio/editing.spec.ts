@@ -314,6 +314,47 @@ test('Wrap into… makes room for the new parent beside what it wraps, also afte
   expect(await studio.layoutViolations()).toEqual([])
 })
 
+test('Wrap into… leaves what it wraps where it is, hugged by the new parent, and moves nothing beside it', async ({ page, studio }) => {
+  // API Gateway went 40 px right and 80 px down with its new group, below
+  // Access & Security's header; the group, at 520 × 360, lay on Auth
+  // Service, which was pushed 174 px up, and Access & Security and Core
+  // Banking Platform grew up after it.
+  await studio.openSample('view-core')
+  const docId = studio.activeDocId()
+  const before = await studio.positions()
+  await studio.node('ctn-apigw').click()
+  const actions = studio.properties.getByRole('region', { name: 'Actions' })
+  await actions.getByRole('button', { name: /^Wrap into…/ }).click()
+  await actions.getByRole('menu').getByRole('menuitem', { name: 'Group', exact: true }).click()
+  await expect.poll(async () => (await studio.storedDoc(docId)).nodes.find((n) => n.id === 'ctn-apigw')?.parentId).not.toBe('dom-access')
+  await studio.settle()
+  await page.waitForTimeout(1000)
+  const after = await studio.positions()
+  /** "translate(Xpx, Ypx) WxH" as a box. */
+  const box = (p: string) => {
+    const [x, y, w, h] = p.match(/-?[\d.]+/g)!.map(Number)
+    return { x, y, w, h }
+  }
+  // It stays where it is drawn, and the group hugs it.
+  expect(after['ctn-apigw']).toBe(before['ctn-apigw'])
+  const group = Object.keys(after).find((id) => !before[id])!
+  const [g, gw] = [box(after[group]), box(before['ctn-apigw'])]
+  expect(g).toEqual({ x: gw.x - 30, y: gw.y - 70, w: gw.w + 60, h: gw.h + 100 })
+  // Its parents grow round it, left and up, and no further.
+  for (const id of ['dom-access', 'sys-core']) {
+    const [b, a] = [box(before[id]), box(after[id])]
+    expect(a.x, id).toBeLessThanOrEqual(b.x)
+    expect(a.y, id).toBeLessThanOrEqual(b.y)
+    // Within a pixel: the sample's frames have fractional sizes.
+    expect(Math.abs(a.x + a.w - (b.x + b.w)), `${id} right`).toBeLessThan(1)
+    expect(Math.abs(a.y + a.h - (b.y + b.h)), `${id} bottom`).toBeLessThan(1)
+  }
+  // Nothing else moves, Auth Service beside it least of all.
+  expect(Object.keys(before).filter((id) => !['dom-access', 'sys-core'].includes(id) && after[id] !== before[id])
+    .map((id) => `${id}: ${before[id]} → ${after[id]}`)).toEqual([])
+  expect(await studio.layoutViolations(docId)).toEqual([])
+})
+
 test('a second relation between the same two elements is drawn and can be selected', async ({ page, studio }) => {
   // It was never drawn: invisible, and impossible to select or delete.
   await studio.open('v-containers')

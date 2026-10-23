@@ -322,7 +322,9 @@ test('unticking a type\'s last allowed parent asks first, naming what it leaves 
   page.once('dialog', (d) => { void d.accept() })
   await parent('Software System').uncheck()
   await expect(parent('Software System')).not.toBeChecked()
-  await expect(page.locator('.mm-issues-count')).toHaveText('1')
+  // The Orders DB out of place, and a Database with no place at all (not at
+  // the root either; F-0032).
+  await expect(page.locator('.mm-issues-count')).toHaveText('2')
 })
 
 // F-0019: a type's Label could be emptied, which left a blank palette entry
@@ -363,4 +365,65 @@ test('an emptied name of a type, a relation type or a property goes back to the 
     const mm = doc.metamodel
     return mm && [mm.nodeTypes.database.label, mm.relationTypes.interacts.label, mm.nodeTypes.container.properties?.at(-1)?.label]
   }).toEqual(['Store', relName, 'New property'])
+})
+
+// F-0030: the metamodel's own name could be emptied in the editor's header
+// and was saved blank; an agent was then told Metamodel "".
+test('an emptied name of the metamodel goes back to the one it had', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const name = page.locator('.mm-editor-header .mm-name')
+  const was = await name.inputValue()
+  expect(was).not.toBe('')
+  await name.click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.press('Backspace')
+  await page.keyboard.press('Tab')
+  await expect(name).toHaveValue(was)
+  // A name typed over it is taken, trimmed.
+  await name.fill(' Bookstore types ')
+  await name.press('Tab')
+  await expect(name).toHaveValue('Bookstore types')
+  await closeEditor(page)
+  await expect.poll(async () => (JSON.parse(await studio.storedJson()) as { metamodel?: { name: string } }).metamodel?.name)
+    .toBe('Bookstore types')
+})
+
+// F-0031, F-0032: a type with no allowed parent left and At the root
+// unticked was taken without a word, Validation stayed silent, and its drops
+// said "Allowed parents: the canvas root" while the root refused it too.
+test('taking a type\'s last place asks first, and a type with no place is warned of and refused truly', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await openEditor(page)
+  const card = page.locator('.mm-card', { has: page.locator('.mm-type-id', { hasText: /^queue$/ }) })
+  await card.locator('.mm-card-header').click()
+  const place = (name: string) => card.locator('.mm-parent-grid label', { hasText: new RegExp(`^${name}$`) }).locator('input')
+  // Group is a place still: no question.
+  await place('Software System').uncheck()
+  await expect(place('Software System')).not.toBeChecked()
+  // At the root unticked first, Group is the last place.
+  await expect(place('At the root')).not.toBeChecked()
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await place('Group').uncheck().catch(() => {})
+  await expect.poll(() => asked).toContain('nothing can be placed as a Queue')
+  await expect(place('Group')).toBeChecked()
+  page.once('dialog', (d) => { void d.accept() })
+  await place('Group').uncheck()
+  await expect(place('Group')).not.toBeChecked()
+  const warning = page.locator('.mm-issue-msg', { hasText: 'Queue has no place in the metamodel' })
+  await expect(warning).toHaveCount(1)
+  await closeEditor(page)
+
+  // The palette still offers it; each drop says it has no place.
+  const toasts = page.locator('.toast-message')
+  await studio.addFromPalette('Queue', await studio.nearBottom())
+  await expect(toasts.last()).toContainText('Queue has no place in the metamodel')
+  const shop = (await studio.node('bookstore').boundingBox())!
+  const pane = (await studio.pane.boundingBox())!
+  await studio.addFromPalette('Queue', { x: shop.x - pane.x + shop.width / 2, y: shop.y - pane.y + shop.height - 30 })
+  await expect(toasts.last()).toContainText('Cannot place Queue inside Software System. Allowed parents: none (Queue has no place in the metamodel)')
+  await expect(toasts.filter({ hasText: 'Allowed parents: the canvas root' })).toHaveCount(0)
 })

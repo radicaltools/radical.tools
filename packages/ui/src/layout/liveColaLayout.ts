@@ -22,7 +22,7 @@ type Model = LiveColaModel
  *  come from. */
 export type LiveColaMessage =
   | { type: 'start'; skipBulk: boolean; model: Model; gen: number }
-  | { type: 'invalidate' | 'relax'; model: Model; gen: number; added?: string[] }
+  | { type: 'invalidate' | 'relax'; model: Model; gen: number; added?: string[]; covered?: boolean }
   | { type: 'reset'; model: Model; gen: number; free?: string[]; aligned?: string[] }
   | { type: 'stop' }
   | { type: 'seed'; id: string; x: number; y: number }
@@ -155,9 +155,9 @@ export class LiveColaLayout {
   }
 
   /** See LiveColaEngine.invalidate. */
-  invalidate(added?: string[]): void {
-    if (this.engine) this.engine.invalidate(added)
-    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen(), added })
+  invalidate(added?: string[], covered?: boolean): void {
+    if (this.engine) this.engine.invalidate(added, covered)
+    else if (this._running) this.post({ type: 'invalidate', model: this.callbacks.getModel(), gen: this.nextGen(), added, covered })
   }
 
   /** See LiveColaEngine.reset. */

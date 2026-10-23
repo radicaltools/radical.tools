@@ -8,6 +8,7 @@ tests: |
   packages/ui/tests/undoSteps.test.ts › undo after a viewpoint changed in the metamodel › "Save as viewpoint… → Replace" is one step, taken back with the viewpoint
   packages/ui/tests/undoSteps.test.ts › undo after a viewpoint changed in the metamodel › a viewpoint deleted in the metamodel editor comes back with its view
   apps/e2e/tests/studio/metamodel-editor.spec.ts › an emptied name of a type, a relation type or a property goes back to the one it had
+  apps/e2e/tests/studio/metamodel-editor.spec.ts › an emptied name of the metamodel goes back to the one it had
 then: "Undo gives back the type and then its elements, the typed label as one step, the relation type added and deleted as a step each; setting a type to what it is makes no step; Save as viewpoint → Replace is one step, taken back with the viewpoint; a viewpoint deleted comes back with its view"
 when: "the user deletes the type's elements and then the type, types a new label into a type, adds and deletes a relation type, sets a type to what it already is, saves a view as a viewpoint replacing another, deletes a viewpoint in the metamodel editor, and undoes each"
 ---

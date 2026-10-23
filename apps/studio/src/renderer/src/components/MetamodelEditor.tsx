@@ -130,10 +130,11 @@ function CountInput({ value, onCommit }: { value: number | undefined; onCommit: 
   )
 }
 
-/** The name of a type, a relation type or a property: taken as it is typed,
- *  while it is not blank; an emptied field goes back to the name when it is
- *  left or Enter is pressed (a type could be left with none, a blank entry
- *  in the palette, which upsert_node_type refuses). */
+/** The name of the metamodel, a type, a relation type or a property: taken
+ *  as it is typed, while it is not blank; an emptied field goes back to the
+ *  name when it is left or Enter is pressed (a type could be left with none,
+ *  a blank entry in the palette, which upsert_node_type refuses; the
+ *  metamodel, a blank header and an agent told Metamodel ""). */
 function NameInput({ value, onChange, className = 'mm-input', placeholder }: {
   value: string
   onChange: (name: string) => void
@@ -905,15 +906,15 @@ export function MetamodelEditor(): React.ReactElement {
    *  it leaves what the model holds against the metamodel (parents, a
    *  maximum, options, a required property, pairs narrowed below it, a
    *  type deleted, an any-pair type added beside the one an untyped
-   *  relation reads as); then after the user has seen what it breaks and
-   *  said yes. A change that asks anyway (`question`) asks it once, with
+   *  relation reads as), or takes a type's last place; then after the user
+   *  has seen what it breaks and said yes. A change that asks anyway (`question`) asks it once, with
    *  the list. */
   const confirmNarrowing = (next: Metamodel, question?: string): boolean => {
     const breaks = metamodelChangeBreaks(nodes, relations, metamodel, next)
     if (!breaks.length) return question ? window.confirm(question) : true
     const shown = breaks.slice(0, 10).map((i) => `• ${i.message}`).join('\n')
     const more = breaks.length > 10 ? `\n…and ${breaks.length - 10} more` : ''
-    return window.confirm(`${question ? `${question}\n\n` : ''}This change leaves what the model holds against the metamodel (${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}):\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
+    return window.confirm(`${question ? `${question}\n\n` : ''}This change brings in ${breaks.length} ${breaks.length === 1 ? 'issue' : 'issues'}:\n\n${shown}${more}\n\nChange the metamodel anyway? Validation will list them until they are fixed.`)
   }
   const changeNodeType = (def: NodeTypeDef): void => {
     if (confirmNarrowing({ ...metamodel, nodeTypes: { ...metamodel.nodeTypes, [def.id]: def } })) upsertNodeType(def)
@@ -1025,10 +1026,10 @@ export function MetamodelEditor(): React.ReactElement {
           <div className={`mm-editor-main${tab === 'diagram' ? ' is-diagram' : ''}`}>
         <div className="mm-editor-header">
           <div>
-            <input
+            <NameInput
               className="mm-input mm-name"
               value={metamodel.name}
-              onChange={(e) => setMetamodel({ ...(forkPresetMetamodel(metamodel) ?? metamodel), name: e.target.value })}
+              onChange={(name) => setMetamodel({ ...(forkPresetMetamodel(metamodel) ?? metamodel), name })}
             />
             <div className="mm-subhead">
               Per-document metamodel · {nodeTypes.length} node type(s) · {relationTypes.length} relation type(s) · {viewpoints.length} viewpoint(s)

@@ -331,7 +331,7 @@
           <li>One element's actions are in its card. With several selected, the <strong>selection bar</strong> over the canvas offers what applies to them all.</li>
         </ul>
         <ul>
-          <li><strong>Wrap into…</strong> — a new container around the selection. <strong>Unwrap</strong> removes a container and keeps its children.</li>
+          <li><strong>Wrap into…</strong> — a new container around the selection. What it wraps stays where it is; the new container fits snugly round it, and the containers it is in grow only as far as needed to hold it. Only what the new container lies on is pushed clear. <strong>Unwrap</strong> removes a container and keeps its children.</li>
           <li><strong>Move to…</strong> — re-parent the selection.</li>
           <li><strong>Align…</strong> — keep the elements in a row, a column or a grid on this canvas (see <a href="#layout">Layout</a>).</li>
           <li><strong>Hide from view</strong> — take them out of this view only.</li>
@@ -539,7 +539,7 @@
         <p>While it runs the button shows its progress. Then a message names the layout that won, and <em>ⓘ</em> beside the button opens <em>Why this layout?</em> with every algorithm tried and its score. The layout you get is the one that stays: nothing moves it until you do.</p>
         <h3>Dragging and pins</h3>
         <ul>
-          <li>A drag moves only what you drag. On the drop, what it now covers is pushed just clear; the rest of the diagram stays. A drop leaves nothing overlapping.</li>
+          <li>A drag moves only what you drag. The containers it is in stay where they are and grow only as far as needed to hold it. On the drop, what it now covers is pushed just clear; the rest of the diagram stays. A drop leaves nothing overlapping.</li>
           <li>A dropped element is <strong>pinned</strong>: the live physics leaves it there. Select it to see the pin; click the pin to unpin. A view's pins are listed in its properties, with <em>Unpin all</em>.</li>
           <li>Hold <kbd>⌘/Ctrl</kbd> as you start a drag to let the physics nudge neighbours out of the way while you drag.</li>
           <li>Smart Layout rearranges the whole canvas and unpins everything on it.</li>
@@ -608,6 +608,7 @@
         <ul>
           <li>Pick or create a presentation, then <em>Add slide</em> to capture what is on screen: the view, the camera, the collapse state, the wiki page or drill level, and the milestone shown.</li>
           <li>Double-click a slide's name to rename it; <em>Capture</em> takes what is on screen now; link a slide to another view or milestone from its card.</li>
+          <li>Click a slide's card to show it: its milestone becomes the one shown, and a slide of the live model (or of its own copy) shows no milestone. The chip, the URL and the Milestones list name what the canvas draws.</li>
           <li><em>Present</em> (or <kbd>F5</kbd>) fills the window. <kbd>→</kbd> <kbd>Space</kbd> advance, <kbd>←</kbd> goes back, <kbd>Esc</kbd> exits. The URL follows the slide, so a listener can open the same one.</li>
         </ul>
       </section>
@@ -674,7 +675,7 @@
           <li><strong>Validation</strong> — everything the model breaks now, each with <em>Open in Designer</em>. Built-in types can be extended but not deleted.</li>
         </ul>
         <div class="doc-tip">
-          <strong>Good to know.</strong> A change that leaves the model against the metamodel (a parent unticked, an enum option removed) asks first and lists what it breaks. Every type, relation, pair and rule is tabled in the <a href="reference.html#types">Reference</a>.
+          <strong>Good to know.</strong> A change that leaves the model against the metamodel (a parent unticked, an enum option removed), or takes a type's last place (its last allowed parent, or <em>At the root</em> when it has none), asks first and lists what it breaks. Validation warns of a type nothing can be placed as, also while the model holds none. An emptied name, of the metamodel, a type, a relation type or a property, goes back to the one it had. Every type, relation, pair and rule is tabled in the <a href="reference.html#types">Reference</a>.
         </div>
       </section>
 

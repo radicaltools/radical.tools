@@ -7,6 +7,10 @@ tests: |
   packages/ui/tests/presentation.test.ts › Present and Esc with a milestone's diff on › gives the milestone's diff back
   packages/ui/tests/milestonePresenting.test.ts › names the milestone the slide draws, and none over the live model
   apps/e2e/tests/studio/milestones.spec.ts › a slide that plays the live model while a milestone is open names no milestone, and offers neither its diff nor Propagate
+  apps/e2e/tests/studio/milestones.spec.ts › in Presenter, a slide card names the milestone its slide shows, and none over the live model
+  packages/ui/tests/milestonePresenting.test.ts › of a slide that shows the live model names no milestone
+  packages/ui/tests/milestonePresenting.test.ts › of a slide linked to another milestone names that one
+  packages/ui/tests/milestonePresenting.test.ts › of a slide with its own copy names no milestone, and a milestone picked after it keeps the live model under it
 then: "the milestone is shown again with its diff on"
 when: "the user presents and ends the presentation with Esc"
 ---

@@ -11,6 +11,9 @@ tests: |
   packages/ui/tests/wrapMakesRoom.test.ts › leaves the new parent clear of the elements beside what it wraps
   packages/ui/tests/wrapMakesRoom.test.ts › pushes a pinned neighbour clear too, and moves nothing out of its way
   apps/e2e/tests/studio/editing.spec.ts › Wrap into… makes room for the new parent beside what it wraps, also after a reload
+  packages/ui/tests/physicsStands.test.ts › keeps API Gateway where it is drawn when it is wrapped into a group, hugged by it, and moves nothing beside it
+  packages/ui/tests/wrapMakesRoom.test.ts › keeps what it wraps where it is drawn, hugs it, and moves nothing it does not cover
+  apps/e2e/tests/studio/editing.spec.ts › Wrap into… leaves what it wraps where it is, hugged by the new parent, and moves nothing beside it
 then: "a new container of that type surrounds both and becomes the selection"
 when: "the user picks a container type under Wrap into…"
 ---
