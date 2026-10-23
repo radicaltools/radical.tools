@@ -212,7 +212,7 @@
         <ul>
           <li>Hold the special key (<kbd>Alt</kbd>/<kbd>⌥ Option</kbd> by default, <em>Settings → Special key</em>), press on the source, drag to the target, release. <kbd>Esc</kbd> cancels.</li>
           <li>With an element selected, holding the key marks every element a relation from it can go to, with the relation's type over it, and dims the rest; on a view with a filter, only where the filter would draw it.</li>
-          <li>An element is not connected to what holds it (a container to its system): containment already joins them. A state machine's transition to a state that holds its source is the exception.</li>
+          <li>An element is not connected to what holds it by a structural relation (a container does not <em>use</em> its system): containment already joins them, and moving an element into one it relates to removes such relations. A governance relation says what containment does not, so it may join them and stays on a move: a requirement inside the system that <em>satisfies</em> it, an ADR inside the system it <em>constrains</em>. The metamodel editor marks a relation type as <em>Governance</em>. A state machine's transition to a state that holds its source is allowed too.</li>
           <li>Over each element it can go to, a pill names each way: the relation's type, <em>inside</em> where it may go in. Drop on a pill to make that one; where one way fits, drop anywhere on the element.</li>
           <li>A relation goes by how its type reads from its source, on its line, in menus and in the card: <em>uses</em>, <em>delivers to</em> (to a person, as in Structurizr), <em>partners with</em>. A metamodel can give a pair of types its own reading.</li>
           <li>Select a relation and drag one of its ends onto another element to move it; it keeps its type, and a place where the type does not fit is refused. Hold the special key while you drag to see where the end can go.</li>
@@ -474,7 +474,7 @@
         <ul>
           <li>A click on a row selects the element, a double-click opens its card; <kbd>F2</kbd> or <kbd>Enter</kbd> renames it in place.</li>
           <li>Elements are added where they will show: a <strong>+ row</strong> after the rows under each element (<em>+ Requirement · refined into</em>) and one at the end for the top level. The new element is linked the way the level hangs under its parent, and gets the values the level's filters ask for.</li>
-          <li>Where there is a choice, the + row opens <em>Add or link</em>: a sentence says what goes there (<em>Account is realised by a software system ▾</em>), the field names a new element and searches the model, <em>New</em> adds one by that name and <em>Existing</em> lists the elements the model has that may be linked there instead; picking one adds only the relation.</li>
+          <li>Where there is a choice, the + row opens <em>Add or link</em>: a sentence says what goes there (<em>Account is realised by a software system ▾</em>), the field names a new element and searches the model, <em>New</em> adds one by that name and <em>Existing</em> lists the elements the model has that may be linked there instead; picking one adds only the relation. <em>Existing</em> lists only what the model accepts linked that way (not what holds the element by a structural relation, no aggregate root as part of another), and follows edits made meanwhile, by an agent or another program.</li>
           <li>A table of hundreds of rows opens at once: only the rows in sight are drawn.</li>
         </ul>
       </section>

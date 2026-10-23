@@ -8,7 +8,8 @@ import {
 } from '@radical/ui/store/diagramStore'
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
-import { isRelationAllowed, relationTypeKeepsAggregates, relationTypeName, relationTypesFitting } from '@radical/common/metamodel'
+import { isRelationAllowed, relationTypeName, relationTypesFitting } from '@radical/common/metamodel'
+import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
@@ -238,9 +239,12 @@ export function MatrixView(): React.ReactElement {
       // Several types fit the pair: which one is the user's to say, as on
       // the canvas (added with none, Validation flagged it).
       if (!made.relationType) {
-        const types = relationTypesFitting(metamodel, source.type, target.type)
-          .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
-          .map((rt) => rt.id)
+        // Those the model accepts (relationTypesAccepted: the aggregate
+        // rules kept, no structural one to what holds an end).
+        const types = relationTypesAccepted({ nodes, relations, metamodel }, source.id, target.id)
+        const fitting = relationTypesFitting(metamodel, source.type, target.type)
+        // None of those that fit: the store refuses it and says why.
+        if (!types.length && fitting.length) { addRelation({ sourceId: source.id, targetId: target.id, relationType: fitting[0].id }); return }
         if (types.length > 1) {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
           setPopup({ relIds: [], types, sourceNode: source, targetNode: target, x: rect.left + rect.width / 2, y: rect.bottom + 4, above: rect.top })
@@ -248,7 +252,8 @@ export function MatrixView(): React.ReactElement {
         }
         if (types.length === 1) made.relationType = types[0]
       }
-      addRelation({ sourceId: source.id, targetId: target.id, ...made })
+      // Refused, the reason is shown, and nothing was added.
+      if (!addRelation({ sourceId: source.id, targetId: target.id, ...made })) return
       pushNotification(`Added relation: ${source.label} \u2192 ${target.label}`, 'info')
     },
     [relMap, selectedEdgeId, armedId, selectEdge, removeRelation, addRelation, metamodel, pushNotification, readonly, relations, relLabel, chain, activeView, nodes],

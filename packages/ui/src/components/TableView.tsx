@@ -126,7 +126,7 @@ export function TableView(): React.ReactElement {
   const addRelation      = useDiagramStore((s) => s.addRelation)
 
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
-  const [picker, setPicker] = useState<{ at: { x: number; y: number }; under: C4Node | null; ways: PickerWay[] } | null>(null)
+  const [picker, setPicker] = useState<{ at: { x: number; y: number }; under?: ChainRow; choices: AddChoice[] } | null>(null)
 
   // The rows: the chain's tree; without a chain, the containment of what
   // the steps give (flat in their order when they set one).
@@ -257,7 +257,8 @@ export function TableView(): React.ReactElement {
     const link = choice.link!
     if (underPath) setFoldedRows((prev) => { const next = new Set(prev); next.delete(underPath); return next })
     const [sourceId, targetId] = link.direction === 'out' ? [nodeId, link.otherId] : [link.otherId, nodeId]
-    addRelation({ sourceId, targetId, relationType: link.relationType })
+    // Refused (the reason is shown): nothing was linked, and no "was linked".
+    if (!addRelation({ sourceId, targetId, relationType: link.relationType })) return
     const s = useDiagramStore.getState()
     const view = s.activeViewId ? s.views[s.activeViewId] : undefined
     const shown = viewShownNodes(view, s.c4Nodes, s.c4Relations)
@@ -265,31 +266,32 @@ export function TableView(): React.ReactElement {
     selectNode(nodeId)
   }
 
+  // What may be linked under the row the way `c` hangs there: those the
+  // level's filters let through, so that the table shows them.
+  const existingFor = (c: AddChoice, under?: ChainRow): C4Node[] =>
+    linkCandidates(c.type, c.link, pipelineCtx, pipeline?.levels?.[under ? under.depth + 1 : 0]?.filters)
+
   // One choice with nothing to link is added at once; otherwise the picker
   // offers each type, a new one by name or one the model has, linked.
   const onAdd = (e: React.MouseEvent, choices: AddChoice[], under?: ChainRow) => {
     e.stopPropagation()
-    // Those the level's filters let through, so that the table shows them.
-    const filters = pipeline?.levels?.[under ? under.depth + 1 : 0]?.filters
-    const existing = choices.map((c) => linkCandidates(c.type, c.link, pipelineCtx, filters))
-    if (choices.length === 1 && !existing[0].length) { add(choices[0], under?.path); return }
+    if (choices.length === 1 && !existingFor(choices[0], under).length) { add(choices[0], under?.path); return }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setPicker({
-      at: { x: rect.left, y: rect.bottom + 4 },
-      under: under?.node ?? null,
-      ways: choices.map((c, i) => ({
-        key: `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`,
-        label: typeName(c.type),
-        caption: c.group === 'Add' ? undefined : c.group.toLowerCase(),
-        kind: 'child' as const,
-        create: { noun: typeNoun(typeName(c.type)), hint: choiceHint(c, under) || undefined, run: (name: string) => add(c, under?.path, name) },
-        linkable: !!c.link,
-        candidates: existing[i],
-        link: (nodeId: string) => linkExisting(c, nodeId, under?.path),
-      })),
-    })
+    setPicker({ at: { x: rect.left, y: rect.bottom + 4 }, under, choices })
   }
 
+  // The picker's ways, from the model as it is now: an element removed
+  // meanwhile (an outside edit, an agent) is no longer offered.
+  const pickerWays = (choices: AddChoice[], under?: ChainRow): PickerWay[] => choices.map((c) => ({
+    key: `${c.type}|${c.link?.relationType ?? ''}|${c.link?.direction ?? ''}`,
+    label: typeName(c.type),
+    caption: c.group === 'Add' ? undefined : c.group.toLowerCase(),
+    kind: 'child' as const,
+    create: { noun: typeNoun(typeName(c.type)), hint: choiceHint(c, under) || undefined, run: (name: string) => add(c, under?.path, name) },
+    linkable: !!c.link,
+    candidates: existingFor(c, under),
+    link: (nodeId: string) => linkExisting(c, nodeId, under?.path),
+  }))
 
   const commitEdit = useCallback(() => {
     if (!editCell) return
@@ -438,12 +440,12 @@ export function TableView(): React.ReactElement {
         </table>
       </div>
       {/* A choice in the picker opens the new row's name: its click must not reach the table, which closes it. */}
-      {picker && (
+      {picker && (!picker.under || nodes[picker.under.node.id]) && (
         <div onClick={(e) => e.stopPropagation()}>
           <AddPicker
             at={picker.at}
-            under={picker.under}
-            ways={picker.ways}
+            under={picker.under ? nodes[picker.under.node.id] : null}
+            ways={pickerWays(picker.choices, picker.under)}
             typeLabel={typeName}
             onClose={() => setPicker(null)}
           />

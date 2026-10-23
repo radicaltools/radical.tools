@@ -42,7 +42,6 @@ import {
   builtInC4Metamodel,
   builtInGovernanceMetamodel,
   isRelationAllowed,
-  relationTypeKeepsAggregates,
   relationTypesFitting,
   allowedPlacesText,
   isParentAllowed,
@@ -61,6 +60,7 @@ import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
+import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
 import type { HubImportRecord, HubConceptMeta } from './hubStore'
@@ -95,7 +95,7 @@ export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
-import { type EdgeStyle, type ViewPipeline, addToViewList, holderOf, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -2872,7 +2872,9 @@ interface DiagramStore {
   cancelNodeWizard: () => void
 
   // ── actions: relations ──
-  addRelation: (rel: Omit<C4Relation, 'id'>) => void
+  /** Adds the relation; returns its id, or null when the model refuses it
+   *  (the reason is shown). */
+  addRelation: (rel: Omit<C4Relation, 'id'>) => string | null
   updateRelation: (id: string, updates: Partial<Omit<C4Relation, 'id'>>) => void
   /** An end of a relation moved on the canvas (its reconnect handle): as
    *  updateRelation, and where the type it has does not fit the new pair
@@ -4688,7 +4690,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const refused = model.checkAddRelation(get(), rel)
         if (refused) {
           get().pushNotification(refused, 'error')
-          return
+          return null
         }
         get()._pushUndo()
         get()._markMilestoneEdit()
@@ -4697,6 +4699,7 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { model.insertRelation(state, id, rel) })
         get()._sync()
         _liveLayout?.invalidate()
+        return id
       },
 
       updateRelation(id, updates) {
@@ -4760,11 +4763,15 @@ export const useDiagramStore = create<DiagramStore>()(
           s.pushNotification(`Relation not allowed: ${label(source.type)} → ${label(target.type)}. The metamodel does not permit this connection.`, 'error')
           return
         }
-        // Containment already joins an element and what holds it (but a
-        // transition to an enclosing state): asked for no type first.
-        const holder = holderOf(s.c4Nodes, source, target)
-        if (holder && !relationTypesFitting(s.metamodel, source.type, target.type).some((rt) => rt.id === 'transition')) {
-          s.pushNotification(`Relation not allowed: ${holder.label} holds ${(holder === source ? target : source).label}, and containment already joins them.`, 'error')
+        // The types the model accepts between the two (relationRefusal: a
+        // structural relation to what holds an element is refused, a
+        // governance one is not; the aggregate rules kept). None of those
+        // that fit: the reason, asked for no type first.
+        const ctx = { nodes: s.c4Nodes, relations: s.c4Relations, metamodel: s.metamodel }
+        const fitting = relationTypesFitting(s.metamodel, source.type, target.type)
+        const accepted = relationTypesAccepted(ctx, sourceId, targetId)
+        if (fitting.length && !accepted.length) {
+          s.pushNotification(relationRefusal(ctx, { sourceId, targetId, relationType: fitting[0].id }) ?? 'Relation not allowed.', 'error')
           return
         }
         // On a canvas whose filter is a chain, the relation is one the chain
@@ -4781,9 +4788,7 @@ export const useDiagramStore = create<DiagramStore>()(
         if (made.relationType) { s.addRelation({ sourceId, targetId, relationType: made.relationType }); return }
         // Several types fit the pair: which one is the user's to say (left
         // to inference, the relation had none, and nothing flagged it).
-        const types = relationTypesFitting(s.metamodel, source.type, target.type)
-          .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
-          .map((rt) => rt.id)
+        const types = accepted
         if (types.length > 1) { set((state) => { state.relationTypeChoice = { sourceId, targetId, types } }); return }
         s.addRelation({ sourceId, targetId, ...(types.length === 1 ? { relationType: types[0] } : {}) })
       },

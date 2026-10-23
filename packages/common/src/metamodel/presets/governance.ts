@@ -267,6 +267,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       { key: 'description', label: 'Note', type: 'text' },
     ],
     color: '#dc2626',
+    governance: true,
     builtin: true,
   }
 
@@ -278,6 +279,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedPairs: [{ from: 'adr', to: 'adr' }],
     properties: [],
     color: '#f59e0b',
+    governance: true,
     builtin: true,
   }
 
@@ -289,6 +291,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedPairs: [{ from: 'fitness-fn', to: 'adr' }],
     properties: [],
     color: '#7c3aed',
+    governance: true,
     builtin: true,
   }
 
@@ -304,6 +307,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       { key: 'description', label: 'Note', type: 'text' },
     ],
     color: '#0891b2',
+    governance: true,
     builtin: true,
   }
 
@@ -321,6 +325,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     ],
     properties: [],
     color: '#0d9488',
+    governance: true,
     builtin: true,
   }
 
@@ -336,6 +341,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     ],
     properties: [],
     color: '#06b6d4',
+    governance: true,
     builtin: true,
   }
 
@@ -392,6 +398,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedPairs: verifiesTargets.map(to => ({ from: 'scenario', to })),
     properties: [],
     color: '#16a34a',
+    governance: true,
     builtin: true,
   }
 
@@ -487,6 +494,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     ],
     properties: [],
     color: '#db2777',
+    governance: true,
     builtin: true,
   }
 
@@ -499,6 +507,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     allowedPairs: (['webapp', 'container', 'component', 'system'] as const).map(to => ({ from: 'mockup', to })),
     properties: [],
     color: '#be185d',
+    governance: true,
     builtin: true,
   }
 

@@ -568,3 +568,35 @@ test('an outside write during a drag waits for the drop, and the drop lands unde
   expect(dx).toBeCloseTo(ex, 2)
   expect(dy).toBeCloseTo(ey, 2)
 })
+
+// F-0045: Add or link kept listing a requirement an outside edit removed,
+// and picking it wrote a relation to an element that no longer existed.
+test('Add or link no longer offers an element an outside edit removed, and links nothing to it', async ({ page, studio }) => {
+  await studio.openSample('view-register')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Manage models/ }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await models.getByRole('button', { name: /^Actions for / }).first().click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  await expect(models.locator('.docmgr-badge.md').first()).toBeVisible()
+  await models.getByRole('button', { name: 'Close' }).click()
+  await expect.poll(async () => Object.keys(await folder.files()).some((p) => p.startsWith('nodes/'))).toBe(true)
+
+  await page.getByRole('button', { name: 'Add under Retail payments brief', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: 'Add under Retail payments brief' })
+  await page.keyboard.type('Four-eyes')
+  await expect(picker.getByRole('option', { name: 'Four-eyes approval' })).toBeVisible()
+
+  // Another program removes the requirement: its file and its relations.
+  const files = await folder.files()
+  const [path] = Object.entries(files).find(([p, text]) => p.startsWith('nodes/') && /^id: "req-dual-approval"/m.test(text))!
+  const relations = JSON.parse(files['relations.json']) as Array<{ sourceId: string; targetId: string }>
+  await folder.write('relations.json', JSON.stringify(relations.filter((r) => r.sourceId !== 'req-dual-approval' && r.targetId !== 'req-dual-approval'), null, 2) + '\n')
+  await folder.remove(path)
+
+  await expect(picker.getByRole('option', { name: 'Four-eyes approval' })).toHaveCount(0, { timeout: 15_000 })
+  await expect(picker.getByRole('option', { name: /^New requirement/ })).toBeVisible()
+  const dangling = async () => (JSON.parse((await folder.files())['relations.json']) as Array<{ sourceId: string; targetId: string }>)
+    .filter((r) => r.sourceId === 'req-dual-approval' || r.targetId === 'req-dual-approval').length
+  expect(await dangling()).toBe(0)
+})

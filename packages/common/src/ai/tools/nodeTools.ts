@@ -184,7 +184,7 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       }, [realId], parentReal)
       if (refused) return fail(`move_node: ${refused}`)
       // Its relations with what will hold it go with the move (reparentNodes).
-      const gone = relationsToNewHolders({ c4Nodes: nodes, c4Relations: ctx.diagram.getRelations() }, [realId], parentReal)
+      const gone = relationsToNewHolders({ c4Nodes: nodes, c4Relations: ctx.diagram.getRelations(), metamodel: ctx.diagram.getMetamodel?.() }, [realId], parentReal)
       ctx.diagram.moveNodes([realId], parentReal)
       const goneText = gone.length ? ` Removed ${gone.length} relation${gone.length === 1 ? '' : 's'} to what now holds it (containment already joins them): ${gone.map((r) => r.id).join(', ')}.` : ''
       return { ok: true, resultText: `Moved node ${realId} to ${parentReal ?? 'the root'}.${goneText}`, updated: { nodes: 1 }, ...(gone.length ? { deleted: { relations: gone.length } } : {}) }

@@ -6,7 +6,7 @@ import {
   suggestNextWays, suggestStartWays, viewShownNodes, readPipeline,
   typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, chainTypes, linkCandidates, connectTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
-import { setViewPipeline, type ModelState } from '../src/model'
+import { checkAddRelation, setViewPipeline, type ModelState } from '../src/model'
 import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
 import { runModelQuery } from '../src/ai/queryLanguage'
 
@@ -403,6 +403,39 @@ describe('linkCandidates', () => {
     expect(linkCandidates('requirement', undefined, ctx)).toEqual([])
     // Only those the level's filters let through, so that the view shows them.
     expect(linkCandidates('requirement', under('n-pay'), ctx, [{ kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven'] }]).map((n) => n.id)).toEqual(['r3'])
+  })
+})
+
+// F-0033, F-0044: Add or link offered what the model then refused (a system
+// to the container it holds) or flagged (an aggregate root part of another):
+// it offers what checkAddRelation accepts, by the same check.
+describe('linkCandidates and what the model accepts', () => {
+  const store = (extra: C4Node[], rels: C4Relation[] = []): PipelineContext => ({
+    nodes: Object.fromEntries(extra.map((n) => [n.id, n])), relations: rels, metamodel: builtInGovernanceMetamodel(),
+  })
+  it('offers no structural link to what holds the element, but a governance one', () => {
+    const c = store([node('shop', 'system'), node('api', 'container', { parentId: 'shop' }), node('pay', 'system'), node('req', 'requirement', { parentId: 'shop' })])
+    // Under API, "uses" a system: not the Shop that holds it.
+    expect(linkCandidates('system', { relationType: 'interacts', direction: 'in', otherId: 'api' }, c).map((n) => n.id)).toEqual(['pay'])
+    expect(linkCandidates('container', { relationType: 'interacts', direction: 'out', otherId: 'shop' }, c)).toEqual([])
+    // A requirement inside the Shop may be satisfied by it.
+    expect(linkCandidates('system', { relationType: 'satisfies', direction: 'out', otherId: 'req' }, c).map((n) => n.id)).toEqual(['pay', 'shop'])
+  })
+  it('offers as part of an aggregate root only the parts of no other aggregate', () => {
+    const entity = (id: string, kind: string) => node(id, 'entity', { kind })
+    const c = store(
+      [entity('payment', 'aggregate-root'), entity('account', 'aggregate-root'), entity('line', 'entity'), entity('owner', 'entity'), entity('customer', 'aggregate-root')],
+      [rel('p1', 'owner', 'customer', 'part-of')],
+    )
+    expect(linkCandidates('entity', { relationType: 'part-of', direction: 'out', otherId: 'payment' }, c).map((n) => n.id)).toEqual(['line'])
+    for (const n of linkCandidates('entity', { relationType: 'part-of', direction: 'out', otherId: 'payment' }, c)) {
+      expect(checkAddRelation({ c4Nodes: c.nodes, c4Relations: Object.fromEntries((c.relations as C4Relation[]).map((r) => [r.id, r])), views: {}, activeViewId: null, metamodel: c.metamodel }, { sourceId: n.id, targetId: 'payment', relationType: 'part-of' })).toBeNull()
+    }
+  })
+  it('the connect key offers a governance type between an element and what holds it, and no structural one', () => {
+    const c = store([node('shop', 'system'), node('api', 'container', { parentId: 'shop' }), node('req', 'requirement', { parentId: 'shop' })])
+    const view: DiagramView = { id: 'v', name: 'V', nodeIds: [], positions: {} }
+    expect([...connectTypes(view, 'shop', ['api', 'req'], c)]).toEqual([['req', ['satisfies']]])
   })
 })
 

@@ -13,6 +13,7 @@
     "./modelMerge": "./src/modelMerge.ts",
     "./branchChanges": "./src/branchChanges.ts",
     "./viewPipeline": "./src/viewPipeline.ts",
+    "./relationRules": "./src/relationRules.ts",
     "./wikiDocument": "./src/wikiDocument.ts",
     "./viewpoints": "./src/viewpoints.ts",
     "./viewStructure": "./src/viewStructure.ts",

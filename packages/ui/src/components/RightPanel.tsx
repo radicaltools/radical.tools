@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
-import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeKeepsAggregates, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
+import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { ViewPipelinePanel } from './ViewPipelinePanel'
 import { MarkdownText } from './MarkdownText'
@@ -13,6 +13,7 @@ import type { HubImportRecord } from '../store/hubStore'
 import { MockupWireframe } from './MockupWireframe'
 import { RefPicker } from './RefPicker'
 import { viewShownNodes } from '@radical/common/viewPipeline'
+import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
@@ -2725,12 +2726,10 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
       // Selectable relation types for this source→target pair.
       const srcNode = c4Nodes[rel.sourceId]
       const dstNode = c4Nodes[rel.targetId]
+      // Those the model accepts between the two (relationTypesAccepted: the
+      // aggregate rules kept, no structural one to what holds an end).
       const compatibleTypes = metamodel
-        ? Object.values(metamodel.relationTypes).filter(rt =>
-            (rt.allowedPairs.length === 0 ||
-              rt.allowedPairs.some(p => p.from === srcNode?.type && p.to === dstNode?.type))
-            && relationTypeKeepsAggregates(rt.id, srcNode, dstNode)
-          )
+        ? relationTypesAccepted({ nodes: c4Nodes, relations: c4Relations, metamodel }, rel.sourceId, rel.targetId, rel.id).map((id) => metamodel.relationTypes[id])
         : []
       // A type that does not connect these two (an end moved, the metamodel
       // changed) shows as it is, with the ones that do to change it to; a

@@ -15,6 +15,7 @@ import { holderOf, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
+import { relationMayJoinHolder, relationRefusal } from './relationRules'
 import { relationTypeKeepsAggregates } from './metamodel/domainModel'
 
 export interface PipelineContext {
@@ -578,13 +579,16 @@ export function connectTypes(view: DiagramView | undefined, sourceId: string, ta
     if (!target || id === sourceId || !isRelationAllowed(ctx.metamodel, source.type, target.type)) continue
     const made = chain ? chainRelationFor(view, sourceId, id, ctx) : {}
     if (!made) continue
-    // The one the chain draws, or each that fits, to choose from; between an
-    // element and what holds it only a transition (checkAddRelation).
+    // The one the chain draws, or each that fits and keeps the aggregates, to
+    // choose from; between an element and what holds it only those that may
+    // join them (relationMayJoinHolder: a governance one, a transition). A
+    // target refused for another reason (a transition from a final state)
+    // stays one: dropped there, the refusal says why.
     const held = !!holderOf(ctx.nodes, source, target)
     const types = (made.relationType ? [made.relationType] : relationTypesFitting(ctx.metamodel, source.type, target.type)
       .filter((rt) => relationTypeKeepsAggregates(rt.id, source, target))
       .map((rt) => rt.id))
-      .filter((type) => !held || type === 'transition')
+      .filter((type) => !held || relationMayJoinHolder(ctx.metamodel, type))
     if (held && !types.length) continue
     out.set(id, types)
   }
@@ -875,7 +879,7 @@ export function addChoices(view: DiagramView | undefined, ctx: PipelineContext, 
 /** The elements that could hang under `link.otherId` the way `link` says
  *  (a WizardLink: `out` when the child is the source), instead of a new
  *  one of `type`: of that type, not the element itself, not linked to it
- *  that way yet, of a pair the relation type allows, and passing `filters`
+ *  that way yet, a relation the model accepts, and passing `filters`
  *  (the level's they go on, so that the view shows them); by name. None
  *  without a link (a child held inside, which is a move, not a link). */
 export function linkCandidates(type: string, link: WizardLink | undefined, ctx: PipelineContext, filters?: ViewFilter[]): C4Node[] {
@@ -885,10 +889,12 @@ export function linkCandidates(type: string, link: WizardLink | undefined, ctx: 
   const linked = new Set(list
     .filter((r) => r.relationType === link.relationType && (link.direction === 'out' ? r.targetId === other.id : r.sourceId === other.id))
     .map((r) => (link.direction === 'out' ? r.sourceId : r.targetId)))
-  const fits = (n: C4Node): boolean => {
-    const [from, to] = link.direction === 'out' ? [n.type, other.type] : [other.type, n.type]
-    return relationTypesFitting(ctx.metamodel, from, to).some((rt) => rt.id === link.relationType)
-  }
+  // Those the model accepts linked that way (relationRefusal): not a
+  // structural relation to what holds it, the aggregate rules kept; offered
+  // otherwise, they were refused when picked, or flagged once linked.
+  const fits = (n: C4Node): boolean => !relationRefusal(ctx, link.direction === 'out'
+    ? { sourceId: n.id, targetId: other.id, relationType: link.relationType }
+    : { sourceId: other.id, targetId: n.id, relationType: link.relationType })
   const candidates = Object.values(ctx.nodes).filter((n) => n.type === type && n.id !== other.id && !linked.has(n.id) && fits(n))
   return (filters?.length ? applyFilters(candidates, filters, ctx).nodes : candidates)
     .sort((a, b) => a.label.localeCompare(b.label))
