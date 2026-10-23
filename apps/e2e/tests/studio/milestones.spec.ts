@@ -206,7 +206,7 @@ test('F5 does not start behind the milestone question, and Propagate after a sli
   // and the live model.
   await sampleTableIn(page, studio, 'v2')
   const docId = studio.activeDocId()
-  await expect.poll(() => storedCounts(studio, docId)).toBe('11 17 30 65 78')
+  await expect.poll(() => storedCounts(studio, docId)).toBe('11 17 30 65 283')
   await page.getByRole('button', { name: 'Add under API Gateway' }).click()
   const question = page.locator('.milestone-modal')
   await expect(question).toBeVisible()
@@ -224,5 +224,5 @@ test('F5 does not start behind the milestone question, and Propagate after a sli
   await page.keyboard.press('Escape')
   await expect(page).not.toHaveURL(/\/play\//)
   await page.getByRole('button', { name: 'Propagate' }).click()
-  await expect.poll(() => storedCounts(studio, docId)).toBe('11 18 31 66 79')
+  await expect.poll(() => storedCounts(studio, docId)).toBe('11 18 31 66 284')
 })

@@ -267,10 +267,12 @@ test('a concern pack imported in a milestone brings its view with its elements: 
 
   await inV3()
   await button('Propagate').click()
-  await expect.poll(async () => (await stored()).views.filter((v) => v.folder === 'Concerns').map((v) => v.name)).toEqual(['Secrets'])
+  // The sample has concern packs of its own: Secrets comes after them.
+  const concernViews = (doc: Doc) => doc.views.filter((v) => v.folder === 'Concerns').map((v) => v.name)
+  await expect.poll(async () => concernViews(await stored())).toEqual([...concernViews(before), 'Secrets'])
   const propagated = await stored()
   const ids = new Set(propagated.nodes.map((n) => n.id))
-  const view = propagated.views.find((v) => v.folder === 'Concerns')!
+  const view = propagated.views.find((v) => v.folder === 'Concerns' && v.name === 'Secrets')!
   expect(view.nodeIds.length).toBeGreaterThan(10)
   expect(view.nodeIds.filter((id) => !ids.has(id))).toEqual([])
 })

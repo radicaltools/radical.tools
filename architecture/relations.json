@@ -2826,6 +2826,12 @@
     "targetId": "33421548-8635-4917-8793-ba89753d6de0"
   },
   {
+    "id": "324df655-c43f-4123-85b2-7ba3239b1d19",
+    "relationType": "derives",
+    "sourceId": "1b2d5147-a847-4829-ba0b-df7274336af2",
+    "targetId": "491c9f6d-f241-4730-932a-64e72cbeec3e"
+  },
+  {
     "id": "3250727e-d6b8-4b4c-aac2-bb4fa188b0df",
     "relationType": "verifies",
     "sourceId": "6beeff28-af59-43cd-8afa-154fdcd2d214",
@@ -8054,6 +8060,12 @@
     "targetId": "65bcdbf7-5067-4f72-9527-af1e7ede68a8"
   },
   {
+    "id": "8930939e-0c67-4dd5-aa12-da4cf8535071",
+    "relationType": "derives",
+    "sourceId": "e1de5d03-c7df-43d3-adec-aa0fc01fd655",
+    "targetId": "157f7331-5a0f-4b2e-8524-06a7a9152234"
+  },
+  {
     "description": "CLI npm releases use the shared npm-publish.yml workflow with package=cli.",
     "id": "89518cce-27e1-45a7-b4c4-ff94ad6d20d5",
     "relationType": "constrains",
@@ -10479,6 +10491,12 @@
     "targetId": "33ed83f4-5df3-42a3-a5d8-cce2ddabc6ac"
   },
   {
+    "id": "b05f59ba-f583-4c5a-bafb-0ee09670e467",
+    "relationType": "satisfies",
+    "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
+    "targetId": "1b2d5147-a847-4829-ba0b-df7274336af2"
+  },
+  {
     "id": "b0f8deac-321c-4611-801b-fa28f72dfbc0",
     "relationType": "constrains",
     "sourceId": "ba79f913-57e2-4f3d-a04f-9915945b9ed4",
@@ -12553,6 +12571,12 @@
     "targetId": "eab07f2c-b0ed-452a-8feb-8d3f1ece02d1"
   },
   {
+    "id": "d2079309-82b7-4822-8dce-7a20b8ac12d0",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "e1de5d03-c7df-43d3-adec-aa0fc01fd655"
+  },
+  {
     "id": "d20c7a4e-2f45-4aa6-be74-5eea888d2daf",
     "relationType": "verifies",
     "sourceId": "79afbbbd-4127-4873-a0ef-48f653122580",
@@ -14460,6 +14484,12 @@
     "targetId": "a2734db2-06ac-481e-ad00-9b5338a4420d"
   },
   {
+    "id": "f3ff41c4-0b8f-4103-8d7a-1575918f6731",
+    "relationType": "verifies",
+    "sourceId": "8c78ab6a-de7c-4c03-9d7a-cbe7b87d61cc",
+    "targetId": "e1de5d03-c7df-43d3-adec-aa0fc01fd655"
+  },
+  {
     "id": "f4472fd7-9500-48d7-82d7-77368c98bb94",
     "relationType": "performed-by",
     "sourceId": "7c077b3c-b485-4a88-b02e-d8aec3e028ff",
@@ -14803,6 +14833,12 @@
     "relationType": "verifies",
     "sourceId": "6b069339-da05-451c-a766-6701e8dc385e",
     "targetId": "9bfb5bd5-0e1c-42cc-9e39-62b60c12a91d"
+  },
+  {
+    "id": "fa3c28d4-d886-49fc-a259-ee78768ac6ed",
+    "relationType": "verifies",
+    "sourceId": "b7963c11-dd65-4d54-ae79-d6eec3229ec3",
+    "targetId": "1b2d5147-a847-4829-ba0b-df7274336af2"
   },
   {
     "id": "fa44dd78-50bf-4792-a949-9341e16c5b21",

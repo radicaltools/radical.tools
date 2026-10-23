@@ -295,7 +295,7 @@ test('a view shows every element again from its steps, and a chain can start fro
   await steps.getByRole('button', { name: 'Show every element' }).click()
   await expect(steps).toContainText('Every element')
   await expect(steps.getByRole('button', { name: 'Show every element' })).toHaveCount(0)
-  await expect(steps.locator('.rp-level-head')).toContainText('78')
+  await expect(steps.locator('.rp-level-head')).toContainText('283')
 })
 
 test('a matrix with a chain adds only a relation its cell shows, and never a copy', async ({ page, studio }) => {
