@@ -8,6 +8,103 @@ in which agents use the product as a user would. All three are commands of the
 `radical` CLI (`apps/cli`), driven by `crucible.json` in the folder you run them
 from. Findings are files in the findings folder (`crucible/findings/F-0001.md`).
 
+## How a cycle runs
+
+A cycle finds bugs, re-runs each before anyone reads it, records it, fixes it
+with a test that fails without the fix, checks that test, and binds it to the
+model. The CLI does what needs no judgement, agents search and fix, the
+maintainer decides.
+
+```
+ the model: requirements and scenarios say what must hold
+        │
+        ▼
+ SEARCH     radical fuzz      random sequences of actions on the store,
+                              the rules checked after every step
+            radical explore   agents use the product as a user would,
+                              each run in an area of its own
+        │
+        ▼
+ CONFIRM    explore verify    every script of a run re-run on a fresh page
+        │
+        ▼
+ RECORD     explore record    crucible/findings/F-NNNN.md, open
+                              (a question waits for the maintainer)
+        │
+        ▼
+ FIX        a fix round       agents in parallel worktrees, the test first
+        │
+        ▼
+ GATE       harden --gate     fails without the fix, passes with it,
+                              passes several runs at once
+        │
+        ▼
+ BIND       the model         the test named by its scenario, the
+                              requirement's text updated; the finding fixed
+        │
+        ▼
+ CI         radical check     every test the model names exists and passes
+```
+
+1. **An exploratory round** (the `crucible-explore` skill).
+   `radical explore prepare` builds the product once and gives every run a
+   folder, ports and a prompt with its area. The round's brief names what
+   changed since the last round, in the code and in the model, the open
+   findings, the rules and the form of the report. The agent session starts
+   one agent per run. Each writes Playwright scripts, looks for what no test
+   describes, changes nothing in the repository, and ends with a report whose
+   JSON block holds at most three findings.
+2. **Confirm and record.** `radical explore verify` serves the run's build
+   (Studio and the Hub) and runs every script again; what a script does not
+   show does not reach the maintainer. `radical explore record` writes each
+   finding with its steps, expected and actual, the commit, and a copy of its
+   script and screenshot. A question (which behaviour is meant?) is asked of
+   the maintainer; the decision is written into the finding, and into the
+   model with the fix.
+3. **A fix round** (the `crucible-fix` skill). The findings are grouped so
+   that groups touch few files in common, and each group gets a git worktree
+   and a branch. For each finding an agent writes the test, checks that it
+   fails for the finding's reason, fixes the cause (and the same pattern
+   elsewhere), and gates the test. E2E tests run one worktree at a time,
+   through a lock: the suite uses fixed ports.
+4. **The gate.** `radical harden --gate --test "<file> › <describe> › <name>"`
+   copies the source files changed since the base aside and sets them back:
+   the test must fail. It puts them back: the test must pass. Then it must
+   pass several runs at once, so a flaky test does not reach CI. For an e2e
+   test the runner's `build` is made before each of the first two runs, and
+   the runs at once are one Playwright run. The working tree is left as it
+   was, also after Ctrl+C; nothing is ever stashed.
+5. **Merge, model, CI.** The group branches are merged into one and checked
+   as CI checks them (typecheck, the test reports, the full e2e suite). One
+   writer updates the model: each new test named by its scenario, each
+   requirement whose behaviour changed rewritten. Each finding is set to
+   `fixed` with its test, and `radical check` makes sure every test the model
+   names exists and passes. The branch is pushed when the maintainer agrees.
+
+A finding's status:
+
+| Status | Meaning |
+|---|---|
+| `open` | a confirmed bug |
+| `question` | waits for the maintainer's decision |
+| `hardened` | has a test bound to a scenario (a fuzz finding, by its own steps) |
+| `fixed` | fixed, with its test |
+| `intended` | decided to be meant, written down in an ADR or a requirement |
+
+Who does what:
+
+| Part | Done by |
+|---|---|
+| Builds, ports, briefs, re-runs, records, the gate | the CLI (`radical explore`, `radical harden`) |
+| Searching and fixing | agents, one per run or per group |
+| Grouping, merging, the model, CI, the report | the agent session that runs the cycle |
+| Questions, starting a round, pushing | the maintainer |
+
+Round 170–175 (2026-10-22) is an example. Six runs found 27 confirmed
+findings. Eight groups fixed them, with 63 new tests, and the fixes went in
+as one pull request (#245). The round also found what the gate could not yet
+do for e2e tests, which #247 adds.
+
 ## radical fuzz
 
 A test of a scenario proves that one sequence of actions works. A fuzz file
