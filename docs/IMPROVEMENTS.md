@@ -493,6 +493,15 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     pane click that restores the camera may land while the fit to the
     selection still moves it; waiting for the camera to rest before the
     click would make it steady.
+    The test has waited for the camera to rest since, and it failed again
+    on 2026-10-22, once in three full local runs (back at 0.345, the
+    overview read at 0.292); it then passed 3 of 3 alone, 56 of 56 with up
+    to 20 workers, and 12 of 12 with Chrome's CPU slowed 6 and 20 times.
+    Another guess: the overview is read before the fit that follows the
+    physics' settling (it waits for the next frame, then animates 300 ms),
+    so two equal readings 150 ms apart can catch the earlier fit. Marking
+    the canvas once that fit has ended, and waiting for the mark, would
+    settle it.
 33. **Renaming a test means hunting the scenarios that name it.** On
     2026-10-16 eight e2e tests were renamed or moved onto other views (All
     elements became a table). The scenarios and fitness functions naming them
