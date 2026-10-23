@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Docs — Radical.Tools</title>
+  <title>Guide — Radical.Tools</title>
   <meta name="description" content="The Radical.Tools guide: one model of your architecture, with every diagram, table and wiki page derived from it. Modelling, views, milestones, the Inspector, the Concern Hub, Radical Forge and the MCP server for coding agents." />
   <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
   <script src="theme.js?v=__BUILD__"></script>
@@ -15,11 +15,12 @@
 </head>
 <body class="doc-page">
 
-  <!-- Shared site navigation — Home · Docs | Hub · Studio | GitHub · theme. Same on radical.tools, docs and the Hub (SiteNav.tsx). -->
+  <!-- Shared site navigation — Home · Use cases · Docs | Hub · Studio | GitHub · theme. Same on radical.tools, docs and the Hub (SiteNav.tsx). -->
   <header class="site-nav" id="top">
     <a class="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span class="site-nav-mark">R</span></a>
     <nav class="site-nav-links">
       <a class="site-nav-btn" href="https://radical.tools">Home</a>
+      <a class="site-nav-btn" href="https://radical.tools/usecases.html">Use cases</a>
       <a class="site-nav-btn active" href="https://radical.tools/manual.html">Docs</a>
       <span class="site-nav-sep" aria-hidden="true"></span>
       <a class="site-nav-btn" href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
@@ -117,7 +118,7 @@
     <main class="doc-main">
 
       <div class="doc-hero">
-        <span class="kicker">Docs</span>
+        <span class="kicker">Guide</span>
         <h1>Radical.Tools, explained</h1>
         <p class="doc-hero-sub">
           One model of your architecture. Every diagram, table and wiki page is derived from it.
@@ -142,7 +143,7 @@
         <ul>
           <li><strong>New model</strong> — pick the metamodel (<em>Radical</em>, or plain <em>C4</em>) and where to keep it: this browser, one <code>.radical</code> file, or a folder of Markdown files. With an AI provider set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
           <li><strong>Open</strong> — a recent model, a file, a folder, a Structurizr DSL workspace or the sample.</li>
-          <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used in this guide: 78 elements, needs, requirements, scenarios, ADRs, mockups, a process, 17 views, four milestones and a presentation.</li>
+          <li><strong>Try the sample</strong> — the <em>Fintech Banking Platform</em> used in this guide: 283 elements, with a domain model and two state machines, needs, requirements, scenarios, ADRs, eight concern packs from the Hub, mockups, a process, 36 views in four folders, four milestones and a presentation.</li>
         </ul>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/welcome-light.png?v=__BUILD__" alt="Welcome screen: New model and Open, with the three most recent models below" loading="lazy" />
@@ -804,6 +805,7 @@ codex mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-mo
     <span>Radical.Tools — MIT licensed. Built on the <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a>.</span>
     <span class="footer-links">
       <a href="index.html">Home</a>
+      <a href="usecases.html">Use cases</a>
       <a href="reference.html">Reference</a>
       <a href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
       <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>

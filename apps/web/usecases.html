@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Use cases — Radical.Tools</title>
+  <meta name="description" content="Six ways teams use Radical.Tools: a modelling tool instead of a drawing tool, requirements that stay attached to the architecture, one language across the organisation, a model from a brief or from the code you have, the architecture the code follows, and a harness for vibe coding." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://radical.tools/usecases.html" />
+  <meta property="og:title" content="Use cases — Radical.Tools" />
+  <meta property="og:description" content="From replacing draw.io to a harness for AI-written code: six ways to use one architecture model, and what each one gives you." />
+  <meta property="og:image" content="https://radical.tools/social-preview.png" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="640" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
+  <script src="theme.js?v=__BUILD__"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="landing.css?v=__BUILD__" />
+</head>
+<body>
+
+  <!-- Shared site navigation — Home · Use cases · Docs | Hub · Studio | GitHub · theme. Same on radical.tools, docs and the Hub (SiteNav.tsx). -->
+  <header class="site-nav" id="top">
+    <a class="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span class="site-nav-mark">R</span></a>
+    <nav class="site-nav-links">
+      <a class="site-nav-btn" href="https://radical.tools">Home</a>
+      <a class="site-nav-btn active" href="https://radical.tools/usecases.html">Use cases</a>
+      <a class="site-nav-btn" href="https://radical.tools/manual.html">Docs</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-btn" href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a class="site-nav-btn primary" href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg></a>
+      <button type="button" class="site-nav-icon" data-theme-toggle aria-label="Toggle theme"></button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ── Head ── -->
+    <section class="hero uc-hero">
+      <div class="eyebrow">
+        <span class="eyebrow-tag">Use cases</span>
+        <span class="sep">/</span><span>one model, six ways to use it</span>
+      </div>
+      <h1>Six ways teams use it,<br /><span class="accent">from a better drawing to a harness for the code.</span></h1>
+      <p class="lead">
+        Start with the lightest one and grow into the next when you need it. <em>It is the same model all the way.</em>
+      </p>
+      <!-- the ladder: one step per use case, in its colour -->
+      <ol class="uc-ladder">
+        <li style="--c:var(--c-studio)"><a href="#modelling"><span class="uc-step">1</span>A modelling tool instead of a drawing tool</a></li>
+        <li style="--c:var(--c-code)"><a href="#requirements"><span class="uc-step">2</span>Requirements that stay attached</a></li>
+        <li style="--c:var(--c-hub)"><a href="#organisation"><span class="uc-step">3</span>One language across the organisation</a></li>
+        <li style="--c:var(--c-forge)"><a href="#no-blank-page"><span class="uc-step">4</span>No blank page</a></li>
+        <li style="--c:var(--c-cli)"><a href="#code-follows"><span class="uc-step">5</span>The architecture the code follows</a></li>
+        <li style="--c:var(--c-mcp)"><a href="#vibe-coding"><span class="uc-step">6</span>A harness for vibe coding</a></li>
+      </ol>
+    </section>
+
+    <!-- ── 1 ── -->
+    <section class="uc" id="modelling" style="--c:var(--c-studio)" aria-labelledby="uc1-title">
+      <div class="uc-head">
+        <span class="uc-num">1</span>
+        <div>
+          <h2 id="uc1-title">A modelling tool instead of a drawing tool</h2>
+          <p class="uc-tagline">Boxes that know what they are, and diagrams that follow the model.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>Your architecture lives in draw.io, Miro or slides, and the same box is drawn on six diagrams, each one a separate truth.</p>
+          <h3>How</h3>
+          <p>Radical Studio alone, in the browser, as a desktop app, or inside VS Code next to the code. Keep the model in the browser, in one <code>.radical</code> file, or as a folder of Markdown files in git. No account, nothing uploaded.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Studio</span><span class="uc-part">Radical Model</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>Rename once, every diagram follows.</b> An element is one thing; diagrams are views of it.</li>
+            <li><b>Studio knows what a box is.</b> A component sits inside a container, a container inside a system, and only the relations the metamodel allows can be drawn.</li>
+            <li><b>One model, eight readings.</b> C4 structure diagrams, a wiki of articles, a table of a subset, a treemap, a flow of numbered steps, a matrix, an explore view, a Warnier diagram.</li>
+            <li><b>Search and explore.</b> Find any element and see what it reaches, level by level.</li>
+            <li><b>Present a walk through the architecture.</b> Slides over views, each with its camera and collapse state, played full screen, with a URL per slide.</li>
+            <li><b>Share it as a file or a folder.</b> Send the <code>.radical</code> file or commit the folder; whoever opens it starts in Viewer, read-only.</li>
+            <li><b>Evolve it.</b> Milestones freeze as-is and target states and compare them; a change is an edit, not a redraw.</li>
+            <li><b>Bring what you have.</b> A Structurizr DSL workspace imports as a C4 model.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio →</a>
+        <a href="manual.html#documents">Models &amp; files →</a>
+        <a href="manual.html#views">The eight view types →</a>
+        <a href="manual.html#presenting">Viewer &amp; Presenter →</a>
+      </p>
+    </section>
+
+    <!-- ── 2 ── -->
+    <section class="uc" id="requirements" style="--c:var(--c-code)" aria-labelledby="uc2-title">
+      <div class="uc-head">
+        <span class="uc-num">2</span>
+        <div>
+          <h2 id="uc2-title">Requirements that stay attached to the architecture</h2>
+          <p class="uc-tagline">A replacement for the Confluence wiki for the business analyst, with every page written from the model.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>A business analyst keeps needs, requirements and processes in Confluence pages that drift apart, and a rename means hunting through twenty of them.</p>
+          <h3>How</h3>
+          <p>The governance part of the Radical metamodel, with or without a C4 model beside it: needs in the stakeholder's words, EARS requirements, Gherkin scenarios, processes, state machines, mockups and screen flows. Write it on the wiki page or in a table; Studio splits a sentence into its fields, and the AI assistant derives EARS requirements from a pasted brief, each linked to the need it came from.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Studio</span><span class="uc-part">Radical Model</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>Relations are real.</b> A requirement derives from a need, a scenario verifies it, a component satisfies it. Follow the chain in either direction.</li>
+            <li><b>Change in one place.</b> Rename, split or re-link, and every page, table and diagram follows.</li>
+            <li><b>The wiki is the model.</b> Every article is written from it, so it is never out of date, and it is edited in place.</li>
+            <li><b>Paste a list</b> of requirements and see what its lines will become before they are added.</li>
+            <li><b>Completeness is checked as you write.</b> Requirements without a scenario, needs without requirements, in the Inspector.</li>
+            <li><b>Processes, states and mockups</b> sit next to the requirements they refine, not in another tool.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#governance">Needs, requirements, decisions →</a>
+        <a href="manual.html#view-wiki">Writing the model on a wiki page →</a>
+        <a href="manual.html#processes">Processes →</a>
+        <a href="manual.html#mockups">Mockups &amp; screen flows →</a>
+      </p>
+    </section>
+
+    <!-- ── 3 ── -->
+    <section class="uc" id="organisation" style="--c:var(--c-hub)" aria-labelledby="uc3-title">
+      <div class="uc-head">
+        <span class="uc-num">3</span>
+        <div>
+          <h2 id="uc3-title">One language across the organisation</h2>
+          <p class="uc-tagline">Your own language for the architecture, with standards and decisions in one place and a view per audience.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>Standards, decisions and principles are spread over wiki pages, decks and chat, and every team reads a different version.</p>
+          <h3>How</h3>
+          <p>A metamodel of your own: the element types and relations your organisation talks in, with their forms and glossary. ADRs with status, context, consequences and alternatives, linked to the elements they constrain; fitness functions that check them; concern packs from the Radical Hub for the decisions every system has to make; a view per audience, from one model.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Studio</span><span class="uc-part">Radical Hub</span><span class="uc-part">Radical Model</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>A view for each stakeholder.</b> C4 diagrams for engineers, wiki articles for product owners, tables and matrices for compliance. Nobody keeps a second copy.</li>
+            <li><b>A common language, defined by you.</b> The metamodel editor adds the types your organisation needs, such as a capability, a team or a standard, with a form for each and the rules between them. The Glossary explains them on every wiki.</li>
+            <li><b>Decisions next to what they govern.</b> An ADR constrains the systems it applies to and supersedes the one it replaces.</li>
+            <li><b>Recurring decisions settled once.</b> A Hub pack asks a few questions and brings the need, requirements, decision and checks, all linked.</li>
+            <li><b>As-is, interim and target in one deck.</b> Milestones freeze each stage of a transformation and compare them; Presenter plays the roadmap.</li>
+            <li><b>What is still undecided, listed.</b> The Hub's critic names each concern a model of this shape has to settle and no accepted decision covers, which is an audit on demand.</li>
+            <li><b>Viewer is a sandbox.</b> Stakeholders can drag, collapse and explore without changing anything.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#metamodel">The metamodel editor →</a>
+        <a href="https://hub.radical.tools" target="_blank" rel="noopener">Explore the Hub →</a>
+        <a href="manual.html#governance">ADRs &amp; fitness functions →</a>
+        <a href="manual.html#milestones">Milestones →</a>
+        <a href="manual.html#presenting">Viewer &amp; Presenter →</a>
+      </p>
+    </section>
+
+    <!-- ── 4 ── -->
+    <section class="uc" id="no-blank-page" style="--c:var(--c-forge)" aria-labelledby="uc4-title">
+      <div class="uc-head">
+        <span class="uc-num">4</span>
+        <div>
+          <h2 id="uc4-title">No blank page: a model from a brief, or from the code you already have</h2>
+          <p class="uc-tagline">A reviewable first draft in an hour, for a system that does not exist yet or one nobody wrote down.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>A new system to design for a proposal, an RFP or a discovery workshop, with a deck due next week. Or an old system nobody documented, and the people who knew it are gone.</p>
+          <h3>How</h3>
+          <p>For a new system, Radical Forge turns the brief into requirements, a domain model, scenarios, states, processes, mockups and a C4 model, one stage at a time, with the Hub's concern packs settled on the way. For an existing one, a coding agent connected through MCP reads the repository and writes the model; the Inspector says what is still missing, and the Hub's critic which concerns nobody has decided.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Forge</span><span class="uc-part">Radical MCP</span><span class="uc-part">Radical Hub</span><span class="uc-part">Radical Studio</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>A first draft in an hour, not a week.</b> Requirements, domain, scenarios and the C4 model, linked, from one description.</li>
+            <li><b>Every stage asks before it writes</b> and can be regenerated; nothing lands in the model that you did not accept.</li>
+            <li><b>The decisions settled early.</b> The packs the brief calls for come in with their requirements and checks before the first box is drawn.</li>
+            <li><b>A deck the same day.</b> The stage views go straight into Presenter for the workshop or the proposal.</li>
+            <li><b>An existing system, written down before the next change,</b> not after: the agent reads the code and files what it finds as containers, components and relations.</li>
+            <li><b>The gaps named.</b> The Inspector lists what the draft lacks, so the review has an agenda.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#forge">Radical Forge →</a>
+        <a href="manual.html#mcp">An agent on your repository →</a>
+        <a href="manual.html#inspector">The Inspector →</a>
+        <a href="manual.html#presenting">Presenter →</a>
+      </p>
+    </section>
+
+    <!-- ── 5 ── -->
+    <section class="uc" id="code-follows" style="--c:var(--c-cli)" aria-labelledby="uc5-title">
+      <div class="uc-head">
+        <span class="uc-num">5</span>
+        <div>
+          <h2 id="uc5-title">The architecture the code follows</h2>
+          <p class="uc-tagline">One source of truth from need to test, for people and for agents, checked in CI.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>You want the architecture to be the single source of truth from need to test, for people and for AI agents, and to know when the code drifts from it.</p>
+          <h3>How</h3>
+          <p>The whole family. The model as a Markdown folder in the repository, Studio to shape it, the MCP server for the agents, <code>radical check</code> in CI, the Inspector to read the result.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Studio</span><span class="uc-part">Radical MCP</span><span class="uc-part">Radical CLI</span><span class="uc-part">Radical Model</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>One source of truth for humans and agents.</b> The agent reads the architecture, decisions and requirements through MCP before it writes code, and updates the model when the design changes.</li>
+            <li><b>CI checks the implementation against the model.</b> <code>radical check</code> reads the test reports and verifies that the tests scenarios and fitness functions name exist and pass. A gap above its baseline fails the build.</li>
+            <li><b>Model health on every change.</b> Consistency, Completeness, Traceability and Decisions as percentages, with goals and baselines; the ratchet only tightens.</li>
+            <li><b>Changes on branch.</b> What a pull request changed in the model, with what the tests say about each requirement and decision.</li>
+            <li><b>One plane.</b> Need → requirement → component → scenario → test, traced end to end.</li>
+            <li><b>Proven on itself.</b> This repository keeps its own architecture this way and checks it on every push.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#mcp">The MCP server →</a>
+        <a href="manual.html#cli">radical check in CI →</a>
+        <a href="manual.html#inspector">The Inspector →</a>
+        <a href="manual.html#changes">Changes on branch →</a>
+        <a href="https://github.com/radicaltools/radical.tools/tree/main/architecture" target="_blank" rel="noopener">Our own model →</a>
+      </p>
+    </section>
+
+    <!-- ── 6 ── -->
+    <section class="uc" id="vibe-coding" style="--c:var(--c-mcp)" aria-labelledby="uc6-title">
+      <div class="uc-head">
+        <span class="uc-num">6</span>
+        <div>
+          <h2 id="uc6-title">A harness for vibe coding</h2>
+          <p class="uc-tagline">Model first, code second, and CI that notices when they part.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>You build fast with agents and still want to know, a month later, what you have.</p>
+          <h3>How</h3>
+          <p>Radical Forge builds the model first, from a brief, one reviewable stage at a time: requirements, domain model, fitness functions, scenarios, state machines, processes, mockups, C4 model, review. Concern packs from the Hub are settled at the start. Then the agent works through MCP, and CI gates the code with the CLI.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Forge</span><span class="uc-part">Radical Hub</span><span class="uc-part">Radical MCP</span><span class="uc-part">Radical CLI</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>Model first, code second.</b> The agent starts from a map, not a blank repository.</li>
+            <li><b>Lower cost.</b> The agent reads the model instead of re-reading the codebase every session. Shorter context, fewer wrong turns, less code thrown away.</li>
+            <li><b>Best practices by default.</b> Packs bring the decisions you would forget, such as who is calling, how long personal data is kept and what happens when a partner is down, with their requirements and checks. Each rests on named sources, OWASP ASVS, NIST, the GDPR, Google SRE, and the catalogue refuses a pack without them.</li>
+            <li><b>Guardrails that fail CI.</b> Fitness functions and scenarios name tests, so drift shows up in the build, not in production.</li>
+            <li><b>You stay in control.</b> Every Forge stage asks first and can be regenerated; proposals are yours to accept.</li>
+            <li><b>The model keeps up with the code,</b> so what you have a month later is still written down.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#forge">Radical Forge →</a>
+        <a href="https://hub.radical.tools" target="_blank" rel="noopener">Concern packs →</a>
+        <a href="manual.html#mcp">Connect your agent →</a>
+        <a href="manual.html#cli">Gate it in CI →</a>
+      </p>
+    </section>
+
+    <!-- ── Start anywhere ── -->
+    <section class="uc-start" aria-labelledby="start-title">
+      <h2 id="start-title">Start anywhere</h2>
+      <ol class="uc-path">
+        <li style="--c:var(--c-studio)"><b>Open Studio</b> in the browser and draw.</li>
+        <li style="--c:var(--c-code)"><b>Add the requirements</b> when the diagrams need a why.</li>
+        <li style="--c:var(--c-hub)"><b>Put the folder in git</b> when the team needs it.</li>
+        <li style="--c:var(--c-forge)"><b>Connect your agent</b> when the code should follow.</li>
+      </ol>
+      <p class="lead">It is one model the whole way.</p>
+      <div class="cta-row">
+        <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio in the browser</a>
+        <a class="cta ghost" href="manual.html">Read the guide</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span>Radical.Tools — MIT licensed. Built on the <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a>.</span>
+    <span class="footer-links">
+      <a href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a href="usecases.html">Use cases</a>
+      <a href="manual.html">Guide</a>
+      <a href="reference.html">Reference</a>
+      <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </footer>
+
+</body>
+</html>

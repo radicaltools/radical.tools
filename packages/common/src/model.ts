@@ -35,7 +35,9 @@ import {
   newPseudostateKind,
   outgoingTransitionCount,
   transitionRefusal,
+  refIds,
   type Metamodel,
+  type PropertyDef,
 } from './metamodel'
 
 export interface ModelState {
@@ -477,7 +479,31 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   }
   forgetRelationsInSequences(state, relations)
   forgetNodesInViews(state, removed)
+  forgetNodesInReferences(state, removed)
   return removed
+}
+
+/** Takes the `removed` elements out of the reference properties of what is
+ *  left (a transition's trigger event and the events it raises, a
+ *  requirement's precondition state): left in, each pointed at nothing and
+ *  Validation reported it. A single reference goes, a list keeps the rest. */
+export function forgetNodesInReferences(state: ModelState, removed: Set<string>): void {
+  const mm = state.metamodel
+  if (!mm || !removed.size) return
+  const forget = (item: Record<string, unknown>, props: PropertyDef[] | undefined): void => {
+    for (const p of props ?? []) {
+      if (p.type !== 'ref' || item[p.key] === undefined) continue
+      const ids = refIds(item[p.key])
+      if (!ids.some((id) => removed.has(id))) continue
+      const kept = ids.filter((id) => !removed.has(id))
+      if (kept.length) item[p.key] = p.multiple ? kept : kept[0]
+      else delete item[p.key]
+    }
+  }
+  for (const node of Object.values(state.c4Nodes)) forget(node as unknown as Record<string, unknown>, mm.nodeTypes[node.type]?.properties)
+  for (const rel of Object.values(state.c4Relations)) {
+    if (rel.relationType) forget(rel as unknown as Record<string, unknown>, mm.relationTypes[rel.relationType]?.properties)
+  }
 }
 
 /** Takes the steps of the `removed` relations out of every sequence, each

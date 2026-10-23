@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Try it in the browser](https://img.shields.io/badge/try%20it-studio.radical.tools-387bf3)](https://studio.radical.tools)
 
-[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Manual](https://radical.tools/manual.html) · [Reference](https://radical.tools/reference.html)
+[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Use cases](https://radical.tools/usecases.html) · [Guide](https://radical.tools/manual.html) · [Reference](https://radical.tools/reference.html)
 
 <img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="apps/web/screenshots/demo.gif" width="880">
 
@@ -177,7 +177,7 @@ apps/
   mcp/            @radicaltools/mcp: local stdio MCP server for model folders
   cli/            @radicaltools/cli: check, diff, hooks and Confluence wiki export
                   (metamodel, completeness, the tests it names)
-  web/            Marketing site and manual (radical.tools)
+  web/            Marketing site, guide and reference (radical.tools)
 packages/
   common/         @radical/common: C4 + metamodel types, file formats, query
                   language, AI tool catalogue. No UI dependencies
@@ -219,12 +219,12 @@ npm run test:reports
 npm run fuzz
 npm run fuzz -- night --survey
 
-# The manual's screenshots (apps/web/screenshots), light and dark
+# The guide's screenshots (apps/web/screenshots), light and dark
 npm run docs:screenshots
 ```
 
 See [apps/e2e/README.md](apps/e2e/README.md) for the e2e suite, its
-screenshot baselines and the manual's screenshots.
+screenshot baselines and the guide's screenshots.
 
 ## Contributing
 

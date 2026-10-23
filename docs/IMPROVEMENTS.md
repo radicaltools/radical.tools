@@ -139,7 +139,11 @@ Status as of 2026-09-29, after the monorepo restructuring (branch
    are only in the JSON. Running the generator drops them and moves every
    element, which changes every figure in the manual. Either bring the
    generator up to date (and make its ELK layout match the current one) or
-   retire it and treat the JSON as the source.
+   retire it and treat the JSON as the source. Since 2026-10-23 the JSON
+   is further ahead: the domain model, two state machines, eight concern
+   packs, the view folders and a Smart Layout of every Structure view were
+   made through the MCP server on a Markdown folder of the sample and
+   converted back. Retiring the generator is the only sensible way now.
 
 ### Bugs found by the e2e suite (2026-09-29)
 
@@ -657,7 +661,37 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     Fixed 2026-10-23: the e2e runner in `crucible.json` passes `--reporter
     line`, which takes the place of the config's reporters, so the gate's
     runs write no report.
-49. **A preview server another worktree left behind serves its build to
+49. **A concern pack bound to two systems draws a hairball.** Refreshing
+    the sample (2026-10-23), *Encryption in transit and at rest* bound to
+    Core Banking Platform and Digital Channels has 26 elements and 51
+    relations in its view, every ADR, fitness function and requirement tied
+    to both systems; Smart Layout leaves 76 crossings and runs again find
+    nothing better. The view could draw the bound elements once at the
+    side, or group what the pack brought by kind.
+50. **No tool turns a `.radical` document into a folder and back.** To edit
+    the sample through the MCP server it had to be serialised to a
+    Markdown folder and read back with a script calling
+    `serializeToMdFolder` / `deserializeFromMdFolder`. A `radical convert`
+    command (JSON ↔ folder) would do it, and keep the metamodel out when
+    it is the preset.
+51. **A view made over MCP gets a uuid for its id.** The sample's views have
+    ids such as `view-ctx` that tests and links name; the nine views made
+    by `create_view` and the eight of the concern packs got uuids, renamed
+    by hand. `create_view` could take an `id` for the new view.
+52. **`search_model` rejects plain text.** `search_model` with
+    "Deleted elements leave views" answers "Unsupported query"; only the
+    query language works (`LIST NODES WHERE label CONTAINS …`). A query
+    that is not the language could be searched as text.
+53. **Smart Layout on the sample's All elements takes half a minute.** The
+    refreshed sample has 283 elements and 450 relations (78 and 125
+    before); one Smart Layout on All elements takes ~30 s on an M-series
+    Mac and ~60 s on a CI runner, and it is the model new users open.
+    `smartLayoutKeeps.test.ts` timed out at 120 s on CI and now runs on a
+    fixture of the old sample (`apps/studio/tests/fixtures/fintech-sample-78-nodes.json`).
+    It no longer fails without the fix it was written for (the relaxed
+    candidate scored with fitted frames, PR #180), on the old sample or the
+    new: that fix has no test that guards it now.
+54. **A preview server another worktree left behind serves its build to
     the next.** Outside CI the Playwright config reuses a server already on
     its port (`reuseExistingServer`). In the fix round of run 176
     (2026-10-23) one worktree's first e2e run got another worktree's sample
