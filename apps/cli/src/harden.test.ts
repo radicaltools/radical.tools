@@ -137,6 +137,64 @@ describe('radical harden --gate', () => {
     expect(await state(cwd)).toEqual(before)
   })
 
+  // An e2e test runs against a build: made once with the fix, it passed
+  // without the fix too, so the gate proved nothing (IMPROVEMENTS item 46).
+  it('builds before the runs without and with the fix, so a test of the build judges the fix', async () => {
+    const cwd = await repository()
+    await writeFile(join(cwd, 'build.mjs'), "import { copyFileSync, mkdirSync } from 'node:fs'\nmkdirSync('out', { recursive: true })\ncopyFileSync('src/calc.mjs', 'out/calc.mjs')\nconsole.log('built')\n")
+    await writeFile(join(cwd, 'tests/built.test.mjs'), "import { add } from '../out/calc.mjs'\nprocess.exit(add(2, 3) === 5 ? 0 : 1)\n")
+    await writeFile(join(cwd, '.git/info/exclude'), 'out/\nbuild.mjs\n')
+    // The build there is the one made with the fix.
+    execFileSync(process.execPath, ['build.mjs'], { cwd })
+    await writeFile(join(cwd, 'crucible.json'), JSON.stringify({ runners: [{ files: 'tests/', command: ['node', '{file}'] }] }))
+    const stale = await run(cwd, '--gate', '--test', 'tests/built.test.mjs › adds', '--base', 'main')
+    expect(stale.code).toBe(1)
+    expect(stale.out).toContain('1. Without the fix: passed. ✖')
+
+    await writeFile(join(cwd, 'crucible.json'), JSON.stringify({ runners: [{ files: 'tests/', command: ['node', '{file}'], build: [['node', 'build.mjs']] }] }))
+    const { code, out } = await run(cwd, '--gate', '--test', 'tests/built.test.mjs › adds', '--base', 'main')
+    expect(code).toBe(0)
+    expect(out).toContain('Building without the fix: node build.mjs')
+    expect(out).toContain('1. Without the fix: failed (exit 1), as it should.')
+    expect(out).toContain('Building with the fix: node build.mjs')
+    expect(out).toContain('2. With the fix: passed.')
+    // The build left is the one with the fix.
+    expect(await readFile(join(cwd, 'out/calc.mjs'), 'utf8')).toContain('a + b')
+  })
+
+  // Five Playwright processes start their web servers on the same fixed
+  // ports; one with --repeat-each runs them side by side (item 46).
+  it("makes the runs at once one run of the runner's repeat command", async () => {
+    const cwd = await repository()
+    await writeFile(join(cwd, 'tests/repeat.mjs'), [
+      "import { appendFileSync } from 'node:fs'",
+      "appendFileSync('repeats.log', process.argv.slice(2).join(' ') + '\\n')",
+      "const { add } = await import('../src/calc.mjs')",
+      'process.exit(add(2, 3) === 5 ? 0 : 1)',
+    ].join('\n') + '\n')
+    await writeFile(join(cwd, '.git/info/exclude'), 'repeats.log\n')
+    await writeFile(join(cwd, 'crucible.json'), JSON.stringify({ runners: [{ files: 'tests/', command: ['node', '{file}'], repeat: ['node', 'tests/repeat.mjs', '{file}', '--repeat-each', '{runs}'] }] }))
+    const { code, out } = await run(cwd, '--gate', '--test', 'tests/calc.test.mjs › adds', '--base', 'main', '--runs', '4')
+    expect(code).toBe(0)
+    expect(out).toContain('3. 4 runs at once, as one run of the repeat command: passed.')
+    expect(await readFile(join(cwd, 'repeats.log'), 'utf8')).toBe('tests/calc.test.mjs --repeat-each 4\n')
+  })
+
+  // Vitest's -t and Playwright's -g match a test's title with its describe
+  // blocks joined by spaces; "describe › name" matched nothing (item 47).
+  it('finds a test named with its describe block', async () => {
+    const cwd = await repository()
+    await writeFile(join(cwd, 'tests/named.mjs'), [
+      "if (process.argv[2] !== 'calc adds \\\\(2, 3\\\\)') { console.log('no test matches ' + process.argv[2]); process.exit(3) }",
+      "const { add } = await import('../src/calc.mjs')",
+      'process.exit(add(2, 3) === 5 ? 0 : 1)',
+    ].join('\n') + '\n')
+    await writeFile(join(cwd, 'crucible.json'), JSON.stringify({ runners: [{ files: 'tests/', command: ['node', 'tests/named.mjs', '{name}'] }] }))
+    const { code, out } = await run(cwd, '--gate', '--test', 'tests/calc.test.mjs › calc › adds (2, 3)', '--base', 'main', '--runs', '2')
+    expect(out).not.toContain('no test matches')
+    expect(code).toBe(0)
+  })
+
   // Ctrl+C sends SIGINT to the whole process group, the test with it; kill
   // sends SIGTERM to radical alone. Node ended on either without running
   // the finally that puts the fix back.

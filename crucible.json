@@ -4,7 +4,11 @@
     { "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }
   ],
   "runners": [
-    { "files": "apps/e2e/", "cwd": "apps/e2e", "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }
+    {
+      "files": "apps/e2e/", "cwd": "apps/e2e", "command": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--reporter", "line"],
+      "build": [["npm", "run", "build:web"], ["npm", "run", "build:hub"]],
+      "repeat": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--repeat-each", "{runs}", "--workers", "{runs}", "--reporter", "line"]
+    }
   ],
   "explore": {
     "rounds": ".crucible/rounds",

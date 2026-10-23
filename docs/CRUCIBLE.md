@@ -82,8 +82,20 @@ for its folder, else with `npx vitest run` in its package:
 
 ```json
 "runners": [{ "files": "apps/e2e/", "cwd": "apps/e2e",
-              "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }]
+              "command": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--reporter", "line"],
+              "build": [["npm", "run", "build:web"], ["npm", "run", "build:hub"]],
+              "repeat": ["npx", "playwright", "test", "{file}", "-g", "{name}",
+                         "--repeat-each", "{runs}", "--workers", "{runs}", "--reporter", "line"] }]
 ```
+
+A test of a build (an e2e test runs the web build) needs that build made
+from the files it runs on: the runner's `build`, run from `crucible.json`'s
+folder, is made before the run without the fix and before the run with it.
+Its `repeat` makes the runs at once one run of that command (`{runs}` the
+number), for tests whose runs cannot go side by side, as Playwright's web
+servers on fixed ports cannot. Name the test with its describe blocks when it
+has them (`"<file> › <describe> › <name>"`): Vitest's `-t` and Playwright's
+`-g` get the title with its parts joined by spaces, as they match it.
 
 Exit status: 0 done (the gate passed), 1 the gate failed, 2 `radical harden`
 could not run or was interrupted.
