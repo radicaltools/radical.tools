@@ -164,7 +164,7 @@
           <li><strong>Top bar</strong> — Undo and Redo, Back and Forward with a History, Quick Search in the middle (<kbd>⌘/Ctrl+P</kbd>), the Forge button, and the four perspectives: <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> plays slide decks, <em>Inspector</em> shows what <code>radical check</code> says. The logo opens <em>About Radical Studio</em> with the version to quote in a bug report.</li>
           <li><strong>Activity rail</strong> — along the left edge, as in VS Code. At the top the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot the menus: <em>Models</em>, the <em>metamodel editor</em>, <em>AI</em>, <em>Export</em> (PNG, SVG, clipboard) and <em>Settings</em> (theme, Smart fit, line style, the connect key, wizards on create).</li>
           <li><strong>Left panel</strong> — the open section. <em>Views</em> starts with <em>All elements</em>, the whole model as a table, then one card per view, in folders if you made any. Drag its inner edge to widen it.</li>
-          <li><strong>Canvas</strong> — the palette stands down its left side: drag a type onto the canvas. At the bottom: <em>Fit All</em>, zoom and <em>Smart Layout</em>. The chip in the top-left names the view, or the milestone you are looking at. Zoomed far out, elements are drawn as coloured blocks with large names so a big model stays readable.</li>
+          <li><strong>Canvas</strong> — the palette stands down its left side: drag a type onto the canvas. At the bottom: <em>Fit All</em>, zoom, <em>Focus</em> and <em>Smart Layout</em>. The chip in the top-left names the view, or the milestone you are looking at. Zoomed far out, elements are drawn as coloured blocks with large names so a big model stays readable.</li>
           <li><strong>Properties card</strong> — double-click an element, a relation or a row (or pick a sequence) and its card slides over the right side; a click only selects, and an open card then shows what you select, until <em>✕</em> or a click on the empty canvas. The head has the type, the name and where it sits; each attribute is a row you edit in place; long texts are Markdown sections. The foot stays in sight: <em>Views</em> lists every view that shows the element (a click opens it there), then the element's <em>Actions</em>, then <em>Delete</em>.</li>
         </ul>
         <div class="doc-tip">
@@ -331,7 +331,7 @@
         <h2>Selections &amp; actions</h2>
         <ul>
           <li>Click selects one element. A click with the special key adds more (or takes one out); a drag with it on the empty canvas draws a box.</li>
-          <li>A selection brings its relations forward: the rest of the canvas dims, and the camera frames what stays. A click on the empty canvas clears it.</li>
+          <li>A selection brings its relations forward: the rest of the canvas dims, and the camera frames what stays. A click on the empty canvas clears it. <em>Focus</em>, at the bottom of the canvas, turns this off while you lay a view out, and back on; the browser remembers it.</li>
           <li>One element's actions are in its card. With several selected, the <strong>selection bar</strong> over the canvas offers what applies to them all.</li>
         </ul>
         <ul>
@@ -559,7 +559,7 @@
           <li>Select a single container for <em>Align children…</em>, which does the same for what is inside it.</li>
         </ul>
         <h3>Fit</h3>
-        <p><em>Fit All</em> frames the visible elements. <em>Smart Fit</em> (Settings) keeps the camera fitted as the diagram changes. Scroll to zoom, drag the background to pan.</p>
+        <p><em>Fit All</em> frames the visible elements. <em>Smart Fit</em> (Settings) keeps the camera fitted as the diagram changes, zoomed in no further than 100 %; an element added where everything stays in sight leaves the camera where it is. Scroll to zoom, drag the background to pan.</p>
       </section>
 
       <section class="doc-section" id="navigation">

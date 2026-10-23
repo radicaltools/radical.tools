@@ -28,6 +28,31 @@ test('a selected node brings its relations forward and dims the rest', async ({ 
   await expect(dimmedEdges).toHaveCount(0)
 })
 
+test('the Focus switch on the canvas turns the dimming off and on, and is remembered', async ({ page, studio }) => {
+  await studio.openSampleWhole()
+  const dimmedNodes = page.locator('.react-flow__node.focus-dim')
+  const focus = page.getByRole('toolbar', { name: 'Canvas' }).getByRole('button', { name: 'Focus' })
+  await expect(focus).toHaveAttribute('aria-pressed', 'true')
+  await focus.click()
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+
+  const accounts = () => studio.nodeByLabel('Accounts Service').first()
+  await accounts().click()
+  await expect(page.locator('.react-flow__node.selected')).toHaveCount(1)
+  await expect(dimmedNodes).toHaveCount(0)
+  await expect(page.locator('.react-flow__edge g.focus-dim')).toHaveCount(0)
+
+  // Off in this browser, also after a reload.
+  await page.reload()
+  await studio.ready()
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  await focus.click()
+  await expect(focus).toHaveAttribute('aria-pressed', 'true')
+  await studio.canvas.click({ position: { x: 8, y: 8 } })
+  await accounts().click()
+  await expect.poll(() => dimmedNodes.count()).toBeGreaterThan(0)
+})
+
 test('a selected relation brings forward itself and its two ends', async ({ page, studio }) => {
   await studio.openSampleWhole()
   await studio.nodeByLabel('Accounts Service').first().click()

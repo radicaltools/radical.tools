@@ -3250,6 +3250,11 @@ interface DiagramStore {
   fitAll: () => void
   /** Flips the Smart fit setting and saves it to the studio settings. */
   toggleAutoFit: () => void
+  /** Focus: whether a selection dims the rest of the canvas and the camera
+   *  frames it (canvasFocus.ts). */
+  selectionFocus: boolean
+  /** Flips Focus and saves it to the studio settings. */
+  toggleSelectionFocus: () => void
   zoomIn: () => void
   zoomOut: () => void
 
@@ -3889,6 +3894,7 @@ export const useDiagramStore = create<DiagramStore>()(
       relationTypeChoice: null,
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
+      selectionFocus: loadStudioSettings().selectionFocus,
       canUndo: false,
       canRedo: false,
       snapshots: initSnapshots,
@@ -6934,6 +6940,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // asked how to save changes nobody had made.
         if (moved) get()._markMilestoneEdit()
         if (!landing) _dragLanded()
+      },
+
+      toggleSelectionFocus() {
+        const next = !get().selectionFocus
+        set((state) => { state.selectionFocus = next })
+        saveStudioSettings({ ...loadStudioSettings(), selectionFocus: next })
       },
 
       setConnectionModifier(mod) {

@@ -4,7 +4,7 @@
 // their other ends stay as they are, and the rest of the canvas is dimmed, as
 // in the metamodel diagram. A selected relation focuses itself and its two
 // ends. Containers of a focused element stay undimmed, so it is clear where
-// the element lives.
+// the element lives. Focus, a switch on the canvas, turns it off.
 
 import type { Edge, Node } from 'reactflow'
 
@@ -14,6 +14,8 @@ interface FocusState {
   rfEdges: readonly Edge[]
   selectedNodeIds: readonly string[]
   selectedEdgeId: string | null
+  /** Focus, the switch on the canvas: off, a selection focuses nothing. */
+  selectionFocus?: boolean
 }
 
 export interface CanvasFocus {
@@ -89,6 +91,7 @@ let last: {
 
 /** The focus of the canvas now, computed once per change of what it reads. */
 export function selectCanvasFocus(s: FocusState): CanvasFocus | null {
+  if (s.selectionFocus === false) return null
   if (
     !last ||
     last.nodes !== s.rfNodes ||

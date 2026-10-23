@@ -261,7 +261,7 @@ test.describe('writing in the wiki', () => {
   })
 })
 
-test('a wiki with a filter offers only the types its chain shows', async ({ page, studio }) => {
+test('a wiki with a filter offers only the types its chain shows, at the top only its first level\'s', async ({ page, studio }) => {
   // The chain of the viewpoint Specification: needs, the requirements
   // derived from them, their scenarios and mockups.
   await studio.seedDocument(JSON.stringify({
@@ -281,10 +281,16 @@ test('a wiki with a filter offers only the types its chain shows', async ({ page
   const start = page.locator('.wiki-write-start')
   await expect(start.getByRole('button', { name: 'Needs', exact: true })).toBeVisible()
   await expect(start.getByRole('button', { name: 'Software systems', exact: true })).toHaveCount(0)
+  // A requirement goes under the need it is derived from, a scenario under
+  // its requirement: not at the top.
+  await expect(start.getByRole('button', { name: 'Requirements', exact: true })).toHaveCount(0)
+  await expect(start.getByRole('button', { name: 'Scenarios', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Add element' }).click()
   await expect(page.locator('.wiki-add-item', { hasText: /^Need$/ })).toBeVisible()
-  await expect(page.locator('.wiki-add-item', { hasText: /^Software System$/ })).toHaveCount(0)
-  await expect(page.locator('.wiki-add-item', { hasText: /^Group$/ })).toHaveCount(0)
+  await expect(page.locator('.wiki-add-item')).toHaveCount(1)
+  await page.locator('.wiki-add-item', { hasText: /^Need$/ }).click()
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(page.locator('.wiki-title')).toHaveText('New Need')
 })
 
 // Needs, and a requirement derived from Audit, in a view of the chain

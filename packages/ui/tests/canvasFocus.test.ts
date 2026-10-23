@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest'
 import type { Edge, Node } from 'reactflow'
-import { canvasFocus } from '../src/store/canvasFocus'
+import { canvasFocus, selectCanvasFocus } from '../src/store/canvasFocus'
 
 const node = (id: string, parentNode?: string): Node => ({ id, parentNode, position: { x: 0, y: 0 }, data: {} })
 const edge = (id: string, source: string, target: string): Edge => ({ id, source, target })
@@ -12,6 +12,13 @@ const sorted = (s: Set<string>) => [...s].sort()
 
 it('nothing selected: no focus', () => {
   expect(canvasFocus(nodes, edges, [], null)).toBeNull()
+})
+
+it('focus off: no focus', () => {
+  const state = { rfNodes: nodes, rfEdges: edges, selectedNodeIds: ['user'], selectedEdgeId: null }
+  expect(selectCanvasFocus({ ...state, selectionFocus: false })).toBeNull()
+  // On again, the same selection is focused.
+  expect(sorted(selectCanvasFocus({ ...state, selectionFocus: true })!.nodes)).toEqual(['shop', 'user', 'web'])
 })
 
 it('a selected node focuses its relations, their other ends and the containers they sit in', () => {

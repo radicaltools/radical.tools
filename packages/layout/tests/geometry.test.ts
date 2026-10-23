@@ -246,7 +246,7 @@ describe('settleMovedNodes', () => {
     settleMovedNodes(nodes, ['a'], modelCanvas(nodes))
     // Beside the first, in its row; the grid grows wider than tall, so a
     // third starts the next row.
-    expect([nodes.a.x, nodes.a.y]).toEqual([nodes.c.x + nodes.c.width + 20, nodes.c.y])
-    expect(gridSlotIn(nodes, 'b', { width: nodes.a.width, height: nodes.a.height })).toEqual({ x: nodes.c.x, y: nodes.c.y + nodes.c.height + 20 })
+    expect([nodes.a.x, nodes.a.y]).toEqual([nodes.c.x + nodes.c.width + 60, nodes.c.y])
+    expect(gridSlotIn(nodes, 'b', { width: nodes.a.width, height: nodes.a.height })).toEqual({ x: nodes.c.x, y: nodes.c.y + nodes.c.height + 60 })
   })
 })
