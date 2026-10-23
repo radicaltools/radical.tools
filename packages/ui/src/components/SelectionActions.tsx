@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activeLayoutConstraints, childrenInView, hideRefusal, shownExploration, useDiagramStore } from '../store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
-import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
+import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName } from '@radical/common/metamodel'
 import { defaultGridColumns, type C4Node } from '@radical/common/c4'
 import { checkPatchRelation, relationTypeOnMove } from '@radical/common/model'
@@ -276,7 +276,7 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
               onClick={() => {
                 const next = !keepOrder
                 setKeepOrder(next)
-                saveStudioSettings({ ...loadStudioSettings(), alignKeepsOrder: next })
+                updateStudioSettings({ alignKeepsOrder: next })
               }}>
               <span>
                 <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

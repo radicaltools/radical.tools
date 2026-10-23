@@ -53,6 +53,31 @@ test('the Focus switch on the canvas turns the dimming off and on, and is rememb
   await expect.poll(() => dimmedNodes.count()).toBeGreaterThan(0)
 })
 
+// F-0039: the Settings menu read the settings once and wrote them all back
+// with its own change, turning Focus and Smart fit on again.
+test('a Settings switch keeps Focus and Smart fit as the user left them', async ({ page, studio }) => {
+  await studio.openSample()
+  await studio.designer()
+  const focus = page.getByRole('toolbar', { name: 'Canvas' }).getByRole('button', { name: 'Focus' })
+  await focus.click()
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Smart fit/ }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('menuitemcheckbox', { name: /Smart fit/ })).toContainText('(off)')
+  const wizard = page.locator('label.app-menu-row', { hasText: 'Wizard on create' }).locator('input')
+  await wizard.uncheck()
+  await expect(wizard).not.toBeChecked()
+  await page.keyboard.press('Escape')
+
+  await page.reload()
+  await studio.ready()
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('menuitemcheckbox', { name: /Smart fit/ })).toContainText('(off)')
+  await expect(wizard).not.toBeChecked()
+})
+
 test('a selected relation brings forward itself and its two ends', async ({ page, studio }) => {
   await studio.openSampleWhole()
   await studio.nodeByLabel('Accounts Service').first().click()
@@ -111,6 +136,60 @@ test('the camera frames a selection and goes back when it is cleared', async ({ 
   await studio.canvas.click({ position: { x: 8, y: 8 } })
   await studio.settle()
   expect(await transform()).toBe(chosen)
+})
+
+// F-0040: with Focus off a click on an element moved the camera all the
+// same, back to the one from before an earlier framing.
+test('with Focus off a click on an element leaves the camera where it is', async ({ page, studio }) => {
+  await studio.openSampleWhole()
+  const transform = () => page.locator('.react-flow__viewport').getAttribute('style')
+  const before = await transform()
+  await studio.nodeByLabel('Accounts Service').first().click()
+  await studio.settle()
+  const framed = await transform()
+  expect(framed).not.toBe(before)
+
+  const focus = page.getByRole('toolbar', { name: 'Canvas' }).getByRole('button', { name: 'Focus' })
+  await focus.click()
+  await expect(focus).toHaveAttribute('aria-pressed', 'false')
+  // Another element in sight, where nothing covers it.
+  const other = await page.evaluate(() => {
+    for (const n of Array.from(document.querySelectorAll('.react-flow__node:not(.selected)'))) {
+      const r = n.getBoundingClientRect()
+      const x = r.x + r.width / 2
+      const y = r.y + r.height / 2
+      if (x < 360 || y < 80 || x > innerWidth - 40 || y > innerHeight - 80) continue
+      if (document.elementFromPoint(x, y)?.closest('.react-flow__node') === n) return { x, y, id: n.getAttribute('data-id') }
+    }
+    return null
+  })
+  expect(other).not.toBeNull()
+  await page.mouse.click(other!.x, other!.y)
+  await expect(page.locator(`.react-flow__node.selected[data-id="${other!.id}"]`)).toHaveCount(1)
+  await studio.settle()
+  expect(await transform()).toBe(framed)
+  // Nor does a click on the empty canvas move it.
+  await studio.canvas.click({ position: { x: 8, y: 8 } })
+  await expect(page.locator('.react-flow__node.selected')).toHaveCount(0)
+  await studio.settle()
+  expect(await transform()).toBe(framed)
+})
+
+// F-0041: a click on the empty canvas while the framing still flew stopped
+// the camera half-way, and it stayed there.
+test('a click on the empty canvas during the framing flight brings back the camera from before', async ({ page, studio }) => {
+  await studio.openSampleWhole()
+  const viewport = page.locator('.react-flow__viewport')
+  const before = await viewport.getAttribute('style')
+  const box = (await studio.nodeByLabel('Accounts Service').first().boundingBox())!
+  const pane = (await studio.canvas.boundingBox())!
+  await page.mouse.click(box.x + 5, box.y + 5)
+  // Mid-flight: the camera has left, and not arrived.
+  await expect.poll(async () => (await viewport.getAttribute('style')) !== before, { intervals: [10] }).toBe(true)
+  await page.mouse.click(pane.x + 8, pane.y + 8)
+  await expect(page.locator('.react-flow__node.selected')).toHaveCount(0)
+  await studio.settle()
+  await expect.poll(() => viewport.getAttribute('style')).toBe(before)
 })
 
 // Item 224: on a hierarchy view the properties card covered Size, Levels and

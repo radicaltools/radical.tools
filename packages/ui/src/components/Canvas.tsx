@@ -769,6 +769,13 @@ function StructuralCanvas(): React.ReactElement {
     fitWindowUntilRef.current = 0
   }, [stopFit])
   const onUserMoveStart = useCallback((event: unknown) => { if (event) takeCamera() }, [takeCamera])
+  // When the user last moved the camera by hand (a wheel, a drag of the
+  // pane, the zoom buttons or keys). A press on the pane alone is no move,
+  // though React Flow reports it as a move start: the press of a click on
+  // the empty canvas must not count as moving the camera it brings back.
+  const userMovedCameraAtRef = useRef(0)
+  const markUserCamera = useCallback(() => { userMovedCameraAtRef.current = performance.now() }, [])
+  const onUserMove = useCallback((event: unknown) => { if (event) markUserCamera() }, [markUserCamera])
 
   /**
    * The camera for a view just opened (or a document just loaded), in one
@@ -825,9 +832,10 @@ function StructuralCanvas(): React.ReactElement {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    el.addEventListener('wheel', takeCamera, { capture: true, passive: true })
-    return () => el.removeEventListener('wheel', takeCamera, { capture: true })
-  }, [takeCamera])
+    const onWheel = () => { markUserCamera(); takeCamera() }
+    el.addEventListener('wheel', onWheel, { capture: true, passive: true })
+    return () => el.removeEventListener('wheel', onWheel, { capture: true })
+  }, [takeCamera, markUserCamera])
 
   // The camera functions this canvas put on window: taken off when it goes
   // (a slide without a canvas unmounts it), so no one moves a camera that
@@ -900,22 +908,49 @@ function StructuralCanvas(): React.ReactElement {
   // next element to pick must stay where it is). Only clicks on the canvas move it: a
   // search, a view switch or a slide that selects sets its own camera. Not
   // in a presentation, whose slides set the camera. A camera the user moved
-  // after the framing stays.
+  // after the framing stays. With Focus off a click moves no camera at all.
   const preFocusCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
   const framedCameraRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
+  // The framing's flight, and when the pointer last went down on the canvas:
+  // a press during the flight stops it half-way (d3 interrupts it), and the
+  // camera there is still the framing's, not one the user chose.
+  const framingFlightRef = useRef<{ from: number; until: number }>({ from: 0, until: 0 })
+  const pressedAtRef = useRef(0)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onPress = () => { pressedAtRef.current = performance.now() }
+    el.addEventListener('pointerdown', onPress, { capture: true, passive: true })
+    return () => el.removeEventListener('pointerdown', onPress, { capture: true })
+  }, [])
+  /** Whether the camera `now` is still the one the last framing set: where
+   *  it flew to, or on its way there when the click came, and not moved by
+   *  the user since. */
+  const stillFramed = useCallback((now: { x: number; y: number; zoom: number }) => {
+    const framed = framedCameraRef.current
+    const flight = framingFlightRef.current
+    if (!framed || userMovedCameraAtRef.current >= flight.from) return false
+    return sameCamera(now, framed) || (pressedAtRef.current >= flight.from && pressedAtRef.current <= flight.until)
+  }, [])
   const frameSelection = useCallback(() => {
     // After the click's selection has reached the store.
     requestAnimationFrame(() => {
       const instance = rfInstanceRef.current
       const s = useDiagramStore.getState()
       if (!instance || s.presentationActive) return
+      if (!s.selectionFocus) {
+        // Focus off: no framing, and no camera to bring back either.
+        preFocusCameraRef.current = null
+        framedCameraRef.current = null
+        return
+      }
       const focus = selectCanvasFocus(s)
       if (!focus) {
         const back = preFocusCameraRef.current
-        const framed = framedCameraRef.current
+        const framed = stillFramed(instance.getViewport())
         preFocusCameraRef.current = null
         framedCameraRef.current = null
-        if (back && framed && sameCamera(instance.getViewport(), framed)) {
+        if (back && framed) {
           suppressAutoFit(SELECTION_CAMERA_MS + 1800)
           instance.setViewport(back, { duration: SELECTION_CAMERA_MS })
         }
@@ -934,13 +969,17 @@ function StructuralCanvas(): React.ReactElement {
         if (left >= paletteCover() && top >= 0 && left + b.width * now.zoom <= free && top + b.height * now.zoom <= rect.height) return
       }
       // Framing again from the framed camera keeps the one from before.
-      if (!preFocusCameraRef.current || !framedCameraRef.current || !sameCamera(now, framedCameraRef.current)) {
+      if (!preFocusCameraRef.current || !stillFramed(now)) {
         preFocusCameraRef.current = now
       }
       framedCameraRef.current = null
-      frameNodes([...focus.frame], SELECTION_CAMERA_MS, Math.max(now.zoom, SELECTION_MAX_ZOOM), (vp) => { framedCameraRef.current = vp })
+      frameNodes([...focus.frame], SELECTION_CAMERA_MS, Math.max(now.zoom, SELECTION_MAX_ZOOM), (vp) => {
+        framedCameraRef.current = vp
+        const from = performance.now()
+        framingFlightRef.current = { from, until: from + SELECTION_CAMERA_MS }
+      })
     })
-  }, [frameNodes, suppressAutoFit])
+  }, [frameNodes, suppressAutoFit, stillFramed])
   // The camera to go back to belongs to the canvas it was taken on.
   useEffect(() => {
     preFocusCameraRef.current = null
@@ -1083,8 +1122,8 @@ function StructuralCanvas(): React.ReactElement {
 
     // Register global zoom helpers used by the Toolbar zoom buttons.
     if (unmountedRef.current) return
-    const zoomIn = () => { takeCamera(); instance.zoomIn({ duration: 300 }) }
-    const zoomOut = () => { takeCamera(); instance.zoomOut({ duration: 300 }) }
+    const zoomIn = () => { markUserCamera(); takeCamera(); instance.zoomIn({ duration: 300 }) }
+    const zoomOut = () => { markUserCamera(); takeCamera(); instance.zoomOut({ duration: 300 }) }
     registeredZoom.current = { zoomIn, zoomOut }
     ;(window as any).__radicalZoomIn  = zoomIn
     ;(window as any).__radicalZoomOut = zoomOut
@@ -1092,7 +1131,7 @@ function StructuralCanvas(): React.ReactElement {
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, placeCamera, frameNodes, computeFitTarget])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, markUserCamera, placeCamera, frameNodes, computeFitTarget])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -1780,6 +1819,7 @@ function StructuralCanvas(): React.ReactElement {
         onPaneClick={onPaneClick}
         onInit={onInit}
         onMoveStart={onUserMoveStart}
+        onMove={onUserMove}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!presentationActive}
