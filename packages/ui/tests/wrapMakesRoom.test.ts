@@ -142,6 +142,53 @@ describe('"Wrap into…"', () => {
     expect(after.customer).toEqual(before.customer)
   })
 
+  describe('on the other canvases (F-0047)', () => {
+    /** The bookstore with a second view of the same elements. */
+    const twoViews = (): DiagramData => {
+      const data = bookstore()
+      return { ...data, views: [...data.views!, { id: 'w', name: 'Other', nodeIds: ['customer', 'shop', 'web', 'api', 'db', 'bank'], positions: {} }] }
+    }
+
+    it('leaves a view that does not draw the new parent as it was', () => {
+      // The sample's Payments Domain after Fraud Detection was wrapped on
+      // Core Banking: 10 of its 15 elements moved on opening, and stayed so.
+      s().loadDiagram(twoViews())
+      s().setActiveView('w')
+      // Laid out a little differently from the view the wrap is made on.
+      s().updateNode('api', { x: 300, y: 130 })
+      const before = drawn()
+      s().setActiveView('v')
+      s().setSelectedNodeIds(['api'])
+      s().wrapSelectionInNewParent('group')
+      s().setActiveView('w')
+      const after = drawn()
+      expect(after[wrapper().id]).toBeUndefined()
+      expect(after).toEqual(before)
+      // As saved: a reload draws it so too.
+      s().setActiveView('v')
+      s().setActiveView('w')
+      expect(drawn()).toEqual(before)
+    })
+
+    it('draws the new parent round what it wraps where a canvas has it, and moves nothing it does not cover', () => {
+      // All elements draws every element.
+      s().loadDiagram(twoViews())
+      s().setActiveView(null)
+      s().updateNode('api', { x: 300, y: 130 })
+      const before = drawn()
+      s().setActiveView('v')
+      s().setSelectedNodeIds(['api'])
+      s().wrapSelectionInNewParent('group')
+      s().setActiveView(null)
+      const after = drawn()
+      expect(after.api).toEqual(before.api)
+      const g = after[wrapper().id]
+      expect(g).toEqual({ x: before.api.x - 30, y: before.api.y - 70, width: before.api.width + 60, height: before.api.height + 100 })
+      for (const id of ['customer', 'web', 'db', 'bank']) expect(after[id], id).toEqual(before[id])
+      expect(violations()).toEqual([])
+    })
+  })
+
   it('makes room as one undo step', () => {
     s().loadDiagram(bookstore())
     s().setActiveView('v')

@@ -69,7 +69,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
@@ -554,7 +554,7 @@ function _rebasedMilestones(change: StepChange, now: HistoryEntry): Pick<History
  *  as an add makes it. Overlaps Studio had already stay. Mutates `nodes`
  *  (copies); returns the ids moved. */
 function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string, C4Node>, sets: CanvasSets = {}, wasSets: CanvasSets = {}): string[] {
-  const before = canvasBoxes(was, wasSets.viewFilter, wasSets.viewCollapsedSet, wasSets.expandedSet)
+  const before = canvasBoxes(was, wasSets.viewFilter, wasSets.viewCollapsedSet, wasSets.expandedSet, wasSets.frames)
   const overlap = (a: CanvasBox, b: CanvasBox): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
   const sameParent = (a: C4Node, b: C4Node): boolean => (a.parentId ?? undefined) === (b.parentId ?? undefined)
   const placed = (n: C4Node): boolean => {
@@ -563,7 +563,7 @@ function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string,
   }
   const touched: string[] = []
   const settled = new Set<string>()
-  let canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
+  let canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet, sets.frames)
   const siblings = new Map<string, string[]>()
   for (const n of Object.values(nodes)) {
     if (!canvas.shown(n)) continue
@@ -594,16 +594,16 @@ function _settleOutsidePlaces(nodes: Record<string, C4Node>, was: Record<string,
         touched.push(id)
       }
       // What was pushed may reach past the parent's frame: it fits again.
-      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)))
+      if (grown.parentId && nodes[grown.parentId]) touched.push(...growWithRoom(nodes, grown.parentId, canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet, sets.frames)))
       settled.add(grown.id)
-      canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
+      canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet, sets.frames)
       continue
     }
     // The one the change placed; of two, the one Studio did not have.
     const mover = pa && pb ? (wb ? a : b) : pa ? a : b
     touched.push(mover.id, ...settleMovedNodes(nodes, [mover.id], canvas))
     settled.add(mover.id)
-    canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet)
+    canvas = canvasBoxes(nodes, sets.viewFilter, sets.viewCollapsedSet, sets.expandedSet, sets.frames)
   }
   return [...new Set(touched)]
 }
@@ -862,6 +862,10 @@ function _pushTextEdit(store: DiagramStore, key: string, edit: (state: model.Mod
 let _beforeDrag: HistoryEntry | null = null
 /** The exploration as it was when a drag on it began: its step (liveRelease). */
 let _explorationBeforeDrag: Exploration | null = null
+/** "Wrap into…" is making its new parent: the element added (empty) gets
+ *  no places on the other canvases yet; the wrap gives them once the parent
+ *  holds what it wraps (wrapSelectionInNewParent). */
+let _wrapping = false
 /** A drag is held: from liveGrab until its drop has landed (_dragLanded),
  *  in any perspective. */
 let _dragHeld = false
@@ -1256,7 +1260,7 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
   const view = viewById(state, state.activeViewId)
   const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  placeUnplaced(nodes, known, shown)
+  placeUnplaced(nodes, known, shown, undefined, { frames: viewFrames(view, nodes, relations) })
   const rootOf = (id: string): C4Node => {
     let n = nodes[id]
     while (n.parentId && nodes[n.parentId]) n = nodes[n.parentId]
@@ -1297,7 +1301,7 @@ function settleMoveOnShownCanvas(
   ids: readonly string[],
   oldParentIds: readonly string[],
 ): Record<string, C4Node> {
-  const { viewFilter, viewCollapsedSet, expandedSet } = activeCanvasSets(state)
+  const { viewFilter, viewCollapsedSet, expandedSet, frames } = activeCanvasSets(state)
   const shownNodes: Record<string, C4Node> = Object.fromEntries(Object.entries(state.c4Nodes).map(([id, n]) => [id, { ...n }]))
   // Fit as fitParentToChildren does, on the copy.
   const fit = (parentId: string): void => {
@@ -1309,7 +1313,7 @@ function settleMoveOnShownCanvas(
       x: c.x, y: c.y, width: effectiveNodeWidth(c, viewCollapsedSet, expandedSet), height: effectiveNodeHeight(c, viewCollapsedSet, expandedSet),
     }))))
   }
-  const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet)
+  const canvas = canvasBoxes(shownNodes, viewFilter, viewCollapsedSet, expandedSet, frames)
   // A new parent the canvas drew with nothing in it was drawn at its folded
   // size, whatever size it keeps: it grows from that, and makes room for
   // what it grows by. Measured at the size it kept, it shrank to what was
@@ -1333,7 +1337,7 @@ function settleMoveOnShownCanvas(
   }))
   const opened = canvasBoxes(shownNodes, viewFilter,
     viewCollapsedSet && new Set([...viewCollapsedSet].filter((id) => !foldsAbove.has(id))),
-    new Set([...(expandedSet ?? []), ...foldsAbove]))
+    new Set([...(expandedSet ?? []), ...foldsAbove]), frames)
   settleMovedNodes(shownNodes, ids, canvas, fit, opened)
   return shownNodes
 }
@@ -1375,6 +1379,7 @@ function showCanvasPositions(
   view: DiagramView | undefined,
   relations: Record<string, C4Relation>,
   live?: Record<string, C4Node>,
+  wrap?: { ids: ReadonlySet<string>; wrapped: string[] },
 ): string[] {
   // Only the view's own places are the live layout's (All elements', which
   // a view never laid out opens on, are the milestone's own).
@@ -1404,13 +1409,16 @@ function showCanvasPositions(
   // container none of whose children it shows.
   const childless = computeViewCollapsedSet(shown, nodes)
   const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  const placed = placeUnplaced(nodes, positions, shown, folded)
+  // The containers the view draws only to hold what it shows: a new one
+  // goes tightly round what it holds there, and nothing is astray in one.
+  const frames = viewFrames(view, nodes, relations)
+  const placed = placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
   // One whose parent got a place of its own too moved with it, at a place
   // that was not its own in it: it is placed in it now.
   const left = own.filter((id) => nodes[id] && !placed.includes(id))
   if (!left.length) return placed
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
-  return [...placed, ...placeUnplaced(nodes, known, shown, folded)]
+  return [...placed, ...placeUnplaced(nodes, known, shown, folded, { frames })]
 }
 
 /**
@@ -1454,13 +1462,15 @@ const liveWhileInMilestone = (state: Pick<DiagramStore, 'activeSnapshotId' | 'li
  * was made then and the live layout settled it with its surroundings:
  * opening a view moved elements no one had touched, and a parent grown
  * there lay over its neighbour. Not in a milestone, whose canvases are not
- * the live ones. Returns the positions to write, per canvas ('' for All
- * elements).
+ * the live ones. `wrap`: `ids` are new parents "Wrap into…" made, which
+ * go round what they wrap where each canvas has it (placeUnplaced). Returns
+ * the positions to write, per canvas ('' for All elements).
  */
 function placesOnOtherCanvases(
   state: Pick<DiagramStore, 'c4Nodes' | 'c4Relations' | 'views' | 'activeViewId' | 'activeSnapshotId' | 'defaultPositions' | 'defaultLayoutConstraints'>,
   ids: readonly string[],
   added: boolean,
+  wrap = false,
 ): Map<string, Record<string, NodePosition>> {
   const out = new Map<string, Record<string, NodePosition>>()
   const nodes = state.c4Nodes as Record<string, C4Node>
@@ -1487,7 +1497,9 @@ function placesOnOtherCanvases(
         known[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
       }
     }
-    if (!showCanvasPositions(copy, known, view, relations).length && known === positions) return
+    const wrapped: string[] = []
+    const wrapping = wrap ? { ids: new Set(touched), wrapped } : undefined
+    if (!showCanvasPositions(copy, known, view, relations, undefined, wrapping).length && !wrapped.length && known === positions) return
     // A row or column of that canvas holds there, as opening it (or a
     // reload) holds it (_enforceLayoutConstraints): the room made for the
     // place could put one of its members off the line, and a reload then
@@ -2295,6 +2307,8 @@ interface CanvasSets {
   viewFilter?: Set<string>
   viewCollapsedSet?: Set<string>
   expandedSet?: Set<string>
+  /** The containers it draws only to hold what it shows (viewFrames). */
+  frames?: Set<string>
 }
 
 /** The sets the canvas shown draws by (as _sync derives them): what the
@@ -2306,17 +2320,20 @@ function activeCanvasSets(state: Pick<DiagramStore, 'activeViewId' | 'views' | '
   const viewFilter = computeViewNodeSet(view, state.c4Nodes, state.c4Relations)
   const viewCollapsedSet = computeViewCollapsedSet(viewFilter, state.c4Nodes)
   for (const id of view.collapsedNodeIds ?? []) viewCollapsedSet.add(id)
-  return { viewFilter, viewCollapsedSet, expandedSet: viewExpandedSet(view, state.c4Nodes, state.c4Relations) }
+  const frames = viewFrames(view, state.c4Nodes, state.c4Relations)
+  return { viewFilter, viewCollapsedSet, expandedSet: viewExpandedSet(view, state.c4Nodes, state.c4Relations, frames), frames }
 }
 
 /** What a canvas draws (`viewFilter`, the collapsed sets) and at what
- *  size, as deriveRFNodes draws it. */
+ *  size, as deriveRFNodes draws it. Its `frames` (viewFrames) make no room
+ *  when they grow (CanvasShape.frame). */
 function canvasBoxes(
   nodes: Record<string, C4Node>,
   viewFilter?: Set<string>,
   viewCollapsedSet?: Set<string>,
   expandedSet?: Set<string>,
-): { shown: (n: C4Node) => boolean; boxOf: (n: C4Node) => CanvasBox } {
+  frames?: Set<string>,
+): CanvasShape {
   const shown = (n: C4Node): boolean => (!viewFilter || viewFilter.has(n.id)) && !isNodeHidden(n.id, nodes, viewCollapsedSet, expandedSet)
   const parents = new Set(Object.values(nodes).filter(shown).map((n) => n.parentId).filter(Boolean))
   const boxOf = (n: C4Node): CanvasBox => {
@@ -2324,7 +2341,7 @@ function canvasBoxes(
     const small = isContainerType(n.type) && (isEffectivelyCollapsed(n, viewCollapsedSet, expandedSet) || (!parents.has(n.id) && !n.collapsed))
     return { x: n.x, y: n.y, w: small ? COLLAPSED_WIDTH[n.type] : n.width, h: small ? COLLAPSED_HEIGHT[n.type] : n.height }
   }
-  return { shown, boxOf }
+  return frames?.size ? { shown, boxOf, frame: (n) => frames.has(n.id) } : { shown, boxOf }
 }
 
 /**
@@ -2474,6 +2491,8 @@ function deriveRFNodes(
     // where the model says. This used to push everything above 110 down,
     // so children the physics had settled at 60 jumped on every reload,
     // view switch and redo, and the canvas showed what the file did not.
+    // A frame the view draws only to hold what it shows has no header: a
+    // child at its top was drawn 50 px below where the live layout had it.
     let renderY = n.y
     if (n.parentId) {
       const parent = nodes[n.parentId]
@@ -2481,7 +2500,8 @@ function deriveRFNodes(
         parent &&
         isContainerType(parent.type) &&
         !isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet) &&
-        parentSet.has(parent.id)
+        parentSet.has(parent.id) &&
+        !frames?.has(parent.id)
       if (parentExpanded && renderY < LIVE_CHILD_TOP_MIN) {
         renderY = LIVE_CHILD_TOP_MIN
       }
@@ -3832,8 +3852,9 @@ export const useDiagramStore = create<DiagramStore>()(
 
     /** Gives `ids` (added, or else moved) their places on the other canvases
      *  (placesOnOtherCanvases). */
-    const _placeOnOtherCanvases = (ids: readonly string[], added = true): void => {
-      const places = placesOnOtherCanvases(get(), ids, added)
+    const _placeOnOtherCanvases = (ids: readonly string[], added = true, wrap = false): void => {
+      if (_wrapping) return
+      const places = placesOnOtherCanvases(get(), ids, added, wrap)
       if (places.size) set((state) => { writeOtherCanvases(state as DiagramStore, places) })
     }
 
@@ -5019,8 +5040,12 @@ export const useDiagramStore = create<DiagramStore>()(
         try {
         _asOneStep(() => {
         // Create the wrapper. addNode will re-validate metamodel; we already
-        // checked but it's a defensive double-check.
-        const newId = get().addNode({
+        // checked but it's a defensive double-check. It gets its places on
+        // the other canvases once it holds the selection (below).
+        _wrapping = true
+        let newId: string
+        try {
+          newId = get().addNode({
           type: parentTypeId,
           label: `New ${wrapperLabel}`,
           description: '',
@@ -5043,6 +5068,9 @@ export const useDiagramStore = create<DiagramStore>()(
             x: n.x - newX,
             y: n.y - newY,
           } as Partial<Omit<C4Node, 'id'>>)
+        }
+        } finally {
+          _wrapping = false
         }
 
         // What it wraps stays where it is drawn, and the wrapper hugs it
@@ -5088,6 +5116,12 @@ export const useDiagramStore = create<DiagramStore>()(
             inner = { x: a.x, y: a.y, w: a.width, h: a.height }
           }
         })
+        // On the other canvases it goes round what it wraps where each
+        // draws it (placeUnplaced): their places there are in the parent
+        // it went into. Placed as an element added, empty, it went beside
+        // its siblings there and took what it wraps along, and the canvas
+        // rearranged round it on opening (F-0047).
+        _placeOnOtherCanvases([newId], false, true)
         get()._sync()
 
         // Promote the new wrapper to the active selection.
@@ -6882,7 +6916,10 @@ export const useDiagramStore = create<DiagramStore>()(
             const shown = get().activeViewId ? get().views[get().activeViewId!] : undefined
             if (shown && (shown.kind ?? 'static') !== 'static' && !isExploration(shown)) return { nodes: {}, relations: {}, alignments: [], pinned: [] }
             const { nodes, relations, alignments } = layoutInputForView(get())
-            return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())) }
+            // The containers it draws only to hold what it shows take no
+            // part in the layout (F-0048). An exploration draws flat.
+            const frames = shownExploration(get()) ? [] : [...viewFrames(shown, get().c4Nodes, get().c4Relations)]
+            return { nodes, relations, alignments, pinned: pinnedNodeIds(activeLayoutConstraints(get())), frames }
           },
           onSettled: () => {
             set((state) => { state.liveLayoutMoving = false })

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { BATCH_CELL, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, modelCanvas, placeGhosts, placeNewNode, placeUnplaced, settleMovedNodes, gridSlotIn } from '../src/geometry'
-import { NODE_SIZES, type C4Node } from '@radical/common/c4'
+import { BATCH_CELL, WRAP_HEADER, WRAP_PAD, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, modelCanvas, placeGhosts, placeNewNode, placeUnplaced, settleMovedNodes, gridSlotIn } from '../src/geometry'
+import { COLLAPSED_HEIGHT, NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type, label: id, collapsed: false, x: 0, y: 0, ...NODE_SIZES[type as keyof typeof NODE_SIZES], ...extra }) as C4Node
@@ -124,6 +124,97 @@ describe('placeUnplaced', () => {
     const nodes = canvas()
     expect(placeUnplaced(nodes, known, new Set(['shop', 'web', 'api', 'search', 'part']))).toEqual(['search'])
     expect(nodes.mail).toMatchObject({ x: -900, y: 4000 })
+  })
+
+  it('measures a container with nothing in it at the size the canvas draws it (F-0049)', () => {
+    // A state dragged down inside its machine, which grew to hold it as
+    // drawn (folded, nothing in it): at its stored 320 × 220 its middle lay
+    // below the machine, and the next opening placed it afresh and freed
+    // it for the physics, which rearranged the whole machine.
+    const drawnH = COLLAPSED_HEIGHT.state
+    const nodes: Record<string, C4Node> = {
+      sm: n('sm', 'state-machine', 0, 0, 600, 500),
+      idle: n('idle', 'state', 30, 120, 320, 220, 'sm'),
+      refused: n('refused', 'state', 30, 500 - 30 - drawnH, 320, 220, 'sm'),
+    }
+    expect(500 - 30 - drawnH + 110).toBeGreaterThan(500)
+    expect(placeUnplaced(nodes, { sm: 1, idle: 1, refused: 1 })).toEqual([])
+    expect(nodes.refused).toMatchObject({ x: 30, y: 500 - 30 - drawnH })
+  })
+
+  it('takes no child for astray in a container the view does not draw (F-0049)', () => {
+    // A machine that grew past the frame of its domain, which the view
+    // draws only to hold it: nothing is drawn astray.
+    const nodes: Record<string, C4Node> = {
+      dom: n('dom', 'domain', 0, 0, 300, 200),
+      sm: n('sm', 'state-machine', 0, 0, 900, 700, 'dom'),
+      idle: n('idle', 'state', 30, 120, 170, 72, 'sm'),
+    }
+    const known = { dom: 1, sm: 1, idle: 1 }
+    const shown = new Set(['dom', 'sm', 'idle'])
+    expect(placeUnplaced(nodes, known, shown, undefined, { frames: new Set(['dom']) })).toEqual([])
+    expect(nodes.sm).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('lets a container the view does not draw grow without pushing its neighbours (F-0048)', () => {
+    // A view of entities: their domains are frames. One added on another
+    // canvas goes beside its siblings, and its domain grows round it; as a
+    // box of its own, that domain pushed the next one and what is in it.
+    const nodes: Record<string, C4Node> = {
+      a: n('a', 'domain', 0, 0, 520, 300),
+      a1: n('a1', 'entity', 30, 120, 170, 56, 'a'),
+      a2: n('a2', 'entity', 250, 120, 170, 56, 'a'),
+      fresh: n('fresh', 'entity', 3000, 3000, 170, 56, 'a'),
+      b: n('b', 'domain', 600, 0, 520, 300),
+      b1: n('b1', 'entity', 30, 200, 170, 56, 'b'),
+    }
+    const known = { a: 1, a1: 1, a2: 1, b: 1, b1: 1 }
+    const shown = new Set(Object.keys(nodes))
+    expect(placeUnplaced(nodes, known, shown, undefined, { frames: new Set(['a', 'b']) })).toEqual(['fresh'])
+    expect(nodes.a.width).toBeGreaterThan(600)
+    expect(nodes.b).toMatchObject({ x: 600, y: 0 })
+    expect(nodes.b1).toMatchObject({ x: 30, y: 200 })
+  })
+
+  describe('a new parent of what the canvas has places for ("Wrap into…" on another canvas, F-0047)', () => {
+    // API wrapped into a group on another canvas: here API still has its
+    // place in Bookstore, and the group none.
+    const wrapped = (): Record<string, C4Node> => ({
+      shop: n('shop', 'system', 0, 0, 860, 400),
+      web: n('web', 'webapp', 30, 120, 210, 140, 'shop'),
+      g: n('g', 'group', 500, 400, 360, 300, 'shop'),
+      api: n('api', 'component', 290, 120, 300, 200, 'g'),
+      db: n('db', 'database', 640, 155, 190, 130, 'shop'),
+    })
+    const known = { shop: 1, web: 1, api: 1, db: 1 }
+    const abs = (nodes: Record<string, C4Node>, id: string): { x: number; y: number } => {
+      let x = 0, y = 0
+      for (let cur: C4Node | undefined = nodes[id]; cur; cur = cur.parentId ? nodes[cur.parentId] : undefined) { x += cur.x; y += cur.y }
+      return { x, y }
+    }
+
+    it('draws the wrapped elements where they were, the new parent round them, and moves nothing else', () => {
+      const nodes = wrapped()
+      const out: string[] = []
+      expect(placeUnplaced(nodes, known, undefined, undefined, { wrap: new Set(['g']), wrapped: out })).toEqual([])
+      expect(out).toEqual(['g'])
+      expect(abs(nodes, 'api')).toEqual({ x: 290, y: 120 })
+      expect(nodes.g).toMatchObject({ x: 290 - WRAP_PAD, y: 120 - WRAP_PAD - WRAP_HEADER, width: 300 + 2 * WRAP_PAD, height: 200 + 2 * WRAP_PAD + WRAP_HEADER })
+      expect(nodes.shop).toMatchObject({ x: 0, y: 0, width: 860, height: 400 })
+      expect(nodes.web).toMatchObject({ x: 30, y: 120 })
+      expect(nodes.db).toMatchObject({ x: 640, y: 155 })
+    })
+
+    it('fits a new parent the view does not draw tightly round them', () => {
+      const nodes = wrapped()
+      const shown = new Set(['shop', 'web', 'g', 'api', 'db'])
+      expect(placeUnplaced(nodes, known, shown, undefined, { frames: new Set(['g']), wrap: new Set(['g']) })).toEqual([])
+      expect(abs(nodes, 'api')).toEqual({ x: 290, y: 120 })
+      expect(nodes.g).toMatchObject({ x: 290, y: 120, width: 300, height: 200 })
+      expect(nodes.shop).toMatchObject({ x: 0, y: 0, width: 860, height: 400 })
+      expect(nodes.web).toMatchObject({ x: 30, y: 120 })
+      expect(nodes.db).toMatchObject({ x: 640, y: 155 })
+    })
   })
 
   it('leaves a canvas with no positions at all alone', () => {

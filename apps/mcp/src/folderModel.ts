@@ -21,7 +21,7 @@ import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboundDecisions } from '@radical/common/concerns'
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { computeViewNodeSet, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
@@ -230,9 +230,10 @@ function settleViewFolds(before: DiagramData, after: DiagramData): void {
     if (!prev || !positions || (view.kind ?? 'static') !== 'static') continue
     const toggled = after.nodes.filter((n) => n.id in positions && old[n.id] && foldedOn(prev, old[n.id]) !== foldedOn(view, n))
     if (!toggled.length) continue
-    // The view's canvas: its places, folded as it folds them.
+    // The view's canvas: its places, folded as it folds them. Its frames
+    // (the containers it draws only to hold what it shows) make no room.
     const nodes: Record<string, C4Node> = Object.fromEntries(after.nodes.map((n) => [n.id, { ...n, ...positions[n.id], collapsed: foldedOn(view, n) }]))
-    const canvas = modelCanvas(nodes, computeViewNodeSet(view, model, relations))
+    const canvas = modelCanvas(nodes, computeViewNodeSet(view, model, relations), viewFrames(view, model, relations))
     for (const { id } of toggled) {
       const node = nodes[id]
       if (node.collapsed) {
