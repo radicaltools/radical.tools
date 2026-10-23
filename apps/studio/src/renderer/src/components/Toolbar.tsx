@@ -23,7 +23,7 @@ import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
 import {
   loadStudioSettings,
-  saveStudioSettings,
+  updateStudioSettings,
   STUDIO_SETTINGS_CHANGED_EVENT,
   type StudioSettings,
 } from '@radical/ui/studioSettings'
@@ -362,18 +362,18 @@ function AppMenu({
   const setDefaultEdgeStyle = useDiagramStore((s) => s.setDefaultEdgeStyle)
   const editable = useDiagramStore((s) => s.appMode === 'designer')
 
-  // Studio-wide preferences (localStorage, not part of the .radical file) —
-  // self-contained here the same way AI settings are self-contained in
-  // AISettingsModal: load once, persist + broadcast on change so any other
-  // mounted view picks it up live.
+  // Studio-wide preferences (localStorage, not part of the .radical file).
+  // A change writes only its own setting over the ones stored now: Focus and
+  // Smart fit are switched elsewhere (canvas controls, the store) after this
+  // menu has read them. Kept in step with those writers through their event.
   const [studioSettings, setStudioSettings] = useState<StudioSettings>(() => loadStudioSettings())
+  useEffect(() => {
+    const reload = () => setStudioSettings(loadStudioSettings())
+    window.addEventListener(STUDIO_SETTINGS_CHANGED_EVENT, reload)
+    return () => window.removeEventListener(STUDIO_SETTINGS_CHANGED_EVENT, reload)
+  }, [])
   const setNodeWizardOnCreate = useCallback((on: boolean) => {
-    setStudioSettings((prev) => {
-      const next = { ...prev, nodeWizardOnCreate: on }
-      saveStudioSettings(next)
-      window.dispatchEvent(new Event(STUDIO_SETTINGS_CHANGED_EVENT))
-      return next
-    })
+    setStudioSettings(updateStudioSettings({ nodeWizardOnCreate: on }))
   }, [])
 
   const run = (fn: () => void) => () => { setMenu(null); fn() }

@@ -93,7 +93,7 @@ import { documentBackend } from './documentBackend'
 import { type Exploration, type ExploreChoice, drawnAt, explorationLines, explorationLinks, explorationOf, flatNodes, foldable, folded, grown, isExploration, laidOut as layExploration, linkCounts, listedIds, newExploration, prunedExploration, viewPlaces, withExploreState, withoutExpansions } from './exploration'
 export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
-import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
+import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
 import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
@@ -6965,7 +6965,7 @@ export const useDiagramStore = create<DiagramStore>()(
       toggleSelectionFocus() {
         const next = !get().selectionFocus
         set((state) => { state.selectionFocus = next })
-        saveStudioSettings({ ...loadStudioSettings(), selectionFocus: next })
+        updateStudioSettings({ selectionFocus: next })
       },
 
       setConnectionModifier(mod) {
@@ -8992,7 +8992,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         const next = !get().autoFitActive
         set((state) => { state.autoFitActive = next })
-        saveStudioSettings({ ...loadStudioSettings(), smartFit: next })
+        updateStudioSettings({ smartFit: next })
         if (next) {
           _getFitViewFn()?.()  // start immediately (animated)
           const t = setInterval(() => {
