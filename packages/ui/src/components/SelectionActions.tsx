@@ -4,7 +4,7 @@ import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, saveStudioSettings } from '../studioSettings'
 import { isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName } from '@radical/common/metamodel'
 import { defaultGridColumns, type C4Node } from '@radical/common/c4'
-import { relationTypeOnMove } from '@radical/common/model'
+import { nestRefusal, relationTypeOnMove } from '@radical/common/model'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { useMenuKeys } from '../hooks/menuKeys'
 import { useOutsideClick } from '../hooks/useOutsideClick'
@@ -206,7 +206,11 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
       }
     }
     for (const id of ids) collect(id)
+    // The card's Parent rule (nestRefusal): not into an external element,
+    // nor where the move would then be refused (it listed both).
+    const modelState = { c4Nodes, c4Relations: {}, views: {}, activeViewId: null, metamodel }
     const allowedIn = (target: C4Node | undefined): boolean => nodes.every((n) => isPlacementAllowed(metamodel, n.type, target, c4Nodes))
+      && nestRefusal(modelState, ids, target?.id ?? null) === null
     const out: { id: string | null; label: string; path: string }[] = []
     if (parentId !== null && allowedIn(undefined)) out.push({ id: null, label: 'Canvas root', path: 'Canvas root' })
     for (const cand of Object.values(c4Nodes)) {

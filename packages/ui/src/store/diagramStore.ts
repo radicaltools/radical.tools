@@ -728,6 +728,15 @@ function slideMilestonesOf(presentations: Presentation[] | undefined): Record<st
   return links
 }
 
+/** Whether the model may be edited now: in Designer (and the metamodel
+ *  editor, which edits Designer's model), not in Viewer, Presenter or the
+ *  Inspector, nor while a presentation plays. Their canvases are put back on
+ *  the way out: a relation made or an element nested there was shown, with
+ *  its notices, and then lost unsaid. */
+export function editsModel(state: Pick<DiagramStore, 'appMode' | 'presentationActive'>): boolean {
+  return (state.appMode === 'designer' || state.appMode === 'metamodel') && !state.presentationActive
+}
+
 function _pushUndo(state: DiagramStore): void {
   // Undo belongs to Designer. What is collapsed or laid out in Viewer or
   // Presenter is put back on the way out and is no step of Designer's.
@@ -4683,6 +4692,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── relations ────────────────────────────────────────────────────────
       addRelation(rel) {
+        if (!editsModel(get())) return
         // Enforce metamodel relation rules: refuse to create a relation
         // whose (from, to) type pair is not permitted by the active
         // metamodel. Existing in-memory relations are left untouched and
@@ -4703,6 +4713,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       updateRelation(id, updates) {
+        if (!editsModel(get())) return
         const existing = get().c4Relations[id] as unknown as Record<string, unknown> | undefined
         if (!existing || Object.entries(updates).every(([k, v]) => existing[k] === v)) return
         // Moving an end obeys the same metamodel rules as adding a relation.
@@ -4718,6 +4729,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       moveRelationEnd(id, updates, relationType) {
+        if (!editsModel(get())) return
         const s = get()
         if (relationType) {
           // Kept: the type must join the new pair itself (checkPatchRelation
@@ -4741,6 +4753,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       removeRelation(id) {
+        if (!editsModel(get())) return
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.deleteRelation(state, id) })
@@ -4756,6 +4769,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       connectNodes(sourceId, targetId) {
         const s = get()
+        if (!editsModel(s)) return
         const source = s.c4Nodes[sourceId], target = s.c4Nodes[targetId]
         if (!source || !target || sourceId === targetId) return
         const label = (type: string) => s.metamodel?.nodeTypes[type]?.label ?? type
@@ -5157,6 +5171,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       reparentNodes(ids, newParentId, options) {
         const state0 = get()
+        if (!editsModel(state0)) return
         const nodes = ids
           .map((id) => state0.c4Nodes[id])
           .filter((n): n is C4Node => !!n)
@@ -6962,6 +6977,7 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       startConnection(sourceId) {
+        if (!editsModel(get())) return
         set((state) => { state.connectSource = sourceId })
       },
 

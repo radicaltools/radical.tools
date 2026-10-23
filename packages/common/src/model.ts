@@ -337,9 +337,31 @@ export function parentCandidates(state: ModelState, id: string): C4Node[] {
   const node = state.c4Nodes[id]
   if (!node) return []
   return Object.values(state.c4Nodes).filter((n) => n.id !== id
-    && (n.id === node.parentId || !n.external)
     && isParentAllowed(state.metamodel, node.type, n.type)
-    && (n.id === node.parentId || checkReparent(state, [id], n.id) === null))
+    && (n.id === node.parentId || nestRefusal(state, [id], n.id) === null))
+}
+
+/** Why the elements `ids`, whatever holds each now, may not all be moved
+ *  into `newParentId` (null = the top of the model), or null: the one rule
+ *  of the card's and the wiki's Parent pickers (parentCandidates) and of
+ *  the canvas's special key. What checkReparent takes, for those of each
+ *  parent, and no external element, which the model leaves as a box. Those
+ *  already there are left out (they stay where they are). */
+export function nestRefusal(state: ModelState, ids: string[], newParentId: string | null): string | null {
+  const moving = ids.map((id) => state.c4Nodes[id]).filter((n): n is C4Node => !!n && (n.parentId ?? null) !== newParentId)
+  if (moving.length === 0) return null
+  const parent = newParentId ? state.c4Nodes[newParentId] : undefined
+  if (parent?.external) {
+    const n = moving[0]
+    return `Cannot place ${typeLabel(state.metamodel, n.type)} "${n.label}" inside ${typeLabel(state.metamodel, parent.type)} "${parent.label}": it is external, a box that holds nothing of this model.`
+  }
+  const byParent = new Map<string, string[]>()
+  for (const n of moving) byParent.set(n.parentId ?? '', [...(byParent.get(n.parentId ?? '') ?? []), n.id])
+  for (const siblings of byParent.values()) {
+    const refused = checkReparent(state, siblings, newParentId)
+    if (refused) return refused
+  }
+  return null
 }
 
 /** Moves the nodes under `newParentId` (null = the root), keeping each one
