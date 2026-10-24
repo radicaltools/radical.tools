@@ -125,10 +125,10 @@ describe('Tidy, the finer points', () => {
   })
 
   it('a time budget stops the tidying with what was done', () => {
-    // A pile of 30 elements: more moves than fit in a budget of a moment.
+    // A chain of 30 elements on a grid: more moves than fit in a budget of a moment.
     const nodes: C4Node[] = [], relations: C4Relation[] = []
     for (let i = 0; i < 30; i++) {
-      nodes.push(node(`n${i}`, 'container', (i % 5) * 10, Math.floor(i / 5) * 10))
+      nodes.push(node(`n${i}`, 'container', (i % 5) * 400, Math.floor(i / 5) * 300))
       if (i) relations.push(rel(`n${i - 1}`, `n${i}`))
     }
     const reported: number[] = []
@@ -178,6 +178,32 @@ describe('Tidy, the finer points', () => {
     expect(result.tidy.after.overdraws).toBe(0)
     expect(result.tidy.after.bends).toBeLessThan(2)
   })
+
+  it('a large view or a pile gets a rough layout first', () => {
+    // 150 containers on a grid, linked across it so that the lines cross and run over elements:
+    // sketched first (persons on top, layers by flow), then tidied.
+    const nodes: C4Node[] = [], relations: C4Relation[] = []
+    for (let i = 0; i < 150; i++) {
+      nodes.push(node(`n${i}`, 'container', (i % 10) * 400, Math.floor(i / 10) * 300))
+      if (i) relations.push(rel(`n${(i * 7) % 150}`, `n${i}`))
+    }
+    const large = runTidyLayout(byId(nodes), byId(relations), { budgetMs: 1 })
+    expect(large.tidy.steps[0]?.kind).toBe('rough')
+    // A large view that reads well (a chain along the grid) starts from where it stands.
+    const calm = byId(nodes.map((n, i) => ({ ...n, x: (i % 10) * 400, y: Math.floor(i / 10) * 300 })))
+    const chain = byId(nodes.slice(1).map((n, i) => rel(`n${i}`, n.id)))
+    expect(runTidyLayout(calm, chain, { budgetMs: 1 }).tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
+    // A pile of a few elements too; a small view that stands apart starts from the canvas.
+    const pile = runTidyLayout(byId([node('a', 'system', 0, 0), node('b', 'system', 10, 10), node('c', 'system', 20, 20)]), byId([rel('a', 'b'), rel('b', 'c')]))
+    expect(pile.tidy.steps[0]?.kind).toBe('rough')
+    const small = runTidyLayout(byId([node('a', 'system', 0, 0), node('b', 'system', 600, 0), node('c', 'system', 0, 500)]), byId([rel('a', 'b'), rel('b', 'c')]))
+    expect(small.tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
+    // Nor round a selection, nor with pins: what stands stays.
+    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['n3'], budgetMs: 1 })
+    expect(around.tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
+    // Cut by its budget right after the sketch, it hands over nothing worse than the start.
+    expect(large.tidy.after.total).toBeLessThanOrEqual(large.tidy.before.total + 0.01)
+  }, 60_000)
 
   it('a row is reordered to uncross its lines', () => {
     // Four in a row above four below, the top row in reverse order: every line crosses.

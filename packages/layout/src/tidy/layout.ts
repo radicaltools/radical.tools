@@ -153,6 +153,8 @@ export class Layout {
     if (was.x === x0 && was.y === y0 && was.w === w && was.h === h) return
     this.set(id, { x: x0, y: y0, w, h, cx: x0 + w / 2, cy: y0 + h / 2 })
   }
+  /** Every frame fitted round its children again (after positions were set from outside). */
+  refit(): void { this.fitAll() }
   private fitAll(): void {
     const depth = (id: string): number => { let d = 0; for (let p = this.parentOf(id); p; p = this.parentOf(p)) d++; return d }
     for (const id of [...this.children.keys()].sort((a, b) => depth(b) - depth(a))) this.fit(id)
@@ -170,12 +172,36 @@ export class Layout {
     }
     return true
   }
+  /** Whether `id` lies on a sibling (overlapping boxes, not merely too close). */
+  overlaps(id: string): boolean {
+    const b = this.boxes.get(id)!
+    for (const o of this.childrenOf(this.parentOf(id))) {
+      if (o === id) continue
+      const r = this.boxes.get(o)!
+      if (b.x < r.x + r.w && r.x < b.x + b.w && b.y < r.y + r.h && r.y < b.y + b.h) return true
+    }
+    return false
+  }
   /** Whether every sibling group is clear: a frame grown by a move may lie on its neighbour. */
   allClear(ids: Iterable<string>): boolean {
     for (const id of ids) {
       for (let x: string | undefined = id; x; x = this.parentOf(x)) if (!this.clear(x)) return false
     }
     return true
+  }
+
+  /** The boxes put back as `positions()` gave them (parents before children). */
+  setPositions(p: PositionMap): void {
+    const depth = (id: string): number => { let d = 0; for (let x = this.parentOf(id); x; x = this.parentOf(x)) d++; return d }
+    for (const id of [...this.allIds].sort((a, b) => depth(a) - depth(b))) {
+      const q = p[id]
+      if (!q) continue
+      const parent = this.parentOf(id)
+      const pb = parent ? this.boxes.get(parent)! : { x: 0, y: 0 }
+      const b = this.boxes.get(id)!
+      const w = q.width ?? b.w, h = q.height ?? b.h
+      this.set(id, { x: pb.x + q.x, y: pb.y + q.y, w, h, cx: pb.x + q.x + w / 2, cy: pb.y + q.y + h / 2 })
+    }
   }
 
   /** Positions as the canvas keeps them: relative to the parent. */

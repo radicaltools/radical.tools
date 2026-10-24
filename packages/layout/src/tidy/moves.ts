@@ -13,16 +13,28 @@ import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf } from '.
 import type { Layout } from './layout'
 
 export interface Move {
-  kind: 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order'
+  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order'
   ids: string[]
   description: string
+  /** Tells apart moves of one kind on the same elements with the same description (the two axes of a slide). */
+  variant?: string
   /** Does it; false when it cannot be done (no room). */
   apply(l: Layout): boolean
 }
 
-/** The lines `id` is an end of, as the elements at the other end. */
+/** The lines `id` is an end of, as the elements at the other end (indexed once per set of lines). */
+const neighbourIndex = new WeakMap<Line[], Map<string, string[]>>()
 function neighbours(id: string, lines: Line[]): string[] {
-  return lines.filter((x) => x.a === id || x.b === id).map((x) => (x.a === id ? x.b : x.a))
+  let index = neighbourIndex.get(lines)
+  if (!index) {
+    index = new Map()
+    for (const x of lines) {
+      index.set(x.a, [...(index.get(x.a) ?? []), x.b])
+      index.set(x.b, [...(index.get(x.b) ?? []), x.a])
+    }
+    neighbourIndex.set(lines, index)
+  }
+  return index.get(id) ?? []
 }
 
 /** A free place for `id` nearest `(cx, cy)`, searched outward in rings
@@ -176,7 +188,8 @@ export function compactMoves(l: Layout, nodes: Record<string, C4Node>, lines: Li
   for (const id of l.ids()) byParent.set(l.parentOf(id), [...(byParent.get(l.parentOf(id)) ?? []), id])
   for (const siblings of byParent.values()) {
     // Satellites go with their anchors.
-    const movers = siblings.filter((id) => linked.has(id) && !l.fixed(id) && !siblings.some((o) => o !== id && satellitesOf(l, o, lines).includes(id)))
+    const satellites = new Set(siblings.flatMap((o) => satellitesOf(l, o, lines)))
+    const movers = siblings.filter((id) => linked.has(id) && !l.fixed(id) && !satellites.has(id))
     if (movers.length < 2) continue
     const cx = movers.reduce((s, id) => s + l.box(id)!.cx, 0) / movers.length
     const cy = movers.reduce((s, id) => s + l.box(id)!.cy, 0) / movers.length
@@ -184,7 +197,7 @@ export function compactMoves(l: Layout, nodes: Record<string, C4Node>, lines: Li
     for (const id of far) {
       for (const axis of ['x', 'y'] as const) {
         moves.push({
-          kind: 'closer', ids: [id],
+          kind: 'closer', ids: [id], variant: axis,
           description: `${nodes[id].label || id} drawn in`,
           apply: (lay) => slideTowards(lay, id, axis, axis === 'x' ? cx : cy, lines),
         })
@@ -225,12 +238,14 @@ function slideTowards(lay: Layout, id: string, axis: 'x' | 'y', to: number, line
   return lay.allClear(moved)
 }
 
-export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, lines: Line[]): Move[] {
+/** `only`: candidates for these elements alone (the ones the last move touched); none: for all. */
+export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, lines: Line[], only?: ReadonlySet<string>): Move[] {
   const moves: Move[] = []
   const label = (id: string) => nodes[id].label || id
+  const concerns = (ids: readonly string[]): boolean => !only || ids.some((id) => only.has(id))
 
   for (const id of l.ids()) {
-    if (l.fixed(id)) continue
+    if (l.fixed(id) || !concerns([id])) continue
     const role = l.role(id)
     const ns = neighbours(id, lines)
     const own = lines.filter((x) => x.a === id || x.b === id)
@@ -259,7 +274,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
         if (Math.abs(g1 - g2) < 2) continue
         const d = (g2 - g1) / 2
         moves.push({
-          kind: 'even', ids: [id],
+          kind: 'even', ids: [id], variant: axis,
           description: `${label(id)} midway between ${label(before)} and ${label(after)}`,
           apply: (lay) => lay.allClear(axis === 'x' ? slide(lay, id, d, 0, lines) : slide(lay, id, 0, d, lines)),
         })
@@ -438,7 +453,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
   // Drawn closer: slid along one axis towards what it relates to (or
   // towards its siblings) as far as it stays clear of them.
   for (const id of l.ids()) {
-    if (l.fixed(id)) continue
+    if (l.fixed(id) || !concerns([id])) continue
     const ns = neighbours(id, lines)
     const b = l.box(id)!
     // Loose elements are gathered, not drawn closer; a satellite goes with its anchor.
@@ -455,7 +470,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
       const want = axis === 'x' ? tx - b.cx : ty - b.cy
       if (Math.abs(want) < l.gapOf(l.parentOf(id))) continue
       moves.push({
-        kind: 'closer', ids: [id],
+        kind: 'closer', ids: [id], variant: axis,
         description: `${label(id)} closer to ${towards.length === 1 ? label(towards[0]) : 'the rest'}`,
         apply: (lay) => slideTowards(lay, id, axis, axis === 'x' ? tx : ty, lines),
       })
@@ -483,7 +498,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
         if (from === chain[i] && to !== first && !chain.includes(to) && l.parentOf(to) === l.parentOf(then)) chain.push(to)
       }
     }
-    if (chain.some((c) => l.fixed(c))) continue
+    if (chain.some((c) => l.fixed(c)) || !concerns([first, ...chain])) continue
     moves.push({
       kind: 'follow', ids: chain,
       description: x.axis === 'vertical' ? `${label(then)} under ${label(first)}: the line reads down` : `${label(then)} right of ${label(first)}: the line reads on`,
@@ -524,7 +539,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
 
   // A line that runs against its flow: its ends change places.
   for (const x of lines) {
-    if (l.parentOf(x.a) !== l.parentOf(x.b) || !againstFlow(l, x) || l.fixed(x.a) || l.fixed(x.b)) continue
+    if (l.parentOf(x.a) !== l.parentOf(x.b) || !againstFlow(l, x) || l.fixed(x.a) || l.fixed(x.b) || !concerns([x.a, x.b])) continue
     const [first, then] = x.flow === 'forward' ? [x.a, x.b] : [x.b, x.a]
     moves.push({
       kind: 'flow', ids: [x.a, x.b],
@@ -553,7 +568,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
         const b = l.box(id)!
         const row = siblings.filter((o) => Math.abs(axis === 'x' ? l.box(o)!.cy - b.cy : l.box(o)!.cx - b.cx) < STRAIGHT_TOLERANCE)
         for (const o of row) seen.add(o)
-        if (row.length < 3 || row.some((o) => l.fixed(o))) continue
+        if (row.length < 3 || row.some((o) => l.fixed(o)) || !concerns(row)) continue
         const inRow = new Set(row)
         const at = (o: string): number => (axis === 'x' ? l.box(o)!.cx : l.box(o)!.cy)
         const bary = (o: string): number => {
@@ -584,7 +599,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
   for (const siblings of byParent.values()) {
     for (let i = 0; i < siblings.length; i++) for (let j = i + 1; j < siblings.length; j++) {
       const a = siblings[i], b = siblings[j]
-      if (l.fixed(a) || l.fixed(b)) continue
+      if (l.fixed(a) || l.fixed(b) || !concerns([a, b])) continue
       if (!neighbours(a, lines).length && !neighbours(b, lines).length) continue
       // Neighbours only: within three mean sizes of each other.
       const ba = l.box(a)!, bb = l.box(b)!

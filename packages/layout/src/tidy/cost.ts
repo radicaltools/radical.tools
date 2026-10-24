@@ -19,7 +19,7 @@
 import type { C4Relation } from '@radical/common/c4'
 import { type LayoutFlow, relationLayoutHint } from '@radical/common/metamodel'
 import type { Layout } from './layout'
-import { allocatePorts } from '../portAllocator'
+import { distributePorts, pickSides } from '../portAllocator'
 import { orthogonalConnector, type Pt } from '../edgeRouting'
 import { Position } from '../side'
 
@@ -129,18 +129,38 @@ export function isStraight(index: CostIndex, line: Line): boolean {
   return Math.abs(m.ax - m.bx) < STRAIGHT_TOLERANCE || Math.abs(m.ay - m.by) < STRAIGHT_TOLERANCE
 }
 
-/** Where every line is drawn: between the ports Studio draws it from (the
- *  side nearest the other end; ports spread along a side several lines
- *  share), so a line judged straight here is drawn straight there. */
-export function portsOf(l: Layout, all: Line[]): Map<Line, LineGeom> {
-  const views = new Map<string, { id: string; positionAbsolute: { x: number; y: number }; width: number; height: number }>()
-  for (const id of l.ids()) { const b = l.box(id)!; views.set(id, { id, positionAbsolute: { x: b.x, y: b.y }, width: b.w, height: b.h }) }
-  const ports = allocatePorts(views, all.map((q) => ({ id: q.id, source: q.a, target: q.b })))
-  const onSide = new Map<string, number>()
-  for (const q of all) {
-    const p = ports.get(q.id)
-    if (p) for (const k of [`${q.a}|${p.sourceSide}`, `${q.b}|${p.targetSide}`]) onSide.set(k, (onSide.get(k) ?? 0) + 1)
-  }
+/** The ports every line is drawn from, kept up to date as elements move.
+ *  Studio picks each end's side by the other end (pickSides) and spreads
+ *  the ports along a side several lines share (distributePorts); a move
+ *  changes the ports of every line on the sides it touches, so those lines
+ *  are judged with it. */
+interface PortState {
+  sides: Map<Line, { s: Position; t: Position }>
+  /** `${node}|${side}` → the lines with a port on that side. */
+  buckets: Map<string, Set<Line>>
+  /** `S:${line id}` / `T:${line id}` → the port. */
+  points: Map<string, { x: number; y: number }>
+}
+const viewOf = (l: Layout, id: string) => { const b = l.box(id)!; return { id, positionAbsolute: { x: b.x, y: b.y }, width: b.w, height: b.h } }
+const bucketKey = (node: string, side: Position): string => `${node}|${side}`
+
+function allot(l: Layout, ports: PortState, key: string): void {
+  const [node, side] = key.split('|') as [string, Position]
+  const lines = ports.buckets.get(key)
+  if (!lines?.size) return
+  const entries = [...lines].map((q) => {
+    const other = q.a === node ? q.b : q.a
+    const ob = l.box(other)!
+    return { edgeId: `${q.a === node ? 'S' : 'T'}:${q.id}`, otherCenter: { x: ob.cx, y: ob.cy } }
+  })
+  for (const [k, pt] of distributePorts(viewOf(l, node), side, entries)) ports.points.set(k, pt)
+}
+
+function geomFor(l: Layout, ports: PortState, q: Line): LineGeom {
+  const a = l.box(q.a)!, b = l.box(q.b)!
+  const sides = ports.sides.get(q)
+  const sp = ports.points.get(`S:${q.id}`), tp = ports.points.get(`T:${q.id}`)
+  const ax = sp?.x ?? a.cx, ay = sp?.y ?? a.cy, bx = tp?.x ?? b.cx, by = tp?.y ?? b.cy
   const middle = (r: { x: number; y: number; w: number; h: number; cx: number; cy: number }, side: Position | undefined): { x: number; y: number } => {
     switch (side) {
       case Position.Left: return { x: r.x, y: r.cy }
@@ -150,19 +170,32 @@ export function portsOf(l: Layout, all: Line[]): Map<Line, LineGeom> {
       default: return { x: r.cx, y: r.cy }
     }
   }
-  const out = new Map<Line, LineGeom>()
-  for (const q of all) {
-    const p = ports.get(q.id)
-    const a = l.box(q.a)!, b = l.box(q.b)!
-    const ax = p?.sourcePoint.x ?? a.cx, ay = p?.sourcePoint.y ?? a.cy, bx = p?.targetPoint.x ?? b.cx, by = p?.targetPoint.y ?? b.cy
-    const ma = middle(a, p?.sourceSide), mb = middle(b, p?.targetSide)
-    const fan = !!p && ((onSide.get(`${q.a}|${p.sourceSide}`) ?? 1) > 1 || (onSide.get(`${q.b}|${p.targetSide}`) ?? 1) > 1)
-    // An orthogonal line runs out of each side and turns between the ports; a curved one is judged on its chord.
-    const path: Pt[] = l.edgeStyle === 'orthogonal' && p ? orthogonalConnector({ x: ax, y: ay }, p.sourceSide, { x: bx, y: by }, p.targetSide) : [{ x: ax, y: ay }, { x: bx, y: by }]
-    const xs = path.map((pt) => pt.x), ys = path.map((pt) => pt.y)
-    out.set(q, { ax, ay, bx, by, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), mid: { ax: ma.x, ay: ma.y, bx: mb.x, by: mb.y }, fan, path })
-  }
-  return out
+  const ma = middle(a, sides?.s), mb = middle(b, sides?.t)
+  const fan = !!sides && ((ports.buckets.get(bucketKey(q.a, sides.s))?.size ?? 1) > 1 || (ports.buckets.get(bucketKey(q.b, sides.t))?.size ?? 1) > 1)
+  // An orthogonal line runs out of each side and turns between the ports; a curved one is judged on its chord.
+  const path: Pt[] = l.edgeStyle === 'orthogonal' && sides ? orthogonalConnector({ x: ax, y: ay }, sides.s, { x: bx, y: by }, sides.t) : [{ x: ax, y: ay }, { x: bx, y: by }]
+  const xs = path.map((pt) => pt.x), ys = path.map((pt) => pt.y)
+  return { ax, ay, bx, by, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), mid: { ax: ma.x, ay: ma.y, bx: mb.x, by: mb.y }, fan, path }
+}
+
+/** The sides of one line, from where its ends stand; true when they changed (buckets updated). */
+function placeSides(l: Layout, ports: PortState, q: Line): boolean {
+  const { sSide, tSide } = pickSides(viewOf(l, q.a), viewOf(l, q.b))
+  const was = ports.sides.get(q)
+  if (was && was.s === sSide && was.t === tSide) return false
+  if (was) { ports.buckets.get(bucketKey(q.a, was.s))?.delete(q); ports.buckets.get(bucketKey(q.b, was.t))?.delete(q) }
+  ports.sides.set(q, { s: sSide, t: tSide })
+  for (const k of [bucketKey(q.a, sSide), bucketKey(q.b, tSide)]) { const set = ports.buckets.get(k); if (set) set.add(q); else ports.buckets.set(k, new Set([q])) }
+  return true
+}
+
+function portsOf(l: Layout, all: Line[]): { ports: PortState; geom: Map<Line, LineGeom> } {
+  const ports: PortState = { sides: new Map(), buckets: new Map(), points: new Map() }
+  for (const q of all) placeSides(l, ports, q)
+  for (const key of ports.buckets.keys()) allot(l, ports, key)
+  const geom = new Map<Line, LineGeom>()
+  for (const q of all) geom.set(q, geomFor(l, ports, q))
+  return { ports, geom }
 }
 
 /** How far an element's centre lies from the middle of what it relates
@@ -307,6 +340,7 @@ export function offConvention(l: Layout, id: string, lines: Line[]): number {
 
 /** The grids over the lines and the elements, built once per round of
  *  judging: what did not move stands where it was. */
+
 type Extent = [number, number, number, number]
 export interface CostIndex {
   all: Line[]
@@ -315,6 +349,7 @@ export interface CostIndex {
   lineIndex: Map<Line, number>
   /** Where each line is drawn, between its ports. */
   geom: Map<Line, LineGeom>
+  ports: PortState
   /** Where each line and box was put in its grid, to take it out when it moves. */
   lineAt: Map<Line, Extent>
   boxAt: Map<string, Extent>
@@ -329,7 +364,7 @@ export function buildIndex(l: Layout, all: Line[]): CostIndex {
   const lineIndex = new Map<Line, number>()
   const lineAt = new Map<Line, Extent>()
   const linesOf = new Map<string, Line[]>()
-  const geom = portsOf(l, all)
+  const { ports, geom } = portsOf(l, all)
   all.forEach((q, i) => {
     lineIndex.set(q, i)
     const g = geom.get(q)!
@@ -340,32 +375,49 @@ export function buildIndex(l: Layout, all: Line[]): CostIndex {
   const boxGrid = new Grid<string>(cell)
   const boxAt = new Map<string, Extent>()
   for (const id of l.ids()) { const r = l.box(id)!; const e: Extent = [r.x, r.y, r.x + r.w, r.y + r.h]; boxGrid.add(id, ...e); boxAt.set(id, e) }
-  return { all, lineGrid, boxGrid, lineIndex, geom, lineAt, boxAt, linesOf }
+  return { all, lineGrid, boxGrid, lineIndex, geom, ports, lineAt, boxAt, linesOf }
 }
 
 /** The index brought up to date for `ids` after they moved (or moved
- *  back). The ports are allotted again for every line: a side shared by
- *  several lines spreads them, so a line far from what moved may shift
- *  along its side. */
-export function updateIndex(l: Layout, index: CostIndex, ids: Iterable<string>): void {
-  let moved = false
+ *  back): their boxes in the grid, the sides and ports of their lines and
+ *  of every line sharing a side with those (a shared side spreads its
+ *  ports), and the grid of every line whose drawing changed. Returns the
+ *  lines drawn differently now: a move is judged with them. */
+export function updateIndex(l: Layout, index: CostIndex, ids: Iterable<string>): Set<Line> {
+  const changedLines = new Set<Line>()
+  const affected = new Set<Line>()
   for (const id of ids) {
     const r = l.box(id)!
     const e: Extent = [r.x, r.y, r.x + r.w, r.y + r.h]
     const was = index.boxAt.get(id)!
     if (was[0] === e[0] && was[1] === e[1] && was[2] === e[2] && was[3] === e[3]) continue
     index.boxGrid.remove(id, ...was); index.boxGrid.add(id, ...e); index.boxAt.set(id, e)
-    moved = true
+    for (const q of index.linesOf.get(id) ?? []) affected.add(q)
   }
-  if (!moved) return
-  index.geom = portsOf(l, index.all)
-  for (const q of index.all) {
-    const g = index.geom.get(q)!
+  if (!affected.size) return changedLines
+  const { ports } = index
+  const dirty = new Set<string>()
+  for (const q of affected) {
+    const was = ports.sides.get(q)
+    if (was) { dirty.add(bucketKey(q.a, was.s)); dirty.add(bucketKey(q.b, was.t)) }
+    placeSides(l, ports, q)
+    const now = ports.sides.get(q)!
+    dirty.add(bucketKey(q.a, now.s)); dirty.add(bucketKey(q.b, now.t))
+  }
+  const redraw = new Set<Line>(affected)
+  for (const key of dirty) { allot(l, ports, key); for (const q of ports.buckets.get(key) ?? []) redraw.add(q) }
+  for (const q of redraw) {
+    const g = geomFor(l, ports, q)
+    const was = index.geom.get(q)!
+    if (was.ax === g.ax && was.ay === g.ay && was.bx === g.bx && was.by === g.by && was.path.length === g.path.length && was.fan === g.fan) continue
+    index.geom.set(q, g)
+    changedLines.add(q)
     const e: Extent = [g.x0, g.y0, g.x1, g.y1]
-    const was = index.lineAt.get(q)!
-    if (was[0] === e[0] && was[1] === e[1] && was[2] === e[2] && was[3] === e[3]) continue
-    index.lineGrid.remove(q, ...was); index.lineGrid.add(q, ...e); index.lineAt.set(q, e)
+    const at = index.lineAt.get(q)!
+    if (at[0] === e[0] && at[1] === e[1] && at[2] === e[2] && at[3] === e[3]) continue
+    index.lineGrid.remove(q, ...at); index.lineGrid.add(q, ...e); index.lineAt.set(q, e)
   }
+  return changedLines
 }
 
 /** The cost of the whole layout. */
@@ -374,13 +426,14 @@ export function totalCost(l: Layout, lines: Line[]): CostParts {
 }
 
 /** The cost of the lines of `moved` elements and of what lies over or under them. */
-export function localCost(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>): number {
-  return localCostParts(l, lines, moved, index, roomy).total
+export function localCost(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>): number {
+  return localCostParts(l, lines, moved, index, roomy, extra).total
 }
 /** `roomy`: the elements whose room is judged (the moved ones and the
  *  siblings near where they were and where they are); judged before and
  *  after a move it must be the same set, so the caller may give it. */
-export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>): CostParts {
+/** `extra`: lines drawn differently by the move though their ends did not move (their ports shifted): judged with it. */
+export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>): CostParts {
   // The lines of what moved, of what it holds, and of the frames holding it (refitted, so their borders moved).
   const idx = index ?? buildIndex(l, lines)
   const own = new Set<string>()
@@ -391,6 +444,7 @@ export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<stri
   }
   const mineSet = new Set<Line>()
   for (const id of own) for (const q of idx.linesOf.get(id) ?? []) mineSet.add(q)
+  if (extra) for (const q of extra) mineSet.add(q)
   const mine = [...mineSet].sort((a, b) => idx.lineIndex.get(a)! - idx.lineIndex.get(b)!)
   const ids = new Set<string>()
   for (const m of moved) { ids.add(m); for (const d of l.descendants(m)) ids.add(d) }
