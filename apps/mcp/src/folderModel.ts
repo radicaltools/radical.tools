@@ -21,6 +21,7 @@ import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboundDecisions } from '@radical/common/concerns'
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
+import { runTidyLayout } from '@radical/layout/tidy'
 import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
@@ -607,21 +608,42 @@ export class FolderModel {
     // Studio's layout button does on it.
     if (view?.layoutMode === 'tree') return this.treeLayout(changed, nodes, view, input, constraints)
     let step = 0
-    const result = await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
-      if (options.signal?.aborted) throw new Error(CANCELLED)
-      const count = 'done' in p ? ` ${p.done}/${p.total}` : ''
-      options.onProgress?.({ progress: ++step, message: `Smart Layout: ${p.phase}${count}` })
-    }, { alignments: input.alignments, edgeStyle: view?.edgeStyle ?? changed.defaultEdgeStyle ?? 'curved' })
+    const edgeStyle = view?.edgeStyle ?? changed.defaultEdgeStyle ?? 'curved'
+    // Auto (the default) tidies the canvas move by move; a view set to
+    // Ensemble runs the twelve engines and ranks them, as Studio's button does.
+    const ensemble = view?.layoutMode === 'ensemble'
+    const result = ensemble
+      ? await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
+        if (options.signal?.aborted) throw new Error(CANCELLED)
+        const count = 'done' in p ? ` ${p.done}/${p.total}` : ''
+        options.onProgress?.({ progress: ++step, message: `Smart Layout: ${p.phase}${count}` })
+      }, { alignments: input.alignments, edgeStyle })
+      : (() => {
+        options.onProgress?.({ progress: ++step, message: 'Smart Layout: tidying' })
+        if (options.signal?.aborted) throw new Error(CANCELLED)
+        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: pinnedNodeIds(constraints) })
+      })()
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
-    if (result.keptCurrent) return { ok: true, text: 'Smart Layout: the current layout already scores best; nothing changed.' }
+    if (result.keptCurrent) {
+      // A view laid out for the first time keeps the places it has as its own.
+      if (view && !Object.keys(view.positions ?? {}).length) {
+        view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
+        return { ok: true, changed, text: `Smart Layout (${view.name}): nothing left to tidy; the view keeps its places.` }
+      }
+      const where = view ? ` (${view.name})` : ''
+      return { ok: true, text: ensemble ? `Smart Layout${where}: the current layout already scores best; nothing changed.` : `Smart Layout${where}: nothing left to tidy.` }
+    }
     applyLayoutPositions(nodes, result.winner.positions, input)
     resizeParentsBottomUp(nodes, input)
-    // Every element has a new place: pins (elements a Studio user dropped
-    // after a drag) go with the old ones.
-    const unpinned = pinnedNodeIds(constraints).length
-    if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
-    else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
+    // The ensemble gave every element a new place: pins (elements a Studio
+    // user dropped after a drag) go with the old ones. Tidy left the pinned
+    // elements where they are, so the pins stay.
+    const unpinned = ensemble ? pinnedNodeIds(constraints).length : 0
+    if (ensemble) {
+      if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
+      else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
+    }
     // The refit knows nothing of the alignments; put them back.
     applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     // All elements writes the nodes themselves (settleGeometry then syncs

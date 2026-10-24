@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { builtInC4Metamodel, metamodelChangeBreaks, propertyKeyProblem, validateModel, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, metamodelChangeBreaks, propertyKeyProblem, validateModel, type Metamodel, LAYOUT_AXES, LAYOUT_FLOWS, LAYOUT_ROLES, type LayoutFlow, type LayoutRole, type LayoutSide, type RelationLayoutHint } from '@radical/common/metamodel'
 import { forkPresetMetamodel, groupLossesOf, groupLossesQuestion, syncViewpoints, type ModelState } from '@radical/common/model'
 import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '@radical/common/viewpoints'
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
@@ -464,6 +464,31 @@ function NodeTypeCard({
           </div>
           <div className="mm-row">
             <label className="mm-field">
+              <span>Layout role</span>
+              <select
+                className="mm-input"
+                value={def.layout?.role ?? 'element'}
+                title="What Smart Layout takes an element of this type for: an actor goes above what it uses, a store beside its one user, a note beside its one anchor, a start above and an end below the states they join, a broker between the two sides it joins, screens in a row."
+                onChange={(e) => onChange({ layout: { ...def.layout, role: e.target.value as LayoutRole } })}
+              >
+                {LAYOUT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+            <label className="mm-field">
+              <span>Layout side</span>
+              <select
+                className="mm-input"
+                value={def.layout?.side ?? ''}
+                title="Where the role is placed, when not on the role's own side (a store on the left of its user)."
+                onChange={(e) => onChange({ layout: { ...def.layout, side: (e.target.value || undefined) as LayoutSide | undefined } })}
+              >
+                <option value="">by role</option>
+                {(['top', 'bottom', 'left', 'right'] as const).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
               <span>Min instances</span>
               <CountInput
                 value={def.cardinality?.min}
@@ -622,6 +647,30 @@ function RelationTypeCard({
                 title="How the wiki reads the relation from its target. The canvas does not show it."
                 onChange={(e) => onChange({ inverseLabel: e.target.value || undefined })}
               />
+            </label>
+          </div>
+          <div className="mm-row">
+            <label className="mm-field">
+              <span>Reads</span>
+              <select
+                className="mm-input"
+                value={def.layout?.flow ?? 'forward'}
+                title="Which way Smart Layout draws the relation: forward from source to target (down or right), reverse (the target above the source: a requirement derives from the need above it), or side (no direction: a decision beside what it constrains)."
+                onChange={(e) => onChange({ layout: { ...def.layout, flow: e.target.value as LayoutFlow } })}
+              >
+                {LAYOUT_FLOWS.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </label>
+            <label className="mm-field">
+              <span>Along</span>
+              <select
+                className="mm-input"
+                value={def.layout?.axis ?? 'free'}
+                title="The axis the relation reads along: free (down or across), vertical (a transition runs down), horizontal (screens navigate to the right)."
+                onChange={(e) => onChange({ layout: { flow: def.layout?.flow ?? 'forward', axis: e.target.value as RelationLayoutHint['axis'] } })}
+              >
+                {LAYOUT_AXES.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
             </label>
           </div>
           <div className="mm-row">

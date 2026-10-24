@@ -565,7 +565,7 @@ describe('long Smart Layout runs', () => {
     const steps: { progress: number; message: string }[] = []
     const outcome = await model.call('smart_layout', {}, { onProgress: (p) => steps.push(p) })
     expect(outcome.ok, outcome.text).toBe(true)
-    expect(steps.map((s) => s.message)).toContain('Smart Layout: candidates 1/12')
+    expect(steps.map((s) => s.message)).toContain('Smart Layout: tidying')
     expect(steps.map((s) => s.progress)).toEqual(steps.map((_, i) => i + 1))
   }, 60_000)
 
@@ -578,11 +578,16 @@ describe('long Smart Layout runs', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   }, 60_000)
 
-  it('unpins the canvas it arranges', async () => {
-    // Elements on top of each other, two of them pinned in Studio.
+  it('leaves the pinned elements where they are, and keeps the pins', async () => {
+    // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()
     const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
-    data.nodes = ['a', 'b', 'c'].map((id, i) => ({ id, type: 'system', label: id.toUpperCase(), x: i * 10, y: i * 10, width: 240, height: 160, collapsed: false }))
+    data.nodes = [
+      { id: 'a', type: 'system', label: 'A', x: 0, y: 0, width: 240, height: 160, collapsed: false },
+      { id: 'b', type: 'system', label: 'B', x: 400, y: 0, width: 240, height: 160, collapsed: false },
+      { id: 'c', type: 'system', label: 'C', x: 20, y: 20, width: 240, height: 160, collapsed: false },
+    ]
+    data.relations = [{ id: 'ab', sourceId: 'a', targetId: 'b', relationType: 'interacts' }, { id: 'bc', sourceId: 'b', targetId: 'c', relationType: 'interacts' }]
     data.defaultLayoutConstraints = [{ id: 'p', type: 'pin', nodeIds: ['a', 'b'] }]
     for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
       await mkdir(dirname(join(folder, path)), { recursive: true })
@@ -590,9 +595,14 @@ describe('long Smart Layout runs', () => {
     }
     const model = await FolderModel.open(folder)
     const outcome = await model.call('smart_layout', {})
-    expect(outcome.text).toContain('Unpinned 2 elements.')
+    expect(outcome.ok, outcome.text).toBe(true)
+    expect(outcome.text).not.toContain('Unpinned')
     const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
-    expect(after.defaultLayoutConstraints ?? []).toEqual([])
+    expect(after.defaultLayoutConstraints).toEqual([{ id: 'p', type: 'pin', nodeIds: ['a', 'b'] }])
+    const at = (id: string) => { const n = after.nodes.find((x) => x.id === id)!; return [n.x, n.y] }
+    expect(at('a')).toEqual([0, 0])
+    expect(at('b')).toEqual([400, 0])
+    expect(at('c')).not.toEqual([20, 20])
   }, 60_000)
 
   it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {

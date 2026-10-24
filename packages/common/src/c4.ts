@@ -216,13 +216,16 @@ export interface DiagramView {
   /**
    * Auto-layout strategy used when the user invokes "Smart Layout" while
    * this view is active.
-   *  - 'auto' (default, undefined) — current behaviour: ensemble Smart Layout.
+   *  - 'auto' (default, undefined) — Tidy: the canvas improved move by move,
+   *                                  as a person arranges it (@radical/layout tidy).
+   *  - 'ensemble'                  — the twelve-engine ensemble ranked by
+   *                                  quality, as Smart Layout ran before.
    *  - 'tree'                      — hierarchical nested tree layout (ELK
    *                                  mrtree per container, top-down).
    * Useful for views populated mostly with domain objects, where a clean
    * containment-tree visualisation is preferable to a force/layered graph.
    */
-  layoutMode?: 'auto' | 'tree'
+  layoutMode?: 'auto' | 'ensemble' | 'tree'
   /**
    * Treemap-only: id of the node currently used as the drill-down root.
    * `null`/`undefined` = top of the hierarchy ("All").

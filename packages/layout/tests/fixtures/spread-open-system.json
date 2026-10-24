@@ -1,0 +1,272 @@
+{
+ "_comment": "All elements of a new model after Smart Layout, 2026-10-23: one open system, two ADRs without relations, laid out about three times as wide as needed.",
+ "nodes": [
+  {
+   "id": "shop",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": false,
+   "x": 951.2250318578328,
+   "y": 54.09612183467635,
+   "width": 599.9726830050265,
+   "height": 1004.6347082723257
+  },
+  {
+   "id": "api",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 59.99403713151651,
+   "y": 60.01376267330818,
+   "width": 300,
+   "height": 260
+  },
+  {
+   "id": "billing",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": false,
+   "x": -169.08354493955852,
+   "y": 168.64302034476492,
+   "width": 509.46400858509855,
+   "height": 520.000001
+  },
+  {
+   "id": "orders-db",
+   "type": "database",
+   "label": "Database",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 379.9726830050265,
+   "y": 60.40521449268661,
+   "width": 190,
+   "height": 130
+  },
+  {
+   "id": "queue",
+   "type": "queue",
+   "label": "Queue",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 265.50487462993897,
+   "y": 449.0454084354782,
+   "width": 220,
+   "height": 95
+  },
+  {
+   "id": "worker",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 59.883898621824756,
+   "y": 705.0337842777448,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "stock-db",
+   "type": "database",
+   "label": "Database",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 379.88335005382896,
+   "y": 844.6347082723257,
+   "width": 190,
+   "height": 130
+  },
+  {
+   "id": "billing-api",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "billing",
+   "x": 59.72275130534837,
+   "y": 60.01192089265135,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "billing-worker",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "billing",
+   "x": 209.46400859933567,
+   "y": 300.00000100000005,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "customer",
+   "type": "person",
+   "label": "Person",
+   "collapsed": false,
+   "external": false,
+   "x": 543.9165882147494,
+   "y": -293.1637031430523,
+   "width": 150,
+   "height": 170
+  },
+  {
+   "id": "payments",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": true,
+   "x": 290.9164550604414,
+   "y": 576.2517669845978,
+   "width": 280,
+   "height": 180
+  },
+  {
+   "id": "adr-shop",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": 650.9164560604414,
+   "y": 503.92509937086186,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-1",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": -165.29270944630633,
+   "y": 1100.084484408304,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-billing",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": -322.10746758816447,
+   "y": 511.4337934160052,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-2",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": -165.29270944630633,
+   "y": 37.02932256567766,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "api-handler",
+   "type": "component",
+   "label": "Component",
+   "collapsed": false,
+   "external": false,
+   "parentId": "api",
+   "x": 20,
+   "y": 120,
+   "width": 200,
+   "height": 120
+  }
+ ],
+ "relations": [
+  {
+   "id": "r1",
+   "sourceId": "billing",
+   "targetId": "api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r2",
+   "sourceId": "api",
+   "targetId": "orders-db",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r3",
+   "sourceId": "api",
+   "targetId": "queue",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r4",
+   "sourceId": "worker",
+   "targetId": "queue",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r5",
+   "sourceId": "worker",
+   "targetId": "stock-db",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r6",
+   "sourceId": "billing-api",
+   "targetId": "billing-worker",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r7",
+   "sourceId": "customer",
+   "targetId": "api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r8",
+   "sourceId": "customer",
+   "targetId": "billing-api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r9",
+   "sourceId": "billing-worker",
+   "targetId": "payments",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r10",
+   "sourceId": "worker",
+   "targetId": "payments",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r11",
+   "sourceId": "adr-shop",
+   "targetId": "shop",
+   "relationType": "constrains"
+  },
+  {
+   "id": "r12",
+   "sourceId": "adr-billing",
+   "targetId": "billing",
+   "relationType": "constrains"
+  }
+ ],
+ "view": {
+  "id": "view-all-elements",
+  "name": "All elements",
+  "nodeIds": [],
+  "positions": {},
+  "collapsedNodeIds": [
+   "billing",
+   "api"
+  ],
+  "expandedNodeIds": [],
+  "layoutConstraints": [],
+  "layoutMode": "auto"
+ }
+}

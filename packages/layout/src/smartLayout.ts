@@ -966,7 +966,7 @@ export interface PlanarityScore {
   verdict: 'planar' | 'near-planar' | 'tangled'
 }
 
-function computePlanarityScore(
+export function computePlanarityScore(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
 ): PlanarityScore {
@@ -1234,7 +1234,7 @@ export interface SmartLayoutResult {
   keptCurrent: boolean
 }
 
-function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
+export function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
   const out: Record<string, C4Node> = {}
   for (const [id, n] of Object.entries(nodes)) {
     const p = positions[id]
@@ -1389,6 +1389,8 @@ export type ELKPhaseResult =
 export type SmartLayoutProgress =
   | { phase: 'candidates' | 'ranking'; done: number; total: number }
   | { phase: 'refining-a' | 'refining-b' | 'refining-c' | 'relaxing' }
+  /** Tidy playing its moves: the one being shown. */
+  | { phase: 'tidy'; message: string }
 
 export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
 
