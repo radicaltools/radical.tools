@@ -56,6 +56,21 @@ for (const view of ['view-ctx', 'view-core', 'view-payments', 'view-screens', 'v
   })
 }
 
+test('tidy lists its moves', async ({ page, studio }) => {
+  // Auto mode tidies the canvas move by move; the result stands at once and
+  // "Why this layout?" lists the moves with what each gained.
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.smartLayout()
+  expect(await studio.layoutViolations()).toEqual([])
+  await page.getByTitle(/^Why this layout\?/).click()
+  const table = page.locator('.smart-layout-report-table')
+  await expect(table.locator('thead th', { hasText: 'Move' })).toBeVisible()
+  const rows = table.locator('tbody tr')
+  expect(await rows.count()).toBeGreaterThan(0)
+  await expect(rows.first().locator('td').nth(1)).not.toBeEmpty()
+})
+
 test('the result is the same on every run', async ({ browser }) => {
   const prepare = async (s: Studio): Promise<void> => {
     await s.seed()

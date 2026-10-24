@@ -68,6 +68,7 @@ import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
+import { runTidyLayout, type TidyStep } from '@radical/layout/tidy'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
@@ -119,6 +120,8 @@ export interface SmartLayoutReportCandidate {
 export interface SmartLayoutReport {
   timestamp: number
   winnerName: string
+  /** Tidy's account of itself: the moves it made, in order (the view's auto-layout is Auto). */
+  tidy?: { steps: Pick<TidyStep, 'kind' | 'description' | 'gain'>[]; before: number; after: number }
   /** Ranked ascending by composite score (index 0 = best pre-refinement candidate). */
   candidates: SmartLayoutReportCandidate[]
   before: { crossings: number; overdraws: number }
@@ -3030,7 +3033,7 @@ interface DiagramStore {
   setTreemapSizeBy: (viewId: string, mode: 'leaves' | 'uniform' | 'relations') => void
   setTreemapMaxDepth: (viewId: string, depth: number | null) => void
   /** Choose the auto-layout strategy used for this view. */
-  setViewLayoutMode: (viewId: string, mode: 'auto' | 'tree') => void
+  setViewLayoutMode: (viewId: string, mode: 'auto' | 'ensemble' | 'tree') => void
   /**
    * Keeps `nodeIds` on one line on the active canvas — a row ('horizontal')
    * or a column ('vertical') — through drags, the live layout and Smart
@@ -6723,7 +6726,10 @@ export const useDiagramStore = create<DiagramStore>()(
             return
           }
         }
-        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = { phase: 'candidates', done: 0, total: 10 } })
+        // Auto (the default) tidies the canvas move by move; Ensemble runs
+        // the twelve engines and ranks them.
+        const ensemble = (get().activeViewId ? get().views[get().activeViewId!]?.layoutMode : undefined) === 'ensemble'
+        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: 'tidying' } })
         try {
           const input = layoutInputForView(get())
           // A view that shows nothing yet (a new model's views) has nothing
@@ -6735,9 +6741,21 @@ export const useDiagramStore = create<DiagramStore>()(
           const { viewFilter: vf, viewCollapsedSet: vcs, expandedSet } = input
           const target = layoutTarget(get())
           const present = parentsOf(get().c4Nodes)
-          const result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
-            set((s) => { s.smartLayoutProgress = progress })
-          }, { alignments: input.alignments, edgeStyle: model.edgeStyleOf(get(), get().activeViewId) })
+          const edgeStyle = model.edgeStyleOf(get(), get().activeViewId)
+          let result: Awaited<ReturnType<typeof runSmartLayout>>
+          if (ensemble) {
+            result = await runSmartLayout(input.nodes, input.relations, get().metamodel as Metamodel | undefined, (progress) => {
+              set((s) => { s.smartLayoutProgress = progress })
+            }, { alignments: input.alignments, edgeStyle })
+          } else {
+            // Tidy lands on the next turn, so a view opened or a model
+            // reloaded meanwhile is handled as for a long run. Its moves
+            // are not played: the result is shown at once, the moves listed
+            // in the report.
+            await new Promise<void>((resolve) => setTimeout(resolve, 0))
+            if (layoutTarget(get()) !== target) { layoutMissedItsCanvas(get().pushNotification); return }
+            result = runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined, pinned: pinnedNodeIds(activeLayoutConstraints(get())) })
+          }
           if (layoutTarget(get()) !== target) {
             layoutMissedItsCanvas(get().pushNotification)
             return
@@ -6757,7 +6775,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if (view) _historyKeepsFirstLayout(firstOpen, view.positions)
               return
             }
-            get().pushNotification('Smart layout: the current layout already scores best — nothing changed.', 'info')
+            get().pushNotification(ensemble ? 'Smart layout: the current layout already scores best — nothing changed.' : 'Smart layout: nothing left to tidy.', 'info')
             return
           }
           // One undo step for the whole layout. Viewer reverts positions on
@@ -6773,9 +6791,11 @@ export const useDiagramStore = create<DiagramStore>()(
           const changed = layoutChangedMeanwhile(present, get().c4Nodes)
           const added = changed.filter((id) => !present.has(id))
           const reparented = changed.filter((id) => present.has(id))
+          // Tidy left the pinned elements where they are: the pins stay.
+          // The ensemble arranged everything: it unpins the canvas.
           set((state) => {
             applyLayoutPositions(state.c4Nodes, positionsWithout(result.winner.positions, changed), input)
-            unpinLaidOut(state, get().appMode)
+            if (ensemble) unpinLaidOut(state, get().appMode)
           })
           if (added.length) set((state) => { placeAddedDuringLayout(state, added) })
           if (reparented.length) {
@@ -6785,11 +6805,14 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           get()._resizeParentsBottomUp(vf, vcs, expandedSet)
 
-          // Final collision-safety pass at root level (same as ELK/Radical paths).
+          // Final collision-safety pass at root level (same as ELK/Radical
+          // paths) for the ensemble, and for what was added or moved while
+          // the layout ran; Tidy itself leaves no two siblings on each
+          // other, and what the author pinned stays where they put it.
           const { nodes: safetyNodes } = layoutInputForView(get())
-          const rootIds = Object.values(safetyNodes)
-            .filter((n) => !n.parentId)
-            .map((n) => n.id)
+          const rootIds = ensemble || added.length || reparented.length
+            ? Object.values(safetyNodes).filter((n) => !n.parentId).map((n) => n.id)
+            : []
           for (const id of rootIds) {
             const updates = separateSiblings(id, safetyNodes)
             if (Object.keys(updates).length > 0) {
@@ -6829,9 +6852,12 @@ export const useDiagramStore = create<DiagramStore>()(
             ? 'planar ✓'
             : `${Math.round((1 - result.planarity.ratio) * 100)}% planar`
           const arrow = '\u2009\u2192\u2009'
-          const msg = before.weightedCost === 0
-            ? `Smart layout: ${result.winner.name} — ${after.crossings} crossings, ${after.overdraws} overdraws · ${planarTag}.`
-            : `Smart layout: ${result.winner.name} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws} (${pct}% better) · ${planarTag}.`
+          const tidied = (result as { tidy?: { steps: TidyStep[]; before: { total: number }; after: { total: number } } }).tidy
+          const msg = tidied
+            ? `Smart layout: ${tidied.steps.length} move${tidied.steps.length === 1 ? '' : 's'} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws}.`
+            : before.weightedCost === 0
+              ? `Smart layout: ${result.winner.name} — ${after.crossings} crossings, ${after.overdraws} overdraws · ${planarTag}.`
+              : `Smart layout: ${result.winner.name} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws} (${pct}% better) · ${planarTag}.`
           get().pushNotification(msg, 'info')
           // Auto fit-all so the user immediately sees the freshly-laid-out
           // diagram framed in the viewport. Defer one paint so React Flow
@@ -6858,6 +6884,7 @@ export const useDiagramStore = create<DiagramStore>()(
           const report: SmartLayoutReport = {
             timestamp: Date.now(),
             winnerName: result.winner.name,
+            ...(tidied ? { tidy: { steps: tidied.steps.map((s) => ({ kind: s.kind, description: s.description, gain: s.gain })), before: tidied.before.total, after: tidied.after.total } } : {}),
             candidates: result.candidates.map((c) => ({
               name: c.name,
               composite: c.score.composite,

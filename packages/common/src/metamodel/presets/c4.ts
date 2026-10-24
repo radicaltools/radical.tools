@@ -5,7 +5,7 @@
 // module's legacy per-type lookup tables are generated FROM the built-in
 // presets (see `builtInGovernanceMetamodel`, the superset of all of them).
 
-import { Metamodel, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
+import { Metamodel, NodeLayoutHint, NodeTypeDef, PropertyDef, RelationPair, RelationTypeDef } from '../types'
 import { c4Viewpoints } from './viewpoints'
 
 interface Visual {
@@ -72,6 +72,14 @@ const VISUALS: Record<string, Visual> = {
   },
 }
 
+/** What each type is to a layout: a person above what it uses, a
+ *  database beside its user, a queue between the sides it joins. */
+const LAYOUT: Record<string, NodeLayoutHint> = {
+  person: { role: 'actor', side: 'top' },
+  database: { role: 'store', side: 'right' },
+  queue: { role: 'broker' },
+}
+
 export function builtInC4Metamodel(): Metamodel {
   const nodeTypes: Record<string, NodeTypeDef> = {}
 
@@ -112,6 +120,7 @@ export function builtInC4Metamodel(): Metamodel {
     nodeTypes[t] = {
       id: t,
       label: v.label,
+      ...(LAYOUT[t] ? { layout: LAYOUT[t] } : {}),
       description: v.description,
       color: v.color,
       fg: v.fg,
@@ -199,6 +208,7 @@ export function builtInC4Metamodel(): Metamodel {
         { key: 'technology', label: 'Technology', type: 'text' },
       ],
       builtin: true,
+      layout: { flow: 'forward' },
     },
   }
 

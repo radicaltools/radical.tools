@@ -4,7 +4,7 @@
 // would swap the preset back in and drop the change. Tool schemas are built
 // from the metamodel, so callers rebuild them after these run.
 
-import { builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef } from '../../metamodel'
+import { LAYOUT_AXES, LAYOUT_FLOWS, LAYOUT_ROLES, builtInC4Metamodel, propertyKeyProblem, type Metamodel, type NodeTypeDef, type PropertyDef, type RelationPair, type RelationTypeDef, type LayoutFlow, type LayoutRole, type LayoutSide, type RelationLayoutHint } from '../../metamodel'
 import { checkRemoveNodeTypeFromMetamodel, checkRemoveRelationTypeFromMetamodel, forkPresetMetamodel, isViewGroup, metamodelWithoutNodeType, milestoneHoldsType, viewNamesType } from '../../model'
 import { pipelineOf } from '../../viewPipeline'
 import { isViewpointKind, newViewpointId, VIEWPOINT_KINDS, viewpointsOf, withViewpoint, withoutViewpoint } from '../../viewpoints'
@@ -58,6 +58,8 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           allowedParents: { type: 'array', items: { type: 'string' }, description: 'Node types it may sit inside. [] = none.' },
           allowedAtRoot: { type: 'boolean' },
           maxCount: { type: ['number', 'null'], description: 'Maximum number of nodes of this type; null removes the limit.' },
+          layoutRole: { type: 'string', enum: ['element', 'actor', 'store', 'note', 'start', 'end', 'broker', 'screen'], description: 'What Smart Layout takes an element of this type for: element (placed by its lines), actor (above what it uses), store (beside its one user, on the right), note (beside its one anchor, on the left: an ADR, a requirement at the element it is about), start (above what it leads to), end (below what leads to it), broker (between the two sides it joins: a queue), screen (in a row with the screens it navigates to).' },
+          layoutSide: { type: ['string', 'null'], enum: ['top', 'bottom', 'left', 'right', null], description: 'Where the role is placed when not on its own side; null restores the role\'s side.' },
           summary: { type: 'string', description: 'How the table sums up an element of this type in one line, from data it has: a template of tokens — {key} a property (or label, description, technology), {ears} a requirement\'s EARS sentence, {obligation} who shall do what and {condition} when it holds, {transitions} where a state or event leads, {out:type}/{in:type} the elements linked by relations of a type, {key.sentence} its first sentence, {key.phrase} its first phrase, {key.cap} capitalised, {a|b} the first with a value; a part in [ ] is left out when a token in it is empty; the template may use inline Markdown. E.g. "[{status.cap}: ]{decision.sentence}". "" restores the default.' },
           properties: PROPERTIES_SCHEMA,
         },
@@ -87,6 +89,8 @@ export function buildMetamodelToolDefs(): ToolDef[] {
           forwardLabel: { type: 'string', description: 'How it reads in a sentence from source to target, when the label is a name rather than a verb ("Uses" for "Interacts"). "" clears it.' },
           inverseLabel: { type: 'string', description: 'How it reads from target to source: "Constrained by". The wiki view uses it; the canvas does not show it. "" clears it.' },
           color: { type: 'string' },
+          layoutFlow: { type: 'string', enum: ['forward', 'reverse', 'side'], description: 'Which way Smart Layout draws a relation of this type: forward from source to target (down or right), reverse (the target above the source: a requirement derives from the need above it), or side (no direction: a decision beside what it constrains).' },
+          layoutAxis: { type: 'string', enum: ['free', 'vertical', 'horizontal'], description: 'The axis the relation reads along: free (down or across; the default), vertical (a transition runs down, a flat one is off), horizontal (screens navigate to the right).' },
           governance: { type: 'boolean', description: 'true for a governance relation, which ties a requirement, decision, check or screen to the element it is about (satisfies, constrains, verifies): it may join an element and what holds it, and moving an element into the other keeps it. false (the default) for a structural one (uses, part of), which containment already says: refused between an element and what holds it, and removed when one is moved into the other.' },
           allowedPairs: {
             type: 'array',
@@ -276,6 +280,15 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
         if (typeof input.summary !== 'string') return fail('upsert_node_type: summary must be a string')
         def.summary = input.summary.trim() || undefined
       }
+      if (input.layoutRole !== undefined) {
+        if (typeof input.layoutRole !== 'string' || !(LAYOUT_ROLES as string[]).includes(input.layoutRole)) return fail(`upsert_node_type: layoutRole must be one of ${LAYOUT_ROLES.join(', ')}`)
+        def.layout = { ...def.layout, role: input.layoutRole as LayoutRole }
+      }
+      if (input.layoutSide === null) { const { side: _side, ...rest } = def.layout ?? {}; def.layout = rest }
+      else if (input.layoutSide !== undefined) {
+        if (typeof input.layoutSide !== 'string' || !['top', 'bottom', 'left', 'right'].includes(input.layoutSide)) return fail('upsert_node_type: layoutSide must be top, bottom, left, right or null')
+        def.layout = { ...def.layout, side: input.layoutSide as LayoutSide }
+      }
       if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
       mm.nodeTypes[id] = def
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} node type "${id}".${note}`)
@@ -341,6 +354,14 @@ export function buildMetamodelToolHandlers(): Record<string, ToolHandler> {
       }
       if (pairs) def.allowedPairs = pairs
       if (properties) def.properties = keepVisibility(properties, input.properties, existing?.properties)
+      if (input.layoutFlow !== undefined) {
+        if (typeof input.layoutFlow !== 'string' || !(LAYOUT_FLOWS as string[]).includes(input.layoutFlow)) return fail(`upsert_relation_type: layoutFlow must be one of ${LAYOUT_FLOWS.join(', ')}`)
+        def.layout = { ...def.layout, flow: input.layoutFlow as LayoutFlow }
+      }
+      if (input.layoutAxis !== undefined) {
+        if (typeof input.layoutAxis !== 'string' || !(LAYOUT_AXES as string[]).includes(input.layoutAxis)) return fail(`upsert_relation_type: layoutAxis must be one of ${LAYOUT_AXES.join(', ')}`)
+        def.layout = { flow: def.layout?.flow ?? 'forward', axis: input.layoutAxis as RelationLayoutHint['axis'] }
+      }
       mm.relationTypes[id] = def
       return save(ctx, mm, `${existing ? 'Updated' : 'Added'} relation type "${id}".${note}`)
     },

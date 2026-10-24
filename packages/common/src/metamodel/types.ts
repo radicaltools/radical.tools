@@ -31,6 +31,52 @@ export interface PropertyDef {
   visibleWhen?: { key: string; values: string[] }
 }
 
+// ─── Layout hints ────────────────────────────────────────────────────────────
+//
+// What an element of a type is to a layout (Smart Layout's Tidy), so that
+// the conventions of a notation hold without an engine per notation: an
+// actor goes above what it uses, a store beside its user, a start above
+// the states, screens in a row; a relation type says which way it reads.
+
+/** What the layout takes an element for. */
+export type LayoutRole =
+  /** Placed by its lines alone. */
+  | 'element'
+  /** Above what it uses (a person). */
+  | 'actor'
+  /** Beside its one user, on the right (a database). */
+  | 'store'
+  /** Beside its one anchor, on the left (an ADR, a requirement at the element it is about). */
+  | 'note'
+  /** Above what it leads to (an initial pseudostate). */
+  | 'start'
+  /** Below what leads to it (a final state). */
+  | 'end'
+  /** Between the two sides it joins (a queue between producer and consumer). */
+  | 'broker'
+  /** In a row with the screens it navigates to. */
+  | 'screen'
+export type LayoutSide = 'top' | 'bottom' | 'left' | 'right'
+export interface NodeLayoutHint {
+  role?: LayoutRole
+  /** Where the role is placed, when it is not the role's own side. */
+  side?: LayoutSide
+  /** Roles by a property's value: a pseudostate of kind "initial" is a start. */
+  byProperty?: { key: string; roles: Record<string, LayoutRole> }
+}
+/** Which way a relation type reads in a drawing: forward from source to
+ *  target (down, or right on the horizontal axis), reverse (the target
+ *  above the source: a requirement derives from the need above it), or
+ *  side (no direction: a decision beside what it constrains). */
+export type LayoutFlow = 'forward' | 'reverse' | 'side'
+export interface RelationLayoutHint {
+  flow: LayoutFlow
+  /** The axis the relation reads along: vertical (a transition runs down,
+   *  a flat one is off), horizontal (screens navigate to the right), or
+   *  free (the default: down or across, only backwards is against it). */
+  axis?: 'vertical' | 'horizontal' | 'free'
+}
+
 export interface NodeTypeDef {
   id: string
   label: string
@@ -78,6 +124,9 @@ export interface NodeTypeDef {
   hierarchyRelation?: string
   /** Guided, step-by-step form for filling in a node of this type. */
   wizard?: NodeWizardDef
+  /** What an element of this type is to a layout; none: the built-in
+   *  preset's hint for a built-in id, else an element (layoutHints.ts). */
+  layout?: NodeLayoutHint
 }
 
 // ─── Node wizard ─────────────────────────────────────────────────────────────
@@ -174,6 +223,9 @@ export interface RelationTypeDef {
   /** Optional visual hint for the relation. */
   color?: string
   builtin?: boolean
+  /** Which way a relation of this type reads in a drawing; none: the
+   *  built-in preset's hint for a built-in id, else forward (layoutHints.ts). */
+  layout?: RelationLayoutHint
 }
 
 /** The kinds of view a viewpoint of the metamodel can be built on (a flow

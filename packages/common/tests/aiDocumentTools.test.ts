@@ -55,6 +55,22 @@ describe('metamodel tools', () => {
     })
   })
 
+  it('set the layout hints of a node type and a relation type', async () => {
+    const { facade, call } = setup()
+    const node = await call('upsert_node_type', { id: 'robot', label: 'Robot', baseType: 'system', layoutRole: 'actor', layoutSide: 'left' })
+    expect(node.ok, node.resultText).toBe(true)
+    expect(facade.getMetamodel!()!.nodeTypes.robot.layout).toEqual({ role: 'actor', side: 'left' })
+    // null restores the role's own side; a built-in type takes a hint too.
+    await call('upsert_node_type', { id: 'robot', layoutSide: null })
+    expect(facade.getMetamodel!()!.nodeTypes.robot.layout).toEqual({ role: 'actor' })
+    await call('upsert_node_type', { id: 'database', layoutRole: 'element' })
+    expect(facade.getMetamodel!()!.nodeTypes.database.layout).toMatchObject({ role: 'element' })
+    const rel = await call('upsert_relation_type', { id: 'feeds', label: 'Feeds', layoutFlow: 'reverse', layoutAxis: 'horizontal' })
+    expect(rel.ok, rel.resultText).toBe(true)
+    expect(facade.getMetamodel!()!.relationTypes.feeds.layout).toEqual({ flow: 'reverse', axis: 'horizontal' })
+    expect((await call('upsert_node_type', { id: 'robot', layoutRole: 'pilot' })).ok).toBe(false)
+  })
+
   it('refuse bad input, built-in deletes and types still in use', async () => {
     const { call } = setup()
     expect((await call('upsert_node_type', { id: 'Bad Id', label: 'X' })).resultText).toContain('lowercase')

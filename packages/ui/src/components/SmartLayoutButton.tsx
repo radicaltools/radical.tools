@@ -48,6 +48,7 @@ function smartLayoutProgressLabel(p: SmartLayoutProgress | null): string | null 
   if (p.phase === 'refining-a') return 'Refining with simulated annealing…'
   if (p.phase === 'refining-b') return 'Refining containers…'
   if (p.phase === 'relaxing') return 'Trying the live layout…'
+  if (p.phase === 'tidy') return p.message
   return 'Polishing…'
 }
 
@@ -74,7 +75,7 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
       <button
         className="toolbar-btn toolbar-btn-icon-only"
         onClick={() => setOpen((o) => !o)}
-        title="Why this layout? — full ranking of every algorithm Smart Layout tried"
+        title={report.tidy ? 'Why this layout? — the moves Smart Layout made, in order' : 'Why this layout? — full ranking of every algorithm Smart Layout tried'}
         aria-haspopup="true"
         aria-expanded={open}
       >
@@ -84,6 +85,13 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
         <div className="smart-layout-report-popover" role="dialog" aria-label="Smart Layout report">
           <div className="smart-layout-report-header">
             <div className="smart-layout-report-title">Why this layout?</div>
+            {report.tidy && (
+              <div className="smart-layout-report-sub">
+                <strong>{report.tidy.steps.length} move{report.tidy.steps.length === 1 ? '' : 's'}</strong> · reader's cost {report.tidy.before.toFixed(0)}{arrow}{report.tidy.after.toFixed(0)} ·
+                {' '}crossings {report.before.crossings}{arrow}{report.after.crossings}, overdraws {report.before.overdraws}{arrow}{report.after.overdraws}
+              </div>
+            )}
+            {!report.tidy && (<>
             <div className="smart-layout-report-sub">
               Winner: <strong>{report.winnerName}</strong> · crossings {report.before.crossings}{arrow}{report.after.crossings},
               {' '}overdraws {report.before.overdraws}{arrow}{report.after.overdraws} · {report.planarity.verdict}
@@ -93,7 +101,21 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
               Simulated annealing: {report.refinement.before.toFixed(0)}{arrow}{report.refinement.after.toFixed(0)} cost
               {' '}over {report.refinement.iterations} iterations
             </div>
+            </>)}
           </div>
+          {report.tidy && (
+            <div className="smart-layout-report-table-wrap">
+              <table className="smart-layout-report-table">
+                <thead><tr><th>#</th><th>Move</th><th title="What the move gained in the reader's cost">Gain</th></tr></thead>
+                <tbody>
+                  {report.tidy.steps.map((s, i) => (
+                    <tr key={i}><td>{i + 1}</td><td>{s.description}</td><td>{s.gain > 0 ? `+${s.gain.toFixed(1)}` : '—'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {!report.tidy && (
           <div className="smart-layout-report-table-wrap">
             <table className="smart-layout-report-table">
               <thead>
@@ -116,6 +138,7 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
     </div>
@@ -140,7 +163,9 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
 
   const baseTitle = activeViewLayoutMode === 'tree'
     ? 'Tree Layout — hierarchical nested-tree arrangement (configured for the active view).'
-    : 'Smart Layout — ensemble of layered + semantic algorithms with edge-crossing minimisation, picks the cleanest result.'
+    : activeViewLayoutMode === 'ensemble'
+      ? 'Smart Layout — ensemble of layered + semantic algorithms with edge-crossing minimisation, picks the cleanest result.'
+      : 'Smart Layout — tidies the canvas as you would: one move at a time, each shown, until nothing is left to do.'
 
   return (
     <>

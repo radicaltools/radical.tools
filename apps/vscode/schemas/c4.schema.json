@@ -257,8 +257,8 @@
         "viewport": { "$ref": "#/definitions/Viewport" },
         "layoutMode": {
           "type": "string",
-          "enum": ["auto", "tree"],
-          "description": "'auto' = Smart Layout ensemble, 'tree' = hierarchical ELK tree layout."
+          "enum": ["auto", "ensemble", "tree"],
+          "description": "'auto' = Tidy (the canvas improved move by move), 'ensemble' = the twelve-engine Smart Layout ensemble, 'tree' = hierarchical ELK tree layout."
         },
         "treemapFocusId": {
           "description": "Treemap drill-down root node ID. null = top of hierarchy.",

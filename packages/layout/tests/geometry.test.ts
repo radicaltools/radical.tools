@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { BATCH_CELL, WRAP_HEADER, WRAP_PAD, createBatchPlacer, fitAncestors, fittedParentSize, freeSpotNear, modelCanvas, placeGhosts, placeNewNode, placeUnplaced, settleMovedNodes, gridSlotIn } from '../src/geometry'
-import { COLLAPSED_HEIGHT, NODE_SIZES, type C4Node } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node } from '@radical/common/c4'
 
 const node = (id: string, type: string, extra: Partial<C4Node> = {}): C4Node =>
   ({ id, type, label: id, collapsed: false, x: 0, y: 0, ...NODE_SIZES[type as keyof typeof NODE_SIZES], ...extra }) as C4Node
 
 describe('fittedParentSize', () => {
-  it('wraps the children plus padding, never below the type default', () => {
+  it('wraps the children plus padding, never below the collapsed size', () => {
     const sys = node('sys', 'system')
     expect(fittedParentSize(sys, [{ x: 30, y: 120, width: 900, height: 600 }])).toEqual({ width: 960, height: 750 })
-    expect(fittedParentSize(sys, [{ x: 0, y: 0, width: 10, height: 10 }])).toEqual(NODE_SIZES.system)
+    expect(fittedParentSize(sys, [{ x: 0, y: 0, width: 10, height: 10 }])).toEqual({ width: COLLAPSED_WIDTH.system, height: COLLAPSED_HEIGHT.system })
   })
 })
 

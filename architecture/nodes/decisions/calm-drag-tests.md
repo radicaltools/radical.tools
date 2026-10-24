@@ -5,7 +5,7 @@ label: "Calm drag tests"
 category: "structural"
 tests: |
   packages/ui/tests/calmDrag.test.ts
-  apps/mcp/src/folderModel.test.ts › long Smart Layout runs › unpins the canvas it arranges
+  apps/mcp/src/folderModel.test.ts › long Smart Layout runs › leaves the pinned elements where they are, and keeps the pins
   apps/e2e/tests/studio/physics.spec.ts › a drag moves only the dragged node, and the drop pins it
   apps/e2e/tests/studio/physics.spec.ts › a drop onto a node pushes that node clear and nothing else
   apps/e2e/tests/studio/physics.spec.ts › a drag with Cmd held lets the physics move the surroundings
