@@ -976,6 +976,25 @@ describe('Pins in the store', () => {
     }
   }, 60_000)
 
+  it('Tidy around moves the given elements and what they relate to, nothing else', async () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 0, y: 400 }),
+        c: node('c', 'system', { x: 2000, y: 0 }),
+        d: node('d', 'system', { x: 2010, y: 10 }),
+      },
+      c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, cd: { id: 'cd', sourceId: 'c', targetId: 'd' } },
+    } as any)
+    s()._sync()
+    await s().runSmartLayout({ around: ['c'] })
+    expect([s().c4Nodes.a.x, s().c4Nodes.a.y, s().c4Nodes.b.x, s().c4Nodes.b.y]).toEqual([0, 0, 0, 400])
+    const c = s().c4Nodes.c, d = s().c4Nodes.d
+    expect(c.x >= d.x + d.width || d.x >= c.x + c.width || c.y >= d.y + d.height || d.y >= c.y + c.height).toBe(true)
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('around the selection')
+  }, 60_000)
+
   it('pins in the active view only', () => {
     const s = useDiagramStore.getState
     const vid = s().addView('Context')

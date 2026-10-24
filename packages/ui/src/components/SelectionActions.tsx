@@ -69,6 +69,12 @@ const Icons = {
       <path d="M3 4h10M6 4V2.5h4V4M5 4l1 9h4l1-9" />
     </svg>
   ),
+  Tidy: () => (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="5.5" y="5.5" width="5" height="5" rx="1" />
+      <path d="M8 2v2M8 12v2M2 8h2M12 8h2" />
+    </svg>
+  ),
   Source: () => (
     <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <circle cx="4" cy="8" r="2" />
@@ -157,6 +163,8 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
   const addAlignment = useDiagramStore((s) => s.addAlignment)
   const addGrid = useDiagramStore((s) => s.addGrid)
   const removeLayoutConstraint = useDiagramStore((s) => s.removeLayoutConstraint)
+  const runSmartLayout = useDiagramStore((s) => s.runSmartLayout)
+  const isLayoutRunning = useDiagramStore((s) => s.isLayoutRunning)
   // An exploration (the temporary one, or a view of type Explore) draws
   // what it lists, level by level: no alignments, no Hide (its − does that).
   const exploring = useDiagramStore((s) => !!shownExploration(s))
@@ -253,6 +261,12 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
       {canUnwrap && (<>
         <ActionButton variant={variant} icon={<Icons.Unwrap />} label="Unwrap"
           title="Remove this container but keep its direct children and their relations" onClick={() => unwrapNode(only!.id)} />
+        {divider}
+      </>)}
+      {canvas && !exploring && !isLayoutRunning && (<>
+        <ActionButton variant={variant} icon={<Icons.Tidy />} label="Tidy around"
+          title={several ? 'Smart Layout round the selected elements: they and what they relate to move, nothing else' : 'Smart Layout round this element: it and what it relates to move, nothing else'}
+          onClick={() => { void runSmartLayout({ around: [...ids] }) }} />
         {divider}
       </>)}
       {canAlign && (<>

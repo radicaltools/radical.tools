@@ -44,7 +44,10 @@ export function buildLayoutToolDefs(): ToolDef[] {
       description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. Call it after adding or moving several nodes.",
       inputSchema: {
         type: 'object',
-        properties: { viewId: { type: 'string', description: 'A static view (real id or tempId); omit for All elements.' } },
+        properties: {
+          viewId: { type: 'string', description: 'A static view (real id or tempId); omit for All elements.' },
+          around: { type: 'array', items: { type: 'string' }, description: 'Tidy round these elements only (ids or tempIds): they and what they relate to move, every other element stays where it is. For an element just added among others that stand well.' },
+        },
         additionalProperties: false,
       },
     },
@@ -147,8 +150,16 @@ export function buildAlignmentToolHandlers(): Record<string, ToolHandler> {
 export function buildLayoutToolHandlers(): Record<string, AsyncToolHandler> {
   return {
     smart_layout: async (rawInput, ctx) => {
-      const input = (rawInput ?? {}) as { viewId?: unknown }
+      const input = (rawInput ?? {}) as { viewId?: unknown; around?: unknown }
       if (!ctx.diagram.runLayout) return fail('smart_layout: layout is not available in this context')
+      let around: string[] | undefined
+      if (input.around !== undefined) {
+        if (!Array.isArray(input.around) || !input.around.every((id) => typeof id === 'string' && id)) return fail('smart_layout: around must be an array of node ids')
+        around = input.around.map((id) => ctx.resolveId(id as string))
+        const nodes = ctx.diagram.getNodes()
+        const unknown = around.filter((id) => !nodes[id])
+        if (unknown.length) return fail(`smart_layout: unknown node id(s) ${unknown.join(', ')}`)
+      }
       if (input.viewId !== undefined && (typeof input.viewId !== 'string' || !input.viewId)) return fail('smart_layout: viewId must be a view id')
       let viewId: string | undefined
       if (typeof input.viewId === 'string') {
@@ -158,7 +169,7 @@ export function buildLayoutToolHandlers(): Record<string, AsyncToolHandler> {
         const refused = noCanvasLayout('smart_layout', view)
         if (refused) return fail(refused)
       }
-      const outcome = await ctx.diagram.runLayout(viewId)
+      const outcome = await ctx.diagram.runLayout(viewId, around)
       return { ok: outcome.ok, resultText: outcome.text }
     },
   }

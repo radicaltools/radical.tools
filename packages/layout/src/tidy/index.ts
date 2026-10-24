@@ -34,6 +34,8 @@ export interface TidyReport {
   after: CostParts
   /** True when no move helped: the canvas was left as it was. */
   unchanged: boolean
+  /** True when the time budget (or a stop) ended the tidying before it was done. */
+  budgetOut: boolean
 }
 
 export interface TidyLayoutResult extends SmartLayoutResult {
@@ -49,6 +51,14 @@ export interface TidyOptions {
   metamodel?: Metamodel | null
   /** Elements the author pinned: they stay, with what they hold; the rest moves round them. */
   pinned?: readonly string[]
+  /** Tidy round these elements only: they and what they relate to move, nothing else. */
+  around?: readonly string[]
+  /** Called after each move taken. */
+  onProgress?: (done: number, description: string) => void
+  /** Asked before each round: true stops the tidying with what was done. */
+  shouldStop?: () => boolean
+  /** Stop after this many milliseconds, with what was done. */
+  budgetMs?: number
 }
 
 export const TIDY_NAME = 'Tidy'
@@ -65,7 +75,23 @@ export function runTidyLayout(
   const style = options.edgeStyle ?? 'curved'
   const { nodes, relations } = projectToVisibleGraph(inputNodes, inputRelations)
   const baseline = computeLayoutMetrics(nodes, relations)
-  const l = new Layout(nodes, options.metamodel, options.pinned ?? [])
+  const started = Date.now()
+  const outOfTime = (): boolean => (options.budgetMs !== undefined && Date.now() - started > options.budgetMs) || !!options.shouldStop?.()
+  // Round a few elements: everything else is as good as pinned, but the
+  // frames holding what moves still follow it.
+  let pinned = options.pinned ?? []
+  if (options.around?.length) {
+    const movable = new Set<string>(options.around)
+    for (const r of Object.values(relations)) {
+      if (movable.has(r.sourceId) && nodes[r.targetId]) movable.add(r.targetId)
+      else if (movable.has(r.targetId) && nodes[r.sourceId]) movable.add(r.sourceId)
+    }
+    const free = new Set<string>(movable)
+    for (const id of movable) for (let p = nodes[id]?.parentId; p && nodes[p]; p = nodes[p].parentId) free.add(p)
+    pinned = [...new Set([...pinned, ...Object.keys(nodes).filter((id) => !free.has(id))])]
+  }
+  const l = new Layout(nodes, options.metamodel, pinned)
+  l.edgeStyle = style
   const lines = linesOf(l, relations)
   const before = totalCost(l, lines)
   const steps: TidyStep[] = []
@@ -82,7 +108,7 @@ export function runTidyLayout(
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
-      if (Object.keys(moved).length) steps.push({ kind: move.kind, description: move.description, gain: 0, moved })
+      if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: 0, moved }); options.onProgress?.(steps.length, move.description) }
     }
   }
   // A pile first: elements on each other pulled apart, deepest containers first.
@@ -96,7 +122,7 @@ export function runTidyLayout(
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
-      if (Object.keys(moved).length) steps.push({ kind: move.kind, description: move.description, gain: 0, moved })
+      if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: 0, moved }); options.onProgress?.(steps.length, move.description) }
     }
   }
   gather()
@@ -160,6 +186,7 @@ export function runTidyLayout(
     const moved: PositionMap = {}
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
     steps.push({ kind: move.kind, description: move.description, gain, moved })
+    options.onProgress?.(steps.length, move.description)
     const touched = stale ?? new Set<string>()
     stale = touched
     const reach = 3 * l.meanSize
@@ -211,6 +238,7 @@ export function runTidyLayout(
   }
   const improve = (): void => {
     for (let n = 0; n < (options.maxSteps ?? MAX_STEPS); n++) {
+      if (outOfTime()) break
       let best: { move: Move; gain: number } | null = null
       const rejected: { move: Move; gain: number }[] = []
       const seen = new Set<string>()
@@ -245,6 +273,7 @@ export function runTidyLayout(
   // Drawn in at the end: every move that costs nothing is taken.
   const drawnIn = new Set<string>()
   for (const move of compactMoves(l, nodes, lines)) {
+    if (outOfTime()) break
     index = buildIndex(l, lines)
     const fresh = judge(move)
     if (!fresh.after || fresh.gain < -0.001) continue
@@ -253,7 +282,7 @@ export function runTidyLayout(
     const now = l.positions()
     const moved: PositionMap = {}
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
-    if (Object.keys(moved).length) steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved })
+    if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved }); options.onProgress?.(steps.length, move.description) }
     for (const id of Object.keys(moved)) { drawnIn.add(id); for (const sb of l.childrenOf(l.parentOf(id))) drawnIn.add(sb) }
   }
   // What the drawing in made possible: judged again where something moved.
@@ -265,13 +294,15 @@ export function runTidyLayout(
   // The whole diagram from the top left, as every layout hands it over;
   // not when something is pinned: it stays where the author put it.
   const roots = l.ids().filter((id) => !l.parentOf(id))
-  if (!options.pinned?.length) {
+  if (!pinned.length) {
     const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
     for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
   }
   positions = enforceAlignments(nodes, positions, options.alignments ?? [])
   const projected = projectPositions(nodes, positions)
-  const after = totalCost(new Layout(projected, options.metamodel), lines)
+  const afterLayout = new Layout(projected, options.metamodel)
+  afterLayout.edgeStyle = style
+  const after = totalCost(afterLayout, lines)
   const score = computeCompositeScore(projected, relations, style)
   const winner = { name: TIDY_NAME, positions, metrics: computeLayoutMetrics(projected, relations), score }
   return {
@@ -281,7 +312,7 @@ export function runTidyLayout(
     planarity: computePlanarityScore(projected, relations),
     refinement: { before: before.total, after: after.total, iterations: steps.length },
     keptCurrent: steps.length === 0,
-    tidy: { steps, before, after, unchanged: steps.length === 0 },
+    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime() },
   }
 }
 

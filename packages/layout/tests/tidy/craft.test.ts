@@ -124,6 +124,61 @@ describe('Tidy, the finer points', () => {
     expect(box('sys').h).toBe(Math.max(box('api').h + pad.top + pad.bottom, COLLAPSED_HEIGHT.system))
   })
 
+  it('a time budget stops the tidying with what was done', () => {
+    // A pile of 30 elements: more moves than fit in a budget of a moment.
+    const nodes: C4Node[] = [], relations: C4Relation[] = []
+    for (let i = 0; i < 30; i++) {
+      nodes.push(node(`n${i}`, 'container', (i % 5) * 10, Math.floor(i / 5) * 10))
+      if (i) relations.push(rel(`n${i - 1}`, `n${i}`))
+    }
+    const reported: number[] = []
+    const result = runTidyLayout(byId(nodes), byId(relations), { budgetMs: 1, onProgress: (done) => reported.push(done) })
+    expect(result.tidy.budgetOut).toBe(true)
+    expect(reported).toEqual(result.tidy.steps.map((_, i) => i + 1))
+    const whole = runTidyLayout(byId(nodes), byId(relations))
+    expect(whole.tidy.budgetOut).toBe(false)
+    expect(whole.tidy.steps.length).toBeGreaterThan(result.tidy.steps.length)
+    // A stop asked for from outside ends it the same way.
+    let rounds = 0
+    const stopped = runTidyLayout(byId(nodes), byId(relations), { shouldStop: () => ++rounds > 3 })
+    expect(stopped.tidy.budgetOut).toBe(true)
+  }, 60_000)
+
+  it('tidy around moves only the given elements and what they relate to', () => {
+    // a → b stand well; c was just dropped on d; e and f are far off, standing where they are.
+    const nodes = [node('a', 'container', 0, 0), node('b', 'container', 0, 400), node('c', 'container', 2000, 0), node('d', 'container', 2010, 10), node('e', 'container', 0, 2000), node('f', 'container', 600, 2000)]
+    const relations = [rel('a', 'b'), rel('c', 'd'), rel('e', 'f')]
+    const { result, box } = tidy(nodes, relations)
+    void result
+    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['c'] })
+    const p = around.winner.positions
+    for (const id of ['a', 'b', 'e', 'f']) expect(p[id], id).toMatchObject({ x: byId(nodes)[id].x, y: byId(nodes)[id].y })
+    const c = p.c, d = p.d
+    expect(c.x >= d.x + d.width! || d.x >= c.x + c.width! || c.y >= d.y + d.height! || d.y >= c.y + c.height!).toBe(true)
+    expect(around.tidy.steps.every((s) => Object.keys(s.moved).every((id) => id === 'c' || id === 'd'))).toBe(true)
+    void box
+  })
+
+  it('orthogonal lines are judged along their route, bends counted', () => {
+    // a above-left of b: the orthogonal route leaves a's right side, turns twice and enters b's left;
+    // c stands on the straight chord between them, off the route.
+    const nodes = [node('a', 'container', 0, 0), node('b', 'container', 700, 500), node('c', 'container', 520, 330)]
+    const relations = [rel('a', 'b')]
+    const curved = new Layout(byId(nodes))
+    const orth = new Layout(byId(nodes))
+    orth.edgeStyle = 'orthogonal'
+    const straight = totalCost(curved, linesOf(curved, byId(relations)))
+    const routed = totalCost(orth, linesOf(orth, byId(relations)))
+    expect(straight.bends).toBe(0)
+    expect(routed.bends).toBe(2)
+    expect(straight.overdraws).toBeGreaterThan(0)
+    expect(routed.overdraws).toBe(0)
+    // Tidied as drawn: no element under the route, and fewer bends where a slide straightens the line.
+    const result = runTidyLayout(byId(nodes), byId(relations), { edgeStyle: 'orthogonal' })
+    expect(result.tidy.after.overdraws).toBe(0)
+    expect(result.tidy.after.bends).toBeLessThan(2)
+  })
+
   it('a row is reordered to uncross its lines', () => {
     // Four in a row above four below, the top row in reverse order: every line crosses.
     const top = ['t1', 't2', 't3', 't4'].map((id, i) => node(id, 'container', (3 - i) * 320, 0))

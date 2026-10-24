@@ -1007,10 +1007,10 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             onChange={(e) => setViewLayoutMode(view.id, e.target.value as 'auto' | 'ensemble' | 'tree')}
             className="props-input"
             style={{ cursor: 'pointer', width: '100%' }}
-            title="What Smart Layout runs on this view. Auto tidies the canvas as you would: elements pulled out, lines straightened, the rest drawn in. Ensemble tries twelve algorithms and keeps the one that scores best. Use 'Hierarchical tree' for views dominated by domain objects."
+            title="What Smart Layout runs on this view. Auto tidies the canvas as you would: elements pulled out, lines straightened, the rest drawn in. Ensemble tries eleven algorithms and keeps the one that scores best. Use 'Hierarchical tree' for views dominated by domain objects."
           >
             <option value="auto">Auto (tidy the canvas)</option>
-            <option value="ensemble">Ensemble (twelve algorithms, ranked)</option>
+            <option value="ensemble">Ensemble (eleven algorithms, ranked)</option>
             <option value="tree">Hierarchical nested tree</option>
           </select>
         </div>

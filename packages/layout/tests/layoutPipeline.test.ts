@@ -184,8 +184,8 @@ describe('runSmartLayoutELKPhase', () => {
     const result = await runSmartLayoutELKPhase(nodes, relations, undefined, (p) => progress.push(p))
     if (result.done) throw new Error('expected candidates')
 
-    expect(result.raw).toHaveLength(12)
+    expect(result.raw).toHaveLength(11)
     expect(result.raw.every((c) => !('score' in c))).toBe(true)
-    expect(progress.map((p) => ('done' in p ? p.done : -1))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    expect(progress.map((p) => ('done' in p ? p.done : -1))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
   })
 })

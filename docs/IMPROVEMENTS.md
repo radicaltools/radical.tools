@@ -712,6 +712,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     needs quoting right; the ids ended up read from the `nodes/*.md` files
     with grep. A `FIND <text>` that matches labels and ids would save the
     round trip.
+57. **Tidy's weights wait for the author's judgements.** The weights of the
+    reader's cost (crossing 10, line over an element 8, slanted 4, against
+    the flow 3, flat 4, …) are set by hand. `packages/layout/bench/tidy-calibrate.mts pairs <dir>`
+    draws each bench view twice (the current weights, one weight doubled or
+    halved) for the author to choose from, and `fit <dir>` fits the weights
+    to the choices (a perceptron over the cost parts). Pending: the author's
+    answers on their own models (2026-10-24).
 
 ### Reverse-engineered requirements (2026-10-06)
 

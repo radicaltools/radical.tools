@@ -46,7 +46,6 @@ import { computeRoutedEdge, ObstacleGrid, separateParallelSegments, type Routing
 import { labelOverlaps, placeEdgeLabels, type LabelEdge, type LabelObstacle } from './edgeLabels'
 import { allocatePorts } from './portAllocator'
 import type { Metamodel } from '@radical/common/metamodel'
-import { applyRadicalLayout } from './radicalLayout'
 import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './crossingOpt'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 import { compoundPadding, projectToVisibleGraph } from './geometry'
@@ -1500,16 +1499,12 @@ export async function runSmartLayoutELKPhase(
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
     ],
-    [
-      'Radical (semantic C4)',
-      () => applyRadicalLayout(nodes, relations),
-    ],
   ]
 
   // Engines run one at a time with a yield in between: bundled ELK runs a
-  // whole layout synchronously on this (main) thread, so queueing all twelve at
+  // whole layout synchronously on this (main) thread, so queueing all eleven at
   // once would freeze the UI for their combined time. One at a time, the
-  // longest freeze is a single layout and "N/12 algorithms tried" advances live.
+  // longest freeze is a single layout and "N/11 algorithms tried" advances live.
   const total = engines.length
   const raw: RawCandidate[] = []
   onProgress?.({ phase: 'candidates', done: 0, total })
