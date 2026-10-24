@@ -4,7 +4,7 @@
  * children after each move the way the canvas fits them. Moves are
  * tried and taken back, so a move is a snapshot of the boxes it changes.
  */
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node, nodeTypeSize, type PositionMap } from '@radical/common/c4'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node, type EdgeStyle, nodeTypeSize, type PositionMap } from '@radical/common/c4'
 import { type LayoutRole, type Metamodel, layoutRoleOf } from '@radical/common/metamodel'
 import { compoundPadding, effectiveHeight, effectiveWidth } from '../geometry'
 import { CHILD_GAP, ROOT_GAP } from '../layoutFinalize'
@@ -24,6 +24,9 @@ export class Layout {
   /** While a move is tried: the box each changed element had before it (boxes are replaced, never changed in place). */
   private journal: Map<string, Box> | null = null
   readonly meanSize: number
+
+  /** How the view draws its lines: an orthogonal line is judged along its route (cost.ts). */
+  edgeStyle: EdgeStyle = 'curved'
 
   constructor(readonly nodes: Record<string, C4Node>, readonly metamodel?: Metamodel | null, pinned: Iterable<string> = []) {
     const abs = new Map<string, { x: number; y: number }>()

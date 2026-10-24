@@ -578,6 +578,32 @@ describe('long Smart Layout runs', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   }, 60_000)
 
+  it('tidies around the given elements only', async () => {
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      { id: 'a', type: 'system', label: 'A', x: 0, y: 0, width: 240, height: 160, collapsed: false },
+      { id: 'b', type: 'system', label: 'B', x: 0, y: 400, width: 240, height: 160, collapsed: false },
+      { id: 'c', type: 'system', label: 'C', x: 2000, y: 0, width: 240, height: 160, collapsed: false },
+      { id: 'd', type: 'system', label: 'D', x: 2010, y: 10, width: 240, height: 160, collapsed: false },
+    ]
+    data.relations = [{ id: 'ab', sourceId: 'a', targetId: 'b', relationType: 'interacts' }, { id: 'cd', sourceId: 'c', targetId: 'd', relationType: 'interacts' }]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { around: ['c'] })
+    expect(outcome.ok, outcome.text).toBe(true)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const at = (id: string) => { const n = after.nodes.find((x) => x.id === id)!; return [n.x, n.y] }
+    expect(at('a')).toEqual([0, 0])
+    expect(at('b')).toEqual([0, 400])
+    const c = after.nodes.find((x) => x.id === 'c')!, d = after.nodes.find((x) => x.id === 'd')!
+    expect(c.x >= d.x + d.width || d.x >= c.x + c.width || c.y >= d.y + d.height || d.y >= c.y + c.height).toBe(true)
+    expect((await model.call('smart_layout', { around: ['nope'] })).ok).toBe(false)
+  }, 60_000)
+
   it('leaves the pinned elements where they are, and keeps the pins', async () => {
     // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()

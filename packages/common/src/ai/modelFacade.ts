@@ -28,7 +28,7 @@ export interface ModelFacadeOptions {
   /** Lays out a document (All elements, or one view) and returns the result
    *  as `data`, or no data when nothing changed. Enables runLayout; the MCP
    *  server passes Smart Layout from @radical/layout. */
-  runLayout?: (doc: DiagramData, viewId?: string) => Promise<{ ok: boolean; text: string; data?: DiagramData }>
+  runLayout?: (doc: DiagramData, viewId?: string, around?: readonly string[]) => Promise<{ ok: boolean; text: string; data?: DiagramData }>
 }
 
 const randomId = (): string =>
@@ -256,8 +256,8 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     },
 
     ...(options.runLayout ? {
-      async runLayout(viewId?: string) {
-        const outcome = await options.runLayout!(toDiagramData(), viewId)
+      async runLayout(viewId?: string, around?: readonly string[]) {
+        const outcome = await options.runLayout!(toDiagramData(), viewId, around)
         if (outcome.data) load(outcome.data)
         return { ok: outcome.ok, text: outcome.text }
       },

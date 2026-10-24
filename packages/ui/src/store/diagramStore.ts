@@ -68,7 +68,8 @@ import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
-import { runTidyLayout, type TidyStep } from '@radical/layout/tidy'
+import type { TidyStep } from '@radical/layout/tidy'
+import { runTidy, TIDY_STOPPED } from '../layout/tidyRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
@@ -3102,7 +3103,10 @@ interface DiagramStore {
   // ── actions: layout ──
   runRadicalLayout: () => void
   runTreeLayout: () => Promise<void>
-  runSmartLayout: () => Promise<void>
+  /** Smart Layout on the active canvas; `around` tidies round those elements only. */
+  runSmartLayout: (options?: { around?: string[] }) => Promise<void>
+  /** Stops a running Tidy; the canvas stays as it was. */
+  cancelSmartLayout: () => void
   setLayoutMode: (mode: 'elk' | 'cola' | 'radical') => void
   startLiveLayout: (opts?: { skipBulk?: boolean }) => void
   stopLiveLayout: () => void
@@ -3322,6 +3326,11 @@ interface DiagramStore {
 /** A layout of the whole canvas places every element anew: the active
  *  canvas's pins (elements dropped after a drag) go with the old places.
  *  Designer only: Viewer puts the old positions back when it is left. */
+/** The Tidy run in progress, to stop it from the button. */
+let _tidyAbort: AbortController | null = null
+/** Tidy hands over what it did within this time; a view that needs more is tidied again. */
+const TIDY_BUDGET_MS = 10_000
+
 function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
   if (appMode !== 'designer') return
   const pinned = pinnedNodeIds(model.layoutConstraintsOf(state, state.activeViewId))
@@ -6704,7 +6713,8 @@ export const useDiagramStore = create<DiagramStore>()(
         }
       },
 
-      async runSmartLayout() {
+      cancelSmartLayout() { _tidyAbort?.abort() },
+      async runSmartLayout(layoutOptions = {}) {
         // Allowed in designer and viewer (viewer = explore: positions are
         // reverted on exit by the __preModeLayout snapshot in setAppMode).
         // Disallowed in metamodel where the canvas isn't shown.
@@ -6727,9 +6737,12 @@ export const useDiagramStore = create<DiagramStore>()(
           }
         }
         // Auto (the default) tidies the canvas move by move; Ensemble runs
-        // the twelve engines and ranks them.
+        // the eleven engines and ranks them.
         const ensemble = (get().activeViewId ? get().views[get().activeViewId!]?.layoutMode : undefined) === 'ensemble'
-        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: 'tidying' } })
+        const around = layoutOptions.around?.filter((id) => !!get().c4Nodes[id])
+        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: around ? 'tidying around' : 'tidying' } })
+        const abort = new AbortController()
+        _tidyAbort = abort
         try {
           const input = layoutInputForView(get())
           // A view that shows nothing yet (a new model's views) has nothing
@@ -6748,13 +6761,22 @@ export const useDiagramStore = create<DiagramStore>()(
               set((s) => { s.smartLayoutProgress = progress })
             }, { alignments: input.alignments, edgeStyle })
           } else {
-            // Tidy lands on the next turn, so a view opened or a model
-            // reloaded meanwhile is handled as for a long run. Its moves
-            // are not played: the result is shown at once, the moves listed
+            // Tidy runs in a worker, each move reported; the button stops it
+            // (the canvas stays as it was), and the time budget hands over
+            // what was done. The result is shown at once, the moves listed
             // in the report.
-            await new Promise<void>((resolve) => setTimeout(resolve, 0))
+            try {
+              result = await runTidy(input.nodes, input.relations, {
+                alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined,
+                pinned: pinnedNodeIds(activeLayoutConstraints(get())), around, budgetMs: TIDY_BUDGET_MS,
+              }, (done, message) => {
+                set((s) => { s.smartLayoutProgress = { phase: 'tidy', message: `${done} move${done === 1 ? '' : 's'} · ${message}` } })
+              }, abort.signal)
+            } catch (err) {
+              if ((err as Error).message === TIDY_STOPPED) { get().pushNotification('Smart layout stopped; nothing changed.', 'info'); return }
+              throw err
+            }
             if (layoutTarget(get()) !== target) { layoutMissedItsCanvas(get().pushNotification); return }
-            result = runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined, pinned: pinnedNodeIds(activeLayoutConstraints(get())) })
           }
           if (layoutTarget(get()) !== target) {
             layoutMissedItsCanvas(get().pushNotification)
@@ -6852,9 +6874,9 @@ export const useDiagramStore = create<DiagramStore>()(
             ? 'planar ✓'
             : `${Math.round((1 - result.planarity.ratio) * 100)}% planar`
           const arrow = '\u2009\u2192\u2009'
-          const tidied = (result as { tidy?: { steps: TidyStep[]; before: { total: number }; after: { total: number } } }).tidy
+          const tidied = (result as { tidy?: { steps: TidyStep[]; before: { total: number }; after: { total: number }; budgetOut?: boolean } }).tidy
           const msg = tidied
-            ? `Smart layout: ${tidied.steps.length} move${tidied.steps.length === 1 ? '' : 's'} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws}.`
+            ? `Smart layout${around ? ' around the selection' : ''}: ${tidied.steps.length} move${tidied.steps.length === 1 ? '' : 's'}${tidied.budgetOut ? ` in ${Math.round(TIDY_BUDGET_MS / 1000)} s (run it again for more)` : ''} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws}.`
             : before.weightedCost === 0
               ? `Smart layout: ${result.winner.name} — ${after.crossings} crossings, ${after.overdraws} overdraws · ${planarTag}.`
               : `Smart layout: ${result.winner.name} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws} (${pct}% better) · ${planarTag}.`
@@ -6912,6 +6934,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification('Smart layout failed — see console.', 'error')
         } finally {
           if (firstOpen && _firstLayoutOf === firstOpen) _firstLayoutOf = null
+          if (_tidyAbort === abort) _tidyAbort = null
           set((state) => { state.isLayoutRunning = false; state.smartLayoutProgress = null })
         }
       },

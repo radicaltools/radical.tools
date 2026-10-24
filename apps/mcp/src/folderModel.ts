@@ -77,6 +77,8 @@ const buildTools = (metamodel: Metamodel | undefined): ToolDef[] => [
 export interface CallOptions {
   onProgress?: (progress: { progress: number; message: string }) => void
   signal?: AbortSignal
+  /** smart_layout: tidy round these elements only. */
+  around?: readonly string[]
 }
 
 const CANCELLED = 'The client cancelled the call; nothing was written.'
@@ -408,8 +410,8 @@ export class FolderModel {
         data.views = withCanvasPositions(data.views, nodes, (view) => viewDrawnIds(view, nodes, relations))
       }
       const facade = createModelFacade(data, {
-        runLayout: async (doc, viewId) => {
-          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel, doc.nodes), viewId, options)
+        runLayout: async (doc, viewId, around) => {
+          const layout = await this.smartLayout(doc, documentMetamodel(doc.metamodel, doc.nodes), viewId, { ...options, around })
           return { ok: layout.ok, text: layout.text, data: layout.changed }
         },
       })
@@ -610,7 +612,7 @@ export class FolderModel {
     let step = 0
     const edgeStyle = view?.edgeStyle ?? changed.defaultEdgeStyle ?? 'curved'
     // Auto (the default) tidies the canvas move by move; a view set to
-    // Ensemble runs the twelve engines and ranks them, as Studio's button does.
+    // Ensemble runs the eleven engines and ranks them, as Studio's button does.
     const ensemble = view?.layoutMode === 'ensemble'
     const result = ensemble
       ? await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
@@ -621,7 +623,7 @@ export class FolderModel {
       : (() => {
         options.onProgress?.({ progress: ++step, message: 'Smart Layout: tidying' })
         if (options.signal?.aborted) throw new Error(CANCELLED)
-        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: pinnedNodeIds(constraints) })
+        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: pinnedNodeIds(constraints), around: options.around })
       })()
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }

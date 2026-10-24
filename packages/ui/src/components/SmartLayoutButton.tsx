@@ -153,6 +153,7 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
  */
 export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = {}): React.ReactElement {
   const runSmartLayout = useDiagramStore((s) => s.runSmartLayout)
+  const cancelSmartLayout = useDiagramStore((s) => s.cancelSmartLayout)
   const isLayoutRunning = useDiagramStore((s) => s.isLayoutRunning)
   const appMode = useDiagramStore((s) => s.appMode)
   const smartLayoutProgress = useDiagramStore((s) => s.smartLayoutProgress)
@@ -160,6 +161,9 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
   const activeViewLayoutMode = useDiagramStore((s) =>
     s.activeViewId ? s.views[s.activeViewId]?.layoutMode ?? 'auto' : 'auto'
   )
+
+  // A running Tidy can be stopped from the button; the ensemble runs on.
+  const tidying = isLayoutRunning && smartLayoutProgress?.phase === 'tidy'
 
   const baseTitle = activeViewLayoutMode === 'tree'
     ? 'Tree Layout — hierarchical nested-tree arrangement (configured for the active view).'
@@ -171,11 +175,13 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
     <>
       <button
         className={`toolbar-btn toolbar-btn-accent${isLayoutRunning ? ' toolbar-btn-busy' : ''}`}
-        onClick={() => { void runSmartLayout() }}
-        disabled={isLayoutRunning || appMode === 'metamodel'}
-        title={readOnlyNote ? `${baseTitle} ${readOnlyNote}` : baseTitle}
+        onClick={() => { if (tidying) cancelSmartLayout(); else void runSmartLayout() }}
+        disabled={(isLayoutRunning && !tidying) || appMode === 'metamodel'}
+        title={tidying ? 'Stop Smart Layout — the canvas stays as it was' : readOnlyNote ? `${baseTitle} ${readOnlyNote}` : baseTitle}
       >
-        {isLayoutRunning && activeViewLayoutMode !== 'tree' ? (
+        {tidying ? (
+          <><span className="toolbar-btn-spin"><IconSmartLayout /></span> Stop · {smartLayoutProgressLabel(smartLayoutProgress) ?? 'tidying'}</>
+        ) : isLayoutRunning && activeViewLayoutMode !== 'tree' ? (
           <><span className="toolbar-btn-spin"><IconSmartLayout /></span> {smartLayoutProgressLabel(smartLayoutProgress) ?? 'Working…'}</>
         ) : activeViewLayoutMode === 'tree' ? (
           <><IconTreeLayout /> Tree Layout</>

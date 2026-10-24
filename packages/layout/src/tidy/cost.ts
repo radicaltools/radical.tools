@@ -20,11 +20,13 @@ import type { C4Relation } from '@radical/common/c4'
 import { type LayoutFlow, relationLayoutHint } from '@radical/common/metamodel'
 import type { Layout } from './layout'
 import { allocatePorts } from '../portAllocator'
+import { orthogonalConnector, type Pt } from '../edgeRouting'
 import { Position } from '../side'
 
 export type Ends = { ax: number; ay: number; bx: number; by: number }
 /** `mid`: the ends at the middle of the sides the ports are on, where a solitary port lies. A side several lines leave from spreads them (`fan`), so such a line is drawn slanted whatever the elements do; it is judged straight when it would be straight from the middle, as a fan is read: by where the elements stand, and its slant counts half. */
-export type LineGeom = Ends & { x0: number; y0: number; x1: number; y1: number; mid: Ends; fan: boolean }
+/** `path`: the points the line is drawn through, port to port: two for a curved or straight line, an L or a Z for an orthogonal one. */
+export type LineGeom = Ends & { x0: number; y0: number; x1: number; y1: number; mid: Ends; fan: boolean; path: Pt[] }
 
 export const W_CROSSING = 10
 export const W_OVERDRAW = 8
@@ -56,6 +58,14 @@ export const W_GRID = 1.5
 export const W_EVEN = 1.5
 /** Per relation label drawn over an element it does not join, or over another label. */
 export const W_LABEL = 3
+/** Per bend of an orthogonal line (an L has one, a Z two). */
+export const W_BEND = 2
+
+/** The weights, by the name of the part they weigh: what bench/tidy-calibrate.mts fits. */
+export const WEIGHTS = {
+  crossings: W_CROSSING, overdraws: W_OVERDRAW, slanted: W_SLANT, length: W_LENGTH, imbalance: W_IMBALANCE, spread: W_SPREAD, misplaced: W_PLACE,
+  againstFlow: W_AGAINST_FLOW, flat: W_FLAT, fans: W_FAN, brushes: W_BRUSH, offGrid: W_GRID, offConvention: W_CONVENTION, uneven: W_EVEN, labels: W_LABEL, bends: W_BEND,
+}
 /** A label's box: the canvas draws the name at 17 px, about 0.56 em per character, with room round it. */
 export const LABEL_CHAR = 17 * 0.56
 export const LABEL_PAD = 16
@@ -147,7 +157,10 @@ export function portsOf(l: Layout, all: Line[]): Map<Line, LineGeom> {
     const ax = p?.sourcePoint.x ?? a.cx, ay = p?.sourcePoint.y ?? a.cy, bx = p?.targetPoint.x ?? b.cx, by = p?.targetPoint.y ?? b.cy
     const ma = middle(a, p?.sourceSide), mb = middle(b, p?.targetSide)
     const fan = !!p && ((onSide.get(`${q.a}|${p.sourceSide}`) ?? 1) > 1 || (onSide.get(`${q.b}|${p.targetSide}`) ?? 1) > 1)
-    out.set(q, { ax, ay, bx, by, x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by), mid: { ax: ma.x, ay: ma.y, bx: mb.x, by: mb.y }, fan })
+    // An orthogonal line runs out of each side and turns between the ports; a curved one is judged on its chord.
+    const path: Pt[] = l.edgeStyle === 'orthogonal' && p ? orthogonalConnector({ x: ax, y: ay }, p.sourceSide, { x: bx, y: by }, p.targetSide) : [{ x: ax, y: ay }, { x: bx, y: by }]
+    const xs = path.map((pt) => pt.x), ys = path.map((pt) => pt.y)
+    out.set(q, { ax, ay, bx, by, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), mid: { ax: ma.x, ay: ma.y, bx: mb.x, by: mb.y }, fan, path })
   }
   return out
 }
@@ -169,7 +182,7 @@ function imbalance(l: Layout, id: string, lines: Line[]): number {
 
 export interface CostParts {
   crossings: number; overdraws: number; slanted: number; length: number; imbalance: number; spread: number; misplaced: number
-  againstFlow: number; flat: number; fans: number; brushes: number; offGrid: number; offConvention: number; uneven: number; labels: number
+  againstFlow: number; flat: number; fans: number; brushes: number; offGrid: number; offConvention: number; uneven: number; labels: number; bends: number
   total: number
 }
 
@@ -430,7 +443,7 @@ class Grid<T> {
 }
 
 function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: ReadonlySet<string> | undefined, index: CostIndex, given?: ReadonlySet<string>): CostParts {
-  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, total: 0 }
+  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, bends: 0, total: 0 }
   const brush = BRUSH * l.meanSize
   const mineSet = new Set(mine)
   // Every line's ends and box (cached while its ends stand), and a coarse
@@ -445,7 +458,7 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
       if (p.a === q.a || p.a === q.b || p.b === q.a || p.b === q.b) continue
       const qe = geomOf(index, q)
       if (qe.x0 > pe.x1 || qe.x1 < pe.x0 || qe.y0 > pe.y1 || qe.y1 < pe.y0) continue
-      if (segmentsCross(pe.ax, pe.ay, pe.bx, pe.by, qe.ax, qe.ay, qe.bx, qe.by)) parts.crossings++
+      if (pathsCross(pe.path, qe.path)) parts.crossings++
     }
   }
   // Over an element: through it, less a hair; brushing it: within BRUSH of it.
@@ -453,7 +466,8 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
     if (id === line.a || id === line.b || l.holds(id, line.a) || l.holds(id, line.b) || l.holds(line.a, id) || l.holds(line.b, id)) return false
     const r = l.box(id)!
     if (r.x - by > e.x1 || r.x + r.w + by < e.x0 || r.y - by > e.y1 || r.y + r.h + by < e.y0) return false
-    return segmentHitsRect(e.ax, e.ay, e.bx, e.by, r.x - by, r.y - by, r.x + r.w + by, r.y + r.h + by)
+    for (let i = 1; i < e.path.length; i++) if (segmentHitsRect(e.path[i - 1].x, e.path[i - 1].y, e.path[i].x, e.path[i].y, r.x - by, r.y - by, r.x + r.w + by, r.y + r.h + by)) return true
+    return false
   }
   const overOrBrush = (line: Line, e: LineGeom, id: string): void => {
     if (!overBox(line, e, id, brush)) return
@@ -476,6 +490,7 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
     const e = geomOf(index, p)
     for (const id of boxGrid.near(e.x0 - brush, e.y0 - brush, e.x1 + brush, e.y1 + brush)) overOrBrush(p, e, id)
     if (p.label) labelOver(p, labelBox(e, p.label))
+    parts.bends += Math.max(0, e.path.length - 2)
     if (!isStraight(index, p)) parts.slanted += e.fan ? 0.5 : 1
     if (againstFlow(l, p)) parts.againstFlow++
     if (flat(l, p)) parts.flat++
@@ -509,10 +524,17 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
   else if (moved) for (const m of moved) siblingsNear(l, l.parentOf(m), l.box(m)!, roomy)
   for (const id of roomy) { parts.spread += spreadOf(l, id); if (!inGrid(l, id)) parts.offGrid++; parts.uneven += uneven(l, id) }
   for (const id of ids) { parts.misplaced += misplaced(l, id, index.linesOf.get(id) ?? []); parts.offConvention += offConvention(l, id, index.linesOf.get(id) ?? []) }
-  parts.total = parts.crossings * W_CROSSING + parts.overdraws * W_OVERDRAW + parts.slanted * W_SLANT + parts.length * W_LENGTH + parts.imbalance * W_IMBALANCE + parts.spread * W_SPREAD + parts.misplaced * W_PLACE
-    + parts.againstFlow * W_AGAINST_FLOW + parts.flat * W_FLAT + parts.fans * W_FAN + parts.brushes * W_BRUSH + parts.offGrid * W_GRID + parts.offConvention * W_CONVENTION
-    + parts.uneven * W_EVEN + parts.labels * W_LABEL
+  parts.total = 0
+  for (const k of Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]) parts.total += parts[k] * WEIGHTS[k]
   return parts
+}
+
+/** Whether two drawn lines cross anywhere along their paths. */
+export function pathsCross(p: Pt[], q: Pt[]): boolean {
+  for (let i = 1; i < p.length; i++) for (let j = 1; j < q.length; j++) {
+    if (segmentsCross(p[i - 1].x, p[i - 1].y, p[i].x, p[i].y, q[j - 1].x, q[j - 1].y, q[j].x, q[j].y)) return true
+  }
+  return false
 }
 
 export function segmentsCross(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean {
