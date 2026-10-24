@@ -3328,8 +3328,9 @@ interface DiagramStore {
  *  Designer only: Viewer puts the old positions back when it is left. */
 /** The Tidy run in progress, to stop it from the button. */
 let _tidyAbort: AbortController | null = null
-/** Tidy hands over what it did within this time; a view that needs more is tidied again. */
-const TIDY_BUDGET_MS = 10_000
+/** Tidy hands over what it did within this time; a view that needs more is tidied again.
+ *  Under the tests (hundreds of layouts in a fuzz run) a short budget: what it hands over is whole either way. */
+const TIDY_BUDGET_MS = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.VITEST ? 1500 : 10_000
 
 function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
   if (appMode !== 'designer') return
