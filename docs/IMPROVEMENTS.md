@@ -699,6 +699,26 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     it had fixed. Worktrees running e2e tests one after another need the
     port free first, or a port of their own (an env variable for the base
     port), or the reuse off when a run's build is not the one served.
+55. **Editing a worktree's `architecture/` through MCP needs a client of
+    one's own.** The project's `radical-architecture` server writes the main
+    checkout; a worktree's model is reached only by starting its own server
+    over stdio and driving it with a throwaway client fed JSON call lists
+    (2026-10-24, the Tidy branch: forty-odd `add_node`/`add_relation` calls
+    per batch). A `radical mcp call <tool> <json>` in the CLI, or `.mcp.json`
+    resolving `--folder` against the worktree, would do.
+56. **No lookup by name in `search_model`.** The query language lists and
+    filters (`LIST NODES WHERE label = …`), but a model element is almost
+    always known by its label, and a label with an apostrophe or a comma
+    needs quoting right; the ids ended up read from the `nodes/*.md` files
+    with grep. A `FIND <text>` that matches labels and ids would save the
+    round trip.
+57. **Tidy's weights wait for the author's judgements.** The weights of the
+    reader's cost (crossing 10, line over an element 8, slanted 4, against
+    the flow 3, flat 4, …) are set by hand. `packages/layout/bench/tidy-calibrate.mts pairs <dir>`
+    draws each bench view twice (the current weights, one weight doubled or
+    halved) for the author to choose from, and `fit <dir>` fits the weights
+    to the choices (a perceptron over the cost parts). Pending: the author's
+    answers on their own models (2026-10-24).
 
 ### Reverse-engineered requirements (2026-10-06)
 

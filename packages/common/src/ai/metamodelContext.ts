@@ -54,6 +54,7 @@ export function buildMetamodelMessage(
       allowedParents,
       allowedAtRoot: atRoot,
       cardinality: t.cardinality,
+      ...(t.layout ? { layout: t.layout } : {}),
       ...(fullDetail ? { properties: t.properties } : {}),
     }
   })
@@ -63,6 +64,7 @@ export function buildMetamodelMessage(
     allowedPairs: r.allowedPairs,
     properties: r.properties,
     ...(r.governance ? { governance: true } : {}),
+    ...(r.layout ? { layout: r.layout } : {}),
   }))
   const viewpoints = viewpointsOf(mm).map((t) => ({ id: t.id, label: t.label, ...(t.group ? { group: t.group } : {}), kind: t.kind, ...(t.subject ? { subjectTypes: t.subject.types } : {}), ...(t.description ? { description: t.description } : {}) }))
   return [
@@ -83,6 +85,10 @@ export function buildMetamodelMessage(
     'not a hard failure). A property of type `ref` takes the id of a node of type',
     '`refType` (or a tempId from this run); with `multiple: true`, an array of them.',
     ...(viewpoints.length ? ['`viewpoints` are a view type (kind) with a filter chain under a name: create_view and', 'update_view take one as `viewpoint` (id or name); the view follows the viewpoint. One with `subjectTypes`', 'draws one element: its view is a group holding a view of each element of those types (partOf).'] : []),
+    'A type\'s `layout` says what Smart Layout takes it for (a node type\'s role: actor above what it uses,',
+    'store beside its user, note beside its anchor, start, end, broker between its sides, screen; a relation',
+    'type\'s flow: forward, reverse or side, along a free, vertical or horizontal axis); upsert_node_type and',
+    'upsert_relation_type set it for a custom type.',
     '```json',
     JSON.stringify({ nodeTypes: types, relationTypes: relations, ...(viewpoints.length ? { viewpoints } : {}) }),
     '```',

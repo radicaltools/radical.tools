@@ -82,6 +82,13 @@ test('a layout started on one canvas does not land on another', async ({ page, s
   await page.waitForTimeout(800)
   const saved = (await studio.storedDoc(docId)).views!.find((v) => v.id === 'view-core')!.positions
 
+  // Tidy lands within a tick; the Ensemble takes long enough to switch
+  // views meanwhile: set it in the view's properties.
+  const trace = page.locator('.lp-view-card', { hasText: 'Requirements Traceability' }).first()
+  await trace.click()
+  await trace.getByTitle('View properties').click()
+  await page.getByTitle(/^What Smart Layout runs on this view/).selectOption('ensemble')
+  await page.locator('.left-panel .rp-slider.show-props .rp-back-btn').click()
   const card = page.locator('.lp-view-card').filter({ hasText: 'Core Banking' }).first()
   await expect(card).toBeVisible()
   await page.getByRole('button', { name: 'Smart Layout', exact: true }).click()

@@ -53,6 +53,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const adr: NodeTypeDef = {
     id: 'adr',
+    layout: { role: 'note', side: 'left' },
     label: 'ADR',
     description: 'An architecture decision record: the context of a decision, the decision itself, its consequences and the alternatives that were considered.',
     color: '#92400e',
@@ -104,6 +105,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const fitnessFn: NodeTypeDef = {
     id: 'fitness-fn',
+    layout: { role: 'note', side: 'left' },
     label: 'Fitness Function',
     description: 'An objective, preferably automated check that the architecture still has a property it was designed for.',
     color: '#5b21b6',
@@ -160,6 +162,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const need: NodeTypeDef = {
     id: 'need',
+    layout: { role: 'element' },
     label: 'Need',
     description: "Raw input in the stakeholder's own words, kept verbatim: a brief, a user story, a note, a regulation.",
     color: '#475569',
@@ -215,6 +218,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const requirement: NodeTypeDef = {
     id: 'requirement',
+    layout: { role: 'note', side: 'left' },
     label: 'Requirement',
     description: 'One thing the system shall do, written as an EARS sentence.',
     color: '#0e7490',
@@ -259,6 +263,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const constrains: RelationTypeDef = {
     id: 'constrains',
+    layout: { flow: 'side' },
     label: 'Constrains',
     description: 'The decision, check or requirement applies to the target element.',
     inverseLabel: 'Constrained by',
@@ -273,6 +278,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const supersedes: RelationTypeDef = {
     id: 'supersedes',
+    layout: { flow: 'forward' },
     label: 'Supersedes',
     description: 'The newer decision replaces the older one.',
     inverseLabel: 'Superseded by',
@@ -285,6 +291,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const implements_: RelationTypeDef = {
     id: 'implements',
+    layout: { flow: 'side' },
     label: 'Implements',
     description: 'A fitness function checks that a decision still holds; a C4 element runs a state machine.',
     inverseLabel: 'Implemented by',
@@ -299,6 +306,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   const satisfiesTargets = ['person', 'system', 'domain', 'container', 'component', 'database', 'webapp', 'queue'] as const
   const satisfies: RelationTypeDef = {
     id: 'satisfies',
+    layout: { flow: 'side' },
     label: 'Satisfies',
     description: 'The element is what makes the requirement true.',
     inverseLabel: 'Satisfied by',
@@ -315,6 +323,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // input it was derived from) and need → need (a need within a broader one)
   const derives: RelationTypeDef = {
     id: 'derives',
+    layout: { flow: 'reverse', axis: 'vertical' },
     label: 'Derives from',
     description: 'A requirement turns stakeholder input into a shall-statement or refines a broader requirement; a need sits inside a broader need.',
     inverseLabel: 'Refined into',
@@ -332,6 +341,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // requirement → ADR traceability
   const tracesTo: RelationTypeDef = {
     id: 'traces-to',
+    layout: { flow: 'reverse', axis: 'vertical' },
     label: 'Traces to',
     description: 'The decision the requirement led to, or the check that keeps it.',
     inverseLabel: 'Traced from',
@@ -357,6 +367,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const scenario: NodeTypeDef = {
     id: 'scenario',
+    layout: { role: 'note', side: 'left' },
     label: 'Scenario',
     description: 'An acceptance example in Gherkin: given a starting situation, when something happens, then the outcome.',
     color: '#166534',
@@ -392,6 +403,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   const verifiesTargets = ['requirement'] as const
   const verifies: RelationTypeDef = {
     id: 'verifies',
+    layout: { flow: 'reverse', axis: 'vertical' },
     label: 'Verifies',
     description: 'The scenario is the acceptance test of the requirement or state machine.',
     inverseLabel: 'Verified by',
@@ -419,6 +431,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const blueprint: NodeTypeDef = {
     id: 'blueprint',
+    layout: { role: 'element' },
     label: 'Blueprint',
     description: 'A curated reference architecture imported from the Concept Hub.',
     color: '#1e3a5f',
@@ -453,6 +466,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const mockup: NodeTypeDef = {
     id: 'mockup',
+    layout: { role: 'screen' },
     label: 'Mockup',
     description: 'One screen of the product, optionally with a low-fi wireframe.',
     color: '#be185d',
@@ -485,6 +499,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // mockup → requirement / scenario: this screen illustrates that behaviour
   const illustrates: RelationTypeDef = {
     id: 'illustrates',
+    layout: { flow: 'side' },
     label: 'Illustrates',
     description: 'The screen shows the requirement being met, the step of the scenario, or what the user sees in the state.',
     inverseLabel: 'Illustrated by',
@@ -501,6 +516,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // mockup → container: which part of the system renders this screen
   const presentedBy: RelationTypeDef = {
     id: 'presented-by',
+    layout: { flow: 'side' },
     label: 'Presented by',
     description: 'The part of the architecture that renders the screen.',
     inverseLabel: 'Presents',
@@ -514,6 +530,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // mockup → mockup: screen flow
   const navigatesTo: RelationTypeDef = {
     id: 'navigates-to',
+    layout: { flow: 'forward', axis: 'horizontal' },
     label: 'Navigates to',
     description: 'One step of a screen flow, with what triggers it.',
     inverseLabel: 'Reached from',
@@ -538,6 +555,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const stateMachine: NodeTypeDef = {
     id: 'state-machine',
+    layout: { role: 'element' },
     label: 'State Machine',
     description: 'The lifecycle of one entity: the states it can be in and the transitions between them.',
     color: '#3730a3',
@@ -558,6 +576,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const state: NodeTypeDef = {
     id: 'state',
+    layout: { role: 'element', byProperty: { key: 'kind', roles: { final: 'end' } } },
     label: 'State',
     description: 'A situation the entity can be in.',
     color: '#4f46e5',
@@ -588,6 +607,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const pseudostate: NodeTypeDef = {
     id: 'pseudostate',
+    layout: { role: 'element', byProperty: { key: 'kind', roles: { initial: 'start' } } },
     label: 'Pseudostate',
     description: 'A point a state machine passes through but never rests in: where it starts, a choice, a history.',
     color: '#1e1b4b',
@@ -612,6 +632,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const event: NodeTypeDef = {
     id: 'event',
+    layout: { role: 'note', side: 'left' },
     label: 'Event',
     description: 'Something that happens and can trigger a transition.',
     color: '#c2410c',
@@ -639,6 +660,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   const stateNodeTypes = ['state', 'pseudostate'] as const
   const transition: RelationTypeDef = {
     id: 'transition',
+    layout: { flow: 'forward', axis: 'vertical' },
     label: 'Transition',
     description: 'The machine moves from one state to another: on an event, under a guard, running actions.',
     forwardLabel: 'Transitions to',
@@ -666,6 +688,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // The C4 elements that run it `implements` the machine.
   const lifecycleOf: RelationTypeDef = {
     id: 'lifecycle-of',
+    layout: { flow: 'side' },
     label: 'Lifecycle of',
     description: 'The machine is the lifecycle of that entity.',
     inverseLabel: 'Lifecycle modelled by',
@@ -681,6 +704,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // relation cannot start at a relation): it lists them in `raises`.
   const emits: RelationTypeDef = {
     id: 'emits',
+    layout: { flow: 'side' },
     label: 'Emits',
     description: 'The element raises the event.',
     inverseLabel: 'Emitted by',
@@ -717,6 +741,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const process_: NodeTypeDef = {
     id: 'process',
+    layout: { role: 'element' },
     label: 'Process',
     description: 'A procedure: the steps it is made of, what repeats and what is an alternative.',
     color: '#0f766e',
@@ -740,6 +765,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const step: NodeTypeDef = {
     id: 'step',
+    layout: { role: 'element' },
     label: 'Step',
     description: 'One part of a process, itself made of steps or not.',
     color: '#14b8a6',
@@ -771,6 +797,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   // step → the element that does it
   const performedBy: RelationTypeDef = {
     id: 'performed-by',
+    layout: { flow: 'side' },
     label: 'Performed by',
     description: 'The person or part of the architecture that does the step.',
     inverseLabel: 'Performs',

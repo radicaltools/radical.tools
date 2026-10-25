@@ -89,7 +89,7 @@ export function pickSides(s: NodeView, t: NodeView): { sSide: Position; tSide: P
  * Spread keeps a margin from corners so adjacent sides don't overlap.
  * For ≤1 edge we return the centre.
  */
-function distributePorts(
+export function distributePorts(
   node: NodeView,
   side: Position,
   edges: { edgeId: string; otherCenter: { x: number; y: number } }[]

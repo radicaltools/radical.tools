@@ -46,7 +46,6 @@ import { computeRoutedEdge, ObstacleGrid, separateParallelSegments, type Routing
 import { labelOverlaps, placeEdgeLabels, type LabelEdge, type LabelObstacle } from './edgeLabels'
 import { allocatePorts } from './portAllocator'
 import type { Metamodel } from '@radical/common/metamodel'
-import { applyRadicalLayout } from './radicalLayout'
 import { minimizeCrossings, computeLayoutMetrics, type LayoutMetrics } from './crossingOpt'
 import { ELK_ROOT_SPACING, ELK_CHILD_SPACING } from './elkSpacingBase'
 import { compoundPadding, projectToVisibleGraph } from './geometry'
@@ -966,7 +965,7 @@ export interface PlanarityScore {
   verdict: 'planar' | 'near-planar' | 'tangled'
 }
 
-function computePlanarityScore(
+export function computePlanarityScore(
   nodes: Record<string, C4Node>,
   relations: Record<string, C4Relation>,
 ): PlanarityScore {
@@ -1234,7 +1233,7 @@ export interface SmartLayoutResult {
   keptCurrent: boolean
 }
 
-function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
+export function projectPositions(nodes: Record<string, C4Node>, positions: PositionMap): Record<string, C4Node> {
   const out: Record<string, C4Node> = {}
   for (const [id, n] of Object.entries(nodes)) {
     const p = positions[id]
@@ -1389,6 +1388,8 @@ export type ELKPhaseResult =
 export type SmartLayoutProgress =
   | { phase: 'candidates' | 'ranking'; done: number; total: number }
   | { phase: 'refining-a' | 'refining-b' | 'refining-c' | 'relaxing' }
+  /** Tidy playing its moves: the one being shown. */
+  | { phase: 'tidy'; message: string }
 
 export type SmartLayoutOnProgress = (progress: SmartLayoutProgress) => void
 
@@ -1498,16 +1499,12 @@ export async function runSmartLayoutELKPhase(
         childOptions: elkLayeredChild('RIGHT', 'BRANDES_KOEPF'),
       }),
     ],
-    [
-      'Radical (semantic C4)',
-      () => applyRadicalLayout(nodes, relations),
-    ],
   ]
 
   // Engines run one at a time with a yield in between: bundled ELK runs a
-  // whole layout synchronously on this (main) thread, so queueing all twelve at
+  // whole layout synchronously on this (main) thread, so queueing all eleven at
   // once would freeze the UI for their combined time. One at a time, the
-  // longest freeze is a single layout and "N/12 algorithms tried" advances live.
+  // longest freeze is a single layout and "N/11 algorithms tried" advances live.
   const total = engines.length
   const raw: RawCandidate[] = []
   onProgress?.({ phase: 'candidates', done: 0, total })

@@ -1,0 +1,271 @@
+{
+ "nodes": [
+  {
+   "id": "shop",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": false,
+   "x": 1075.9420289855072,
+   "y": 449.85507246376807,
+   "width": 675.9420289855072,
+   "height": 1006.3768115942029
+  },
+  {
+   "id": "api",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 67.24637681159425,
+   "y": 158.84057971014494,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "billing",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": false,
+   "x": 582.0289855072464,
+   "y": 598.2608695652174,
+   "width": 280,
+   "height": 180
+  },
+  {
+   "id": "orders-db",
+   "type": "database",
+   "label": "Database",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 456.8115942028985,
+   "y": 172.7536231884058,
+   "width": 190,
+   "height": 130
+  },
+  {
+   "id": "queue",
+   "type": "queue",
+   "label": "Queue",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 77.68115942028976,
+   "y": 453.3333333333333,
+   "width": 220,
+   "height": 95
+  },
+  {
+   "id": "worker",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 69.56521739130426,
+   "y": 691.0144927536232,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "stock-db",
+   "type": "database",
+   "label": "Database",
+   "collapsed": false,
+   "external": false,
+   "parentId": "shop",
+   "x": 444.05797101449275,
+   "y": 706.0869565217392,
+   "width": 190,
+   "height": 130
+  },
+  {
+   "id": "billing-api",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "billing",
+   "x": 59.72275130534837,
+   "y": 60.01192089265135,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "billing-worker",
+   "type": "container",
+   "label": "Container",
+   "collapsed": false,
+   "external": false,
+   "parentId": "billing",
+   "x": 209.46400859933567,
+   "y": 300.00000100000005,
+   "width": 240,
+   "height": 160
+  },
+  {
+   "id": "customer",
+   "type": "person",
+   "label": "Person",
+   "collapsed": false,
+   "external": false,
+   "x": 911.3043478260869,
+   "y": 140.28985507246375,
+   "width": 150,
+   "height": 170
+  },
+  {
+   "id": "payments",
+   "type": "system",
+   "label": "System",
+   "collapsed": false,
+   "external": true,
+   "x": 585.5072463768115,
+   "y": 1133.9130434782608,
+   "width": 280,
+   "height": 180
+  },
+  {
+   "id": "adr-shop",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": 1948.9855072463768,
+   "y": 925.2173913043478,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-1",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": 229.56521739130434,
+   "y": 780.2898550724638,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-billing",
+   "type": "adr",
+   "label": "Adr",
+   "collapsed": false,
+   "x": 231.88405797101447,
+   "y": 659.7101449275362,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "adr-2",
+   "type": "adr",
+   "label": "jjkjk",
+   "collapsed": false,
+   "x": 227.2463768115942,
+   "y": 902.0289855072464,
+   "width": 180,
+   "height": 52
+  },
+  {
+   "id": "api-handler",
+   "type": "component",
+   "label": "Component",
+   "collapsed": false,
+   "external": false,
+   "parentId": "api",
+   "x": 20,
+   "y": 120,
+   "width": 200,
+   "height": 120
+  }
+ ],
+ "relations": [
+  {
+   "id": "r1",
+   "sourceId": "billing",
+   "targetId": "api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r2",
+   "sourceId": "api",
+   "targetId": "orders-db",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r3",
+   "sourceId": "api",
+   "targetId": "queue",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r4",
+   "sourceId": "worker",
+   "targetId": "queue",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r5",
+   "sourceId": "worker",
+   "targetId": "stock-db",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r6",
+   "sourceId": "billing-api",
+   "targetId": "billing-worker",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r7",
+   "sourceId": "customer",
+   "targetId": "api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r8",
+   "sourceId": "customer",
+   "targetId": "billing-api",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r9",
+   "sourceId": "billing-worker",
+   "targetId": "payments",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r10",
+   "sourceId": "worker",
+   "targetId": "payments",
+   "relationType": "interacts"
+  },
+  {
+   "id": "r11",
+   "sourceId": "adr-shop",
+   "targetId": "shop",
+   "relationType": "constrains"
+  },
+  {
+   "id": "r12",
+   "sourceId": "adr-billing",
+   "targetId": "billing",
+   "relationType": "constrains"
+  }
+ ],
+ "view": {
+  "id": "view-all-elements",
+  "name": "All elements",
+  "nodeIds": [],
+  "positions": {},
+  "collapsedNodeIds": [
+   "billing",
+   "api"
+  ],
+  "expandedNodeIds": [],
+  "layoutConstraints": [],
+  "layoutMode": "auto"
+ }
+}

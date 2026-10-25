@@ -930,7 +930,7 @@ describe('Pins in the store', () => {
     expect(s().defaultLayoutConstraints).toEqual([])
   })
 
-  it('Smart Layout unpins the canvas it arranges, in the same undo step', async () => {
+  it('the Ensemble unpins the canvas it arranges, in the same undo step', async () => {
     const s = useDiagramStore.getState
     // On top of each other: Smart Layout has something to do.
     useDiagramStore.setState({
@@ -941,12 +941,58 @@ describe('Pins in the store', () => {
       },
     } as any)
     s()._sync()
+    const vid = s().addView('Ensemble')
+    s().setActiveView(vid)
+    s().setViewLayoutMode(vid, 'ensemble')
+    s().liveRelease('a', ['b'])
+    expect(pinnedNodeIds(s().views[vid].layoutConstraints)).toEqual(['a', 'b'])
+    await s().runSmartLayout()
+    expect(pinnedNodeIds(s().views[vid].layoutConstraints)).toEqual([])
+    s().undo()
+    expect(pinnedNodeIds(s().views[vid].layoutConstraints)).toEqual(['a', 'b'])
+  }, 60_000)
+
+  it('Tidy keeps the pins and leaves the pinned elements where they are', async () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 600, y: 0 }),
+        c: node('c', 'system', { x: 20, y: 20 }),
+        d: node('d', 'system', { x: 30, y: 30 }),
+      },
+      c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, cd: { id: 'cd', sourceId: 'c', targetId: 'd' } },
+    } as any)
+    s()._sync()
     s().liveRelease('a', ['b'])
     expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
     await s().runSmartLayout()
-    expect(s().defaultLayoutConstraints).toEqual([])
-    s().undo()
     expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
+    expect([s().c4Nodes.a.x, s().c4Nodes.a.y, s().c4Nodes.b.x, s().c4Nodes.b.y]).toEqual([0, 0, 600, 0])
+    // The rest was tidied off them.
+    for (const id of ['c', 'd']) for (const p of ['a', 'b']) {
+      const m = s().c4Nodes[id], f = s().c4Nodes[p]
+      expect(m.x >= f.x + f.width || f.x >= m.x + m.width || m.y >= f.y + f.height || f.y >= m.y + m.height, `${id} clear of ${p}`).toBe(true)
+    }
+  }, 60_000)
+
+  it('Tidy around moves the given elements and what they relate to, nothing else', async () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 0, y: 400 }),
+        c: node('c', 'system', { x: 2000, y: 0 }),
+        d: node('d', 'system', { x: 2010, y: 10 }),
+      },
+      c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, cd: { id: 'cd', sourceId: 'c', targetId: 'd' } },
+    } as any)
+    s()._sync()
+    await s().runSmartLayout({ around: ['c'] })
+    expect([s().c4Nodes.a.x, s().c4Nodes.a.y, s().c4Nodes.b.x, s().c4Nodes.b.y]).toEqual([0, 0, 0, 400])
+    const c = s().c4Nodes.c, d = s().c4Nodes.d
+    expect(c.x >= d.x + d.width || d.x >= c.x + c.width || c.y >= d.y + d.height || d.y >= c.y + c.height).toBe(true)
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('around the selection')
   }, 60_000)
 
   it('pins in the active view only', () => {

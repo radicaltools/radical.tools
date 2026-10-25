@@ -79,9 +79,11 @@ export function fittedParentSize(
     maxRight = Math.max(maxRight, child.x + child.width)
     maxBottom = Math.max(maxBottom, child.y + child.height)
   }
+  // Never smaller than the frame shows collapsed: its empty default size
+  // would leave room round one or two children that reads as missing content.
   return {
-    width: Math.max(maxRight + pad.side, NODE_SIZES[parent.type].width),
-    height: Math.max(maxBottom + pad.bottom, NODE_SIZES[parent.type].height),
+    width: Math.max(maxRight + pad.side, COLLAPSED_WIDTH[parent.type] ?? NODE_SIZES[parent.type].width),
+    height: Math.max(maxBottom + pad.bottom, COLLAPSED_HEIGHT[parent.type] ?? NODE_SIZES[parent.type].height),
   }
 }
 

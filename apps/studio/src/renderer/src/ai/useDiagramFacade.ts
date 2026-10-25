@@ -122,13 +122,13 @@ export function createStoreFacade(): DiagramFacade {
     setMetamodel: (metamodel: Metamodel) => useDiagramStore.getState().setMetamodel(metamodel),
     getPresentations: () => useDiagramStore.getState().presentations,
     setPresentations: (presentations: Presentation[]) => useDiagramStore.getState().setPresentations(presentations),
-    runLayout: async (viewId?: string) => {
+    runLayout: async (viewId?: string, around?: readonly string[]) => {
       const s = useDiagramStore.getState()
       if (s.appMode !== 'designer') return { ok: false, text: 'Smart Layout runs only in the designer.' }
       // Studio lays out what is on screen, so switch to the requested canvas first.
       const target = viewId ?? null
       if (target !== s.activeViewId) s.setActiveView(target)
-      await useDiagramStore.getState().runSmartLayout()
+      await useDiagramStore.getState().runSmartLayout(around ? { around: [...around] } : undefined)
       const name = target ? useDiagramStore.getState().views[target]?.name ?? target : 'All elements'
       return { ok: true, text: `Ran Smart Layout on ${name}.` }
     },

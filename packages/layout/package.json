@@ -17,7 +17,8 @@
     "./side": "./src/side.ts",
     "./viewInput": "./src/viewInput.ts",
     "./constraints": "./src/constraints.ts",
-    "./liveColaEngine": "./src/liveColaEngine.ts"
+    "./liveColaEngine": "./src/liveColaEngine.ts",
+    "./tidy": "./src/tidy/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
