@@ -14,6 +14,21 @@ test.beforeEach(async ({ page, studio }) => {
 })
 test.afterEach(async () => { await model.dispose() })
 
+test('desktop table rows open the same node discussion as the graph', async ({ page, studio }) => {
+  await page.locator('.lp-view-card', { hasText: 'Element Table' }).click()
+  await studio.row('customer').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Discuss', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: 'Customer', exact: true })
+  await panel.getByLabel('Comment (Markdown supported)').fill('Desktop table thread')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await panel.getByRole('button', { name: 'Close discussions' }).click()
+  await expect(studio.row('customer')).toBeFocused()
+  await page.locator('.lp-view-card', { hasText: 'System Context' }).click()
+  await page.locator('button[data-discussion-node="customer"]').click()
+  await expect(panel.locator('.discussion-comment')).toContainText('Desktop table thread')
+})
+
 test('desktop discussions preserve nested replies, email snapshots and resolution on reopening', async ({ page, studio }) => {
   await studio.node('customer').click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Discuss', exact: true })).toBeFocused()

@@ -44,6 +44,22 @@ test('discussions', async ({ page, studio, shot }) => {
   await shot('discussions')
 })
 
+/** A table row offers the same node discussion as the graph and wiki. */
+test('discussions-table', async ({ page, studio, shot }) => {
+  await new ModelFolder(page).install()
+  await studio.open('v-table', 'designer', 'docs-bookstore')
+  await studio.ready()
+  await menu(page, /Manage models/)
+  await page.getByRole('button', { name: 'Actions for Bookstore' }).click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await expect(models.locator('.docmgr-badge.md')).toBeVisible()
+  await models.getByRole('button', { name: 'Close' }).click()
+  await studio.row('customer').click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Discuss', exact: true })).toBeVisible()
+  await shot('discussions-table')
+})
+
 /** A few models kept in this browser, so Recent and the Models dialog have rows. */
 async function seedModels(page: Page): Promise<void> {
   await page.addInitScript(([sample, bookstore, order]) => {

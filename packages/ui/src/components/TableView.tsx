@@ -8,6 +8,7 @@ import { typeNoun } from '@radical/common/metamodel'
 import { AddPicker, type PickerWay } from './AddPicker'
 import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
 import { MarkdownText } from './MarkdownText'
+import { WikiMenu } from './WikiMenu'
 
 // ─── Table view ──────────────────────────────────────────────────────────────
 // Shows what the view's steps give (viewPipeline.ts, set in the Nodes panel)
@@ -111,7 +112,7 @@ function useTableWindow(kinds: ReadonlyArray<'row' | 'add'>, wrap: React.RefObje
   return { on, start, end, before: offsets[start], after: offsets[kinds.length] - offsets[end], reveal }
 }
 
-export function TableView(): React.ReactElement {
+export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void } = {}): React.ReactElement {
   const nodes            = useDiagramStore((s) => s.c4Nodes)
   const relations        = useDiagramStore((s) => s.c4Relations)
   const updateNode       = useDiagramStore((s) => s.updateNode)
@@ -120,6 +121,8 @@ export function TableView(): React.ReactElement {
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   // Read-only out of Designer, and on a slide played from it (F5).
   const readOnly         = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive)
+  const presenting       = useDiagramStore((s) => s.presentationActive)
+  const discussNode      = presenting ? undefined : onDiscuss
   const metamodel        = useDiagramStore((s) => s.metamodel)
   const requestCreateNode = useDiagramStore((s) => s.requestCreateNode)
   const pushNotification = useDiagramStore((s) => s.pushNotification)
@@ -127,6 +130,8 @@ export function TableView(): React.ReactElement {
 
   const [editCell, setEditCell]   = useState<EditCell | null>(null)
   const [picker, setPicker] = useState<{ at: { x: number; y: number }; under?: ChainRow; choices: AddChoice[] } | null>(null)
+  const [discussionMenu, setDiscussionMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  useEffect(() => { setDiscussionMenu(null) }, [discussNode, activeView?.id])
 
   // The rows: the chain's tree; without a chain, the containment of what
   // the steps give (flat in their order when they set one).
@@ -407,8 +412,22 @@ export function TableView(): React.ReactElement {
                 tabIndex={-1}
                 onClick={(e) => { e.stopPropagation(); selectNode(line.row.node.id) }}
                 onDoubleClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}
+                onContextMenu={(e) => {
+                  if (!discussNode || (e.target as Element).closest('input, textarea, select, [contenteditable="true"], a[href]')) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setDiscussionMenu({ nodeId: line.row.node.id, x: e.clientX, y: e.clientY })
+                }}
                 // F2, or Enter (where a rename leaves the keyboard), renames it.
-                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === 'F2') && e.target === e.currentTarget) { e.preventDefault(); startEdit(line.row.node.id, line.row.node.label) } }}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return
+                  if (discussNode && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10'))) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const box = e.currentTarget.getBoundingClientRect()
+                    setDiscussionMenu({ nodeId: line.row.node.id, x: box.left + 8, y: box.bottom })
+                  } else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(line.row.node.id, line.row.node.label) }
+                }}
               >
                 <td className="tv-td">{renderName(line.row)}</td>
                 <td className="tv-td">{renderSummary(line.row.node)}</td>
@@ -439,6 +458,11 @@ export function TableView(): React.ReactElement {
           </tbody>
         </table>
       </div>
+      {discussionMenu && discussNode && nodes[discussionMenu.nodeId] && (
+        <WikiMenu key={`${discussionMenu.nodeId}:${discussionMenu.x}:${discussionMenu.y}`} at={discussionMenu}
+          root={{ items: [{ id: 'discuss', label: 'Discuss', onSelect: () => discussNode(discussionMenu.nodeId) }] }}
+          onClose={() => { setDiscussionMenu(null); focusRow(discussionMenu.nodeId) }} />
+      )}
       {/* A choice in the picker opens the new row's name: its click must not reach the table, which closes it. */}
       {picker && (!picker.under || nodes[picker.under.node.id]) && (
         <div onClick={(e) => e.stopPropagation()}>

@@ -43,7 +43,12 @@ function AppInner(): React.ReactElement {
   }, [discussionDocumentId])
   const closeDiscussion = useCallback(() => {
     setDiscussionTarget((target) => {
-      if (target) document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(target.nodeId)}"]`)?.focus()
+      if (target) {
+        const id = CSS.escape(target.nodeId)
+        const element = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"], tr[data-node-id="${id}"], [data-wiki-node-id="${id}"]`)
+          ?? document.querySelector<HTMLElement>('.wiki-page')
+        element?.focus({ preventScroll: true })
+      }
       return null
     })
   }, [])
@@ -117,7 +122,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
