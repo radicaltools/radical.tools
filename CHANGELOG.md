@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Desktop folder models: right-click any graph node and choose *Discuss* to start a thread, reply to comments and resolve or reopen threads. Optional email attribution is remembered on the device. Discussions stay in a separate `discussions.json`, with atomic writes, independent refresh and retained drafts on failure.
 - *Focus* switch at the bottom of the canvas: off, a selection no longer dims what it is not related to and the camera no longer frames it; on by default, remembered in the browser
 - New model asks for the views: *Views of the metamodel* (the default) starts the model with *All elements* as a Structure view at the top of the list and a view of each of the metamodel's viewpoints in the folders Conceptual, Logical and Governance (a viewpoint that draws one element as a group of views per element), *Customise…* leaving any out; *Empty* starts with none. A model with no elements opens on the All elements table
 - Add or link: the table's + row and the wiki's *Add or link…* open one panel that reads as a sentence (*Account is realised by a software system*), names a new element or searches the model, and links an element the model has instead of adding a duplicate; the wiki's relationships are part of it, and its writing line suggests elements to link by name

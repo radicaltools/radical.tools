@@ -6,6 +6,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Page } from '@playwright/test'
 import { fixture } from '../support/fixtures'
+import { DesktopDiscussionModel } from '../support/discussions'
 import { SHOTS_DIR, calm, expect, test } from './shots'
 
 // Every Studio screenshot of the manual, on the Fintech sample unless it says
@@ -14,6 +15,30 @@ import { SHOTS_DIR, calm, expect, test } from './shots'
 
 const SAMPLE = readFileSync(fileURLToPath(new URL('../../studio/src/renderer/src/store/fintechSampleData.json', import.meta.url)), 'utf8')
 const ARCHITECTURE = fileURLToPath(new URL('../../../architecture/', import.meta.url))
+
+// Bookstore, through the desktop folder bridge: discussions are desktop-only.
+test('discussions', async ({ page, studio, shot }) => {
+  const model = await DesktopDiscussionModel.create()
+  try {
+    await model.install(page)
+    await model.open(page)
+    await studio.ready()
+    await studio.node('customer').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Discuss', exact: true }).click()
+    const panel = page.getByRole('dialog', { name: 'Customer', exact: true })
+    await panel.getByLabel('Comment (Markdown supported)').fill('Should the customer receive a confirmation after the payment completes?')
+    await panel.getByRole('button', { name: 'Post comment' }).click()
+    await expect(panel.locator('.discussion-comment')).toHaveCount(1)
+    await panel.getByRole('button', { name: 'Reply', exact: true }).click()
+    await panel.getByLabel('Comment (Markdown supported)').fill('Yes — send it after the transaction commits, using an **idempotent event**.')
+    await panel.getByLabel('Email (optional)').fill('reviewer@example.com')
+    await panel.getByRole('button', { name: 'Post comment' }).click()
+    await expect(panel.locator('.discussion-comment')).toHaveCount(2)
+    await panel.locator('.discussion-content').evaluate((element) => { element.scrollTop = 0 })
+    await panel.getByRole('heading', { level: 2 }).click()
+    await shot('discussions')
+  } finally { await model.dispose() }
+})
 
 /** A few models kept in this browser, so Recent and the Models dialog have rows. */
 async function seedModels(page: Page): Promise<void> {

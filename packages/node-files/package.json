@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./discussions": "./src/discussions.ts",
     "./diskFolderStorage": "./src/diskFolderStorage.ts",
     "./gitModel": "./src/gitModel.ts",
     "./selectionFile": "./src/selectionFile.ts",

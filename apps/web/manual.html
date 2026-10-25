@@ -56,6 +56,7 @@
             <li><a href="#processes">Processes</a></li>
             <li><a href="#mockups">Mockups &amp; screen flows</a></li>
             <li><a href="#selection">Selections &amp; actions</a></li>
+            <li><a href="#discussions">Node discussions</a></li>
           </ul>
         </div>
         <div class="toc-group">
@@ -618,6 +619,20 @@
           <li>Click a slide's card to show it: its milestone becomes the one shown, and a slide of the live model (or of its own copy) shows no milestone. The chip, the URL and the Milestones list name what the canvas draws.</li>
           <li><em>Present</em> (or <kbd>F5</kbd>) fills the window. <kbd>→</kbd> <kbd>Space</kbd> advance, <kbd>←</kbd> goes back, <kbd>Esc</kbd> exits. The URL follows the slide, so a listener can open the same one.</li>
         </ul>
+      </section>
+
+      <section class="doc-section" id="discussions">
+        <h2>Node discussions</h2>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/discussions-light.png?v=__BUILD__" alt="Desktop folder model with the Customer discussion panel, a question and a nested reply with optional email attribution" loading="lazy" />
+          <img class="shot-dark" src="screenshots/discussions-dark.png?v=__BUILD__" alt="Desktop folder model with the Customer discussion panel, a question and a nested reply with optional email attribution" loading="lazy" />
+          <figcaption>Discuss a node in a desktop folder model; replies and attribution stay beside the model.</figcaption>
+        </figure>
+        <p>In the desktop app, open a model kept in a folder, right-click any graph node and choose <strong>Discuss</strong>. The panel names that node and stays attached to it while you select other nodes. Write a comment to start a thread, or choose <em>Reply</em> on any comment, including a reply. Markdown is supported; long and deeply nested conversations keep readable reply links.</p>
+        <p>Email is optional and editable on every submission. Leave it empty to appear as <em>Anonymous</em>. An email you include is saved with that comment in the shared <code>discussions.json</code> and remembered on your device for next time. Changing or clearing it leaves earlier comments unchanged. No account or email verification is required.</p>
+        <p><em>Resolve thread</em> keeps a thread readable; choose <em>Reopen thread</em> before replying again. If a thread changes while you compose, review its refreshed contents and choose Reply again. A failed post keeps your text. After an uncertain write, Studio checks the submitted IDs before offering a manual retry; it never automatically replays the post. If the discussion file is invalid, conflicted, unreadable or unexpectedly missing, restore or repair it and choose <em>Refresh discussions</em>.</p>
+        <p>Discussions are kept separately in <code>&lt;model-folder&gt;/discussions.json</code>, created by the first successful post and discovered when the folder is reopened. Move or copy the whole folder to carry them with the model. They attach by node ID: renaming or moving a node keeps them, deletion retains them, and restoring the same ID reattaches them. A duplicate with a new ID starts without discussions. Save a new node in the model to retain its attachment. Posting does not save the model or change its undo history, layout or exports.</p>
+        <p>Drafts remain in this app session when you close the panel or discuss another node; recovery after restarting the app is not provided. Browser, VS Code and single-file models, other object targets and Confluence synchronization are future work.</p>
       </section>
 
       <section class="doc-section" id="inspector">

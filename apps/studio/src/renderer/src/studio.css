@@ -3890,3 +3890,28 @@ div.milestone-option { cursor: default; }
 .forge-clarify-answer { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .forge-clarify-quote { flex: 1; min-width: 0; font-size: 11px; font-style: italic; color: var(--text-muted); }
 .forge-clarify-proposal-row .forge-btn { margin-left: auto; }
+/* The discussion panel owns its scroll and leaves the graph usable. */
+.discussion-panel { position: fixed; right: 12px; top: 64px; bottom: 12px; width: min(460px, calc(100vw - 24px)); z-index: 95; display: flex; flex-direction: column; background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 8px 32px #0004; }
+.discussion-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border-color); }
+.discussion-header h2 { font-size: 18px; margin: 4px 0 0; overflow-wrap: anywhere; }
+.discussion-header small, .discussion-note, .discussion-attribution time { color: var(--text-muted); }
+.discussion-content { overflow: auto; padding: 14px; min-height: 0; }
+.discussion-panel button, .discussion-panel input, .discussion-panel textarea { font: inherit; color: inherit; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-panel); padding: 6px 8px; }
+.discussion-panel button { cursor: pointer; }
+.discussion-panel button:disabled { cursor: default; opacity: .5; }
+.discussion-panel :focus-visible { outline: 2px solid var(--accent, #387bf3); outline-offset: 2px; }
+.discussion-note { font-size: 12px; line-height: 1.5; }
+.discussion-thread { margin: 18px 0; border-top: 1px solid var(--border-color); padding-top: 12px; }
+.discussion-thread-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.discussion-comment { margin-top: 12px; border-left: 2px solid var(--border-color); padding: 8px; min-width: 0; overflow-wrap: anywhere; }
+.discussion-comment .md-text { line-height: 1.5; }
+.discussion-comment .md-text pre { overflow-x: auto; max-width: 100%; }
+.discussion-comment .md-text img { max-width: 100%; }
+.discussion-attribution { font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.discussion-ancestry { display: block; text-align: left; font-size: 11px !important; margin-top: 6px; overflow-wrap: anywhere; }
+.discussion-composer { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 12px; }
+.discussion-composer h3 { margin: 0; font-size: 15px; }
+.discussion-composer textarea { resize: vertical; min-height: 90px; max-height: 50vh; }
+.discussion-composer input, .discussion-composer textarea { width: 100%; box-sizing: border-box; }
+.discussion-reply-target { font-size: 12px; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.discussion-error { color: var(--error, #d94b4b); font-size: 13px; line-height: 1.5; }

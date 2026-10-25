@@ -1,5 +1,23 @@
 [
   {
+    "id": "198599fb-04f6-4b82-8fc7-ae12b67eac49",
+    "relationType": "verifies",
+    "sourceId": "27c958de-eecf-49a7-b87f-a056829ad647",
+    "targetId": "b631eb97-6838-4027-8f77-6f93ae174aca"
+  },
+  {
+    "id": "82af8009-c177-489e-9eb6-1dc6db5fe8ce",
+    "relationType": "verifies",
+    "sourceId": "4a53adbe-4e5a-4ec8-ade9-1409fd7f53f4",
+    "targetId": "b631eb97-6838-4027-8f77-6f93ae174aca"
+  },
+  {
+    "id": "d014535d-2ac4-44b6-990e-c9c6776a3648",
+    "relationType": "verifies",
+    "sourceId": "5f99c955-5856-4402-83db-a46ed98c46ac",
+    "targetId": "b631eb97-6838-4027-8f77-6f93ae174aca"
+  },
+  {
     "id": "00341094-6821-4d08-bb22-d71e4ae7c2f9",
     "relationType": "verifies",
     "sourceId": "30338aa6-aa0b-487f-a9ab-913edcb6d690",
@@ -5608,7 +5626,7 @@
     "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
-    "description": "Proposed allocation to Modelling; this placeholder capability is not implemented.",
+    "description": "Modelling provides node discussions for desktop folder models; broader object targets and Confluence synchronization remain future scope.",
     "id": "5c74d4f4-d89f-4453-b6ef-607cb57f08ca",
     "relationType": "satisfies",
     "sourceId": "4dd09e43-c313-4300-b9f2-d9f937b789bf",

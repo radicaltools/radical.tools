@@ -302,8 +302,20 @@ function ConnectionPreviewLine({
   )
 }
 
-function StructuralCanvas(): React.ReactElement {
+function StructuralCanvas({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }): React.ReactElement {
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null)
+  const [discussionMenu, setDiscussionMenu] = useState<{ nodeId: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
+  const discussionMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!discussionMenu) return
+    discussionMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const close = (event: MouseEvent): void => {
+      if (!discussionMenuRef.current?.contains(event.target as Node)) setDiscussionMenu(null)
+    }
+    window.addEventListener('mousedown', close, true)
+    return () => window.removeEventListener('mousedown', close, true)
+  }, [discussionMenu])
+  useEffect(() => { setDiscussionMenu(null) }, [onDiscuss])
 
   const appMode = useDiagramStore((s) => s.appMode)
   // Both viewer AND presenter must be layout-read-only — the saved
@@ -1746,6 +1758,16 @@ function StructuralCanvas(): React.ReactElement {
     <div
       ref={containerRef}
       className={canvasClasses.join(' ')}
+      onKeyDownCapture={(event) => {
+        if (!onDiscuss || presentationActive || !(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return
+        const trigger = (event.target as HTMLElement).closest<HTMLElement>('.react-flow__node')
+        const nodeId = trigger?.dataset.id
+        if (!nodeId || !useDiagramStore.getState().c4Nodes[nodeId]) return
+        event.preventDefault()
+        event.stopPropagation()
+        const rect = trigger.getBoundingClientRect()
+        setDiscussionMenu({ nodeId, x: Math.min(rect.left, window.innerWidth - 180), y: Math.min(rect.bottom, window.innerHeight - 60), trigger })
+      }}
       onClickCapture={onClickCapture}
       onDrop={isViewMode ? undefined : onDrop}
       onDragOver={isViewMode ? undefined : onDragOver}
@@ -1869,6 +1891,13 @@ function StructuralCanvas(): React.ReactElement {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeContextMenu={onDiscuss && !presentationActive ? (event, node) => {
+          if (!useDiagramStore.getState().c4Nodes[node.id]) return
+          event.preventDefault()
+          event.stopPropagation()
+          const trigger = (event.target as HTMLElement).closest<HTMLElement>('.react-flow__node')
+          setDiscussionMenu({ nodeId: node.id, x: Math.min(event.clientX, window.innerWidth - 180), y: Math.min(event.clientY, window.innerHeight - 60), trigger })
+        } : undefined}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
@@ -1919,6 +1948,17 @@ function StructuralCanvas(): React.ReactElement {
 
       <RelationTypeMenu containerRef={containerRef} />
       <ExploreMenu containerRef={containerRef} />
+      {discussionMenu && onDiscuss && createPortal(
+        <div ref={discussionMenuRef} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
+          onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDiscussionMenu(null) }}
+          onKeyDown={(event) => {
+            event.stopPropagation()
+            if (event.key === 'Escape') { event.preventDefault(); discussionMenu.trigger?.focus(); setDiscussionMenu(null) }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); discussionMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }
+          }}>
+          <button type="button" role="menuitem" onClick={() => { onDiscuss(discussionMenu.nodeId); setDiscussionMenu(null) }}>Discuss</button>
+        </div>, document.body,
+      )}
 
       {connectSource && connectMouse && (
         <ConnectionPreviewLine
@@ -1985,7 +2025,7 @@ function StructuralCanvas(): React.ReactElement {
 /** The canvas, with the elements palette down its left side in Designer and
  *  its controls centred at its bottom (neither while a presentation plays).
  *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
-export function Canvas({ smartLayoutNote }: { smartLayoutNote?: string } = {}): React.ReactElement {
+export function Canvas({ smartLayoutNote, onDiscuss }: { smartLayoutNote?: string; onDiscuss?: (nodeId: string) => void } = {}): React.ReactElement {
   const presenting = useDiagramStore((s) => s.presentationActive)
   const showPalette = useDiagramStore((s) => s.appMode === 'designer') && !presenting
   // One element around both, whether the palette shows or not: switching
@@ -1993,7 +2033,7 @@ export function Canvas({ smartLayoutNote }: { smartLayoutNote?: string } = {}): 
   return (
     <div className="canvas-column">
       {showPalette && <ElementPalette />}
-      <StructuralCanvas />
+      <StructuralCanvas onDiscuss={onDiscuss} />
       {!presenting && <CanvasControls smartLayoutNote={smartLayoutNote} />}
     </div>
   )

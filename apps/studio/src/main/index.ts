@@ -9,6 +9,16 @@ import { readCheckFiles, readEditorStateFile, writeCheckConfig, writeEditorState
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
+import { DiskDiscussions } from '@radical/node-files/discussions'
+import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
+
+const discussionFolders = new Map<string, DiskDiscussions>()
+function discussionsFor(folderPath: string): DiskDiscussions {
+  const key = resolve(folderPath)
+  let adapter = discussionFolders.get(key)
+  if (!adapter) { adapter = new DiskDiscussions(key); discussionFolders.set(key, adapter) }
+  return adapter
+}
 
 /** One session per model folder, kept for the app's lifetime: it remembers
  *  what the renderer last read, so writes never clobber outside edits. */
@@ -95,6 +105,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('discussions:load', async (_event, folderPath: string) => {
+    try { return { success: true, discussions: await discussionsFor(folderPath).load() } }
+    catch (error) { return { success: false, error: (error as Error).message } }
+  })
+  ipcMain.handle('discussions:act', async (_event, folderPath: string, action: DiscussionAction) => {
+    try { return { success: true, discussions: await discussionsFor(folderPath).act(action) } }
+    catch (error) { return { success: false, conflict: error instanceof DiscussionConflict, error: (error as Error).message } }
+  })
   electronApp.setAppUserModelId('com.radical.diagram')
 
   app.on('browser-window-created', (_, window) => {

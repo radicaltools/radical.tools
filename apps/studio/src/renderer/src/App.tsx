@@ -22,10 +22,25 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
+import { useDocumentsStore } from './store/documentStore'
+import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 function AppInner(): React.ReactElement {
+  const activeDocument = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId))
+  const discussionFolder = host().kind === 'electron' && host().loadDiscussions && host().actOnDiscussion && activeDocument?.source === 'md' ? activeDocument.folderPath : undefined
+  const [discussionTarget, setDiscussionTarget] = useState<DiscussionTarget | null>(null)
+  const openDiscussion = useCallback((nodeId: string) => {
+    const node = useDiagramStore.getState().c4Nodes[nodeId]
+    if (discussionFolder && node) setDiscussionTarget({ folder: discussionFolder, nodeId, label: node.label })
+  }, [discussionFolder])
+  const closeDiscussion = useCallback(() => {
+    setDiscussionTarget((target) => {
+      if (target) document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(target.nodeId)}"]`)?.focus()
+      return null
+    })
+  }, [])
   const runRadicalLayout = useDiagramStore((s) => s.runRadicalLayout)
   // A link still waiting for its document is drawn in its own perspective.
   const appMode = useShownMode()
@@ -95,7 +110,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionFolder ? openDiscussion : undefined} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
@@ -110,6 +125,7 @@ function AppInner(): React.ReactElement {
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
+      {!isPresenting && discussionTarget && discussionTarget.folder === discussionFolder && <DiscussionPanel key={`${discussionTarget.folder}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
       {isMetamodel && !isPresenting && <MetamodelEditor />}
       {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} />}
     </div>
