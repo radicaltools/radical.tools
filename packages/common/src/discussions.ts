@@ -21,6 +21,19 @@ export interface DiscussionThread {
 
 export interface Discussions { threads: DiscussionThread[] }
 
+export type NodeDiscussionCounts = Readonly<Record<string, { readonly total: number; readonly open: number }>>
+
+/** Includes resolved and missing-node threads; rendering decides which nodes exist. */
+export function countNodeDiscussions(store: Discussions | null): NodeDiscussionCounts {
+  const counts: Record<string, { total: number; open: number }> = Object.create(null)
+  for (const thread of store?.threads ?? []) {
+    const count = counts[thread.nodeId] ?? (counts[thread.nodeId] = { total: 0, open: 0 })
+    count.total++
+    if (!thread.resolved) count.open++
+  }
+  return counts
+}
+
 export type DiscussionAction =
   | { kind: 'createThread'; thread: DiscussionThread }
   | { kind: 'addReply'; threadId: string; nodeId: string; parent: DiscussionComment; comment: DiscussionComment }

@@ -24,6 +24,47 @@ function fixture() {
 beforeEach(() => { vi.stubGlobal('localStorage', storage()) })
 
 describe('discussion session', () => {
+  it('keeps marker snapshots stable across drafts, replies and unchanged polls, while resolution updates their counts', async () => {
+    const f = fixture()
+    await f.session.refresh()
+    f.session.edit('payments', { body: 'Root' })
+    await f.session.post('payments', 'Payments')
+    const counts = f.session.getNodeCounts()
+    expect(counts.payments).toEqual({ total: 1, open: 1 })
+    const t = f.data().threads[0]
+    f.session.edit('payments', { body: 'Reply', reply: { threadId: t.id, parent: t.comments[0] } })
+    expect(f.session.getNodeCounts()).toBe(counts)
+    await f.session.post('payments', 'Payments')
+    await f.session.refresh()
+    expect(f.session.getNodeCounts()).toBe(counts)
+    await f.session.setResolved('payments', f.data().threads[0])
+    expect(f.session.getNodeCounts().payments).toEqual({ total: 1, open: 0 })
+    const resolved = f.session.getNodeCounts()
+    f.api.loadDiscussions.mockResolvedValueOnce({ success: false, error: 'Unreadable file' })
+    await f.session.refresh()
+    expect(f.session.getNodeCounts()).toBe(resolved)
+  })
+
+  it('shares one background poll between the canvas and panel and stops after both leave', async () => {
+    const f = fixture()
+    vi.useFakeTimers()
+    let stopCanvas: (() => void) | undefined
+    let stopPanel: (() => void) | undefined
+    try {
+      stopCanvas = f.session.watch()
+      stopPanel = f.session.watch()
+      await f.session.refresh()
+      expect(f.api.loadDiscussions).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1500)
+      expect(f.api.loadDiscussions).toHaveBeenCalledTimes(2)
+      stopPanel(); stopPanel = undefined
+      await vi.advanceTimersByTimeAsync(1500)
+      expect(f.api.loadDiscussions).toHaveBeenCalledTimes(3)
+      stopCanvas(); stopCanvas = undefined
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(f.api.loadDiscussions).toHaveBeenCalledTimes(3)
+    } finally { stopCanvas?.(); stopPanel?.(); vi.useRealTimers() }
+  })
   it('checks timed-out submissions before allowing a manual retry and never automatically replays them', async () => {
     const f = fixture()
     await f.session.refresh()

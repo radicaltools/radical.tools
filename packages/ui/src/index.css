@@ -4866,6 +4866,13 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .relation-label.relation-label-active .relation-label-tech { white-space: normal; }
 
 /* ── Collapse buttons above the relations (CollapseToggleMirror.tsx) ───── */
+.node-discussion-badges { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 6; }
+.node-discussion-badge { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; padding: 0; display: grid; place-items: center; border: 1px solid var(--border-color); border-radius: 50%; background: var(--bg-panel); color: var(--accent); box-shadow: 0 1px 5px #0003; cursor: pointer; pointer-events: auto; }
+.node-discussion-badge.all-resolved { color: var(--text-muted); }
+.node-discussion-badge.focus-dim { opacity: .35; }
+.node-discussion-badge:hover, .node-discussion-badge:focus-visible { opacity: 1; color: var(--accent); border-color: var(--accent); }
+.node-discussion-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* The button under its copy: still clicked, not seen (it showed as a shadow). */
 .react-flow__node [data-mirrored] { opacity: 0; }
 .c4-collapse-mirror-layer {

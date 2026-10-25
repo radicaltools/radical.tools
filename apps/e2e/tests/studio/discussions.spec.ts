@@ -24,6 +24,7 @@ test('desktop discussions preserve nested replies, email snapshots and resolutio
   await body.fill('**Question:** should we notify the customer?')
   await panel.getByRole('button', { name: 'Post comment' }).click()
   await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await expect(page.locator('button[data-discussion-node="customer"]')).toHaveAttribute('title', '1 discussion thread, 1 open')
   await expect(panel.locator('.discussion-attribution strong')).toHaveText('Anonymous')
   await panel.getByRole('button', { name: 'Reply', exact: true }).click()
   await body.fill('Yes, after the payment commits.')

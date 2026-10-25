@@ -21,9 +21,7 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
 
   useEffect(() => {
     input.current?.focus()
-    void session.refresh()
-    const timer = setInterval(() => { void session.refresh() }, 1500)
-    return () => clearInterval(timer)
+    return session.watch()
   }, [session, target.nodeId])
 
   const reply = (threadId: string, parent: DiscussionComment): void => {

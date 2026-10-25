@@ -2,6 +2,7 @@ import { expect, Studio } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
 import type { Discussions } from '@radical/common/discussions'
+import { randomUUID } from 'node:crypto'
 
 let folder: ModelFolder
 test.beforeEach(async ({ page, studio }) => {
@@ -27,6 +28,48 @@ async function discuss(page: Page, nodeId = 'customer', label = 'Customer') {
   return page.getByRole('dialog', { name: label, exact: true })
 }
 const modelFiles = (files: Record<string, string>) => Object.fromEntries(Object.entries(files).filter(([name]) => name !== 'discussions.json' && !name.startsWith('.discussions.') && !name.startsWith('.radical/')))
+
+test('node discussion corner icons open the right panel, persist after resolution and refresh while closed', async ({ page, studio }) => {
+  await moveToFolder(page)
+  const before = modelFiles(await folder.files())
+  const marker = (nodeId: string) => page.locator(`button[data-discussion-node="${nodeId}"]`)
+  await expect(page.locator('.node-discussion-badge')).toHaveCount(0)
+  const panel = await discuss(page)
+  await panel.getByLabel('Comment (Markdown supported)').fill('A marked discussion')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await panel.getByRole('button', { name: 'Close discussions' }).click()
+  await expect(marker('customer')).toBeVisible()
+  await expect(marker('customer')).toHaveAttribute('title', '1 discussion thread, 1 open')
+  await expect(marker('bookstore')).toHaveCount(0)
+  const node = (await studio.node('customer').boundingBox())!
+  const icon = (await marker('customer').boundingBox())!
+  expect(Math.abs(icon.x + icon.width / 2 - (node.x + node.width + 8))).toBeLessThan(2)
+  expect(Math.abs(icon.y + icon.height / 2 - (node.y - 8))).toBeLessThan(2)
+  // The marker belongs to the UI, outside the diagram's export viewport.
+  await expect(page.locator('.react-flow__viewport .node-discussion-badge')).toHaveCount(0)
+  await marker('customer').click()
+  await expect(panel.locator('.discussion-comment')).toContainText('A marked discussion')
+  await panel.getByRole('button', { name: 'Resolve thread' }).click()
+  await panel.getByRole('button', { name: 'Close discussions' }).click()
+  await expect(marker('customer')).toHaveAttribute('title', '1 discussion thread, all resolved')
+  const saved = JSON.parse((await folder.files())['discussions.json']) as Discussions
+  saved.threads.push({ id: randomUUID(), nodeId: 'bookstore', nodeLabelAtCreation: 'Bookstore', resolved: false, comments: [{ id: randomUUID(), parentCommentId: null, body: 'External discussion', createdAt: new Date().toISOString() }] })
+  await folder.write('discussions.json', JSON.stringify(saved, null, 2))
+  await expect(marker('bookstore')).toBeVisible()
+  await marker('bookstore').focus()
+  await page.keyboard.press('Enter')
+  const other = page.getByRole('dialog', { name: 'Bookstore', exact: true })
+  await expect(other.locator('.discussion-comment')).toContainText('External discussion')
+  await other.getByRole('button', { name: 'Close discussions' }).click()
+  await page.reload()
+  await studio.ready()
+  await expect(marker('customer')).toHaveAttribute('title', '1 discussion thread, all resolved')
+  await expect(marker('bookstore')).toBeVisible()
+  expect(modelFiles(await folder.files())).toEqual(before)
+  await folder.write('discussions.json', '{"threads": []}')
+  await expect(page.locator('.node-discussion-badge')).toHaveCount(0)
+})
 
 test('browser folder discussions persist nested replies, attribution and resolution without changing the model', async ({ page, studio }) => {
   // Browser-storage models still have no folder in which to keep discussions.

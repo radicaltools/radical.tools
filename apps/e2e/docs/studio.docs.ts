@@ -38,6 +38,7 @@ test('discussions', async ({ page, studio, shot }) => {
   await panel.getByLabel('Email (optional)').fill('reviewer@example.com')
   await panel.getByRole('button', { name: 'Post comment' }).click()
   await expect(panel.locator('.discussion-comment')).toHaveCount(2)
+  await expect(page.locator('button[data-discussion-node="customer"]')).toBeVisible()
   await panel.locator('.discussion-content').evaluate((element) => { element.scrollTop = 0 })
   await panel.getByRole('heading', { level: 2 }).click()
   await shot('discussions')

@@ -33,6 +33,8 @@ import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
+import { NodeDiscussionBadges } from './NodeDiscussionBadges'
+import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
 import { allowedPlacesText, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName, type Metamodel } from '@radical/common/metamodel'
@@ -302,7 +304,9 @@ function ConnectionPreviewLine({
   )
 }
 
-function StructuralCanvas({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }): React.ReactElement {
+interface DiscussionCanvasProps { onDiscuss?: (nodeId: string) => void; nodeDiscussions?: NodeDiscussionCounts }
+
+function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps): React.ReactElement {
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null)
   const [discussionMenu, setDiscussionMenu] = useState<{ nodeId: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
   const discussionMenuRef = useRef<HTMLDivElement>(null)
@@ -1746,7 +1750,7 @@ function StructuralCanvas({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
   // is meant for the button: hand it over before the edge sees it. Same
   // reach as the button's own hit area (CSS).
   const onClickCapture = useCallback((e: React.MouseEvent) => {
-    if ((e.target as Element).closest('.c4-node-collapse-btn, .explore-more')) return
+    if ((e.target as Element).closest('.c4-node-collapse-btn, .explore-more, .node-discussion-badge')) return
     const btn = nodeControlAt(containerRef.current, e.clientX, e.clientY)
     if (!btn) return
     e.stopPropagation()
@@ -1944,6 +1948,7 @@ function StructuralCanvas({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
         />
         <AlignmentGuides />
         <CollapseToggleMirror />
+        {!presentationActive && onDiscuss && nodeDiscussions && <NodeDiscussionBadges counts={nodeDiscussions} onDiscuss={onDiscuss} />}
       </ReactFlow>
 
       <RelationTypeMenu containerRef={containerRef} />
@@ -2025,7 +2030,7 @@ function StructuralCanvas({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
 /** The canvas, with the elements palette down its left side in Designer and
  *  its controls centred at its bottom (neither while a presentation plays).
  *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
-export function Canvas({ smartLayoutNote, onDiscuss }: { smartLayoutNote?: string; onDiscuss?: (nodeId: string) => void } = {}): React.ReactElement {
+export function Canvas({ smartLayoutNote, onDiscuss, nodeDiscussions }: { smartLayoutNote?: string } & DiscussionCanvasProps = {}): React.ReactElement {
   const presenting = useDiagramStore((s) => s.presentationActive)
   const showPalette = useDiagramStore((s) => s.appMode === 'designer') && !presenting
   // One element around both, whether the palette shows or not: switching
@@ -2033,7 +2038,7 @@ export function Canvas({ smartLayoutNote, onDiscuss }: { smartLayoutNote?: strin
   return (
     <div className="canvas-column">
       {showPalette && <ElementPalette />}
-      <StructuralCanvas onDiscuss={onDiscuss} />
+      <StructuralCanvas onDiscuss={onDiscuss} nodeDiscussions={nodeDiscussions} />
       {!presenting && <CanvasControls smartLayoutNote={smartLayoutNote} />}
     </div>
   )

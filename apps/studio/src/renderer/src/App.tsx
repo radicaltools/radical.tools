@@ -25,6 +25,7 @@ import { useRouteSync, useShownMode, parseHash } from './route'
 import { useDocumentsStore } from './store/documentStore'
 import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
 import { webFolderSupported } from './persist/webFolder'
+import { useNodeDiscussions } from './discussions/useNodeDiscussions'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
@@ -63,6 +64,7 @@ function AppInner(): React.ReactElement {
   const isCanvasView   = !isTreemapView && !isSequenceView && !isTableView && !isMatrixView && !isWikiView && !isWarnierView
 
   const isPresenting = presentationActive
+  const nodeDiscussions = useNodeDiscussions(isPresenting ? undefined : discussionDocumentId)
   const isDesigner = appMode === 'designer'
   const isViewer = appMode === 'viewer'
   const isPresenter = appMode === 'presenter'
@@ -115,7 +117,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (

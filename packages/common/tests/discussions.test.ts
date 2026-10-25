@@ -1,12 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { applyDiscussionAction, commentRows, parseDiscussions, submissionState, threadState, validateDiscussions, type DiscussionAction, type DiscussionComment, type DiscussionThread } from '../src/discussions'
+import { applyDiscussionAction, commentRows, countNodeDiscussions, parseDiscussions, submissionState, threadState, validateDiscussions, type DiscussionAction, type DiscussionComment, type DiscussionThread } from '../src/discussions'
 
 const comment = (parentCommentId: string | null = null): DiscussionComment => ({ id: randomUUID(), parentCommentId, body: 'Question?', createdAt: '2026-10-25T10:00:00.000Z' })
 const thread = (): DiscussionThread => ({ id: randomUUID(), nodeId: 'stable-existing-node', nodeLabelAtCreation: 'Payments', resolved: false, comments: [comment()] })
 const reply = (t: DiscussionThread, parent = t.comments[0]): DiscussionAction => ({ kind: 'addReply', threadId: t.id, nodeId: t.nodeId, parent, comment: comment(parent.id) })
 
 describe('node discussions', () => {
+  it('counts threads by stable node ID, including resolved threads and missing targets rather than replies', () => {
+    const t = thread()
+    const withReply = applyDiscussionAction({ threads: [t] }, reply(t))
+    const store = { threads: [...withReply.threads, { ...thread(), nodeId: t.nodeId, resolved: true }, { ...thread(), nodeId: 'missing-target', resolved: true }] }
+    expect(countNodeDiscussions(store)[t.nodeId]).toEqual({ total: 2, open: 1 })
+    expect(countNodeDiscussions(store)['missing-target']).toEqual({ total: 1, open: 0 })
+    expect(countNodeDiscussions(store)['new-id-with-the-same-label']).toBeUndefined()
+    expect(Object.keys(countNodeDiscussions(null))).toEqual([])
+  })
   it('creates separate threads and preserves nested ancestry and attribution snapshots', () => {
     const t = thread()
     t.comments[0].email = 'original@example.com'

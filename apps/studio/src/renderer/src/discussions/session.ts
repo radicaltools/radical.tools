@@ -1,4 +1,4 @@
-import { submissionState, threadState, type DiscussionAction, type DiscussionComment, type Discussions, type DiscussionThread } from '@radical/common/discussions'
+import { countNodeDiscussions, submissionState, threadState, type DiscussionAction, type DiscussionComment, type Discussions, type DiscussionThread, type NodeDiscussionCounts } from '@radical/common/discussions'
 import type { HostCapabilities, DiscussionResult } from '@radical/host-bridge'
 import { host } from '../platform/host'
 import { documents } from '../store/documentStore'
@@ -22,6 +22,7 @@ export interface DiscussionDraft {
 }
 interface Snapshot {
   data: Discussions | null
+  nodeCounts: NodeDiscussionCounts
   fileError: string
   pendingNode: string | null
   drafts: Record<string, DiscussionDraft>
@@ -39,18 +40,28 @@ async function acknowledged<T>(promise: Promise<T>): Promise<T> {
 
 /** Session drafts are keyed by folder and node, independently of graph selection. */
 export class DiscussionSession {
-  private snapshot: Snapshot = { data: null, fileError: '', pendingNode: null, drafts: {} }
+  private snapshot: Snapshot = { data: null, nodeCounts: {}, fileError: '', pendingNode: null, drafts: {} }
   private listeners = new Set<() => void>()
   private refreshing: Promise<void> | null = null
   private generation = 0
+  private watchers = 0
+  private poll: ReturnType<typeof setInterval> | undefined
   constructor(readonly folder: string, private readonly bridge: () => HostCapabilities = host) {}
 
   getSnapshot = (): Snapshot => this.snapshot
+  getNodeCounts = (): NodeDiscussionCounts => this.snapshot.nodeCounts
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
   private change(patch: Partial<Snapshot>): void {
+    if (patch.data !== undefined) {
+      const next = countNodeDiscussions(patch.data)
+      const current = this.snapshot.nodeCounts
+      const unchanged = Object.keys(next).length === Object.keys(current).length && Object.entries(next).every(([id, count]) => count.total === current[id]?.total && count.open === current[id]?.open)
+      // Draft edits, new replies and unchanged polls do not repaint the canvas.
+      patch.nodeCounts = unchanged ? current : next
+    }
     this.snapshot = { ...this.snapshot, ...patch }
     for (const listener of this.listeners) listener()
   }
@@ -67,6 +78,15 @@ export class DiscussionSession {
   }
 
   refresh = (): Promise<void> => this.load()
+
+  /** The panel and canvas share one independent poll for this document. */
+  watch = (): (() => void) => {
+    if (this.watchers++ === 0) this.poll = setInterval(() => { void this.refresh() }, 1500)
+    void this.refresh()
+    return () => {
+      if (--this.watchers === 0) { clearInterval(this.poll); this.poll = undefined }
+    }
+  }
 
   private load(afterWrite = false): Promise<void> {
     if (this.snapshot.pendingNode && !afterWrite) return Promise.resolve()
