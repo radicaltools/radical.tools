@@ -1,5 +1,7 @@
 /** Discussions are a companion file, deliberately outside DiagramData. */
 export const DISCUSSIONS_FILE = 'discussions.json'
+export const DISCUSSIONS_LOCK_FILE = '.discussions.lock'
+export const DISCUSSIONS_WEB_LOCK_FILE = '.discussions.web.lock'
 
 export interface DiscussionComment {
   id: string

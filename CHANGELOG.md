@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Desktop folder models: right-click any graph node and choose *Discuss* to start a thread, reply to comments and resolve or reopen threads. Optional email attribution is remembered on the device. Discussions stay in a separate `discussions.json`, with atomic writes, independent refresh and retained drafts on failure.
+- Folder models in the desktop app and Chrome/Edge web UI: right-click any graph node and choose *Discuss* to start a thread, reply to comments and resolve or reopen threads. Optional email attribution is remembered on the device. Discussions stay in a separate `discussions.json`, with coordinated writes across browser tabs and the desktop app, independent refresh and retained drafts on failure.
 - Smart Layout runs Tidy in a worker: Studio stays responsive, the button counts the moves and stops the run (the canvas then stays as it was), and a ten-second budget hands over what was done so far — never a layout worse than the start. A view of more than 120 elements, or a pile, is sketched first with the semantic layered layout and tidied from there: a thousand elements in about 20 s (from minutes)
 - *Tidy around* on the selection (card and multi-select bar) and `smart_layout { around }` for agents: the chosen elements and what they relate to move, every other element stays where it is
 - With orthogonal lines, Smart Layout judges crossings, covered elements and bends along the route the canvas draws

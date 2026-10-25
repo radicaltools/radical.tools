@@ -21,11 +21,17 @@ import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
+export interface FsWritable {
+  write(data: string): Promise<void>
+  close(): Promise<void>
+  abort?(): Promise<void>
+}
+
 export interface FsFileHandle {
   kind: 'file'
   name: string
   getFile(): Promise<{ text(): Promise<string>; lastModified: number; size: number }>
-  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
+  createWritable(options?: { keepExistingData?: boolean; mode?: 'exclusive' | 'siloed' }): Promise<FsWritable>
   queryPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>
   requestPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<'granted' | 'denied' | 'prompt'>
 }

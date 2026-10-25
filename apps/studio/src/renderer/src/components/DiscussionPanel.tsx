@@ -4,11 +4,11 @@ import { MarkdownText } from '@radical/ui/components/MarkdownText'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { discussionSession } from '../discussions/session'
 
-export interface DiscussionTarget { folder: string; nodeId: string; label: string }
+export interface DiscussionTarget { documentId: string; nodeId: string; label: string }
 
 /** One panel, pinned to the node explicitly opened, with session drafts per node. */
 export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget; onClose: () => void }): React.ReactElement {
-  const session = discussionSession(target.folder)
+  const session = discussionSession(target.documentId)
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const node = useDiagramStore((s) => s.c4Nodes[target.nodeId])
   const draft = session.draft(target.nodeId)

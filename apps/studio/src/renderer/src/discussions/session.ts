@@ -1,6 +1,7 @@
 import { submissionState, threadState, type DiscussionAction, type DiscussionComment, type Discussions, type DiscussionThread } from '@radical/common/discussions'
 import type { HostCapabilities, DiscussionResult } from '@radical/host-bridge'
 import { host } from '../platform/host'
+import { documents } from '../store/documentStore'
 
 const EMAIL_KEY = 'radical-discussion-email'
 export function rememberedEmail(): string {
@@ -74,7 +75,7 @@ export class DiscussionSession {
     this.refreshing = (async () => {
       try {
         const load = this.bridge().loadDiscussions
-        if (!load) throw new Error('Discussions require a desktop folder model.')
+        if (!load) throw new Error('Discussions require a model kept in a folder.')
         const result = await acknowledged(load(this.folder))
         if (generation !== this.generation) return
         if (!result.success || !result.discussions) throw new Error(result.error ?? 'Could not read discussions.')
@@ -135,7 +136,7 @@ export class DiscussionSession {
     let checkConflict = false
     try {
       const act = this.bridge().actOnDiscussion
-      if (!act) throw new Error('The desktop host does not support discussions.')
+      if (!act) throw new Error('This model does not support discussions.')
       const result: DiscussionResult = await acknowledged(act(this.folder, action))
       if (!result.success || !result.discussions) {
         if (result.conflict) {
@@ -165,8 +166,14 @@ export class DiscussionSession {
 }
 
 const sessions = new Map<string, DiscussionSession>()
-export function discussionSession(folder: string): DiscussionSession {
-  let session = sessions.get(folder)
-  if (!session) { session = new DiscussionSession(folder); sessions.set(folder, session) }
+export function discussionSession(documentId: string): DiscussionSession {
+  let session = sessions.get(documentId)
+  if (!session) {
+    session = new DiscussionSession(documentId, () => ({
+      loadDiscussions: () => documents.loadDiscussions(documentId),
+      actOnDiscussion: (_, action) => documents.actOnDiscussion(documentId, action),
+    }))
+    sessions.set(documentId, session)
+  }
   return session
 }

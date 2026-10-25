@@ -7,7 +7,7 @@ import { DiskDiscussions } from '../src/discussions'
 import { diskFolderStorage } from '../src/diskFolderStorage'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
-import { threadState, type DiscussionAction, type DiscussionThread } from '@radical/common/discussions'
+import { DISCUSSIONS_WEB_LOCK_FILE, threadState, type DiscussionAction, type DiscussionThread } from '@radical/common/discussions'
 
 const fault = vi.hoisted(() => ({ replace: false }))
 vi.mock('node:fs/promises', async (original) => {
@@ -26,6 +26,16 @@ const create = (t: DiscussionThread): DiscussionAction => ({ kind: 'createThread
 const reply = (t: DiscussionThread): Extract<DiscussionAction, { kind: 'addReply' }> => ({ kind: 'addReply', threadId: t.id, nodeId: t.nodeId, parent: t.comments[0], comment: { id: randomUUID(), parentCommentId: t.comments[0].id, body: randomUUID(), createdAt: new Date().toISOString() } })
 
 describe('desktop discussion storage', () => {
+  it('yields to browser intent without taking its marker or touching the discussion file', async () => {
+    const dir = await folder()
+    const adapter = new DiskDiscussions(dir, 30)
+    const marker = join(dir, DISCUSSIONS_WEB_LOCK_FILE)
+    await writeFile(marker, '')
+    await expect(adapter.act(create(thread()))).rejects.toThrow('Another writer')
+    expect(await readdir(dir)).toEqual([DISCUSSIONS_WEB_LOCK_FILE])
+    await rm(marker)
+    expect((await adapter.act(create(thread()))).threads).toHaveLength(1)
+  })
   it('keeps the live file and removes temporary files when atomic replacement fails', async () => {
     const dir = await folder()
     const adapter = new DiskDiscussions(dir)

@@ -24,17 +24,22 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
 import { useDocumentsStore } from './store/documentStore'
 import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
+import { webFolderSupported } from './persist/webFolder'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 function AppInner(): React.ReactElement {
   const activeDocument = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId))
-  const discussionFolder = host().kind === 'electron' && host().loadDiscussions && host().actOnDiscussion && activeDocument?.source === 'md' ? activeDocument.folderPath : undefined
+  const h = host()
+  const discussionDocumentId = activeDocument?.source === 'md' && (
+    (h.kind === 'electron' && h.loadDiscussions && h.actOnDiscussion && activeDocument.folderPath)
+    || (h.kind === 'web' && webFolderSupported())
+  ) ? activeDocument.id : undefined
   const [discussionTarget, setDiscussionTarget] = useState<DiscussionTarget | null>(null)
   const openDiscussion = useCallback((nodeId: string) => {
     const node = useDiagramStore.getState().c4Nodes[nodeId]
-    if (discussionFolder && node) setDiscussionTarget({ folder: discussionFolder, nodeId, label: node.label })
-  }, [discussionFolder])
+    if (discussionDocumentId && node) setDiscussionTarget({ documentId: discussionDocumentId, nodeId, label: node.label })
+  }, [discussionDocumentId])
   const closeDiscussion = useCallback(() => {
     setDiscussionTarget((target) => {
       if (target) document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(target.nodeId)}"]`)?.focus()
@@ -110,7 +115,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionFolder ? openDiscussion : undefined} />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
@@ -125,7 +130,7 @@ function AppInner(): React.ReactElement {
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
-      {!isPresenting && discussionTarget && discussionTarget.folder === discussionFolder && <DiscussionPanel key={`${discussionTarget.folder}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
+      {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
       {isMetamodel && !isPresenting && <MetamodelEditor />}
       {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} />}
     </div>
