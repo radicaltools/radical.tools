@@ -3,6 +3,8 @@
  * change to what it shows (ADR "A view can keep itself tidied").
  *
  * Covers:
+ *   - an element dropped from the palette stays where it lands in the
+ *     tidying its drop sets off (no pin kept); the next change may move it
  *   - an add tidies the whole view, a pinned element stays where it was
  *     dropped, and the tidying is part of the add's undo step
  *   - undo, redo, a view switch and an outside change of positions only
@@ -101,6 +103,19 @@ describe('Continuous layout', () => {
     s().undo()
     expect(s().c4Nodes[d]).toBeUndefined()
     expect(places()).toEqual(before)
+  }, 60_000)
+
+  it('leaves an element dropped from the palette where it lands, this once', async () => {
+    const size = NODE_SIZES.system
+    const d = s().requestCreateNode({ type: 'system', label: 'D', description: '', technology: '', collapsed: false, external: false, x: 5000, y: 4000, ...size } as Omit<C4Node, 'id'>, { skipWizard: true, dropped: true })
+    const landed = at(d)
+    await settled()
+    expect(at(d), 'where it was dropped').toEqual(landed)
+    expect(pinnedNodeIds(s().views.v.layoutConstraints), 'and not pinned').toEqual([])
+    // The next change may move it.
+    s().addRelation({ sourceId: 'c', targetId: d })
+    await settled()
+    expect(gap('c', d)).toBeLessThan(1500)
   }, 60_000)
 
   it('undo, redo, a view switch and a move tidy nothing', async () => {

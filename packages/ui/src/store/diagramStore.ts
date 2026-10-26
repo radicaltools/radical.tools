@@ -3661,6 +3661,10 @@ let _continuousBase: { target: string; shape: string | null } | null = null
 let _continuousTimer: ReturnType<typeof setTimeout> | null = null
 /** A drop asks for a run even when the shape stayed (the element was pinned already). */
 let _continuousKicked = false
+/** Elements just dropped from the palette: the tidying their drop sets off
+ *  leaves them where they were dropped (held as if pinned, no pin kept); a
+ *  later one may move them (the author, 2026-10-26). */
+const _continuousHeld = new Set<string>()
 
 /** The shape of the canvas shown, or null when it does not keep itself tidied. */
 function continuousShape(s: DiagramStore): string | null {
@@ -3681,6 +3685,7 @@ function continuousShape(s: DiagramStore): string | null {
 function continuousRebase(s: DiagramStore): void {
   _continuousBase = { target: layoutTarget(s), shape: continuousShape(s) }
   _continuousKicked = false
+  _continuousHeld.clear()
 }
 
 /** Looks at the shape once the changes have stopped for a moment. */
@@ -4640,6 +4645,10 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── node wizard ──────────────────────────────────────────────────────
       requestCreateNode(node, opts = {}) {
         node = _placeInGrid(node, !!opts.dropped)
+        if (opts.dropped) {
+          const created = opts.onCreated
+          opts = { ...opts, onCreated: (id) => { _continuousHeld.add(id); created?.(id) } }
+        }
         const links = opts.links ?? []
         const wizard = wizardFor(get().metamodel, node.type, 'create')
         if (wizard && !opts.skipWizard && loadStudioSettings().nodeWizardOnCreate) {
@@ -7185,6 +7194,10 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = continuous ? null : ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: around ? 'tidying around' : 'tidying' } })
         const abort = new AbortController()
         _tidyAbort = abort
+        // Kept smart, what was just dropped from the palette stays where it
+        // landed this once.
+        const held = continuous ? [..._continuousHeld].filter((id) => !!get().c4Nodes[id]) : []
+        if (continuous) _continuousHeld.clear()
         try {
           const input = layoutInputForView(get())
           // A view that shows nothing yet (a new model's views) has nothing
@@ -7210,7 +7223,7 @@ export const useDiagramStore = create<DiagramStore>()(
             try {
               result = await runTidy(input.nodes, input.relations, {
                 alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined,
-                pinned: unpins ? [] : pinnedNodeIds(activeLayoutConstraints(get())), around, budget: TIDY_WORK, frames: [...input.frames],
+                pinned: unpins ? [] : [...pinnedNodeIds(activeLayoutConstraints(get())), ...held], around, budget: TIDY_WORK, frames: [...input.frames],
               }, (done, message) => {
                 if (continuous && Date.now() - started < 400) return
                 set((s) => { s.smartLayoutProgress = { phase: 'tidy', message: `${continuous ? 'keeping the view tidy · ' : ''}${done} move${done === 1 ? '' : 's'} · ${message}` } })
