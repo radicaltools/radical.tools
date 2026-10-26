@@ -29,3 +29,33 @@ it('does not save the view\'s camera as All elements\' on a reload', () => {
   s().setActiveView('v')
   expect(s().defaultViewport).toEqual({ x: 1, y: 2, zoom: 0.5 })
 })
+
+// F-0095: a model opened on one of its views (the sample from Models, a
+// Structurizr import) switches to it while it loads; the load then placed
+// All elements' camera on the view, and the canvas kept it as the view's.
+it('a view opened while the model loads opens at its own camera', () => {
+  const doc: DiagramData = {
+    nodes: [{ id: 'a', type: 'system', label: 'A', collapsed: false, x: 0, y: 0, width: 300, height: 180 }],
+    relations: [],
+    views: [{ id: 'v', name: 'V', nodeIds: ['a'], positions: { a: { x: 0, y: 0, width: 300, height: 180 } }, viewport: { x: 5, y: 6, zoom: 1.2 } }],
+    defaultViewport: { x: 1, y: 2, zoom: 0.5 },
+  } as DiagramData
+  s().setAppMode('designer')
+  s().loadDiagram({ nodes: [], relations: [] } as DiagramData)
+  const placed: unknown[] = []
+  ;(window as any).__rfPlaceCamera = (vp: unknown) => { placed.push(vp && { ...(vp as object) }) }
+  // As ModelSteps' openOnView: the view opens once the store has it.
+  const unsub = useDiagramStore.subscribe((st) => {
+    if (!st.views.v || st.activeViewId === 'v') return
+    unsub()
+    st.setActiveView('v')
+  })
+  try {
+    s().loadDiagram(structuredClone(doc))
+  } finally {
+    unsub()
+    delete (window as any).__rfPlaceCamera
+  }
+  expect(s().activeViewId).toBe('v')
+  expect(placed[placed.length - 1]).toEqual({ x: 5, y: 6, zoom: 1.2 })
+})

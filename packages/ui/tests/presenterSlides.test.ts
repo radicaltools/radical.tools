@@ -187,6 +187,30 @@ describe('back in Designer from Presenter', () => {
   })
 })
 
+describe('a presentation started from Designer (F5)', () => {
+  // F-0097: Esc put back the view shown before, not its camera: the view was
+  // drawn at the last slide's camera, and a reload moved it.
+  it('ends at Designer\'s camera from before it started', () => {
+    const W = window as unknown as Record<string, unknown>
+    const placed: unknown[][] = []
+    W.__rfPlaceCamera = (...args: unknown[]) => { placed.push(args) }
+    try {
+      s().setActiveView('core')
+      s().addPresentationSlide('Core')
+      s().setActiveView('ctx')
+      W.__rfCurrentViewport = { x: 1, y: 2, zoom: 0.5 }
+      s().startPresentation()
+      // The slide's camera.
+      W.__rfCurrentViewport = { x: 50, y: 60, zoom: 2 }
+      s().stopPresentation()
+      expect(s().activeViewId).toBe('ctx')
+      expect(placed[placed.length - 1]?.[0]).toEqual({ x: 1, y: 2, zoom: 0.5 })
+    } finally {
+      delete W.__rfPlaceCamera
+    }
+  })
+})
+
 describe('the model a slide shows once its milestone is gone (item 232)', () => {
   // Milestone v1 has the four elements; the live model has a fifth since.
   const live = (): string => s().addNode({ type: 'system', label: 'Pay', x: 900, y: 600, collapsed: false, ...NODE_SIZES.system } as Omit<C4Node, 'id'>)

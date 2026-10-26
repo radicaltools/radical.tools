@@ -201,3 +201,29 @@ test('F5 stops a presentation F5 started, and Esc ends a Warnier slide with an e
   await studio.settle()
   await expect(page.getByText('3 / 3')).toHaveCount(0)
 })
+
+// F-0096: a slide clicked in Presenter moved the camera, and the canvas kept
+// that as the view's camera: after a reload in Presenter, Designer opened the
+// view at the slide's camera. Only Designer's camera is kept as the view's.
+test('a slide shown in Presenter leaves the view\'s camera Designer\'s, also after a reload', async ({ page, studio }) => {
+  await studio.open('v-context', 'designer')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Smart fit/ }).click()
+  await page.keyboard.press('Escape')
+  const transform = () => page.locator('.react-flow__viewport').getAttribute('style')
+  const pane = (await studio.canvas.boundingBox())!
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2)
+  await page.mouse.wheel(0, -300)
+  await studio.settle()
+  const designer = await transform()
+
+  await page.locator('.toolbar-mode-btn', { hasText: 'Presenter' }).click()
+  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Context' }).click()
+  await studio.settle()
+  expect(await transform()).not.toBe(designer)
+  await page.reload()
+  await studio.ready()
+  await studio.designer()
+  await studio.settle()
+  expect(await transform()).toBe(designer)
+})
