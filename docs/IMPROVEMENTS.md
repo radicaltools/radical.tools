@@ -4528,6 +4528,36 @@ Still open:
      physics move the old parent over its neighbours.** Sample model, seen
      on the code before the fixes too. Next to item 281. (KM3)
 
+**Left open by the fixes of round 185–192, 2026-10-26** (findings F-0061 to
+F-0085, all fixed):
+
+285. **A concurrent folder merge can leave a relation between an element and
+     what holds it.** When one side nests an element and the other relates it
+     to its new holder, `mergeModels` (`packages/common/src/modelMerge.ts`)
+     keeps both; Propagate now refuses that (F-0070), the merge does not, and
+     its `MergeDrop` notices have no wording for it.
+286. **Restoring a milestone that holds a deleted element rebuilds its view
+     without the places the milestone kept.** `restoreSnapshot` lets the
+     group sync make a fresh view per element instead of reusing the one the
+     milestone holds since F-0064.
+287. **Tidy's label cost leaves out labels that show only a type name** ("is
+     part of", "navigates to"). Counting them breaks the aggregate-above-parts
+     and screens-in-a-row conventions, because Tidy places elements only at
+     the sibling gap or the comfort distance; it needs per-pair gaps with
+     room for the label in its moves (`moves.ts`, as `labelRoom` does for the
+     ensemble). (F-0077)
+288. **Two relations of the sample still find no route around elements**:
+     each ends at an element with another 43 px away, and the padded routing
+     grid has no free cell in that gap; a curved route can also graze a
+     corner by up to 4 px. (F-0076)
+289. **Smart Layout's summary names only the parts that improved**, in Studio
+     and over MCP: a part that got worse (lines over elements 13 → 20 on the
+     sample's Encryption view) is not mentioned. (F-0082)
+290. **A cancel of an agent's `smart_layout` takes effect only when the
+     synchronous Tidy run ends**, now within the work budget. (F-0080)
+291. **The milestone chip and a container's −/+ are still exported** with a
+     view's image; the other editing controls are left out since F-0067.
+
 ### Radical Forge over MCP (2026-10-07)
 
 Added in `feat/forge-mcp`: the MCP server runs Radical Forge with the
