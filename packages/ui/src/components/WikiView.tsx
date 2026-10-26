@@ -496,15 +496,30 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
   // The element Delete was asked for here, and its parent: its page goes
   // to the parent's.
   const leaving = useRef<{ id: string; parentId: string | null } | null>(null)
+  // The page's element is still in the model, but the view's filter leaves
+  // it out now (rewritten as another EARS type): said, as an add the filter
+  // leaves out is, and its page comes back once the view shows it again
+  // (Undo) while the Overview it gave way to is read.
+  const leftOut = useRef<{ viewId: string; id: string } | null>(null)
   useEffect(() => {
-    if (focus) { readFocus.current = focus.id; return }
+    if (focus) { readFocus.current = focus.id; leftOut.current = null; return }
     if (view && focusId && !glossary && readFocus.current === focusId) {
       readFocus.current = null
       const parentId = leaving.current?.id === focusId ? leaving.current.parentId : null
       leaving.current = null
+      if (c4Nodes[focusId]) {
+        leftOut.current = { viewId: view.id, id: focusId }
+        pushNotification(`This view's filter does not show ${c4Nodes[focusId].label} any more.`, 'warning')
+      }
       setWikiFocus(view.id, parentId && c4Nodes[parentId] ? parentId : null)
+      return
     }
-  }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes])
+    const back = leftOut.current
+    if (view && !focusId && back?.viewId === view.id && c4Nodes[back.id] && shownSet?.has(back.id)) {
+      leftOut.current = null
+      setWikiFocus(view.id, back.id)
+    }
+  }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes, shownSet, pushNotification])
 
   // An open properties card goes along to the page read; a closed one (✕
   // too) stays closed. The Overview and Glossary leave it as it is.

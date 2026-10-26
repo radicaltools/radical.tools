@@ -663,3 +663,31 @@ test.describe('the wiki keeps the metamodel', () => {
     expect(native).toEqual([])
   })
 })
+
+// F-0102 (decided 2026-10-26): a requirement rewritten on its page so that
+// the view's filter leaves it out gave way to the Overview without a word,
+// and Undo brought the requirement back but not its page.
+test("a rewrite the view's filter leaves out says so, and Undo brings its page back", async ({ page, studio }) => {
+  const req = (id: string, label: string, trigger: string, action: string) =>
+    ({ id, type: 'requirement', label, ears_type: 'event-driven', trigger, action, x: 0, y: 0, width: 240, height: 100, collapsed: false })
+  await studio.seedDocument(JSON.stringify({
+    nodes: [req('r-back', 'Back within the limit', 'a region fails', 'restore service within 30 minutes'), req('r-why', 'Tell the customer why', 'a payment fails', 'tell the customer why')],
+    relations: [],
+    views: [{ id: 'v-ev', kind: 'wiki', name: 'Event-driven', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }], filters: [{ kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven'] }] }] } }],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  await studio.open('v-ev/f/r-back')
+  await expect(page.locator('.wiki-title')).toHaveText('Back within the limit')
+  await page.locator('.ears-sentence').hover()
+  await page.getByRole('button', { name: 'Rewrite the sentence' }).click()
+  const sentence = page.getByRole('textbox', { name: 'The requirement as one sentence' })
+  await sentence.fill('The system shall restore service within 30 minutes')
+  await sentence.press('Enter')
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'r-back')?.['ears_type' as keyof object]).toBe('ubiquitous')
+  await expect(page).toHaveURL(/\/v\/v-ev$/)
+  await expect(page.locator('.toast-message').last()).toContainText("This view's filter does not show Back within the limit any more")
+  await page.locator('.wiki-title').click()
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(page).toHaveURL(/\/v\/v-ev\/f\/r-back$/)
+  await expect(page.locator('.wiki-title')).toHaveText('Back within the limit')
+})
