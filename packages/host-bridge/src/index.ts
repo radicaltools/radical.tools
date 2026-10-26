@@ -12,7 +12,14 @@
 // Every capability is optional. Callers check for a method before using it,
 // and a failed operation resolves with `success: false` rather than throwing.
 
+import type { DiscussionAction, Discussions } from '@radical/common/discussions'
+
 export type HostKind = 'electron' | 'vscode' | 'web'
+
+export interface DiscussionResult extends HostResult {
+  discussions?: Discussions
+  conflict?: boolean
+}
 
 export interface HostResult {
   success: boolean
@@ -50,6 +57,9 @@ export interface FolderChange {
 
 /** What a host can do. Everything but `kind` is optional. */
 export interface HostCapabilities {
+  /** Independent companion-file operations, acknowledged after atomic replacement. */
+  loadDiscussions?(folderPath: string): Promise<DiscussionResult>
+  actOnDiscussion?(folderPath: string, action: DiscussionAction): Promise<DiscussionResult>
   /** Save dialog, then write `json` to the chosen file. */
   saveDiagram?(json: string): Promise<HostResult & { filePath?: string }>
   /** Open dialog, then read the chosen file. */

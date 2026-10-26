@@ -5,6 +5,8 @@ import type { FileChange, FolderChange, HostCapabilities } from '@radical/host-b
 // IPC channel handled in src/main. The renderer reaches it through host()
 // (src/renderer/src/platform/host.ts), never through window.electronAPI.
 const api = {
+  loadDiscussions: (folderPath) => ipcRenderer.invoke('discussions:load', folderPath),
+  actOnDiscussion: (folderPath, action) => ipcRenderer.invoke('discussions:act', folderPath, action),
   saveDiagram: (json) => ipcRenderer.invoke('dialog:save', json),
   openDiagram: () => ipcRenderer.invoke('dialog:open'),
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),

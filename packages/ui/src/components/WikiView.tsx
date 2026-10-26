@@ -239,6 +239,7 @@ type MenuPoint = { x: number; y: number; alignRight?: boolean }
 // the infobox), and the elements a line written under a heading stands for.
 interface WikiActions {
   readOnly: boolean
+  onDiscuss?: (nodeId: string) => void
   openMenu: (target: MenuTarget, at: MenuPoint) => void
   /** Add an element of `type` for each line, as children of `under` (null:
    *  at the top of the model). Returns the ids of the ones added. */
@@ -276,13 +277,12 @@ function useWikiActions(): WikiActions {
   return actions
 }
 
-// Open the menu where a right click landed. A designer's only: a reader has
-// nothing to do with an element but open it, and text being edited keeps the
-// browser's own menu (copy, paste).
+// Readers may discuss a node when the host supports it. Model editing remains
+// Designer-only; text editors retain the browser's copy/paste menu.
 function menuOnRightClick(actions: WikiActions, target: MenuTarget): (e: React.MouseEvent) => void {
   return (e) => {
-    if (actions.readOnly) return
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+    if (actions.readOnly && !(actions.onDiscuss && target.nodeId)) return
+    if ((e.target as Element).closest('input, textarea, select, [contenteditable="true"], a[href]')) return
     e.preventDefault()
     e.stopPropagation()
     actions.openMenu(target, { x: e.clientX, y: e.clientY })
@@ -413,7 +413,7 @@ function relationReadingsOf(
   return readings
 }
 
-export function WikiView(): React.ReactElement {
+export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void } = {}): React.ReactElement {
   const views = useDiagramStore((s) => s.views)
   const activeViewId = useDiagramStore((s) => s.activeViewId)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
@@ -434,6 +434,7 @@ export function WikiView(): React.ReactElement {
   // Read-only out of Designer, and on a slide played from it (F5).
   const presenting = useDiagramStore((s) => s.presentationActive)
   const readOnly = appMode !== 'designer' || presenting
+  const discussNode = presenting ? undefined : onDiscuss
   const typeMeta = useTypeMeta()
 
   const view = activeViewId ? views[activeViewId] : null
@@ -531,6 +532,7 @@ export function WikiView(): React.ReactElement {
   // Add or link…, opened from an element's menu where that menu stood.
   const [picker, setPicker] = useState<{ at: MenuPoint; nodeId: string } | null>(null)
   const [editingRelation, setEditingRelation] = useState<WikiActions['editingRelation']>(null)
+  useEffect(() => { setMenu(null) }, [readOnly, discussNode, activeViewId])
   const [factsFor, setFactsFor] = useState<string | null>(null)
   // The elements written in a line under a heading: no wizard and no change
   // of page, so that the next one can be written at once. Where they go
@@ -577,6 +579,7 @@ export function WikiView(): React.ReactElement {
     ? addChoices(view ?? undefined, { nodes: c4Nodes, relations: c4Relations, metamodel }).filter((c) => !viewTypes || viewTypes.has(c.type))
     : null, [view, c4Nodes, c4Relations, metamodel, viewTypes])
   const actions: WikiActions = {
+    onDiscuss: discussNode,
     viewTypes,
     topChoices,
     childTypes: (under) => [...new Set(childChoicesOf(under).map((c) => c.type))]
@@ -734,6 +737,8 @@ export function WikiView(): React.ReactElement {
   const menuPage = (target: MenuTarget): WikiMenuPage => {
     const node = target.nodeId ? c4Nodes[target.nodeId] : undefined
     const items: WikiMenuItem[] = []
+    if (node && discussNode) items.push({ id: 'discuss', label: 'Discuss', onSelect: () => discussNode(node.id) })
+    if (readOnly) return { items }
     const relation = target.relation
     if (relation) {
       items.push({
@@ -796,7 +801,7 @@ export function WikiView(): React.ReactElement {
         typeMeta={typeMeta}
         sort={pipelineOf(view)?.sort}
       />
-      <div className="wiki-page" ref={pageRef}>
+      <div className="wiki-page" ref={pageRef} tabIndex={-1} onContextMenu={focus && discussNode ? menuOnRightClick(actions, { nodeId: focus.id }) : undefined}>
         <div className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
@@ -860,10 +865,10 @@ export function WikiView(): React.ReactElement {
           />
         )}
       </div>
-      {menu && !readOnly && (
+      {menu && (!readOnly || !!discussNode) && (
         <WikiMenu
           // A menu asked for elsewhere is a new menu, not this one moved.
-          key={`${menu.at.x}:${menu.at.y}:${menu.target.nodeId ?? ''}:${menu.target.relation?.id ?? ''}`}
+          key={`${menu.at.x}:${menu.at.y}:${menu.target.nodeId ?? ''}:${menu.target.relation?.id ?? ''}:${readOnly}:${!!discussNode}`}
           at={menu.at}
           root={menuPage(menu.target)}
           onClose={() => setMenu(null)}
@@ -2341,6 +2346,9 @@ function WikiElementPage({
   return (
     <Root
       className={embedded ? 'wiki-section' : 'wiki-doc'}
+      data-wiki-node-id={node.id}
+      tabIndex={-1}
+      onContextMenu={actions.onDiscuss ? menuOnRightClick(actions, menuTarget) : undefined}
       ref={embedded ? undefined : articleRef}
       style={{ ['--type-color' as string]: meta.color }}
     >

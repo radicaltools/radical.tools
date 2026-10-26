@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@radical/common": "*"
+  },
   "devDependencies": {
     "typescript": "^5.3.3",
     "vitest": "^4.1.4"
