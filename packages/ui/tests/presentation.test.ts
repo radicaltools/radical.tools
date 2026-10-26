@@ -172,6 +172,19 @@ describe('Present with a menu open over the canvas', () => {
   })
 })
 
+// An export draws the diagram, not the selection: nothing dimmed (F-0088).
+describe('An export with an element selected', () => {
+  it('draws no focus while it is drawn, and the focus comes back after', () => {
+    useDiagramStore.getState().setSelectedNodeIds(['sys1'])
+    useDiagramStore.getState().selectNode('sys1')
+    expect(selectCanvasFocus(useDiagramStore.getState())).not.toBeNull()
+    useDiagramStore.setState({ drawnForExport: true } as any)
+    expect(selectCanvasFocus(useDiagramStore.getState())).toBeNull()
+    useDiagramStore.setState({ drawnForExport: false } as any)
+    expect(selectCanvasFocus(useDiagramStore.getState())).not.toBeNull()
+  })
+})
+
 describe('Present and Esc with a milestone\'s diff on', () => {
   // The slides' diff replaced the milestone's, and Esc cleared it: the
   // toggle said on and drew nothing, off and on again too.

@@ -37,6 +37,7 @@ import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { NodeDiscussionBadges } from './NodeDiscussionBadges'
 import { keepKeysHere } from './keysHere'
+import { editingControl } from './editingControl'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
@@ -105,6 +106,10 @@ function focusDimmed(n: RFNode): RFNode {
     focusDimmedCopies.set(n, copy)
   }
   return copy
+}
+
+function unselected<T extends { selected?: boolean }>(item: T): T {
+  return item.selected ? { ...item, selected: false } : item
 }
 
 // What the connect gesture offers besides relation types: the element moved
@@ -212,7 +217,7 @@ function ConnectPills({ containerRef, targets, nameOf }: {
         if (!node || node.hidden) return null
         const at = node.positionAbsolute ?? node.position
         return (
-          <div key={id} className="connect-pills-over" style={{ left: at.x, top: at.y, width: node.width ?? 0 }}>
+          <div key={id} {...editingControl} className="connect-pills-over" style={{ left: at.x, top: at.y, width: node.width ?? 0 }}>
             <div className="connect-pills" role="group" aria-label={`Drop on ${nameOf(id)}`} data-connect-over={id}>
               {types.map((t) => t.type === NEST_HOLDS
                 ? <span key={t.type} className="connect-pill holds">{t.text}</span>
@@ -289,6 +294,7 @@ function ConnectionPreviewLine({
 
   return (
     <svg
+      {...editingControl}
       style={{
         position: 'absolute',
         inset: 0,
@@ -1794,6 +1800,11 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
           : focus && !focus.nodes.has(n.id) ? focusDimmed(n) : n
       )
     : rfNodes
+  // An export draws the diagram, not the selection: nothing selected while
+  // it is drawn (useExport), so no outline and no highlighted line.
+  const drawnForExport = useDiagramStore((s) => s.drawnForExport)
+  const shownNodes = drawnForExport ? annotatedNodes.map(unselected) : annotatedNodes
+  const shownEdges = drawnForExport ? rfEdges.map(unselected) : rfEdges
 
   // Edges between a container's children are drawn above the container (so
   // they stay visible and clickable), and one can lie over its expand /
@@ -1831,8 +1842,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       onDragOver={isViewMode ? undefined : onDragOver}
       onDoubleClick={isViewMode ? undefined : onCanvasDoubleClick}
     >
+      {/* Editing a sequence, the bar says how and is left out of an export;
+          shown, it names the sequence, as the caption names the view. */}
       {activeSequenceId && (
-        <div style={{
+        <div {...(isViewMode || presentationActive ? {} : editingControl)} style={{
           position: 'absolute',
           top: 8,
           left: '50%',
@@ -1855,6 +1868,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
             ? <>Sequence: {activeSequenceName ?? activeSequenceId}</>
             : <>Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)</>}
           <button
+            {...editingControl}
             onClick={() => setActiveSequence(null)}
             style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1, opacity: 0.85 }}
             title={isViewMode || presentationActive ? 'Close the sequence' : 'Stop editing'}
@@ -1884,9 +1898,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
           <span style={{ color: 'var(--accent)', fontSize: 10 }}>●</span>
           <span>
             Milestone: <strong style={{ color: 'var(--text-primary)' }}>{snapshotName}</strong>
-            {milestoneDirty && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
+            {milestoneDirty && <span {...editingControl} style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
           </span>
           {!presentationActive && <button
+            {...editingControl}
             title={showDiff ? 'Hide diff' : 'Show changes vs. previous milestone'}
             onClick={toggleShowDiff}
             style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: showDiff ? 'var(--accent)' : 'var(--bg-surface)', color: showDiff ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 3 }}
@@ -1901,7 +1916,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
             </span>
           )}
           {milestoneDirty && (
-            <>
+            <span {...editingControl} style={{ display: 'contents' }}>
               <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--border-color)', margin: '0 2px' }} />
               <button
                 title="Apply changes to this and all later milestones"
@@ -1938,14 +1953,14 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
                 onClick={discardMilestoneChanges}
                 style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: 'none', border: '1px solid var(--border-color)', borderRadius: 3, color: 'var(--text-muted)' }}
               >Discard</button>
-            </>
+            </span>
           )}
         </div>
       )}
       <DeleteConfirmDialog />
       <ReactFlow
-        nodes={annotatedNodes}
-        edges={rfEdges}
+        nodes={shownNodes}
+        edges={shownEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
@@ -2008,7 +2023,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       <RelationTypeMenu containerRef={containerRef} />
       <ExploreMenu containerRef={containerRef} />
       {discussionMenu && onDiscuss && !presentationActive && createPortal(
-        <div ref={discussionMenuRef} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
+        <div ref={discussionMenuRef} {...editingControl} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDiscussionMenu(null) }}
           onKeyDown={(event) => {
             keepKeysHere(event)
@@ -2034,6 +2049,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       {connectSource && (
         <div
+          {...editingControl}
           style={{
             position: 'absolute',
             top: 12,
@@ -2133,7 +2149,7 @@ function RelationTypeMenu({ containerRef }: { containerRef: React.RefObject<HTML
   const x = Math.max(8, Math.min((at?.x ?? (box?.width ?? 400) / 2), (box?.width ?? 400) - 240))
   const y = Math.max(8, Math.min((at?.y ?? (box?.height ?? 300) / 2), (box?.height ?? 300) - 40 - choice.types.length * 30))
   return (
-    <div ref={menuRef} className="relation-type-menu" role="menu" aria-label={`Relation from ${source} to ${target}`}
+    <div ref={menuRef} {...editingControl} className="relation-type-menu" role="menu" aria-label={`Relation from ${source} to ${target}`}
       style={{ position: 'absolute', left: x, top: y, zIndex: 120 }}>
       <div className="relation-type-menu-title">{source} → {target}: which relation?</div>
       {choice.types.map((t) => {

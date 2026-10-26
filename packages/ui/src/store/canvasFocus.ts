@@ -16,6 +16,8 @@ interface FocusState {
   selectedEdgeId: string | null
   /** Focus, the switch on the canvas: off, a selection focuses nothing. */
   selectionFocus?: boolean
+  /** An export is being drawn: it shows the diagram, nothing dimmed. */
+  drawnForExport?: boolean
 }
 
 export interface CanvasFocus {
@@ -91,7 +93,7 @@ let last: {
 
 /** The focus of the canvas now, computed once per change of what it reads. */
 export function selectCanvasFocus(s: FocusState): CanvasFocus | null {
-  if (s.selectionFocus === false) return null
+  if (s.selectionFocus === false || s.drawnForExport) return null
   if (
     !last ||
     last.nodes !== s.rfNodes ||

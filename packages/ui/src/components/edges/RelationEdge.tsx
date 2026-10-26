@@ -11,6 +11,7 @@ import { C4EdgeRFData } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { edgeFocus } from '../../store/canvasFocus'
 import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
+import { editingControl } from '../editingControl'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ function ReconnectHandle({
   }, [dragging, mouse])
 
   return (
-    <>
+    <g {...editingControl}>
       {/* Draggable handle circle */}
       <circle
         cx={x}
@@ -147,7 +148,7 @@ function ReconnectHandle({
           <circle cx={previewPt.x} cy={previewPt.y} r={4} fill="var(--accent)" opacity={0.6} pointerEvents="none" />
         </>
       )}
-    </>
+    </g>
   )
 }
 

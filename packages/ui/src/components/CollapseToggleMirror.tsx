@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useStore, type Node } from 'reactflow'
 import { useDiagramStore } from '../store/diagramStore'
+import { editingControl } from './editingControl'
 
 /** The buttons drawn inside a node that a relation's line can run over:
  *  a container's −/+ and an exploration element's + and − (ExploreMore). */
@@ -110,7 +111,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
 
   if (!toggles.length) return null
   return (
-    <div className="c4-collapse-mirror-layer" aria-hidden="true">
+    <div {...editingControl} className="c4-collapse-mirror-layer" aria-hidden="true">
       {toggles.map((t) => {
         const n = nodeInternals.get(t.id) as (Node & { positionAbsolute?: { x: number; y: number } }) | undefined
         if (!n || n.hidden) return null

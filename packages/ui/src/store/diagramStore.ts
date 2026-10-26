@@ -2900,6 +2900,9 @@ interface DiagramStore {
   /** Every relation label is shown whatever the zoom (an export is being
    *  drawn), so the labels are placed even when zoomed out. */
   allEdgeLabelsShown: boolean
+  /** An export is being drawn: the canvas draws the diagram without the
+   *  selection, its outline or its focus (the rest dimmed). */
+  drawnForExport: boolean
   /** The canvas draws simple blocks, zoomed out (canvasDetail.ts). Canvas
    *  keeps it in step with the zoom; switching views sets it from the
    *  incoming camera, so a large view is not drawn as cards first. */
@@ -4018,6 +4021,7 @@ export const useDiagramStore = create<DiagramStore>()(
       liveLayoutActive: true,
       liveLayoutMoving: false,
       allEdgeLabelsShown: false,
+      drawnForExport: false,
       lowDetail: false,
       setLowDetail(low) {
         if (get().lowDetail !== low) set((state) => { state.lowDetail = low })

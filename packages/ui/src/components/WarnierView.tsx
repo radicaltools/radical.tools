@@ -10,6 +10,7 @@ import {
   flatten, insertPlan, locate, outlinePlan, warnierEditable, warnierRows, warnierTree,
   type OutlineMove, type WarnierMode, type WarnierNode,
 } from '@radical/common/warnier'
+import { editingControl } from './editingControl'
 
 // A view of kind `warnier`: what the view shows as a Warnier–Orr diagram,
 // left to right, each element with what is under it in a brace. The tree
@@ -161,7 +162,7 @@ function Item(props: ItemProps): React.ReactElement {
           <span className="wn-head">
             <span className="wn-type">{type.label}</span>
             {edit?.structural && (
-              <span className="wn-actions" role="group" aria-label={`Actions of ${name}`}>
+              <span {...editingControl} className="wn-actions" role="group" aria-label={`Actions of ${name}`}>
                 {hasRepeat && (
                   <button type="button" aria-label={`Set the repeat of ${name}`} title="How often it happens, and for what"
                     onMouseDown={keepFocus} onClick={toggleRepeat}><Icon d={ICONS.repeat} /></button>
@@ -211,7 +212,7 @@ function Item(props: ItemProps): React.ReactElement {
           <RepeatPopover node={node} onPick={(fields) => edit.setFields(node.id, fields)} onClose={() => edit.openRepeat(null)} />
         )}
         {item.children.length === 0 && childLabel && (
-          <button type="button" className="wn-add-first" aria-label={`Add a ${childLabel.toLowerCase()} inside ${name}`}
+          <button type="button" {...editingControl} className="wn-add-first" aria-label={`Add a ${childLabel.toLowerCase()} inside ${name}`}
             title={`Add a ${childLabel.toLowerCase()} inside it`} onMouseDown={keepFocus} onClick={(e) => { e.stopPropagation(); edit?.addInside(item) }}>+</button>
         )}
       </div>
@@ -232,7 +233,7 @@ function Item(props: ItemProps): React.ReactElement {
               </React.Fragment>
             ))}
             {childLabel && (
-              <button type="button" className="wn-add" aria-label={`Add a ${childLabel.toLowerCase()} to ${name}`} onMouseDown={keepFocus}
+              <button type="button" {...editingControl} className="wn-add" aria-label={`Add a ${childLabel.toLowerCase()} to ${name}`} onMouseDown={keepFocus}
                 onClick={(e) => { e.stopPropagation(); edit?.addInside(item) }}>+ {childLabel}</button>
             )}
           </div>
@@ -485,7 +486,7 @@ export function WarnierView(): React.ReactElement {
           {canAddProcess ? (
             <>
               <p>No process yet.</p>
-              <button type="button" className="wn-empty-add" onClick={(e) => { e.stopPropagation(); addProcess() }}>+ Process</button>
+              <button type="button" {...editingControl} className="wn-empty-add" onClick={(e) => { e.stopPropagation(); addProcess() }}>+ Process</button>
             </>
           ) : 'Nothing to draw yet. Add a process with its steps, or set what the view shows in its Filter.'}
         </div>
@@ -506,7 +507,7 @@ export function WarnierView(): React.ReactElement {
             />
           ))}
           {canAddProcess && (
-            <button type="button" className="wn-add wn-add-root" onMouseDown={keepFocus} onClick={(e) => { e.stopPropagation(); addProcess() }}>+ Process</button>
+            <button type="button" {...editingControl} className="wn-add wn-add-root" onMouseDown={keepFocus} onClick={(e) => { e.stopPropagation(); addProcess() }}>+ Process</button>
           )}
         </div>
       )}
