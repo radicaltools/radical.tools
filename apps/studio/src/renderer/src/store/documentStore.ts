@@ -11,6 +11,9 @@
 import { create } from 'zustand'
 import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
+import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
+import type { DiscussionResult } from '@radical/host-bridge'
+import { WebDiscussions } from '../discussions/webStorage'
 import {
   serializeToMdFolder,
   deserializeFromMdFolder,
@@ -76,6 +79,21 @@ const queuedSaves = new Map<string, DiagramData>()
  *  remembers what was last read so writes never clobber outside edits. (In
  *  Electron the main process keeps the equivalent session per folder.) */
 const webSessions = new Map<string, MdFolderSession>()
+const webDiscussionStores = new Map<string, WebDiscussions>()
+
+async function webDiscussionsFor(id: string): Promise<WebDiscussions> {
+  if (host().kind !== 'web' || !connectedWebHandles.has(id)) throw new Error('The model folder is not connected. Reconnect it in Models before posting discussions.')
+  let adapter = webDiscussionStores.get(id)
+  if (!adapter) {
+    const handle = await loadHandle(id)
+    if (!handle || handle.kind !== 'directory') throw new Error('The model folder is unavailable. Reconnect it in Models.')
+    const existing = webDiscussionStores.get(id)
+    if (existing) return existing
+    adapter = new WebDiscussions(handle)
+    webDiscussionStores.set(id, adapter)
+  }
+  return adapter
+}
 /** How often a web md-folder doc's directory is checked for outside edits. */
 const WEB_FOLDER_POLL_MS = 2000
 
@@ -475,6 +493,7 @@ async function pickAndWriteFolder(
 
 /** Turn `meta` into the md-backed document of a folder just written. */
 async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<void> {
+  webDiscussionStores.delete(meta.id)
   if ('folderPath' in written) {
     meta.folderPath = written.folderPath
   } else {
@@ -492,6 +511,7 @@ async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<v
 
 /** Turn `meta` into the file-backed document of a file handle just written. */
 async function bindWebFile(meta: DocumentMeta, handle: FsFileHandle): Promise<void> {
+  webDiscussionStores.delete(meta.id)
   await saveHandle(meta.id, handle)
   connectedWebHandles.add(meta.id)
   if (meta.source === 'ls') deleteLSPayload(meta.id)
@@ -674,6 +694,9 @@ function migrateLegacyIfNeeded(index: DocumentsIndex): DocumentsIndex {
 // ─── Public API (pure functions) ─────────────────────────────────────────────
 
 export interface DocumentsAPI {
+  /** Companion-file operations; never enter model saves or model watchers. */
+  loadDiscussions(id: string): Promise<DiscussionResult>
+  actOnDiscussion(id: string, action: DiscussionAction): Promise<DiscussionResult>
   listDocuments(): DocumentMeta[]
   getActiveId(): string | null
   setActiveId(id: string | null): void
@@ -1027,6 +1050,7 @@ export const documents: DocumentsAPI = {
     if (removed?.source === 'md') {
       connectedWebHandles.delete(id)
       webSessions.delete(id)
+      webDiscussionStores.delete(id)
       void removeHandle(id)
     } else if (removed?.source === 'fs' && !removed.filePath) {
       connectedWebHandles.delete(id)
@@ -1268,6 +1292,7 @@ export const documents: DocumentsAPI = {
     unreadable.delete(id)
     connectedWebHandles.delete(id)
     webSessions.delete(id)
+    webDiscussionStores.delete(id)
     void removeHandle(id)
     notify()
     return meta
@@ -1438,6 +1463,26 @@ export const documents: DocumentsAPI = {
     const handle = !h.readFolder && connectedWebHandles.has(id) ? await loadHandle(id) : null
     if (!handle) throw new Error('The folder is not connected; open it again to save.')
     await writeCheckConfigToHandle(handle, content)
+  },
+
+  async loadDiscussions(id) {
+    try {
+      const meta = readIndex().docs.find((d) => d.id === id)
+      if (meta?.source !== 'md') throw new Error('Discussions require a model kept in a folder.')
+      const h = host()
+      if (h.kind === 'electron' && meta.folderPath && h.loadDiscussions) return await h.loadDiscussions(meta.folderPath)
+      return { success: true, discussions: await (await webDiscussionsFor(id)).load() }
+    } catch (error) { return { success: false, error: (error as Error).message } }
+  },
+
+  async actOnDiscussion(id, action) {
+    try {
+      const meta = readIndex().docs.find((d) => d.id === id)
+      if (meta?.source !== 'md') throw new Error('Discussions require a model kept in a folder.')
+      const h = host()
+      if (h.kind === 'electron' && meta.folderPath && h.actOnDiscussion) return await h.actOnDiscussion(meta.folderPath, action)
+      return { success: true, discussions: await (await webDiscussionsFor(id)).act(action) }
+    } catch (error) { return { success: false, conflict: error instanceof DiscussionConflict, error: (error as Error).message } }
   },
 
   watchDocument(id, onExternalChange) {

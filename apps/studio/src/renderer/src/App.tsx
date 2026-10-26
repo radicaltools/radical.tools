@@ -22,10 +22,36 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
+import { useDocumentsStore } from './store/documentStore'
+import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
+import { webFolderSupported } from './persist/webFolder'
+import { useNodeDiscussions } from './discussions/useNodeDiscussions'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 function AppInner(): React.ReactElement {
+  const activeDocument = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId))
+  const h = host()
+  const discussionDocumentId = activeDocument?.source === 'md' && (
+    (h.kind === 'electron' && h.loadDiscussions && h.actOnDiscussion && activeDocument.folderPath)
+    || (h.kind === 'web' && webFolderSupported())
+  ) ? activeDocument.id : undefined
+  const [discussionTarget, setDiscussionTarget] = useState<DiscussionTarget | null>(null)
+  const openDiscussion = useCallback((nodeId: string) => {
+    const node = useDiagramStore.getState().c4Nodes[nodeId]
+    if (discussionDocumentId && node) setDiscussionTarget({ documentId: discussionDocumentId, nodeId, label: node.label })
+  }, [discussionDocumentId])
+  const closeDiscussion = useCallback(() => {
+    setDiscussionTarget((target) => {
+      if (target) {
+        const id = CSS.escape(target.nodeId)
+        const element = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"], tr[data-node-id="${id}"], [data-wiki-node-id="${id}"]`)
+          ?? document.querySelector<HTMLElement>('.wiki-page')
+        element?.focus({ preventScroll: true })
+      }
+      return null
+    })
+  }, [])
   const runRadicalLayout = useDiagramStore((s) => s.runRadicalLayout)
   // A link still waiting for its document is drawn in its own perspective.
   const appMode = useShownMode()
@@ -43,6 +69,7 @@ function AppInner(): React.ReactElement {
   const isCanvasView   = !isTreemapView && !isSequenceView && !isTableView && !isMatrixView && !isWikiView && !isWarnierView
 
   const isPresenting = presentationActive
+  const nodeDiscussions = useNodeDiscussions(isPresenting ? undefined : discussionDocumentId)
   const isDesigner = appMode === 'designer'
   const isViewer = appMode === 'viewer'
   const isPresenter = appMode === 'presenter'
@@ -95,7 +122,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView /> : isWarnierView ? <WarnierView /> : <Canvas />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
@@ -110,6 +137,7 @@ function AppInner(): React.ReactElement {
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
+      {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
       {isMetamodel && !isPresenting && <MetamodelEditor />}
       {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} />}
     </div>
