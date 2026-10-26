@@ -192,6 +192,34 @@ test('a click on the empty canvas during the framing flight brings back the came
   await expect.poll(() => viewport.getAttribute('style')).toBe(before)
 })
 
+// F-0061: a click only selects (the card opens on a double-click), but the
+// framing kept room on the right for the card all the same: the framed
+// elements sat off to the left, and at 1280 px, the room left under half the
+// canvas, the framing took the whole canvas and one lay under the palette.
+for (const [width, height] of [[1280, 720], [1600, 900]]) {
+  test(`a click at ${width} px frames the selection in what the palette leaves free, with no room for a card that is closed`, async ({ page, studio }) => {
+    await page.setViewportSize({ width, height })
+    await studio.openSample()
+    await studio.designer()
+    await studio.node('sys-core').click({ position: { x: 10, y: 10 } })
+    await expect(page.locator('.react-flow__node.selected[data-id="sys-core"]')).toHaveCount(1)
+    await expect.poll(() => page.locator('.react-flow__node.focus-dim').count()).toBeGreaterThan(0)
+    await studio.settle()
+    await expect(page.locator('.right-panel.open')).toHaveCount(0)
+    const geo = await page.evaluate(() => {
+      const palette = document.querySelector('.canvas-column .element-palette')!.getBoundingClientRect()
+      const canvas = document.querySelector('.react-flow')!.getBoundingClientRect()
+      const boxes = Array.from(document.querySelectorAll('.react-flow__node:not(.focus-dim)')).map((n) => n.getBoundingClientRect())
+      const left = Math.min(...boxes.map((b) => b.left))
+      const right = Math.max(...boxes.map((b) => b.right))
+      return { left: left - palette.right, right: canvas.right - right }
+    })
+    expect(geo.left).toBeGreaterThanOrEqual(0)
+    expect(geo.right).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(geo.left - geo.right)).toBeLessThan(100)
+  })
+}
+
 // Item 224: on a hierarchy view the properties card covered Size, Levels and
 // ↑ Up: a click on Levels reached the card, and Levels stayed 2.
 test('the hierarchy\'s Size, Levels and Up stay clear of the properties card', async ({ page, studio }) => {
