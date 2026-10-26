@@ -250,14 +250,16 @@ type ConnectionMod = 'alt' | 'shift' | 'ctrl' | 'meta'
 type RailMenuId = 'models' | 'settings'
 
 // The rail's own icons: drawn on a 24 grid, larger and bolder than the
-// menus' 16 px ones, so they read at a glance.
-const RailIcon = ({ children }: { children: React.ReactNode }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+// menus' 16 px ones, so they read at a glance; `viewBox` pads one that fills
+// its grid more than the rail's others do.
+const RailIcon = ({ children, viewBox = '0 0 24 24' }: { children: React.ReactNode; viewBox?: string }) => (
+  <svg viewBox={viewBox} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     {children}
   </svg>
 )
+// The gear fills 22 of its 24: padded to the folder's size above it.
 const RailIconSettings = () => (
-  <RailIcon>
+  <RailIcon viewBox="-2.5 -2.5 29 29">
     <path d="M10.3 3.2a1.7 1.7 0 0 1 3.4 0l.2 1a1.7 1.7 0 0 0 2.5 1.1l.9-.5a1.7 1.7 0 0 1 2.4 2.4l-.5.9a1.7 1.7 0 0 0 1.1 2.5l1 .2a1.7 1.7 0 0 1 0 3.4l-1 .2a1.7 1.7 0 0 0-1.1 2.5l.5.9a1.7 1.7 0 0 1-2.4 2.4l-.9-.5a1.7 1.7 0 0 0-2.5 1.1l-.2 1a1.7 1.7 0 0 1-3.4 0l-.2-1a1.7 1.7 0 0 0-2.5-1.1l-.9.5a1.7 1.7 0 0 1-2.4-2.4l.5-.9a1.7 1.7 0 0 0-1.1-2.5l-1-.2a1.7 1.7 0 0 1 0-3.4l1-.2a1.7 1.7 0 0 0 1.1-2.5l-.5-.9a1.7 1.7 0 0 1 2.4-2.4l.9.5a1.7 1.7 0 0 0 2.5-1.1Z" />
     <circle cx="12" cy="12" r="3" />
   </RailIcon>
@@ -267,28 +269,28 @@ const RailIconSettings = () => (
 const DOC_BADGE: Record<DocumentSource, string> = { ls: 'LOCAL', fs: 'FILE', md: 'FOLDER' }
 const DOC_WHERE: Record<DocumentSource, string> = { ls: 'kept in this browser (local storage)', fs: 'a file on disk', md: 'a folder on disk' }
 
-/** One button at the foot of the activity rail and the menu it opens beside
- *  the rail; ↑/↓, Escape and Tab as in any menu (useMenuKeys). */
-function RailMenu({ id, label, icon, open, onOpen, onClose, onToolbar = false, children }: {
+/** One button on the activity rail and the menu it opens beside the rail;
+ *  ↑/↓, Escape and Tab as in any menu (useMenuKeys). */
+function RailMenu({ id, label, icon, open, onOpen, onClose, atTop = false, children }: {
   id: RailMenuId
   label: string
   icon: React.ReactNode
   open: boolean
   onOpen: (id: RailMenuId | null) => void
   onClose: () => void
-  /** On the toolbar instead of the rail: a toolbar button, the menu dropping below it. */
-  onToolbar?: boolean
+  /** At the rail's top: the menu hangs from the button's top, not stands on its foot. */
+  atTop?: boolean
   children: React.ReactNode
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   useOutsideClick([wrapRef], open, onClose)
   useMenuKeys(wrapRef, open, onClose)
   return (
-    <div className={onToolbar ? 'app-menu-wrap' : 'rail-menu'} ref={wrapRef}>
+    <div className="rail-menu" ref={wrapRef}>
       <button
         type="button"
-        className={onToolbar ? `app-brand-models${open ? ' open' : ''}` : `rail-action${open ? ' open' : ''}`}
-        title={onToolbar ? `${label}: manage models, import from the Hub` : label}
+        className={`rail-action${open ? ' open' : ''}`}
+        title={atTop ? `${label}: manage models, import from the Hub` : label}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -297,7 +299,7 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, onToolbar = false, c
         {icon}
       </button>
       {open && (
-        <div className={`app-menu-popover${onToolbar ? '' : ' rail-flyout'}`} role="menu" aria-label={label}>
+        <div className={`app-menu-popover rail-flyout${atTop ? ' at-top' : ''}`} role="menu" aria-label={label}>
           {children}
         </div>
       )}
@@ -305,12 +307,12 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, onToolbar = false, c
   )
 }
 
-/** Models on the toolbar: the folder button in a strip with the model open; and
- *  Settings at the foot of the activity rail (ActivityRail), holding the
- *  metamodel editor, AI and Export too (the author moved them there on
- *  2026-10-26), About last. */
+/** Models at the top of the activity rail (ActivityRail), as VS Code's
+ *  explorer, the model open named at the toolbar's left; and Settings at the
+ *  rail's foot, holding the metamodel editor, AI and Export too (the author
+ *  moved them there on 2026-10-26), About last. */
 function AppMenu({
-  onManage, activeDocLabel, activeDocSource,
+  onManage, activeDocLabel, activeDocSource, branch,
   connectionModifier, setConnectionModifier,
   theme, onToggleTheme,
   smartFitActive, onToggleSmartFit,
@@ -327,6 +329,8 @@ function AppMenu({
   onManage: () => void
   activeDocLabel: string | null
   activeDocSource: DocumentSource | null
+  /** Changes on branch, in the strip after the model's name. */
+  branch: React.ReactNode
   connectionModifier: ConnectionMod
   setConnectionModifier: (m: ConnectionMod) => void
   theme: 'dark' | 'light'
@@ -347,6 +351,7 @@ function AppMenu({
   const [menu, setMenu] = useState<RailMenuId | null>(null)
   const close = useCallback(() => setMenu(null), [])
   const slot = useRailSlot((s) => s.el)
+  const topSlot = useRailSlot((s) => s.top)
   // Radical Forge talks to an AI provider: without one it is offered
   // disabled (it saved the description, made its views and fetched the
   // Hub's index before saying so). Read each time the menu opens.
@@ -378,7 +383,7 @@ function AppMenu({
   )
 
   const modelsMenu = (
-    <RailMenu id="models" label="Models" open={menu === 'models'} onOpen={setMenu} onClose={close} onToolbar
+    <RailMenu id="models" label="Models" open={menu === 'models'} onOpen={setMenu} onClose={close} atTop
       icon={<IconModels />}>
           <div className="app-menu-section">
             <div className="app-menu-label">Models</div>
@@ -552,18 +557,20 @@ function AppMenu({
 
   return (
     <>
-      {/* As the perspectives on the right: a switch-like strip, the folder
-          (the Models menu) its one button, the model open beside it. */}
-      <div className="app-brand-switch">
-        {modelsMenu}
-        {/* The model open, and where it is kept. */}
-        {activeDocLabel && (
-          <span className="app-brand-doc" title={`${activeDocLabel}: ${DOC_WHERE[activeDocSource ?? 'ls']}`}>
-            <span className="app-brand-doc-name">{activeDocLabel}</span>
-            <span className={`toolbar-doc-badge ${activeDocSource ?? 'ls'}`}>{DOC_BADGE[activeDocSource ?? 'ls']}</span>
-          </span>
-        )}
-      </div>
+      {/* The model open, where it is kept and its changes on the branch: a
+          strip as the perspectives'. */}
+      {(activeDocLabel || branch) && (
+        <div className="app-brand-switch">
+          {activeDocLabel && (
+            <span className="app-brand-doc" title={`${activeDocLabel}: ${DOC_WHERE[activeDocSource ?? 'ls']}`}>
+              <span className="app-brand-doc-name">{activeDocLabel}</span>
+              <span className={`toolbar-doc-badge ${activeDocSource ?? 'ls'}`}>{DOC_BADGE[activeDocSource ?? 'ls']}</span>
+            </span>
+          )}
+          {branch}
+        </div>
+      )}
+      {topSlot && createPortal(modelsMenu, topSlot)}
       {slot && createPortal(menus, slot)}
     </>
   )
@@ -654,7 +661,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     const edges = (selector: string, side: 'left' | 'right'): number[] =>
       [...el.querySelectorAll<HTMLElement>(selector)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => r[side])
     const start = Math.max(0, ...edges(':scope > .app-brand-switch, :scope > .toolbar-edit', 'right'))
-    const end = Math.min(width, ...edges(':scope > .branch-btn-wrap, :scope > .toolbar-mode-switch', 'left'))
+    const end = Math.min(width, ...edges(':scope > .toolbar-mode-switch', 'left'))
     // How much wider the perspectives are with their labels than without
     // (a label left out keeps its width in scrollWidth).
     let labels = 0
@@ -690,7 +697,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     // The sides change width on their own (a count on Inspector or on
     // Changes on branch, the fonts loading), the window by a resize.
     const watch = new ResizeObserver(() => fit())
-    for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-edit, :scope > .branch-btn-wrap, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
+    for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-edit, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
     window.addEventListener('resize', fit)
     return () => { watch.disconnect(); window.removeEventListener('resize', fit) }
   }, [fit, appMode])
@@ -901,6 +908,9 @@ export function Toolbar(): React.ReactElement {
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}
         activeDocSource={activeDoc?.source ?? null}
+        // The model's state on the branch, beside its name; not in the
+        // Inspector, which lists the changes itself and has no canvas to mark.
+        branch={appMode !== 'inspector' && <BranchChangesButton />}
         connectionModifier={connectionModifier}
         setConnectionModifier={setConnectionModifier}
         theme={theme}
@@ -942,10 +952,6 @@ export function Toolbar(): React.ReactElement {
       </div>
 
       <div style={{ flex: 1 }} />
-
-      {/* The model's state on the branch, beside the perspectives; not in the
-          Inspector, which lists the changes itself and has no canvas to mark. */}
-      {appMode !== 'inspector' && <BranchChangesButton />}
 
       <div className="toolbar-mode-switch">
         <button
