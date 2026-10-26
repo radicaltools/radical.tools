@@ -616,6 +616,28 @@ test.describe('the wiki keeps the metamodel', () => {
     await expect(relationships.filter({ hasText: /part of/i })).toHaveCount(0)
   })
 
+  // F-0100: a line written on an aggregate root's page made a new entity,
+  // which is a root by default: refused as a part, it was written as one
+  // more root, unlinked. A part's page offered parts too.
+  test("a part written on an aggregate root's page is a part linked to it, and a part's page offers none", async ({ page, studio }) => {
+    await studio.open('v-wiki/f/e1')
+    const start = page.locator('.wiki-write-start')
+    const entities = start.getByRole('button', { name: 'Entities', exact: true })
+    if (await entities.count()) await entities.click()
+    const line = page.getByRole('textbox', { name: /^Write an? entity$/ }).first()
+    await line.fill('Order Fee')
+    await line.press('Enter')
+    await expect.poll(async () => {
+      const doc = await studio.storedDoc() as unknown as { nodes: Array<{ id: string; label: string; kind?: string; parentId?: string }>; relations: Array<{ sourceId: string; targetId: string; relationType?: string }> }
+      const added = doc.nodes.find((n) => n.label === 'Order Fee')
+      return added && `${added.kind} in ${added.parentId}: ${doc.relations.filter((r) => r.sourceId === added.id).map((r) => `${r.relationType} → ${r.targetId}`).join(', ')}`
+    }).toBe('entity in d1: part-of → e1')
+    await studio.open('v-wiki/f/e3')
+    await expect(page.locator('.wiki-title')).toHaveText('Line')
+    await expect(page.getByRole('textbox', { name: /^Write an? entity$/ })).toHaveCount(0)
+    await expect(start.getByRole('button', { name: 'Entities', exact: true })).toHaveCount(0)
+  })
+
   // Decided 2026-10-21 (runs 65 to 69): the wiki's Delete asks as the
   // canvas does, counting the relations and sequence steps that go, and
   // Undo brings it all back.
@@ -640,4 +662,32 @@ test.describe('the wiki keeps the metamodel', () => {
     }).toEqual([true, 4, ['r1', 'r2']])
     expect(native).toEqual([])
   })
+})
+
+// F-0102 (decided 2026-10-26): a requirement rewritten on its page so that
+// the view's filter leaves it out gave way to the Overview without a word,
+// and Undo brought the requirement back but not its page.
+test("a rewrite the view's filter leaves out says so, and Undo brings its page back", async ({ page, studio }) => {
+  const req = (id: string, label: string, trigger: string, action: string) =>
+    ({ id, type: 'requirement', label, ears_type: 'event-driven', trigger, action, x: 0, y: 0, width: 240, height: 100, collapsed: false })
+  await studio.seedDocument(JSON.stringify({
+    nodes: [req('r-back', 'Back within the limit', 'a region fails', 'restore service within 30 minutes'), req('r-why', 'Tell the customer why', 'a payment fails', 'tell the customer why')],
+    relations: [],
+    views: [{ id: 'v-ev', kind: 'wiki', name: 'Event-driven', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }], filters: [{ kind: 'property', key: 'ears_type', op: 'is', values: ['event-driven'] }] }] } }],
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+  }))
+  await studio.open('v-ev/f/r-back')
+  await expect(page.locator('.wiki-title')).toHaveText('Back within the limit')
+  await page.locator('.ears-sentence').hover()
+  await page.getByRole('button', { name: 'Rewrite the sentence' }).click()
+  const sentence = page.getByRole('textbox', { name: 'The requirement as one sentence' })
+  await sentence.fill('The system shall restore service within 30 minutes')
+  await sentence.press('Enter')
+  await expect.poll(async () => (await studio.storedDoc()).nodes.find((n) => n.id === 'r-back')?.['ears_type' as keyof object]).toBe('ubiquitous')
+  await expect(page).toHaveURL(/\/v\/v-ev$/)
+  await expect(page.locator('.toast-message').last()).toContainText("This view's filter does not show Back within the limit any more")
+  await page.locator('.wiki-title').click()
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(page).toHaveURL(/\/v\/v-ev\/f\/r-back$/)
+  await expect(page.locator('.wiki-title')).toHaveText('Back within the limit')
 })

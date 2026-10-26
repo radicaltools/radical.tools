@@ -102,8 +102,9 @@ function WizardDialog({ session, wizard, typeDef, type }: {
   )
   const [links, setLinks] = useState<WizardLink[]>(openingLinks)
   // The element as the model will check its links: the one edited, or the
-  // new one of its type where it will be made.
-  const self = session.mode === 'edit' ? { id: session.nodeId, type } : { type, label: session.draft.label, parentId: session.draft.parentId }
+  // new one of its type where it will be made, with the values written in
+  // the wizard (an entity whose Kind is entity may be part of a root).
+  const self = session.mode === 'edit' ? { id: session.nodeId, type, properties: values } : { type, label: session.draft.label, parentId: session.draft.parentId, properties: values }
 
   const step = steps[Math.min(stepIndex, steps.length - 1)]
   const isLast = stepIndex >= steps.length - 1

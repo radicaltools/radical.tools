@@ -3552,6 +3552,19 @@ function _insertWizardLinks(state: model.ModelState, nodeId: string, links: Wiza
   }
 }
 
+/** Why `node`, about to be added as `id`, may not get one of its `links`
+ *  (checkAddRelation), or null. */
+function _wizardLinksRefusal(state: model.ModelState, id: string, node: Omit<C4Node, 'id'>, links: WizardLink[]): string | null {
+  const withNode = { ...state, c4Nodes: { ...state.c4Nodes, [id]: { id, ...node } as C4Node } } as model.ModelState
+  for (const link of links) {
+    if (!state.c4Nodes[link.otherId]) continue
+    const rel = link.direction === 'out' ? { sourceId: id, targetId: link.otherId, relationType: link.relationType } : { sourceId: link.otherId, targetId: id, relationType: link.relationType }
+    const refused = model.checkAddRelation(withNode, rel)
+    if (refused) return refused
+  }
+  return null
+}
+
 // Counts the times the whole model was replaced (a document loaded, a new or
 // sample model started): what was computed for the model before is not for
 // the one after. The model shown read again with a change made outside
@@ -4373,7 +4386,10 @@ export const useDiagramStore = create<DiagramStore>()(
         for (const { node: unplaced, links = [] } of items) {
           const node = { ...unplaced, ...place(unplaced.parentId ?? undefined) }
           // Checked one by one: a node added before may fill a cardinality.
-          const refused = model.checkAddNode(get(), node)
+          // A link the rules refuse refuses the node, as for one added alone
+          // (_createNodeWithLinks): added without it, it went elsewhere unlinked.
+          const id = uid()
+          const refused = model.checkAddNode(get(), node) ?? _wizardLinksRefusal(get() as unknown as model.ModelState, id, node, links)
           if (refused) {
             get().pushNotification(refused, 'error')
             break
@@ -4384,7 +4400,6 @@ export const useDiagramStore = create<DiagramStore>()(
             if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
             else get()._markMilestoneEdit()
           }
-          const id = uid()
           set((state) => {
             insertNodeShown(state as DiagramStore, id, node)
             _insertWizardLinks(state, id, links)

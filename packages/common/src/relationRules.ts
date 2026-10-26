@@ -128,19 +128,37 @@ export function relationTypesAccepted(ctx: RelationContext, sourceId: string, ta
 /** The id an element not yet in the model goes by in linkRefusal. */
 const NEW_ELEMENT = '\u0000new'
 
+/** An element of the model, or one about to be made: its type, name and
+ *  place, and the values it gets (`properties`, over those it has). */
+export interface LinkEnd { id?: string; type: string; label?: string; parentId?: string; properties?: Record<string, unknown> }
+
 /** Why the element `self` may not be linked the way `link` says (a
  *  WizardLink: `out` when `self` is the source): relationRefusal, for an
  *  element of the model or, without an id, one about to be made of its
- *  type in `parentId` (a wizard's relation step before Create). */
-export function linkRefusal(ctx: RelationContext, self: { id?: string; type: string; label?: string; parentId?: string }, link: WizardLink): string | null {
+ *  type in `parentId` (a wizard's relation step before Create), with the
+ *  values it is given. */
+export function linkRefusal(ctx: RelationContext, self: LinkEnd, link: WizardLink): string | null {
   const id = self.id && ctx.nodes[self.id] ? self.id : NEW_ELEMENT
   const nodes = id === NEW_ELEMENT
-    ? { ...ctx.nodes, [id]: { id, type: self.type, label: self.label ?? typeLabel(ctx.metamodel, self.type), parentId: self.parentId } as C4Node }
-    : ctx.nodes
+    ? { ...ctx.nodes, [id]: { ...self.properties, id, type: self.type, label: self.label ?? typeLabel(ctx.metamodel, self.type), parentId: self.parentId } as C4Node }
+    : self.properties ? { ...ctx.nodes, [id]: { ...ctx.nodes[id], ...self.properties } as C4Node } : ctx.nodes
   const rel = link.direction === 'out'
     ? { sourceId: id, targetId: link.otherId, relationType: link.relationType }
     : { sourceId: link.otherId, targetId: id, relationType: link.relationType }
   return relationRefusal({ ...ctx, nodes }, rel)
+}
+
+/** The values a new element (`self`, no id) needs to be linked the way
+ *  `link` says, over those it is given: an entity made part of another
+ *  is a part (Kind entity), not the aggregate root its type makes it by
+ *  default. Null when the model refuses the link all the same (a
+ *  structural relation to what holds it): the element is not to be
+ *  offered that way. */
+export function newLinkFit(ctx: RelationContext, self: LinkEnd, link: WizardLink): Record<string, unknown> | null {
+  const other = ctx.nodes[link.otherId]
+  const part = link.relationType === 'part-of' && link.direction === 'out' && self.type === 'entity' && other?.type === 'entity'
+  const properties = { ...(part ? { kind: 'entity' } : {}), ...self.properties }
+  return linkRefusal(ctx, { ...self, id: undefined, properties }, link) ? null : properties
 }
 
 /** The elements a wizard's relation step offers to link `self` to
@@ -151,7 +169,7 @@ export function linkRefusal(ctx: RelationContext, self: { id?: string; type: str
 export function wizardLinkCandidates(
   ctx: RelationContext,
   step: WizardRelationsStep,
-  self: { id?: string; type: string; label?: string; parentId?: string },
+  self: LinkEnd,
   links: WizardLink[] = [],
 ): C4Node[] {
   return wizardRelationCandidates(ctx.metamodel, step, self.type, ctx.nodes, self.id).filter((n) => {
