@@ -159,6 +159,31 @@ describe('createModelFacade', () => {
     expect(f.toDiagramData().snapshots![1].views).toBeUndefined()
   })
 
+  it('removing the element of a view of one element keeps that view, with its places, in a milestone that holds it (delete_node, F-0064)', () => {
+    const f = facade()
+    const a = f.addNode(node('system', 'A'))
+    const view = f.addView!('A')
+    f.getViews!()[view].subject = a
+    f.getViews!()[view].positions = { [a]: { x: 0, y: 0, width: 200, height: 100 } }
+    f.createMilestone!('As-is')
+    f.removeNode(a)
+    expect(f.getViews!()[view]).toBeUndefined()
+    const [milestone] = f.toDiagramData().snapshots!
+    expect(milestone.views?.[view]?.subject).toBe(a)
+    expect(milestone.views?.[view]?.positions).toEqual({ [a]: { x: 0, y: 0, width: 200, height: 100 } })
+  })
+
+  it('removing a sequence a milestone holds keeps its flow view linked there (delete_sequence, F-0065)', () => {
+    const f = facade()
+    const q = f.addSequence!('Pay')
+    const view = f.addView!('Flow')
+    f.setViewSequence!(view, q)
+    f.createMilestone!('As-is')
+    f.removeSequence!(q)
+    expect(f.getViews!()[view].sequenceId).toBeUndefined()
+    expect(f.toDiagramData().snapshots![0].views?.[view]?.sequenceId).toBe(q)
+  })
+
   it('keeps view node lists to known ids, deduplicated, and adds new nodes to the active view', () => {
     const f = facade()
     const a = f.addNode(node('system', 'A'))

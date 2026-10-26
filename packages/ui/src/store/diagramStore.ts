@@ -718,7 +718,10 @@ function _captureState(state: DiagramStore): HistoryEntry {
 function _sharedNow(state: Pick<DiagramStore, 'views' | 'metamodel' | 'snapshots' | 'presentations' | 'defaultEdgeStyle'>, backup: DiagramStore['liveBackup']): Pick<HistoryEntry, 'views' | 'metamodel' | 'snapshots' | 'slideMilestones' | 'defaultEdgeStyle'> {
   let views = state.views as Record<string, DiagramView>
   for (const [id, view] of Object.entries(backup?.views ?? {})) {
-    if (views[id] && views[id] !== view) views = { ...views, [id]: view as DiagramView }
+    if (views[id] && views[id] !== view) views = { ...views, [id]: parkedAsShown(view as DiagramView, views[id]) }
+  }
+  if (Object.values(views).some((v) => milestoneOnlyView(v, backup?.nodes))) {
+    views = Object.fromEntries(Object.entries(views).filter(([, v]) => !milestoneOnlyView(v, backup?.nodes)))
   }
   return {
     views,
@@ -1156,10 +1159,15 @@ function keepingSharedViews(state: DiagramStore, edit: () => void): void {
  *  elements are looked up there, not in the milestone shown. Checked
  *  against a milestone without it (or with it deleted there), a view of
  *  one element lost its element and its "within" filter, in the live views
- *  too (Undo and Redo in a milestone). Use inside immer set. */
+ *  too (Undo and Redo in a milestone). A view the milestone has alone
+ *  (milestoneOnlyView) is the milestone's: its element is looked up there.
+ *  Use inside immer set. */
 function syncViewpointsOfLive(state: DiagramStore): string[] {
   const nodes = state.activeSnapshotId && state.liveBackup ? state.liveBackup.nodes : state.c4Nodes
-  return model.syncViewpoints({ c4Nodes: nodes, views: state.views, metamodel: state.metamodel } as unknown as model.ModelState)
+  const views = Object.values(state.views) as DiagramView[]
+  const sync = (of: Record<string, C4Node>, only: DiagramView[]): string[] =>
+    model.syncViewpoints({ c4Nodes: of, views: Object.fromEntries(only.map((v) => [v.id, v])), metamodel: state.metamodel } as unknown as model.ModelState)
+  return [...sync(nodes, views.filter((v) => !milestoneOnlyView(v, nodes))), ...sync(state.c4Nodes, views.filter((v) => milestoneOnlyView(v, nodes)))]
 }
 
 /** The Hub template records as a milestone has them: its texts hold the
@@ -1210,14 +1218,40 @@ function propagatedHubTemplates(live: Record<string, HubImportRecord>, base: Rec
 /** The milestone is left without its edits carried into the live model:
  *  the views, All elements' positions and alignments its edits changed are
  *  put back as the live model has them (liveBackup, _milestoneViewEdit). A
- *  view deleted meanwhile stays deleted. Use inside immer set. */
+ *  view deleted meanwhile stays deleted, and a view the milestone has alone
+ *  (milestoneOnlyView) goes. Use inside immer set. */
 function unparkLiveViews(state: DiagramStore, backup: DiagramStore['liveBackup']): void {
   if (!backup) return
   for (const [id, view] of Object.entries(backup.views ?? {})) {
-    if (state.views[id]) state.views[id] = view as any
+    if (state.views[id]) state.views[id] = parkedAsShown(view as DiagramView, state.views[id] as DiagramView) as any
+  }
+  for (const view of Object.values(state.views)) {
+    if (!milestoneOnlyView(view as DiagramView, backup.nodes)) continue
+    delete state.views[view.id]
+    if (state.activeViewId === view.id) state.activeViewId = null
   }
   if (backup.defaultPositions) state.defaultPositions = backup.defaultPositions as any
   if (backup.defaultLayoutConstraints) state.defaultLayoutConstraints = backup.defaultLayoutConstraints as any
+}
+
+/** A live view parked while a milestone is shown (liveBackup.views), with
+ *  the name and folder the view has as `shown`: those are the live model's
+ *  (showMilestoneViews). A view or folder renamed in the milestone was
+ *  saved, and put back on leaving it, as before. */
+function parkedAsShown(parked: DiagramView, shown: DiagramView | undefined): DiagramView {
+  if (!shown || (parked.name === shown.name && parked.folder === shown.folder)) return parked
+  const view = { ...parked, name: shown.name }
+  if (shown.folder === undefined) delete view.folder
+  else view.folder = shown.folder
+  return view
+}
+
+/** Whether `view`, shown while a milestone is, is the milestone's alone: a
+ *  view of one element the live model (`liveNodes`) deleted since, which
+ *  the milestone keeps (model.keepViewsInMilestones). It is none of the
+ *  live views: not saved with them, and gone on leaving the milestone. */
+function milestoneOnlyView(view: DiagramView, liveNodes: Record<string, C4Node> | undefined): boolean {
+  return !!view.subject && !!liveNodes && !liveNodes[view.subject]
 }
 
 /** What a milestone keeps of a view its own way (DiagramSnapshot.views). */
@@ -1229,12 +1263,22 @@ const sameOwnView = (a: DiagramView, b: DiagramView): boolean =>
 /** The views a milestone keeps its own way (`snap.views`) are shown in place
  *  of the live ones, which are parked in liveBackup.views and put back on
  *  leaving it (unparkLiveViews). A view's name and folder, its places and
- *  camera are the live model's. Use inside immer set, with liveBackup set. */
+ *  camera are the live model's. A view of an element the live model
+ *  deleted since is shown as the milestone has it, in its group's folder
+ *  (milestoneOnlyView). Use inside immer set, with liveBackup set. */
 function showMilestoneViews(state: DiagramStore, snap: DiagramSnapshot | undefined): void {
   if (!snap?.views || !state.liveBackup) return
   for (const [id, own] of Object.entries(snap.views)) {
     const live = state.views[id] as DiagramView | undefined
-    if (!live) continue
+    if (!live) {
+      const group = own.partOf ? state.views[own.partOf] as DiagramView | undefined : undefined
+      if (!milestoneOnlyView(own, state.liveBackup.nodes) || !snap.nodes[own.subject!] || (own.partOf && !group)) continue
+      const shown: DiagramView = { ...own }
+      if (group?.folder) shown.folder = group.folder
+      else if (group) delete shown.folder
+      state.views[id] = shown as any
+      continue
+    }
     if (!state.liveBackup.views?.[id]) state.liveBackup.views = { ...state.liveBackup.views, [id]: live } as any
     const shown: DiagramView = { ...own, name: live.name, positions: live.positions }
     for (const key of ['folder', 'viewport', 'treemapFocusId', 'wikiFocusId', 'tableActiveTab'] as const) {
@@ -4159,7 +4203,8 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const backup = state.liveBackup!
           for (const id of ids) {
-            if (!views[id] || backup.views?.[id]) continue
+            // A view the milestone has alone has no live one to park.
+            if (!views[id] || backup.views?.[id] || milestoneOnlyView(views[id], backup.nodes as Record<string, C4Node>)) continue
             backup.views = { ...backup.views, [id]: views[id] }
           }
           if (viewId === 'every' && !backup.defaultPositions) backup.defaultPositions = defaultPositions as any
@@ -6229,7 +6274,11 @@ export const useDiagramStore = create<DiagramStore>()(
         for (const view of Object.values(get().views)) {
           if (view.sequenceId === id) get()._milestoneViewEdit(view.id)
         }
+        // On the live model, a milestone that holds it keeps its flow views
+        // linked to it.
+        const milestones = get().activeSnapshotId ? null : model.keepSequenceViewsInMilestones(get().snapshots, get().views, id)
         set((state) => {
+          if (milestones && milestones !== state.snapshots) state.snapshots = milestones as any
           delete state.sequences[id]
           // Unlink views that referenced this sequence
           for (const view of Object.values(state.views)) {
@@ -7425,6 +7474,7 @@ export const useDiagramStore = create<DiagramStore>()(
           state.activeSnapshotId = id
           // Coming from another milestone: its views (its own, or edits
           // kept by Save as new) are the live ones again first.
+          const shownView = state.activeViewId
           if (activeSnapshotId && backup) {
             unparkLiveViews(state as DiagramStore, backup)
             const { views: _views, defaultPositions: _positions, defaultLayoutConstraints: _constraints, ...live } = backup
@@ -7433,6 +7483,8 @@ export const useDiagramStore = create<DiagramStore>()(
             state.liveBackup = backup as any
           }
           showMilestoneViews(state as DiagramStore, snap)
+          // A view of an element both milestones hold, and the live model not.
+          if (shownView && !state.activeViewId && state.views[shownView]) state.activeViewId = shownView
           state.milestoneDirty = false
           state.milestonePromptOpen = false
           state.diffHighlight = diff as any
@@ -7545,6 +7597,10 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const [viewId, live] of Object.entries(liveBackup?.views ?? {})) {
             const shown = get().views[viewId]
             if (shown && !sameOwnView(shown, live as DiagramView)) ownViews[viewId] = milestoneOwnView(shown)
+          }
+          // And the views it has alone, of elements it still holds.
+          for (const view of Object.values(get().views)) {
+            if (milestoneOnlyView(view, liveBackup?.nodes) && editedNodes[view.subject!]) ownViews[view.id] = view
           }
           const newSnap: DiagramSnapshot = {
             id: newId,
@@ -7757,10 +7813,10 @@ export const useDiagramStore = create<DiagramStore>()(
           const shown = get().views[viewId]
           const mine = ownViews[viewId]
           if (!shown || !mine) continue
-          if (sameOwnView(shown, mine)) { keptLiveViews[viewId] = live; continue }
+          if (sameOwnView(shown, mine)) { keptLiveViews[viewId] = parkedAsShown(live, shown); continue }
           const was = milestoneOwnView(mine) as unknown as Record<string, unknown>
           const now = milestoneOwnView(shown) as unknown as Record<string, unknown>
-          const next = { ...live } as unknown as Record<string, unknown>
+          const next = { ...parkedAsShown(live, shown) } as unknown as Record<string, unknown>
           for (const key of new Set([...Object.keys(was), ...Object.keys(now)])) {
             if (key === 'positions' || key === 'name' || key === 'folder' || JSON.stringify(was[key]) === JSON.stringify(now[key])) continue
             if (now[key] === undefined) delete next[key]
@@ -7769,6 +7825,17 @@ export const useDiagramStore = create<DiagramStore>()(
           keptLiveViews[viewId] = next as unknown as DiagramView
           ownViewsAfter[viewId] = now as unknown as DiagramView
         }
+        // The views it has alone stay its own, as they are now; that of an
+        // element the edits deleted goes.
+        const goneOnlyViews: string[] = []
+        for (const view of Object.values(get().views)) {
+          if (!milestoneOnlyView(view, liveBackup?.nodes)) continue
+          if (editedNodes[view.subject!]) ownViewsAfter[view.id] = view
+          else { delete ownViewsAfter[view.id]; goneOnlyViews.push(view.id) }
+        }
+        // The live views before the edits: a flow view linked to a sequence
+        // they delete is parked so.
+        const liveViewsBefore = { ...get().views, ...(liveBackup?.views ?? {}) } as Record<string, DiagramView>
 
         // The view on screen was the view of an element the edits deleted.
         let lostShownView = false
@@ -7781,6 +7848,7 @@ export const useDiagramStore = create<DiagramStore>()(
               snap.relations = editedRels
               snap.sequences = editedSeqs
               if (Object.keys(ownViewsAfter).length) snap.views = ownViewsAfter
+              else delete snap.views
             } else {
               if (!snap.sequences) snap.sequences = {}
               applyDiff(snap.nodes, snap.relations, snap.sequences, snap.name)
@@ -7813,6 +7881,16 @@ export const useDiagramStore = create<DiagramStore>()(
             else delete state.liveBackup.views
             delete state.liveBackup.defaultPositions
             delete state.liveBackup.defaultLayoutConstraints
+            // The milestones before this one keep the flow views of a
+            // sequence the edits deleted linked to it.
+            for (const sequenceId of removedSeqIds) {
+              const was = current(state.snapshots).slice(0, idx) as DiagramSnapshot[]
+              model.keepSequenceViewsInMilestones(was, liveViewsBefore, sequenceId).forEach((snap, i) => { if (snap !== was[i]) state.snapshots[i] = snap as any })
+            }
+            for (const viewId of goneOnlyViews) {
+              delete state.views[viewId]
+              if (state.activeViewId === viewId) { state.activeViewId = null; lostShownView = true }
+            }
             const gone = new Set(before.filter((id) => !state.liveBackup!.nodes[id]))
             if (gone.size) {
               const shown = state.activeViewId
@@ -9011,9 +9089,11 @@ export const useDiagramStore = create<DiagramStore>()(
           ? { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
           : null
         const savedDefaultVP = activeViewId === null ? (currentVP ?? defaultViewport) : defaultViewport
-        // A view a milestone's edit changed is saved as the live model has it.
+        // A view a milestone's edit changed is saved as the live model has it,
+        // and one the milestone has alone is none of the live views.
         const parked = timeTravelling ? liveBackup.views ?? {} : {}
-        const savedViews = Object.values(views).map((shown) => parked[shown.id] ?? shown).map(v => ({
+        const savedViews = Object.values(views).filter((shown) => !timeTravelling || !milestoneOnlyView(shown, liveBackup.nodes))
+          .map((shown) => (parked[shown.id] ? parkedAsShown(parked[shown.id], shown) : shown)).map(v => ({
           ...v,
           positions: v.id === activeViewId && currentPos && v.id !== _firstLayoutOf ? viewCanvasPositions(v, liveNodes, currentPos, viewDrawnIds(v, liveNodes, liveRelations)) : v.positions,
           viewport: v.id === activeViewId ? (currentVP ?? v.viewport) : v.viewport,
