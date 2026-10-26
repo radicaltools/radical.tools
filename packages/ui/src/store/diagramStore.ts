@@ -6857,7 +6857,13 @@ export const useDiagramStore = create<DiagramStore>()(
               if (view) _historyKeepsFirstLayout(firstOpen, view.positions)
               return
             }
-            if (unpinCount) set((state) => { unpinLaidOut(state, get().appMode) })
+            // Nothing moved, but the pins came off: that is a step of its own.
+            if (unpinCount) {
+              if (!onExploration(get())) get()._pushUndo()
+              get()._milestoneViewEdit(get().activeViewId)
+              set((state) => { unpinLaidOut(state, get().appMode) })
+              _liveLayout?.invalidate()
+            }
             get().pushNotification((ensemble ? 'Smart layout: the current layout already scores best — nothing changed.' : 'Smart layout: nothing left to tidy.') + unpinNote, 'info')
             return
           }

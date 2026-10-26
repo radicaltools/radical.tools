@@ -58,7 +58,7 @@ function smartLayoutProgressLabel(p: SmartLayoutProgress | null): string | null 
  * (previously a console.info-only breadcrumb) so the ensemble's reasoning
  * is legible without opening DevTools.
  */
-function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): React.ReactElement {
+function SmartLayoutReportButton({ report, held = false }: { report: SmartLayoutReport; held?: boolean }): React.ReactElement {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   useOutsideClick([wrapRef], open, useCallback(() => setOpen(false), []))
@@ -72,7 +72,7 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
   const arrow = ' → '
 
   return (
-    <div className="smart-layout-report-wrap" ref={wrapRef}>
+    <div className={`smart-layout-report-wrap${held ? ' smart-layout-report-held' : ''}`} ref={wrapRef} aria-hidden={held || undefined}>
       <button
         className="toolbar-btn toolbar-btn-icon-only"
         onClick={() => setOpen((o) => !o)}
@@ -183,6 +183,13 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
       ? 'Smart Layout — ensemble of layered + semantic algorithms with edge-crossing minimisation, picks the cleanest result.'
       : 'Smart Layout — tidies the canvas as you would: one move at a time, each shown, until nothing is left to do.'
 
+  // The button keeps one width and place while the layout runs (F-0083):
+  // its label is Stop (or Working…) over the room its idle label takes, and
+  // the move under way is told beside the controls, not in the button.
+  const idleLabel = activeViewLayoutMode === 'tree' ? <><IconTreeLayout /> Tree Layout</> : <><IconSmartLayout /> Smart Layout</>
+  const busyLabel = tidying ? 'Stop' : isLayoutRunning && activeViewLayoutMode !== 'tree' ? 'Working…' : null
+  const progress = busyLabel ? smartLayoutProgressLabel(smartLayoutProgress) : null
+
   return (
     <>
       <button
@@ -191,18 +198,16 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
         disabled={(isLayoutRunning && !tidying) || appMode === 'metamodel'}
         title={tidying ? 'Stop Smart Layout — the canvas stays as it was' : readOnlyNote ? `${baseTitle} ${readOnlyNote}` : baseTitle}
       >
-        {tidying ? (
-          <><span className="toolbar-btn-spin"><IconSmartLayout /></span> Stop · {smartLayoutProgressLabel(smartLayoutProgress) ?? 'tidying'}</>
-        ) : isLayoutRunning && activeViewLayoutMode !== 'tree' ? (
-          <><span className="toolbar-btn-spin"><IconSmartLayout /></span> {smartLayoutProgressLabel(smartLayoutProgress) ?? 'Working…'}</>
-        ) : activeViewLayoutMode === 'tree' ? (
-          <><IconTreeLayout /> Tree Layout</>
-        ) : (
-          <><IconSmartLayout /> Smart Layout</>
-        )}
+        <span className="smart-layout-labels">
+          <span className={busyLabel ? 'smart-layout-label-held' : undefined} aria-hidden={busyLabel ? true : undefined}>{idleLabel}</span>
+          {busyLabel && <span><span className="toolbar-btn-spin"><IconSmartLayout /></span> {busyLabel}</span>}
+        </span>
       </button>
-      {!isLayoutRunning && activeViewLayoutMode !== 'tree' && lastSmartLayoutReport && (
-        <SmartLayoutReportButton report={lastSmartLayoutReport} />
+      {progress && <span className="smart-layout-status" role="status">{progress}</span>}
+      {/* Held in place (hidden) while the layout runs, so the controls do
+          not shift when it starts and ends. */}
+      {activeViewLayoutMode !== 'tree' && lastSmartLayoutReport && (
+        <SmartLayoutReportButton report={lastSmartLayoutReport} held={isLayoutRunning} />
       )}
     </>
   )
