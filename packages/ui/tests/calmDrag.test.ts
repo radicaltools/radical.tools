@@ -952,6 +952,38 @@ describe('Pins in the store', () => {
     expect(pinnedNodeIds(s().views[vid].layoutConstraints)).toEqual(['a', 'b'])
   }, 60_000)
 
+  it('a Smart Layout that has nothing left to tidy but unpins is an undo step of its own (F-0073)', async () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 10, y: 10 }),
+        c: node('c', 'system', { x: 20, y: 20 }),
+      },
+      c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, bc: { id: 'bc', sourceId: 'b', targetId: 'c' } },
+    } as any)
+    s()._sync()
+    await s().runSmartLayout()
+    await s().runSmartLayout()
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('nothing left to tidy')
+    // A drag that drops the element where it was: pinned, nothing moved.
+    const at = { x: s().c4Nodes.a.x, y: s().c4Nodes.a.y }
+    s().liveGrab('a', at.x, at.y)
+    s().liveRelease('a')
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a'])
+    s().updateNode('b', { label: 'B' })
+    await s().runSmartLayout()
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('nothing left to tidy. Unpinned 1 element.')
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual([])
+    // Undo gives the pin back and nothing else: the edit before it stays.
+    s().undo()
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a'])
+    expect(s().c4Nodes.b.label).toBe('B')
+    expect({ x: s().c4Nodes.a.x, y: s().c4Nodes.a.y }).toEqual(at)
+    s().redo()
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual([])
+  }, 60_000)
+
   it('Smart Layout over the whole view unpins it; round a selection the pinned elements stay, pinned', async () => {
     const s = useDiagramStore.getState
     const start = () => {
