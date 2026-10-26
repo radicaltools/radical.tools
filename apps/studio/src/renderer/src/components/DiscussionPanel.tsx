@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useSyncExternalStore } from 'react'
 import { commentRows, type DiscussionComment } from '@radical/common/discussions'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
+import { keepKeysHere } from '@radical/ui/components/keysHere'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { discussionSession } from '../discussions/session'
 
@@ -36,7 +37,7 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
   return (
     <aside className="discussion-panel" role="dialog" aria-labelledby="discussion-title" ref={panel}
       onKeyDown={(event) => {
-        event.stopPropagation()
+        keepKeysHere(event)
         if (event.key === 'Escape') { event.preventDefault(); onClose() }
       }}>
       <header className="discussion-header">

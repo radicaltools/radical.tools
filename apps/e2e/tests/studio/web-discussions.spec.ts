@@ -203,3 +203,25 @@ test('an export of the view leaves out the discussion icons', async ({ page }) =
   expect(svg).not.toContain('data-discussion-node')
 })
 
+// The panel keeps its keys from the canvas, and kept F5 and Cmd/Ctrl+P from
+// Studio as well: the browser reloaded the page, and the draft was lost, or
+// opened its print dialog (F-0068).
+test('F5 and Cmd/Ctrl+P pressed in the comment field are taken as in any dialog of Studio', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  const body = panel.getByLabel('Comment (Markdown supported)')
+  await body.fill('A long draft')
+  await page.evaluate(() => {
+    const w = window as unknown as { __keys: string[] }
+    w.__keys = []
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F5' || e.key === 'p') setTimeout(() => w.__keys.push(`${e.key} prevented: ${e.defaultPrevented}`))
+    }, true)
+  })
+  await page.keyboard.press('F5')
+  await page.keyboard.press('ControlOrMeta+p')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __keys?: string[] }).__keys)).toEqual(['F5 prevented: true', 'p prevented: true'])
+  await expect(body).toHaveValue('A long draft')
+  await expect(body).toBeFocused()
+})
+

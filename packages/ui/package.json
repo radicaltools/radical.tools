@@ -22,6 +22,7 @@
     "./components/propertiesCover": "./src/components/propertiesCover.ts",
     "./components/NotificationHost": "./src/components/NotificationHost.tsx",
     "./components/MilestoneChip": "./src/components/MilestoneChip.tsx",
+    "./components/keysHere": "./src/components/keysHere.ts",
     "./components/NodeWizard": "./src/components/NodeWizard.tsx",
     "./components/SmartLayoutButton": "./src/components/SmartLayoutButton.tsx",
     "./components/ErrorBoundary": "./src/components/ErrorBoundary.tsx",

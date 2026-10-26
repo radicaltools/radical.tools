@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { keepKeysHere } from '@radical/ui/components/keysHere'
 
 /**
  * Blocking modal that appears when the user tries to switch milestones
@@ -71,7 +72,7 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => {
-                e.stopPropagation()
+                keepKeysHere(e)
                 if (e.key === 'Enter') { e.preventDefault(); commit('new', newName) }
               }}
               placeholder="New milestone name"
