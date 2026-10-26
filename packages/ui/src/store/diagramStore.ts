@@ -97,6 +97,7 @@ export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
+import { viewCameras } from './viewCameras'
 import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
@@ -3598,6 +3599,7 @@ export const useDiagramStore = create<DiagramStore>()(
     let initSnapshots: DiagramSnapshot[]
     let initPres: ReturnType<typeof buildPresentationsFromData>
     let initMetamodel: Metamodel
+    let initDefaultViewport: { x: number; y: number; zoom: number } | null = null
 
     // A synchronously readable document (localStorage) shows on first paint.
     // Anything else renders the sample first and the app loads it afterwards.
@@ -3627,6 +3629,10 @@ export const useDiagramStore = create<DiagramStore>()(
       // agent's write), the one opened at boot was taken for another, and
       // a selected relation's card closed while it was typed in.
       _viewSelectionsDoc = documentBackend()?.getActiveId() ?? null
+      // Each view opens at the camera this viewer left it at (viewCameras.ts).
+      const cameras = viewCameras(_viewSelectionsDoc)
+      for (const [id, camera] of Object.entries(cameras)) if (initViews[id]) initViews[id] = { ...initViews[id], viewport: camera }
+      initDefaultViewport = cameras[''] ?? persisted.defaultViewport ?? null
     } else if (viewerProfile) {
       initNodes = {}
       initRelations = {}
@@ -3945,7 +3951,7 @@ export const useDiagramStore = create<DiagramStore>()(
       views: initViews,
       activeViewId: null,
       defaultPositions: initDefaultPositions,
-      defaultViewport: persisted?.defaultViewport ?? null,
+      defaultViewport: initDefaultViewport,
       defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
       defaultEdgeStyle: persisted?.defaultEdgeStyle ?? 'curved',
       exploration: null,
@@ -8831,9 +8837,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Restore per-view positions (backward compat: old files won't have them)
         const settledPos = settledOnLoad.length ? Object.fromEntries(Object.entries(snapshotPositions(nodes)).filter(([id]) => settledOnLoad.includes(id))) : {}
         const defaultPos = data.defaultPositions ? { ...data.defaultPositions, ...settledPos } : snapshotPositions(nodes)
-        const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
-
         const activeDocId = documentBackend()?.getActiveId()
+        // Each view opens at the camera this viewer left it at, kept outside
+        // the model (viewCameras.ts): a camera moved on its own saves nothing.
+        const cameras = viewCameras(activeDocId ?? null)
+        for (const [id, camera] of Object.entries(cameras)) if (views[id]) views[id] = { ...views[id], viewport: camera }
+        const defaultVP: { x: number; y: number; zoom: number } | null = cameras[''] ?? data.defaultViewport ?? null
         // Another document forgets the views' selections; the same one read
         // again (an outside change) keeps them, the open canvas's included.
         if ((activeDocId ?? null) !== _viewSelectionsDoc) {

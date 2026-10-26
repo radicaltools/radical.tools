@@ -29,6 +29,7 @@ import { AlignmentGuides } from './AlignmentGuides'
 import { CollapseToggleMirror, nodeControlAt } from './CollapseToggleMirror'
 import { selectCanvasFocus } from '../store/canvasFocus'
 import { noteUserCamera } from '../store/userCamera'
+import { noteViewCamera } from '../store/viewCameras'
 import { ElementPalette } from './ElementPalette'
 import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
@@ -437,7 +438,19 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       containerRef.current?.style.setProperty('--canvas-unzoom', String(1 / (transform[2] || 1)))
     }
     record(rfStore.getState().transform)
-    return rfStore.subscribe((s, prev) => { if (s.transform !== prev.transform) record(s.transform) })
+    // And kept as the view's camera by this viewer, outside the model
+    // (viewCameras.ts): a slide's is the slide's, an exploration keeps none.
+    // Not on mount: React Flow's default camera stands until the view's is placed.
+    const keep = (transform: [number, number, number]): void => {
+      const s = useDiagramStore.getState()
+      if (s.presentationActive || (s.activeViewId !== null && !s.views[s.activeViewId])) return
+      noteViewCamera(s.activeViewId, { x: transform[0], y: transform[1], zoom: transform[2] })
+    }
+    return rfStore.subscribe((s, prev) => {
+      if (s.transform === prev.transform) return
+      record(s.transform)
+      keep(s.transform)
+    })
   }, [rfStore])
 
   // Cards or blocks for the zoom (store/canvasDetail.ts). After a swap the

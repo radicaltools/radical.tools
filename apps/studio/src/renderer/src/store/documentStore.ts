@@ -11,6 +11,7 @@
 import { create } from 'zustand'
 import type { DiagramData } from '@radical/common/c4'
 import { host } from '../platform/host'
+import { forgetViewCameras } from '@radical/ui/store/viewCameras'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
 import type { DiscussionResult } from '@radical/host-bridge'
 import { WebDiscussions } from '../discussions/webStorage'
@@ -1046,6 +1047,7 @@ export const documents: DocumentsAPI = {
     idx.docs = idx.docs.filter(d => d.id !== id)
     if (idx.docs.length === before) return
     if (opts?.wipePayload !== false) deleteLSPayload(id)
+    forgetViewCameras(id)
     unreadable.delete(id)
     if (removed?.source === 'md') {
       connectedWebHandles.delete(id)
