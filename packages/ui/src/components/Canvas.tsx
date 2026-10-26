@@ -34,6 +34,7 @@ import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { NodeDiscussionBadges } from './NodeDiscussionBadges'
+import { keepKeysHere } from './keysHere'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
@@ -1957,7 +1958,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         <div ref={discussionMenuRef} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDiscussionMenu(null) }}
           onKeyDown={(event) => {
-            event.stopPropagation()
+            keepKeysHere(event)
             if (event.key === 'Escape') { event.preventDefault(); discussionMenu.trigger?.focus(); setDiscussionMenu(null) }
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); discussionMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }
           }}>

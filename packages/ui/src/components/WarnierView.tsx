@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
 import { openCard, useShowRequest } from '../store/showInView'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { keepKeysHere } from './keysHere'
 import { TYPE_LABELS, nodeTypeSize, type C4ElementType, type C4Node } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
 import { newElementFilters, pipelineOf, viewShownNodes, type PipelineContext } from '@radical/common/viewPipeline'
@@ -104,7 +105,7 @@ function RepeatPopover({ node, onPick, onClose }: {
   const saveCondition = () => { if (condition.trim() !== String(record.condition ?? '')) onPick({ condition: condition.trim() }) }
   return (
     <div className="wn-pop" ref={box} role="dialog" aria-label={`Repeat of ${node.label}`} onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Escape') onClose() }}>
+      onKeyDown={(e) => { keepKeysHere(e); if (e.key === 'Escape') onClose() }}>
       <div className="wn-pop-row" role="group" aria-label="Repeat">
         {REPEATS.map(([value, mark]) => (
           <button key={value} type="button" className={value === current ? 'on' : ''} aria-pressed={value === current}
@@ -189,7 +190,7 @@ function Item(props: ItemProps): React.ReactElement {
               // that blur, it closed, and what was typed next was lost.
               onBlur={() => { if (!useDiagramStore.getState().milestonePromptOpen) onCommit() }}
               onKeyDown={(e) => {
-                e.stopPropagation()
+                keepKeysHere(e)
                 if (e.key === 'Enter') { e.preventDefault(); onCommit() }
                 else if (e.key === 'Escape') { e.preventDefault(); onCancel() }
               }}

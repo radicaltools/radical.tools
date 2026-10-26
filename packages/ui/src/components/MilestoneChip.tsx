@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useDiagramStore } from '../store/diagramStore'
+import { keepKeysHere } from './keysHere'
 
 /**
  * The chip that names the milestone shown, with the diff toggle and, once
@@ -90,7 +91,7 @@ export function MilestoneChip({ style }: { style?: React.CSSProperties }): React
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
-                  e.stopPropagation()
+                  keepKeysHere(e)
                   if (e.key === 'Enter') saveNew(newName)
                   if (e.key === 'Escape') setNewName(null)
                 }}

@@ -3892,6 +3892,8 @@ div.milestone-option { cursor: default; }
 .forge-clarify-proposal-row .forge-btn { margin-left: auto; }
 /* The discussion panel owns its scroll and leaves the graph usable. */
 .discussion-panel { position: fixed; right: 12px; top: 64px; bottom: 12px; width: min(460px, calc(100vw - 24px)); z-index: 95; display: flex; flex-direction: column; background: var(--bg-panel); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 8px 32px #0004; }
+/* The panel holds the focus while a post or a resolve saves (DiscussionPanel). */
+.discussion-panel:focus { outline: none; }
 .discussion-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border-color); }
 .discussion-header h2 { font-size: 18px; margin: 4px 0 0; overflow-wrap: anywhere; }
 .discussion-header small, .discussion-note, .discussion-attribution time { color: var(--text-muted); }
