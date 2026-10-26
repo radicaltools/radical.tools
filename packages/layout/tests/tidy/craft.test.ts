@@ -159,6 +159,27 @@ describe('Tidy, the finer points', () => {
     void box
   })
 
+  it('tidy around reaches one step out, not along a chain', () => {
+    // a → b → c → d, the last two dropped on each other: round a, only a and b may move.
+    const nodes = [node('a', 'container', 0, 0), node('b', 'container', 900, 700), node('c', 'container', 2000, 0), node('d', 'container', 2010, 10)]
+    const relations = [rel('a', 'b'), rel('b', 'c'), rel('c', 'd')]
+    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['a'] })
+    for (const id of ['c', 'd']) expect(around.winner.positions[id], id).toMatchObject({ x: byId(nodes)[id].x, y: byId(nodes)[id].y })
+    expect(around.tidy.steps.every((s) => Object.keys(s.moved).every((id) => id === 'a' || id === 'b'))).toBe(true)
+  })
+
+  it('a frame holding a pinned element is not moved', () => {
+    // s holds the pinned x and y; y relates to z far off. Moving s would carry x along.
+    const nodes = [node('s', 'system', 0, 0), node('x', 'container', 40, 120, 's'), node('y', 'container', 340, 120, 's'), node('z', 'container', 2400, 1600)]
+    const relations = [rel('y', 'z')]
+    const l = new Layout(byId(nodes), null, ['x'])
+    expect(l.fixed('x')).toBe(true)
+    expect(l.fixed('s')).toBe(true)
+    expect(l.fixed('y')).toBe(false)
+    const { box } = tidy(nodes, relations, { pinned: ['x'] })
+    expect(box('x')).toMatchObject({ x: 40, y: 120 })
+  })
+
   it('orthogonal lines are judged along their route, bends counted', () => {
     // a above-left of b: the orthogonal route leaves a's right side, turns twice and enters b's left;
     // c stands on the straight chord between them, off the route.

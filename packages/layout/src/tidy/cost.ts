@@ -31,8 +31,10 @@ export type LineGeom = Ends & { x0: number; y0: number; x1: number; y1: number; 
 export const W_CROSSING = 10
 export const W_OVERDRAW = 8
 export const W_SLANT = 4
-/** Per mean element size of line beyond one. */
-export const W_LENGTH = 2
+/** Per mean element size of line beyond the comfortable distance (the gap and COMFORT): every
+ *  line longer than two neighbours need costs, so a person's habit of drawing related elements
+ *  in close is part of the judgement, not only of the moves that draw them in. */
+export const W_LENGTH = 4
 export const W_IMBALANCE = 1
 /** Per mean element size an element's nearest sibling stands off the comfortable distance, too far or too near. */
 export const W_SPREAD = 2
@@ -60,12 +62,47 @@ export const W_EVEN = 1.5
 export const W_LABEL = 3
 /** Per bend of an orthogonal line (an L has one, a Z two). */
 export const W_BEND = 2
+/** Per near sibling almost in a row or a column with an element (off by less than NEAR): a
+ *  line a reader expects and finds broken looks worse than no line at all. */
+export const W_NEAR = 2
+export const NEAR = 0.4
+/** Per element sharing no row and no column with any sibling of its type, when it has some:
+ *  people, stores, services, frames of one kind read as a group when they stand in line. */
+export const W_KIN = 1.5
+/** Per mean element size the side of the box round a frame's children (and round the whole
+ *  diagram) exceeds the side they would need packed: empty room. It keeps pulling a diagram
+ *  together after nothing crosses any more. */
+export const W_COMPACT = 3
 
 /** The weights, by the name of the part they weigh: what bench/tidy-calibrate.mts fits. */
 export const WEIGHTS = {
   crossings: W_CROSSING, overdraws: W_OVERDRAW, slanted: W_SLANT, length: W_LENGTH, imbalance: W_IMBALANCE, spread: W_SPREAD, misplaced: W_PLACE,
   againstFlow: W_AGAINST_FLOW, flat: W_FLAT, fans: W_FAN, brushes: W_BRUSH, offGrid: W_GRID, offConvention: W_CONVENTION, uneven: W_EVEN, labels: W_LABEL, bends: W_BEND,
+  nearMisses: W_NEAR, kinApart: W_KIN, loose: W_COMPACT,
 }
+/** What each part is called where a person reads the report (Why this layout?). */
+export const PART_LABELS: Record<keyof typeof WEIGHTS, string> = {
+  crossings: 'Crossings', overdraws: 'Lines over elements', slanted: 'Slanted lines', length: 'Line length', loose: 'Empty room',
+  nearMisses: 'Almost in line', kinApart: 'Apart from their kind', offGrid: 'In no row or column', uneven: 'Uneven spacing',
+  spread: 'Too far or too near', imbalance: 'Off-centre', misplaced: 'Out of place', againstFlow: 'Against the flow',
+  flat: 'Across the reading way', fans: 'Bunched lines', brushes: 'Lines brushing elements', offConvention: 'Off convention',
+  labels: 'Labels over things', bends: 'Bends',
+}
+
+/** The parts as a person reads them: each with its value before and after and its share of the
+ *  cost before, the weightiest first; parts that are nothing either side left out. */
+export function costRows(before: CostParts, after: CostParts): { key: keyof typeof WEIGHTS; label: string; before: number; after: number; weight: number }[] {
+  return (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[])
+    .filter((k) => before[k] > 0.005 || after[k] > 0.005)
+    .map((k) => ({ key: k, label: PART_LABELS[k], before: before[k], after: after[k], weight: WEIGHTS[k] }))
+    .sort((p, q) => Math.max(q.before, q.after) * q.weight - Math.max(p.before, p.after) * p.weight)
+}
+
+/** A part's value as the report shows it: a count whole, a length or a room to one decimal. */
+export function formatPart(v: number): string {
+  return Math.abs(v - Math.round(v)) < 0.005 ? String(Math.round(v)) : v.toFixed(1)
+}
+
 /** A label's box: the canvas draws the name at 17 px, about 0.56 em per character, with room round it. */
 export const LABEL_CHAR = 17 * 0.56
 export const LABEL_PAD = 16
@@ -216,6 +253,7 @@ function imbalance(l: Layout, id: string, lines: Line[]): number {
 export interface CostParts {
   crossings: number; overdraws: number; slanted: number; length: number; imbalance: number; spread: number; misplaced: number
   againstFlow: number; flat: number; fans: number; brushes: number; offGrid: number; offConvention: number; uneven: number; labels: number; bends: number
+  nearMisses: number; kinApart: number; loose: number
   total: number
 }
 
@@ -240,7 +278,7 @@ export function uneven(l: Layout, id: string): number {
   let out = 0
   for (const axis of ['x', 'y'] as const) {
     let before = -Infinity, after = Infinity
-    for (const o of l.childrenOf(l.parentOf(id))) {
+    for (const o of l.peersIn(l.parentOf(id))) {
       if (o === id) continue
       const r = l.box(o)!
       if (axis === 'x') {
@@ -260,17 +298,72 @@ export function uneven(l: Layout, id: string): number {
   return out
 }
 
+/** How far two siblings are from standing in one column (`x`) or one row
+ *  (`y`): by their middles, and for a frame also by its top or left edge
+ *  (frames of different sizes are lined up by the edge their name is on). */
+export function offLine(l: Layout, a: string, b: string, axis: 'x' | 'y'): number {
+  const p = l.box(a)!, q = l.box(b)!
+  const mid = axis === 'x' ? Math.abs(p.cx - q.cx) : Math.abs(p.cy - q.cy)
+  if (!l.isFrame(a) && !l.isFrame(b)) return mid
+  return Math.min(mid, axis === 'x' ? Math.abs(p.x - q.x) : Math.abs(p.y - q.y))
+}
+
 /** Whether `id` shares a row or a column with some sibling. */
 export function inGrid(l: Layout, id: string): boolean {
-  const b = l.box(id)!
-  const siblings = l.childrenOf(l.parentOf(id))
+  const siblings = l.peersIn(l.parentOf(id))
   if (siblings.length < 2) return true
   for (const o of siblings) {
     if (o === id) continue
-    const r = l.box(o)!
-    if (Math.abs(r.cx - b.cx) < STRAIGHT_TOLERANCE || Math.abs(r.cy - b.cy) < STRAIGHT_TOLERANCE) return true
+    if (offLine(l, id, o, 'x') < STRAIGHT_TOLERANCE || offLine(l, id, o, 'y') < STRAIGHT_TOLERANCE) return true
   }
   return false
+}
+
+/** The siblings near `id` almost in a row or a column with it, by axis:
+ *  off by more than the tolerance and less than NEAR mean sizes, and no
+ *  more than two mean sizes apart across. */
+export function nearMissesOf(l: Layout, id: string): { o: string; axis: 'x' | 'y' }[] {
+  const b = l.box(id)!
+  const out: { o: string; axis: 'x' | 'y' }[] = []
+  const near = NEAR * l.meanSize, reach = 2 * l.meanSize
+  for (const o of l.peersIn(l.parentOf(id))) {
+    if (o === id) continue
+    const r = l.box(o)!
+    const gx = Math.max(0, r.x - (b.x + b.w), b.x - (r.x + r.w)), gy = Math.max(0, r.y - (b.y + b.h), b.y - (r.y + r.h))
+    if (gx > reach || gy > reach) continue
+    for (const axis of ['x', 'y'] as const) {
+      const d = offLine(l, id, o, axis)
+      if (d >= STRAIGHT_TOLERANCE && d < near) out.push({ o, axis })
+    }
+  }
+  return out
+}
+
+/** The empty room among a frame's children (none: the diagram's top level),
+ *  in mean element sizes: how much the side of the box round them exceeds
+ *  the side of a square of their area, gaps included. */
+export function looseness(l: Layout, parent: string | undefined): number {
+  const kids = l.childrenOf(parent)
+  if (kids.length < 2) return 0
+  const gap = l.gapOf(parent)
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, area = 0
+  for (const k of kids) {
+    const b = l.box(k)!
+    x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h)
+    area += (b.w + gap) * (b.h + gap)
+  }
+  return Math.max(0, Math.sqrt((x1 - x0 + gap) * (y1 - y0 + gap)) - Math.sqrt(area)) / l.meanSize
+}
+
+/** The siblings of `id`'s type, when it stands in line with none of them (none: it does, or it has no kin).
+ *  `linked`: whether an element has lines; one without is gathered to the margin, neither kin nor judged as one. */
+export function kinApartOf(l: Layout, id: string, linked: (id: string) => boolean): string[] {
+  if (!linked(id)) return []
+  const type = l.nodes[id].type
+  const kin = l.peersIn(l.parentOf(id)).filter((o) => o !== id && l.nodes[o].type === type && linked(o))
+  if (!kin.length) return []
+  for (const o of kin) if (offLine(l, id, o, 'x') < STRAIGHT_TOLERANCE || offLine(l, id, o, 'y') < STRAIGHT_TOLERANCE) return []
+  return kin
 }
 
 /** How far `id` stands from its nearest sibling, edge to edge beyond the gap, in mean sizes (capped). */
@@ -279,7 +372,7 @@ function spreadOf(l: Layout, id: string): number {
   const parent = l.parentOf(id)
   const gap = l.gapOf(parent)
   let nearest = Infinity
-  for (const o of l.childrenOf(parent)) {
+  for (const o of l.peersIn(parent)) {
     if (o === id) continue
     const r = l.box(o)!
     const dx = Math.max(0, r.x - (b.x + b.w), b.x - (r.x + r.w))
@@ -345,6 +438,8 @@ type Extent = [number, number, number, number]
 export interface CostIndex {
   all: Line[]
   lineGrid: Grid<Line>
+  /** The labelled lines by their label's box, which reaches past the line's own (a short line, a long name). */
+  labelGrid: Grid<Line>
   boxGrid: Grid<string>
   lineIndex: Map<Line, number>
   /** Where each line is drawn, between its ports. */
@@ -352,6 +447,7 @@ export interface CostIndex {
   ports: PortState
   /** Where each line and box was put in its grid, to take it out when it moves. */
   lineAt: Map<Line, Extent>
+  labelAt: Map<Line, Extent>
   boxAt: Map<string, Extent>
   linesOf: Map<string, Line[]>
 }
@@ -363,6 +459,8 @@ export function buildIndex(l: Layout, all: Line[]): CostIndex {
   const lineGrid = new Grid<Line>(cell)
   const lineIndex = new Map<Line, number>()
   const lineAt = new Map<Line, Extent>()
+  const labelGrid = new Grid<Line>(cell)
+  const labelAt = new Map<Line, Extent>()
   const linesOf = new Map<string, Line[]>()
   const { ports, geom } = portsOf(l, all)
   all.forEach((q, i) => {
@@ -370,12 +468,18 @@ export function buildIndex(l: Layout, all: Line[]): CostIndex {
     const g = geom.get(q)!
     const e: Extent = [g.x0, g.y0, g.x1, g.y1]
     lineGrid.add(q, ...e); lineAt.set(q, e)
+    if (q.label) { const lb = labelExtent(g, q.label); labelGrid.add(q, ...lb); labelAt.set(q, lb) }
     for (const end of [q.a, q.b]) { const list = linesOf.get(end); if (list) list.push(q); else linesOf.set(end, [q]) }
   })
   const boxGrid = new Grid<string>(cell)
   const boxAt = new Map<string, Extent>()
   for (const id of l.ids()) { const r = l.box(id)!; const e: Extent = [r.x, r.y, r.x + r.w, r.y + r.h]; boxGrid.add(id, ...e); boxAt.set(id, e) }
-  return { all, lineGrid, boxGrid, lineIndex, geom, ports, lineAt, boxAt, linesOf }
+  return { all, lineGrid, labelGrid, boxGrid, lineIndex, geom, ports, lineAt, labelAt, boxAt, linesOf }
+}
+
+function labelExtent(g: LineGeom, label: string): Extent {
+  const b = labelBox(g, label)
+  return [b.x0, b.y0, b.x1, b.y1]
 }
 
 /** The index brought up to date for `ids` after they moved (or moved
@@ -412,6 +516,10 @@ export function updateIndex(l: Layout, index: CostIndex, ids: Iterable<string>):
     if (was.ax === g.ax && was.ay === g.ay && was.bx === g.bx && was.by === g.by && was.path.length === g.path.length && was.fan === g.fan) continue
     index.geom.set(q, g)
     changedLines.add(q)
+    if (q.label) {
+      const lb = labelExtent(g, q.label)
+      index.labelGrid.remove(q, ...index.labelAt.get(q)!); index.labelGrid.add(q, ...lb); index.labelAt.set(q, lb)
+    }
     const e: Extent = [g.x0, g.y0, g.x1, g.y1]
     const at = index.lineAt.get(q)!
     if (at[0] === e[0] && at[1] === e[1] && at[2] === e[2] && at[3] === e[3]) continue
@@ -426,14 +534,15 @@ export function totalCost(l: Layout, lines: Line[]): CostParts {
 }
 
 /** The cost of the lines of `moved` elements and of what lies over or under them. */
-export function localCost(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>): number {
-  return localCostParts(l, lines, moved, index, roomy, extra).total
+export function localCost(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>, boxes?: ReadonlySet<string>): number {
+  return localCostParts(l, lines, moved, index, roomy, extra, boxes).total
 }
 /** `roomy`: the elements whose room is judged (the moved ones and the
  *  siblings near where they were and where they are); judged before and
  *  after a move it must be the same set, so the caller may give it. */
 /** `extra`: lines drawn differently by the move though their ends did not move (their ports shifted): judged with it. */
-export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>): CostParts {
+/** `boxes`: every box the move changed besides the moved elements' own (satellites, refitted frames): what others' lines and labels now lie over. */
+export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<string>, index?: CostIndex, roomy?: ReadonlySet<string>, extra?: ReadonlySet<Line>, boxes?: ReadonlySet<string>): CostParts {
   // The lines of what moved, of what it holds, and of the frames holding it (refitted, so their borders moved).
   const idx = index ?? buildIndex(l, lines)
   const own = new Set<string>()
@@ -449,13 +558,13 @@ export function localCostParts(l: Layout, lines: Line[], moved: ReadonlySet<stri
   const ids = new Set<string>()
   for (const m of moved) { ids.add(m); for (const d of l.descendants(m)) ids.add(d) }
   for (const x of mine) { ids.add(x.a); ids.add(x.b) }
-  return costOf(l, lines, mine, [...ids], moved, idx, roomy)
+  return costOf(l, lines, mine, [...ids], moved, idx, roomy, boxes)
 }
 
 /** The siblings within reach of a box: those whose nearest neighbour it may be. */
 export function siblingsNear(l: Layout, parent: string | undefined, b: { x: number; y: number; w: number; h: number }, out: Set<string>): void {
   const reach = 3 * l.meanSize
-  for (const s of l.childrenOf(parent)) {
+  for (const s of l.peersIn(parent)) {
     const r = l.box(s)!
     if (r.x < b.x + b.w + reach && b.x < r.x + r.w + reach && r.y < b.y + b.h + reach && b.y < r.y + r.h + reach) out.add(s)
   }
@@ -496,8 +605,8 @@ class Grid<T> {
   }
 }
 
-function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: ReadonlySet<string> | undefined, index: CostIndex, given?: ReadonlySet<string>): CostParts {
-  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, bends: 0, total: 0 }
+function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: ReadonlySet<string> | undefined, index: CostIndex, given?: ReadonlySet<string>, boxes?: ReadonlySet<string>): CostParts {
+  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, bends: 0, nearMisses: 0, kinApart: 0, loose: 0, total: 0 }
   const brush = BRUSH * l.meanSize
   const mineSet = new Set(mine)
   // Every line's ends and box (cached while its ends stand), and a coarse
@@ -534,7 +643,7 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
       const r = l.box(id)!
       if (r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + r.h) parts.labels++
     }
-    for (const q of lineGrid.near(lb.x0, lb.y0, lb.x1, lb.y1)) {
+    for (const q of index.labelGrid.near(lb.x0, lb.y0, lb.x1, lb.y1)) {
       if (q === p || !q.label || (mineSet.has(q) && lineIndex.get(q)! < lineIndex.get(p)!)) continue
       const o = labelBox(geomOf(index, q), q.label)
       if (o.x0 < lb.x1 && lb.x0 < o.x1 && o.y0 < lb.y1 && lb.y0 < o.y1) parts.labels++
@@ -548,22 +657,24 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
     if (!isStraight(index, p)) parts.slanted += e.fan ? 0.5 : 1
     if (againstFlow(l, p)) parts.againstFlow++
     if (flat(l, p)) parts.flat++
-    parts.length += Math.max(0, Math.hypot(e.ax - e.bx, e.ay - e.by) / l.meanSize - 1)
+    parts.length += Math.max(0, Math.hypot(e.ax - e.bx, e.ay - e.by) - l.gapOf(l.parentOf(p.a)) - COMFORT * l.meanSize) / l.meanSize
   }
-  // Lines of others drawn over the moved elements.
+  // Lines of others, and their labels, drawn over the moved elements and
+  // over every other box the move changed (satellites slid along, frames
+  // refitted round them).
   if (moved) {
-    for (const m of moved) {
-      for (const id of [m, ...l.descendants(m)]) {
-        const r = l.box(id)!
-        for (const q of lineGrid.near(r.x - brush, r.y - brush, r.x + r.w + brush, r.y + r.h + brush)) {
-          if (mineSet.has(q)) continue
-          const g = geomOf(index, q)
-          overOrBrush(q, g, id)
-          if (q.label && id !== q.a && id !== q.b && !l.holds(id, q.a) && !l.holds(id, q.b)) {
-            const lb = labelBox(g, q.label)
-            if (r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + r.h) parts.labels++
-          }
-        }
+    const over = new Set<string>()
+    for (const m of moved) { over.add(m); for (const d of l.descendants(m)) over.add(d) }
+    if (boxes) for (const id of boxes) over.add(id)
+    for (const id of over) {
+      const r = l.box(id)!
+      for (const q of lineGrid.near(r.x - brush, r.y - brush, r.x + r.w + brush, r.y + r.h + brush)) {
+        if (!mineSet.has(q)) overOrBrush(q, geomOf(index, q), id)
+      }
+      for (const q of index.labelGrid.near(r.x, r.y, r.x + r.w, r.y + r.h)) {
+        if (mineSet.has(q) || id === q.a || id === q.b || l.holds(id, q.a) || l.holds(id, q.b)) continue
+        const lb = labelBox(geomOf(index, q), q.label!)
+        if (r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + r.h) parts.labels++
       }
     }
   }
@@ -576,8 +687,19 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
   const roomy = new Set<string>(ids)
   if (given) for (const id of given) roomy.add(id)
   else if (moved) for (const m of moved) siblingsNear(l, l.parentOf(m), l.box(m)!, roomy)
-  for (const id of roomy) { parts.spread += spreadOf(l, id); if (!inGrid(l, id)) parts.offGrid++; parts.uneven += uneven(l, id) }
+  for (const id of roomy) {
+    // A tight frame is not seen: what it holds is judged among its peers.
+    if (l.isTight(id)) continue
+    parts.spread += spreadOf(l, id); if (!inGrid(l, id)) parts.offGrid++; parts.uneven += uneven(l, id)
+    parts.nearMisses += nearMissesOf(l, id).length
+    if (kinApartOf(l, id, (o) => !!index.linesOf.get(o)?.length).length) parts.kinApart++
+  }
   for (const id of ids) { parts.misplaced += misplaced(l, id, index.linesOf.get(id) ?? []); parts.offConvention += offConvention(l, id, index.linesOf.get(id) ?? []) }
+  // Empty room in every frame a move changes (and the top level); in all of them for the whole layout.
+  const frames = new Set<string | undefined>()
+  if (moved) for (const m of moved) { for (let p = l.parentOf(m); p; p = l.parentOf(p)) frames.add(p); frames.add(undefined) }
+  else { frames.add(undefined); for (const id of ids) if (l.isFrame(id)) frames.add(id) }
+  for (const f of frames) parts.loose += looseness(l, f)
   parts.total = 0
   for (const k of Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]) parts.total += parts[k] * WEIGHTS[k]
   return parts

@@ -58,13 +58,17 @@ for (const view of ['view-ctx', 'view-core', 'view-payments', 'view-screens', 'v
 
 test('tidy lists its moves', async ({ page, studio }) => {
   // Auto mode tidies the canvas move by move; the result stands at once and
-  // "Why this layout?" lists the moves with what each gained.
+  // "Why this layout?" lists the moves with what each gained, and the
+  // reader's cost part by part (line length, empty room, …) before and after.
   await studio.seed()
   await studio.open('v-containers')
   await studio.smartLayout()
   expect(await studio.layoutViolations()).toEqual([])
   await page.getByTitle(/^Why this layout\?/).click()
-  const table = page.locator('.smart-layout-report-table')
+  const parts = page.locator('.smart-layout-report-parts')
+  await expect(parts.locator('thead th', { hasText: 'What the reader sees' })).toBeVisible()
+  expect(await parts.locator('tbody tr').count()).toBeGreaterThan(0)
+  const table = page.locator('.smart-layout-report-table:not(.smart-layout-report-parts)')
   await expect(table.locator('thead th', { hasText: 'Move' })).toBeVisible()
   const rows = table.locator('tbody tr')
   expect(await rows.count()).toBeGreaterThan(0)

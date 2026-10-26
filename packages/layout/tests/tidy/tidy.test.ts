@@ -8,7 +8,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { runTidyLayout } from '../../src/tidy'
 import { Layout } from '../../src/tidy/layout'
-import { linesOf, totalCost } from '../../src/tidy/cost'
+import { buildIndex, linesOf, localCostParts, totalCost, updateIndex } from '../../src/tidy/cost'
+import { candidateMoves } from '../../src/tidy/moves'
 import { viewLayoutInput } from '../../src/viewInput'
 import { projectToVisibleGraph } from '../../src/geometry'
 import type { C4Node, C4Relation, DiagramView, PositionMap } from '@radical/common/c4'
@@ -90,6 +91,69 @@ describe('Tidy', () => {
         expect(s.gain, `${name}: ${s.description}`).toBeGreaterThanOrEqual(0)
       }
       void cost
+    }
+  })
+
+  it('judges each move by what it changes in the whole layout', { timeout: 120_000 }, () => {
+    // Every move a tidied layout offers, judged locally as Tidy judges it and
+    // on the whole layout: what lines do (crossings, lines and labels over
+    // elements, slants, length…) must agree exactly, and the index kept up
+    // to date move by move must draw every line as a fresh one would.
+    const lineParts = ['crossings', 'overdraws', 'brushes', 'labels', 'fans', 'slanted', 'length', 'bends', 'againstFlow', 'flat', 'imbalance', 'misplaced', 'offConvention'] as const
+    const files = [
+      ...readdirSync(join(benchDir, 'pattern')).filter((f) => f.endsWith('.radical')).sort().map((f) => join(benchDir, 'pattern', f)),
+      join(benchDir, 'blueprint', 'bp-realtime-collaboration.radical'),
+      join(fixturesDir, 'spread-open-system.json'),
+    ]
+    let judged = 0
+    for (const file of files) {
+      const name = file.split('/').pop()
+      const { laidOut, visible } = tidy(load(file))
+      const l = new Layout(laidOut)
+      const lines = linesOf(l, visible.relations)
+      const index = buildIndex(l, lines)
+      for (const move of candidateMoves(l, visible.nodes, visible.relations, lines)) {
+        const whole0 = totalCost(l, lines)
+        l.begin()
+        if (!move.apply(l)) { l.rollback(); continue }
+        const touched = l.changed()
+        const after = l.snapshot(touched)
+        const was = l.journalBoxes()
+        const whole1 = totalCost(l, lines)
+        l.rollback()
+        const moved = new Set(move.ids), changed = new Set(touched)
+        l.restore(after)
+        const shifted = updateIndex(l, index, touched)
+        const fresh = buildIndex(l, lines)
+        for (const q of lines) expect(index.geom.get(q), `${name}: ${move.description}, line ${q.id}`).toEqual(fresh.geom.get(q))
+        const local1 = localCostParts(l, lines, moved, index, undefined, shifted, changed)
+        l.restore(was)
+        updateIndex(l, index, touched)
+        const local0 = localCostParts(l, lines, moved, index, undefined, shifted, changed)
+        for (const k of lineParts) expect(local0[k] - local1[k], `${name}: ${move.description}, ${k}`).toBeCloseTo(whole0[k] - whole1[k], 6)
+        judged++
+      }
+    }
+    expect(judged).toBeGreaterThan(300)
+  })
+
+  it('never goes round in circles', { timeout: 120_000 }, () => {
+    // Tidied twice, every pattern: no layout comes back on the way, and the
+    // second run finds little left to do.
+    for (const f of readdirSync(join(benchDir, 'pattern')).filter((f) => f.endsWith('.radical')).sort()) {
+      const first = tidy(load(join(benchDir, 'pattern', f)))
+      const again = runTidyLayout(first.laidOut, first.visible.relations)
+      for (const [run, start] of [[first.result, first.visible.nodes], [again, first.laidOut]] as const) {
+        const at: PositionMap = Object.fromEntries(Object.entries(start).map(([id, n]) => [id, { x: n.x, y: n.y }]))
+        const key = (): string => Object.keys(at).sort().map((id) => `${Math.round(at[id].x)},${Math.round(at[id].y)}`).join(';')
+        const seen = new Set([key()])
+        for (const s of run.tidy.steps) {
+          for (const [id, p] of Object.entries(s.moved)) at[id] = { x: p.x, y: p.y }
+          expect(seen.has(key()), `${f}: back to an earlier layout at "${s.description}"`).toBe(false)
+          seen.add(key())
+        }
+      }
+      expect(again.tidy.steps.length, f).toBeLessThanOrEqual(2)
     }
   })
 

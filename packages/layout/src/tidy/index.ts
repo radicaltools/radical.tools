@@ -19,6 +19,7 @@ import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
 import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
 import { candidateMoves, compactMoves, gatherMoves, untangleMoves, type Move } from './moves'
+export { type CostParts, PART_LABELS, costRows, formatPart } from './cost'
 
 export interface TidyStep {
   kind: Move['kind']
@@ -52,6 +53,8 @@ export interface TidyOptions {
   metamodel?: Metamodel | null
   /** Elements the author pinned: they stay, with what they hold; the rest moves round them. */
   pinned?: readonly string[]
+  /** Containers the view draws only to hold what it shows (viewFrames): tight round it, as the canvas draws them. */
+  frames?: readonly string[]
   /** Tidy round these elements only: they and what they relate to move, nothing else. */
   around?: readonly string[]
   /** Called after each move taken. */
@@ -66,6 +69,11 @@ export const TIDY_NAME = 'Tidy'
 const MAX_STEPS = 400
 /** Two moves ahead: this many of the best rejected moves are tried, those within this much of paying off. */
 const LOOKAHEAD_WIDTH = 6
+/** A move is taken when it gains more than this. */
+const MIN_GAIN = 0.001
+/** Two moves ahead are taken when together they gain more than this: two moves for a sliver
+ *  are a dance, and one run's dance is the next run's work. */
+const PAIR_GAIN = 0.001
 const LOOKAHEAD_REACH = 20
 /** The whole cost is measured every this many moves, to hand over the best layout seen. */
 const CHECKPOINT_EVERY = 25
@@ -74,6 +82,8 @@ const CHECKPOINT_EVERY = 25
  *  first (frames as blocks, layers by flow): moves from there, not from the canvas. A large
  *  view that already reads well is tidied from where it stands, so a second run keeps it. */
 const ROUGH_FROM = 120
+/** Up to this many siblings of a moved element's type are judged with it (alone in a row or not). */
+const KIN_JUDGED = 12
 const PILE_SHARE = 0.3
 const ROUGH_WHEN_TANGLED = 0.5
 /** A large view's first round takes every move that helps as it comes (first improvement)
@@ -94,16 +104,18 @@ export function runTidyLayout(
   // frames holding what moves still follow it.
   let pinned = options.pinned ?? []
   if (options.around?.length) {
-    const movable = new Set<string>(options.around)
+    // What they relate to, one step out: not what that relates to in turn.
+    const chosen = new Set<string>(options.around)
+    const movable = new Set<string>(chosen)
     for (const r of Object.values(relations)) {
-      if (movable.has(r.sourceId) && nodes[r.targetId]) movable.add(r.targetId)
-      else if (movable.has(r.targetId) && nodes[r.sourceId]) movable.add(r.sourceId)
+      if (chosen.has(r.sourceId) && nodes[r.targetId]) movable.add(r.targetId)
+      if (chosen.has(r.targetId) && nodes[r.sourceId]) movable.add(r.sourceId)
     }
     const free = new Set<string>(movable)
     for (const id of movable) for (let p = nodes[id]?.parentId; p && nodes[p]; p = nodes[p].parentId) free.add(p)
     pinned = [...new Set([...pinned, ...Object.keys(nodes).filter((id) => !free.has(id))])]
   }
-  const l = new Layout(nodes, options.metamodel, pinned)
+  const l = new Layout(nodes, options.metamodel, pinned, options.frames)
   l.edgeStyle = style
   const lines = linesOf(l, relations)
   const before = totalCost(l, lines)
@@ -207,17 +219,54 @@ export function runTidyLayout(
     const after = l.snapshot(touched)
     const was = l.journalBoxes()
     const roomy = new Set<string>()
-    for (const m of moved) { siblingsNear(l, l.parentOf(m), l.box(m)!, roomy); siblingsNear(l, l.parentOf(m), was.get(m) ?? l.box(m)!, roomy) }
+    // The moved elements and the frames round them (refitted, so they moved
+    // too): each with the siblings near where it was and where it is.
+    const changed = new Set(touched)
+    const room = new Set<string>()
+    for (const m of moved) for (let x: string | undefined = m; x && (x === m || changed.has(x)); x = l.parentOf(x)) room.add(x)
+    for (const m of room) {
+      siblingsNear(l, l.parentOf(m), l.box(m)!, roomy); siblingsNear(l, l.parentOf(m), was.get(m) ?? l.box(m)!, roomy)
+      // Its kind too, wherever they stand: leaving a row may leave one of them alone.
+      const kin = l.peersIn(l.parentOf(m)).filter((o) => l.nodes[o].type === l.nodes[m].type)
+      if (kin.length <= KIN_JUDGED) for (const o of kin) roomy.add(o)
+    }
     l.rollback()
     // Judged after, then before, on the same lines: the moved elements'
     // and those drawn differently now that their ports shifted.
     l.restore(after)
     const shifted = updateIndex(l, index, touched)
-    const costNow = localCost(l, lines, moved, index, roomy, shifted)
+    const costNow = localCost(l, lines, moved, index, roomy, shifted, changed)
     l.restore(was)
     updateIndex(l, index, touched)
-    const costWas = localCost(l, lines, moved, index, roomy, shifted)
+    const costWas = localCost(l, lines, moved, index, roomy, shifted, changed)
     return { gain: costWas - costNow, after }
+  }
+  // Every layout the moves passed through, by where the boxes stand, with
+  // the number of steps that led there. Moves that come back to one went
+  // round in a circle (their gains, judged locally, added up to more than
+  // the whole changed): the circle is taken back and the round ends.
+  const seen = new Map<string, number>()
+  const stateKey = (): string => {
+    let h1 = 0, h2 = 0
+    for (const id of l.ids()) {
+      const b = l.box(id)!
+      const x = Math.round(b.x), y = Math.round(b.y)
+      h1 = (Math.imul(h1, 31) + x) | 0; h1 = (Math.imul(h1, 31) + y) | 0
+      h2 = (Math.imul(h2, 37) ^ (x * 7919 + y)) | 0
+    }
+    return `${h1}:${h2}`
+  }
+  let looped = false
+  const circled = (): boolean => {
+    const key = stateKey()
+    const back = seen.get(key)
+    if (back === undefined) { seen.set(key, steps.length); return false }
+    // Back where `back` steps left it; the best layout seen inside the circle, if any, kept.
+    if (best.steps > back) { l.setPositions(best.positions); steps.length = best.steps }
+    else steps.length = back
+    for (const [k, n] of seen) if (n > steps.length) seen.delete(k)
+    looped = true
+    return true
   }
   let stale: Set<string> | null = null
   /** The move taken: its boxes put in place, the step recorded, and what it
@@ -232,6 +281,7 @@ export function runTidyLayout(
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
     steps.push({ kind: move.kind, description: move.description, gain, moved })
     options.onProgress?.(steps.length, move.description)
+    if (circled()) return
     if (steps.length % CHECKPOINT_EVERY === 0) checkpoint()
     const touched = stale ?? new Set<string>()
     stale = touched
@@ -271,11 +321,11 @@ export function runTidyLayout(
       }
       l.restore(was)
       updateIndex(l, index, was.keys())
-      if (second && f.gain + second.gain > 0.001) {
+      if (second && f.gain + second.gain > PAIR_GAIN) {
         // The pair's gain goes to the move that pays off; the first made way for it.
         stale = null
         commit({ ...first.move, description: `${first.move.description} (making way)` }, f.after, 0)
-        commit(second.move, second.after, f.gain + second.gain)
+        if (!looped) commit(second.move, second.after, f.gain + second.gain)
         return true
       }
     }
@@ -286,8 +336,9 @@ export function runTidyLayout(
   let cands: Move[] = []
   const improve = (): void => {
     let misses = 0
+    looped = false
     for (let n = 0; n < (options.maxSteps ?? MAX_STEPS); n++) {
-      if (outOfTime()) break
+      if (outOfTime() || looped) break
       let best: { move: Move; gain: number } | null = null
       const rejected: { move: Move; gain: number }[] = []
       const seen = new Set<string>()
@@ -301,10 +352,10 @@ export function runTidyLayout(
         let swept = 0
         for (const move of cands) {
           const j = judge(move)
-          if (j.after && j.gain > 0.001) { commit(move, j.after, j.gain); swept++; n++ }
-          if (++judged % 64 === 0 && outOfTime()) break
+          if (j.after && j.gain > MIN_GAIN) { commit(move, j.after, j.gain); swept++; n++ }
+          if (looped || (++judged % 64 === 0 && outOfTime())) break
         }
-        if (outOfTime()) break
+        if (outOfTime() || looped) break
         if (swept) { gains.clear(); continue }
       }
       for (const move of cands) {
@@ -316,7 +367,7 @@ export function runTidyLayout(
           gains.set(key, gain)
           if (++judged % 64 === 0 && outOfTime()) break
         }
-        if (gain <= 0.001) { if (gain > -LOOKAHEAD_REACH) rejected.push({ move, gain }); continue }
+        if (gain <= MIN_GAIN) { if (gain > -LOOKAHEAD_REACH) rejected.push({ move, gain }); continue }
         if (!best || gain > best.gain) best = { move, gain }
       }
       if (outOfTime()) break
@@ -329,12 +380,13 @@ export function runTidyLayout(
       // Judged again now, in case its cached gain is out of date; a few
       // such misses in a row end the round rather than spin on them.
       const fresh = judge(best.move)
-      if (!fresh.after || fresh.gain <= 0.001) { gains.set(keyOf(best.move), fresh.gain); if (++misses > 8) break; n--; continue }
+      if (!fresh.after || fresh.gain <= MIN_GAIN) { gains.set(keyOf(best.move), fresh.gain); if (++misses > 8) break; n--; continue }
       misses = 0
       stale = null
       commit(best.move, fresh.after, fresh.gain)
     }
   }
+  seen.set(stateKey(), steps.length)
   improve()
 
   // Drawn in at the end: every move that costs nothing is taken.
@@ -356,7 +408,20 @@ export function runTidyLayout(
   stale = new Set(drawnIn)
   for (const id of drawnIn) for (const x of lines) { if (x.a === id) stale.add(x.b); if (x.b === id) stale.add(x.a) }
   improve()
-  gather()
+  // A last look at every move, every gain judged afresh rather than kept
+  // from earlier rounds: what is left now, a second run would find.
+  stale = null
+  improve()
+  // The loose elements to the margin the diagram has now; that opens moves
+  // of its own (a row with one of them), which a second run would take, so
+  // they are taken now, as long as the margin keeps moving.
+  for (let round = 0; round < 3; round++) {
+    const done = steps.length
+    gather()
+    if (steps.length === done || outOfTime()) break
+    stale = null
+    improve()
+  }
   checkpoint()
   if (totalCost(l, lines).total > best.cost + 0.01) {
     l.setPositions(best.positions)
@@ -372,7 +437,7 @@ export function runTidyLayout(
   }
   positions = enforceAlignments(nodes, positions, options.alignments ?? [])
   const projected = projectPositions(nodes, positions)
-  const afterLayout = new Layout(projected, options.metamodel)
+  const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
   afterLayout.edgeStyle = style
   const after = totalCost(afterLayout, lines)
   const score = computeCompositeScore(projected, relations, style)

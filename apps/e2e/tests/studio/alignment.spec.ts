@@ -76,8 +76,8 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
   await expect.poll(types).toEqual(['align', 'pin'])
 
   // Smart Layout keeps a layout no worse than what it finds, so first send
-  // the database far off: then it tidies, keeps the row, and leaves the
-  // pinned element and its pin where they are.
+  // the database far off: then it tidies the whole view, keeps the row, and
+  // takes the pin off (a pin marks a drop, not a place to keep).
   const db = (await studio.node('db').boundingBox())!
   await page.mouse.move(db.x + db.width / 2, db.y + 12)
   await page.mouse.down()
@@ -86,7 +86,7 @@ test('a row on a canvas of the whole model holds through a drag, Smart Layout an
   await expect.poll(types).toEqual(['align', 'pin'])
   await studio.smartLayout()
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
-  await expect.poll(types).toEqual(['align', 'pin'])
+  await expect.poll(types).toEqual(['align'])
   await studio.open(WHOLE)
   await expect.poll(() => spread(studio, row, 'y'), { timeout: 10_000 }).toBeLessThanOrEqual(1.5)
 })

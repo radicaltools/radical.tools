@@ -623,7 +623,7 @@ export class FolderModel {
       : (() => {
         options.onProgress?.({ progress: ++step, message: 'Smart Layout: tidying' })
         if (options.signal?.aborted) throw new Error(CANCELLED)
-        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: pinnedNodeIds(constraints), around: options.around })
+        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: options.around?.length ? pinnedNodeIds(constraints) : [], around: options.around, frames: [...input.frames] })
       })()
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
@@ -638,11 +638,12 @@ export class FolderModel {
     }
     applyLayoutPositions(nodes, result.winner.positions, input)
     resizeParentsBottomUp(nodes, input)
-    // The ensemble gave every element a new place: pins (elements a Studio
-    // user dropped after a drag) go with the old ones. Tidy left the pinned
-    // elements where they are, so the pins stay.
-    const unpinned = ensemble ? pinnedNodeIds(constraints).length : 0
-    if (ensemble) {
+    // The whole view was arranged: pins (elements a Studio user dropped
+    // after a drag) go with the old places. Round a selection the pinned
+    // elements stayed where they are, so their pins stay.
+    const unpins = ensemble || !options.around?.length
+    const unpinned = unpins ? pinnedNodeIds(constraints).length : 0
+    if (unpins) {
       if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
       else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
     }

@@ -243,6 +243,10 @@ body {
 .smart-layout-report-title { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
 .smart-layout-report-sub { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
 .smart-layout-report-table-wrap { max-height: 260px; overflow-y: auto; overflow-x: auto; }
+.smart-layout-report-parts { margin-top: 6px; }
+.smart-layout-report-parts td:nth-child(n+2), .smart-layout-report-parts th:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+.smart-layout-report-parts tr.better td:last-child { color: var(--success); }
+.smart-layout-report-parts tr.worse td:last-child { color: var(--danger); }
 .smart-layout-report-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .smart-layout-report-table th {
   text-align: left;

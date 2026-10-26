@@ -162,6 +162,8 @@ export interface LayoutInput {
   expandedSet: Set<string> | undefined
   /** The view's alignment rules that hold on this canvas (resolveAlignments). */
   alignments: Alignment[]
+  /** The containers the view draws only to hold what it shows (viewFrames): drawn tight round it, no frame of their own. */
+  frames: Set<string>
 }
 
 /**
@@ -199,7 +201,7 @@ export function viewLayoutInput(
   for (const [id, r] of Object.entries(lines)) {
     if (!hidden.has(id)) relations[id] = r
   }
-  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes) }
+  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes), frames: new Set([...frames].filter((id) => nodes[id])) }
 }
 
 /**

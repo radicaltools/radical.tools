@@ -21,6 +21,8 @@ export class Layout {
   private roles = new Map<string, LayoutRole>()
   /** Pinned elements and what they hold: no move touches them. */
   private fixedIds = new Set<string>()
+  /** Frames holding a pinned element: fitted round it, never moved (that would carry it along). */
+  private holdsFixed = new Set<string>()
   /** While a move is tried: the box each changed element had before it (boxes are replaced, never changed in place). */
   private journal: Map<string, Box> | null = null
   readonly meanSize: number
@@ -28,7 +30,11 @@ export class Layout {
   /** How the view draws its lines: an orthogonal line is judged along its route (cost.ts). */
   edgeStyle: EdgeStyle = 'curved'
 
-  constructor(readonly nodes: Record<string, C4Node>, readonly metamodel?: Metamodel | null, pinned: Iterable<string> = []) {
+  /** Containers the canvas draws only to hold what a view shows: tight round it, no padding, no header, no size of their own. */
+  private tight = new Set<string>()
+
+  constructor(readonly nodes: Record<string, C4Node>, readonly metamodel?: Metamodel | null, pinned: Iterable<string> = [], frames: Iterable<string> = []) {
+    for (const id of frames) this.tight.add(id)
     const abs = new Map<string, { x: number; y: number }>()
     const of = (id: string): { x: number; y: number } => {
       const got = abs.get(id)
@@ -58,12 +64,16 @@ export class Layout {
       this.ancestorSets.set(id, set)
     }
     for (const id of this.allIds) this.roles.set(id, layoutRoleOf(nodes[id] as C4Node & Record<string, unknown>, metamodel))
-    for (const id of pinned) if (this.boxes.has(id)) { this.fixedIds.add(id); for (const d of this.descendants(id)) this.fixedIds.add(d) }
+    for (const id of pinned) if (this.boxes.has(id)) {
+      this.fixedIds.add(id)
+      for (const d of this.descendants(id)) this.fixedIds.add(d)
+      for (const a of this.ancestorSets.get(id)!) this.holdsFixed.add(a)
+    }
     this.fitAll()
   }
 
-  /** Whether the element is pinned (or held by one): it stays where it is. */
-  fixed(id: string): boolean { return this.fixedIds.has(id) }
+  /** Whether no move may take the element: it is pinned, held by one, or holds one. */
+  fixed(id: string): boolean { return this.fixedIds.has(id) || this.holdsFixed.has(id) }
 
   /** What the element is to the layout, from the metamodel (layoutHints.ts). */
   role(id: string): LayoutRole { return this.roles.get(id) ?? 'element' }
@@ -91,7 +101,29 @@ export class Layout {
     this.descendantLists.set(id, out)
     return out
   }
-  gapOf(parent: string | undefined): number { return parent ? CHILD_GAP : ROOT_GAP }
+  /** The gap between siblings; in a tight frame, the gap of the level it stands on (its children read as that level's). */
+  gapOf(parent: string | undefined): number {
+    while (parent && this.tight.has(parent)) parent = this.parentOf(parent)
+    return parent ? CHILD_GAP : ROOT_GAP
+  }
+  /** Whether the canvas draws this container only to hold what the view shows (no frame of its own). */
+  isTight(id: string): boolean { return this.tight.has(id) }
+  private peerLists = new Map<string, string[]>()
+  /** What a reader sees side by side at `parent`'s level: its children, with
+   *  a tight frame's in its place (it draws no frame of its own); the
+   *  children alone when there is no tight frame. */
+  peersIn(parent: string | undefined): string[] {
+    while (parent && this.tight.has(parent)) parent = this.parentOf(parent)
+    if (!this.tight.size) return this.childrenOf(parent)
+    const key = parent ?? ''
+    const hit = this.peerLists.get(key)
+    if (hit) return hit
+    const out: string[] = []
+    const add = (ids: string[]): void => { for (const c of ids) if (this.tight.has(c)) add(this.childrenOf(c)); else out.push(c) }
+    add(this.childrenOf(parent))
+    this.peerLists.set(key, out)
+    return out
+  }
 
   /** Every box, to take a move back. */
   snapshot(ids: Iterable<string>): Map<string, Box> {
@@ -140,10 +172,11 @@ export class Layout {
     const kids = this.childrenOf(id)
     if (!kids.length) return
     const type = this.nodes[id].type
-    const pad = compoundPadding(type)
+    const tight = this.tight.has(id)
+    const pad = tight ? { side: 0, top: 0, bottom: 0 } : compoundPadding(type)
     const def = this.metamodel?.nodeTypes[type]
     const size = nodeTypeSize(type, this.metamodel)
-    const min = { width: def?.collapsedWidth ?? COLLAPSED_WIDTH[type] ?? size.width, height: def?.collapsedHeight ?? COLLAPSED_HEIGHT[type] ?? size.height }
+    const min = tight ? { width: 0, height: 0 } : { width: def?.collapsedWidth ?? COLLAPSED_WIDTH[type] ?? size.width, height: def?.collapsedHeight ?? COLLAPSED_HEIGHT[type] ?? size.height }
     const x0 = Math.min(...kids.map((k) => this.boxes.get(k)!.x)) - pad.side
     const y0 = Math.min(...kids.map((k) => this.boxes.get(k)!.y)) - pad.top
     const x1 = Math.max(...kids.map((k) => this.boxes.get(k)!.x + this.boxes.get(k)!.w)) + pad.side
