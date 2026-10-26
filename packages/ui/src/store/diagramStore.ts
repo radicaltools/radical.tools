@@ -795,6 +795,12 @@ function allElementsCamera(camera: { x: number; y: number; zoom: number } | null
   return camera
 }
 
+/** The camera on the canvas now, as Canvas keeps it on window. */
+function shownCamera(): { x: number; y: number; zoom: number } | null {
+  const vp = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+  return vp ? { x: vp.x, y: vp.y, zoom: vp.zoom } : null
+}
+
 /** Counts the user's steps: each undo step made, undone or redone. */
 let _historyMark = 0
 
@@ -8522,6 +8528,8 @@ export const useDiagramStore = create<DiagramStore>()(
           // on it, selected an element and dimmed the rest. It comes back
           // after.
           selection: { nodeIds: [...get().selectedNodeIds], edgeId: get().selectedEdgeId },
+          // And the camera: Esc drew the view at the last slide's.
+          camera: shownCamera(),
         }
         set((state) => {
           state.presentationActive = true
@@ -8538,7 +8546,7 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null } }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null }; camera?: { x: number; y: number; zoom: number } | null }
           | undefined
         get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
@@ -8551,6 +8559,10 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(window as any).__prePresState = undefined
         }
         get()._sync()
+        if (pre?.camera) {
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.({ ...pre.camera }, shown, { keep: true })
+        }
         if (pre?.selection) set((state) => { showSelection(state as DiagramStore, pre.selection!.nodeIds, pre.selection!.edgeId) })
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
