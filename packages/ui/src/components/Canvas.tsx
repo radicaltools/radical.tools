@@ -1748,9 +1748,11 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // collapse button; a selected element's lines are drawn above the
   // elements, and one can lie over its + in an exploration. A click there
   // is meant for the button: hand it over before the edge sees it. Same
-  // reach as the button's own hit area (CSS).
+  // reach as the button's own hit area (CSS). A control drawn over the
+  // canvas keeps its own click: a selected pinned container's Unpin pin
+  // sits within reach of its − (F-0075).
   const onClickCapture = useCallback((e: React.MouseEvent) => {
-    if ((e.target as Element).closest('.c4-node-collapse-btn, .explore-more, .node-discussion-badge')) return
+    if ((e.target as Element).closest('.c4-node-collapse-btn, .explore-more, .node-discussion-badge, button, a[href], input, select, textarea, [contenteditable="true"]')) return
     const btn = nodeControlAt(containerRef.current, e.clientX, e.clientY)
     if (!btn) return
     e.stopPropagation()

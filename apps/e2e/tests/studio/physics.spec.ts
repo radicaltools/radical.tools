@@ -232,6 +232,29 @@ test('a drag moves only the dragged node, and the drop pins it', async ({ page, 
   await expect.poll(async () => wholeConstraints(studio)).toEqual([])
 })
 
+test('a click on a pinned container\'s pin unpins it, and leaves it expanded (F-0075)', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const pins = async () => ((await studio.storedDoc()).views!.find((v) => v.id === 'v-containers') as { layoutConstraints?: Array<{ type: string; nodeIds: string[] }> })
+    .layoutConstraints?.filter((c) => c.type === 'pin').flatMap((c) => c.nodeIds) ?? []
+  // Dragged by its header and dropped: pinned.
+  const bookstore = studio.node('bookstore')
+  const box = (await bookstore.boundingBox())!
+  await page.mouse.move(box.x + 150, box.y + 40)
+  await page.mouse.down()
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + 150, box.y + 40 + 12 * i)
+  await page.mouse.up()
+  await expect.poll(pins).toContain('bookstore')
+  await bookstore.click({ position: { x: 150, y: 40 } })
+  // The pin sits at the corner, within reach of the container's −: the
+  // click is the pin's, not the −'s.
+  const pin = (await page.getByTestId('unpin-node').boundingBox())!
+  await page.mouse.click(pin.x + pin.width / 2, pin.y + pin.height / 2)
+  await expect.poll(pins).not.toContain('bookstore')
+  for (const child of ['web', 'api', 'db']) await expect(studio.node(child)).toBeVisible()
+  await expect(bookstore.getByTitle('Collapse')).toHaveCount(1)
+})
+
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
   // The canvas as wide as before the activity rail took 44 px of it, from
   // the first frame: at the zoom a narrower canvas fits the grid at, the
