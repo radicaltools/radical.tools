@@ -1311,6 +1311,9 @@ div.milestone-option { cursor: default; }
    menu), and the dialogs its menus open, drawn after it, above the rail. */
 .milestone-modal-backdrop.mm-editor-backdrop { z-index: 999; }
 .app-layout.mode-metamodel .activity-rail { z-index: 1000; }
+/* Models (the folder at the toolbar's left) opens over the editor too, as
+   the rail's Settings does: the toolbar stands over the editor's backdrop. */
+.app-layout.mode-metamodel .toolbar { z-index: 1000; }
 .mm-editor-modal {
   position: relative;
   width: min(1200px, 96vw);

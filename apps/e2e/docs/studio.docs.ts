@@ -282,14 +282,14 @@ test('presenter', async ({ page, shot }) => {
 
 test('metamodel', async ({ page, shot }) => {
   await open(page, 'view-ctx')
-  await menu(page, 'Metamodel editor…')
+  await menu(page, 'Metamodel editor')
   await expect(page.getByRole('dialog', { name: 'Metamodel editor' })).toBeVisible()
   await shot('metamodel')
 })
 
 test('metamodel-diagram', async ({ page, shot }) => {
   await open(page, 'view-ctx')
-  await menu(page, 'Metamodel editor…')
+  await menu(page, 'Metamodel editor')
   const editor = page.getByRole('dialog', { name: 'Metamodel editor' })
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   await editor.locator('.mmd-canvas').getByTestId('rf__node-requirement').click()

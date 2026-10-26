@@ -649,8 +649,9 @@ test('the activity rail keeps the app\'s menus in the metamodel editor, without 
   await expect(page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ })).toHaveAttribute('aria-checked', 'true')
+  // Radical Forge… carries a hint while no AI provider is set up.
   for (const item of ['AI providers…', 'Radical Forge…', 'Export as PNG…', 'Export as SVG…', 'Copy to clipboard']) {
-    await expect(page.getByRole('menu', { name: 'Settings' }).getByText(item, { exact: true })).toBeVisible()
+    await expect(page.getByRole('menu', { name: 'Settings' }).getByRole('menuitem', { name: new RegExp(`^${item.replace('.', '\\.')}`) })).toBeVisible()
   }
 })
 
