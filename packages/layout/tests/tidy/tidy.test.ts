@@ -6,15 +6,16 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { runTidyLayout } from '../../src/tidy'
+import { TIDY_BUDGET, runTidyLayout } from '../../src/tidy'
 import { Layout } from '../../src/tidy/layout'
 import { buildIndex, linesOf, localCostParts, totalCost, updateIndex } from '../../src/tidy/cost'
 import { candidateMoves } from '../../src/tidy/moves'
 import { viewLayoutInput } from '../../src/viewInput'
 import { projectToVisibleGraph } from '../../src/geometry'
+import { type Alignment, resolveAlignments } from '../../src/constraints'
 import { computeCompositeScore, projectPositions } from '../../src/smartLayout'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import type { C4Node, C4Relation, DiagramView, PositionMap } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramView, EdgeStyle, LayoutConstraint, PositionMap } from '@radical/common/c4'
 
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
 const fixturesDir = join(__dirname, '..', 'fixtures')
@@ -22,6 +23,17 @@ const benchDir = join(__dirname, '..', '..', 'bench', 'models')
 
 interface Fixture { nodes: C4Node[]; relations: C4Relation[]; view?: DiagramView }
 const load = (file: string): Fixture => JSON.parse(readFileSync(file, 'utf8'))
+/** A view as Studio hands it to Tidy (viewLayoutInput). */
+interface ViewFixture { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; frames: string[]; edgeStyle: EdgeStyle }
+const viewFixture = (file: string): ViewFixture => JSON.parse(readFileSync(join(fixturesDir, file), 'utf8'))
+
+/** Tidied as Studio runs it, with its budget; the canvas it leaves. */
+function tidyView(f: ViewFixture, at: Record<string, C4Node>, alignments: Alignment[]) {
+  const result = runTidyLayout(at, f.relations, { alignments, edgeStyle: f.edgeStyle, frames: f.frames, budget: TIDY_BUDGET })
+  const laidOut: Record<string, C4Node> = {}
+  for (const [id, n] of Object.entries(at)) laidOut[id] = { ...n, ...(result.winner.positions[id] ?? {}) }
+  return { result, laidOut }
+}
 
 function tidy(f: Fixture) {
   const input = viewLayoutInput(f.view, byId(f.nodes), byId(f.relations))
@@ -187,6 +199,27 @@ describe('Tidy', () => {
       const again = runTidyLayout(laidOut, visible.relations)
       expect(again.tidy.steps.map((s) => s.description), f).toEqual([])
       expect(again.keptCurrent, f).toBe(true)
+    }
+  })
+
+  it('leaves nothing for a second or third run with a row, a column or a grid set on the view (F-0108)', { timeout: 240_000 }, () => {
+    // The Studio view of the repository's own model, with a column of five
+    // of Studio's components (the finding's), a row of three, a grid of four.
+    const f = viewFixture('tidy-studio-view.json')
+    const ids = (labels: string[]) => labels.map((l) => Object.values(f.nodes).find((n) => n.label === l)!.id)
+    const cases: [string, LayoutConstraint][] = [
+      ['a column', { id: 'k', type: 'align', axis: 'vertical', nodeIds: ids(['Canvas', 'Diagram store', 'Inspector', 'Metamodel editor', 'Wiki and table views']) }],
+      ['a row', { id: 'k', type: 'align', axis: 'horizontal', nodeIds: ids(['Hub import', 'Host adapter', 'Radical Forge']) }],
+      ['a grid', { id: 'k', type: 'grid', columns: 2, nodeIds: ids(['AI assistant', 'Layout runners', 'Warnier view', 'Treemap, flow and matrix views']) }],
+    ]
+    for (const [name, constraint] of cases) {
+      const alignments = resolveAlignments([constraint], f.nodes)
+      const first = tidyView(f, f.nodes, alignments)
+      expect(first.result.tidy.steps.length, name).toBeGreaterThan(0)
+      const second = tidyView(f, first.laidOut, alignments)
+      expect(second.result.tidy.steps.map((s) => s.description), `${name}, run 2`).toEqual([])
+      const third = tidyView(f, second.laidOut, alignments)
+      expect(third.result.tidy.steps.map((s) => s.description), `${name}, run 3`).toEqual([])
     }
   })
 

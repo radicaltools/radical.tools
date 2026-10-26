@@ -261,12 +261,15 @@ function centre(
  * Makes `positions` (parent-relative, as Smart Layout produces them) satisfy
  * `alignments`. `nodes` is the graph as drawn (projectToVisibleGraph);
  * nodes missing from `positions` start where they are. Returns a box for
- * every node. Without alignments the input is returned as is.
+ * every node. Without alignments the input is returned as is. Boxes in
+ * `fixed` (pinned, or left out of a Tidy round a selection) are never
+ * pushed aside to make room; a member of a line still moves onto it.
  */
 export function enforceAlignments(
   nodes: Record<string, C4Node>,
   positions: PositionMap,
   alignments: readonly Alignment[],
+  fixed: ReadonlySet<string> = new Set(),
 ): PositionMap {
   if (!alignments.length) return positions
   const boxes = boxesOf(nodes, positions)
@@ -419,7 +422,7 @@ export function enforceAlignments(
     const orderOf = (u: string, v: string, axis: 'x' | 'y'): number =>
       before[axis].has(`${u}\u0000${v}`) ? 1 : before[axis].has(`${v}\u0000${u}`) ? -1 : 0
     const group = (id: string, axis: 'x' | 'y'): string[] => cluster[axis].get(id) ?? [id]
-    const movable = (id: string, axis: 'x' | 'y'): boolean => !group(id, axis).some((m) => locked[axis].has(m))
+    const movable = (id: string, axis: 'x' | 'y'): boolean => !group(id, axis).some((m) => locked[axis].has(m) || fixed.has(m))
     const move = (id: string, axis: 'x' | 'y', d: number): void => {
       for (const m of group(id, axis)) boxes[m][axis] += d
     }

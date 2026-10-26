@@ -13,7 +13,7 @@ import type { C4Node, C4Relation, EdgeStyle, PositionMap } from '@radical/common
 import type { Metamodel } from '@radical/common/metamodel'
 import { projectToVisibleGraph } from '../geometry'
 import { computeLayoutMetrics } from '../crossingOpt'
-import { type Alignment, alongAxis, enforceAlignments } from '../constraints'
+import { type Alignment, alignmentError, alongAxis, enforceAlignments } from '../constraints'
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
@@ -98,6 +98,8 @@ const ROUGH_WHEN_TANGLED = 0.5
 /** The closing passes (drawn in, judged afresh, the margin) are repeated until one changes
  *  nothing, at most this many times: what a second run would find, this one takes. */
 const MAX_PASSES = 4
+/** The author's rows and columns hold when their centres, as drawn, are this close (constraints.ts). */
+const ALIGNED = 0.5
 /** A large view's first round takes every move that helps as it comes (first improvement)
  *  instead of judging them all for the single best: hundreds of moves in the time the
  *  best-first round would spend choosing one, so a budget always buys something. */
@@ -139,11 +141,15 @@ export function runTidyLayout(
 
   // The rows and columns the author set hold from the start, and every move
   // keeps them (keepLines): what Tidy hands over is the layout it judged,
-  // so a second run finds it as this one left it.
+  // so a second run finds it as this one left it. Lined up only where they
+  // do not hold as the canvas draws them: the line-up makes room round
+  // every box it finds too close, the rest of the view included, and fits
+  // frames its own way, so on lines that held it moved what no move took.
+  // Nothing pinned, or left out of a Tidy round a selection, is pushed aside.
   const alignments = options.alignments ?? []
   const lineUp = (): void => {
-    if (!alignments.length) return
-    l.setPositions(enforceAlignments(nodes, l.positions(), alignments))
+    if (!alignments.length || alignmentError(nodes, l.positions(), alignments) <= ALIGNED) return
+    l.setPositions(enforceAlignments(nodes, l.positions(), alignments, new Set(l.ids().filter((id) => l.fixed(id)))))
     l.refit()
   }
   {
@@ -535,10 +541,11 @@ export function runTidyLayout(
     l.setPositions(best.positions)
     steps.length = best.steps
   }
-  // The author's rows and columns held all along; lined up once more as
-  // the canvas measures them, before the diagram is moved to the top left,
-  // so what is handed over stands where the next run will find it.
-  let positions = enforceAlignments(nodes, l.positions(), alignments)
+  // The author's rows and columns held all along; lined up once more
+  // where the canvas measures them off, before the diagram is moved to the
+  // top left, so what is handed over stands where the next run will find it.
+  lineUp()
+  const positions = l.positions()
   // The whole diagram from the top left, as every layout hands it over;
   // not when something is pinned: it stays where the author put it.
   const roots = l.ids().filter((id) => !l.parentOf(id))
