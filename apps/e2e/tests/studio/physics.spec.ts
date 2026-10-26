@@ -171,6 +171,38 @@ test('zooming with the wheel wins over a fit still animating', async ({ page, st
   await expect(page.locator('.autofit-active')).toHaveCount(1)
 })
 
+test('while Smart Layout tidies, its Stop button and the controls beside it stay where they are (F-0083)', async ({ page, studio }) => {
+  // Squeezed so the boxes overlap: Tidy has many moves to make, each shown.
+  await studio.seedDocument(gridDocument({ x: 150, y: 90 }))
+  await studio.open(WHOLE)
+  const smart = page.getByRole('button', { name: 'Smart Layout', exact: true })
+  const idle = (await smart.boundingBox())!
+  await smart.click()
+  await expect(page.getByRole('button', { name: /^Stop/ })).toBeVisible()
+  // Every frame for up to three seconds: where the Stop button and Fit All
+  // are, and what the controls say about the move.
+  const seen = await page.evaluate(() => new Promise<{ stop: string[]; fit: string[]; said: string[] }>((resolve) => {
+    const stop = new Set<string>(), fit = new Set<string>(), said = new Set<string>()
+    const at = (el: Element | null | undefined) => { const r = el!.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}` }
+    const end = performance.now() + 3000
+    const sample = () => {
+      const bar = document.querySelector('.canvas-controls')
+      const button = [...(bar?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim().startsWith('Stop'))
+      if (!bar || !button || performance.now() > end) { resolve({ stop: [...stop], fit: [...fit], said: [...said] }); return }
+      stop.add(at(button))
+      fit.add(at([...bar.querySelectorAll('button')].find((b) => b.textContent!.includes('Fit All'))))
+      said.add(bar.textContent!)
+      requestAnimationFrame(sample)
+    }
+    sample()
+  }))
+  // The moves were shown as they came…
+  expect(seen.said.length).toBeGreaterThan(2)
+  // …and nothing moved under the pointer.
+  expect(seen.stop).toEqual([`${Math.round(idle.x)},${Math.round(idle.y)} ${Math.round(idle.width)}x${Math.round(idle.height)}`])
+  expect(seen.fit).toHaveLength(1)
+})
+
 /** A 15 × 15 grid of linked systems, laid out near rest (or squeezed so
  *  they overlap, far from it). */
 function gridDocument(spacing = { x: 420, y: 300 }): string {

@@ -222,6 +222,37 @@ body {
 
 .toolbar-btn-icon-only { padding: 0 7px; }
 
+/* Smart Layout keeps one width while it runs: Stop is drawn over the room
+   the idle label takes (held, unseen), and the move under way is told
+   above the controls, where a longer text moves nothing. */
+.smart-layout-labels { display: inline-grid; }
+.smart-layout-labels > span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.smart-layout-label-held { visibility: hidden; }
+.smart-layout-status {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, 80vw);
+  padding: 3px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.smart-layout-report-held { visibility: hidden; }
+
 /* "Why this layout?" report popover */
 .smart-layout-report-wrap { position: relative; display: inline-flex; }
 .smart-layout-report-popover {
