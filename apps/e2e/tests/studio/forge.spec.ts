@@ -91,7 +91,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   ])
   await studio.open('v-context')
 
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
@@ -171,7 +171,7 @@ test('Forge builds the domain model after the requirements and the state machine
     ] },
   ])
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
@@ -212,7 +212,7 @@ test('Forge asks for the view structure and files the run into the Radical one',
   await studio.seedDocument(JSON.stringify(doc))
   await scriptAnthropic(page, [{ task: /extract its functional requirements/, calls: [1, 2].map(requirement) }])
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
 
   // Radical by default, in the radical model's folders; any viewpoint can be left out.
@@ -305,7 +305,7 @@ test('Forge asks before it refines an earlier stage and applies only what the us
     },
   ])
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
@@ -381,7 +381,7 @@ test('without an AI provider Radical Forge is offered disabled, with how to set 
   const asked: string[] = []
   page.on('request', (r) => { if (/index\.json|api\.anthropic\.com/.test(r.url())) asked.push(r.url()) })
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   const item = page.getByRole('menuitem', { name: /Radical Forge…/ })
   await expect(item).toBeDisabled()
   await expect(item).toContainText('Needs an AI provider')
@@ -409,7 +409,7 @@ test('Forge proposes a concern pack\'s answers from the description and imports 
     ],
   })
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Book shop\n\nReaders browse the catalogue; nobody needs an account.')
   await page.getByRole('button', { name: 'Start →' }).click()
@@ -455,7 +455,7 @@ test('Forge asks a concern pack\'s questions and imports it whole', async ({ pag
     { task: /extract its functional requirements/, calls: [requirement(1)] },
   ], 'Authentication')
   await studio.open('v-context')
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Book shop\n\nReaders browse the catalogue; nobody needs an account.')
   await page.getByRole('button', { name: 'Start →' }).click()

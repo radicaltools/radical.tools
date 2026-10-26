@@ -30,10 +30,19 @@ test.describe('About Radical Studio', () => {
     await expect(about).toBeHidden()
   })
 
-  test('the logo on the toolbar opens About', async ({ page, studio }) => {
+  test('the folder on the toolbar opens Models, beside the model open, and About is under Settings', async ({ page, studio }) => {
     await studio.seed()
     await studio.open('v-context')
-    await page.getByRole('button', { name: /Radical/ }).first().click()
+    // The folder at the toolbar's left: the Models menu.
+    const models = page.locator('.toolbar').getByRole('button', { name: 'Models', exact: true })
+    // The model open, and where it is kept (the seeded model is in the browser).
+    await expect(page.locator('.toolbar .app-brand-doc')).toHaveText('E2ELOCAL')
+    await expect(page.locator('.toolbar .app-brand-doc')).toHaveAttribute('title', 'E2E: kept in this browser (local storage)')
+    await models.click()
+    await expect(page.getByRole('menu', { name: 'Models' }).getByText('Manage models…')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'About Radical Studio' }).click()
     await expect(page.getByRole('dialog', { name: 'About Radical Studio' })).toBeVisible()
   })
 

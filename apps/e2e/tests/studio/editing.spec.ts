@@ -283,7 +283,8 @@ test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor 
     await page.keyboard.press('ControlOrMeta+z')
   }
   await toolbar.getByRole('button', { name: 'Designer', exact: true }).click()
-  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
   await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
   await expect(undo).toHaveCount(0)
   await expect(redo).toHaveCount(0)
@@ -637,20 +638,43 @@ test('a dialog keeps the keys: Tab stays in it, Ctrl+Z and F5 leave the model be
 })
 
 test('the activity rail keeps the app\'s menus in the metamodel editor, without the panel\'s sections', async ({ page }) => {
-  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
   await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Metamodel editor', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('tab', { name: 'Views' })).toHaveCount(0)
-  for (const name of ['Models', 'AI', 'Export', 'Settings']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+  // Models is the folder at the toolbar's left; the rail's foot is
+  // Settings, which holds the metamodel editor (marked open), AI and Export.
+  await expect(page.locator('.toolbar').getByRole('button', { name: 'Models', exact: true })).toBeVisible()
+  await expect(page.locator('.activity-rail').getByRole('button')).toHaveText([''])
+  await expect(page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ })).toHaveAttribute('aria-checked', 'true')
+  // Radical Forge… carries a hint while no AI provider is set up.
+  for (const item of ['AI providers…', 'Radical Forge…', 'Export as PNG…', 'Export as SVG…', 'Copy to clipboard']) {
+    await expect(page.getByRole('menu', { name: 'Settings' }).getByRole('menuitem', { name: new RegExp(`^${item.replace('.', '\\.')}`) })).toBeVisible()
+  }
 })
 
-// F-0003: the editor's backdrop lay over the rail, so a click on Models, AI,
-// Export or Settings closed the editor and opened no menu.
+// With no sections above it (the metamodel editor, the Inspector), Settings
+// rose to the rail's top.
+test('Settings stays at the activity rail\'s foot where the rail has no sections', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
+  await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Views' })).toHaveCount(0)
+  const rail = (await page.locator('.activity-rail').boundingBox())!
+  const settings = (await page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true }).boundingBox())!
+  expect(rail.y + rail.height - (settings.y + settings.height)).toBeLessThan(16)
+})
+
+// F-0003: the editor's backdrop lay over the rail, so a click on Models or
+// Settings closed the editor and opened no menu.
 test('the activity rail\'s menus open over the metamodel editor, which stays open', async ({ page }) => {
-  await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
   const close = page.getByRole('button', { name: 'Close metamodel editor' })
   await expect(close).toBeVisible()
-  for (const name of ['Models', 'AI', 'Export', 'Settings']) {
+  for (const name of ['Models', 'Settings']) {
     await page.getByRole('button', { name, exact: true }).click()
     await expect(page.getByRole('menu', { name })).toBeVisible()
     await expect(close).toBeVisible()
@@ -669,7 +693,7 @@ test('the toolbar groups undo, navigation around Quick Search, and the branch\'s
   const search = await box(page.locator('.quick-search-bar'))
   const changes = await box(page.locator('.toolbar .branch-btn'))
   const modes = await box(page.locator('.toolbar-mode-switch'))
-  // Undo and Redo after the logo, before the navigation.
+  // Undo and Redo after Models and the model open, before the navigation.
   expect(edit.x + edit.width).toBeLessThan(navigate.x)
   // ‹ › just before Quick Search, the clock just after it, as in VS Code.
   expect(navigate.x + navigate.width).toBeLessThanOrEqual(search.x)

@@ -101,40 +101,40 @@
   padding: 12px 16px;
   white-space: nowrap;
 }
-/* ─── App brand (logo + menu trigger combo) ─────────────────────────── */
-.app-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 10px 0 8px;
-  margin-right: 4px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  transition: background 0.15s ease, border-color 0.15s ease;
+/* ─── App brand: the Models menu, a folder and the name ─────────────── */
+/* A strip like the perspective switch: the folder its one button, then the model open,
+   in line with the activity rail's icons below (both 26 px wide at x 8.5:
+   the toolbar's 12 px padding less 7.5, then the strip's border and padding). */
+.app-brand-switch {
+  display: flex; align-items: center; gap: 2px;
+  margin-left: -7.5px; margin-right: 4px; padding: 3px;
+  background: rgba(0,0,0,0.11);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.10);
 }
-.app-brand-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  color: var(--accent);
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.06));
+/* As a perspective button: grey while its menu is closed, blue while open. */
+.app-brand-models {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 24px; padding: 0;
+  border: none; border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--text-muted);
+  background: transparent;
+  transition: all 0.15s;
 }
-.app-brand-name {
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--text-primary)));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.app-brand-models svg { width: 17px; height: 17px; }
+.app-brand-models:hover { color: var(--text-primary); background: var(--hover-bg); }
+.app-brand-models.open {
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white), var(--accent));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, var(--shadow-sm);
 }
+.app-brand-doc {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 0 8px 0 6px;
+  font-size: 12px; font-weight: 500; color: var(--text-primary);
+}
+.app-brand-doc-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-brand-caret {
   display: inline-flex;
   color: var(--text-muted);
@@ -153,10 +153,12 @@
   transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
 }
 .rail-action svg { width: 21px; height: 21px; }
-.rail-action:hover, .rail-action.open { color: var(--text-primary); background: var(--hover-bg-faint); }
+.rail-action:hover { color: var(--text-primary); background: var(--hover-bg-faint); }
 .rail-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Its menu open: lit as an open section is, in the accent, with the bar. */
+.rail-action.open { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .rail-action.active { color: var(--accent); }
-.rail-action.active::after {
+.rail-action.open::after, .rail-action.active::after {
   content: ''; position: absolute; top: 7px; bottom: 7px; right: -1px;
   width: 3px; border-radius: 2px 0 0 2px; background: var(--accent);
 }
@@ -1287,6 +1289,11 @@ div.milestone-option { cursor: default; }
   padding: 1px 5px; border-radius: 3px;
 }
 .toolbar-doc-badge.fs { background: rgba(79,156,249,0.25); color: #a8c8f8; }
+/* Read on either theme: the theme's text on a light tint of the badge's colour. */
+.toolbar-doc-badge.ls, .toolbar-doc-badge.fs, .toolbar-doc-badge.md { color: var(--text-primary); }
+.toolbar-doc-badge.ls { background: color-mix(in srgb, var(--text-muted) 22%, transparent); }
+.toolbar-doc-badge.fs { background: color-mix(in srgb, #4f9cf9 24%, transparent); }
+.toolbar-doc-badge.md { background: color-mix(in srgb, #8b5cf6 24%, transparent); }
 /* Inline current-doc summary inside the "Manage diagrams…" menu item */
 .app-menu-current-doc-inline {
   display: flex; align-items: center; gap: 6px;
@@ -1304,6 +1311,9 @@ div.milestone-option { cursor: default; }
    menu), and the dialogs its menus open, drawn after it, above the rail. */
 .milestone-modal-backdrop.mm-editor-backdrop { z-index: 999; }
 .app-layout.mode-metamodel .activity-rail { z-index: 1000; }
+/* Models (the folder at the toolbar's left) opens over the editor too, as
+   the rail's Settings does: the toolbar stands over the editor's backdrop. */
+.app-layout.mode-metamodel .toolbar { z-index: 1000; }
 .mm-editor-modal {
   position: relative;
   width: min(1200px, 96vw);
@@ -3613,6 +3623,9 @@ div.milestone-option { cursor: default; }
 .branch-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .branch-btn.active, .branch-btn.active:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
 .branch-btn.unavailable { color: var(--text-muted); }
+/* Its help, or History's list, open: lit as the rail's Settings is while its menu is open. */
+.branch-btn.open, .branch-btn.open:hover,
+.nav-history-list .nav-btn.active, .nav-history-list .nav-btn.active:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .branch-btn[aria-disabled="true"]:not(.unavailable) { opacity: 0.55; cursor: default; }
 .branch-count { padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: var(--warning); }
 .branch-count.old { background: var(--danger); }

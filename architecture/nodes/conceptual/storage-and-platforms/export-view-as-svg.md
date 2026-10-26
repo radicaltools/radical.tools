@@ -5,5 +5,5 @@ label: "Export view as SVG"
 given: "the bookstore sample is open on the System context view"
 tests: "apps/e2e/tests/studio/export.spec.ts › export as SVG"
 then: "an .svg file is downloaded that contains Customer, Bookstore, Payment Provider and the browses and orders relation label"
-when: "the user chooses Export as SVG… under Export on the activity rail"
+when: "the user chooses Export as SVG… under Export in the activity rail's Settings menu"
 ---

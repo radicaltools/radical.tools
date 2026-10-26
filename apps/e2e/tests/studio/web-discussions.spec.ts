@@ -194,7 +194,7 @@ test('an export of the view leaves out the discussion icons', async ({ page }) =
   await expect(panel.getByRole('status')).toHaveText('Posted.')
   await panel.getByRole('button', { name: 'Close discussions' }).click()
   await expect(page.locator('button[data-discussion-node="customer"]')).toBeVisible()
-  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   const download = page.waitForEvent('download')
   await page.getByText('Export as SVG…', { exact: true }).click()
   const svg = await readFile(await (await download).path(), 'utf8')

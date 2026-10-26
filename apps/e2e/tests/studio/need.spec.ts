@@ -49,7 +49,7 @@ test.describe('on the governance bookstore', () => {
     })
     await studio.open('v-context')
     const openForge = async () => {
-      await page.getByRole('button', { name: 'AI', exact: true }).click()
+      await page.getByRole('button', { name: 'Settings', exact: true }).click()
       await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
     }
 
