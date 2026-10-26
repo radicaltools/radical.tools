@@ -9107,8 +9107,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
         suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
+        // The camera of the canvas shown now: one switched to during the load
+        // (a model opened on a view) opens at its own, not at All elements'.
+        const shownViewId = get().activeViewId
+        const shownVP = shownViewId === null ? defaultVP : viewById(get(), shownViewId)?.viewport ?? null
         const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-        ;(window as any).__rfPlaceCamera?.(defaultVP ?? null, shown)
+        ;(window as any).__rfPlaceCamera?.(shownVP ?? null, shown)
       },
 
       saveDiagram() {
