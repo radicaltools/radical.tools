@@ -72,7 +72,7 @@ import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutR
 import { TIDY_BUDGET, type TidyReport, type TidyStep, costRows, tidySummary } from '@radical/layout/tidy'
 import { runTidy, TIDY_STOPPED } from '../layout/tidyRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnBoxesOf, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
@@ -1396,7 +1396,8 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
   const view = viewById(state, state.activeViewId)
   const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  placeUnplaced(nodes, known, shown, undefined, { frames: viewFrames(view, nodes, relations) })
+  const frames = viewFrames(view, nodes, relations)
+  placeUnplaced(nodes, known, shown, undefined, { frames })
   const rootOf = (id: string): C4Node => {
     let n = nodes[id]
     while (n.parentId && nodes[n.parentId]) n = nodes[n.parentId]
@@ -1416,7 +1417,10 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
       x: ends.reduce((sum, b) => sum + b.x + b.width / 2, 0) / ends.length,
       y: ends.reduce((sum, b) => sum + b.y + b.height / 2, 0) / ends.length,
     }
-    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id))).map(box)
+    // A frame is in nobody's way, what it holds is (drawnBoxesOf).
+    const canvas = modelCanvas(nodes, shown, frames)
+    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id)))
+      .flatMap((n) => frames.has(n.id) ? drawnBoxesOf(n, nodes, canvas).map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h })) : [box(n)])
     const at = freeSpotNear(taken, drawnSize(node, parents.has(id)), centre)
     node.x = at.x
     node.y = at.y

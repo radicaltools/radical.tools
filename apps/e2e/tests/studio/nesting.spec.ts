@@ -322,3 +322,81 @@ test('a drop on the holds pill says the element is there already', async ({ page
   await page.keyboard.up('Alt')
   await expect(page.getByText('"API" is already in "Bookstore": nothing to move.')).toBeVisible()
 })
+
+// F-0092: the pills keep their size on screen, so zoomed out those of an
+// element stand over the element above it. On the sample's Authorization
+// view at Fit All, a drop on "Leavers lose access" where the pill of
+// "Unpermitted calls refused" lay over it made the relation to that one,
+// and a click with the special key there did nothing.
+test('zoomed out, a drop or a click with the special key on an element goes to that element, not to another element\'s pill over it', async ({ page, studio }) => {
+  const SRC = 'dfd072e9-a9f7-45bf-8adb-c4a9b287af20' // Break-glass use alerts
+  const TGT = 'c8fdf808-27c6-4a35-b117-6b3c2cf45786' // Leavers lose access
+  await studio.openSample('view-authorization')
+  const focus = page.getByRole('toolbar', { name: 'Canvas' }).getByRole('button', { name: 'Focus' })
+  if ((await focus.getAttribute('aria-pressed')) !== 'false') await focus.click()
+  await page.getByRole('button', { name: 'Fit All' }).click()
+  await studio.settle()
+  const docId = studio.activeDocId()
+  const before = (await studio.storedDoc(docId)).relations.length
+  const s = (await studio.node(SRC).boundingBox())!
+  await page.mouse.click(s.x + s.width / 2, s.y + s.height - 3)
+  await studio.settle()
+  await page.keyboard.down('Alt')
+  // A point of it another element's pill lies over.
+  const covered = () => page.evaluate((id) => {
+    const t = document.querySelector(`.react-flow__node[data-id="${id}"]`)!.getBoundingClientRect()
+    for (const pill of document.querySelectorAll<HTMLElement>('.connect-pills:not([data-connect-over="' + id + '"]) .connect-pill')) {
+      const p = pill.getBoundingClientRect()
+      const x0 = Math.max(t.left, p.left), x1 = Math.min(t.right, p.right), y0 = Math.max(t.top, p.top), y1 = Math.min(t.bottom, p.bottom)
+      if (x1 - x0 > 2 && y1 - y0 > 2) {
+        const at = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }
+        if (document.elementFromPoint(at.x, at.y)?.closest('.connect-pill') === pill) return at
+      }
+    }
+    return null
+  }, TGT)
+  await expect.poll(covered).not.toBeNull()
+  const point = (await covered())!
+  await page.mouse.move(s.x + s.width / 2, s.y + s.height - 3)
+  await page.mouse.down()
+  await page.mouse.move(point.x, point.y, { steps: 10 })
+  await page.mouse.up()
+  await expect.poll(async () => (await studio.storedDoc(docId)).relations.length).toBe(before + 1)
+  const made = (await studio.storedDoc(docId)).relations.slice(-1)[0] as { sourceId: string; targetId: string }
+  expect([made.sourceId, made.targetId]).toEqual([SRC, TGT])
+  // A click there adds it to the selection.
+  await page.mouse.click(point.x, point.y)
+  await page.keyboard.up('Alt')
+  await expect.poll(() => page.locator('.react-flow__node.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')).sort())).toEqual([SRC, TGT].sort())
+})
+
+// F-0094: after a box drawn with the special key, React Flow lays a
+// rectangle over the elements it selected: a press with the key there found
+// no element, so the gesture did not start and React Flow dragged the
+// selection (Web App and API 690 px right, the Bookstore grown round them).
+test('after a box selection, a drag with the special key from one of the selected relates each of them, and moves nothing', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.settle()
+  const doc = await studio.storedDoc()
+  const relations = doc.relations.length
+  const places = await studio.positions()
+  const held = await Promise.all(['web', 'api'].map(async (id) => (await studio.node(id).boundingBox())!))
+  const frame = (await studio.node('bookstore').boundingBox())!
+  // From the empty canvas above and left of the Bookstore.
+  const from = { x: frame.x - 15, y: frame.y - 15 }
+  const to = { x: Math.max(...held.map((b) => b.x + b.width)) + 8, y: Math.max(...held.map((b) => b.y + b.height)) + 8 }
+  await page.keyboard.down('Alt')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(to.x, to.y, { steps: 10 })
+  await page.mouse.up()
+  await expect.poll(() => page.locator('.react-flow__node.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')).sort())).toEqual(['api', 'web'])
+  await altDrag(page, studio.node('api'), studio.node('payments'))
+  await page.keyboard.up('Alt')
+  await expect.poll(async () => (await studio.storedDoc()).relations.length).toBe(relations + 2)
+  const added = (await studio.storedDoc()).relations.slice(relations) as Array<{ sourceId: string; targetId: string }>
+  expect(added.map((r) => `${r.sourceId}>${r.targetId}`).sort()).toEqual(['api>payments', 'web>payments'])
+  await studio.settle()
+  expect(await studio.positions()).toEqual(places)
+})

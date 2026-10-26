@@ -11,7 +11,7 @@
 // a plain object or an immer draft.
 
 import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
-import { readPipeline, viewShownNodes } from './viewPipeline'
+import { readPipeline, viewShownNodes, withAncestors } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -480,6 +480,7 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
   const moving = ids.filter((id) => state.c4Nodes[id] && (state.c4Nodes[id].parentId ?? null) !== newParentId)
   const movingSet = new Set(moving)
   const siblings = Object.values(state.c4Nodes).filter((n) => (n.parentId ?? null) === newParentId && !movingSet.has(n.id))
+  const childrenOf = (parentId: string): C4Node[] => Object.values(state.c4Nodes).filter((n) => n.parentId === parentId && !movingSet.has(n.id))
   // Measure every node against the original tree before changing any parent.
   const canvases = [
     { positions: state.defaultPositions, view: undefined },
@@ -497,9 +498,16 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     }
     const overlaps = (a: NodePosition, b: NodePosition): boolean =>
       a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    // A container the view draws only to hold what it shows (its frame,
+    // invisible) is in nobody's way; what it draws inside is (F-0093).
+    const shown = view ? viewShownNodes(view, state.c4Nodes, state.c4Relations) : undefined
+    const held = shown && withAncestors(shown, state.c4Nodes)
+    const inWay = (id: string, at: NodePosition): NodePosition[] => !shown?.has(id) && held?.has(id)
+      ? childrenOf(id).filter((c) => c.id in positions && held.has(c.id)).flatMap((c) => inWay(c.id, positions[c.id]).map((b) => ({ ...b, x: b.x + at.x, y: b.y + at.y })))
+      : [drawn(id, at)]
     // At the top, what it may not lie on: the siblings there, and what was
     // moved there before it.
-    const taken = newParentId ? [] : siblings.filter((s) => s.id in positions).map((s) => drawn(s.id, positions[s.id]))
+    const taken = newParentId ? [] : siblings.filter((s) => s.id in positions).flatMap((s) => inWay(s.id, positions[s.id]))
     return moving.filter((id) => id in positions).map((id) => {
       const abs = absOf(id, positions)
       const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
@@ -511,7 +519,7 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
       // it there (beside every sibling, it went to the far right).
       const at = drawn(id, box)
       const inside = !newParentId || (!!parent && at.x >= 0 && at.y >= 0 && at.x + at.width <= parent.width && at.y + at.height <= parent.height)
-      const clear = !siblings.some((s) => s.id in positions && overlaps(at, drawn(s.id, positions[s.id])))
+      const clear = !siblings.some((s) => s.id in positions && inWay(s.id, positions[s.id]).some((b) => overlaps(at, b)))
       if (!newParentId) {
         const free = clear ? box : { ...box, ...freePlaceNear(taken, at) }
         taken.push(drawn(id, free))

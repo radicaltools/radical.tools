@@ -235,7 +235,18 @@ export function liesClearInParent(
     if (box.x < 0 || box.y < 0 || box.x + box.w > frame.w || box.y + box.h > frame.h) return false
   }
   return !Object.values(nodes).some((s) => s.id !== node.id && (s.parentId ?? undefined) === (node.parentId ?? undefined)
-    && canvas.shown(s) && !ignore(s) && boxesOverlap(box, canvas.boxOf(s)))
+    && canvas.shown(s) && !ignore(s) && drawnBoxesOf(s, nodes, canvas, (c) => c.id !== node.id && !ignore(c)).some((b) => boxesOverlap(box, b)))
+}
+
+/** What the canvas draws of `node`, in its parent's frame: its box; for a
+ *  frame (drawn invisible), the boxes of what it draws inside, those `keep`
+ *  accepts. A frame is in nobody's way, what it holds is (Payment taken out
+ *  of Payments on Domain model went clear of the invisible domain: F-0093). */
+export function drawnBoxesOf(node: C4Node, nodes: Record<string, C4Node>, canvas: CanvasShape, keep: (n: C4Node) => boolean = () => true): CanvasBox[] {
+  const box = canvas.boxOf(node)
+  if (!canvas.frame?.(node)) return [box]
+  return Object.values(nodes).filter((c) => c.parentId === node.id && canvas.shown(c) && keep(c))
+    .flatMap((c) => drawnBoxesOf(c, nodes, canvas, keep).map((b) => ({ ...b, x: b.x + box.x, y: b.y + box.y })))
 }
 
 /**
@@ -276,7 +287,7 @@ export function settleMovedNodes(
         // beside every sibling it went to the far right of the canvas.
         const at = node.parentId && nodes[node.parentId]
           ? gridSlotIn(nodes, node.parentId, { width: box.w, height: box.h }, (s) => counts(s), { width: on.boxOf(nodes[node.parentId]).w, height: on.boxOf(nodes[node.parentId]).h })
-          : freeSpotNear(Object.values(nodes).filter((s) => !s.parentId && counts(s)).map((s) => { const b = on.boxOf(s); return { x: b.x, y: b.y, width: b.w, height: b.h } }),
+          : freeSpotNear(Object.values(nodes).filter((s) => !s.parentId && counts(s)).flatMap((s) => drawnBoxesOf(s, nodes, on, counts)).map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h })),
             { width: box.w, height: box.h }, { x: box.x + box.w / 2, y: box.y + box.h / 2 })
         node.x = at.x
         node.y = at.y
