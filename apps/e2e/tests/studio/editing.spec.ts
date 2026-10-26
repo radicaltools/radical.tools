@@ -642,10 +642,10 @@ test('the activity rail keeps the app\'s menus in the metamodel editor, without 
   await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
   await expect(page.getByRole('button', { name: 'Close metamodel editor' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Views' })).toHaveCount(0)
-  // Models is the folder at the toolbar's left; the rail's foot is
-  // Settings, which holds the metamodel editor (marked open), AI and Export.
-  await expect(page.locator('.toolbar').getByRole('button', { name: 'Models', exact: true })).toBeVisible()
-  await expect(page.locator('.activity-rail').getByRole('button')).toHaveText([''])
+  // Models is the folder at the rail's top; the rail's foot is Settings,
+  // which holds the metamodel editor (marked open), AI and Export.
+  await expect(page.locator('.activity-rail').getByRole('button')).toHaveText(['', ''])
+  await expect(page.locator('.activity-rail').getByRole('button', { name: 'Models', exact: true })).toBeVisible()
   await expect(page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ })).toHaveAttribute('aria-checked', 'true')
@@ -685,24 +685,26 @@ test('the activity rail\'s menus open over the metamodel editor, which stays ope
   }
 })
 
-test('the toolbar groups undo, navigation around Quick Search, and the branch\'s changes beside the perspectives', async ({ page }) => {
+test('the toolbar groups the branch\'s changes with the model open, undo, and navigation around Quick Search', async ({ page }) => {
   const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
   const edit = await box(page.getByRole('group', { name: 'Edit' }))
   const navigate = await box(page.getByRole('group', { name: 'Navigate' }))
   const history = await box(page.getByRole('button', { name: 'History' }))
   const search = await box(page.locator('.quick-search-bar'))
+  const model = await box(page.locator('.toolbar .app-brand-doc'))
+  const strip = await box(page.locator('.toolbar .app-brand-switch'))
   const changes = await box(page.locator('.toolbar .branch-btn'))
-  const modes = await box(page.locator('.toolbar-mode-switch'))
-  // Undo and Redo after Models and the model open, before the navigation.
+  // The branch's changes in the strip of the model open, after its name.
+  expect(changes.x).toBeGreaterThanOrEqual(model.x + model.width)
+  expect(changes.x + changes.width).toBeLessThanOrEqual(strip.x + strip.width)
+  // Undo and Redo after the model open, before the navigation.
+  expect(strip.x + strip.width).toBeLessThan(edit.x)
   expect(edit.x + edit.width).toBeLessThan(navigate.x)
   // ‹ › just before Quick Search, the clock just after it, as in VS Code.
   expect(navigate.x + navigate.width).toBeLessThanOrEqual(search.x)
   expect(search.x - (navigate.x + navigate.width)).toBeLessThan(16)
   expect(history.x).toBeGreaterThanOrEqual(search.x + search.width)
   expect(history.x - (search.x + search.width)).toBeLessThan(16)
-  // The branch's changes beside the perspectives, clear of the clock.
-  expect(changes.x).toBeGreaterThan(history.x + history.width)
-  expect(changes.x + changes.width).toBeLessThanOrEqual(modes.x)
 })
 
 // F-0001: below about 1160 px the toolbar's buttons lay on top of each

@@ -30,11 +30,20 @@ test.describe('About Radical Studio', () => {
     await expect(about).toBeHidden()
   })
 
-  test('the folder on the toolbar opens Models, beside the model open, and About is under Settings', async ({ page, studio }) => {
+  test('the folder at the top of the activity rail opens Models, the model open is named at the toolbar\'s left, and About is under Settings', async ({ page, studio }) => {
     await studio.seed()
     await studio.open('v-context')
-    // The folder at the toolbar's left: the Models menu.
-    const models = page.locator('.toolbar').getByRole('button', { name: 'Models', exact: true })
+    // The rail runs from the window's top, as VS Code's activity bar, the
+    // toolbar beside it; the folder (the Models menu) at its top, in the
+    // toolbar's row, above the panel's sections.
+    const rail = (await page.locator('.activity-rail').boundingBox())!
+    const toolbar = (await page.locator('.toolbar').boundingBox())!
+    expect(rail.y).toBe(0)
+    expect(toolbar.x).toBeGreaterThanOrEqual(rail.x + rail.width - 1)
+    const models = page.locator('.activity-rail').getByRole('button', { name: 'Models', exact: true })
+    const folder = (await models.boundingBox())!
+    expect(folder.y + folder.height).toBeLessThanOrEqual(toolbar.y + toolbar.height)
+    expect(folder.y + folder.height).toBeLessThanOrEqual((await page.getByRole('tab', { name: 'Views' }).boundingBox())!.y)
     // The model open, and where it is kept (the seeded model is in the browser).
     await expect(page.locator('.toolbar .app-brand-doc')).toHaveText('E2ELOCAL')
     await expect(page.locator('.toolbar .app-brand-doc')).toHaveAttribute('title', 'E2E: kept in this browser (local storage)')

@@ -303,7 +303,6 @@ body {
   border-radius: var(--radius-md);
   padding: 3px;
   gap: 2px;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.10);
 }
 .toolbar-mode-btn {
   display: inline-flex;
@@ -325,7 +324,6 @@ body {
 .toolbar-mode-btn.active {
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white), var(--accent));
   color: #fff;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, var(--shadow-sm);
 }
 
 /* ── Toolbar dropdown (snapshots) ─────────────────────────────────── */
@@ -1131,16 +1129,25 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   overflow: hidden;
 }
 
-/* ── Activity rail (as in VS Code): the left panel's sections at the top,
-   the app's actions at the foot, along the window's left edge ──────────── */
+/* ── Activity rail (as in VS Code): along the window's left edge from its
+   top, the app's models first, the left panel's sections, the app's
+   settings at the foot ──────────────────────────────────────────────── */
 .activity-rail {
   grid-area: rail;
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column;
   min-height: 0; width: 44px;
   border-right: 1px solid var(--border-color);
   background: color-mix(in srgb, var(--text-primary) 2.5%, var(--bg-panel));
-  position: relative; z-index: 7;
+  /* Over the toolbar (100), which its Models menu opens beside. */
+  position: relative; z-index: 101;
 }
+/* In the toolbar's row: the models, its line under them as under the toolbar. */
+.activity-rail-top {
+  display: flex; flex-direction: column; justify-content: center;
+  flex: 0 0 48px;
+  border-bottom: 1px solid var(--border-color);
+}
+.activity-rail-top:empty { display: none; }
 .lp-rail {
   display: flex; flex-direction: column; align-items: stretch;
   gap: 2px; padding: 8px 0;

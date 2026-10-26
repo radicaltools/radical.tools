@@ -163,16 +163,17 @@ function SectionIcon({ id }: { id: PanelSectionId }) {
 
 /** The left panel's open section, picked on the activity rail. */
 export const useLeftPanelSection = create<{ open: PanelSectionId }>()(() => ({ open: 'views' }))
-/** Where the app puts its own actions at the foot of the activity rail
- *  (Studio's models, metamodel, AI, export and settings). */
-export const useRailSlot = create<{ el: HTMLElement | null }>()(() => ({ el: null }))
+/** Where the app puts its own actions on the activity rail: at its top
+ *  (Studio's models, as VS Code's explorer) and at its foot (settings). */
+export const useRailSlot = create<{ el: HTMLElement | null; top: HTMLElement | null }>()(() => ({ el: null, top: null }))
 
-/** The activity rail along the window's left edge, as in VS Code: the left
- *  panel's sections at the top as tabs, each its icon and count, its name
- *  and what it holds on hover; the app's actions at the foot. A click on
- *  the open section folds the panel away and back, on another opens the
- *  panel on it. ↑/↓ move between the tabs. Without a left panel (the
- *  metamodel editor, the Inspector) it has the actions only. */
+/** The activity rail along the window's left edge, top to bottom, as in
+ *  VS Code: the app's models first, then the left panel's sections as tabs,
+ *  each its icon and count, its name and what it holds on hover; the app's
+ *  settings at the foot. A click on the open section folds the panel away
+ *  and back, on another opens the panel on it. ↑/↓ move between the tabs.
+ *  Without a left panel (the metamodel editor, the Inspector) it has the
+ *  models and the settings only. */
 export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }: {
   sections: boolean
   collapsed?: boolean
@@ -206,8 +207,10 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }:
     e.currentTarget.querySelector<HTMLElement>(`#lp-tab-${next.id}`)?.focus()
   }
   const slot = useCallback((el: HTMLDivElement | null) => { useRailSlot.setState({ el }) }, [])
+  const topSlot = useCallback((top: HTMLDivElement | null) => { useRailSlot.setState({ top }) }, [])
   return (
     <nav className="activity-rail" aria-label="Activity bar">
+      <div className="activity-rail-top" ref={topSlot} />
       {sections && (
         <div className="lp-rail" role="tablist" aria-orientation="vertical" aria-label="Panel sections" onKeyDown={onKeyDown}>
           {tabs.map((x) => {
