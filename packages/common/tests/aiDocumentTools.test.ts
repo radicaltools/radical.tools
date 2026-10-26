@@ -403,6 +403,43 @@ describe('milestone tools', () => {
     expect(facade.getMilestones!().map((m) => m.id)).toEqual([asIs])
   })
 
+  // F-0104: a slide of a milestone shows the views as the milestone has
+  // them, and they were judged by the live ones: its own list of a view
+  // ("not in view") and a view of an element deleted since ("unknown viewId").
+  it('let a slide of a milestone show and focus on what the milestone\'s views draw', async () => {
+    const { facade, call, ctx } = setup()
+    await call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    await call('add_node', { tempId: 'fraud', type: 'system', label: 'Fraud' })
+    await call('create_view', { tempId: 'core', name: 'Core', nodeIds: ['shop', 'fraud'] })
+    await call('create_milestone', { name: 'As-is' })
+    const asIs = facade.getMilestones!()[0].id
+    await call('delete_node', { id: 'fraud' })
+    const [core, fraud] = [ctx.resolveId('core'), ctx.resolveId('fraud')]
+    const made = await call('create_presentation', { name: 'Deck', slides: [{ name: 'Then', viewId: core, milestone: asIs, focus: [fraud] }] })
+    expect(made.ok, made.resultText).toBe(true)
+    // On the live model the view no longer draws it.
+    expect((await call('create_presentation', { name: 'Now', slides: [{ name: 'Now', viewId: core, focus: [fraud] }] })).ok).toBe(false)
+  })
+
+  it('let a slide of a milestone show a view of an element deleted since, which the milestone has alone', async () => {
+    const el = (id: string, label: string, parentId?: string): C4Node => ({ id, type: 'system', label, x: 0, y: 0, width: 200, height: 100, ...(parentId ? { parentId } : {}) } as C4Node)
+    const facade = createModelFacade({
+      nodes: [el('shop', 'Shop')], relations: [], metamodel: builtInGovernanceMetamodel(),
+      snapshots: [{ id: 'm', name: 'M', timestamp: 0, nodes: { shop: el('shop', 'Shop'), sm: el('sm', 'Lifecycle'), s1: el('s1', 'Pending', 'sm') }, relations: {},
+        views: { pl: { id: 'pl', name: 'Payment lifecycle', subject: 'sm', nodeIds: ['sm', 's1'], positions: {} } } }],
+    })
+    const ctx: ToolRunContext = { diagram: facade, resolveId: (id) => id, registerTempId: () => {}, resetTempIds: () => {}, placeNext: () => ({ x: 0, y: 0 }) }
+    const call = (name: string, input: unknown) => runTool(name, input, ctx)
+    const slide = await call('create_presentation', { name: 'Flows', slides: [{ name: 'Lifecycle', viewId: 'pl', milestone: 'm', focus: ['s1'] }] })
+    expect(slide.ok, slide.resultText).toBe(true)
+    // Studio's slide of it: a new focus on it is checked against that view.
+    const flows = facade.getPresentations!()[0]
+    const kept = await call('update_presentation', { id: flows.id, slides: [{ id: flows.slides[0].id, name: 'Lifecycle', focus: ['sm'] }] })
+    expect(kept.ok, kept.resultText).toBe(true)
+    // The live model has no such view.
+    expect((await call('create_presentation', { name: 'Live', slides: [{ name: 'Lifecycle', viewId: 'pl' }] })).resultText).toContain('unknown viewId')
+  })
+
   it('refuse to read the current model while Studio has a milestone loaded over it', async () => {
     const { facade, call, ctx } = setup()
     await call('add_node', { tempId: 'a', type: 'system', label: 'A' })

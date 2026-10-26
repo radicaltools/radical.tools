@@ -64,8 +64,9 @@ describe('An element deleted from the live model since a milestone', () => {
     s().setActiveView('core')
     s().selectMilestone(early)
     expect(drawn()).toContain('api')
-    // The milestone keeps the view's list, not its places.
-    expect(s().saveDiagram().snapshots![0].views!.core.positions).toEqual({})
+    // The milestone keeps the view's list, and nothing else of it: its
+    // places and the rest of its layout are the live view's.
+    expect(Object.keys(s().saveDiagram().snapshots![0].views!.core).sort()).toEqual(['empty', 'id', 'nodeIds'])
   })
 
   it('Undo of the delete leaves the milestone as it was', () => {
@@ -105,6 +106,90 @@ describe('An element deleted from the live model since a milestone', () => {
     s().discardMilestoneChanges()
     expect(s().c4Nodes.web).toBeUndefined()
     expect(s().views.core.nodeIds).not.toContain('web')
+  })
+
+  it('Restore to live of the milestone puts it back on the views that listed it (F-0090)', () => {
+    s().removeNode('api')
+    // And takes off them what it does not hold.
+    const added = s().addNode({ type: 'system', label: 'New', x: 1600, y: 600, collapsed: false, ...NODE_SIZES.system } as Omit<C4Node, 'id'>)
+    expect(s().views.core.nodeIds).toContain(added)
+    // A view the milestone shows as the live model has it, with a fold.
+    s().setActiveView('all')
+    s().toggleCollapse('shop')
+    expect(s().views.all.collapsedNodeIds).toContain('shop')
+    s().setActiveView('core')
+    s().selectMilestone(early)
+    expect(drawn()).toContain('api')
+    s().restoreSnapshot(early)
+    expect(s().activeSnapshotId).toBeNull()
+    expect(s().c4Nodes.api).toBeDefined()
+    expect(s().views.core.nodeIds).toContain('api')
+    expect(drawn()).toContain('api')
+    expect(s().saveDiagram().views!.find((v) => v.id === 'core')!.nodeIds).toContain('api')
+    expect(s().views.core.nodeIds).not.toContain(added)
+    // The milestone and the live model have one list again: a live edit of
+    // it reaches the milestone.
+    s().removeNodeFromView('core', 'web')
+    s().selectMilestone(early)
+    expect(drawn()).not.toContain('web')
+  })
+})
+
+describe('The view a milestone keeps its own list of has the live view\'s layout (F-0089, F-0091)', () => {
+  // A milestone that holds an element the live model deleted keeps the
+  // view's list of elements, and only that: the view's folds, line style,
+  // alignments and filter are the live view's for every milestone. Its copy
+  // of the whole view froze them at the delete, and Propagate wrote the
+  // copy's whole list and folds over the live view.
+  const addInto = (label: string, parentId?: string): string =>
+    s().addNode({ type: parentId ? 'container' : 'system', label, x: parentId ? 920 : 1600, y: parentId ? 120 : 600, collapsed: false, ...(parentId ? { parentId } : {}), ...(NODE_SIZES as Record<string, { width: number; height: number }>)[parentId ? 'container' : 'system'] } as Omit<C4Node, 'id'>)
+  let later = ''
+  beforeEach(() => {
+    later = s().createSnapshot('later')
+    s().removeNode('api')
+  })
+
+  it('a fold and the line style set on the live view after the delete show in every milestone that holds it', () => {
+    s().toggleCollapse('shop')
+    s().setViewEdgeStyle('core', 'orthogonal')
+    for (const m of [early, later]) {
+      s().selectMilestone(m)
+      expect(drawn()).toContain('api')
+      expect(s().views.core.collapsedNodeIds).toContain('shop')
+      expect(s().views.core.edgeStyle).toBe('orthogonal')
+      s().discardMilestoneChanges()
+    }
+  })
+
+  it('Propagate of a fold from the earlier milestone reaches the later one and the live view', () => {
+    s().selectMilestone(early)
+    s().toggleCollapse('shop')
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(s().views.core.collapsedNodeIds).toContain('shop')
+    s().selectMilestone(later)
+    expect(s().views.core.collapsedNodeIds).toContain('shop')
+    expect(s().views.core.nodeIds).toContain('api')
+  })
+
+  it('Propagate carries only the edit: the live view keeps what was added and folded on it, and does not list what it deleted', () => {
+    const added = addInto('New system')
+    addInto('Ledger', 'bank')
+    s().toggleCollapse('bank')
+    expect(s().views.core.nodeIds).toContain(added)
+    s().selectMilestone(early)
+    s().removeNodeFromView('core', 'web')
+    s().toggleCollapse('shop')
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(s().views.core.nodeIds).toContain(added)
+    expect(s().views.core.nodeIds).not.toContain('api')
+    expect(s().views.core.nodeIds).not.toContain('web')
+    expect(s().views.core.collapsedNodeIds).toEqual(expect.arrayContaining(['bank', 'shop']))
+    // The milestone draws its own list with the edit.
+    s().selectMilestone(early)
+    expect(drawn()).toContain('api')
+    expect(drawn()).not.toContain('web')
   })
 })
 
@@ -164,6 +249,36 @@ describe('A view of one element deleted from the live model since a milestone (F
     s().undo()
     expect(s().views[view.id].subject).toBe('api')
     expect(s().saveDiagram().views!.map((v) => v.id)).not.toContain(view.id)
+  })
+
+  it('a slide of it added in the milestone plays it from the live model too (F-0103)', () => {
+    const view = viewOf('api')!
+    s().setActiveView(view.id)
+    const drawnLive = drawn()
+    s().setActiveView(null)
+    s().removeNode('api')
+    s().selectMilestone(m)
+    s().setActiveView(view.id)
+    s().addPresentationSlide('Payments')
+    s().discardMilestoneChanges()
+    const slides = s().presentationSlides
+    expect(slides[slides.length - 1]).toMatchObject({ viewId: view.id, snapshotId: m })
+    s().startPresentation()
+    s().goToSlide(slides.length - 1)
+    expect(s().activeViewId).toBe(view.id)
+    expect(drawn()).toEqual(drawnLive)
+    s().stopPresentation()
+    expect(s().views[view.id]).toBeUndefined()
+    expect(s().saveDiagram().views!.map((v) => v.id)).not.toContain(view.id)
+  })
+
+  it('comes back with its element and its places on Restore to live (F-0090)', () => {
+    const view = viewOf('api')!
+    s().removeNode('api')
+    s().restoreSnapshot(m)
+    expect(viewOf('api')?.id).toBe(view.id)
+    expect(Object.keys(s().views[view.id].positions).sort()).toEqual(['api', 'c1'])
+    expect(s().saveDiagram().views!.map((v) => v.id)).toContain(view.id)
   })
 
   it('is in the milestone after a reload, with its places', () => {

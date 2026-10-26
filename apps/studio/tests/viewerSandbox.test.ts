@@ -320,6 +320,34 @@ describe('a slide added in Presenter while Designer shows a milestone', () => {
     store().discardMilestoneChanges()
     documents.deleteDocument(meta.id, { wipePayload: true })
   })
+
+  // A view of an element the live model deleted is the milestone's alone:
+  // the save a slide asks for wrote it with the live views.
+  it('saves none of the views the milestone has alone', async () => {
+    const store = useDiagramStore.getState
+    const el = (id: string, type: string, parentId?: string): C4Node => ({ id, type, label: id, x: 0, y: 0, width: 200, height: 120, collapsed: false, ...(parentId ? { parentId } : {}) } as C4Node)
+    store().loadDiagram({ nodes: [el('shop', 'system'), el('api', 'container', 'shop'), el('c1', 'component', 'api')], relations: [], views: [] })
+    const meta = documents.createLSDocument('own-view-on-milestone', store().saveDiagram())
+    documents.setActiveId(meta.id)
+    await new Promise((r) => setTimeout(r, 100))
+    store().setAppMode('designer')
+    const g = store().addView('Components')
+    store().applyViewpoint(g, 'container-components', null)
+    const view = Object.values(store().views).find((v) => v.partOf === g && v.subject === 'api')!
+    expect(view).toBeDefined()
+    const milestone = store().createSnapshot('Before')
+    store().removeNode('api')
+    store().selectMilestone(milestone)
+    expect(store().views[view.id]).toBeDefined()
+    store().setAppMode('presenter')
+    store().addPresentationSlide('On the milestone')
+    await ((window as any).__radicalFlushPersist as () => Promise<void>)()
+    expect((await documents.loadDocument(meta.id))!.views!.map((v) => v.id)).not.toContain(view.id)
+
+    store().setAppMode('designer')
+    store().discardMilestoneChanges()
+    documents.deleteDocument(meta.id, { wipePayload: true })
+  })
 })
 
 describe('a presentation played from Designer (F5)', () => {
