@@ -414,7 +414,7 @@ radical-mcp --version</code></pre>
           <table class="doc-table">
             <thead><tr><th>Group</th><th>Tools</th></tr></thead>
             <tbody>
-              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> (counts, views, sequences, milestones, the modelling rules and the metamodel rules) · <code>get_issues</code> · <code>search_model</code> (<code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>) · <code>get_selection</code> · <code>get_changes</code></td></tr>
+              <tr><td><strong>Read</strong></td><td><code>get_model_summary</code> (counts, views, sequences, milestones, the modelling rules and the metamodel rules) · <code>get_issues</code> · <code>search_model</code> (<code>FIND</code> with the words and prefixes of Quick Search, <code>LIST NODES WHERE …</code>, <code>GET NEIGHBORS</code>, <code>LIST SEQUENCES</code>) · <code>get_selection</code> · <code>get_changes</code></td></tr>
               <tr><td><strong>Elements &amp; relations</strong></td><td><code>add_node</code>, <code>update_node</code>, <code>delete_node</code>, <code>move_node</code> · <code>add_relation</code>, <code>update_relation</code>, <code>delete_relation</code></td></tr>
               <tr><td><strong>Views</strong></td><td><code>create_view</code>, <code>update_view</code>, <code>set_view_nodes</code>, <code>order_views</code>, <code>delete_view</code> · <code>smart_layout</code> · <code>align_nodes</code>, <code>grid_nodes</code>, <code>remove_alignment</code></td></tr>
               <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code> (a slide shows a view or zooms onto elements with <code>focus</code>, from the model or a milestone)</td></tr>
@@ -500,14 +500,34 @@ radical-mcp --version</code></pre>
         <p>File and folder paths open only in the desktop app; in the browser a folder is identified by its id, so its links work in the browser that opened it. The Hub uses <code>#/browse</code> for the catalogue and <code>#/c/&lt;conceptId&gt;/v/canvas|wiki|table</code> for one pack; <code>studio.radical.tools/?hub=id1,id2</code> opens Studio with those packs queued for import.</p>
       </section>
 
+      <section class="doc-section" id="search">
+        <h2>Search prefixes</h2>
+        <p>Quick Search (<kbd>⌘/Ctrl+P</kbd>), the find bar (<kbd>⌘/Ctrl+F</kbd>) and the query language's <code>FIND</code> read the same words. Every word must match, in any order, without case or accents.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Typed</th><th>Finds</th></tr></thead>
+            <tbody>
+              <tr><td><code>v:</code> <code>f:</code> <code>e:</code> <code>r:</code></td><td>Only views, view folders, elements, relations</td></tr>
+              <tr><td><code>s:</code> <code>p:</code> <code>m:</code></td><td>Only sequences, presentations and their slides, milestones</td></tr>
+              <tr><td><code>@</code></td><td>The elements and relations of the view shown</td></tr>
+              <tr><td><code>in:Name</code> · <code>in:"Two words"</code></td><td>The elements and relations of a view, by its name or the start of it</td></tr>
+              <tr><td><code>type:adr</code> · <code>t:container</code></td><td>Elements of a type, by its id or name</td></tr>
+              <tr><td><code>status:accepted</code></td><td>Elements whose property (by key or name) holds the value</td></tr>
+              <tr><td><code>&gt;</code> first</td><td>Commands, in Quick Search only</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="doc-section" id="shortcuts">
         <h2>Keyboard shortcuts</h2>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Keys</th><th>Action</th></tr></thead>
             <tbody>
-              <tr><td><kbd>⌘/Ctrl+P</kbd></td><td>Quick Search (and AI prompt)</td></tr>
-              <tr><td><kbd>Tab</kbd> / <kbd>⌘/Ctrl+Enter</kbd></td><td>In Quick Search: switch to AI mode / send to AI</td></tr>
+              <tr><td><kbd>⌘/Ctrl+P</kbd></td><td>Quick Search (and AI prompt); <kbd>&gt;</kbd> first lists the commands</td></tr>
+              <tr><td><kbd>Tab</kbd> / <kbd>⌘/Ctrl+Enter</kbd></td><td>In Quick Search: take the first suggestion, or on an empty box switch to AI mode / send to AI</td></tr>
+              <tr><td><kbd>⌘/Ctrl+F</kbd></td><td>Find in the view shown; <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> next / previous hit, <kbd>Esc</kbd> closes</td></tr>
               <tr><td><kbd>⌘/Ctrl+Z</kbd> · <kbd>⌘/Ctrl+⇧+Z</kbd></td><td>Undo · Redo (Designer)</td></tr>
               <tr><td>The special key: <kbd>Alt</kbd>/<kbd>⌥</kbd> (<em>Settings → Special key</em>)</td><td>Held with an element selected: mark where a relation from it, or nesting, can go</td></tr>
               <tr><td>Special key + drag from an element</td><td>Connect it (or the selected elements) to another, or nest them there, on a pill; to the empty canvas: take them out of their container (those the metamodel keeps there are named). One step for Undo; in Viewer and Presenter it only selects</td></tr>

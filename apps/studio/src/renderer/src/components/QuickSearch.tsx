@@ -327,7 +327,7 @@ export function QuickSearch(): React.ReactElement | null {
       const items: Item[] = list.slice(0, limit).map((hit) => ({ key: `${kind}:${hit.id}`, type: 'hit', hit }))
       if (list.length > limit && !narrowed) {
         const prefix = KIND_PREFIXES.find((p) => p.kinds.includes(kind))!.prefix
-        items.push({ key: `more:${kind}`, type: 'more', label: `Show all ${list.length} ${SECTION_TITLES[kind].toLowerCase()}`, query: `${prefix} ${q.trim()}` })
+        items.push({ key: `more:${kind}`, type: 'more', label: `List all ${list.length} ${SECTION_TITLES[kind].toLowerCase()}`, query: `${prefix} ${q.trim()}` })
       }
       if (kind === 'element' && list.length >= 2) items.push({ key: 'table', type: 'table', count: list.length })
       out.push({ id: kind, title: SECTION_TITLES[kind], count: list.length, items, best: scored(list[0]) })

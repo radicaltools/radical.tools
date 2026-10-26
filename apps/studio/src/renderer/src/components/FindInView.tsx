@@ -106,6 +106,9 @@ export function FindInView(): React.ReactElement | null {
     showOnPage(s.activeViewId, id)
     s.setSelectedNodeIds([id])
     s.selectNode(id)
+    // With Focus on, the canvas frames the selection itself, moving only
+    // when the hit is out of sight.
+    if (s.selectionFocus) return
     requestAnimationFrame(() => {
       const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
       focus?.(id, { zoom: 1.1, duration: 400 })
