@@ -146,6 +146,8 @@ export function filterForView(
     const kept = rolledUpLine.get(key)
     if (kept) {
       if (r.label) relations[kept] = { ...relations[kept], label: relations[kept].label ? `${relations[kept].label}\n${r.label}` : r.label }
+      // A technology only when they all use it (deriveRFEdges).
+      if (relations[kept].technology !== r.technology) relations[kept] = { ...relations[kept], technology: undefined }
       continue
     }
     rolledUpLine.set(key, id)

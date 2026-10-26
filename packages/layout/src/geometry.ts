@@ -851,6 +851,8 @@ export function projectToVisibleGraph(
     const kept = rolledUpLine.get(key)
     if (kept) {
       if (r.label) projected[kept] = { ...projected[kept], label: projected[kept].label ? `${projected[kept].label}\n${r.label}` : r.label }
+      // A technology only when they all use it (deriveRFEdges).
+      if (projected[kept].technology !== r.technology) projected[kept] = { ...projected[kept], technology: undefined }
       continue
     }
     rolledUpLine.set(key, id)

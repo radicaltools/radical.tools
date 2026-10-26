@@ -2665,6 +2665,9 @@ function deriveRFEdges(
     if (isVirtual && seen.has(key)) {
       const existing = rfEdges.find((e) => e.id === `virtual-${key}`)
       existing?.data?.relationIds?.push(rel.id)
+      // A technology only when they all use it: the first one's alone
+      // read as the whole line's.
+      if (existing?.data && existing.data.technology !== rel.technology) existing.data.technology = undefined
       const label = relationDisplayLabel(rel, nodes)
       if (existing && label) {
         const joined = existing.data?.label ? `${existing.data.label}\n${label}` : label
