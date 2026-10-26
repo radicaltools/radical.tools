@@ -202,6 +202,18 @@ describe('Tidy', () => {
     }
   })
 
+  it("leaves nothing for a second run on a state machine view of the repository's own model (F-0107)", { timeout: 120_000 }, () => {
+    // Tidied with Studio's budget, then again from what the first run handed
+    // over: the margin the loose events were gathered into opened moves the
+    // first run had taken back as a circle.
+    const f = viewFixture('tidy-forge-run-lifecycle.json')
+    const first = tidyView(f, f.nodes, [])
+    expect(first.result.tidy.steps.length).toBeGreaterThan(0)
+    const second = tidyView(f, first.laidOut, [])
+    expect(second.result.tidy.steps.map((s) => s.description)).toEqual([])
+    expect(second.result.keptCurrent).toBe(true)
+  })
+
   it('leaves nothing for a second or third run with a row, a column or a grid set on the view (F-0108)', { timeout: 240_000 }, () => {
     // The Studio view of the repository's own model, with a column of five
     // of Studio's components (the finding's), a row of three, a grid of four.
