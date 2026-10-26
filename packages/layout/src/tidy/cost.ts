@@ -74,12 +74,18 @@ export const W_KIN = 1.5
  *  diagram) exceeds the side they would need packed: empty room. It keeps pulling a diagram
  *  together after nothing crosses any more. */
 export const W_COMPACT = 3
+/** Per line that runs shorter, border to border, than its label and arrowheads need (half for
+ *  a hair short, a whole one when short by an arrowhead's room or more): a label squeezed between two elements, or an arrowhead hidden under one, reads as no
+ *  line at all (the author, 2026-10-26: "strzałki się nie mieszczą"). */
+export const W_CRAMPED = 8
+/** Room at each end of a line beyond its label: the arrowhead and a hair of line. */
+export const ARROW_ROOM = 18
 
 /** The weights, by the name of the part they weigh: what bench/tidy-calibrate.mts fits. */
 export const WEIGHTS = {
   crossings: W_CROSSING, overdraws: W_OVERDRAW, slanted: W_SLANT, length: W_LENGTH, imbalance: W_IMBALANCE, spread: W_SPREAD, misplaced: W_PLACE,
   againstFlow: W_AGAINST_FLOW, flat: W_FLAT, fans: W_FAN, brushes: W_BRUSH, offGrid: W_GRID, offConvention: W_CONVENTION, uneven: W_EVEN, labels: W_LABEL, bends: W_BEND,
-  nearMisses: W_NEAR, kinApart: W_KIN, loose: W_COMPACT,
+  nearMisses: W_NEAR, kinApart: W_KIN, loose: W_COMPACT, cramped: W_CRAMPED,
 }
 /** What each part is called where a person reads the report (Why this layout?). */
 export const PART_LABELS: Record<keyof typeof WEIGHTS, string> = {
@@ -87,7 +93,7 @@ export const PART_LABELS: Record<keyof typeof WEIGHTS, string> = {
   nearMisses: 'Almost in line', kinApart: 'Apart from their kind', offGrid: 'In no row or column', uneven: 'Uneven spacing',
   spread: 'Too far or too near', imbalance: 'Off-centre', misplaced: 'Out of place', againstFlow: 'Against the flow',
   flat: 'Across the reading way', fans: 'Bunched lines', brushes: 'Lines brushing elements', offConvention: 'Off convention',
-  labels: 'Labels over things', bends: 'Bends',
+  labels: 'Labels over things', bends: 'Bends', cramped: 'Lines too short for their labels',
 }
 
 /** The parts as a person reads them: each with its value before and after and its share of the
@@ -129,6 +135,20 @@ function pathMiddle(path: Pt[]): Pt {
     rest -= seg
   }
   return path[path.length - 1]
+}
+
+/** How long a line has to run between `dx`, `dy` apart ends for its label (as wide as it
+ *  reaches along the line) and an arrowhead at each end to show. */
+export function lineNeeds(label: LabelSize | undefined, dx: number, dy: number): number {
+  const len = Math.hypot(dx, dy) || 1
+  return (label ? Math.abs(dx / len) * label.w + Math.abs(dy / len) * label.h : 0) + 2 * ARROW_ROOM
+}
+
+/** The length of a drawn path. */
+function pathLength(path: Pt[]): number {
+  let total = 0
+  for (let i = 1; i < path.length; i++) total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y)
+  return total
 }
 
 /** Whether a label's box lies over element `id` as the canvas's label
@@ -285,7 +305,7 @@ function imbalance(l: Layout, id: string, lines: Line[]): number {
 export interface CostParts {
   crossings: number; overdraws: number; slanted: number; length: number; imbalance: number; spread: number; misplaced: number
   againstFlow: number; flat: number; fans: number; brushes: number; offGrid: number; offConvention: number; uneven: number; labels: number; bends: number
-  nearMisses: number; kinApart: number; loose: number
+  nearMisses: number; kinApart: number; loose: number; cramped: number
   total: number
 }
 
@@ -638,7 +658,7 @@ class Grid<T> {
 }
 
 function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: ReadonlySet<string> | undefined, index: CostIndex, given?: ReadonlySet<string>, boxes?: ReadonlySet<string>): CostParts {
-  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, bends: 0, nearMisses: 0, kinApart: 0, loose: 0, total: 0 }
+  const parts: CostParts = { crossings: 0, overdraws: 0, slanted: 0, length: 0, imbalance: 0, spread: 0, misplaced: 0, againstFlow: 0, flat: 0, fans: 0, brushes: 0, offGrid: 0, offConvention: 0, uneven: 0, labels: 0, bends: 0, nearMisses: 0, kinApart: 0, loose: 0, cramped: 0, total: 0 }
   const brush = BRUSH * l.meanSize
   const mineSet = new Set(mine)
   // Every line's ends and box (cached while its ends stand), and a coarse
@@ -685,7 +705,12 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
     if (!isStraight(index, p)) parts.slanted += e.fan ? 0.5 : 1
     if (againstFlow(l, p)) parts.againstFlow++
     if (flat(l, p)) parts.flat++
-    parts.length += Math.max(0, Math.hypot(e.ax - e.bx, e.ay - e.by) - l.gapOf(l.parentOf(p.a)) - COMFORT * l.meanSize) / l.meanSize
+    // A line needs room for its label and arrowheads; past that, and past
+    // the comfortable distance, every bit of it costs.
+    const needs = lineNeeds(p.label, e.bx - e.ax, e.by - e.ay)
+    const short = needs - pathLength(e.path)
+    if (short > 1) parts.cramped += 0.5 + 0.5 * Math.min(1, short / ARROW_ROOM)
+    parts.length += Math.max(0, Math.hypot(e.ax - e.bx, e.ay - e.by) - Math.max(needs, l.gapOf(l.parentOf(p.a)) + COMFORT * l.meanSize)) / l.meanSize
   }
   // Lines of others, and their labels, drawn over the moved elements and
   // over every other box the move changed (satellites slid along, frames

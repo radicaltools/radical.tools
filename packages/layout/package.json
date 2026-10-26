@@ -8,6 +8,7 @@
     "./smartLayout": "./src/smartLayout.ts",
     "./elkLayout": "./src/elkLayout.ts",
     "./radicalLayout": "./src/radicalLayout.ts",
+    "./layoutFinalize": "./src/layoutFinalize.ts",
     "./crossingOpt": "./src/crossingOpt.ts",
     "./geometry": "./src/geometry.ts",
     "./portAllocator": "./src/portAllocator.ts",

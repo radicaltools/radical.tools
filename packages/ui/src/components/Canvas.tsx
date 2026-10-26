@@ -1623,6 +1623,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         ...size,
       } as Omit<C4Node, 'id'>, {
         skipWizard,
+        dropped: true,
         onCreated: (id) => {
           const now = useDiagramStore.getState()
           const shown = viewShownNodes(now.activeViewId ? now.views[now.activeViewId] : undefined, now.c4Nodes, now.c4Relations)

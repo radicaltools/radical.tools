@@ -148,6 +148,7 @@ export function buildViewToolDefs(): ToolDef[] {
       inputSchema: {
         type: 'object',
         properties: {
+          continuousLayout: { type: 'boolean', description: 'Static views: when true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place. Off by default.' },
           edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           tempId: { type: 'string' },
@@ -169,10 +170,11 @@ export function buildViewToolDefs(): ToolDef[] {
     },
     {
       name: 'update_view',
-      description: "Rename a view, move it into a folder of the list of views, change its kind, line style or linked sequence, set which relations it hides, show elements open or folded in it, or set its filter chain (pipeline), or make it one of the metamodel's viewpoints (viewpoint). Use set_view_nodes to change its nodes; [] there makes the chain work among every element.",
+      description: "Rename a view, move it into a folder of the list of views, change its kind, line style, continuous layout or linked sequence, set which relations it hides, show elements open or folded in it, or set its filter chain (pipeline), or make it one of the metamodel's viewpoints (viewpoint). Use set_view_nodes to change its nodes; [] there makes the chain work among every element.",
       inputSchema: {
         type: 'object',
         properties: {
+          continuousLayout: { type: 'boolean', description: 'Static views: when true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place. Off by default.' },
           edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           id: { type: 'string' },
@@ -250,10 +252,11 @@ export function buildViewToolDefs(): ToolDef[] {
 export function buildViewToolHandlers(): Record<string, ToolHandler> {
   return {
     create_view: (rawInput, ctx) => {
-      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown; pipeline?: unknown; viewpoint?: unknown }
+      const input = rawInput as { tempId?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; nodeIds?: unknown; active?: unknown; folder?: unknown; edgeStyle?: unknown; continuousLayout?: unknown; pipeline?: unknown; viewpoint?: unknown }
       if (typeof input.tempId !== 'string' || !input.tempId) return fail('create_view: tempId is required')
       if (typeof input.name !== 'string' || !input.name.trim()) return fail('create_view: name is required')
       const name = input.name.trim()
+      if (input.continuousLayout !== undefined && typeof input.continuousLayout !== 'boolean') return fail('create_view: continuousLayout must be true or false')
       if (!ctx.diagram.addView || !ctx.diagram.setViewNodes) return fail('create_view: views are not editable in this context')
 
       const sequence = input.kind === 'dynamic' ? sequenceFor(ctx, 'create_view', input.sequenceId) : undefined
@@ -286,6 +289,10 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.setViewEdgeStyle) return fail('create_view: line styles are not available in this context')
         ctx.diagram.setViewEdgeStyle(realId, input.edgeStyle)
       }
+      if (input.continuousLayout === true) {
+        if (!ctx.diagram.setViewContinuousLayout) return fail('create_view: continuous layout is not available in this context')
+        ctx.diagram.setViewContinuousLayout(realId, true)
+      }
       if (typeof input.folder === 'string' && input.folder.trim()) {
         if (!ctx.diagram.setViewFolder) return fail('create_view: folders of views are not available in this context')
         ctx.diagram.setViewFolder(realId, input.folder)
@@ -304,7 +311,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
     },
 
     update_view: (rawInput, ctx) => {
-      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown; edgeStyle?: unknown; pipeline?: unknown; viewpoint?: unknown }
+      const input = rawInput as { id?: unknown; name?: unknown; kind?: unknown; sequenceId?: unknown; hiddenRelationIds?: unknown; expand?: unknown; collapse?: unknown; folder?: unknown; edgeStyle?: unknown; continuousLayout?: unknown; pipeline?: unknown; viewpoint?: unknown }
       if (typeof input.id !== 'string' || !input.id) return fail('update_view: id is required')
       if (!ctx.diagram.getViews) return fail('update_view: views are not editable in this context')
       const vId = ctx.resolveId(input.id)
@@ -337,6 +344,12 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.setViewEdgeStyle) return fail('update_view: line styles are not available in this context')
         const style = input.edgeStyle === 'model' ? null : input.edgeStyle
         changes.push(() => ctx.diagram.setViewEdgeStyle!(vId, style))
+      }
+      if (input.continuousLayout !== undefined) {
+        if (typeof input.continuousLayout !== 'boolean') return fail('update_view: continuousLayout must be true or false')
+        if (!ctx.diagram.setViewContinuousLayout) return fail('update_view: continuous layout is not available in this context')
+        const on = input.continuousLayout
+        changes.push(() => ctx.diagram.setViewContinuousLayout!(vId, on))
       }
       if (input.folder !== undefined) {
         if (typeof input.folder !== 'string') return fail('update_view: folder must be a string ("" for none)')

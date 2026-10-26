@@ -513,6 +513,12 @@
     "targetId": "5690ed24-c7bf-4068-9ec5-ba9d1b19c537"
   },
   {
+    "id": "07eef5f4-7ad2-495b-8367-c838329baf3a",
+    "relationType": "derives",
+    "sourceId": "9f1013dd-241c-4880-a938-d18ef939fe2e",
+    "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
     "id": "07f93b1a-37c4-4976-a261-69d6caaa6638",
     "label": "browses concepts in",
     "relationType": "interacts",
@@ -4866,6 +4872,12 @@
     "targetId": "03c244db-af29-4d29-ba90-2cb2f18158dd"
   },
   {
+    "id": "4c5d344e-ccb6-403c-8952-aa02e8dc0360",
+    "relationType": "verifies",
+    "sourceId": "02cffbc6-642e-4baa-bce7-6cd72653c212",
+    "targetId": "9f1013dd-241c-4880-a938-d18ef939fe2e"
+  },
+  {
     "id": "4c9041a7-fb8e-46eb-a1a2-c8a4b0df0417",
     "relationType": "derives",
     "sourceId": "40f6c0ad-e841-4535-94a9-b039ccb174fc",
@@ -6295,6 +6307,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "dfd3d90a-48d7-401b-9279-2ba37d3e1380"
+  },
+  {
+    "id": "63708e73-ee32-4855-9a08-2ffcc7baeb33",
+    "relationType": "implements",
+    "sourceId": "b70815d1-520c-412c-937c-e9d6bd8178ea",
+    "targetId": "e1954496-428a-43d0-8d70-a2519bcd1dd8"
   },
   {
     "id": "63c17d0a-52a2-4cee-a2a0-dadd8ae609da",
@@ -13645,6 +13663,12 @@
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
     "targetId": "22418a18-7acd-45b7-a7de-790d90cda253"
+  },
+  {
+    "id": "d3c262e8-ebf4-4d79-9633-58b64c8b754b",
+    "relationType": "satisfies",
+    "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+    "targetId": "9f1013dd-241c-4880-a938-d18ef939fe2e"
   },
   {
     "id": "d3d3a7a8-5cc2-4e75-9bce-b36c5f25941a",

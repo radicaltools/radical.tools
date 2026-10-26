@@ -1463,6 +1463,14 @@ export function setViewEdgeStyle(state: ModelState, viewId: string, style: EdgeS
   else delete view.edgeStyle
 }
 
+/** Whether Studio keeps a view tidied after each change; off leaves no key. */
+export function setViewContinuousLayout(state: ModelState, viewId: string, on: boolean): void {
+  const view = state.views[viewId]
+  if (!view) return
+  if (on) view.continuousLayout = true
+  else delete view.continuousLayout
+}
+
 /** A view's pipeline (viewPipeline.ts); one with no step is removed. */
 export function setViewPipeline(state: ModelState, viewId: string, raw: ViewPipeline): void {
   const view = state.views[viewId]

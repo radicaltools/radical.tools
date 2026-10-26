@@ -279,6 +279,23 @@ describe('folder-backed MCP model', () => {
   })
 })
 
+describe('continuous layout', () => {
+  it('create_view and update_view set it on a view, saved in the folder and told in the summary', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const saved = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views ?? []
+    expect((await model.call('create_view', { tempId: 'v', name: 'Growing', continuousLayout: true })).ok).toBe(true)
+    expect((await model.call('create_view', { tempId: 'w', name: 'Drawn by hand' })).ok).toBe(true)
+    expect((await saved()).map((v) => [v.name, v.continuousLayout])).toEqual([['Growing', true], ['Drawn by hand', undefined]])
+    const summary = JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
+    expect(summary.views.find((v: { name: string }) => v.name === 'Growing').continuousLayout).toBe(true)
+    const id = (await saved()).find((v) => v.name === 'Growing')!.id
+    expect((await model.call('update_view', { id, continuousLayout: false })).ok).toBe(true)
+    expect((await saved()).find((v) => v.id === id)!.continuousLayout).toBeUndefined()
+    expect((await model.call('update_view', { id, continuousLayout: 'yes' })).text).toContain('continuousLayout must be true or false')
+  })
+})
+
 describe('canvas selection', () => {
   it('returns what Studio selected, resolved against the model, and is not a model change', async () => {
     const folder = await fixture()

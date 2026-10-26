@@ -227,6 +227,12 @@ export interface DiagramView {
    */
   layoutMode?: 'auto' | 'ensemble' | 'tree'
   /**
+   * Continuous layout: Studio tidies the whole view (Tidy, pins kept) after
+   * each change to what it shows, the user's or an agent's, and glides the
+   * elements to their new places. Off when absent.
+   */
+  continuousLayout?: boolean
+  /**
    * Treemap-only: id of the node currently used as the drill-down root.
    * `null`/`undefined` = top of the hierarchy ("All").
    * Persisted so reopening the view restores the user's location.
