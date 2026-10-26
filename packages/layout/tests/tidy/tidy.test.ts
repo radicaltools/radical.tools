@@ -171,8 +171,36 @@ describe('Tidy', () => {
           seen.add(key())
         }
       }
-      expect(again.tidy.steps.length, f).toBeLessThanOrEqual(2)
+      expect(again.tidy.steps.length, f).toBe(0)
     }
+  })
+
+  it('leaves nothing for a second run: every blueprint tidied twice', { timeout: 120_000 }, () => {
+    // All of a blueprint's elements on one canvas, as a view listing them
+    // all shows them: tidied, then tidied again from the result.
+    for (const f of readdirSync(join(benchDir, 'blueprint')).filter((f) => f.endsWith('.radical')).sort()) {
+      const d = load(join(benchDir, 'blueprint', f))
+      const visible = projectToVisibleGraph(byId(d.nodes), byId(d.relations))
+      const first = runTidyLayout(visible.nodes, visible.relations)
+      const laidOut: Record<string, C4Node> = {}
+      for (const [id, n] of Object.entries(visible.nodes)) laidOut[id] = { ...n, ...(first.winner.positions[id] ?? {}) }
+      const again = runTidyLayout(laidOut, visible.relations)
+      expect(again.tidy.steps.map((s) => s.description), f).toEqual([])
+      expect(again.keptCurrent, f).toBe(true)
+    }
+  })
+
+  it('continues a large tangled view where the last run stopped', { timeout: 120_000 }, () => {
+    // Too tangled to read well even when tidied: the first run sketches it
+    // and is cut short; the second starts from that, not from a new sketch.
+    const { nodes, relations } = tangledModel(150)
+    const first = runTidyLayout(nodes, relations, { budgetMs: 1000 })
+    expect(first.tidy.steps[0]?.kind).toBe('rough')
+    const laidOut: Record<string, C4Node> = {}
+    for (const [id, n] of Object.entries(nodes)) laidOut[id] = { ...n, ...(first.winner.positions[id] ?? {}) }
+    const again = runTidyLayout(laidOut, relations, { budgetMs: 1000 })
+    expect(again.tidy.steps[0]?.kind).not.toBe('rough')
+    expect(again.tidy.after.total).toBeLessThan(first.tidy.after.total - 1)
   })
 
   it('stops when nothing is left to do', () => {
@@ -193,6 +221,22 @@ function node(id: string, type: string, parentId: string | undefined, x: number,
   const size: Record<string, [number, number]> = { system: [360, 260], person: [150, 170], database: [190, 130], container: [240, 160], adr: [180, 52] }
   const [width, height] = size[type] ?? [200, 100]
   return { id, type: type as C4Node['type'], label: id, collapsed: false, x, y, width, height, ...(parentId ? { parentId } : {}) }
+}
+
+/** `n` elements in a grid, each related to three others picked at random (always the same):
+ *  more crossings than any layout can take out. */
+function tangledModel(n: number): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+  const nodes: C4Node[] = [], relations: C4Relation[] = []
+  let seed = 7
+  const pick = (): number => { seed = (seed * 16807) % 2147483647; return seed % n }
+  for (let i = 0; i < n; i++) nodes.push(node(`e${i}`, 'container', undefined, (i % 15) * 300, Math.floor(i / 15) * 220))
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 3; k++) {
+      const j = pick()
+      if (j !== i) relations.push({ id: `r${i}-${k}`, sourceId: `e${i}`, targetId: `e${j}`, relationType: 'interacts' })
+    }
+  }
+  return { nodes: byId(nodes), relations: byId(relations) }
 }
 
 /** `n` elements piled up: systems with containers and databases, people, ADRs, a chain of relations. */

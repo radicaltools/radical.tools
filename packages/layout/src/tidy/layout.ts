@@ -11,6 +11,17 @@ import { CHILD_GAP, ROOT_GAP } from '../layoutFinalize'
 
 export interface Box { x: number; y: number; w: number; h: number; cx: number; cy: number }
 
+/** Boxes stand on a grid this fine (a power of two): sums and differences of
+ *  coordinates are then exact, so the same diagram moved elsewhere on the
+ *  canvas (Smart Layout hands it over from the top left) is judged exactly
+ *  as it was, and a second run finds what the first left, not rounding. */
+const QUANTUM = 1 / 1024
+const snap = (v: number): number => Math.round(v / QUANTUM) * QUANTUM
+const snapped = (b: Box): Box => {
+  const x = snap(b.x), y = snap(b.y), w = snap(b.w), h = snap(b.h)
+  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 }
+}
+
 export class Layout {
   private boxes = new Map<string, Box>()
   private children = new Map<string, string[]>()
@@ -41,7 +52,7 @@ export class Layout {
       if (got) return got
       const n = nodes[id]
       const p = n.parentId && nodes[n.parentId] ? of(n.parentId) : { x: 0, y: 0 }
-      const at = { x: p.x + n.x, y: p.y + n.y }
+      const at = { x: snap(p.x + n.x), y: snap(p.y + n.y) }
       abs.set(id, at)
       return at
     }
@@ -50,7 +61,7 @@ export class Layout {
       const n = nodes[id]
       if (n.parentId && nodes[n.parentId]) this.children.set(n.parentId, [...(this.children.get(n.parentId) ?? []), id])
       const { x, y } = of(id)
-      const w = effectiveWidth(n), h = effectiveHeight(n)
+      const w = snap(effectiveWidth(n)), h = snap(effectiveHeight(n))
       this.boxes.set(id, { x, y, w, h, cx: x + w / 2, cy: y + h / 2 })
     }
     for (const id of this.boxes.keys()) if (!this.children.has(id)) { const b = this.boxes.get(id)!; size += (b.w + b.h) / 2; leaves++ }
@@ -136,7 +147,7 @@ export class Layout {
   }
   private set(id: string, b: Box): void {
     if (this.journal && !this.journal.has(id)) this.journal.set(id, this.boxes.get(id)!)
-    this.boxes.set(id, b)
+    this.boxes.set(id, snapped(b))
   }
 
   /** Changes from here on are noted, so a tried move can be taken back by what it changed alone. */
@@ -154,6 +165,7 @@ export class Layout {
 
   /** `id` and what it holds moved by (dx, dy); its frames refitted. */
   moveBy(id: string, dx: number, dy: number): void {
+    dx = snap(dx); dy = snap(dy)
     for (const x of [id, ...this.descendants(id)]) {
       const b = this.boxes.get(x)!
       this.set(x, { ...b, x: b.x + dx, y: b.y + dy, cx: b.cx + dx, cy: b.cy + dy })
