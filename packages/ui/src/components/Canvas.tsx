@@ -336,6 +336,9 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // because someone is browsing or presenting it.
   const isViewMode = appMode !== 'designer'
   const presentationActive = useDiagramStore((s) => s.presentationActive)
+  // A presentation offers no Discuss menu: one open when it started stayed
+  // over the slide and kept the arrows and Space from it (F-0087).
+  useEffect(() => { if (presentationActive) setDiscussionMenu(null) }, [presentationActive])
   const autoFitActive = useDiagramStore((s) => s.autoFitActive)
 
   const rfNodes = useDiagramStore((s) => s.rfNodes)
@@ -2004,7 +2007,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       <RelationTypeMenu containerRef={containerRef} />
       <ExploreMenu containerRef={containerRef} />
-      {discussionMenu && onDiscuss && createPortal(
+      {discussionMenu && onDiscuss && !presentationActive && createPortal(
         <div ref={discussionMenuRef} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDiscussionMenu(null) }}
           onKeyDown={(event) => {

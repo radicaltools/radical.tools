@@ -188,3 +188,24 @@ test('unsafe Markdown stays inert and the composer and ancestry work with the ke
   await expect(panel).toHaveCount(0)
   await expect(studio.node('customer')).toBeFocused()
 })
+
+// F5 with the Discuss menu open started the presentation with the menu over
+// the slide, holding the keys: → did not move on and Space pressed Discuss
+// (F-0087). A presentation offers no Discuss menu.
+test('F5 with the Discuss menu open presents without it, and the keys move the slides', async ({ page, studio }) => {
+  await studio.node('payments').focus()
+  await page.keyboard.press('Shift+F10')
+  const discuss = page.getByRole('menuitem', { name: 'Discuss', exact: true })
+  await expect(discuss).toBeFocused()
+  await page.keyboard.press('F5')
+  await expect(page.locator('.pres-hud')).toContainText('1 / 2')
+  await expect(discuss).toHaveCount(0)
+  await page.keyboard.press('ArrowRight')
+  await expect(page.locator('.pres-hud')).toContainText('2 / 2')
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('Space')
+  await expect(page.locator('.pres-hud')).toContainText('2 / 2')
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.pres-hud')).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: 'Payment Provider', exact: true })).toHaveCount(0)
+})

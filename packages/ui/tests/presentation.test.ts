@@ -157,6 +157,21 @@ describe('Present with an element selected', () => {
   })
 })
 
+// F-0087: what was open over the canvas stayed over the slide, holding the
+// keys the presentation needs.
+describe('Present with a menu open over the canvas', () => {
+  it('closes the relation type asked for and the Explore menu, adding nothing', () => {
+    useDiagramStore.getState().addPresentationSlide('a')
+    const relations = Object.keys(useDiagramStore.getState().c4Relations).length
+    useDiagramStore.setState({ relationTypeChoice: { sourceId: 'sys1', targetId: 'ctn1', types: ['uses', 'depends-on'] }, exploreMenuFor: 'sys1' } as any)
+    useDiagramStore.getState().startPresentation()
+    const s = useDiagramStore.getState()
+    expect(s.relationTypeChoice).toBeNull()
+    expect(s.exploreMenuFor).toBeNull()
+    expect(Object.keys(s.c4Relations)).toHaveLength(relations)
+  })
+})
+
 describe('Present and Esc with a milestone\'s diff on', () => {
   // The slides' diff replaced the milestone's, and Esc cleared it: the
   // toggle said on and drew nothing, off and on again too.

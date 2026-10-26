@@ -8526,6 +8526,10 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           state.presentationActive = true
           showSelection(state as DiagramStore, [], null)
+          // Nor what was open over the canvas: a relation's type asked for,
+          // an element's Explore menu.
+          state.relationTypeChoice = null
+          state.exploreMenuFor = null
         })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
         // flips off before the user can grab anything (rfNodes carry
