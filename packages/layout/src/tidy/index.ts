@@ -412,7 +412,16 @@ export function runTidyLayout(
   // from earlier rounds: what is left now, a second run would find.
   stale = null
   improve()
-  gather()
+  // The loose elements to the margin the diagram has now; that opens moves
+  // of its own (a row with one of them), which a second run would take, so
+  // they are taken now, as long as the margin keeps moving.
+  for (let round = 0; round < 3; round++) {
+    const done = steps.length
+    gather()
+    if (steps.length === done || outOfTime()) break
+    stale = null
+    improve()
+  }
   checkpoint()
   if (totalCost(l, lines).total > best.cost + 0.01) {
     l.setPositions(best.positions)
