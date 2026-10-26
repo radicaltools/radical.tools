@@ -10,6 +10,7 @@ import ReactFlow, {
   NodeDragHandler,
   SelectionDragHandler,
   ReactFlowInstance,
+  useStore,
   useStoreApi,
   useUpdateNodeInternals,
   getNodesBounds,
@@ -191,31 +192,37 @@ function connectTarget(n: RFNode, label: string): RFNode {
 // the relation's type ("uses"), "inside", or "holds" on the container the
 // element stands in. A drop on a pill makes that relation or nests it there
 // (the canvas's mouseup reads data-connect-target and data-connect-type).
-// Rendered into the element's own node, they move and zoom with it, at the
-// same size on screen at any zoom (--canvas-unzoom).
+// Rendered into the canvas's viewport over the element, they move and zoom
+// with it, at the same size on screen at any zoom (--canvas-unzoom), and lie
+// over every line: rendered into the element's own node, a line raised
+// above it (one to the selected element, rolled up to a folded container)
+// lay over its pills and took the drop, which then did nothing.
 function ConnectPills({ containerRef, targets, nameOf }: {
   containerRef: React.RefObject<HTMLDivElement>
   targets: Map<string, Array<{ type: string; text: string }>>
   nameOf: (id: string) => string
 }): React.ReactElement | null {
-  const container = containerRef.current
-  if (!container) return null
-  return (
+  const nodeInternals = useStore((s) => s.nodeInternals)
+  const viewport = containerRef.current?.querySelector('.react-flow__viewport')
+  if (!viewport) return null
+  return createPortal(
     <>
       {[...targets].map(([id, types]) => {
-        const node = container.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)
-        if (!node) return null
-        return createPortal(
-          <div className="connect-pills" role="group" aria-label={`Drop on ${nameOf(id)}`} data-connect-over={id}>
-            {types.map((t) => t.type === NEST_HOLDS
-              ? <span key={t.type} className="connect-pill holds">{t.text}</span>
-              : <span key={t.type || 'relation'} className="connect-pill" data-connect-target={id} data-connect-type={t.type}>{t.text}</span>)}
-          </div>,
-          node,
-          `pills-${id}`,
+        const node = nodeInternals.get(id)
+        if (!node || node.hidden) return null
+        const at = node.positionAbsolute ?? node.position
+        return (
+          <div key={id} className="connect-pills-over" style={{ left: at.x, top: at.y, width: node.width ?? 0 }}>
+            <div className="connect-pills" role="group" aria-label={`Drop on ${nameOf(id)}`} data-connect-over={id}>
+              {types.map((t) => t.type === NEST_HOLDS
+                ? <span key={t.type} className="connect-pill holds">{t.text}</span>
+                : <span key={t.type || 'relation'} className="connect-pill" data-connect-target={id} data-connect-type={t.type}>{t.text}</span>)}
+            </div>
+          </div>
         )
       })}
-    </>
+    </>,
+    viewport,
   )
 }
 
@@ -1276,6 +1283,9 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // In Viewer and Presenter: the element pressed with the key, which a
   // release on it adds to the selection or takes out.
   const selectOnlyRef = useRef<string | null>(null)
+  // There, a frame pressed with the key: a drag from it draws a box over
+  // what it holds, as one from the empty canvas does (where it starts).
+  const boxFromRef = useRef<{ x: number; y: number } | null>(null)
   const [connectMouse, setConnectMouse] = useState<{ x: number; y: number } | null>(null)
   // The element the line is drawn over: its panel of relation types shows.
   const [connectOver, setConnectOver] = useState<string | null>(null)
@@ -1312,13 +1322,26 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       // Viewer and Presenter do not edit: the key only adds the element to
       // the selection or takes it out (no line, no pills, no relation or
       // nesting, which were shown there and lost on the way back).
-      if (!editsModel(state)) { selectOnlyRef.current = nodeId; return }
+      if (!editsModel(state)) {
+        selectOnlyRef.current = nodeId
+        if ((e.target as HTMLElement).closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
+        return
+      }
       state.startConnection(nodeId)
       connectingRef.current = true
       setConnectMouse({ x: e.clientX, y: e.clientY })
     }
 
     const onMouseMove = (e: MouseEvent) => {
+      // Drawn on from a frame in Viewer or Presenter: React Flow's box
+      // starts on the empty canvas only, so it is started there, at the
+      // press, and the release is no click on the frame.
+      const from = boxFromRef.current
+      if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) {
+        boxFromRef.current = null
+        selectOnlyRef.current = null
+        el.querySelector('.react-flow__pane')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: from.x, clientY: from.y, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }))
+      }
       if (!connectingRef.current) return
       setConnectMouse({ x: e.clientX, y: e.clientY })
       // Over the panel the element stays the one it stands over.
@@ -1330,6 +1353,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     const onMouseUp = (e: MouseEvent) => {
       const pressed = selectOnlyRef.current
       selectOnlyRef.current = null
+      boxFromRef.current = null
       if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
         const ids = useDiagramStore.getState().selectedNodeIds
         useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
@@ -1356,7 +1380,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       }
 
       // On the panel beside its fields: the element it stands over.
-      const nodeId = (e.target as HTMLElement).closest('.connect-pills') ? connectOverRef.current : findNodeId(e.target as HTMLElement)
+      const panel = (e.target as HTMLElement).closest<HTMLElement>('.connect-pills')
+      const nodeId = panel ? panel.dataset.connectOver ?? connectOverRef.current : findNodeId(e.target as HTMLElement)
       const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
       // On the empty canvas: out of its container, where it may stand there;
       // where it may not, it stays and a notice says why.
@@ -1365,11 +1390,21 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       if (!nodeId && onCanvas) nestAll(sources, null)
       // Inside the target, its only offer; nothing on its container.
       else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(sources, nodeId)
-      else if (nodeId && offered.length === 1 && offered[0] === NEST_HOLDS) { /* where they are */ }
+      // On what holds them: where they are, which a notice says.
+      else if (nodeId && offered.length === 1 && offered[0] === NEST_HOLDS) {
+        state.pushNotification(`${sources.length === 1 ? `"${state.c4Nodes[src]?.label ?? src}" is` : `The ${sources.length} elements are`} already in "${state.c4Nodes[nodeId]?.label ?? nodeId}": nothing to move.`, 'info')
+      }
       // Several: of the one type that fits each (several types ask by the panel).
-      else if (nodeId && sources.length > 1) {
+      else if (nodeId && sources.length > 1 && !sources.includes(nodeId)) {
         const types = offered.filter((t) => t !== NEST_INSIDE)
         if (types.length === 1) relateAll(sources, nodeId, types[0])
+        else state.pushNotification(types.length
+          ? `Several relation types fit: drop on one of the pills over "${state.c4Nodes[nodeId]?.label ?? nodeId}".`
+          : `No relation fits each of the ${sources.length} elements and "${state.c4Nodes[nodeId]?.label ?? nodeId}"${offered.includes(NEST_INSIDE) ? ': drop on its "inside" pill to move them into it' : ''}.`, types.length ? 'info' : 'error')
+      }
+      // On another of those it goes from.
+      else if (nodeId && nodeId !== src && sources.includes(nodeId)) {
+        state.pushNotification(`"${state.c4Nodes[nodeId]?.label ?? nodeId}" is one of the ${sources.length} selected elements the line goes from: drop on another element.`, 'info')
       }
       // Refused, of the type the view's chain follows, or asked about where
       // several types fit (connectNodes).

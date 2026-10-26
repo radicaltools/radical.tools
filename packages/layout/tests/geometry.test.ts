@@ -340,4 +340,21 @@ describe('settleMovedNodes', () => {
     expect([nodes.a.x, nodes.a.y]).toEqual([nodes.c.x + nodes.c.width + 60, nodes.c.y])
     expect(gridSlotIn(nodes, 'b', { width: nodes.a.width, height: nodes.a.height })).toEqual({ x: nodes.c.x, y: nodes.c.y + nodes.c.height + 60 })
   })
+
+  // Taken out to the top, it lay over the system it was in, now a sibling,
+  // and went right of every root element, to the far top right (F-0072).
+  it('puts one taken out to the top in the free place nearest where it stood', () => {
+    const nodes: Record<string, C4Node> = {
+      b: node('b', 'system', { x: 0, y: 0, width: 600, height: 330 }),
+      c: node('c', 'container', { parentId: 'b', x: 30, y: 120 }),
+      far: node('far', 'system', { x: 3000, y: -1000 }),
+      a: node('a', 'container', { x: 330, y: 120 }),
+    }
+    const canvas = modelCanvas(nodes)
+    settleMovedNodes(nodes, ['a'], canvas)
+    const box = canvas.boxOf(nodes.a), frame = canvas.boxOf(nodes.b)
+    const clear = box.x >= frame.x + frame.w || box.x + box.w <= frame.x || box.y >= frame.y + frame.h || box.y + box.h <= frame.y
+    expect(clear).toBe(true)
+    expect(Math.hypot(nodes.a.x - 330, nodes.a.y - 120)).toBeLessThan(400)
+  })
 })

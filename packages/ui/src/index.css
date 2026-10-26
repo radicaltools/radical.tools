@@ -3504,6 +3504,11 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ── Modifier+click connection mode ── */
 .canvas-area.connect-ready .react-flow__node { cursor: crosshair; }
 .canvas-area.connecting .react-flow__node   { cursor: crosshair; }
+/* A line takes no part in the gesture: a drop on one is a drop on what
+   lies under it (an element, its pills, the empty canvas). It took the
+   drop, and nothing happened. */
+.canvas-area.connecting .react-flow__edge,
+.canvas-area.connecting .react-flow__edge * { pointer-events: none !important; }
 
 .react-flow__node.connecting-source .c4-node {
   outline: 3px solid var(--accent) !important;
@@ -3518,7 +3523,14 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   border-radius: 8px;
 }
 /* Over each element a relation can go to, a pill per way (Canvas:
-   ConnectPills, rendered into the node); a drop on one makes it. */
+   ConnectPills, rendered into the viewport over the node, above every
+   line and element); a drop on one makes it. */
+.connect-pills-over {
+  position: absolute;
+  height: 0;
+  z-index: 100000;
+  pointer-events: none;
+}
 .connect-pills {
   position: absolute;
   left: 50%;

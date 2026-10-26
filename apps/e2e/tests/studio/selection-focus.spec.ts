@@ -282,3 +282,35 @@ test('the hierarchy\'s Size, Levels and Up stay clear of the properties card', a
   await page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).locator('select').selectOption('3')
   await expect(page.locator('.tm-bc-sizeby', { hasText: 'Levels' }).locator('select')).toHaveValue('3')
 })
+
+// F-0085: a box drawn with the special key from the empty inside of a frame
+// selected the frame itself in Viewer and Presenter (the press was a click
+// on it); in Designer, from the empty canvas, it selected what it held.
+// Perspectives draw no line, so the box selects the same there.
+for (const mode of ['viewer', 'presenter'] as const) {
+  test(`a box drawn with the special key from the empty inside of a frame selects what it holds in ${mode}`, async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-containers', mode)
+    await studio.settle()
+    const saved = JSON.stringify(await studio.storedDoc())
+    const frame = (await studio.node('bookstore').boundingBox())!
+    const held = await Promise.all(['web', 'api', 'db'].map(async (id) => (await studio.node(id).boundingBox())!))
+    // Inside the frame, left of and above what it holds.
+    const from = { x: Math.max(frame.x + 4, Math.min(...held.map((b) => b.x)) - 8), y: Math.min(...held.map((b) => b.y)) - 8 }
+    expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.react-flow__node')?.getAttribute('data-id'), [from.x, from.y])).toBe('bookstore')
+    const to = { x: Math.max(...held.map((b) => b.x + b.width)) + 8, y: Math.max(...held.map((b) => b.y + b.height)) + 8 }
+    await page.keyboard.down('Alt')
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(to.x, to.y, { steps: 10 })
+    await page.mouse.up()
+    await page.keyboard.up('Alt')
+    await expect.poll(() => page.locator('.react-flow__node.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')).sort())).toEqual(['api', 'db', 'web'])
+    // A click with the key on the frame still adds it to the selection.
+    await page.keyboard.down('Alt')
+    await page.mouse.click(from.x, from.y)
+    await page.keyboard.up('Alt')
+    await expect(studio.node('bookstore')).toHaveClass(/selected/)
+    expect(JSON.stringify(await studio.storedDoc())).toBe(saved)
+  })
+}
