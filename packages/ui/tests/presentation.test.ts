@@ -19,6 +19,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useDiagramStore } from '../src/store/diagramStore'
+import { selectCanvasFocus } from '../src/store/canvasFocus'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 
 const initial = (() => {
@@ -133,6 +134,26 @@ describe('startPresentation / stopPresentation', () => {
     expect((window as any).__prePresState).toBeUndefined()
     const someRf = (s.rfNodes as any[]).find((n) => !n.hidden)
     expect(someRf?.draggable).toBe(true)
+  })
+})
+
+// F-0062: a slide shows what it holds. The selection made in Designer
+// was drawn on it, the element selected and the rest of the slide dimmed.
+describe('Present with an element selected', () => {
+  it('plays the slides with nothing selected, and gives the selection back after', () => {
+    useDiagramStore.getState().addPresentationSlide('a')
+    useDiagramStore.getState().setSelectedNodeIds(['sys1'])
+    useDiagramStore.getState().selectNode('sys1')
+    expect(selectCanvasFocus(useDiagramStore.getState())).not.toBeNull()
+    useDiagramStore.getState().startPresentation()
+    const s = useDiagramStore.getState()
+    expect(s.selectedNodeId).toBeNull()
+    expect(s.selectedNodeIds).toEqual([])
+    expect((s.rfNodes as any[]).filter((n) => n.selected)).toEqual([])
+    expect(selectCanvasFocus(s)).toBeNull()
+    useDiagramStore.getState().stopPresentation()
+    expect(useDiagramStore.getState().selectedNodeId).toBe('sys1')
+    expect(useDiagramStore.getState().selectedNodeIds).toEqual(['sys1'])
   })
 })
 

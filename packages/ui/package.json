@@ -11,6 +11,7 @@
     "./store/hubStore": "./src/store/hubStore.ts",
     "./store/documentBackend": "./src/store/documentBackend.ts",
     "./store/userCamera": "./src/store/userCamera.ts",
+    "./store/viewCameras": "./src/store/viewCameras.ts",
     "./store/showInView": "./src/store/showInView.ts",
     "./components/Canvas": "./src/components/Canvas.tsx",
     "./components/WikiView": "./src/components/WikiView.tsx",

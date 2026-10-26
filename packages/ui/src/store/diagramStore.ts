@@ -97,6 +97,7 @@ export type { Exploration, ExploreChoice } from './exploration'
 import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
+import { viewCameras } from './viewCameras'
 import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
@@ -3642,6 +3643,7 @@ export const useDiagramStore = create<DiagramStore>()(
     let initSnapshots: DiagramSnapshot[]
     let initPres: ReturnType<typeof buildPresentationsFromData>
     let initMetamodel: Metamodel
+    let initDefaultViewport: { x: number; y: number; zoom: number } | null = null
 
     // A synchronously readable document (localStorage) shows on first paint.
     // Anything else renders the sample first and the app loads it afterwards.
@@ -3671,6 +3673,10 @@ export const useDiagramStore = create<DiagramStore>()(
       // agent's write), the one opened at boot was taken for another, and
       // a selected relation's card closed while it was typed in.
       _viewSelectionsDoc = documentBackend()?.getActiveId() ?? null
+      // Each view opens at the camera this viewer left it at (viewCameras.ts).
+      const cameras = viewCameras(_viewSelectionsDoc)
+      for (const [id, camera] of Object.entries(cameras)) if (initViews[id]) initViews[id] = { ...initViews[id], viewport: camera }
+      initDefaultViewport = cameras[''] ?? persisted.defaultViewport ?? null
     } else if (viewerProfile) {
       initNodes = {}
       initRelations = {}
@@ -3692,6 +3698,23 @@ export const useDiagramStore = create<DiagramStore>()(
     // Views of a viewpoint follow the viewpoint as the metamodel has it now.
     model.syncViewpoints({ c4Nodes: initNodes, views: initViews, metamodel: initMetamodel } as unknown as model.ModelState)
 
+    // The camera of the canvas shown, kept with its view (All elements' in
+    // defaultViewport), as setActiveView keeps it for the view it leaves.
+    const _keepShownCamera = (): void => {
+      const rawVP = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+      if (!rawVP || get().activeSnapshotId) return
+      const camera = { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
+      set((state) => {
+        const viewId = state.activeViewId
+        if (viewId === null) {
+          const shown = allElementsCamera(camera)
+          if (shown) state.defaultViewport = shown
+        } else if (viewById(state as DiagramStore, viewId) && !model.isViewGroup(state.views[viewId] as DiagramView | undefined, state.metamodel as Metamodel)) {
+          viewById(state as DiagramStore, viewId)!.viewport = camera
+        }
+      })
+    }
+
     // Puts the model back as a history entry has it, on the canvas the
     // entry was taken on (undo and redo).
     const _restoreHistoryEntry = (entry: HistoryEntry): void => {
@@ -3701,19 +3724,23 @@ export const useDiagramStore = create<DiagramStore>()(
       if (onExploration(get())) get()._saveShownCanvas()
       const backOnExploration = !!exploration && entry.explorationId === exploration.id
       const canvasChanged = (backOnExploration ? exploration!.id : entry.activeViewId) !== get().activeViewId
+      // The canvas left keeps the camera it has now, as a view switch keeps it.
+      if (canvasChanged) _keepShownCamera()
       set((state) => {
         state.c4Nodes = entry.c4Nodes as any
         state.c4Relations = entry.c4Relations as any
         // What a view is looking at (the hierarchy's drill level, the wiki's
         // page, the table's tab) is like a camera: no step takes it back.
         // Restored with the views, Undo of a drag reset the hierarchy to the
-        // top, and that was saved.
+        // top, and that was saved. Nor the camera itself: Undo pressed on
+        // another view opened the view it went back to at the camera of the
+        // step, and the view left lost its own.
         let views = entry.views as Record<string, DiagramView>
         for (const [id, v] of Object.entries(entry.views as Record<string, DiagramView>)) {
           const now = state.views[id] as DiagramView | undefined
-          if (!now || (now.treemapFocusId === v.treemapFocusId && now.wikiFocusId === v.wikiFocusId && now.tableActiveTab === v.tableActiveTab)) continue
+          if (!now || (now.treemapFocusId === v.treemapFocusId && now.wikiFocusId === v.wikiFocusId && now.tableActiveTab === v.tableActiveTab && now.viewport === v.viewport)) continue
           if (views === entry.views) views = { ...views }
-          views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab } as DiagramView
+          views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab, viewport: now.viewport } as DiagramView
         }
         state.views = views as any
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
@@ -3968,7 +3995,7 @@ export const useDiagramStore = create<DiagramStore>()(
       views: initViews,
       activeViewId: null,
       defaultPositions: initDefaultPositions,
-      defaultViewport: persisted?.defaultViewport ?? null,
+      defaultViewport: initDefaultViewport,
       defaultLayoutConstraints: persisted?.defaultLayoutConstraints ?? [],
       defaultEdgeStyle: persisted?.defaultEdgeStyle ?? 'curved',
       exploration: null,
@@ -8490,8 +8517,15 @@ export const useDiagramStore = create<DiagramStore>()(
           // diff comes back after (Esc cleared it, the toggle still on).
           diffHighlight: get().diffHighlight,
           views: get().views,
+          // A slide shows what it holds: the selection made before, drawn
+          // on it, selected an element and dimmed the rest. It comes back
+          // after.
+          selection: { nodeIds: [...get().selectedNodeIds], edgeId: get().selectedEdgeId },
         }
-        set((state) => { state.presentationActive = true })
+        set((state) => {
+          state.presentationActive = true
+          showSelection(state as DiagramStore, [], null)
+        })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
         // flips off before the user can grab anything (rfNodes carry
         // draggable per-node, which would otherwise override the
@@ -8503,7 +8537,7 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView> }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null } }
           | undefined
         get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
@@ -8516,6 +8550,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(window as any).__prePresState = undefined
         }
         get()._sync()
+        if (pre?.selection) set((state) => { showSelection(state as DiagramStore, pre.selection!.nodeIds, pre.selection!.edgeId) })
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
         // restored c4Nodes positions instead of the slide-shown ones.
@@ -8909,9 +8944,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // Restore per-view positions (backward compat: old files won't have them)
         const settledPos = settledOnLoad.length ? Object.fromEntries(Object.entries(snapshotPositions(nodes)).filter(([id]) => settledOnLoad.includes(id))) : {}
         const defaultPos = data.defaultPositions ? { ...data.defaultPositions, ...settledPos } : snapshotPositions(nodes)
-        const defaultVP: { x: number; y: number; zoom: number } | null = data.defaultViewport ?? null
-
         const activeDocId = documentBackend()?.getActiveId()
+        // Each view opens at the camera this viewer left it at, kept outside
+        // the model (viewCameras.ts): a camera moved on its own saves nothing.
+        const cameras = viewCameras(activeDocId ?? null)
+        for (const [id, camera] of Object.entries(cameras)) if (views[id]) views[id] = { ...views[id], viewport: camera }
+        const defaultVP: { x: number; y: number; zoom: number } | null = cameras[''] ?? data.defaultViewport ?? null
         // Another document forgets the views' selections; the same one read
         // again (an outside change) keeps them, the open canvas's included.
         if ((activeDocId ?? null) !== _viewSelectionsDoc) {

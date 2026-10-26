@@ -96,6 +96,31 @@ describe('Undo and the canvas a step was made on', () => {
     expect(at('b')).toEqual({ x: 1300, y: 400 })
   })
 
+  // F-0063: the camera is no part of a step. Undo pressed on another view
+  // put back the cameras the views had when the step was made: the view it
+  // went back to opened at the camera of the load, and the one left lost
+  // its zoom.
+  it('keeps the cameras of both views', () => {
+    const w = window as any
+    const placed: unknown[] = []
+    w.__rfPlaceCamera = (vp: unknown) => placed.push(vp)
+    try {
+      s().setActiveView('one')
+      w.__rfCurrentViewport = { x: -159, y: -160, zoom: 0.834 }
+      drag('b', { x: 1300, y: 400 })
+      s().setActiveView('two')
+      w.__rfCurrentViewport = { x: 222, y: 92, zoom: 0.318 }
+      s().undo()
+      expect(s().activeViewId).toBe('one')
+      expect(placed[placed.length - 1]).toEqual({ x: -159, y: -160, zoom: 0.834 })
+      expect(s().views.one.viewport).toEqual({ x: -159, y: -160, zoom: 0.834 })
+      expect(s().views.two.viewport).toEqual({ x: 222, y: 92, zoom: 0.318 })
+    } finally {
+      delete w.__rfPlaceCamera
+      w.__rfCurrentViewport = undefined
+    }
+  })
+
   it('gives a step made on All elements back there, redone from a view', () => {
     drag('b', { x: 600, y: 500 })
     s().setActiveView('one')

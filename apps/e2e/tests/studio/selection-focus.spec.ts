@@ -192,6 +192,72 @@ test('a click on the empty canvas during the framing flight brings back the came
   await expect.poll(() => viewport.getAttribute('style')).toBe(before)
 })
 
+// F-0061: a click only selects (the card opens on a double-click), but the
+// framing kept room on the right for the card all the same: the framed
+// elements sat off to the left, and at 1280 px, the room left under half the
+// canvas, the framing took the whole canvas and one lay under the palette.
+for (const [width, height] of [[1280, 720], [1600, 900]]) {
+  test(`a click at ${width} px frames the selection in what the palette leaves free, with no room for a card that is closed`, async ({ page, studio }) => {
+    await page.setViewportSize({ width, height })
+    await studio.openSample()
+    await studio.designer()
+    await studio.node('sys-core').click({ position: { x: 10, y: 10 } })
+    await expect(page.locator('.react-flow__node.selected[data-id="sys-core"]')).toHaveCount(1)
+    await expect.poll(() => page.locator('.react-flow__node.focus-dim').count()).toBeGreaterThan(0)
+    await studio.settle()
+    await expect(page.locator('.right-panel.open')).toHaveCount(0)
+    const geo = await page.evaluate(() => {
+      const palette = document.querySelector('.canvas-column .element-palette')!.getBoundingClientRect()
+      const canvas = document.querySelector('.react-flow')!.getBoundingClientRect()
+      const boxes = Array.from(document.querySelectorAll('.react-flow__node:not(.focus-dim)')).map((n) => n.getBoundingClientRect())
+      const left = Math.min(...boxes.map((b) => b.left))
+      const right = Math.max(...boxes.map((b) => b.right))
+      return { left: left - palette.right, right: canvas.right - right }
+    })
+    expect(geo.left).toBeGreaterThanOrEqual(0)
+    expect(geo.right).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(geo.left - geo.right)).toBeLessThan(100)
+  })
+}
+
+// F-0084: the model is saved only after an edit, and with it the view's
+// camera: with Smart fit off a camera moved on its own (a wheel, the framing
+// of a click) was lost on reload, the view opened at the camera of its last
+// edit. It is kept by this viewer, outside the model.
+test('a camera moved on its own survives a reload, and the model is not saved for it', async ({ page, studio }) => {
+  await studio.openSample()
+  await studio.designer()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: /Smart fit/ }).click()
+  await page.keyboard.press('Escape')
+  await page.reload()
+  await studio.ready()
+  const docId = studio.activeDocId()
+  const saved = await studio.storedJson(docId)
+  const transform = () => page.locator('.react-flow__viewport').getAttribute('style')
+  const before = await transform()
+
+  const pane = (await studio.canvas.boundingBox())!
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2)
+  await page.mouse.wheel(0, -300)
+  await studio.settle()
+  const zoomed = await transform()
+  expect(zoomed).not.toBe(before)
+  await page.reload()
+  await studio.ready()
+  expect(await transform()).toBe(zoomed)
+
+  // The framing of a click too.
+  await studio.node('sys-core').click({ position: { x: 10, y: 10 } })
+  await studio.settle()
+  const framed = await transform()
+  expect(framed).not.toBe(zoomed)
+  await page.reload()
+  await studio.ready()
+  expect(await transform()).toBe(framed)
+  expect(await studio.storedJson(docId)).toBe(saved)
+})
+
 // Item 224: on a hierarchy view the properties card covered Size, Levels and
 // ↑ Up: a click on Levels reached the card, and Levels stayed 2.
 test('the hierarchy\'s Size, Levels and Up stay clear of the properties card', async ({ page, studio }) => {
