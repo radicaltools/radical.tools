@@ -86,6 +86,9 @@ const ROUGH_FROM = 120
 const KIN_JUDGED = 12
 const PILE_SHARE = 0.3
 const ROUGH_WHEN_TANGLED = 0.5
+/** The closing passes (drawn in, judged afresh, the margin) are repeated until one changes
+ *  nothing, at most this many times: what a second run would find, this one takes. */
+const MAX_PASSES = 4
 /** A large view's first round takes every move that helps as it comes (first improvement)
  *  instead of judging them all for the single best: hundreds of moves in the time the
  *  best-first round would spend choosing one, so a budget always buys something. */
@@ -142,6 +145,25 @@ export function runTidyLayout(
       options.onProgress?.(steps.length, description)
     }
   }
+
+  // Every layout the moves passed through, by where the boxes stand, with
+  // the number of steps that led there. Moves that come back to one went
+  // round in a circle (their gains, judged locally, added up to more than
+  // the whole changed): the circle is taken back and the round ends.
+  const seen = new Map<string, number>()
+  const stateKey = (): string => {
+    let h1 = 0, h2 = 0
+    for (const id of l.ids()) {
+      const b = l.box(id)!
+      const x = Math.round(b.x), y = Math.round(b.y)
+      h1 = (Math.imul(h1, 31) + x) | 0; h1 = (Math.imul(h1, 31) + y) | 0
+      h2 = (Math.imul(h2, 37) ^ (x * 7919 + y)) | 0
+    }
+    return `${h1}:${h2}`
+  }
+  // Where it started, so moves that come back to it (the loose elements
+  // to the margin and back) are seen to have gone round.
+  seen.set(stateKey(), steps.length)
 
   // First the loose elements out of the way, whatever the cost says: they
   // have no lines for it to see. And again at the end, to the margin the
@@ -240,21 +262,6 @@ export function runTidyLayout(
     updateIndex(l, index, touched)
     const costWas = localCost(l, lines, moved, index, roomy, shifted, changed)
     return { gain: costWas - costNow, after }
-  }
-  // Every layout the moves passed through, by where the boxes stand, with
-  // the number of steps that led there. Moves that come back to one went
-  // round in a circle (their gains, judged locally, added up to more than
-  // the whole changed): the circle is taken back and the round ends.
-  const seen = new Map<string, number>()
-  const stateKey = (): string => {
-    let h1 = 0, h2 = 0
-    for (const id of l.ids()) {
-      const b = l.box(id)!
-      const x = Math.round(b.x), y = Math.round(b.y)
-      h1 = (Math.imul(h1, 31) + x) | 0; h1 = (Math.imul(h1, 31) + y) | 0
-      h2 = (Math.imul(h2, 37) ^ (x * 7919 + y)) | 0
-    }
-    return `${h1}:${h2}`
   }
   let looped = false
   const circled = (): boolean => {
@@ -389,38 +396,48 @@ export function runTidyLayout(
   seen.set(stateKey(), steps.length)
   improve()
 
-  // Drawn in at the end: every move that costs nothing is taken.
-  const drawnIn = new Set<string>()
-  for (const move of compactMoves(l, nodes, lines)) {
-    if (outOfTime()) break
-    index = buildIndex(l, lines)
-    const fresh = judge(move)
-    if (!fresh.after || fresh.gain < -0.001) continue
-    const wasPositions = l.positions()
-    l.restore(fresh.after)
-    const now = l.positions()
-    const moved: PositionMap = {}
-    for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
-    if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved }); options.onProgress?.(steps.length, move.description) }
-    for (const id of Object.keys(moved)) { drawnIn.add(id); for (const sb of l.childrenOf(l.parentOf(id))) drawnIn.add(sb) }
-  }
-  // What the drawing in made possible: judged again where something moved.
-  stale = new Set(drawnIn)
-  for (const id of drawnIn) for (const x of lines) { if (x.a === id) stale.add(x.b); if (x.b === id) stale.add(x.a) }
-  improve()
-  // A last look at every move, every gain judged afresh rather than kept
-  // from earlier rounds: what is left now, a second run would find.
-  stale = null
-  improve()
-  // The loose elements to the margin the diagram has now; that opens moves
-  // of its own (a row with one of them), which a second run would take, so
-  // they are taken now, as long as the margin keeps moving.
-  for (let round = 0; round < 3; round++) {
-    const done = steps.length
-    gather()
-    if (steps.length === done || outOfTime()) break
+  // The closing passes, until one changes nothing: a run that ends with
+  // moves still to take hands the next run its work (a drawing in that
+  // opened a row, a margin that moved), and Smart Layout run again on its
+  // own layout should find nothing left to tidy.
+  for (let pass = 0; pass < MAX_PASSES && !outOfTime(); pass++) {
+    const at = stateKey()
+    // Drawn in at the end: every move that costs nothing is taken.
+    const drawnIn = new Set<string>()
+    for (const move of compactMoves(l, nodes, lines)) {
+      if (outOfTime()) break
+      index = buildIndex(l, lines)
+      const fresh = judge(move)
+      if (!fresh.after || fresh.gain < -0.001) continue
+      const wasPositions = l.positions()
+      l.restore(fresh.after)
+      const now = l.positions()
+      const moved: PositionMap = {}
+      for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
+      if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved }); options.onProgress?.(steps.length, move.description) }
+      for (const id of Object.keys(moved)) { drawnIn.add(id); for (const sb of l.childrenOf(l.parentOf(id))) drawnIn.add(sb) }
+    }
+    // What the drawing in made possible: judged again where something moved.
+    if (drawnIn.size) {
+      stale = new Set(drawnIn)
+      for (const id of drawnIn) for (const x of lines) { if (x.a === id) stale.add(x.b); if (x.b === id) stale.add(x.a) }
+      improve()
+    }
+    // A last look at every move, every gain judged afresh rather than kept
+    // from earlier rounds: what is left now, a second run would find.
     stale = null
     improve()
+    // The loose elements to the margin the diagram has now; that opens moves
+    // of its own (a row with one of them), which a second run would take, so
+    // they are taken now, as long as the margin keeps moving.
+    for (let round = 0; round < 3; round++) {
+      const done = steps.length
+      gather()
+      if (steps.length === done || outOfTime()) break
+      stale = null
+      improve()
+    }
+    if (stateKey() === at) break
   }
   checkpoint()
   if (totalCost(l, lines).total > best.cost + 0.01) {

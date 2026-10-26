@@ -153,7 +153,22 @@ describe('Tidy', () => {
           seen.add(key())
         }
       }
-      expect(again.tidy.steps.length, f).toBeLessThanOrEqual(2)
+      expect(again.tidy.steps.length, f).toBe(0)
+    }
+  })
+
+  it('leaves nothing for a second run: every blueprint tidied twice', { timeout: 120_000 }, () => {
+    // All of a blueprint's elements on one canvas, as a view listing them
+    // all shows them: tidied, then tidied again from the result.
+    for (const f of readdirSync(join(benchDir, 'blueprint')).filter((f) => f.endsWith('.radical')).sort()) {
+      const d = load(join(benchDir, 'blueprint', f))
+      const visible = projectToVisibleGraph(byId(d.nodes), byId(d.relations))
+      const first = runTidyLayout(visible.nodes, visible.relations)
+      const laidOut: Record<string, C4Node> = {}
+      for (const [id, n] of Object.entries(visible.nodes)) laidOut[id] = { ...n, ...(first.winner.positions[id] ?? {}) }
+      const again = runTidyLayout(laidOut, visible.relations)
+      expect(again.tidy.steps.map((s) => s.description), f).toEqual([])
+      expect(again.keptCurrent, f).toBe(true)
     }
   })
 
