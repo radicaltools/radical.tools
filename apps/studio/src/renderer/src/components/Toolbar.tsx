@@ -746,8 +746,11 @@ export function Toolbar(): React.ReactElement {
       }
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
-      const undoKey = e.key === 'z' && !e.shiftKey
-      const redoKey = (e.key === 'z' && e.shiftKey) || e.key === 'y'
+      // A letter comes as its capital with Shift or Caps Lock: Ctrl+Shift+Z
+      // on Windows and Linux is 'Z', and it did not redo.
+      const letter = e.key.length === 1 ? e.key.toLowerCase() : e.key
+      const undoKey = letter === 'z' && !e.shiftKey
+      const redoKey = (letter === 'z' && e.shiftKey) || letter === 'y'
       if (undoKey || redoKey) {
         // While a text field has the focus the keys are its own: they take
         // back typing. Here they took back the model's last step instead (a
