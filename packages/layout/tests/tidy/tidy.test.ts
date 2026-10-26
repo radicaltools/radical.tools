@@ -192,13 +192,14 @@ describe('Tidy', () => {
 
   it('continues a large tangled view where the last run stopped', { timeout: 120_000 }, () => {
     // Too tangled to read well even when tidied: the first run sketches it
-    // and is cut short; the second starts from that, not from a new sketch.
+    // and is cut short (about 2000 moves judged); the second starts from
+    // that, not from a new sketch.
     const { nodes, relations } = tangledModel(150)
-    const first = runTidyLayout(nodes, relations, { budgetMs: 1000 })
+    const first = runTidyLayout(nodes, relations, { budget: 300_000 })
     expect(first.tidy.steps[0]?.kind).toBe('rough')
     const laidOut: Record<string, C4Node> = {}
     for (const [id, n] of Object.entries(nodes)) laidOut[id] = { ...n, ...(first.winner.positions[id] ?? {}) }
-    const again = runTidyLayout(laidOut, relations, { budgetMs: 1000 })
+    const again = runTidyLayout(laidOut, relations, { budget: 300_000 })
     expect(again.tidy.steps[0]?.kind).not.toBe('rough')
     expect(again.tidy.after.total).toBeLessThan(first.tidy.after.total - 1)
   })
