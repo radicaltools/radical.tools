@@ -3648,6 +3648,23 @@ export const useDiagramStore = create<DiagramStore>()(
     // Views of a viewpoint follow the viewpoint as the metamodel has it now.
     model.syncViewpoints({ c4Nodes: initNodes, views: initViews, metamodel: initMetamodel } as unknown as model.ModelState)
 
+    // The camera of the canvas shown, kept with its view (All elements' in
+    // defaultViewport), as setActiveView keeps it for the view it leaves.
+    const _keepShownCamera = (): void => {
+      const rawVP = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+      if (!rawVP || get().activeSnapshotId) return
+      const camera = { x: rawVP.x, y: rawVP.y, zoom: rawVP.zoom }
+      set((state) => {
+        const viewId = state.activeViewId
+        if (viewId === null) {
+          const shown = allElementsCamera(camera)
+          if (shown) state.defaultViewport = shown
+        } else if (viewById(state as DiagramStore, viewId) && !model.isViewGroup(state.views[viewId] as DiagramView | undefined, state.metamodel as Metamodel)) {
+          viewById(state as DiagramStore, viewId)!.viewport = camera
+        }
+      })
+    }
+
     // Puts the model back as a history entry has it, on the canvas the
     // entry was taken on (undo and redo).
     const _restoreHistoryEntry = (entry: HistoryEntry): void => {
@@ -3657,19 +3674,23 @@ export const useDiagramStore = create<DiagramStore>()(
       if (onExploration(get())) get()._saveShownCanvas()
       const backOnExploration = !!exploration && entry.explorationId === exploration.id
       const canvasChanged = (backOnExploration ? exploration!.id : entry.activeViewId) !== get().activeViewId
+      // The canvas left keeps the camera it has now, as a view switch keeps it.
+      if (canvasChanged) _keepShownCamera()
       set((state) => {
         state.c4Nodes = entry.c4Nodes as any
         state.c4Relations = entry.c4Relations as any
         // What a view is looking at (the hierarchy's drill level, the wiki's
         // page, the table's tab) is like a camera: no step takes it back.
         // Restored with the views, Undo of a drag reset the hierarchy to the
-        // top, and that was saved.
+        // top, and that was saved. Nor the camera itself: Undo pressed on
+        // another view opened the view it went back to at the camera of the
+        // step, and the view left lost its own.
         let views = entry.views as Record<string, DiagramView>
         for (const [id, v] of Object.entries(entry.views as Record<string, DiagramView>)) {
           const now = state.views[id] as DiagramView | undefined
-          if (!now || (now.treemapFocusId === v.treemapFocusId && now.wikiFocusId === v.wikiFocusId && now.tableActiveTab === v.tableActiveTab)) continue
+          if (!now || (now.treemapFocusId === v.treemapFocusId && now.wikiFocusId === v.wikiFocusId && now.tableActiveTab === v.tableActiveTab && now.viewport === v.viewport)) continue
           if (views === entry.views) views = { ...views }
-          views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab } as DiagramView
+          views[id] = { ...v, treemapFocusId: now.treemapFocusId, wikiFocusId: now.wikiFocusId, tableActiveTab: now.tableActiveTab, viewport: now.viewport } as DiagramView
         }
         state.views = views as any
         state.defaultLayoutConstraints = entry.defaultLayoutConstraints as any
