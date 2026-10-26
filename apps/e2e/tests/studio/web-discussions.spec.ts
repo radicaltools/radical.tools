@@ -225,3 +225,27 @@ test('F5 and Cmd/Ctrl+P pressed in the comment field are taken as in any dialog 
   await expect(body).toBeFocused()
 })
 
+// Post comment and Resolve thread are disabled while they save, and Start a
+// new thread instead goes away: the focus fell to the page, and Escape no
+// longer closed the panel (F-0069).
+test('the focus stays in the discussion panel after Post comment, Resolve thread and Start a new thread instead', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  const body = panel.getByLabel('Comment (Markdown supported)')
+  await body.fill('Is the customer a person or a company?')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await expect(body).toBeFocused()
+  await panel.getByRole('button', { name: 'Resolve thread' }).click()
+  await expect(panel.getByRole('button', { name: 'Reopen thread' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+  await discuss(page)
+  await panel.getByRole('button', { name: 'Reopen thread' }).click()
+  await expect(panel.getByRole('button', { name: 'Resolve thread' })).toBeFocused()
+  await panel.getByRole('button', { name: 'Reply', exact: true }).click()
+  await panel.getByRole('button', { name: 'Start a new thread instead' }).click()
+  await expect(body).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+})
