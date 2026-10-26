@@ -68,7 +68,7 @@ import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
-import { type CostParts, type TidyStep, costRows, formatPart as fmtPart } from '@radical/layout/tidy'
+import { TIDY_BUDGET, type TidyReport, type TidyStep, costRows, tidySummary } from '@radical/layout/tidy'
 import { runTidy, TIDY_STOPPED } from '../layout/tidyRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
 import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
@@ -3380,9 +3380,10 @@ interface DiagramStore {
  *  Designer only: Viewer puts the old positions back when it is left. */
 /** The Tidy run in progress, to stop it from the button. */
 let _tidyAbort: AbortController | null = null
-/** Tidy hands over what it did within this time; a view that needs more is tidied again.
- *  Under the tests (hundreds of layouts in a fuzz run) a short budget: what it hands over is whole either way. */
-const TIDY_BUDGET_MS = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.VITEST ? 1500 : 10_000
+/** Tidy hands over what it did within this much work (the MCP server's budget too); a view
+ *  that needs more is tidied again. Under the tests (hundreds of layouts in a fuzz run) a
+ *  short budget: what it hands over is whole either way. */
+const TIDY_WORK = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.VITEST ? TIDY_BUDGET * 0.15 : TIDY_BUDGET
 
 function unpinLaidOut(state: DiagramStore, appMode: DiagramStore['appMode']): void {
   if (appMode !== 'designer') return
@@ -6852,13 +6853,13 @@ export const useDiagramStore = create<DiagramStore>()(
             }, { alignments: input.alignments, edgeStyle })
           } else {
             // Tidy runs in a worker, each move reported; the button stops it
-            // (the canvas stays as it was), and the time budget hands over
+            // (the canvas stays as it was), and the budget hands over
             // what was done. The result is shown at once, the moves listed
             // in the report.
             try {
               result = await runTidy(input.nodes, input.relations, {
                 alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined,
-                pinned: unpins ? [] : pinnedNodeIds(activeLayoutConstraints(get())), around, budgetMs: TIDY_BUDGET_MS, frames: [...input.frames],
+                pinned: unpins ? [] : pinnedNodeIds(activeLayoutConstraints(get())), around, budget: TIDY_WORK, frames: [...input.frames],
               }, (done, message) => {
                 set((s) => { s.smartLayoutProgress = { phase: 'tidy', message: `${done} move${done === 1 ? '' : 's'} · ${message}` } })
               }, abort.signal)
@@ -6971,14 +6972,11 @@ export const useDiagramStore = create<DiagramStore>()(
             ? 'planar ✓'
             : `${Math.round((1 - result.planarity.ratio) * 100)}% planar`
           const arrow = '\u2009\u2192\u2009'
-          const tidied = (result as { tidy?: { steps: TidyStep[]; before: CostParts; after: CostParts; budgetOut?: boolean } }).tidy
+          const tidied = (result as { tidy?: TidyReport }).tidy
           const parts = tidied ? costRows(tidied.before, tidied.after) : []
-          // The three parts that gained most, as the reader sees them.
-          const gained = [...parts].sort((p, q) => (q.before - q.after) * q.weight - (p.before - p.after) * p.weight)
-            .filter((p) => p.before - p.after > 0.05).slice(0, 3)
-            .map((p) => `${p.label.toLowerCase()} ${fmtPart(p.before)}${arrow}${fmtPart(p.after)}`)
+          // The moves and the parts that gained most, as smart_layout tells an agent.
           const msg = tidied
-            ? `Smart layout${around ? ' around the selection' : ''}: ${tidied.steps.length} move${tidied.steps.length === 1 ? '' : 's'}${tidied.budgetOut ? ` in ${Math.round(TIDY_BUDGET_MS / 1000)} s (run it again for more)` : ''}${gained.length ? ` — ${gained.join(', ')}` : ''}.`
+            ? `Smart layout${around ? ' around the selection' : ''}: ${tidySummary(tidied)}.`
             : before.weightedCost === 0
               ? `Smart layout: ${result.winner.name} — ${after.crossings} crossings, ${after.overdraws} overdraws · ${planarTag}.`
               : `Smart layout: ${result.winner.name} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws} (${pct}% better) · ${planarTag}.`

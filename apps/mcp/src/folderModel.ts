@@ -21,7 +21,7 @@ import { runModelQuery } from '@radical/common/ai/queryLanguage'
 import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboundDecisions } from '@radical/common/concerns'
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
-import { runTidyLayout } from '@radical/layout/tidy'
+import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radical/layout/tidy'
 import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
@@ -604,15 +604,17 @@ export class FolderModel {
     const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
     const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
-    // Large models take minutes: report each step, and stop at the next one
+    // Large models take a while: report each step, and stop at the next one
     // once the client has cancelled (or gone away) rather than finish unseen.
     // A view set to "Hierarchical nested tree" is laid out as a tree, as
     // Studio's layout button does on it.
     if (view?.layoutMode === 'tree') return this.treeLayout(changed, nodes, view, input, constraints)
     let step = 0
     const edgeStyle = view?.edgeStyle ?? changed.defaultEdgeStyle ?? 'curved'
-    // Auto (the default) tidies the canvas move by move; a view set to
-    // Ensemble runs the eleven engines and ranks them, as Studio's button does.
+    // Auto (the default) tidies the canvas move by move, within Studio's
+    // budget (counted in work, so the same view gets the same layout from
+    // both); a view set to Ensemble runs the eleven engines and ranks them,
+    // as Studio's button does.
     const ensemble = view?.layoutMode === 'ensemble'
     const result = ensemble
       ? await runSmartLayoutCore(input.nodes, input.relations, metamodel, (p) => {
@@ -623,7 +625,7 @@ export class FolderModel {
       : (() => {
         options.onProgress?.({ progress: ++step, message: 'Smart Layout: tidying' })
         if (options.signal?.aborted) throw new Error(CANCELLED)
-        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: options.around?.length ? pinnedNodeIds(constraints) : [], around: options.around, frames: [...input.frames] })
+        return runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle, metamodel, pinned: options.around?.length ? pinnedNodeIds(constraints) : [], around: options.around, budget: TIDY_BUDGET, frames: [...input.frames] })
       })()
     if (options.signal?.aborted) return { ok: false, text: CANCELLED }
     if (!result.candidates.length) return { ok: false, text: 'Smart Layout: no candidate produced a result.' }
@@ -654,10 +656,13 @@ export class FolderModel {
     if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
     const before = result.baseline
     const after = result.winner.metrics
+    // Tidy's moves and cost parts, the numbers Studio's notice gives.
+    const tidied = (result as { tidy?: TidyReport }).tidy
+    const done = tidied ? tidySummary(tidied) : `${result.winner.name}; crossings ${before.crossings} -> ${after.crossings}, overdraws ${before.overdraws} -> ${after.overdraws}`
     return {
       ok: true,
       changed,
-      text: `Smart Layout${view ? ` (${view.name})` : ''}: ${result.winner.name}; crossings ${before.crossings} -> ${after.crossings}, overdraws ${before.overdraws} -> ${after.overdraws}.${unpinned ? ` Unpinned ${unpinned} element${unpinned === 1 ? '' : 's'}.` : ''}`,
+      text: `Smart Layout${view ? ` (${view.name})` : ''}: ${done}.${unpinned ? ` Unpinned ${unpinned} element${unpinned === 1 ? '' : 's'}.` : ''}`,
     }
   }
 
