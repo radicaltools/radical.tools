@@ -348,13 +348,17 @@ function tidyOnce(
   }
   // A pile first: elements on each other pulled apart, deepest containers first.
   take(untangleMoves(l, nodes))
-  const gather = (): void => {
+  // `judged`: a gathering that leaves the diagram worse is not taken. The
+  // closing passes judge it: there a margin taken at a loss was won back by
+  // the moves after it, and the next pass gathered again, round and round.
+  const gather = (judged = false): void => {
     for (const move of gatherMoves(l, nodes, lines)) {
       const touched = [...new Set([...move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]), ...lineReach])]
       const wasPositions = l.positions()
       const was = l.snapshot(touched)
       const lined = held()
-      if (!move.apply(l) || !keepLines(lined)) { l.restore(was); continue }
+      const cost = judged ? totalCost(l, lines).total : 0
+      if (!move.apply(l) || !keepLines(lined) || (judged && totalCost(l, lines).total > cost + 0.001)) { l.restore(was); continue }
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -604,7 +608,7 @@ function tidyOnce(
     // they are taken now, as long as the margin keeps moving.
     for (let round = 0; round < 3; round++) {
       const done = steps.length
-      gather()
+      gather(true)
       if (steps.length === done || outOfTime()) break
       stale = null
       improve()

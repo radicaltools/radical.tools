@@ -10,7 +10,7 @@ import { projectPositions } from '../src/smartLayout'
 import { projectToVisibleGraph } from '../src/geometry'
 
 const byId = (xs: any[]) => Object.fromEntries(xs.map((x) => [x.id, x]))
-const sum = { slanted: 0, crossings: 0, overdraws: 0, length: 0, area: 0, near: 0, kin: 0 }
+const sum = { slanted: 0, crossings: 0, overdraws: 0, length: 0, area: 0, near: 0, kin: 0, cramped: 0 }
 for (const f of process.argv.slice(2)) {
   const d = JSON.parse(readFileSync(f, 'utf8'))
   const input = viewLayoutInput(d.view, byId(d.nodes), byId(d.relations))
@@ -26,8 +26,8 @@ for (const f of process.argv.slice(2)) {
   const area = (Math.max(...roots.map((b) => b.x + b.w)) - Math.min(...roots.map((b) => b.x))) * (Math.max(...roots.map((b) => b.y + b.h)) - Math.min(...roots.map((b) => b.y))) / l.meanSize ** 2
   const near = l.ids().reduce((s, id) => s + nearMissesOf(l, id).length, 0) / 2
   const kin = l.ids().filter((id) => kinApartOf(l, id, (o) => !!index.linesOf.get(o)?.length).length).length
-  sum.near += near; sum.kin += kin
+  sum.near += near; sum.kin += kin; sum.cramped += c.cramped
   sum.slanted += slanted; sum.crossings += c.crossings; sum.overdraws += c.overdraws; sum.length += length; sum.area += area
-  console.log(`${basename(f).padEnd(38)} slanted ${String(slanted).padStart(2)}/${String(lines.length).padEnd(3)} cross ${c.crossings} over ${c.overdraws}  length ${length.toFixed(1).padStart(6)}  area ${area.toFixed(0).padStart(4)}  near ${near} kin ${kin}  moves ${res.tidy.steps.length}`)
+  console.log(`${basename(f).padEnd(38)} slanted ${String(slanted).padStart(2)}/${String(lines.length).padEnd(3)} cross ${c.crossings} over ${c.overdraws}  length ${length.toFixed(1).padStart(6)}  area ${area.toFixed(0).padStart(4)}  near ${near} kin ${kin} cramped ${c.cramped.toFixed(1)}  moves ${res.tidy.steps.length}`)
 }
-console.log(`TOTAL slanted ${sum.slanted} cross ${sum.crossings} over ${sum.overdraws} length ${sum.length.toFixed(1)} area ${sum.area.toFixed(0)} near ${sum.near} kin ${sum.kin}`)
+console.log(`TOTAL slanted ${sum.slanted} cross ${sum.crossings} over ${sum.overdraws} length ${sum.length.toFixed(1)} area ${sum.area.toFixed(0)} near ${sum.near} kin ${sum.kin} cramped ${sum.cramped.toFixed(1)}`)

@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { runTidyLayout } from '../../src/tidy'
 import { Layout } from '../../src/tidy/layout'
-import { buildIndex, linesOf, totalCost } from '../../src/tidy/cost'
+import { buildIndex, lineNeeds, linesOf, totalCost } from '../../src/tidy/cost'
 import { builtInGovernanceMetamodel, type Metamodel } from '@radical/common/metamodel'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type C4Relation } from '@radical/common/c4'
 import { compoundPadding, projectToVisibleGraph } from '../../src/geometry'
@@ -42,6 +42,48 @@ describe('Tidy, the finer points', () => {
       expect(m.x >= f.x + f.w || f.x >= m.x + m.w || m.y >= f.y + f.h || f.y >= m.y + m.h, `${id} clear of ${p}`).toBe(true)
     }
     expect(result.tidy.steps.every((s) => !('a' in s.moved) && !('b' in s.moved))).toBe(true)
+  })
+
+  it('every line keeps room for its label and arrowheads (the author\'s view, 2026-10-26)', () => {
+    // As the author's screenshot had it: a database 25 px beside the container
+    // it serves, the line from the system's frame to an outside system no
+    // longer than its label, a queue nearly touching the system that uses it.
+    const nodes = [
+      node('person', 'person', 680, 0),
+      node('s', 'system', 247, 178, undefined, { width: 1026, height: 1173 }),
+      node('web', 'webapp', 456, 132, 's'),
+      node('c1', 'container', 439, 358, 's', { width: 263, height: 175 }),
+      node('dbL', 'database', 205, 374, 's'),
+      node('dbR', 'database', 768, 374, 's'),
+      node('cf', 'container', 32, 607, 's', { width: 556, height: 285 }),
+      node('comp1', 'component', 22, 132, 'cf'),
+      node('comp2', 'component', 314, 132, 'cf'),
+      node('c2', 'container', 32, 965, 's'),
+      node('c3', 'container', 392, 965, 's'),
+      node('q', 'queue', 753, 1000, 's'),
+      node('ext', 'system', 1320, 666, undefined, { external: true }),
+      node('sys2', 'system', 1320, 1132),
+    ]
+    const relations = [
+      rel('person', 'web', 'uses'), rel('web', 'c1', 'uses'), rel('c1', 'dbL', 'uses'), rel('c1', 'dbR', 'uses'), rel('cf', 'dbL', 'uses'),
+      rel('c1', 'q', 'uses'), rel('c2', 'comp1', 'uses'), rel('comp2', 'comp1', 'uses'), rel('c2', 'c3', 'uses'), rel('c3', 'q', 'uses'),
+      rel('sys2', 'q', 'uses'), rel('s', 'ext', 'uses'),
+    ]
+    const { l, result } = tidy(nodes, relations)
+    expect(result.tidy.before.cramped, 'lines too short at the start').toBeGreaterThan(2)
+    // Each line as Studio draws it, port to port: long enough for its label and an arrowhead at each end.
+    const lines = linesOf(l, byId(relations))
+    const index = buildIndex(l, lines)
+    const short: string[] = []
+    for (const x of lines) {
+      const g = index.geom.get(x)!
+      let run = 0
+      for (let i = 1; i < g.path.length; i++) run += Math.hypot(g.path[i].x - g.path[i - 1].x, g.path[i].y - g.path[i - 1].y)
+      const needs = lineNeeds(x.label, g.bx - g.ax, g.by - g.ay)
+      if (run < needs - 1) short.push(`${x.id} ${Math.round(run)} < ${Math.round(needs)}`)
+    }
+    expect(short, result.tidy.steps.map((s) => s.description).join('; ')).toEqual([])
+    expect(result.tidy.after.cramped).toBe(0)
   })
 
   it('a row is spaced evenly', () => {

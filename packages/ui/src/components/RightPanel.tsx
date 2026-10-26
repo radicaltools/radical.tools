@@ -785,6 +785,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)), [allViews])
   const [editingFolder, setEditingFolder] = useState(false)
   const setViewEdgeStyle = useDiagramStore((s) => s.setViewEdgeStyle)
+  const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
   const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
@@ -1013,6 +1014,17 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
             <option value="ensemble">Ensemble (eleven algorithms, ranked)</option>
             <option value="tree">Hierarchical nested tree</option>
           </select>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, cursor: 'pointer' }}
+            title="After each change to what the view shows (yours or an agent's), Smart Layout tidies the whole view and the elements glide into place; what you drop stays pinned"
+          >
+            <input
+              type="checkbox"
+              checked={!!view.continuousLayout}
+              onChange={(e) => setViewContinuousLayout(view.id, e.target.checked)}
+            />
+            Keep smart (lay out after each change)
+          </label>
         </div>
       )}
       {(isStatic || isDynamic) && (view.layoutConstraints?.length ?? 0) > 0 && (

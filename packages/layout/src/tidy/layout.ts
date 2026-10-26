@@ -9,6 +9,12 @@ import { type LayoutRole, type Metamodel, layoutRoleOf } from '@radical/common/m
 import { compoundPadding, effectiveHeight, effectiveWidth } from '../geometry'
 import { CHILD_GAP, ROOT_GAP } from '../layoutFinalize'
 
+/** The least room between two related elements Tidy places side by side: a line
+ *  between them shows an arrowhead at each end and a one-line label
+ *  (24 + 22 + 24 px). The canvas's own gaps (20 px in a frame) left a label
+ *  over both elements and no arrowhead (the author, 2026-10-26). */
+export const LINE_GAP = 70
+
 export interface Box { x: number; y: number; w: number; h: number; cx: number; cy: number }
 
 /** Boxes stand on a grid this fine (a power of two): sums and differences of
@@ -116,6 +122,10 @@ export class Layout {
   gapOf(parent: string | undefined): number {
     while (parent && this.tight.has(parent)) parent = this.parentOf(parent)
     return parent ? CHILD_GAP : ROOT_GAP
+  }
+  /** The room an element is given beside one it has a line to: the line's arrowheads and a label. */
+  lineGapOf(parent: string | undefined): number {
+    return Math.max(LINE_GAP, this.gapOf(parent))
   }
   /** Whether the canvas draws this container only to hold what the view shows (no frame of its own). */
   isTight(id: string): boolean { return this.tight.has(id) }

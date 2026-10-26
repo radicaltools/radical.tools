@@ -719,6 +719,13 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     halved) for the author to choose from, and `fit <dir>` fits the weights
     to the choices (a perceptron over the cost parts). Pending: the author's
     answers on their own models (2026-10-24).
+58. **`search_model` takes no plain words.** An agent looking for the
+    elements about "pins" or "Tidy" gets `Unsupported query: pin`: only the
+    query language (`LIST NODES WHERE …`, `GET NODE …`) is understood, and
+    its form is not in the error. While modelling continuous layout
+    (2026-10-26) the related requirements were found by reading the folder's
+    files instead. A plain word could search labels and descriptions, and the
+    error could show the forms it takes.
 
 ### Reverse-engineered requirements (2026-10-06)
 

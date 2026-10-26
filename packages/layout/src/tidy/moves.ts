@@ -9,11 +9,11 @@
  * reads come from the metamodel (layoutHints.ts), through the Layout.
  */
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf, kinApartOf, nearMissesOf, segmentHitsRect } from './cost'
+import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf, kinApartOf, lineNeeds, nearMissesOf, segmentHitsRect } from './cost'
 import type { Layout } from './layout'
 
 export interface Move {
-  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear'
+  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear' | 'room'
   ids: string[]
   description: string
   /** Tells apart moves of one kind on the same elements with the same description (the two axes of a slide). */
@@ -163,10 +163,10 @@ function spotFree(l: Layout, id: string, axis: 'x' | 'y', delta: number, lines: 
   })
 }
 
-/** Whether `id` already stands beside `anchor` on `side`, touching by the gap. */
+/** Whether `id` already stands beside `anchor` on `side`, room for the line between them. */
 function besideOn(l: Layout, id: string, anchor: string, side: 'left' | 'right'): boolean {
   const a = l.box(anchor)!, b = l.box(id)!
-  const gap = l.gapOf(l.parentOf(id))
+  const gap = l.lineGapOf(l.parentOf(id))
   const rowed = Math.abs(a.cy - b.cy) < STRAIGHT_TOLERANCE
   const near = side === 'right' ? Math.abs(b.x - (a.x + a.w + gap)) < 1 : Math.abs(a.x - (b.x + b.w + gap)) < 1
   return rowed && near
@@ -276,6 +276,19 @@ export function compactMoves(l: Layout, nodes: Record<string, C4Node>, lines: Li
   return moves
 }
 
+/** The two elements standing side by side in one container that a line
+ *  from `a` to `b` runs between: its ends, or the frames holding them where
+ *  it leaves one. None when one holds the other. */
+function sidesOf(l: Layout, a: string, b: string): [string, string] | null {
+  const chain = (id: string): string[] => { const out = [id]; for (let p = l.parentOf(id); p; p = l.parentOf(p)) out.push(p); return out }
+  const ups = chain(b)
+  for (const x of chain(a)) {
+    const y = ups.find((u) => l.parentOf(u) === l.parentOf(x))
+    if (y !== undefined) return y === x ? null : [x, y]
+  }
+  return null
+}
+
 /** `id` slid along `axis` towards coordinate `to`, up to the comfortable
  *  distance from whatever stands in the way; false when it cannot move. */
 function slideTowards(lay: Layout, id: string, axis: 'x' | 'y', to: number, lines: Line[]): boolean {
@@ -291,14 +304,17 @@ function slideTowards(lay: Layout, id: string, axis: 'x' | 'y', to: number, line
     for (const o of lay.childrenOf(lay.parentOf(id))) {
       if (group.includes(o)) continue
       const r = lay.box(o)!
+      // A line between the two keeps room for its label and arrowheads.
+      const line = lines.find((x) => (x.a === g && x.b === o) || (x.a === o && x.b === g))
+      const keep = line ? Math.max(comfort, axis === 'x' ? lineNeeds(line.label, 1, 0) : lineNeeds(line.label, 0, 1)) : comfort
       if (axis === 'x') {
         if (r.y >= gb.y + gb.h + comfort || gb.y >= r.y + r.h + comfort) continue
         const d = sign > 0 ? r.x - (gb.x + gb.w) : gb.x - (r.x + r.w)
-        if (d >= 0) free = Math.min(free, d - comfort)
+        if (d >= 0) free = Math.min(free, d - keep)
       } else {
         if (r.x >= gb.x + gb.w + comfort || gb.x >= r.x + r.w + comfort) continue
         const d = sign > 0 ? r.y - (gb.y + gb.h) : gb.y - (r.y + r.h)
-        if (d >= 0) free = Math.min(free, d - comfort)
+        if (d >= 0) free = Math.min(free, d - keep)
       }
     }
   }
@@ -359,7 +375,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
           kind: 'pull-out', ids: [id],
           description: `${label(id)} beside ${label(anchor)}, on its ${side}`,
           apply: (lay) => {
-            const a = lay.box(anchor)!, b = lay.box(id)!, gap = lay.gapOf(lay.parentOf(id))
+            const a = lay.box(anchor)!, b = lay.box(id)!, gap = lay.lineGapOf(lay.parentOf(id))
             const x = side === 'right' ? a.x + a.w + gap : a.x - gap - b.w
             lay.moveTo(id, x, a.cy - b.h / 2)
             // Something in the way: the nearest free place to it.
@@ -380,7 +396,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
           apply: (lay) => {
             const b = lay.box(id)!
             const top = Math.min(...ns.map((n) => lay.box(n)!.y))
-            const gap = lay.gapOf(lay.parentOf(id))
+            const gap = lay.lineGapOf(lay.parentOf(id))
             lay.moveTo(id, mx - b.w / 2, top - gap - b.h)
             return lay.allClear([id]) || placeNear(lay, id, mx, top - gap - b.h / 2)
           },
@@ -399,7 +415,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
           apply: (lay) => {
             const b = lay.box(id)!
             const bottom = Math.max(...ns.map((n) => lay.box(n)!.y + lay.box(n)!.h))
-            const gap = lay.gapOf(lay.parentOf(id))
+            const gap = lay.lineGapOf(lay.parentOf(id))
             lay.moveTo(id, mx - b.w / 2, bottom + gap)
             return lay.allClear([id]) || placeNear(lay, id, mx, bottom + gap + b.h / 2)
           },
@@ -436,7 +452,7 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
           kind: 'external-out', ids: [id],
           description: `${label(id)} out of the way, below ${callers.map(label).join(', ')}`,
           apply: (lay) => {
-            const b = lay.box(id)!, gap = lay.gapOf(undefined)
+            const b = lay.box(id)!, gap = lay.lineGapOf(undefined)
             const bottom = Math.max(...callers.map((n) => lay.box(n)!.y + lay.box(n)!.h))
             lay.moveTo(id, mx - b.w / 2, bottom + gap)
             if (lay.allClear([id])) return true
@@ -580,6 +596,31 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
     }
   }
 
+  // Room for a line: two elements (or the frames holding them, where the
+  // line leaves one) so close that the line between them has no room for its
+  // label and arrowheads are slid apart along it, one or the other.
+  for (const x of lines) {
+    const ends = sidesOf(l, x.a, x.b)
+    if (!ends) continue
+    const [a, b] = ends
+    // Measured between the line's own ends; the elements side by side move.
+    const p = l.box(x.a)!, q = l.box(x.b)!
+    const dx = q.cx - p.cx, dy = q.cy - p.cy
+    const across = Math.abs(dx) >= Math.abs(dy)
+    const run = across ? Math.max(q.x - (p.x + p.w), p.x - (q.x + q.w)) : Math.max(q.y - (p.y + p.h), p.y - (q.y + q.h))
+    const short = (across ? lineNeeds(x.label, 1, 0) : lineNeeds(x.label, 0, 1)) - run
+    if (run < 0 || short < 2) continue
+    for (const [mover, sign] of [[b, 1], [a, -1]] as const) {
+      if (l.fixed(mover) || !concerns([mover])) continue
+      const d = sign * short * Math.sign((across ? dx : dy) || 1)
+      moves.push({
+        kind: 'room', ids: [mover], variant: x.id,
+        description: `${label(mover)} moved off ${label(mover === a ? b : a)}: room for the line between them`,
+        apply: (lay) => lay.allClear(across ? slide(lay, mover, d, 0, lines) : slide(lay, mover, 0, d, lines)),
+      })
+    }
+  }
+
   // Drawn closer: slid along one axis towards what it relates to (or
   // towards its siblings) as far as it stays clear of them.
   for (const id of l.ids()) {
@@ -633,7 +674,8 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
       kind: 'follow', ids: chain,
       description: x.axis === 'vertical' ? `${label(then)} under ${label(first)}: the line reads down` : `${label(then)} right of ${label(first)}: the line reads on`,
       apply: (lay) => {
-        const a = lay.box(first)!, b = lay.box(then)!, gap = lay.gapOf(lay.parentOf(then))
+        const a = lay.box(first)!, b = lay.box(then)!
+        const gap = Math.max(lay.gapOf(lay.parentOf(then)), x.axis === 'vertical' ? lineNeeds(x.label, 0, 1) : lineNeeds(x.label, 1, 0))
         const cx = x.axis === 'vertical' ? a.cx : a.x + a.w + gap + b.w / 2
         const cy = x.axis === 'vertical' ? a.y + a.h + gap + b.h / 2 : a.cy
         const tryAt = (tx: number, ty: number): boolean => {

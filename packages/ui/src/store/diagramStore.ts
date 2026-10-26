@@ -68,6 +68,7 @@ import type { HubImportRecord, HubConceptMeta } from './hubStore'
 import { conceptFileAsModel, resolveParamValues, retemplateText } from '@radical/common/hubImport'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { applyRadicalLayout } from '@radical/layout/radicalLayout'
+import { CHILD_GAP } from '@radical/layout/layoutFinalize'
 import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { TIDY_BUDGET, type TidyReport, type TidyStep, costRows, tidySummary } from '@radical/layout/tidy'
 import { runTidy, TIDY_STOPPED } from '../layout/tidyRunner'
@@ -2914,6 +2915,9 @@ export interface RequestCreateNodeOptions {
   skipWizard?: boolean
   links?: WizardLink[]
   onCreated?: (id: string) => void
+  /** Its place is where the pointer dropped it (the palette): in a parent it
+   *  stays there when it fits inside the frame clear of what is drawn there. */
+  dropped?: boolean
 }
 
 // ─── Store interface ─────────────────────────────────────────────────────────
@@ -3166,6 +3170,8 @@ interface DiagramStore {
   orderViews: (viewIds: string[]) => void
   /** How a view draws relations; null: the model's default. One undo step. */
   setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
+  /** Whether the view keeps itself tidied after each change; switched on, it is tidied at once. */
+  setViewContinuousLayout: (viewId: string, on: boolean) => void
   /** A view's pipeline (viewPipeline.ts): source, filters, grouping, order; one undo step, saved. */
   setViewPipeline: (viewId: string, pipeline: ViewPipeline) => void
   /** Makes the view one of the metamodel's viewpoint (its kind and chain,
@@ -3266,8 +3272,11 @@ interface DiagramStore {
   // ── actions: layout ──
   runRadicalLayout: () => void
   runTreeLayout: () => Promise<void>
-  /** Smart Layout on the active canvas; `around` tidies round those elements only. */
-  runSmartLayout: (options?: { around?: string[] }) => Promise<void>
+  /** Smart Layout on the active canvas; `around` tidies round those elements
+   *  only; `continuous` is the view keeping itself tidied (continuousLayout):
+   *  Tidy over the whole view, pins kept, no undo step or notice of its own,
+   *  the result glided in. */
+  runSmartLayout: (options?: { around?: string[]; continuous?: boolean }) => Promise<void>
   /** Stops a running Tidy; the canvas stays as it was. */
   cancelSmartLayout: () => void
   setLayoutMode: (mode: 'elk' | 'cola' | 'radical') => void
@@ -3631,6 +3640,187 @@ function saveLayoutNow(appMode: DiagramStore['appMode']): void {
   void flush?.()
 }
 
+// ─── Continuous layout ──────────────────────────────────────────────────────
+//
+// A view with continuousLayout on is tidied after each change to what it
+// shows (ADR "A view can keep itself tidied"). The store keeps the shape of
+// the canvas shown: its elements with their parents and sizes, its lines,
+// pins and rows, not where anything is. When the shape changes on the same
+// canvas, Tidy runs over the whole view with the pins kept, and the result
+// glides in. Undo, redo, a view switch and a load take the shape as it is
+// and run nothing; a layout moves things but leaves the shape, so it never
+// sets off another.
+
+/** How long after the last change the view is tidied. */
+export const CONTINUOUS_DELAY_MS = 250
+/** How long the elements take to glide to their new places. */
+export const CONTINUOUS_GLIDE_MS = 420
+
+/** The shape last taken, and the canvas it was taken on (layoutTarget). */
+let _continuousBase: { target: string; shape: string | null } | null = null
+let _continuousTimer: ReturnType<typeof setTimeout> | null = null
+/** A drop asks for a run even when the shape stayed (the element was pinned already). */
+let _continuousKicked = false
+
+/** The shape of the canvas shown, or null when it does not keep itself tidied. */
+function continuousShape(s: DiagramStore): string | null {
+  if (s.appMode === 'metamodel' || s.presentationActive) return null
+  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+  if (!view?.continuousLayout || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
+  const input = layoutInputForView(s)
+  const nodes = Object.values(input.nodes)
+  const holders = new Set(nodes.map((n) => n.parentId))
+  // A frame's size is the layout's to give; a leaf's is the author's.
+  const boxes = nodes.map((n) => `${n.id}<${n.parentId ?? ''}${n.collapsed ? '-' : ''}${holders.has(n.id) ? '' : `:${n.width}x${n.height}`}`).sort()
+  const lines = Object.values(input.relations).map((r) => `${r.id}:${r.sourceId}>${r.targetId}`).sort()
+  const pins = [...pinnedNodeIds(activeLayoutConstraints(s))].sort()
+  return [boxes.join(','), lines.join(','), pins.join(','), JSON.stringify(input.alignments)].join('\n')
+}
+
+/** Takes the canvas's shape as it is: what changed up to now runs nothing. */
+function continuousRebase(s: DiagramStore): void {
+  _continuousBase = { target: layoutTarget(s), shape: continuousShape(s) }
+  _continuousKicked = false
+}
+
+/** Looks at the shape once the changes have stopped for a moment. */
+function continuousSoon(): void {
+  if (_continuousTimer !== null) clearTimeout(_continuousTimer)
+  _continuousTimer = setTimeout(continuousCheck, CONTINUOUS_DELAY_MS)
+}
+
+function continuousCheck(): void {
+  _continuousTimer = null
+  const s = useDiagramStore.getState()
+  const base = _continuousBase
+  const shape = continuousShape(s)
+  // Another canvas, model or perspective, or one that does not keep
+  // itself tidied: its shape is the new base.
+  if (!base || base.target !== layoutTarget(s) || shape === null) { continuousRebase(s); return }
+  if (shape === base.shape && !_continuousKicked) return
+  // A drag held, a layout running or a glide under way: look again later.
+  if (_dragHeld || s.isLayoutRunning || _glide) { continuousSoon(); return }
+  _continuousBase = { target: base.target, shape }
+  _continuousKicked = false
+  void s.runSmartLayout({ continuous: true })
+}
+
+/** An element was dropped: the view is tidied round it (it is pinned). */
+function continuousKick(): void {
+  _continuousKicked = true
+  continuousSoon()
+}
+
+type Geometry = { x: number; y: number; width?: number; height?: number }
+
+/** Where `ids` are now. */
+function geometryOf(nodes: Record<string, C4Node>, ids: Iterable<string>): Record<string, Geometry> {
+  const out: Record<string, Geometry> = {}
+  for (const id of ids) {
+    const n = nodes[id]
+    if (n) out[id] = { x: n.x, y: n.y, width: n.width, height: n.height }
+  }
+  return out
+}
+
+/** Writes `positions` to the model and patches the drawn nodes in place, as
+ *  the live layout's frames do: no rebuild of the canvas per frame. Mutates
+ *  `state` (inside immer set). */
+function patchGeometry(state: DiagramStore, positions: Record<string, Geometry>): void {
+  for (const [id, pos] of Object.entries(positions)) {
+    const node = state.c4Nodes[id]
+    if (!node) continue
+    node.x = pos.x
+    node.y = pos.y
+    if (pos.width != null) node.width = pos.width
+    if (pos.height != null) node.height = pos.height
+  }
+  for (const rfNode of state.rfNodes) {
+    const pos = positions[rfNode.id]
+    if (!pos) continue
+    rfNode.position = { x: pos.x, y: pos.y }
+    const data = rfNode.data as C4NodeRFData
+    // The layout sizes only groups that show children. A size for
+    // a node drawn collapsed is a stale group box (a tick from
+    // before the collapse) and would leave a big empty rectangle.
+    if (data.collapsed || !data.hasChildren) continue
+    if (pos.width != null) {
+      data.width = pos.width
+      rfNode.width = pos.width
+      if (!rfNode.style) rfNode.style = {}
+      ;(rfNode.style as any).width = pos.width
+    }
+    if (pos.height != null) {
+      data.height = pos.height
+      rfNode.height = pos.height
+      if (!rfNode.style) rfNode.style = {}
+      ;(rfNode.style as any).height = pos.height
+    }
+  }
+}
+
+/** The glide under way: from where the elements were to where the layout put them. */
+let _glide: { from: Record<string, Geometry>; to: Record<string, Geometry>; start: number; frame: number; done: () => void } | null = null
+
+const easeInOut = (t: number): number => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+
+/**
+ * Shows a layout already applied (the model holds `to`) as a glide from
+ * `from`: the elements are put back where they were and moved there over
+ * CONTINUOUS_GLIDE_MS, their lines following. `done` runs at the end, or at
+ * once where nothing moved, there are no frames or less motion is asked for.
+ */
+function glideIn(from: Record<string, Geometry>, to: Record<string, Geometry>, done: () => void): void {
+  finishGlide()
+  const moved = Object.keys(to).filter((id) => {
+    const a = from[id], b = to[id]
+    return a && (a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height)
+  })
+  const still = typeof requestAnimationFrame === 'undefined'
+    || (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches)
+  if (!moved.length || still) { done(); return }
+  const glide = {
+    from: Object.fromEntries(moved.map((id) => [id, from[id]])),
+    to: Object.fromEntries(moved.map((id) => [id, to[id]])),
+    start: performance.now(),
+    frame: 0,
+    done,
+  }
+  _glide = glide
+  useDiagramStore.setState((state) => { patchGeometry(state, glide.from) })
+  const step = (): void => {
+    if (_glide !== glide) return
+    const t = Math.min(1, (performance.now() - glide.start) / CONTINUOUS_GLIDE_MS)
+    if (t >= 1) { finishGlide(); return }
+    const k = easeInOut(t)
+    const at = (a: number | undefined, b: number | undefined): number | undefined => a == null || b == null ? b : a + (b - a) * k
+    const frame: Record<string, Geometry> = {}
+    for (const [id, b] of Object.entries(glide.to)) {
+      const a = glide.from[id]
+      frame[id] = { x: at(a.x, b.x)!, y: at(a.y, b.y)!, width: at(a.width, b.width), height: at(a.height, b.height) }
+    }
+    useDiagramStore.setState((state) => { patchGeometry(state, frame) })
+    glide.frame = requestAnimationFrame(step)
+  }
+  glide.frame = requestAnimationFrame(step)
+}
+
+/** Puts the elements of the glide under way where it takes them, at once:
+ *  before an undo, a drag, a view switch or another layout reads them. */
+function finishGlide(): void {
+  const glide = _glide
+  if (!glide) return
+  _glide = null
+  if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(glide.frame)
+  useDiagramStore.setState((state) => { patchGeometry(state, glide.to) })
+  glide.done()
+}
+
+/** A glide is under way (tests and the e2e wait for its end). */
+export function continuousLayoutBusy(): boolean {
+  return _glide !== null || _continuousTimer !== null
+}
+
 // Set to true during store init when an existing document was loaded from
 // localStorage. Used by the boot startLiveLayout() call to skip the
 // 110-iteration cola bulk phase (which would immediately overwrite the
@@ -3979,11 +4169,16 @@ export const useDiagramStore = create<DiagramStore>()(
      * stored at that size (its parent then frames what is drawn; it grows
      * once something goes in it); in a parent it goes to the next cell of the
      * grid of the parent's children, the first centred in the parent as it
-     * will be fitted to hold it, whatever the drop point. What other callers
-     * add (a paste, an import, an agent) keeps the place and size it has.
+     * will be fitted to hold it. One `dropped` from the palette stays where
+     * the pointer let go of it when there is room for it there: inside the
+     * frame, clear of what the frame draws (the author, 2026-10-26). What
+     * other callers add (a paste, an import, an agent) keeps the place and
+     * size it has.
      */
-    const _placeInGrid = <T extends Omit<C4Node, 'id'>>(node: T): T => {
-      const sized = isContainerType(node.type) && !node.collapsed ? { ...node, ...drawnSize(node as unknown as C4Node, false) } : node
+    const _placeInGrid = <T extends Omit<C4Node, 'id'>>(node: T, dropped = false): T => {
+      const sized = isContainerType(node.type) && !node.collapsed
+        ? { ...node, ...drawnSize(node as unknown as C4Node, false), x: node.x + (node.width - drawnSize(node as unknown as C4Node, false).width) / 2, y: node.y + (node.height - drawnSize(node as unknown as C4Node, false).height) / 2 }
+        : node
       const { c4Nodes, activeViewId } = get()
       const parent = sized.parentId ? c4Nodes[sized.parentId] : undefined
       const view = viewById(get(), activeViewId)
@@ -3991,6 +4186,16 @@ export const useDiagramStore = create<DiagramStore>()(
       const shown = view ? computeViewNodeSet(view, c4Nodes, get().c4Relations) : null
       const size = { width: sized.width, height: sized.height }
       const pad = compoundPadding(parent.type)
+      if (dropped) {
+        const frame = get().rfNodes.find((n) => n.id === parent.id)
+        const fw = (frame?.data as C4NodeRFData | undefined)?.width ?? parent.width
+        const fh = (frame?.data as C4NodeRFData | undefined)?.height ?? parent.height
+        const inside = sized.x >= pad.side && sized.y >= pad.top && sized.x + size.width <= fw - pad.side && sized.y + size.height <= fh - pad.bottom
+        const { drawn, boxes } = childrenInView(get(), parent.id)
+        const clear = !drawn || boxes.every((b) => sized.x + size.width + CHILD_GAP <= b.x || b.x + b.width + CHILD_GAP <= sized.x
+          || sized.y + size.height + CHILD_GAP <= b.y || b.y + b.height + CHILD_GAP <= sized.y)
+        if (inside && clear) return sized
+      }
       const fitted = fittedParentSize(parent, [{ x: pad.side, y: pad.top, ...size }])
       return { ...sized, ...gridSlotIn(c4Nodes, parent.id, size, (c) => !shown || shown.has(c.id), fitted) }
     }
@@ -4329,6 +4534,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       /** Push current state to undo stack and sync canUndo/canRedo flags */
       _pushUndo() {
+        finishGlide()
         _pushUndo(get())
         set((state) => { state.canUndo = _undoStack.length > 0; state.canRedo = _redoStack.length > 0 })
       },
@@ -4433,7 +4639,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── node wizard ──────────────────────────────────────────────────────
       requestCreateNode(node, opts = {}) {
-        node = _placeInGrid(node)
+        node = _placeInGrid(node, !!opts.dropped)
         const links = opts.links ?? []
         const wizard = wizardFor(get().metamodel, node.type, 'create')
         if (wizard && !opts.skipWizard && loadStudioSettings().nodeWizardOnCreate) {
@@ -5547,6 +5753,7 @@ export const useDiagramStore = create<DiagramStore>()(
         })
       },
       setActiveView(newId) {
+        finishGlide()
         // A group of views per element is never a canvas of its own: it
         // opens on its first view (none: nothing opens). Quick Search, a
         // link and Back drew it as one, and saved positions into it.
@@ -5937,6 +6144,17 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._pushUndo()
         get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewEdgeStyle(state, viewId, style) })
+        get()._sync()
+      },
+
+      // A step of its own, as the line style is; switched on, the view is
+      // tidied at once (continuousCheck sees a shape where there was none).
+      setViewContinuousLayout(viewId, on) {
+        const view = get().views[viewId]
+        if (!view || !!view.continuousLayout === on) return
+        get()._pushUndo()
+        get()._milestoneViewEdit(viewId)
+        set((state) => { model.setViewContinuousLayout(state, viewId, on) })
         get()._sync()
       },
 
@@ -6927,6 +7145,8 @@ export const useDiagramStore = create<DiagramStore>()(
 
       cancelSmartLayout() { _tidyAbort?.abort() },
       async runSmartLayout(layoutOptions = {}) {
+        finishGlide()
+        const continuous = !!layoutOptions.continuous
         // Allowed in designer and viewer (viewer = explore: positions are
         // reverted on exit by the __preModeLayout snapshot in setAppMode).
         // Disallowed in metamodel where the canvas isn't shown.
@@ -6942,7 +7162,7 @@ export const useDiagramStore = create<DiagramStore>()(
         {
           const s = get()
           const v = s.activeViewId ? s.views[s.activeViewId] : undefined
-          if (v?.layoutMode === 'tree') {
+          if (v?.layoutMode === 'tree' && !continuous) {
             if (firstOpen) _firstLayoutOf = null
             await get().runTreeLayout()
             return
@@ -6950,15 +7170,19 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         // Auto (the default) tidies the canvas move by move; Ensemble runs
         // the eleven engines and ranks them.
-        const ensemble = (get().activeViewId ? get().views[get().activeViewId!]?.layoutMode : undefined) === 'ensemble'
-        const around = layoutOptions.around?.filter((id) => !!get().c4Nodes[id])
+        const ensemble = !continuous && (get().activeViewId ? get().views[get().activeViewId!]?.layoutMode : undefined) === 'ensemble'
+        const around = continuous ? undefined : layoutOptions.around?.filter((id) => !!get().c4Nodes[id])
         // Smart Layout over the whole view arranges everything and unpins it
         // (pins are where a drag was dropped, not a request to stay); round
         // a selection the rest stays where it is, pinned or not.
-        const unpins = ensemble || !around?.length
+        // A view keeping itself tidied keeps them: what the author drops
+        // stays, the rest is arranged round it.
+        const unpins = !continuous && (ensemble || !around?.length)
         const unpinCount = unpins && get().appMode === 'designer' ? pinnedNodeIds(activeLayoutConstraints(get())).length : 0
         const unpinNote = unpinCount ? ` Unpinned ${unpinCount} element${unpinCount === 1 ? '' : 's'}.` : ''
-        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: around ? 'tidying around' : 'tidying' } })
+        // A view keeping itself tidied tells of a run only once it takes a while.
+        const started = Date.now()
+        set((state) => { state.isLayoutRunning = true; state.smartLayoutProgress = continuous ? null : ensemble ? { phase: 'candidates', done: 0, total: 10 } : { phase: 'tidy', message: around ? 'tidying around' : 'tidying' } })
         const abort = new AbortController()
         _tidyAbort = abort
         try {
@@ -6988,20 +7212,22 @@ export const useDiagramStore = create<DiagramStore>()(
                 alignments: input.alignments, edgeStyle, metamodel: get().metamodel as Metamodel | undefined,
                 pinned: unpins ? [] : pinnedNodeIds(activeLayoutConstraints(get())), around, budget: TIDY_WORK, frames: [...input.frames],
               }, (done, message) => {
-                set((s) => { s.smartLayoutProgress = { phase: 'tidy', message: `${done} move${done === 1 ? '' : 's'} · ${message}` } })
+                if (continuous && Date.now() - started < 400) return
+                set((s) => { s.smartLayoutProgress = { phase: 'tidy', message: `${continuous ? 'keeping the view tidy · ' : ''}${done} move${done === 1 ? '' : 's'} · ${message}` } })
               }, abort.signal)
             } catch (err) {
               if ((err as Error).message === TIDY_STOPPED) { get().pushNotification('Smart layout stopped; nothing changed.', 'info'); return }
               throw err
             }
-            if (layoutTarget(get()) !== target) { layoutMissedItsCanvas(get().pushNotification); return }
           }
+          // Another canvas is shown: a view keeping itself tidied is tidied
+          // again when it is back with a change.
           if (layoutTarget(get()) !== target) {
-            layoutMissedItsCanvas(get().pushNotification)
+            if (!continuous) layoutMissedItsCanvas(get().pushNotification)
             return
           }
           if (result.candidates.length === 0) {
-            get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
+            if (!continuous) get().pushNotification('Smart layout: no candidate produced a result.', 'warning')
             return
           }
           if (result.keptCurrent) {
@@ -7015,6 +7241,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if (view) _historyKeepsFirstLayout(firstOpen, view.positions)
               return
             }
+            if (continuous) return
             // Nothing moved, but the pins came off: that is a step of its own.
             if (unpinCount) {
               if (!onExploration(get())) get()._pushUndo()
@@ -7027,8 +7254,10 @@ export const useDiagramStore = create<DiagramStore>()(
           }
           // One undo step for the whole layout. Viewer reverts positions on
           // exit anyway; a view's first layout is none (_firstLayoutOf).
-          if (get().appMode === 'designer' && !firstOpen && !onExploration(get())) get()._pushUndo()
+          // Kept tidy, it joins the step of the change that set it off.
+          if (get().appMode === 'designer' && !firstOpen && !continuous && !onExploration(get())) get()._pushUndo()
           get()._milestoneViewEdit(get().activeViewId)
+          const from = continuous ? geometryOf(get().c4Nodes, Object.keys(input.nodes)) : null
           // Added while the layout ran: its drop point was a place in the
           // layout this one replaces (893 px from anything on 300
           // elements). It is placed as a new element here, in the layout's
@@ -7084,10 +7313,14 @@ export const useDiagramStore = create<DiagramStore>()(
 
           // The live layout takes the new positions as they are: it does
           // not relax a diagram Smart Layout arranged (Smart Layout scored
-          // that relaxation itself, as one of its candidates).
-          _liveLayout?.reset()
-
-          saveLayoutNow(get().appMode)
+          // that relaxation itself, as one of its candidates). Kept tidy,
+          // the elements glide there first.
+          const landed = (): void => {
+            _liveLayout?.reset()
+            saveLayoutNow(get().appMode)
+          }
+          if (from) glideIn(from, geometryOf(get().c4Nodes, Object.keys(from)), landed)
+          else landed()
 
           // Friendly summary so the user sees what happened.
           const before = result.baseline
@@ -7107,17 +7340,19 @@ export const useDiagramStore = create<DiagramStore>()(
             : before.weightedCost === 0
               ? `Smart layout: ${result.winner.name} — ${after.crossings} crossings, ${after.overdraws} overdraws · ${planarTag}.`
               : `Smart layout: ${result.winner.name} — crossings ${before.crossings}${arrow}${after.crossings}, overdraws ${before.overdraws}${arrow}${after.overdraws} (${pct}% better) · ${planarTag}.`
-          get().pushNotification(msg + unpinNote, 'info')
+          // Kept tidy, the view changes without a notice, and the camera stays.
+          if (!continuous) get().pushNotification(msg + unpinNote, 'info')
           // Auto fit-all so the user immediately sees the freshly-laid-out
           // diagram framed in the viewport. Defer one paint so React Flow
           // has applied the new node positions before fitView measures them.
-          if (typeof requestAnimationFrame !== 'undefined') {
+          if (continuous) { /* the camera stays where the author has it */ }
+          else if (typeof requestAnimationFrame !== 'undefined') {
             requestAnimationFrame(() => { _getFitViewFn()?.() })
           } else {
             _getFitViewFn()?.()
           }
           // Console breadcrumb with full ranking + SA stats — useful for tuning.
-          console.info(
+          if (!continuous) console.info(
             '[smartLayout]', result.winner.name,
             'crossings', after.crossings, 'overdraws', after.overdraws,
             '· SA', result.refinement.before.toFixed(0), arrow, result.refinement.after.toFixed(0),
@@ -7207,39 +7442,7 @@ export const useDiagramStore = create<DiagramStore>()(
               // Update c4Nodes (source of truth) and patch rfNodes positions
               // in-place. Avoids full _sync() re-derive which would rebuild
               // all rfNodes/rfEdges arrays every animation frame.
-              for (const [id, pos] of Object.entries(positions)) {
-                const node = state.c4Nodes[id]
-                if (!node) continue
-                node.x = pos.x
-                node.y = pos.y
-                if (pos.width != null)  node.width  = pos.width
-                if (pos.height != null) node.height = pos.height
-              }
-              // Patch rfNodes positions directly (O(n) but no new array refs)
-              for (const rfNode of state.rfNodes) {
-                const pos = positions[rfNode.id]
-                if (!pos) continue
-                rfNode.position = { x: pos.x, y: pos.y }
-                const data = rfNode.data as C4NodeRFData
-                // The layout sizes only groups that show children. A size for
-                // a node drawn collapsed is a stale group box (a tick from
-                // before the collapse) and would leave a big empty rectangle.
-                if (data.collapsed || !data.hasChildren) continue
-                if (pos.width != null || pos.height != null) {
-                  if (pos.width != null) {
-                    data.width = pos.width
-                    rfNode.width = pos.width
-                    if (!rfNode.style) rfNode.style = {}
-                    ;(rfNode.style as any).width = pos.width
-                  }
-                  if (pos.height != null) {
-                    data.height = pos.height
-                    rfNode.height = pos.height
-                    if (!rfNode.style) rfNode.style = {}
-                    ;(rfNode.style as any).height = pos.height
-                  }
-                }
-              }
+              patchGeometry(state, positions)
             })
           },
         })
@@ -7260,6 +7463,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Viewer and Presenter have no undo: what is moved there is put back
         // on the way out.
         // A drag on the exploration is a step of its own (ExplorationStep).
+        finishGlide()
         const designer = get().appMode === 'designer'
         _beforeDrag = designer && !onExploration(get()) ? _captureState(get()) : null
         _explorationBeforeDrag = designer && onExploration(get()) ? explorationNow(get()) : null
@@ -7308,6 +7512,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // milestones reverts the move. A click (nothing moved) is no edit: it
         // asked how to save changes nobody had made.
         if (moved) get()._markMilestoneEdit()
+        if (moved) continuousKick()
         if (!landing) _dragLanded()
       },
 
@@ -7340,6 +7545,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Designer's steps, unseen (the canvas there is put back on return).
         if (get().appMode !== 'designer') return
         if (_undoStack.length === 0) return
+        finishGlide()
         const item = _undoStack.pop()!
         // A step of the exploration's: it is put back as it was, the way it
         // is now going to Redo.
@@ -7366,6 +7572,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const canvas = made ? after.activeViewId : before.activeViewId
         _redoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Undo')
+        continuousRebase(get())
       },
 
       clearModel() {
@@ -7395,6 +7602,7 @@ export const useDiagramStore = create<DiagramStore>()(
       redo() {
         if (get().appMode !== 'designer') return
         if (_redoStack.length === 0) return
+        finishGlide()
         const item = _redoStack.pop()!
         if (isExplorationStep(item)) {
           const now = explorationNow(get())
@@ -7408,6 +7616,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const canvas = (isStepChange(item) ? item.to : item).activeViewId
         _undoStack.push(isStepChange(item) ? { from: item.to, to: _entryOnCanvas(item.from, canvas) } : _entryOnCanvas(now, canvas))
         _restoreHistoryItem(item, now, 'Redo')
+        continuousRebase(get())
       },
 
       // ── snapshots (versions) ────────────────────────────────────────────
@@ -8958,6 +9167,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       // ── I/O ─────────────────────────────────────────────────────────────
       loadDiagram(loaded, opts) {
+        finishGlide()
         // A Hub concept file opened as a model: its template filled in.
         const data = conceptFileAsModel(loaded)
         if (!opts?.outsideChange) _modelLoads++
@@ -9477,6 +9687,14 @@ export const useDiagramStore = create<DiagramStore>()(
     }
   })
 )
+
+// A view keeping itself tidied looks at its shape after each change to the
+// model or the views (continuousCheck); a glide's frames only reset the wait.
+useDiagramStore.subscribe((s, prev) => {
+  if (s.c4Nodes !== prev.c4Nodes || s.c4Relations !== prev.c4Relations || s.views !== prev.views
+    || s.activeViewId !== prev.activeViewId || s.defaultLayoutConstraints !== prev.defaultLayoutConstraints
+    || s.appMode !== prev.appMode) continuousSoon()
+})
 
 // Auto-start live cola layout (skip in test/SSR environments)
 if (typeof requestAnimationFrame !== 'undefined') {

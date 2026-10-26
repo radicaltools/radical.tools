@@ -75,6 +75,36 @@ test('tidy lists its moves', async ({ page, studio }) => {
   await expect(rows.first().locator('td').nth(1)).not.toBeEmpty()
 })
 
+test('continuous layout glides the view into place after an add', async ({ page, studio }) => {
+  // Keep smart on: an element added and related is drawn in by Tidy over
+  // the whole view, and it glides there frame by frame rather than jumping.
+  await studio.seed()
+  await studio.open('v-context')
+  const keepSmart = page.getByRole('button', { name: 'Keep smart' })
+  await keepSmart.click()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'true')
+  await studio.advance(3000)
+  const before = new Set(await studio.nodes.evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.id!)))
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await expect(studio.nodes).toHaveCount(4)
+  const added = (await studio.nodes.evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.id!))).find((id) => !before.has(id))!
+  await studio.connect(studio.node(added), studio.node('bookstore'))
+  await expect(studio.edges).toHaveCount(3)
+  // Frame by frame: where the added element is drawn.
+  const seen: string[] = []
+  let still = 0
+  for (let i = 0; i < 1500 && still < 60; i++) {
+    await studio.advance(16)
+    await page.waitForTimeout(5)
+    const at = await studio.node(added).evaluate((el) => (el as HTMLElement).style.transform)
+    if (at !== seen[seen.length - 1]) { seen.push(at); still = 0 } else if (seen.length > 1) still++
+  }
+  expect(seen.length, `glided through ${seen.join(' → ')}`).toBeGreaterThanOrEqual(4)
+  const doc = await studio.storedDoc()
+  expect(doc.views?.find((v) => v.id === 'v-context')).toMatchObject({ continuousLayout: true })
+  expect(await studio.layoutViolations()).toEqual([])
+})
+
 test('the result is the same on every run', async ({ browser }) => {
   const prepare = async (s: Studio): Promise<void> => {
     await s.seed()

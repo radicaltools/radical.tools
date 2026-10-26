@@ -20,6 +20,14 @@ const IconSmartLayout = () => (
   </svg>
 )
 
+// Two arrows going round: the view keeps itself tidied.
+const IconContinuous = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 6.5A5 5 0 0 0 3.6 5.2M3 9.5a5 5 0 0 0 9.4 1.3" />
+    <path d="M3.4 2.6v2.8h2.8M12.6 13.4v-2.8H9.8" />
+  </svg>
+)
+
 // Hierarchical tree icon — root branching down to two children, each with two
 // leaves. Used when the active view is configured for the nested-tree layout.
 const IconTreeLayout = () => (
@@ -174,6 +182,14 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
     s.activeViewId ? s.views[s.activeViewId]?.layoutMode ?? 'auto' : 'auto'
   )
 
+  // Continuous layout is the view's (saved with it): a static view in Designer.
+  const continuousView = useDiagramStore((s) => {
+    const v = s.activeViewId ? s.views[s.activeViewId] : undefined
+    return s.appMode === 'designer' && v && (v.kind ?? 'static') === 'static' ? v : undefined
+  })
+  const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
+  const continuous = !!continuousView?.continuousLayout
+
   // A running Tidy can be stopped from the button; the ensemble runs on.
   const tidying = isLayoutRunning && smartLayoutProgress?.phase === 'tidy'
 
@@ -203,6 +219,18 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
           {busyLabel && <span><span className="toolbar-btn-spin"><IconSmartLayout /></span> {busyLabel}</span>}
         </span>
       </button>
+      {continuousView && !readOnlyNote && (
+        <button
+          className={`toolbar-btn canvas-continuous-toggle${continuous ? ' active' : ''}`}
+          onClick={() => setViewContinuousLayout(continuousView.id, !continuous)}
+          aria-pressed={continuous}
+          title={continuous
+            ? 'Keep smart is on for this view: after each change Smart Layout tidies it and the elements glide into place; what you drop stays pinned. Click to turn it off'
+            : 'Keep smart is off: the view stays as it is until you run Smart Layout. Click to tidy it after each change, saved with the view'}
+        >
+          <IconContinuous /> Keep smart
+        </button>
+      )}
       {progress && <span className="smart-layout-status" role="status">{progress}</span>}
       {/* Held in place (hidden) while the layout runs, so the controls do
           not shift when it starts and ends. */}
