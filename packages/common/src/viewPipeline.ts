@@ -15,7 +15,7 @@ import { holderOf, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
-import { relationMayJoinHolder, relationRefusal } from './relationRules'
+import { newLinkFit, relationMayJoinHolder, relationRefusal } from './relationRules'
 import { relationTypeKeepsAggregates } from './metamodel/domainModel'
 
 export interface PipelineContext {
@@ -133,11 +133,14 @@ function ancestorsOf(node: C4Node, ctx: PipelineContext): string[] {
 }
 
 /** The values `node` has for `key`, as its card shows them: one that stores
- *  none (undefined) reads as its type's default; a stored '' is no value
- *  (a cleared default). */
+ *  none (undefined) reads as its type's default, and so does a choice
+ *  (enum) stored as '', as the canvas and the rules read it (an entity of
+ *  Kind '' is an aggregate root); any other stored '' is no value (a
+ *  cleared default). */
 function propertyValues(node: C4Node, key: string, ctx: PipelineContext): string[] {
   let raw = (node as unknown as Record<string, unknown>)[key]
-  if (raw === undefined || raw === null) raw = ctx.metamodel?.nodeTypes[node.type]?.properties?.find((p) => p.key === key)?.default
+  const def = ctx.metamodel?.nodeTypes[node.type]?.properties?.find((p) => p.key === key)
+  if (raw === undefined || raw === null || (raw === '' && def?.type === 'enum')) raw = def?.default
   if (raw === undefined || raw === null || raw === '') return []
   return (Array.isArray(raw) ? raw : [raw]).map((v) => String(v))
 }
@@ -748,7 +751,17 @@ function meetFilters(type: string, filters: ViewFilter[] | undefined, link: Omit
             return true
           }
           const fails = f.op === 'unset' ? hasDefault : hasDefault && !!f.values?.includes(String(def))
-          if (fails) properties[f.key] = ''
+          if (!fails) return true
+          // A choice cannot be cleared (it reads as its default): another
+          // of its options, where the filter leaves one.
+          const prop = props.find((p) => p.key === f.key)
+          if (prop?.type === 'enum') {
+            const other = f.op === 'is-not' ? prop.options?.find((o) => !f.values?.includes(o)) : undefined
+            if (!other) return false
+            properties[f.key] = other
+            return true
+          }
+          properties[f.key] = ''
           return true
         }
         case 'within': {
@@ -874,7 +887,13 @@ export function addChoices(view: DiagramView | undefined, ctx: PipelineContext, 
       if (meet.excluded) continue
       if ('contains' in via) { push({ type: t, parentId: under.node.id, ...withFilters(meet), group: viaLabel(via, ctx) }); continue }
       const place = meet.within ? { parentId: meet.within } : placeBeside(t, under.node, ctx)
-      if (place) push({ type: t, ...place, link: { ...link!, otherId: under.node.id }, ...withFilters(meet), group: viaLabel(via, ctx) })
+      if (!place) continue
+      // Only a link the model accepts, with the values that make it fit (a
+      // part of an aggregate is Kind entity): offered otherwise, it was
+      // refused once named, or made without the link.
+      const full = { ...link!, otherId: under.node.id }
+      const fit = newLinkFit(ctx, { type: t, parentId: place.parentId, properties: meet.properties }, full)
+      if (fit) push({ type: t, ...place, link: full, ...withFilters({ ...meet, properties: fit as Record<string, string> }), group: viaLabel(via, ctx) })
     }
   }
   return out

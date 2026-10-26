@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import type { C4Node, C4Relation, DiagramView, ViewPipeline } from '../src/c4'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import type { C4Node, C4Relation, DiagramData, DiagramView, ViewPipeline } from '../src/c4'
 import { builtInGovernanceMetamodel } from '../src/metamodel/presets/governance'
 import {
   applyFilters, chainDrawn, chainRelationFor, filterLabel, levelLabel, runChain, runPipeline, sortNodes, suggestFilters,
   suggestNextWays, suggestSorts, suggestStartWays, viewShownNodes, readPipeline,
   typeChoices, propertyChoices, relationChoices, placeChoices, viaChoices, addChoices, newElementFilters, levelTypes, chainTypes, linkCandidates, connectTypes, type ChainRow, type PipelineContext,
 } from '../src/viewPipeline'
-import { checkAddRelation, setViewPipeline, type ModelState } from '../src/model'
+import { checkAddRelation, documentMetamodel, setViewPipeline, type ModelState } from '../src/model'
 import { serializeToMdFolder, deserializeFromMdFolder } from '../src/formats/mdFolder'
 import { runModelQuery } from '../src/ai/queryLanguage'
 
@@ -169,21 +171,22 @@ describe('view pipeline: filters and order', () => {
   })
 
   it("reads an element that stores no value as its type's default, as the card does", () => {
+    // A choice stored as '' reads as its default too, as the Warnier view
+    // draws it (no repeat mark) and the rules read an entity of Kind ''.
     const steps = [
       node('s-default', 'step'), node('s-once', 'step', { repeat: '1' }), node('s-many', 'step', { repeat: '1..n' }),
       node('s-cleared', 'step', { repeat: '' }),
     ]
     const stepCtx: PipelineContext = { nodes: Object.fromEntries(steps.map((n) => [n.id, n])), relations: [], metamodel: ctx.metamodel }
     const kept = (f: Parameters<typeof applyFilters>[1]) => applyFilters(steps, f, stepCtx).nodes.map((n) => n.id)
-    expect(kept([{ kind: 'property', key: 'repeat', op: 'is', values: ['1'] }])).toEqual(['s-default', 's-once'])
-    expect(kept([{ kind: 'property', key: 'repeat', op: 'is-not', values: ['1'] }])).toEqual(['s-many', 's-cleared'])
-    expect(kept([{ kind: 'property', key: 'repeat', op: 'unset' }])).toEqual(['s-cleared'])
-    expect(kept([{ kind: 'property', key: 'repeat', op: 'set' }])).toEqual(['s-default', 's-once', 's-many'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'is', values: ['1'] }])).toEqual(['s-default', 's-once', 's-cleared'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'is-not', values: ['1'] }])).toEqual(['s-many'])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'unset' }])).toEqual([])
+    expect(kept([{ kind: 'property', key: 'repeat', op: 'set' }])).toEqual(['s-default', 's-once', 's-many', 's-cleared'])
     const labels = suggestFilters(steps, stepCtx).map((s) => `${s.label} (${s.count})`)
-    expect(labels).toContain('Repeat is 1 (2)')
-    expect(labels).toContain('Repeat is not set (1)')
-    expect(propertyChoices(steps, stepCtx).find((c) => c.key === 'repeat')!.values.find((v) => v.value === '1')!.count).toBe(2)
-    expect(sortNodes(steps, { by: 'property', key: 'repeat', desc: true }, stepCtx).map((n) => n.id)).toEqual(['s-many', 's-default', 's-once', 's-cleared'])
+    expect(labels).toContain('Repeat is 1 (3)')
+    expect(propertyChoices(steps, stepCtx).find((c) => c.key === 'repeat')!.values.find((v) => v.value === '1')!.count).toBe(3)
+    expect(sortNodes(steps, { by: 'property', key: 'repeat', desc: true }, stepCtx).map((n) => n.id)[0]).toBe('s-many')
     expect(suggestSorts([steps[0]], stepCtx).map((s) => s.label)).toContain('Repeat')
   })
 
@@ -477,5 +480,65 @@ describe('connectTypes', () => {
     const domains: ViewPipeline = { edges: 'all', levels: [{ ways: [{ types: ['domain'] }] }] }
     expect(connectTypes(viewOf(domains), 'Billing', ids, ctx).get('Ledger')!.length).toBeGreaterThan(1)
     expect(connectTypes(viewOf(), 'gone', ids, ctx).size).toBe(0)
+  })
+})
+
+describe('view pipeline: a new element offered under another is one the model accepts', () => {
+  const sample = JSON.parse(readFileSync(fileURLToPath(new URL('../../../apps/studio/src/renderer/src/store/fintechSampleData.json', import.meta.url)), 'utf8')) as DiagramData
+  const sampleCtx: PipelineContext = {
+    nodes: Object.fromEntries(sample.nodes.map((n) => [n.id, n])),
+    relations: Object.fromEntries(sample.relations.map((r) => [r.id, r])),
+    metamodel: documentMetamodel(sample.metamodel, sample.nodes),
+  }
+  const view = (pipeline: ViewPipeline): DiagramView => ({ id: 'v', name: 'v', kind: 'table', nodeIds: [], positions: {}, pipeline }) as DiagramView
+  const byLabel = (label: string) => sample.nodes.find((n) => n.label === label)!
+  // Each choice under each row, made as offered: its link is not refused.
+  const refusals = (pipeline: ViewPipeline): string[] => {
+    const out: string[] = []
+    for (const row of runPipeline(view(pipeline), sampleCtx).rows ?? []) {
+      for (const c of addChoices(view(pipeline), sampleCtx, { node: row.node, depth: row.depth })) {
+        if (!c.link) continue
+        const made = { id: 'new', type: c.type, label: 'New', parentId: c.parentId, ...c.properties } as C4Node
+        const state = { ...sampleCtx, c4Nodes: { ...sampleCtx.nodes, new: made }, c4Relations: sampleCtx.relations } as unknown as ModelState
+        const rel = c.link.direction === 'out'
+          ? { sourceId: 'new', targetId: c.link.otherId, relationType: c.link.relationType }
+          : { sourceId: c.link.otherId, targetId: 'new', relationType: c.link.relationType }
+        const why = checkAddRelation(state, rel)
+        if (why) out.push(`${c.type} under ${row.node.label}: ${why}`)
+      }
+    }
+    return out
+  }
+
+  it('a part of an aggregate root is made Kind entity, and none is offered under a part', () => {
+    const aggregates: ViewPipeline = { levels: [
+      { ways: [{ types: ['entity'] }] },
+      { ways: [{ via: { relationType: 'part-of', direction: 'in' }, types: ['entity'] }] },
+    ] }
+    expect(refusals(aggregates)).toEqual([])
+    const [part, ...rest] = addChoices(view(aggregates), sampleCtx, { node: byLabel('Payment'), depth: 0 })
+    expect(rest).toEqual([])
+    expect(part).toMatchObject({ type: 'entity', properties: { kind: 'entity' }, link: { relationType: 'part-of', direction: 'out' } })
+    expect(addChoices(view(aggregates), sampleCtx, { node: byLabel('FX Quote'), depth: 0 })).toEqual([])
+  })
+
+  it('a container is not offered by a relation to the system that would hold it', () => {
+    const systems: ViewPipeline = { levels: [
+      { ways: [{ types: ['system', 'container', 'webapp', 'database', 'queue'] }] },
+      { ways: [{ via: { anyRelation: true }, types: ['person', 'system', 'container', 'webapp', 'database', 'queue'] }] },
+    ] }
+    expect(refusals(systems)).toEqual([])
+    const core = addChoices(view(systems), sampleCtx, { node: byLabel('Core Banking Platform'), depth: 0 })
+    expect(core.map((c) => c.type)).not.toContain('container')
+  })
+
+  it('a choice whose default a filter leaves out gets another of its options, never an empty one', () => {
+    const parts: ViewPipeline = { levels: [
+      { ways: [{ types: ['entity'] }], filters: [{ kind: 'property', key: 'kind', op: 'is-not', values: ['aggregate-root'] }] },
+    ] }
+    expect(addChoices(view(parts), sampleCtx)[0]).toMatchObject({ type: 'entity', properties: { kind: 'entity' } })
+    // Stored as '', a choice reads as its default, as the canvas and the rules read it.
+    const blank = { ...byLabel('FX Quote'), id: 'blank', kind: '' } as C4Node
+    expect(applyFilters([blank], parts.levels![0].filters!, sampleCtx).nodes).toEqual([])
   })
 })

@@ -47,7 +47,7 @@ import {
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
 import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
-import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
+import { newLinkFit, relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 
@@ -662,16 +662,18 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
     const nests = hierarchy ? relationPhrase(metamodel?.relationTypes[hierarchy], 'in') : undefined
     return childTypesOf(node, c4Nodes, metamodel, typeMeta, viewTypes)
       .sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
-      .map((t) => ({
-        type: t.id,
-        group: nests?.reads ? nests.text : nodeTypeCategory(t.id).label,
+      .flatMap((t): ChildChoice[] => {
+        const group = nests?.reads ? nests.text : nodeTypeCategory(t.id).label
         // A type that nests by a relation (a requirement under a need)
         // becomes a child through that relation, in the same container as
         // `node`; any other is placed inside `node`.
-        ...(hierarchy
-          ? { parentId: node.parentId, link: { relationType: hierarchy, direction: 'out' as const, otherId: node.id } }
-          : { parentId: node.id }),
-      }))
+        if (!hierarchy) return [{ type: t.id, group, parentId: node.id }]
+        const link = { relationType: hierarchy, direction: 'out' as const, otherId: node.id }
+        // With the values the link needs (a part of an aggregate), and
+        // only where the model accepts it (no part of a part).
+        const fit = newLinkFit(ctx, { type: t.id, parentId: node.parentId }, link)
+        return fit ? [{ type: t.id, group, parentId: node.parentId, link, ...(Object.keys(fit).length ? { properties: fit as Record<string, string> } : {}) }] : []
+      })
   }
 
   const existingFor: WikiActions['existingFor'] = (type, under) => {

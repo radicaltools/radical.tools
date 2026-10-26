@@ -616,6 +616,28 @@ test.describe('the wiki keeps the metamodel', () => {
     await expect(relationships.filter({ hasText: /part of/i })).toHaveCount(0)
   })
 
+  // F-0100: a line written on an aggregate root's page made a new entity,
+  // which is a root by default: refused as a part, it was written as one
+  // more root, unlinked. A part's page offered parts too.
+  test("a part written on an aggregate root's page is a part linked to it, and a part's page offers none", async ({ page, studio }) => {
+    await studio.open('v-wiki/f/e1')
+    const start = page.locator('.wiki-write-start')
+    const entities = start.getByRole('button', { name: 'Entities', exact: true })
+    if (await entities.count()) await entities.click()
+    const line = page.getByRole('textbox', { name: /^Write an? entity$/ }).first()
+    await line.fill('Order Fee')
+    await line.press('Enter')
+    await expect.poll(async () => {
+      const doc = await studio.storedDoc() as unknown as { nodes: Array<{ id: string; label: string; kind?: string; parentId?: string }>; relations: Array<{ sourceId: string; targetId: string; relationType?: string }> }
+      const added = doc.nodes.find((n) => n.label === 'Order Fee')
+      return added && `${added.kind} in ${added.parentId}: ${doc.relations.filter((r) => r.sourceId === added.id).map((r) => `${r.relationType} → ${r.targetId}`).join(', ')}`
+    }).toBe('entity in d1: part-of → e1')
+    await studio.open('v-wiki/f/e3')
+    await expect(page.locator('.wiki-title')).toHaveText('Line')
+    await expect(page.getByRole('textbox', { name: /^Write an? entity$/ })).toHaveCount(0)
+    await expect(start.getByRole('button', { name: 'Entities', exact: true })).toHaveCount(0)
+  })
+
   // Decided 2026-10-21 (runs 65 to 69): the wiki's Delete asks as the
   // canvas does, counting the relations and sequence steps that go, and
   // Undo brings it all back.

@@ -2290,7 +2290,8 @@ function AttrValue({ def, value, readOnly, onChange }: {
   readOnly: boolean
   onChange: (v: unknown) => void
 }) {
-  const shown = value ?? def.default
+  // A choice stored as '' reads as its default, as the canvas and the rules read it.
+  const shown = def.type === 'enum' && value === '' ? def.default : value ?? def.default
   if (def.type === 'ref') {
     // None picked is no value ("(none)" stored event: "").
     return <RefPicker def={def as PropertyDef} value={value} readOnly={readOnly} className="pp-input pp-select" onChange={(v) => !readOnly && onChange(v === '' ? undefined : v)} />
