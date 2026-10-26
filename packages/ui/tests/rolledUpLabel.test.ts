@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { NODE_SIZES } from '@radical/common/c4'
+import { relationTypeName } from '@radical/common/metamodel'
 import { useDiagramStore } from '../src/store/diagramStore'
 
 const s = useDiagramStore.getState
@@ -43,6 +44,22 @@ describe('A rolled-up line\'s label', () => {
     s().setActiveView('ctx')
     expect(line().data?.label).toBe('Admin API calls\nAPI calls\nAPI calls')
     expect(line().data?.technology).toBeUndefined()
+  })
+
+  it('lists a relation without a name by its type, as a line of one relation shows it', () => {
+    // Relations without a name were left out of the list, and unnamed ones
+    // of two types read as the first one's type alone.
+    const data = model(['HTTPS / REST', 'HTTPS / REST', 'HTTPS / REST'])
+    data.relations = [
+      { ...data.relations[0], label: undefined, relationType: 'uses' },
+      data.relations[1],
+      { ...data.relations[2], label: undefined, relationType: 'depends-on' },
+    ]
+    s().loadDiagram(data)
+    s().setActiveView('ctx')
+    const typeName = (id: string) => relationTypeName(s().metamodel, id, true, { from: 'container', to: 'system' })
+    expect(typeName('uses')).not.toBe(typeName('depends-on'))
+    expect(line().data?.label).toBe(`${typeName('uses')}\nAPI calls\n${typeName('depends-on')}`)
   })
 
   it('shows the technology they all use', () => {
