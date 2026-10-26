@@ -372,7 +372,8 @@ export function nestRefusal(state: ModelState, ids: string[], newParentId: strin
  *  is shown) are rebased the same way where the node then lies inside its
  *  new parent's frame there and on none of its new siblings; where it does
  *  not, its place there is dropped, and that canvas gives it one inside the
- *  parent, beside its siblings, when it shows (placeUnplaced). */
+ *  parent, beside its siblings, when it shows (placeUnplaced); at the top,
+ *  it goes to the free place nearest it there. */
 /** The relations that would join an element of `ids` (or one it holds) to
  *  what holds it once they are moved into `newParentId`: containment then
  *  joins them, so the move takes them; not those that may join an element
@@ -402,6 +403,26 @@ export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Rel
   return Object.values(state.c4Relations).filter((r) => !relationMayJoinHolder(state.metamodel, r.relationType)
     && (under(r.sourceId) || under(r.targetId))
     && (holds(r.sourceId, r.targetId) || holds(r.targetId, r.sourceId)))
+}
+
+/** The top-left corner nearest `box` where it lies clear of `taken` by
+ *  `gap`: tried on rings round it, nearest first (the layout's freeSpotNear,
+ *  which the model does not import); with no room within reach, right of
+ *  everything. */
+function freePlaceNear(taken: readonly NodePosition[], box: NodePosition, gap = 60): { x: number; y: number } {
+  const fits = (x: number, y: number): boolean => taken.every((b) =>
+    x + box.width + gap <= b.x || b.x + b.width + gap <= x || y + box.height + gap <= b.y || b.y + b.height + gap <= y)
+  const step = 80
+  for (let ring = 0; ring <= 40; ring++) {
+    const spots: Array<{ x: number; y: number }> = []
+    for (let k = -ring; k <= ring; k++) {
+      spots.push({ x: box.x + k * step, y: box.y - ring * step }, { x: box.x + k * step, y: box.y + ring * step })
+      if (k !== -ring && k !== ring) spots.push({ x: box.x - ring * step, y: box.y + k * step }, { x: box.x + ring * step, y: box.y + k * step })
+    }
+    spots.sort((a, b) => Math.hypot(a.x - box.x, a.y - box.y) - Math.hypot(b.x - box.x, b.y - box.y))
+    for (const s of spots) if (fits(s.x, s.y)) return s
+  }
+  return { x: Math.max(box.x, ...taken.map((b) => b.x + b.width)) + gap, y: box.y }
 }
 
 /** Moves `ids` into `newParentId` (null: the top of the model). Returns the
@@ -442,16 +463,26 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     }
     const overlaps = (a: NodePosition, b: NodePosition): boolean =>
       a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    // At the top, what it may not lie on: the siblings there, and what was
+    // moved there before it.
+    const taken = newParentId ? [] : siblings.filter((s) => s.id in positions).map((s) => drawn(s.id, positions[s.id]))
     return moving.filter((id) => id in positions).map((id) => {
       const abs = absOf(id, positions)
       const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
       // It keeps its place where that lies inside its new parent's frame
       // (anywhere at the root) and on none of its new siblings; in a parent
       // the canvas has no place for, outside its frame or on a sibling, it
-      // is placed afresh (beside its siblings, placeUnplaced).
+      // is placed afresh (beside its siblings, placeUnplaced). At the top it
+      // lies on what it was taken out of: it goes to the free place nearest
+      // it there (beside every sibling, it went to the far right).
       const at = drawn(id, box)
       const inside = !newParentId || (!!parent && at.x >= 0 && at.y >= 0 && at.x + at.width <= parent.width && at.y + at.height <= parent.height)
       const clear = !siblings.some((s) => s.id in positions && overlaps(at, drawn(s.id, positions[s.id])))
+      if (!newParentId) {
+        const free = clear ? box : { ...box, ...freePlaceNear(taken, at) }
+        taken.push(drawn(id, free))
+        return { positions, id, box: free }
+      }
       return { positions, id, box: inside && clear ? box : null }
     })
   }).flat()
