@@ -5,7 +5,8 @@ label: "Pinned elements stay"
 given: "a view with two elements pinned where the author dropped them, the rest piled up"
 tests: |
   packages/layout/tests/tidy/craft.test.ts › pinned elements stay where they are
+  packages/layout/tests/tidy/craft.test.ts › Tidy, the finer points › a frame holding a pinned element is not moved
   packages/ui/tests/calmDrag.test.ts › Tidy keeps the pins and leaves the pinned elements where they are
-then: "the pinned elements have not moved, the rest stands tidied round them, and the pins are still there"
+then: "the pinned elements have not moved, nor the frames holding them (moving one would carry them along), the rest stands tidied round them, and the pins are still there"
 when: "Smart Layout tidies it"
 ---

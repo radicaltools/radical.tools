@@ -952,24 +952,34 @@ describe('Pins in the store', () => {
     expect(pinnedNodeIds(s().views[vid].layoutConstraints)).toEqual(['a', 'b'])
   }, 60_000)
 
-  it('Tidy keeps the pins and leaves the pinned elements where they are', async () => {
+  it('Smart Layout over the whole view unpins it; round a selection the pinned elements stay, pinned', async () => {
     const s = useDiagramStore.getState
-    useDiagramStore.setState({
-      c4Nodes: {
-        a: node('a', 'system', { x: 0, y: 0 }),
-        b: node('b', 'system', { x: 600, y: 0 }),
-        c: node('c', 'system', { x: 20, y: 20 }),
-        d: node('d', 'system', { x: 30, y: 30 }),
-      },
-      c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, cd: { id: 'cd', sourceId: 'c', targetId: 'd' } },
-    } as any)
-    s()._sync()
-    s().liveRelease('a', ['b'])
-    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
+    const start = () => {
+      useDiagramStore.setState({
+        c4Nodes: {
+          a: node('a', 'system', { x: 0, y: 0 }),
+          b: node('b', 'system', { x: 2600, y: 0 }),
+          c: node('c', 'system', { x: 20, y: 20 }),
+          d: node('d', 'system', { x: 30, y: 30 }),
+        },
+        c4Relations: { ab: { id: 'ab', sourceId: 'a', targetId: 'b' }, cd: { id: 'cd', sourceId: 'c', targetId: 'd' } },
+        defaultLayoutConstraints: [],
+      } as any)
+      s()._sync()
+      s().liveRelease('a', ['b'])
+      expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
+    }
+    // The whole view: the pins are where drags were dropped, not places to keep.
+    start()
     await s().runSmartLayout()
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual([])
+    expect(s().c4Nodes.b.x, 'b drawn in to a').toBeLessThan(2600)
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('Unpinned 2 elements')
+    // Round a selection: what is pinned stays, and keeps its pin.
+    start()
+    await s().runSmartLayout({ around: ['c'] })
     expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['a', 'b'])
-    expect([s().c4Nodes.a.x, s().c4Nodes.a.y, s().c4Nodes.b.x, s().c4Nodes.b.y]).toEqual([0, 0, 600, 0])
-    // The rest was tidied off them.
+    expect([s().c4Nodes.a.x, s().c4Nodes.a.y, s().c4Nodes.b.x, s().c4Nodes.b.y]).toEqual([0, 0, 2600, 0])
     for (const id of ['c', 'd']) for (const p of ['a', 'b']) {
       const m = s().c4Nodes[id], f = s().c4Nodes[p]
       expect(m.x >= f.x + f.width || f.x >= m.x + m.width || m.y >= f.y + f.height || f.y >= m.y + m.height, `${id} clear of ${p}`).toBe(true)

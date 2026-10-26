@@ -103,11 +103,13 @@ export function distributePorts(
   if (edges.length === 0) return result
 
   const isVertical = side === Position.Top || side === Position.Bottom
-  // Sort by perpendicular coord of OTHER endpoint
+  // Sort by perpendicular coord of OTHER endpoint; ends level with each
+  // other by edge id, so the order never hangs on the order edges came in
+  // (Tidy keeps the buckets up to date incrementally and must agree).
   const sorted = [...edges].sort((a, b) =>
-    isVertical
+    (isVertical
       ? a.otherCenter.x - b.otherCenter.x
-      : a.otherCenter.y - b.otherCenter.y
+      : a.otherCenter.y - b.otherCenter.y) || (a.edgeId < b.edgeId ? -1 : a.edgeId > b.edgeId ? 1 : 0)
   )
 
   const total = isVertical ? w : h

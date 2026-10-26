@@ -9,11 +9,11 @@
  * reads come from the metamodel (layoutHints.ts), through the Layout.
  */
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf } from './cost'
+import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf, kinApartOf, nearMissesOf, segmentHitsRect } from './cost'
 import type { Layout } from './layout'
 
 export interface Move {
-  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order'
+  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear'
   ids: string[]
   description: string
   /** Tells apart moves of one kind on the same elements with the same description (the two axes of a slide). */
@@ -92,6 +92,75 @@ function slide(l: Layout, id: string, dx: number, dy: number, lines: Line[]): st
   const group = [id, ...satellitesOf(l, id, lines).filter((s) => !l.fixed(s))]
   for (const g of group) l.moveBy(g, dx, dy)
   return group
+}
+
+/** `id` with its satellites slid by `delta` along `axis` into line with
+ *  something; when the spot is taken, on along the other axis to the
+ *  nearest place clear of what stands there, as a person moves an element
+ *  into line and then just past the one in the way: never past `partner`,
+ *  what it is put in line with, which would turn the line round. */
+function slideInto(l: Layout, id: string, axis: 'x' | 'y', delta: number, lines: Line[], partner: string): boolean {
+  const group = axis === 'x' ? slide(l, id, delta, 0, lines) : slide(l, id, 0, delta, lines)
+  if (l.allClear(group)) return true
+  const parent = l.parentOf(id)
+  const gap = l.gapOf(parent)
+  const along = axis === 'x' ? 'y' : 'x'
+  const by = (d: number) => { for (const g of group) along === 'x' ? l.moveBy(g, d, 0) : l.moveBy(g, 0, d) }
+  const span = (): [number, number] => {
+    const bs = group.map((g) => l.box(g)!)
+    return along === 'x' ? [Math.min(...bs.map((b) => b.x)), Math.max(...bs.map((b) => b.x + b.w))] : [Math.min(...bs.map((b) => b.y)), Math.max(...bs.map((b) => b.y + b.h))]
+  }
+  // Just before or just past each sibling in the way, and a few steps either side.
+  const offsets = new Set<number>()
+  const [s0, s1] = span()
+  for (const o of l.childrenOf(parent)) {
+    if (group.includes(o)) continue
+    const r = l.box(o)!
+    const hit = group.some((g) => { const b = l.box(g)!; return b.x < r.x + r.w + gap && r.x < b.x + b.w + gap && b.y < r.y + r.h + gap && r.y < b.y + b.h + gap })
+    if (!hit) continue
+    const [r0, r1] = along === 'x' ? [r.x, r.x + r.w] : [r.y, r.y + r.h]
+    offsets.add(r0 - gap - 1 - s1)
+    offsets.add(r1 + gap + 1 - s0)
+  }
+  const step = gap + COMFORT * l.meanSize
+  for (let k = 1; k <= 3; k++) { offsets.add(k * step); offsets.add(-k * step) }
+  const centre = (x: string) => along === 'x' ? l.box(x)!.cx : l.box(x)!.cy
+  const side = Math.sign(centre(id) - centre(partner))
+  let at = 0
+  for (const d of [...offsets].sort((p, q) => Math.abs(p) - Math.abs(q)).slice(0, 12)) {
+    if (Math.abs(d) > 3 * l.meanSize) continue
+    if (side && Math.sign(centre(id) + d - at - centre(partner)) !== side) continue
+    by(d - at)
+    at = d
+    if (l.allClear(group)) return true
+  }
+  by(-at)
+  return false
+}
+
+/** How far `id` slides along `axis` to stand in line with `o`: middle to
+ *  middle, or for a frame edge to edge when that is the nearer. */
+function lineUpDelta(l: Layout, id: string, o: string, axis: 'x' | 'y'): number {
+  const p = l.box(id)!, q = l.box(o)!
+  const mid = axis === 'x' ? q.cx - p.cx : q.cy - p.cy
+  if (!l.isFrame(id) && !l.isFrame(o)) return mid
+  const edge = axis === 'x' ? q.x - p.x : q.y - p.y
+  return Math.abs(edge) < Math.abs(mid) ? edge : mid
+}
+
+/** Whether `id` with its satellites, slid by `delta` along `axis`, would stand clear of its siblings. */
+function spotFree(l: Layout, id: string, axis: 'x' | 'y', delta: number, lines: Line[]): boolean {
+  const group = [id, ...satellitesOf(l, id, lines).filter((s) => !l.fixed(s))]
+  const gap = l.gapOf(l.parentOf(id))
+  const dx = axis === 'x' ? delta : 0, dy = axis === 'y' ? delta : 0
+  return l.childrenOf(l.parentOf(id)).every((o) => {
+    if (group.includes(o)) return true
+    const r = l.box(o)!
+    return group.every((g) => {
+      const b = l.box(g)!
+      return !(b.x + dx < r.x + r.w + gap && r.x < b.x + dx + b.w + gap && b.y + dy < r.y + r.h + gap && r.y < b.y + dy + b.h + gap)
+    })
+  })
 }
 
 /** Whether `id` already stands beside `anchor` on `side`, touching by the gap. */
@@ -389,14 +458,16 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
       if (dx < STRAIGHT_TOLERANCE || dy < STRAIGHT_TOLERANCE) continue
       const short: 'x' | 'y' = dx <= dy ? 'x' : 'y'
       const read: 'x' | 'y' = x.flow === 'side' || x.axis === 'free' ? short : x.axis === 'vertical' ? 'x' : 'y'
-      for (const axis of read === short ? [read] : [read, short]) {
+      // A free line the other way too when the shorter slide finds its spot taken.
+      const shortTaken = x.axis === 'free' && !spotFree(l, id, short, short === 'x' ? b.cx - a.cx : b.cy - a.cy, lines)
+      const axes: ('x' | 'y')[] = shortTaken ? [short, short === 'x' ? 'y' : 'x'] : read === short ? [read] : [read, short]
+      for (const axis of axes) {
         moves.push({
-          kind: 'align', ids: [id],
+          kind: 'align', ids: [id], variant: axis,
           description: `${label(id)} ${axis === 'x' ? 'under' : 'level with'} ${label(n)}: a straight line`,
           apply: (lay) => {
             const me = lay.box(id)!, other = lay.box(n)!
-            const group = axis === 'x' ? slide(lay, id, other.cx - me.cx, 0, lines) : slide(lay, id, 0, other.cy - me.cy, lines)
-            return lay.allClear(group)
+            return slideInto(lay, id, axis, axis === 'x' ? other.cx - me.cx : other.cy - me.cy, lines, n)
           },
         })
       }
@@ -420,9 +491,37 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
             description: `${label(id)} in a ${axis === 'x' ? 'column' : 'row'} with ${label(o)}`,
             apply: (lay) => {
               const me = lay.box(id)!, other = lay.box(o)!
-              const group = axis === 'x' ? slide(lay, id, other.cx - me.cx, 0, lines) : slide(lay, id, 0, other.cy - me.cy, lines)
-              return lay.allClear(group)
+              return slideInto(lay, id, axis, axis === 'x' ? other.cx - me.cx : other.cy - me.cy, lines, o)
             },
+          })
+        }
+      }
+    }
+
+    // Snapped into the row or column it almost stands in with a near
+    // sibling: a line nearly kept reads as a mistake.
+    for (const { o, axis } of nearMissesOf(l, id)) {
+      moves.push({
+        kind: 'snap', ids: [id], variant: `${axis}:${o}`,
+        description: `${label(id)} in line with ${label(o)}`,
+        apply: (lay) => slideInto(lay, id, axis, lineUpDelta(lay, id, o, axis), lines, o),
+      })
+    }
+
+    // In a row or a column with others of its kind, when it stands in
+    // line with none of them: the people together, the stores together,
+    // frames of one kind side by side; the nearest two tried each way.
+    {
+      const b = l.box(id)!
+      const kin = kinApartOf(l, id, (o) => neighbours(o, lines).length > 0)
+        .map((o) => ({ o, d: Math.hypot(l.box(o)!.cx - b.cx, l.box(o)!.cy - b.cy) }))
+        .sort((p, q) => p.d - q.d).slice(0, 2)
+      for (const { o } of kin) {
+        for (const axis of ['x', 'y'] as const) {
+          moves.push({
+            kind: 'kin', ids: [id], variant: `${axis}:${o}`,
+            description: `${label(id)} in a ${axis === 'x' ? 'column' : 'row'} with ${label(o)}, of its kind`,
+            apply: (lay) => slideInto(lay, id, axis, lineUpDelta(lay, id, o, axis), lines, o),
           })
         }
       }
@@ -445,6 +544,37 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
             const group = axis === 'x' ? slide(lay, id, mx - me.cx, 0, lines) : slide(lay, id, 0, my - me.cy, lines)
             return lay.allClear(group)
           },
+        })
+      }
+    }
+  }
+
+  // Off a line drawn over it: the element (or the group a view draws
+  // round it, which has no frame of its own) slid aside, square to the
+  // line, just clear of it on either side.
+  for (const x of lines) {
+    const a = l.box(x.a)!, b = l.box(x.b)!
+    const dx = b.cx - a.cx, dy = b.cy - a.cy, len = Math.hypot(dx, dy)
+    if (len < 1) continue
+    const nx = -dy / len, ny = dx / len
+    const x0 = Math.min(a.cx, b.cx), x1 = Math.max(a.cx, b.cx), y0 = Math.min(a.cy, b.cy), y1 = Math.max(a.cy, b.cy)
+    for (const e of l.ids()) {
+      if (e === x.a || e === x.b || l.isFrame(e) || l.holds(e, x.a) || l.holds(e, x.b)) continue
+      const r = l.box(e)!
+      if (r.x > x1 || r.x + r.w < x0 || r.y > y1 || r.y + r.h < y0) continue
+      if (!segmentHitsRect(a.cx, a.cy, b.cx, b.cy, r.x, r.y, r.x + r.w, r.y + r.h)) continue
+      // The group that goes: the element, or the tight frame holding it when the line's ends are outside it.
+      let mover = e
+      for (let p = l.parentOf(e); p && l.isTight(p) && !l.holds(p, x.a) && !l.holds(p, x.b); p = l.parentOf(p)) mover = p
+      if (l.fixed(mover) || !concerns([mover, x.a, x.b])) continue
+      const m = l.box(mover)!
+      const corners = [[m.x, m.y], [m.x + m.w, m.y], [m.x, m.y + m.h], [m.x + m.w, m.y + m.h]].map(([px, py]) => (px - a.cx) * nx + (py - a.cy) * ny)
+      const gap = l.gapOf(l.parentOf(mover))
+      for (const shift of [-Math.min(...corners) + gap, -(Math.max(...corners) + gap)]) {
+        moves.push({
+          kind: 'clear', ids: [mover], variant: `${x.id}:${shift > 0 ? '+' : '-'}`,
+          description: `${label(mover)} off the line from ${label(x.a)} to ${label(x.b)}`,
+          apply: (lay) => lay.allClear(slide(lay, mover, nx * shift, ny * shift, lines)),
         })
       }
     }

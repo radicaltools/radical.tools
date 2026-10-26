@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
 import type { SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { useOutsideClick } from '../hooks/useOutsideClick'
+import { formatPart } from '@radical/layout/tidy'
 
 const IconSmartLayout = () => (
   <svg className="toolbar-btn-accent-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -87,9 +88,20 @@ function SmartLayoutReportButton({ report }: { report: SmartLayoutReport }): Rea
             <div className="smart-layout-report-title">Why this layout?</div>
             {report.tidy && (
               <div className="smart-layout-report-sub">
-                <strong>{report.tidy.steps.length} move{report.tidy.steps.length === 1 ? '' : 's'}</strong> · reader's cost {report.tidy.before.toFixed(0)}{arrow}{report.tidy.after.toFixed(0)} ·
-                {' '}crossings {report.before.crossings}{arrow}{report.after.crossings}, overdraws {report.before.overdraws}{arrow}{report.after.overdraws}
+                <strong>{report.tidy.steps.length} move{report.tidy.steps.length === 1 ? '' : 's'}</strong> · reader's cost {report.tidy.before.toFixed(0)}{arrow}{report.tidy.after.toFixed(0)}
               </div>
+            )}
+            {report.tidy && report.tidy.parts.length > 0 && (
+              <table className="smart-layout-report-table smart-layout-report-parts" aria-label="The reader's cost, part by part">
+                <thead><tr><th>What the reader sees</th><th title="Before Smart Layout">Before</th><th title="After Smart Layout">After</th></tr></thead>
+                <tbody>
+                  {report.tidy.parts.map((p) => (
+                    <tr key={p.key} className={p.after < p.before - 0.005 ? 'better' : p.after > p.before + 0.005 ? 'worse' : undefined}>
+                      <td title={`Weighs ${p.weight} in the reader's cost`}>{p.label}</td><td>{formatPart(p.before)}</td><td>{formatPart(p.after)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
             {!report.tidy && (<>
             <div className="smart-layout-report-sub">

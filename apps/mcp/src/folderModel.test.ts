@@ -604,7 +604,7 @@ describe('long Smart Layout runs', () => {
     expect((await model.call('smart_layout', { around: ['nope'] })).ok).toBe(false)
   }, 60_000)
 
-  it('leaves the pinned elements where they are, and keeps the pins', async () => {
+  it('unpins the view it lays out whole; round a selection the pinned elements stay, pinned', async () => {
     // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()
     const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
@@ -620,15 +620,22 @@ describe('long Smart Layout runs', () => {
       await writeFile(join(folder, path), content)
     }
     const model = await FolderModel.open(folder)
-    const outcome = await model.call('smart_layout', {})
-    expect(outcome.ok, outcome.text).toBe(true)
-    expect(outcome.text).not.toContain('Unpinned')
-    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    // Round C: A and B stay where they are, pinned.
+    const around = await model.call('smart_layout', { around: ['c'] })
+    expect(around.ok, around.text).toBe(true)
+    expect(around.text).not.toContain('Unpinned')
+    let after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
     expect(after.defaultLayoutConstraints).toEqual([{ id: 'p', type: 'pin', nodeIds: ['a', 'b'] }])
     const at = (id: string) => { const n = after.nodes.find((x) => x.id === id)!; return [n.x, n.y] }
     expect(at('a')).toEqual([0, 0])
     expect(at('b')).toEqual([400, 0])
     expect(at('c')).not.toEqual([20, 20])
+    // The whole model: laid out and unpinned.
+    const whole = await model.call('smart_layout', {})
+    expect(whole.ok, whole.text).toBe(true)
+    expect(whole.text).toContain('Unpinned 2 elements')
+    after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(after.defaultLayoutConstraints ?? []).toEqual([])
   }, 60_000)
 
   it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {
