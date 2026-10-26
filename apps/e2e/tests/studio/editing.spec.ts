@@ -1,5 +1,17 @@
 import { test, expect, fixture } from '../../support/fixtures'
 import { addPicker } from '../../support/addPicker'
+import type { Page } from '@playwright/test'
+
+// The middle of a relation's drawn line, on screen: a route around elements
+// can leave the centre of its box on something else.
+async function edgeMid(page: Page, id: string): Promise<{ x: number; y: number }> {
+  return page.locator(`[data-testid="rf__edge-${id}"] path.react-flow__edge-interaction`).first().evaluate((el) => {
+    const path = el as SVGPathElement
+    const p = path.getPointAtLength(path.getTotalLength() / 2)
+    const m = path.getScreenCTM()!
+    return { x: p.x * m.a + m.e, y: p.y * m.d + m.f }
+  })
+}
 
 // Editing on the flat System Context view of the bookstore fixture
 // (Customer, Bookstore, Payment Provider; 2 relations shown).
@@ -32,7 +44,8 @@ test('holding the connection key marks where a relation from the selected elemen
 test('a relation\'s end dragged with the special key shows where it can go, keeping its type', async ({ page, studio }) => {
   await studio.open('v-containers')
   // API → Payment Provider, selected: its ends show their handles.
-  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().click({ force: true })
+  const r4 = await edgeMid(page, 'r4')
+  await page.mouse.click(r4.x, r4.y)
   await studio.settle() // the camera frames the selection first
   const handle = page.locator('[data-testid="rf__edge-r4"] circle[r="10"]').nth(1)
   const at = (await handle.boundingBox())!

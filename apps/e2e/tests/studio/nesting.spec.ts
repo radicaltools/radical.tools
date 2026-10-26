@@ -205,6 +205,9 @@ test.describe('the special key', () => {
     await studio.settle()
     await studio.node('customer').click()
     await studio.node('clerk').click({ modifiers: ['Alt'] })
+    // The camera frames the two selected; Staff may lie outside that.
+    await page.getByRole('button', { name: 'Fit All' }).click()
+    await studio.settle()
     await page.keyboard.down('Alt')
     await altDrag(page, studio.node('clerk'), studio.node('staff'))
     await page.keyboard.up('Alt')
