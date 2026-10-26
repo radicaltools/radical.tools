@@ -44,6 +44,7 @@ export function buildModelToolHandlers(): Record<string, ToolHandler> {
           relations: ctx.diagram.getRelations(),
           views: ctx.diagram.getViews?.(),
           sequences: ctx.diagram.getSequences?.(),
+          metamodel: ctx.diagram.getMetamodel?.(),
         })
         return { ok: true, resultText: JSON.stringify(result.result) }
       } catch (err) {

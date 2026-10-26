@@ -1,5 +1,7 @@
 import { isBackwardStep, type C4Node, type C4Relation, type DiagramSequence, type DiagramView } from '../c4'
 import { viewShownNodes } from '../viewPipeline'
+import type { Metamodel } from '../metamodel/types'
+import { searchModel } from '../search'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
 use this whenever you need exact data before answering or acting, instead of
@@ -23,6 +25,11 @@ Syntax:
 - GET DEPENDENCIES OF <id> [DEPTH n]
 - GET DEPENDENTS OF <id> [DEPTH n]
 - STATS MODEL
+- FIND <words> [LIMIT n]  — the loose search of Studio's Quick Search: every
+  word matches, in any order, without case or accents, in names, types,
+  technologies, descriptions and property values. Prefixes narrow it:
+  v: views, f: folders, e: elements, r: relations, s: sequences,
+  in:"View name" the elements of a view, type:<type>, <property>:<value>
 
 Operators:
 - =   exact match
@@ -53,13 +60,18 @@ Examples:
 - "LIST RELATIONS WHERE relationType = \"derives\""
 - "LIST VIEWS WHERE kind = \"table\""
 - "GET NEIGHBORS OF node-123 DEPTH 2"
-- "GET DEPENDENTS OF database-1 DEPTH 4"`.trim()
+- "GET DEPENDENTS OF database-1 DEPTH 4"
+- "FIND payment ledger"
+- "FIND type:requirement status:accepted search"
+- "FIND v: deployment"`.trim()
 
 export interface ModelQueryContext {
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   views?: Record<string, DiagramView>
   sequences?: Record<string, DiagramSequence>
+  /** For FIND: the property names a prefix may use. */
+  metamodel?: Metamodel
 }
 
 export interface ModelQueryResult {
@@ -501,6 +513,28 @@ export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQuery
   const upper = raw.toUpperCase()
   const views = ctx.views ?? {}
   const relations = Object.values(ctx.relations)
+
+  const find = /^FIND\s+([\s\S]*?)(?:\s+LIMIT\s+(\d+))?$/i.exec(raw)
+  if (find) {
+    const limit = find[2] ? Number(find[2]) : 30
+    const { hits, counts } = searchModel({ nodes: ctx.nodes, relations: ctx.relations, views, sequences: ctx.sequences, metamodel: ctx.metamodel }, find[1])
+    return {
+      query: raw,
+      command: 'FIND',
+      result: {
+        total: hits.length,
+        counts: Object.fromEntries(Object.entries(counts).filter(([, n]) => n > 0)),
+        hits: hits.slice(0, limit).map((h) => ({
+          kind: h.kind,
+          id: h.id,
+          label: h.label,
+          ...(h.type ? { type: h.type } : {}),
+          detail: h.detail,
+          ...(h.snippet ? { match: h.snippet.field ? `${h.snippet.field}: ${h.snippet.text}` : h.snippet.text } : {}),
+        })),
+      },
+    }
+  }
 
   const listNodes = parseListQuery(raw, 'NODES')
   if (listNodes) {
