@@ -12,6 +12,8 @@ import { buildIndex, linesOf, localCostParts, totalCost, updateIndex } from '../
 import { candidateMoves } from '../../src/tidy/moves'
 import { viewLayoutInput } from '../../src/viewInput'
 import { projectToVisibleGraph } from '../../src/geometry'
+import { computeCompositeScore, projectPositions } from '../../src/smartLayout'
+import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation, DiagramView, PositionMap } from '@radical/common/c4'
 
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
@@ -63,6 +65,22 @@ describe('Tidy', () => {
     expect(result.tidy.steps.length).toBeGreaterThan(5)
     // What it did is said.
     for (const s of result.tidy.steps) expect(s.description.length).toBeGreaterThan(5)
+  })
+
+  it('leaves room for the labels as the canvas places them', { timeout: 60_000 }, () => {
+    // The sample's System Context: Tidy set Core Banking Platform and KYC /
+    // AML Provider closer than their relation's label is wide, so the label
+    // lay over both names wherever the canvas put it. Its label cost skipped
+    // a line's own ends and sized the label by a guess of its own.
+    const f = load(join(fixturesDir, 'sample-system-context.json'))
+    const input = viewLayoutInput(f.view, byId(f.nodes), byId(f.relations))
+    const visible = projectToVisibleGraph(input.nodes, input.relations)
+    for (const edgeStyle of ['curved', 'orthogonal'] as const) {
+      expect(computeCompositeScore(visible.nodes, visible.relations, edgeStyle).labelCollisions).toBe(0)
+      const result = runTidyLayout(input.nodes, input.relations, { edgeStyle, metamodel: builtInGovernanceMetamodel(), frames: [...input.frames] })
+      const after = computeCompositeScore(projectPositions(visible.nodes, result.winner.positions), visible.relations, edgeStyle)
+      expect(after.labelCollisions, edgeStyle).toBe(0)
+    }
   })
 
   it('never makes a layout worse', { timeout: 120_000 }, () => {
