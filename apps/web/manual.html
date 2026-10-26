@@ -163,7 +163,8 @@
         </figure>
         <ul>
           <li><strong>Top bar</strong> — Undo and Redo, Back and Forward with a History, Quick Search in the middle (<kbd>⌘/Ctrl+P</kbd>), the Forge button, and the four perspectives: <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> plays slide decks, <em>Inspector</em> shows what <code>radical check</code> says. The logo opens <em>About Radical Studio</em> with the version to quote in a bug report.</li>
-          <li><strong>Activity rail</strong> — along the left edge, as in VS Code. At the top the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot the menus: <em>Models</em>, the <em>metamodel editor</em>, <em>AI</em>, <em>Export</em> (PNG, SVG, clipboard) and <em>Settings</em> (theme, Smart fit, line style, the connect key, wizards on create).</li>
+          <li><strong>Activity rail</strong> — along the left edge, as in VS Code. At the top the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot <em>Settings</em>: theme, Smart fit, line style, the special key, wizards on create, the <em>metamodel editor</em>, <em>AI</em> (providers, Radical Forge) and <em>Export</em> (PNG, SVG, clipboard).</li>
+          <li><strong>Models</strong> — at the toolbar's left, the folder and the name of the model open, marked LOCAL (in this browser), FILE or FOLDER (on disk). The folder opens <em>Manage models…</em> and <em>Import from Hub…</em>. About is under <em>Settings</em>.</li>
           <li><strong>Left panel</strong> — the open section. <em>Views</em> starts with <em>All elements</em>, the whole model as a table, then one card per view, in folders if you made any. Drag its inner edge to widen it.</li>
           <li><strong>Canvas</strong> — the palette stands down its left side: drag a type onto the canvas. At the bottom: <em>Fit All</em>, zoom, <em>Focus</em> and <em>Smart Layout</em>. The chip in the top-left names the view, or the milestone you are looking at. Zoomed far out, elements are drawn as coloured blocks with large names so a big model stays readable.</li>
           <li><strong>Properties card</strong> — double-click an element, a relation or a row (or pick a sequence) and its card slides over the right side; a click only selects, and an open card then shows what you select, until <em>✕</em> or a click on the empty canvas. The head has the type, the name and where it sits; each attribute is a row you edit in place; long texts are Markdown sections. The foot stays in sight: <em>Views</em> lists every view that shows the element (a click opens it there), then the element's <em>Actions</em>, then <em>Delete</em>.</li>
@@ -702,7 +703,7 @@
           <figcaption>The <em>Diagram</em> tab of the metamodel editor. Click a type, here <em>Requirement</em>, to see where it may sit and every relation that may go out of it or come in.</figcaption>
         </figure>
         <h3>Metamodel editor</h3>
-        <p>The editor on the activity rail changes the model's metamodel. The first change makes a copy, <em>Radical (custom)</em>, so the built-in rules are never edited in place. An unedited built-in metamodel is updated each time the model opens, so models get new types as Studio ships them.</p>
+        <p>The editor (<em>Settings → Metamodel editor</em> on the activity rail) changes the model's metamodel. The first change makes a copy, <em>Radical (custom)</em>, so the built-in rules are never edited in place. An unedited built-in metamodel is updated each time the model opens, so models get new types as Studio ships them.</p>
         <ul>
           <li><strong>Node types</strong> — colours, description, size, min and max instances, allowed parents, and properties: text, long text, number, boolean, enum or reference. <em>Summary in tables</em> is the template the table makes an element's one-line summary from.</li>
           <li><strong>Relation types</strong> — the allowed pairs of source and target, their own properties, and how the relation reads in a sentence from each end (<em>Constrains</em> / <em>Constrained by</em>), which the wiki uses.</li>
@@ -743,7 +744,7 @@
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/ai-settings-light.png?v=__BUILD__" alt="AI providers dialog with a master switch and tabs for Ollama, OpenAI, Anthropic and Google Gemini, each with model, base URL and API key fields and a Test connection button" loading="lazy" />
           <img class="shot-dark" src="screenshots/ai-settings-dark.png?v=__BUILD__" alt="AI providers dialog with a master switch and tabs for Ollama, OpenAI, Anthropic and Google Gemini, each with model, base URL and API key fields and a Test connection button" loading="lazy" />
-          <figcaption><em>AI → AI providers…</em> on the activity rail. Keys stay in this browser and calls go straight to the provider.</figcaption>
+          <figcaption><em>Settings → AI providers…</em> on the activity rail. Keys stay in this browser and calls go straight to the provider.</figcaption>
         </figure>
         <p>Bring your own model: Ollama (local, no key), OpenAI, Anthropic Claude or Google Gemini. Enable AI, pick the provider, paste a key, <em>Test connection</em>. Nothing is proxied through radical.tools.</p>
         <p>Then open Quick Search and switch to <em>✨ AI mode</em> (<kbd>Tab</kbd> on an empty box). The assistant sees the model and its metamodel and can:</p>
@@ -756,7 +757,7 @@
 
       <section class="doc-section" id="forge">
         <h2>Radical Forge</h2>
-        <p>Radical Forge turns a plain-language description into a model, one reviewable stage at a time: Requirements → Domain model → Fitness functions → Scenarios → State machines → Processes → Mockups → C4 model → Review. Start it with <em>Create with Radical Forge</em> on the Welcome screen, or <em>AI → Radical Forge…</em>.</p>
+        <p>Radical Forge turns a plain-language description into a model, one reviewable stage at a time: Requirements → Domain model → Fitness functions → Scenarios → State machines → Processes → Mockups → C4 model → Review. Start it with <em>Create with Radical Forge</em> on the Welcome screen, or <em>Settings → Radical Forge…</em>.</p>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/forge-views-light.png?v=__BUILD__" alt="Radical Forge's Description step: the description, and under Views the Radical structure chosen with its viewpoints in the folders Conceptual, Logical and Governance, and Layer canvases below" loading="lazy" />
           <img class="shot-dark" src="screenshots/forge-views-dark.png?v=__BUILD__" alt="Radical Forge's Description step: the description, and under Views the Radical structure chosen with its viewpoints in the folders Conceptual, Logical and Governance, and Layer canvases below" loading="lazy" />

@@ -184,6 +184,22 @@ const IconAI = () => (
   </svg>
 )
 
+const IconModels = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 4.5a1.2 1.2 0 0 1 1.2-1.2h2.9l1.4 1.4h5.3A1.2 1.2 0 0 1 14 5.9v6.3a1.2 1.2 0 0 1-1.2 1.2H3.2A1.2 1.2 0 0 1 2 12.2Z" />
+    <path d="M2 6.8h12" />
+  </svg>
+)
+
+const IconMetamodel = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="6" y="1.5" width="4" height="3.5" rx="0.7" />
+    <rect x="1.5" y="11" width="4" height="3.5" rx="0.7" />
+    <rect x="10.5" y="11" width="4" height="3.5" rx="0.7" />
+    <path d="M8 5v2.5M3.5 11V9.5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1V11" />
+  </svg>
+)
+
 const IconInfo = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round">
     <circle cx="8" cy="8" r="6.2" />
@@ -231,7 +247,7 @@ const IconClipboard = () => (
 // ── App menus (the activity rail's foot, as in VS Code) ──────────────────────
 
 type ConnectionMod = 'alt' | 'shift' | 'ctrl' | 'meta'
-type RailMenuId = 'models' | 'ai' | 'export' | 'settings'
+type RailMenuId = 'models' | 'settings'
 
 // The rail's own icons: drawn on a 24 grid, larger and bolder than the
 // menus' 16 px ones, so they read at a glance.
@@ -240,32 +256,6 @@ const RailIcon = ({ children }: { children: React.ReactNode }) => (
     {children}
   </svg>
 )
-const RailIconModels = () => (
-  <RailIcon>
-    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-    <path d="M3 10h18" />
-  </RailIcon>
-)
-const RailIconMetamodel = () => (
-  <RailIcon>
-    <rect x="9" y="3" width="6" height="5" rx="1" />
-    <rect x="3" y="16" width="6" height="5" rx="1" />
-    <rect x="15" y="16" width="6" height="5" rx="1" />
-    <path d="M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
-  </RailIcon>
-)
-const RailIconAI = () => (
-  <RailIcon>
-    <path d="M10 3.5 11.6 8a2 2 0 0 0 1.2 1.2l4.5 1.6-4.5 1.6a2 2 0 0 0-1.2 1.2L10 18.1l-1.6-4.5a2 2 0 0 0-1.2-1.2L2.7 10.8l4.5-1.6A2 2 0 0 0 8.4 8Z" />
-    <path d="M18.5 3v4M16.5 5h4M18 16v3M16.5 17.5h3" />
-  </RailIcon>
-)
-const RailIconExport = () => (
-  <RailIcon>
-    <path d="M12 15V3M7.5 7.5 12 3l4.5 4.5" />
-    <path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
-  </RailIcon>
-)
 const RailIconSettings = () => (
   <RailIcon>
     <path d="M10.3 3.2a1.7 1.7 0 0 1 3.4 0l.2 1a1.7 1.7 0 0 0 2.5 1.1l.9-.5a1.7 1.7 0 0 1 2.4 2.4l-.5.9a1.7 1.7 0 0 0 1.1 2.5l1 .2a1.7 1.7 0 0 1 0 3.4l-1 .2a1.7 1.7 0 0 0-1.1 2.5l.5.9a1.7 1.7 0 0 1-2.4 2.4l-.9-.5a1.7 1.7 0 0 0-2.5 1.1l-.2 1a1.7 1.7 0 0 1-3.4 0l-.2-1a1.7 1.7 0 0 0-2.5-1.1l-.9.5a1.7 1.7 0 0 1-2.4-2.4l.5-.9a1.7 1.7 0 0 0-1.1-2.5l-1-.2a1.7 1.7 0 0 1 0-3.4l1-.2a1.7 1.7 0 0 0 1.1-2.5l-.5-.9a1.7 1.7 0 0 1 2.4-2.4l.9.5a1.7 1.7 0 0 0 2.5-1.1Z" />
@@ -273,26 +263,32 @@ const RailIconSettings = () => (
   </RailIcon>
 )
 
+/** Where the open model is kept, as its badge says it and in words. */
+const DOC_BADGE: Record<DocumentSource, string> = { ls: 'LOCAL', fs: 'FILE', md: 'FOLDER' }
+const DOC_WHERE: Record<DocumentSource, string> = { ls: 'kept in this browser (local storage)', fs: 'a file on disk', md: 'a folder on disk' }
+
 /** One button at the foot of the activity rail and the menu it opens beside
  *  the rail; ↑/↓, Escape and Tab as in any menu (useMenuKeys). */
-function RailMenu({ id, label, icon, open, onOpen, onClose, children }: {
+function RailMenu({ id, label, icon, open, onOpen, onClose, onToolbar = false, children }: {
   id: RailMenuId
   label: string
   icon: React.ReactNode
   open: boolean
   onOpen: (id: RailMenuId | null) => void
   onClose: () => void
+  /** On the toolbar instead of the rail: a toolbar button, the menu dropping below it. */
+  onToolbar?: boolean
   children: React.ReactNode
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   useOutsideClick([wrapRef], open, onClose)
   useMenuKeys(wrapRef, open, onClose)
   return (
-    <div className="rail-menu" ref={wrapRef}>
+    <div className={onToolbar ? 'app-menu-wrap' : 'rail-menu'} ref={wrapRef}>
       <button
         type="button"
-        className={`rail-action${open ? ' open' : ''}`}
-        title={label}
+        className={onToolbar ? `app-brand-models${open ? ' open' : ''}` : `rail-action${open ? ' open' : ''}`}
+        title={onToolbar ? `${label}: manage models, import from the Hub` : label}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -301,7 +297,7 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, children }: {
         {icon}
       </button>
       {open && (
-        <div className="app-menu-popover rail-flyout" role="menu" aria-label={label}>
+        <div className={`app-menu-popover${onToolbar ? '' : ' rail-flyout'}`} role="menu" aria-label={label}>
           {children}
         </div>
       )}
@@ -309,10 +305,10 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, children }: {
   )
 }
 
-/** Radical's logo on the toolbar, and what its menu held as menus at the
- *  foot of the activity rail (ActivityRail): Models, the metamodel editor,
- *  AI, Export and Settings, About last in Settings. A click on the logo is
- *  About. */
+/** Models on the toolbar: the folder button in a strip with the model open; and
+ *  Settings at the foot of the activity rail (ActivityRail), holding the
+ *  metamodel editor, AI and Export too (the author moved them there on
+ *  2026-10-26), About last. */
 function AppMenu({
   onManage, activeDocLabel, activeDocSource,
   connectionModifier, setConnectionModifier,
@@ -354,7 +350,7 @@ function AppMenu({
   // Radical Forge talks to an AI provider: without one it is offered
   // disabled (it saved the description, made its views and fetched the
   // Hub's index before saying so). Read each time the menu opens.
-  const forgeReady = menu === 'ai' && aiReady(loadAISettings())
+  const forgeReady = menu === 'settings' && aiReady(loadAISettings())
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
   // How the model's canvases draw relations (All elements, and the views
   // that do not choose their own in their properties).
@@ -381,9 +377,9 @@ function AppMenu({
     <RailMenu id={id} label={label} icon={icon} open={menu === id} onOpen={setMenu} onClose={close}>{children}</RailMenu>
   )
 
-  const menus = (
-    <>
-      {railMenu('models', 'Models', <RailIconModels />, (
+  const modelsMenu = (
+    <RailMenu id="models" label="Models" open={menu === 'models'} onOpen={setMenu} onClose={close} onToolbar
+      icon={<IconModels />}>
           <div className="app-menu-section">
             <div className="app-menu-label">Models</div>
             <button className="app-menu-item" role="menuitem" onClick={run(onManage)}>
@@ -393,7 +389,7 @@ function AppMenu({
                 {activeDocLabel && (
                   <span className="app-menu-current-doc-inline">
                     <span className={`toolbar-doc-badge ${activeDocSource}`}>
-                      {activeDocSource === 'fs' ? 'FILE' : activeDocSource === 'md' ? 'FOLDER' : 'LOCAL'}
+                      {DOC_BADGE[activeDocSource ?? 'ls']}
                     </span>
                     <span className="app-menu-current-doc-name">{activeDocLabel}</span>
                   </span>
@@ -405,79 +401,11 @@ function AppMenu({
               <span className="app-menu-text">Import from Hub…</span>
             </button>
           </div>
-      ))}
-      <button
-        type="button"
-        className={`rail-action${metamodelActive ? ' active' : ''}`}
-        title={metamodelActive ? 'Close metamodel editor' : 'Metamodel editor — object types, relations and constraints'}
-        aria-label="Metamodel editor"
-        aria-pressed={metamodelActive}
-        onClick={() => { setMenu(null); onToggleMetamodel() }}
-      >
-        <RailIconMetamodel />
-      </button>
-      {railMenu('ai', 'AI', <RailIconAI />, (
-          <div className="app-menu-section">
-            <div className="app-menu-label">AI</div>
-            <button
-              className="app-menu-item"
-              role="menuitem"
-              onClick={run(onOpenAISettings)}
-              title="Configure AI providers (Ollama, OpenAI, Claude, Gemini)"
-            >
-              <span className="app-menu-icon"><IconAI /></span>
-              <span className="app-menu-text">AI providers…</span>
-            </button>
-            <button
-              className="app-menu-item"
-              role="menuitem"
-              onClick={run(onOpenForge)}
-              disabled={!forgeReady}
-              aria-describedby={forgeReady ? undefined : 'app-menu-forge-hint'}
-              title={forgeReady
-                ? 'Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description'
-                : FORGE_NEEDS_AI}
-            >
-              <span className="app-menu-icon"><IconAI /></span>
-              <span className="app-menu-text">
-                Radical Forge…
-                {!forgeReady && <span id="app-menu-forge-hint" className="app-menu-hint">Needs an AI provider: AI providers… above</span>}
-              </span>
-            </button>
-          </div>
-      ))}
-      {railMenu('export', 'Export', <RailIconExport />, (
-          <div className="app-menu-section">
-            <div className="app-menu-label">Export</div>
-            <button
-              className="app-menu-item"
-              role="menuitem"
-              onClick={run(onExportPNG)}
-              disabled={exportBusy}
-            >
-              <span className="app-menu-icon"><IconExportPNG /></span>
-              <span className="app-menu-text">Export as PNG…</span>
-            </button>
-            <button
-              className="app-menu-item"
-              role="menuitem"
-              onClick={run(onExportSVG)}
-              disabled={exportBusy}
-            >
-              <span className="app-menu-icon"><IconExportSVG /></span>
-              <span className="app-menu-text">Export as SVG…</span>
-            </button>
-            <button
-              className="app-menu-item"
-              role="menuitem"
-              onClick={run(onCopyToClipboard)}
-              disabled={exportBusy}
-            >
-              <span className="app-menu-icon"><IconClipboard /></span>
-              <span className="app-menu-text">Copy to clipboard</span>
-            </button>
-          </div>
-      ))}
+      </RailMenu>
+  )
+
+  const menus = (
+    <>
       {railMenu('settings', 'Settings', <RailIconSettings />, (<>
           <div className="app-menu-section">
             <div className="app-menu-label">View</div>
@@ -539,6 +467,80 @@ function AppMenu({
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">
+            <div className="app-menu-label">Metamodel</div>
+            <button
+              className={`app-menu-item${metamodelActive ? ' active' : ''}`}
+              role="menuitemcheckbox"
+              aria-checked={metamodelActive}
+              onClick={run(onToggleMetamodel)}
+              title={metamodelActive ? 'Close the metamodel editor' : 'Object types, relations and constraints'}
+            >
+              <span className="app-menu-icon"><IconMetamodel /></span>
+              <span className="app-menu-text">Metamodel editor {metamodelActive ? '(open)' : ''}</span>
+            </button>
+          </div>
+          <div className="app-menu-divider" />
+          <div className="app-menu-section">
+            <div className="app-menu-label">AI</div>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onOpenAISettings)}
+              title="Configure AI providers (Ollama, OpenAI, Claude, Gemini)"
+            >
+              <span className="app-menu-icon"><IconAI /></span>
+              <span className="app-menu-text">AI providers…</span>
+            </button>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onOpenForge)}
+              disabled={!forgeReady}
+              aria-describedby={forgeReady ? undefined : 'app-menu-forge-hint'}
+              title={forgeReady
+                ? 'Generate requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model from a description'
+                : FORGE_NEEDS_AI}
+            >
+              <span className="app-menu-icon"><IconAI /></span>
+              <span className="app-menu-text">
+                Radical Forge…
+                {!forgeReady && <span id="app-menu-forge-hint" className="app-menu-hint">Needs an AI provider: AI providers… above</span>}
+              </span>
+            </button>
+          </div>
+          <div className="app-menu-divider" />
+          <div className="app-menu-section">
+            <div className="app-menu-label">Export</div>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onExportPNG)}
+              disabled={exportBusy}
+            >
+              <span className="app-menu-icon"><IconExportPNG /></span>
+              <span className="app-menu-text">Export as PNG…</span>
+            </button>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onExportSVG)}
+              disabled={exportBusy}
+            >
+              <span className="app-menu-icon"><IconExportSVG /></span>
+              <span className="app-menu-text">Export as SVG…</span>
+            </button>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(onCopyToClipboard)}
+              disabled={exportBusy}
+            >
+              <span className="app-menu-icon"><IconClipboard /></span>
+              <span className="app-menu-text">Copy to clipboard</span>
+            </button>
+          </div>
+          <div className="app-menu-divider" />
+          <div className="app-menu-section">
             <button className="app-menu-item" role="menuitem" onClick={run(onOpenAbout)}>
               <span className="app-menu-icon"><IconInfo /></span>
               <span className="app-menu-text">About Radical Studio</span>
@@ -550,15 +552,18 @@ function AppMenu({
 
   return (
     <>
-      <button className="app-brand" onClick={onOpenAbout} title="About Radical Studio">
-        <span className="app-brand-logo" aria-hidden>
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
-            <path d="M10 1.8 L17.5 6 V14 L10 18.2 L2.5 14 V6 Z" fill="rgba(var(--accent-rgb),0.18)" />
-            <circle cx="10" cy="10" r="2.4" fill="currentColor" stroke="none" />
-          </svg>
-        </span>
-        <span className="app-brand-name">Radical</span>
-      </button>
+      {/* As the perspectives on the right: a switch-like strip, the folder
+          (the Models menu) its one button, the model open beside it. */}
+      <div className="app-brand-switch">
+        {modelsMenu}
+        {/* The model open, and where it is kept. */}
+        {activeDocLabel && (
+          <span className="app-brand-doc" title={`${activeDocLabel}: ${DOC_WHERE[activeDocSource ?? 'ls']}`}>
+            <span className="app-brand-doc-name">{activeDocLabel}</span>
+            <span className={`toolbar-doc-badge ${activeDocSource ?? 'ls'}`}>{DOC_BADGE[activeDocSource ?? 'ls']}</span>
+          </span>
+        )}
+      </div>
       {slot && createPortal(menus, slot)}
     </>
   )
@@ -648,7 +653,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     const width = window.innerWidth
     const edges = (selector: string, side: 'left' | 'right'): number[] =>
       [...el.querySelectorAll<HTMLElement>(selector)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => r[side])
-    const start = Math.max(0, ...edges(':scope > .app-brand, :scope > .toolbar-edit', 'right'))
+    const start = Math.max(0, ...edges(':scope > .app-brand-switch, :scope > .toolbar-edit', 'right'))
     const end = Math.min(width, ...edges(':scope > .branch-btn-wrap, :scope > .toolbar-mode-switch', 'left'))
     // How much wider the perspectives are with their labels than without
     // (a label left out keeps its width in scrollWidth).
@@ -685,7 +690,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     // The sides change width on their own (a count on Inspector or on
     // Changes on branch, the fonts loading), the window by a resize.
     const watch = new ResizeObserver(() => fit())
-    for (const side of el.querySelectorAll(':scope > .app-brand, :scope > .toolbar-edit, :scope > .branch-btn-wrap, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
+    for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-edit, :scope > .branch-btn-wrap, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
     window.addEventListener('resize', fit)
     return () => { watch.disconnect(); window.removeEventListener('resize', fit) }
   }, [fit, appMode])

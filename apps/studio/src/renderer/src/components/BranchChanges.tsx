@@ -102,7 +102,7 @@ export function BranchChangesButton(): React.ReactElement | null {
     <div className="branch-btn-wrap" ref={box}>
       <button
         type="button"
-        className={`toolbar-btn branch-btn${on ? ' active' : ''}${base ? '' : ' unavailable'}`}
+        className={`toolbar-btn branch-btn${on ? ' active' : ''}${base ? '' : ' unavailable'}${help ? ' open' : ''}`}
         aria-pressed={base ? on : undefined}
         aria-disabled={base && milestone ? true : undefined}
         aria-expanded={base ? undefined : help}

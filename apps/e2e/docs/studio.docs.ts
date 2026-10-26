@@ -105,17 +105,11 @@ async function dismissToasts(page: Page): Promise<void> {
   await expect(page.locator('.toast')).toHaveCount(0)
 }
 
-/** Picks `item` in the menu of the activity rail's `rail` button (Models,
- *  AI, Export, Settings); the metamodel editor is a button of its own. */
+/** Picks `item` in Models (on the toolbar) or in the activity rail's
+ *  Settings, which holds the metamodel editor, AI and Export too. */
 async function menu(page: Page, item: RegExp | string): Promise<void> {
   const text = String(item)
-  if (/Metamodel editor/.test(text)) {
-    await page.getByRole('button', { name: 'Metamodel editor', exact: true }).click()
-    return
-  }
-  const rail = /Manage models|Import from Hub/.test(text) ? 'Models'
-    : /AI providers|Radical Forge/.test(text) ? 'AI'
-    : /Export|clipboard/.test(text) ? 'Export' : 'Settings'
+  const rail = /Manage models|Import from Hub/.test(text) ? 'Models' : 'Settings'
   await page.getByRole('button', { name: rail, exact: true }).click()
   await page.getByRole('menu').getByRole('menuitem').or(page.getByRole('menu').getByRole('menuitemcheckbox')).filter({ hasText: item }).click()
 }

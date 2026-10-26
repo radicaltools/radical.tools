@@ -389,7 +389,7 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   await expect(button).toHaveClass(/unavailable/)
 
-  await page.getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Card payments\n\nShoppers pay by card.')
   await page.getByRole('button', { name: 'Start →' }).click()
