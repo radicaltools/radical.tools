@@ -124,3 +124,43 @@ describe('curved ends', () => {
     expect(routed).toBeGreaterThan(20)
   })
 })
+
+describe('routes around nodes', () => {
+  type Rect = { x: number; y: number; w: number; h: number }
+  /** Does the drawn polyline pass through a rect (sampled every 4 px)? */
+  const through = (pts: { x: number; y: number }[], o: Rect) => pts.slice(1).some((b, i) => {
+    const a = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4))
+    for (let k = 0; k <= n; k++) {
+      const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+      if (x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return true
+    }
+    return false
+  })
+
+  it('finds the route wherever the grid falls: the keep-outs behind the ends never wall in their exits', () => {
+    // The sample's Core Banking view: API Gateway (left side) to Accounts
+    // Service (right side) across Payments Service and its two components.
+    // A far node sets the routing grid's origin; on some origins the
+    // padded keep-out behind each end blocked the cells round its exit, the
+    // search found nothing and the direct line went over the components.
+    const scene: Rect[] = [
+      { x: 1487.9, y: 482.4, w: 240, h: 160 }, // Authorization Service
+      { x: 571.9, y: 867.4, w: 220, h: 95 }, // Event Bus
+      { x: 896.4, y: 506.4, w: 300, h: 396 }, // Payments Service
+      { x: 952.1, y: 562.4, w: 200, h: 120 }, // FX Engine
+      { x: 952.1, y: 762.4, w: 200, h: 120 }, // Payment Validator
+    ]
+    for (const style of ['orthogonal', 'curved'] as const) {
+      for (let shift = 0; shift < 15; shift++) {
+        const far = { x: 300 - shift, y: 300 - shift, w: 60, h: 40 }
+        const r = computeRoutedEdge(1487.9, 782.4, Position.Left, 732.1, 667.4, Position.Right, [...scene, far], undefined, style)
+        // A curve rounding a corner may graze a node by a few pixels: the
+        // router's own hit test counts a line as through a node past 4 px.
+        for (const o of scene) {
+          const core = { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 }
+          expect(through(r.points, core), `${style}, grid shifted ${shift} px`).toBe(false)
+        }
+      }
+    }
+  })
+})

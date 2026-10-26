@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { computeCompositeScore, runSmartLayoutCore } from '../src/smartLayout'
+import { bestIndex } from '../src/ranking'
 import type { C4Node, C4Relation, PositionMap } from '@radical/common/c4'
 
 function node(id: string, x: number, y: number, w = 200, h = 100, parentId?: string): C4Node {
@@ -175,8 +176,10 @@ describe('runSmartLayoutCore guarantees', () => {
       }
     }
 
-    const bestCandidate = Math.min(...result.candidates.map((c) => c.score.composite))
-    expect(result.winner.score.composite).toBeLessThanOrEqual(bestCandidate)
+    // Best by the ranking Smart Layout picks with (aggregated quality), not
+    // by the composite alone: a candidate whose lines route around elements
+    // can rank first with a higher composite.
+    expect(bestIndex([result.winner.score, ...result.candidates.map((c) => c.score)], true)).toBe(0)
     expect(result.winner.score.composite).toBeLessThanOrEqual(computeCompositeScore(nodes, relations).composite)
   })
 
