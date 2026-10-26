@@ -219,6 +219,8 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       model.setSequenceSteps(state, id, steps)
     },
     removeSequence(id: string) {
+      // A milestone that holds it keeps its flow views linked to it.
+      if (carried.snapshots?.length) carried.snapshots = model.keepSequenceViewsInMilestones(carried.snapshots, state.views, id)
       model.deleteSequence(state, id)
     },
 

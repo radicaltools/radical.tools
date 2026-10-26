@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
@@ -404,6 +404,40 @@ export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Rel
     && (holds(r.sourceId, r.targetId) || holds(r.targetId, r.sourceId)))
 }
 
+/** The relations of a model that another copy's edits were carried into
+ *  (a milestone's edits propagated), which it refuses as it is now, each
+ *  with why: one of `relationIds` (added or changed by the edits) as one
+ *  made here is refused (relationRefusal), and one that joins an element
+ *  of `movedIds` (or one it holds) to what holds it now, as a move made
+ *  here takes it (relationsToNewHolders). Carried in as they were, they
+ *  joined an element and its holder: Studio drew none of them and offered
+ *  nothing to remove them. */
+export function relationsRefusedHere(state: Pick<ModelState, 'c4Nodes' | 'c4Relations' | 'metamodel'>, relationIds: Iterable<string>, movedIds: Iterable<string>): Array<{ relation: C4Relation; reason: string }> {
+  const checked = new Set(relationIds)
+  const moved = new Set(movedIds)
+  const under = (id: string): boolean => {
+    const seen = new Set<string>()
+    for (let cur: string | undefined = id; cur && !seen.has(cur); cur = state.c4Nodes[cur]?.parentId) {
+      if (moved.has(cur)) return true
+      seen.add(cur)
+    }
+    return false
+  }
+  const out: Array<{ relation: C4Relation; reason: string }> = []
+  for (const rel of Object.values(state.c4Relations)) {
+    if (checked.has(rel.id)) {
+      const reason = relationRefusal(relationContext(state), rel, rel.id, rel.relationType)
+      if (reason) out.push({ relation: rel, reason: reason.replace(/^Relation not allowed: /, '') })
+      continue
+    }
+    if (relationMayJoinHolder(state.metamodel, rel.relationType) || !(under(rel.sourceId) || under(rel.targetId))) continue
+    const src = state.c4Nodes[rel.sourceId], dst = state.c4Nodes[rel.targetId]
+    const holder = src && dst ? holderOf(state.c4Nodes, src, dst) : undefined
+    if (holder) out.push({ relation: rel, reason: `${holder.label} holds ${(holder === src ? dst : src).label}, and containment already joins them.` })
+  }
+  return out
+}
+
 /** Moves `ids` into `newParentId` (null: the top of the model). Returns the
  *  relations it removed: those joining a moved element, or one it holds,
  *  to what now holds it (relationsToNewHolders). */
@@ -555,13 +589,17 @@ export function milestoneOwnView(view: DiagramView): DiagramView {
  *  (DiagramSnapshot.views, milestoneOwnView: without the places, which stay
  *  the view's for every milestone). Left to the live view, the milestone's
  *  view and the slide showing it lost the element deleted since. A view the
- *  milestone keeps its own way already keeps its list, and a view of one of
- *  the `removed` goes with it. Returns `snapshots` itself when no milestone
- *  changes, else a new array with new milestones where they changed. */
+ *  milestone keeps its own way already keeps its list. A view of one of the
+ *  `removed` (a view per element) goes with it from the live model: a
+ *  milestone that holds the element keeps all of it, its places too, and
+ *  shows it as its own (its group listed one view fewer there). Returns
+ *  `snapshots` itself when no milestone changes, else a new array with new
+ *  milestones where they changed. */
 export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Record<string, DiagramView>, removed: Set<string>): DiagramSnapshot[] {
   if (!snapshots.length || !removed.size) return snapshots
   const listing = Object.values(views).filter((v) => !(v.subject && removed.has(v.subject)) && v.nodeIds.some((id) => removed.has(id)))
-  if (!listing.length) return snapshots
+  const ofRemoved = Object.values(views).filter((v) => v.subject && removed.has(v.subject))
+  if (!listing.length && !ofRemoved.length) return snapshots
   let out = snapshots
   snapshots.forEach((snap, i) => {
     const own: Record<string, DiagramView> = {}
@@ -569,6 +607,33 @@ export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Recor
       if (snap.views?.[view.id] || !view.nodeIds.some((id) => removed.has(id) && snap.nodes[id])) continue
       own[view.id] = milestoneOwnView(view)
     }
+    for (const view of ofRemoved) {
+      const had = snap.views?.[view.id]
+      if (!snap.nodes[view.subject!] || (had && Object.keys(had.positions ?? {}).length)) continue
+      own[view.id] = { ...(had ?? milestoneOwnView(view)), positions: { ...view.positions } }
+    }
+    if (!Object.keys(own).length) return
+    if (out === snapshots) out = [...snapshots]
+    out[i] = { ...snap, views: { ...snap.views, ...own } }
+  })
+  return out
+}
+
+/** The milestones (`snapshots`) as they are once the sequence `sequenceId`
+ *  is deleted from the live model, which unlinks the views that play it
+ *  (deleteSequence; call it with the `views` before): a milestone that
+ *  holds the sequence keeps those views linked, as views of its own
+ *  (milestoneOwnView). Left to the live views, a flow view said "No
+ *  sequence linked" in a milestone that still has the sequence. Returns
+ *  `snapshots` itself when no milestone changes. */
+export function keepSequenceViewsInMilestones(snapshots: DiagramSnapshot[], views: Record<string, DiagramView>, sequenceId: string): DiagramSnapshot[] {
+  const playing = Object.values(views).filter((v) => v.sequenceId === sequenceId)
+  if (!snapshots.length || !playing.length) return snapshots
+  let out = snapshots
+  snapshots.forEach((snap, i) => {
+    if (!snap.sequences?.[sequenceId]) return
+    const own: Record<string, DiagramView> = {}
+    for (const view of playing) if (!snap.views?.[view.id]) own[view.id] = milestoneOwnView(view)
     if (!Object.keys(own).length) return
     if (out === snapshots) out = [...snapshots]
     out[i] = { ...snap, views: { ...snap.views, ...own } }
