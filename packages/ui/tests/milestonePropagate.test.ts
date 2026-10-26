@@ -208,3 +208,48 @@ describe('Propagate a delete of an element a later reference names (F-0054)', ()
     expect(issues.filter((i) => i.id.startsWith('bad-ref:')).map((i) => i.message)).toEqual([])
   })
 })
+
+describe('Propagate a nest or a relation that joins an element to what holds it in a later model (F-0070)', () => {
+  // The diff was applied as it was: a nest carried into a model where the
+  // element relates to its new holder kept the relation, and a relation
+  // carried into a model where one end holds the other was added. Studio
+  // refuses both there, draws neither, and offered nothing to remove them.
+  const between = (rels: Record<string, C4Relation>, a: string, b: string) => Object.values(rels).filter((r) => r.sourceId === a && r.targetId === b)
+  let m = ''
+  beforeEach(() => {
+    s().loadDiagram({
+      nodes: [{ ...node('s1', 'system', 0, 0), width: 700, height: 400 }, node('c', 'container', 40, 120, 's1'), { ...node('s2', 'system', 900, 0), width: 700, height: 400 }],
+      relations: [],
+      views: [],
+    })
+    m = s().createSnapshot('m')
+    useDiagramStore.setState({ notifications: [] } as any)
+  })
+
+  it('a nest made in the milestone takes, in later models, the relation to the new holder, and says so', () => {
+    s().addRelation({ sourceId: 'c', targetId: 's2' })
+    const later = s().createSnapshot('later')
+    s().selectMilestone(m)
+    s().reparentNodes(['c'], 's2')
+    s().commitMilestoneChanges('propagate')
+    const laterSnap = s().snapshots.find((x) => x.id === later)!
+    expect(laterSnap.nodes.c.parentId).toBe('s2')
+    expect(between(laterSnap.relations as Record<string, C4Relation>, 'c', 's2')).toEqual([])
+    expect(s().notifications.map((n) => n.message).join('\n')).toMatch(/containment already joins/)
+    s().discardMilestoneChanges()
+    expect(s().c4Nodes.c.parentId).toBe('s2')
+    expect(between(s().c4Relations, 'c', 's2')).toEqual([])
+  })
+
+  it('a relation made in the milestone is not carried into a later model where one end holds the other', () => {
+    s().reparentNodes(['c'], 's2')
+    s().selectMilestone(m)
+    expect(s().c4Nodes.c.parentId).toBe('s1')
+    s().addRelation({ sourceId: 'c', targetId: 's2' })
+    s().commitMilestoneChanges('propagate')
+    expect(between(s().snapshots.find((x) => x.id === m)!.relations as Record<string, C4Relation>, 'c', 's2')).toHaveLength(1)
+    s().discardMilestoneChanges()
+    expect(s().c4Nodes.c.parentId).toBe('s2')
+    expect(between(s().c4Relations, 'c', 's2')).toEqual([])
+  })
+})

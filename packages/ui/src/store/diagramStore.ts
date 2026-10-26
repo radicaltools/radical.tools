@@ -7657,10 +7657,14 @@ export const useDiagramStore = create<DiagramStore>()(
         }
 
         // Apply diff to active milestone + every later milestone + live HEAD backup.
+        // The relations a later model refuses, which the edits left out of
+        // it (model.relationsRefusedHere), and where: said once it is done.
+        const refusedHere = new Map<string, { text: string; reason: string; where: string[] }>()
         const applyDiff = (
           targetNodes: Record<string, C4Node>,
           targetRels: Record<string, C4Relation>,
           targetSeqs: Record<string, DiagramSequence>,
+          where: string,
         ) => {
           for (const n of addedNodes) targetNodes[n.id] = JSON.parse(JSON.stringify(n))
           for (const { id, updates } of updatedNodes) {
@@ -7701,6 +7705,20 @@ export const useDiagramStore = create<DiagramStore>()(
           for (const id of removedRelIds) delete targetRels[id]
           for (const [rid, r] of Object.entries(targetRels)) {
             if (!targetNodes[r.sourceId] || !targetNodes[r.targetId]) delete targetRels[rid]
+          }
+          // What this model refuses goes, as a nest made here takes it and a
+          // relation made here is refused: a nest carried here kept the
+          // element's relation to its new holder, and a relation carried
+          // here joined an element and what holds it.
+          const moved = updatedNodes.filter((u) => 'parentId' in u.updates).map((u) => u.id)
+          const touched = [...addedRels.map((r) => r.id), ...updatedRels.map((u) => u.id)]
+          for (const { relation, reason } of model.relationsRefusedHere({ c4Nodes: targetNodes, c4Relations: targetRels, metamodel } as unknown as model.ModelState, touched, moved)) {
+            delete targetRels[relation.id]
+            const label = (id: string): string => targetNodes[id]?.label || id
+            const type = relationTypeForProse(relation, targetNodes, metamodel as Metamodel | undefined)
+            const said = refusedHere.get(relation.id) ?? { text: `${label(relation.sourceId)} ${type ? relationTypeName(metamodel as Metamodel | undefined, type, true) : 'relates to'} ${label(relation.targetId)}`, reason, where: [] }
+            said.where.push(where)
+            refusedHere.set(relation.id, said)
           }
           // What is left here no longer names what is gone (a transition's
           // event, a requirement's state), as a delete takes it out: a later
@@ -7765,7 +7783,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if (Object.keys(ownViewsAfter).length) snap.views = ownViewsAfter
             } else {
               if (!snap.sequences) snap.sequences = {}
-              applyDiff(snap.nodes, snap.relations, snap.sequences)
+              applyDiff(snap.nodes, snap.relations, snap.sequences, snap.name)
             }
           }
           // Apply to the live HEAD backup so it picks up future-facing changes too,
@@ -7780,7 +7798,7 @@ export const useDiagramStore = create<DiagramStore>()(
               if (typeof updates.label === 'string') model.renameViewsOf(live, id, updates.label)
             }
             const before = Object.keys(state.liveBackup.nodes)
-            applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences)
+            applyDiff(state.liveBackup.nodes as any, state.liveBackup.relations as any, (state.liveBackup as any).sequences, 'the live model')
             // The Hub template records go with the texts they wrote: what an
             // Apply in the milestone changed, not the milestone's values.
             state.liveBackup.hubTemplates = propagatedHubTemplates(
@@ -7831,6 +7849,11 @@ export const useDiagramStore = create<DiagramStore>()(
         if (lostShownView) get()._showLiveCanvasPositions()
         get()._sync()
         _liveLayout?.reset()
+        if (refusedHere.size) {
+          const names = (where: string[]): string => where.length > 1 ? `${where.slice(0, -1).join(', ')} and ${where[where.length - 1]}` : where[0]
+          const said = [...refusedHere.values()].map((r) => `${r.text} from ${names(r.where)}: ${r.reason}`)
+          get().pushNotification(`Propagate removed ${said.length === 1 ? 'the relation' : `${said.length} relations`} ${said.join('; ')}`, 'warning')
+        }
       },
 
       setDiffHighlight(diff) {

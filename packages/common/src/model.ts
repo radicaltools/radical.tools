@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
@@ -402,6 +402,40 @@ export function relationsToNewHolders(state: Pick<ModelState, 'c4Nodes' | 'c4Rel
   return Object.values(state.c4Relations).filter((r) => !relationMayJoinHolder(state.metamodel, r.relationType)
     && (under(r.sourceId) || under(r.targetId))
     && (holds(r.sourceId, r.targetId) || holds(r.targetId, r.sourceId)))
+}
+
+/** The relations of a model that another copy's edits were carried into
+ *  (a milestone's edits propagated), which it refuses as it is now, each
+ *  with why: one of `relationIds` (added or changed by the edits) as one
+ *  made here is refused (relationRefusal), and one that joins an element
+ *  of `movedIds` (or one it holds) to what holds it now, as a move made
+ *  here takes it (relationsToNewHolders). Carried in as they were, they
+ *  joined an element and its holder: Studio drew none of them and offered
+ *  nothing to remove them. */
+export function relationsRefusedHere(state: Pick<ModelState, 'c4Nodes' | 'c4Relations' | 'metamodel'>, relationIds: Iterable<string>, movedIds: Iterable<string>): Array<{ relation: C4Relation; reason: string }> {
+  const checked = new Set(relationIds)
+  const moved = new Set(movedIds)
+  const under = (id: string): boolean => {
+    const seen = new Set<string>()
+    for (let cur: string | undefined = id; cur && !seen.has(cur); cur = state.c4Nodes[cur]?.parentId) {
+      if (moved.has(cur)) return true
+      seen.add(cur)
+    }
+    return false
+  }
+  const out: Array<{ relation: C4Relation; reason: string }> = []
+  for (const rel of Object.values(state.c4Relations)) {
+    if (checked.has(rel.id)) {
+      const reason = relationRefusal(relationContext(state), rel, rel.id, rel.relationType)
+      if (reason) out.push({ relation: rel, reason: reason.replace(/^Relation not allowed: /, '') })
+      continue
+    }
+    if (relationMayJoinHolder(state.metamodel, rel.relationType) || !(under(rel.sourceId) || under(rel.targetId))) continue
+    const src = state.c4Nodes[rel.sourceId], dst = state.c4Nodes[rel.targetId]
+    const holder = src && dst ? holderOf(state.c4Nodes, src, dst) : undefined
+    if (holder) out.push({ relation: rel, reason: `${holder.label} holds ${(holder === src ? dst : src).label}, and containment already joins them.` })
+  }
+  return out
 }
 
 /** Moves `ids` into `newParentId` (null: the top of the model). Returns the
