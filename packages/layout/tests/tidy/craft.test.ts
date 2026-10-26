@@ -11,7 +11,8 @@ import { Layout } from '../../src/tidy/layout'
 import { buildIndex, linesOf, totalCost } from '../../src/tidy/cost'
 import { builtInGovernanceMetamodel, type Metamodel } from '@radical/common/metamodel'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type C4Relation } from '@radical/common/c4'
-import { compoundPadding } from '../../src/geometry'
+import { compoundPadding, projectToVisibleGraph } from '../../src/geometry'
+import { alignmentError, resolveAlignments } from '../../src/constraints'
 
 function node(id: string, type: string, x: number, y: number, parentId?: string, extra: Partial<C4Node> = {}): C4Node {
   return { id, type: type as C4Node['type'], label: id, collapsed: false, x, y, ...NODE_SIZES[type as keyof typeof NODE_SIZES], ...(parentId ? { parentId } : {}), ...extra } as C4Node
@@ -225,6 +226,41 @@ describe('Tidy, the finer points', () => {
     // Cut by its budget right after the sketch, it hands over nothing worse than the start.
     expect(large.tidy.after.total).toBeLessThanOrEqual(large.tidy.before.total + 0.01)
   }, 60_000)
+
+  it('a row the author set holds through tidying, and a second run keeps the layout', { timeout: 60_000 }, () => {
+    // A pile of systems with containers and databases, people and ADRs, five
+    // of them in a row the author set: lined up from the first run, so the
+    // second finds nothing left to do.
+    const nodes: C4Node[] = [], relations: C4Relation[] = []
+    for (let i = 0; i < 8; i++) {
+      nodes.push(node(`sys${i}`, 'system', (i % 4) * 15, Math.floor(i / 4) * 15))
+      for (let k = 0; k < 3; k++) {
+        nodes.push(node(`sys${i}-c${k}`, 'container', 40 + k * 10, 120 + k * 10, `sys${i}`))
+        if (k) relations.push(rel(`sys${i}-c${k - 1}`, `sys${i}-c${k}`))
+      }
+      nodes.push(node(`sys${i}-db`, 'database', 50, 130, `sys${i}`))
+      relations.push(rel(`sys${i}-c0`, `sys${i}-db`))
+      if (i % 2 === 0) { nodes.push(node(`person${i}`, 'person', i * 15 + 10, 10)); relations.push(rel(`person${i}`, `sys${i}-c0`)) }
+      if (i % 3 === 0) { nodes.push(node(`adr${i}`, 'adr', i * 15 + 20, 20)); relations.push({ ...rel(`adr${i}`, `sys${i}`), relationType: 'constrains' }) }
+      if (i) relations.push(rel(`sys${i - 1}-c0`, `sys${i}-c0`))
+    }
+    const row = ['adr0', 'sys3', 'person6', 'adr6', 'sys5']
+    const run = (at: Record<string, C4Node>) => {
+      const alignments = resolveAlignments([{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: row }], at)
+      const result = runTidyLayout(at, byId(relations), { alignments })
+      const laidOut: Record<string, C4Node> = {}
+      for (const [id, n] of Object.entries(at)) laidOut[id] = { ...n, ...(result.winner.positions[id] ?? {}) }
+      return { result, laidOut, error: alignmentError(projectToVisibleGraph(laidOut, byId(relations)).nodes, {}, alignments) }
+    }
+    const first = run(byId(nodes))
+    expect(first.error).toBeLessThan(1)
+    const again = run(first.laidOut)
+    expect(again.result.tidy.steps.map((s) => s.description)).toEqual([])
+    expect(again.result.keptCurrent).toBe(true)
+    expect(again.error).toBeLessThan(1)
+    // What it hands over is what it judged: the cost it reports is the layout's.
+    expect(again.result.tidy.after.total).toBeCloseTo(first.result.tidy.after.total, 3)
+  })
 
   it('a row is reordered to uncross its lines', () => {
     // Four in a row above four below, the top row in reverse order: every line crosses.

@@ -13,7 +13,7 @@ import type { C4Node, C4Relation, EdgeStyle, PositionMap } from '@radical/common
 import type { Metamodel } from '@radical/common/metamodel'
 import { projectToVisibleGraph } from '../geometry'
 import { computeLayoutMetrics } from '../crossingOpt'
-import { type Alignment, enforceAlignments } from '../constraints'
+import { type Alignment, alongAxis, enforceAlignments } from '../constraints'
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
@@ -123,7 +123,32 @@ export function runTidyLayout(
   const lines = linesOf(l, relations)
   const before = totalCost(l, lines)
   const steps: TidyStep[] = []
-  const startPositions = l.positions()
+  // A pile, or a large tangled view, as the canvas has it (for the rough layout below).
+  const piled = l.ids().filter((id) => l.overlaps(id)).length > PILE_SHARE * l.ids().length
+  const tangled = lines.length > 0 && (before.crossings + before.overdraws) > ROUGH_WHEN_TANGLED * lines.length
+
+  // The rows and columns the author set hold from the start, and every move
+  // keeps them (keepLines): what Tidy hands over is the layout it judged,
+  // so a second run finds it as this one left it.
+  const alignments = options.alignments ?? []
+  const lineUp = (): void => {
+    if (!alignments.length) return
+    l.setPositions(enforceAlignments(nodes, l.positions(), alignments))
+    l.refit()
+  }
+  {
+    const wasPositions = l.positions()
+    lineUp()
+    const now = l.positions()
+    const moved: PositionMap = {}
+    for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
+    if (Object.keys(moved).length) {
+      const description = 'The rows and columns set on the view lined up'
+      steps.push({ kind: 'align', description, gain: 0, moved })
+      options.onProgress?.(steps.length, description)
+    }
+  }
+  const start = { cost: steps.length ? totalCost(l, lines).total : before.total, positions: l.positions(), steps: steps.length }
 
   // A large view, or a pile, is sketched first: the semantic layered layout
   // puts persons on top, outside systems at the edge, frames as blocks and
@@ -132,13 +157,12 @@ export function runTidyLayout(
   // not do either). Not round a selection, nor with pins to keep. A large
   // view still tangled after a run is not sketched again unless the sketch
   // reads better: another run continues from the canvas.
-  const piled = l.ids().filter((id) => l.overlaps(id)).length > PILE_SHARE * l.ids().length
-  const tangled = lines.length > 0 && (before.crossings + before.overdraws) > ROUGH_WHEN_TANGLED * lines.length
   if (!options.around?.length && !pinned.length && (piled || (l.ids().length > ROUGH_FROM && tangled))) {
     const wasPositions = l.positions()
     l.setPositions(applyRadicalLayout(nodes, relations))
     l.refit()
-    if (!piled && totalCost(l, lines).total >= before.total) l.setPositions(wasPositions)
+    lineUp()
+    if (!piled && totalCost(l, lines).total >= start.cost) l.setPositions(wasPositions)
     const now = l.positions()
     const moved: PositionMap = {}
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -168,15 +192,63 @@ export function runTidyLayout(
   // to the margin and back) are seen to have gone round.
   seen.set(stateKey(), steps.length)
 
+  // The members of the author's rows and columns where a move found them;
+  // after it, a row a member left follows it (the others moved along that
+  // axis, with what they hold), or, where that is not clear of the rest,
+  // the member is put back on the row; the move fails when neither is
+  // clear or a row is left out of its order.
+  const lineIds = [...new Set(alignments.flatMap((a) => a.ids))].filter((id) => l.box(id))
+  const lineReach = [...new Set(lineIds.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+  const held = (): Map<string, Box> | null => (lineIds.length ? l.snapshot(lineIds) : null)
+  const keepLines = (was: Map<string, Box> | null): boolean => {
+    if (!was) return true
+    const offsets = (a: Alignment): { id: string; d: number }[] => {
+      const key = a.axis === 'x' ? 'cx' : 'cy'
+      return a.ids.filter((id) => was.has(id)).map((id) => ({ id, d: l.box(id)![key] - was.get(id)![key] }))
+    }
+    const level = (ds: { d: number }[]): boolean => ds.every((m) => Math.abs(m.d - ds[0].d) < 0.01)
+    const shift = (a: Alignment, id: string, d: number): void => l.moveBy(id, a.axis === 'x' ? d : 0, a.axis === 'y' ? d : 0)
+    const repair = (follow: boolean): boolean => {
+      for (let round = 0; round < 3; round++) {
+        let off = false
+        for (const a of alignments) {
+          const ds = offsets(a)
+          if (level(ds)) continue
+          off = true
+          const moved = ds.filter((m) => Math.abs(m.d) >= 0.01)
+          if (follow && level(moved)) { for (const m of ds) if (Math.abs(m.d) < 0.01) shift(a, m.id, moved[0].d) }
+          else for (const m of moved) shift(a, m.id, -m.d)
+        }
+        if (!off) break
+      }
+      for (const a of alignments) {
+        if (!level(offsets(a))) return false
+        const along = alongAxis(a) === 'x' ? 'cx' : 'cy'
+        for (const chain of a.orders) {
+          const ids = chain.filter((id) => was.has(id))
+          for (let k = 1; k < ids.length; k++) {
+            if (was.get(ids[k - 1])![along] < was.get(ids[k])![along] && l.box(ids[k - 1])![along] >= l.box(ids[k])![along]) return false
+          }
+        }
+      }
+      return l.allClear(lineIds)
+    }
+    const moved = l.snapshot(lineReach)
+    if (repair(true)) return true
+    l.restore(moved)
+    return repair(false)
+  }
+
   // First the loose elements out of the way, whatever the cost says: they
   // have no lines for it to see. And again at the end, to the margin the
   // tidied diagram has.
   const take = (moves: Move[]): void => {
     for (const move of moves) {
-      const touched = [...new Set(move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+      const touched = [...new Set([...move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]), ...lineReach])]
       const wasPositions = l.positions()
       const was = l.snapshot(touched)
-      if (!move.apply(l)) { l.restore(was); continue }
+      const lined = held()
+      if (!move.apply(l) || !keepLines(lined)) { l.restore(was); continue }
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -187,10 +259,11 @@ export function runTidyLayout(
   take(untangleMoves(l, nodes))
   const gather = (): void => {
     for (const move of gatherMoves(l, nodes, lines)) {
-      const touched = [...new Set(move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+      const touched = [...new Set([...move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]), ...lineReach])]
       const wasPositions = l.positions()
       const was = l.snapshot(touched)
-      if (!move.apply(l)) { l.restore(was); continue }
+      const lined = held()
+      if (!move.apply(l) || !keepLines(lined)) { l.restore(was); continue }
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -208,7 +281,7 @@ export function runTidyLayout(
   // The best layout seen, by the whole cost: a run cut short by its budget,
   // or one whose local judgements added up wrong, hands that over, never
   // anything worse than it started from.
-  let best = { cost: before.total, positions: startPositions, steps: 0 }
+  let best = start
   const checkpoint = (): void => {
     const cost = totalCost(l, lines).total
     if (cost < best.cost) best = { cost, positions: l.positions(), steps: steps.length }
@@ -237,10 +310,14 @@ export function runTidyLayout(
     // then judged on the same elements (the room round where the moved
     // ones were and where they are).
     l.begin()
+    const lined = held()
     const done = move.apply(l)
     if (!done) { l.rollback(); return { gain: -Infinity, after: null } }
     settle(l.journalBoxes())
+    if (!keepLines(lined)) { l.rollback(); return { gain: -Infinity, after: null } }
     const touched = l.changed()
+    // A member put back on its line moved too: its lines are judged with the move.
+    for (const id of touched) if (lined?.has(id)) moved.add(id)
     const after = l.snapshot(touched)
     const was = l.journalBoxes()
     const roomy = new Set<string>()
@@ -447,7 +524,10 @@ export function runTidyLayout(
     l.setPositions(best.positions)
     steps.length = best.steps
   }
-  let positions = l.positions()
+  // The author's rows and columns held all along; lined up once more as
+  // the canvas measures them, before the diagram is moved to the top left,
+  // so what is handed over stands where the next run will find it.
+  let positions = enforceAlignments(nodes, l.positions(), alignments)
   // The whole diagram from the top left, as every layout hands it over;
   // not when something is pinned: it stays where the author put it.
   const roots = l.ids().filter((id) => !l.parentOf(id))
@@ -455,7 +535,6 @@ export function runTidyLayout(
     const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
     for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
   }
-  positions = enforceAlignments(nodes, positions, options.alignments ?? [])
   const projected = projectPositions(nodes, positions)
   const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
   afterLayout.edgeStyle = style
