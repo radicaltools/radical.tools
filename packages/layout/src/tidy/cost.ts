@@ -21,7 +21,7 @@ import { type LayoutFlow, relationLayoutHint, relationTypeName } from '@radical/
 import type { Layout } from './layout'
 import { distributePorts, pickSides } from '../portAllocator'
 import { orthogonalConnector, type Pt } from '../edgeRouting'
-import { relationLabelSize, type LabelSize } from '../edgeLabels'
+import { relationLabelSize, tableMeasure, type LabelSize } from '../edgeLabels'
 import { Position } from '../side'
 
 export type Ends = { ax: number; ay: number; bx: number; by: number }
@@ -158,7 +158,9 @@ export function linesOf(l: Layout, relations: Record<string, C4Relation>): Line[
     // names, and would give up its conventions to keep them clear.
     const name = r.label?.trim()
     const typeName = (): string | undefined => r.relationType && l.metamodel ? relationTypeName(l.metamodel, r.relationType, true, { from: l.nodes[r.sourceId].type, to: l.nodes[r.targetId].type }) : undefined
-    const label = name || r.technology ? relationLabelSize({ ...r, label: name, typeName: typeName() }, l.nodes) ?? undefined : undefined
+    // Measured by the font's advance table, not the canvas: the same view
+    // gets the same layout on any machine and from the MCP server.
+    const label = name || r.technology ? relationLabelSize({ ...r, label: name, typeName: typeName() }, l.nodes, tableMeasure) ?? undefined : undefined
     out.push({ id, a: r.sourceId, b: r.targetId, flow: hint.flow, axis: hint.axis ?? 'free', ...(label ? { label } : {}) })
   }
   return out

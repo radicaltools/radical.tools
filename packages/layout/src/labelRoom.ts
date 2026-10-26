@@ -10,7 +10,7 @@
  * side.
  */
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { relationLabelSize, type LabelSize } from './edgeLabels'
+import { relationLabelSize, tableMeasure, type LabelSize } from './edgeLabels'
 
 /** Clear space kept on both sides of a label, along its edge. */
 export const LABEL_MARGIN = 10
@@ -42,7 +42,7 @@ export function labelSizeOf(r: C4Relation, nodes: Record<string, C4Node>): Label
   }
   let size = byRelation.get(r)
   if (size === undefined) {
-    size = relationLabelSize(r, nodes)
+    size = relationLabelSize(r, nodes, tableMeasure) // the table: one layout on any machine
     byRelation.set(r, size)
   }
   return size
