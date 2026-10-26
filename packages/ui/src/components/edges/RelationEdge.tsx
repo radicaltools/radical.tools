@@ -270,8 +270,9 @@ export const RelationEdge = memo(
                 data.label || typeName ? '' : 'relation-label-tech-only',
               ].join(' ')}
             >
+              {/* A rolled-up line's relations, one a line (deriveRFEdges joins them with a line break). */}
               {data.label
-                ? <div className="relation-label-name">{data.label}</div>
+                ? data.label.split('\n').map((name, i) => <div key={i} className="relation-label-name">{name}</div>)
                 : typeName && <div className="relation-label-name" style={{ opacity: 0.85, fontStyle: 'italic' }}>{typeName}</div>
               }
               {data.technology && (

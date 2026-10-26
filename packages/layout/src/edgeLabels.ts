@@ -96,7 +96,9 @@ export interface RelationLabelText {
 
 /** The lines of a relation's label, the name on at most two rows and the
  *  technology on one (cut with an ellipsis, whole while the relation is
- *  active on the canvas); none when it has no label. With the
+ *  active on the canvas); none when it has no label. A rolled-up line's
+ *  label holds its relations' names joined with line breaks: each is a
+ *  name of its own, as RelationEdge draws them. With the
  *  model's nodes, a transition without a label shows `event [guard] /
  *  actions ^raised` (its events by name), and nothing when it is a
  *  completion transition. */
@@ -104,7 +106,7 @@ export function relationLabelLines(r: RelationLabelText, nodes?: Record<string, 
   const lines: LabelTextLine[] = []
   const name = r.label
     || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.typeName ?? r.relationType)
-  if (name) lines.push({ text: name, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows })
+  if (name) for (const text of name.split('\n')) lines.push({ text, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows })
   if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize, maxRows: 1 })
   return lines
 }
