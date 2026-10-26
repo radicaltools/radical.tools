@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { current, produce } from 'immer'
+import { current, isDraft, produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
   Node,
@@ -20,6 +20,7 @@ import {
   DiagramView,
   DiagramSequence,
   DiagramSnapshot,
+  MilestoneView,
   PresentationSlide,
   Presentation,
   SlideCanvasState,
@@ -71,7 +72,7 @@ import { runSmartLayout, type SmartLayoutProgress } from '../layout/smartLayoutR
 import { TIDY_BUDGET, type TidyReport, type TidyStep, costRows, tidySummary } from '@radical/layout/tidy'
 import { runTidy, TIDY_STOPPED } from '../layout/tidyRunner'
 import { minimizeCrossings } from '@radical/layout/crossingOpt'
-import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
+import { type CanvasBox, type CanvasShape, EXPAND_GAP, compoundPadding, createBatchPlacer, drawnBoxesOf, drawnSize, fittedParentSize, freeSpotNear, gridSlotIn, growFrameLeftUp as growFrameLeftUpIn, isFixedSizeType, growWithRoom, makeRoomAround, placeBesideSiblings, settleMovedNodes, placeGhosts, placeUnplaced, projectToVisibleGraph, strayNodeIds } from '@radical/layout/geometry'
 import { liesClearInParent, modelCanvas } from '@radical/layout/geometry'
 import { arrangeGrid } from '@radical/layout/constraints'
 import {
@@ -627,6 +628,10 @@ interface ShownMilestone {
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   sequences: Record<string, DiagramSequence>
+  /** The views shown, and the live ones parked under them (liveBackup.views):
+   *  what was done on them in the milestone (keepMilestoneViewEdits). */
+  views: Record<string, DiagramView>
+  parkedViews?: Record<string, DiagramView>
   dirty: boolean
   promptOpen: boolean
   activeViewId: string | null
@@ -793,6 +798,12 @@ function allElementsCamera(camera: { x: number; y: number; zoom: number } | null
   const was = _cameraAtLoad
   if (!camera || (was && was.x === camera.x && was.y === camera.y && was.zoom === camera.zoom)) return null
   return camera
+}
+
+/** The camera on the canvas now, as Canvas keeps it on window. */
+function shownCamera(): { x: number; y: number; zoom: number } | null {
+  const vp = typeof window !== 'undefined' ? (window as any).__rfCurrentViewport as { x: number; y: number; zoom: number } | undefined : undefined
+  return vp ? { x: vp.x, y: vp.y, zoom: vp.zoom } : null
 }
 
 /** Counts the user's steps: each undo step made, undone or redone. */
@@ -1255,39 +1266,111 @@ function milestoneOnlyView(view: DiagramView, liveNodes: Record<string, C4Node> 
   return !!view.subject && !!liveNodes && !liveNodes[view.subject]
 }
 
-/** What a milestone keeps of a view its own way (DiagramSnapshot.views). */
-const milestoneOwnView = model.milestoneOwnView
-
-const sameOwnView = (a: DiagramView, b: DiagramView): boolean =>
-  JSON.stringify(milestoneOwnView(a)) === JSON.stringify(milestoneOwnView(b))
-
 /** The views a milestone keeps its own way (`snap.views`) are shown in place
  *  of the live ones, which are parked in liveBackup.views and put back on
- *  leaving it (unparkLiveViews). A view's name and folder, its places and
- *  camera are the live model's. A view of an element the live model
- *  deleted since is shown as the milestone has it, in its group's folder
- *  (milestoneOnlyView). Use inside immer set, with liveBackup set. */
+ *  leaving it (unparkLiveViews): each as the milestone shows it
+ *  (model.milestoneView: the live view with what the milestone keeps of it
+ *  its own, the rule model.ts writes down beside it). A view of an element
+ *  the live model deleted since is shown as the milestone has it, in its
+ *  group's folder (milestoneOnlyView). Use inside immer set, with
+ *  liveBackup set. */
 function showMilestoneViews(state: DiagramStore, snap: DiagramSnapshot | undefined): void {
   if (!snap?.views || !state.liveBackup) return
-  for (const [id, own] of Object.entries(snap.views)) {
-    const live = state.views[id] as DiagramView | undefined
-    if (!live) {
-      const group = own.partOf ? state.views[own.partOf] as DiagramView | undefined : undefined
-      if (!milestoneOnlyView(own, state.liveBackup.nodes) || !snap.nodes[own.subject!] || (own.partOf && !group)) continue
-      const shown: DiagramView = { ...own }
-      if (group?.folder) shown.folder = group.folder
-      else if (group) delete shown.folder
-      state.views[id] = shown as any
-      continue
-    }
-    if (!state.liveBackup.views?.[id]) state.liveBackup.views = { ...state.liveBackup.views, [id]: live } as any
-    const shown: DiagramView = { ...own, name: live.name, positions: live.positions }
-    for (const key of ['folder', 'viewport', 'treemapFocusId', 'wikiFocusId', 'tableActiveTab'] as const) {
-      if (live[key] === undefined) delete shown[key]
-      else (shown as unknown as Record<string, unknown>)[key] = live[key]
-    }
-    state.views[id] = shown as any
+  const live = (isDraft(state.views) ? current(state.views) : state.views) as Record<string, DiagramView>
+  const shown = model.milestoneViews(live, snap, state.liveBackup.nodes as Record<string, C4Node>)
+  for (const id of Object.keys(snap.views)) {
+    if (!shown[id] || shown[id] === live[id]) continue
+    if (live[id] && !state.liveBackup.views?.[id]) state.liveBackup.views = { ...state.liveBackup.views, [id]: live[id] } as any
+    state.views[id] = shown[id] as any
   }
+}
+
+/** The view `id` as the milestone shown has it before its edits (`snap`
+ *  its saved state): the live view parked, or the live one, with what the
+ *  milestone keeps of it; its own whole when it has it alone. What was done
+ *  on it in the milestone is what the view shown differs by. */
+function milestoneViewBefore(id: string, snap: DiagramSnapshot, live: DiagramView | undefined): DiagramView | undefined {
+  const own = snap.views?.[id]
+  if (live) return model.milestoneView(live, own)
+  return own?.nodeIds ? own as unknown as DiagramView : undefined
+}
+
+/** What was done on the views in the milestone shown and not saved yet,
+ *  done again on them as read after an outside change (loadDiagram, after
+ *  showMilestoneViews; inside immer set, or on a parked Designer): the
+ *  change is the live model's, and showing the views as saved dropped the
+ *  milestone's edits of them while it still said they were not saved.
+ *  `shown.before` is the milestone as it was saved before the change. */
+function keepMilestoneViewEdits(state: DiagramStore, shown: Pick<ShownMilestone, 'id' | 'before' | 'nodes' | 'views' | 'parkedViews'>): void {
+  for (const [id, after] of Object.entries(shown.views)) {
+    const live = shown.parkedViews?.[id]
+    const before = milestoneViewBefore(id, shown.before, live)
+    const now = state.views[id] as DiagramView | undefined
+    if (!before || !now || (!live && !milestoneOnlyView(now, state.liveBackup?.nodes as Record<string, C4Node>))) continue
+    const edited = model.viewEdited(isDraft(now) ? current(now) : now, before, after, (n) => !!shown.nodes[n])
+    if (JSON.stringify(edited) === JSON.stringify(now)) continue
+    if (live && !state.liveBackup!.views?.[id]) state.liveBackup!.views = { ...state.liveBackup!.views, [id]: isDraft(now) ? current(now) : now } as any
+    state.views[id] = edited as any
+  }
+}
+
+/** Restore to live's part on the views (restoreSnapshot, inside its immer
+ *  set, before the live nodes are replaced): the views as milestone `snap`
+ *  shows them become the live views, and the milestone keeps nothing of
+ *  those its own: it and the live model have one view each again. */
+function restoreMilestoneViews(state: DiagramStore, snap: DiagramSnapshot): void {
+  if (!snap.views) return
+  const live = (isDraft(state.views) ? current(state.views) : state.views) as Record<string, DiagramView>
+  const shown = model.milestoneViews(live, snap, state.c4Nodes as Record<string, C4Node>)
+  if (shown === live) return
+  for (const id of Object.keys(shown)) if (shown[id] !== live[id]) state.views[id] = shown[id] as any
+  const kept = state.snapshots.find((m) => m.id === snap.id)
+  if (!kept?.views) return
+  for (const id of Object.keys(kept.views)) if (shown[id]) delete kept.views[id]
+  if (!Object.keys(kept.views).length) delete kept.views
+}
+
+/** Propagate's part on the views (commitMilestoneChanges, inside its immer
+ *  set, once the edits reached the live model and the later milestones):
+ *  what was done on each view in milestone `idx` (`edits`: the view as the
+ *  milestone had it and as it is shown now) is done on the live view parked
+ *  under it (`live`) and on what each later milestone keeps of the view its
+ *  own, setting by setting (model.viewEdited). Milestone `idx` keeps what
+ *  it shows another way than the live view then (`own`, its views after,
+ *  saved into it). Returns the live views to park: those it shows its own
+ *  way; any other is the live view as shown. */
+function propagateViewEdits(state: DiagramStore, idx: number, edits: { id: string; live?: DiagramView; before: DiagramView; after: DiagramView }[], own: Record<string, MilestoneView>): Record<string, DiagramView> {
+  const plain = <T,>(x: T): T => (isDraft(x) ? current(x) : x)
+  const liveNodes = state.liveBackup!.nodes as Record<string, C4Node>
+  const liveNow: Record<string, DiagramView> = {}
+  const parked: Record<string, DiagramView> = {}
+  for (const { id, live, before, after } of edits) {
+    if (!live) continue
+    const next = model.viewEdited(parkedAsShown(live, after), before, after, (n) => !!liveNodes[n])
+    liveNow[id] = next
+    const mine = model.milestoneOwnView(after, next)
+    if (mine) { own[id] = mine; parked[id] = next }
+    else delete own[id]
+  }
+  for (let i = idx + 1; i < state.snapshots.length; i++) {
+    const snap = state.snapshots[i] as DiagramSnapshot
+    for (const { id, before, after } of edits) {
+      const had = plain(snap.views?.[id])
+      if (!had) continue
+      const has = (n: string): boolean => !!snap.nodes[n]
+      const live = liveNow[id]
+      const edited = live
+        ? model.milestoneOwnView(model.milestoneView(live, model.viewEdited(had, before, after, has, true)), live)
+        : model.viewEdited(had, before, after, has)
+      if (edited) snap.views![id] = edited
+      else delete snap.views![id]
+    }
+    if (snap.views && !Object.keys(snap.views).length) delete snap.views
+  }
+  const snap = state.snapshots[idx] as DiagramSnapshot
+  if (Object.keys(own).length) snap.views = own
+  else delete snap.views
+  return parked
 }
 
 /** Snapshot all node positions from c4Nodes into a positions map */
@@ -1313,7 +1396,8 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !fresh.has(id)).map((id) => [id, true]))
   const view = viewById(state, state.activeViewId)
   const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  placeUnplaced(nodes, known, shown, undefined, { frames: viewFrames(view, nodes, relations) })
+  const frames = viewFrames(view, nodes, relations)
+  placeUnplaced(nodes, known, shown, undefined, { frames })
   const rootOf = (id: string): C4Node => {
     let n = nodes[id]
     while (n.parentId && nodes[n.parentId]) n = nodes[n.parentId]
@@ -1333,7 +1417,10 @@ function placeAddedDuringLayout(state: DiagramStore, added: string[]): void {
       x: ends.reduce((sum, b) => sum + b.x + b.width / 2, 0) / ends.length,
       y: ends.reduce((sum, b) => sum + b.y + b.height / 2, 0) / ends.length,
     }
-    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id))).map(box)
+    // A frame is in nobody's way, what it holds is (drawnBoxesOf).
+    const canvas = modelCanvas(nodes, shown, frames)
+    const taken = Object.values(nodes).filter((n) => !n.parentId && n.id !== id && (!shown || shown.has(n.id)))
+      .flatMap((n) => frames.has(n.id) ? drawnBoxesOf(n, nodes, canvas).map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h })) : [box(n)])
     const at = freeSpotNear(taken, drawnSize(node, parents.has(id)), centre)
     node.x = at.x
     node.y = at.y
@@ -1832,6 +1919,19 @@ function slideTreemapFocusOf(slide: PresentationSlide, viewId: string | null, vi
 function slideViewIdOf(slide: PresentationSlide, views: Record<string, DiagramView>): string | null {
   const id = slide.viewId ?? null
   return id && views[id] ? id : null
+}
+
+/** The views a slide shows (goToSlide): as its milestone has them
+ *  (model.milestoneViews over the live views), else the live ones.
+ *  `shown` are the views shown when the presentation started, with
+ *  `nodes`: those of the milestone open then, its edits too, over the live
+ *  ones parked (liveBackup). */
+function slideViewsOf(state: DiagramStore, slide: PresentationSlide, shown: Record<string, DiagramView>, nodes: Record<string, C4Node>): Record<string, DiagramView> {
+  const milestone = slide.snapshotId ? state.snapshots.find((m) => m.id === slide.snapshotId) : undefined
+  if (milestone && milestone.id === state.activeSnapshotId) return shown
+  const backup = state.activeSnapshotId ? state.liveBackup : null
+  const live = backup ? _sharedNow({ ...state, views: shown }, backup).views : shown
+  return milestone ? model.milestoneViews(live, milestone as DiagramSnapshot, (backup?.nodes ?? nodes) as Record<string, C4Node>) : live
 }
 
 /** Build the initial presentations array from possibly-legacy persisted data. */
@@ -2632,6 +2732,11 @@ function deriveRFEdges(
     return d
   }
 
+  // How a relation's type reads, and what a relation without a name shows
+  // in its stead: its type, or nothing for a transition (RelationEdge).
+  const typeNameOf = (rel: C4Relation, type: string) => relationTypeName(metamodel, type, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined)
+  const shownTypeName = (rel: C4Relation) => rel.relationType && rel.relationType !== 'transition' ? typeNameOf(rel, rel.relationType) : undefined
+
   for (const rel of Object.values(relations)) {
     if (!nodes[rel.sourceId] || !nodes[rel.targetId]) continue
     if (hiddenRelationIds && hiddenRelationIds.has(rel.id)) continue
@@ -2668,9 +2773,12 @@ function deriveRFEdges(
       // A technology only when they all use it: the first one's alone
       // read as the whole line's.
       if (existing?.data && existing.data.technology !== rel.technology) existing.data.technology = undefined
-      const label = relationDisplayLabel(rel, nodes)
+      // One a line, each by its name, or by its type as a line of its own
+      // shows it (the first one's type, until now in the label's stead).
+      const label = relationDisplayLabel(rel, nodes) ?? shownTypeName(rel)
       if (existing && label) {
-        const joined = existing.data?.label ? `${existing.data.label}\n${label}` : label
+        const first = existing.data?.label ?? (existing.data?.relationType === 'transition' ? undefined : existing.data?.typeName)
+        const joined = first ? `${first}\n${label}` : label
         existing.label = joined
         if (existing.data) existing.data.label = joined
       }
@@ -2701,7 +2809,7 @@ function deriveRFEdges(
         label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
-        ...(rel.relationType ? { typeName: relationTypeName(metamodel, rel.relationType, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined) } : {}),
+        ...(rel.relationType ? { typeName: typeNameOf(rel, rel.relationType) } : {}),
         isVirtual,
         ...(isVirtual ? { relationIds: [rel.id] } : {}),
       },
@@ -2900,6 +3008,9 @@ interface DiagramStore {
   /** Every relation label is shown whatever the zoom (an export is being
    *  drawn), so the labels are placed even when zoomed out. */
   allEdgeLabelsShown: boolean
+  /** An export is being drawn: the canvas draws the diagram without the
+   *  selection, its outline or its focus (the rest dimmed). */
+  drawnForExport: boolean
   /** The canvas draws simple blocks, zoomed out (canvasDetail.ts). Canvas
    *  keeps it in step with the zoom; switching views sets it from the
    *  incoming camera, so a large view is not drawn as cards first. */
@@ -3454,6 +3565,19 @@ function _insertWizardLinks(state: model.ModelState, nodeId: string, links: Wiza
     )
     if (!exists) model.insertRelation(state, uid(), rel)
   }
+}
+
+/** Why `node`, about to be added as `id`, may not get one of its `links`
+ *  (checkAddRelation), or null. */
+function _wizardLinksRefusal(state: model.ModelState, id: string, node: Omit<C4Node, 'id'>, links: WizardLink[]): string | null {
+  const withNode = { ...state, c4Nodes: { ...state.c4Nodes, [id]: { id, ...node } as C4Node } } as model.ModelState
+  for (const link of links) {
+    if (!state.c4Nodes[link.otherId]) continue
+    const rel = link.direction === 'out' ? { sourceId: id, targetId: link.otherId, relationType: link.relationType } : { sourceId: link.otherId, targetId: id, relationType: link.relationType }
+    const refused = model.checkAddRelation(withNode, rel)
+    if (refused) return refused
+  }
+  return null
 }
 
 // Counts the times the whole model was replaced (a document loaded, a new or
@@ -4018,6 +4142,7 @@ export const useDiagramStore = create<DiagramStore>()(
       liveLayoutActive: true,
       liveLayoutMoving: false,
       allEdgeLabelsShown: false,
+      drawnForExport: false,
       lowDetail: false,
       setLowDetail(low) {
         if (get().lowDetail !== low) set((state) => { state.lowDetail = low })
@@ -4277,7 +4402,10 @@ export const useDiagramStore = create<DiagramStore>()(
         for (const { node: unplaced, links = [] } of items) {
           const node = { ...unplaced, ...place(unplaced.parentId ?? undefined) }
           // Checked one by one: a node added before may fill a cardinality.
-          const refused = model.checkAddNode(get(), node)
+          // A link the rules refuse refuses the node, as for one added alone
+          // (_createNodeWithLinks): added without it, it went elsewhere unlinked.
+          const id = uid()
+          const refused = model.checkAddNode(get(), node) ?? _wizardLinksRefusal(get() as unknown as model.ModelState, id, node, links)
           if (refused) {
             get().pushNotification(refused, 'error')
             break
@@ -4288,7 +4416,6 @@ export const useDiagramStore = create<DiagramStore>()(
             if (get().activeViewId) get()._milestoneViewEdit(get().activeViewId)
             else get()._markMilestoneEdit()
           }
-          const id = uid()
           set((state) => {
             insertNodeShown(state as DiagramStore, id, node)
             _insertWizardLinks(state, id, links)
@@ -7338,6 +7465,12 @@ export const useDiagramStore = create<DiagramStore>()(
           // What the milestone lacks goes out of the views, as a delete
           // takes it: they kept its id (a view listing 23 drew 3).
           const gone = new Set(Object.keys(state.c4Nodes).filter((id) => !(snap.nodes as Record<string, C4Node>)[id]))
+          // The views as the milestone shows them (model.milestoneViews):
+          // what it keeps of a view its own (its list, with the elements the
+          // live model deleted since) and the views it has alone are the
+          // live ones now, and it keeps nothing of them its own any more.
+          // Left out, an element it brought back was on no view.
+          restoreMilestoneViews(state as DiagramStore, snap)
           state.c4Nodes = snap.nodes as any
           state.c4Relations = snap.relations as any
           if (gone.size) model.forgetNodesInViews(state as unknown as model.ModelState, gone)
@@ -7626,11 +7759,13 @@ export const useDiagramStore = create<DiagramStore>()(
           const newId = uid()
           const namePrefix = newName?.trim() || `${baseSnap.name} (edited)`
           // The views as shown in the milestone, where they are not the live
-          // ones: the new milestone shows them so when opened again.
-          const ownViews: Record<string, DiagramView> = {}
+          // ones: the new milestone keeps what they differ by, and shows them
+          // so when opened again (model.milestoneView).
+          const ownViews: Record<string, MilestoneView> = {}
           for (const [viewId, live] of Object.entries(liveBackup?.views ?? {})) {
             const shown = get().views[viewId]
-            if (shown && !sameOwnView(shown, live as DiagramView)) ownViews[viewId] = milestoneOwnView(shown)
+            const own = shown ? model.milestoneOwnView(shown, live as DiagramView) : null
+            if (own) ownViews[viewId] = own
           }
           // And the views it has alone, of elements it still holds.
           for (const view of Object.values(get().views)) {
@@ -7837,28 +7972,19 @@ export const useDiagramStore = create<DiagramStore>()(
           model.forgetRelationsInSequences({ sequences: targetSeqs } as unknown as model.ModelState, missing)
         }
 
-        // The views the milestone keeps its own way stay its own: what was
-        // edited in them now goes to the live views, the rest of them stays
-        // parked (a view not its own becomes the live one, as it is shown).
-        const ownViews = baseSnap.views ?? {}
-        const keptLiveViews: Record<string, DiagramView> = {}
-        const ownViewsAfter: Record<string, DiagramView> = { ...ownViews }
+        // What was done on each view in the milestone: the view shown
+        // against the view as the milestone had it (milestoneViewBefore).
+        // It goes to the live view and to the later milestones' own settings
+        // of it (model.viewEdited), never the milestone's copy, which held
+        // its old list and folds; the milestone keeps what it shows another
+        // way than the live view then (model.milestoneOwnView).
+        const viewEdits: { id: string; live?: DiagramView; before: DiagramView; after: DiagramView }[] = []
         for (const [viewId, live] of Object.entries((liveBackup?.views ?? {}) as Record<string, DiagramView>)) {
-          const shown = get().views[viewId]
-          const mine = ownViews[viewId]
-          if (!shown || !mine) continue
-          if (sameOwnView(shown, mine)) { keptLiveViews[viewId] = parkedAsShown(live, shown); continue }
-          const was = milestoneOwnView(mine) as unknown as Record<string, unknown>
-          const now = milestoneOwnView(shown) as unknown as Record<string, unknown>
-          const next = { ...parkedAsShown(live, shown) } as unknown as Record<string, unknown>
-          for (const key of new Set([...Object.keys(was), ...Object.keys(now)])) {
-            if (key === 'positions' || key === 'name' || key === 'folder' || JSON.stringify(was[key]) === JSON.stringify(now[key])) continue
-            if (now[key] === undefined) delete next[key]
-            else next[key] = now[key]
-          }
-          keptLiveViews[viewId] = next as unknown as DiagramView
-          ownViewsAfter[viewId] = now as unknown as DiagramView
+          const after = get().views[viewId]
+          const before = after && milestoneViewBefore(viewId, baseSnap, live)
+          if (before) viewEdits.push({ id: viewId, live, before, after })
         }
+        const ownViewsAfter: Record<string, MilestoneView> = { ...baseSnap.views }
         // The views it has alone stay its own, as they are now; that of an
         // element the edits deleted goes.
         const goneOnlyViews: string[] = []
@@ -7866,6 +7992,8 @@ export const useDiagramStore = create<DiagramStore>()(
           if (!milestoneOnlyView(view, liveBackup?.nodes)) continue
           if (editedNodes[view.subject!]) ownViewsAfter[view.id] = view
           else { delete ownViewsAfter[view.id]; goneOnlyViews.push(view.id) }
+          const before = milestoneViewBefore(view.id, baseSnap, undefined)
+          if (before) viewEdits.push({ id: view.id, before, after: view })
         }
         // The live views before the edits: a flow view linked to a sequence
         // they delete is parked so.
@@ -7881,8 +8009,6 @@ export const useDiagramStore = create<DiagramStore>()(
               snap.nodes = editedNodes
               snap.relations = editedRels
               snap.sequences = editedSeqs
-              if (Object.keys(ownViewsAfter).length) snap.views = ownViewsAfter
-              else delete snap.views
             } else {
               if (!snap.sequences) snap.sequences = {}
               applyDiff(snap.nodes, snap.relations, snap.sequences, snap.name)
@@ -7911,6 +8037,7 @@ export const useDiagramStore = create<DiagramStore>()(
             // What was done on the views in the milestone is the live
             // views' now: nothing of them is put back on leaving it but the
             // views the milestone keeps its own way.
+            const keptLiveViews = propagateViewEdits(state as DiagramStore, idx, viewEdits, ownViewsAfter)
             if (Object.keys(keptLiveViews).length) state.liveBackup.views = keptLiveViews as any
             else delete state.liveBackup.views
             delete state.liveBackup.defaultPositions
@@ -8522,10 +8649,16 @@ export const useDiagramStore = create<DiagramStore>()(
           // on it, selected an element and dimmed the rest. It comes back
           // after.
           selection: { nodeIds: [...get().selectedNodeIds], edgeId: get().selectedEdgeId },
+          // And the camera: Esc drew the view at the last slide's.
+          camera: shownCamera(),
         }
         set((state) => {
           state.presentationActive = true
           showSelection(state as DiagramStore, [], null)
+          // Nor what was open over the canvas: a relation's type asked for,
+          // an element's Explore menu.
+          state.relationTypeChoice = null
+          state.exploreMenuFor = null
         })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
         // flips off before the user can grab anything (rfNodes carry
@@ -8538,7 +8671,7 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null } }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null }; camera?: { x: number; y: number; zoom: number } | null }
           | undefined
         get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
@@ -8551,6 +8684,10 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(window as any).__prePresState = undefined
         }
         get()._sync()
+        if (pre?.camera) {
+          const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
+          ;(window as any).__rfPlaceCamera?.({ ...pre.camera }, shown, { keep: true })
+        }
         if (pre?.selection) set((state) => { showSelection(state as DiagramStore, pre.selection!.nodeIds, pre.selection!.edgeId) })
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
@@ -8566,6 +8703,15 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!presentationSlides.length) return
         const i = Math.max(0, Math.min(index, presentationSlides.length - 1))
         const slide = presentationSlides[i]
+        // The views as the slide's model has them: a slide of a milestone
+        // shows its own list of a view and a view it has alone (played from
+        // the live model, it showed All elements instead). Put back on
+        // stopping, as the model is.
+        const pre = (window as any).__prePresState as { views?: Record<string, DiagramView>; c4Nodes: Record<string, C4Node> } | undefined
+        if (get().presentationActive && pre?.views) {
+          const views = slideViewsOf(get(), slide, pre.views, pre.c4Nodes)
+          if (views !== get().views) set((state) => { state.views = views as any })
+        }
         const targetViewId = slideViewIdOf(slide, get().views)
         set((state) => { state.presentationSlideIndex = i })
 
@@ -8836,6 +8982,8 @@ export const useDiagramStore = create<DiagramStore>()(
           nodes: st.c4Nodes,
           relations: st.c4Relations,
           sequences: st.sequences,
+          views: st.views,
+          parkedViews: st.liveBackup!.views as Record<string, DiagramView> | undefined,
           dirty: st.milestoneDirty,
           promptOpen: st.milestonePromptOpen,
           activeViewId: st.activeViewId,
@@ -9037,6 +9185,8 @@ export const useDiagramStore = create<DiagramStore>()(
             nodes: pre.c4Nodes,
             relations: pre.c4Relations,
             sequences: pre.sequences,
+            views: pre.views,
+            parkedViews: pre.liveBackup!.views as Record<string, DiagramView> | undefined,
             dirty: pre.milestoneDirty,
             promptOpen: false,
             activeViewId: pre.activeViewId,
@@ -9045,15 +9195,22 @@ export const useDiagramStore = create<DiagramStore>()(
             diffGhostNodes: pre.diffGhostNodes,
             diffGhostRelations: pre.diffGhostRelations,
           }, snapshots) : null
+          // Its views as it shows them over the live ones read, with its
+          // edits of them (showMilestoneViews, keepMilestoneViewEdits).
+          const parkedViews = parkedMilestone ? { views: { ...views }, liveBackup: { nodes: liveNodes, relations, sequences } } as unknown as DiagramStore : null
+          if (parkedViews && parkedShown) {
+            showMilestoneViews(parkedViews, parkedShown)
+            keepMilestoneViewEdits(parkedViews, { id: parkedShown.id, before: st.snapshots.find((m) => m.id === parkedShown.id) ?? parkedShown, nodes: pre.c4Nodes, views: pre.views, parkedViews: pre.liveBackup!.views as Record<string, DiagramView> | undefined })
+          }
           W.__preModeLayout = (parkedMilestone ? {
             ...pre,
             c4Nodes: parkedMilestone.nodes,
             c4Relations: parkedMilestone.relations,
             sequences: parkedMilestone.sequences,
-            views,
+            views: parkedViews!.views,
             defaultPositions: defaultPos,
             activeViewId: parkedViewId,
-            liveBackup: { nodes: liveNodes, relations, sequences },
+            liveBackup: parkedViews!.liveBackup,
           } : {
             ...loaded,
             c4Nodes: liveNodes,
@@ -9072,6 +9229,7 @@ export const useDiagramStore = create<DiagramStore>()(
           set((state) => {
             state.liveBackup = { nodes: state.c4Nodes, relations: state.c4Relations, sequences: state.sequences, hubTemplates: state.hubTemplates } as any
             showMilestoneViews(state as DiagramStore, snapshots.find((m) => m.id === shownMilestone.id))
+            keepMilestoneViewEdits(state as DiagramStore, shownMilestone)
             // From the store, not the draft: a draft kept past this set is
             // revoked, and Propagate threw on it.
             _milestoneHubBase = milestoneHubTemplates(get().hubTemplates as Record<string, HubImportRecord>, shownNodes as Record<string, C4Node>)
@@ -9107,8 +9265,12 @@ export const useDiagramStore = create<DiagramStore>()(
         if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
         suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
+        // The camera of the canvas shown now: one switched to during the load
+        // (a model opened on a view) opens at its own, not at All elements'.
+        const shownViewId = get().activeViewId
+        const shownVP = shownViewId === null ? defaultVP : viewById(get(), shownViewId)?.viewport ?? null
         const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
-        ;(window as any).__rfPlaceCamera?.(defaultVP ?? null, shown)
+        ;(window as any).__rfPlaceCamera?.(shownVP ?? null, shown)
       },
 
       saveDiagram() {

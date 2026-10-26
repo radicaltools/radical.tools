@@ -4555,8 +4555,31 @@ F-0085, all fixed):
      sample's Encryption view) is not mentioned. (F-0082)
 290. **A cancel of an agent's `smart_layout` takes effect only when the
      synchronous Tidy run ends**, now within the work budget. (F-0080)
-291. **The milestone chip and a container's −/+ are still exported** with a
-     view's image; the other editing controls are left out since F-0067.
+291. ~~**The milestone chip and a container's −/+ are still exported** with a
+     view's image; the other editing controls are left out since F-0067.~~
+     Fixed 2026-10-26 with F-0088: every editing control carries
+     `data-editing-control` and the export leaves out whatever does; the chip
+     keeps its name and diff counts, the caption and legend of the picture.
+
+**Left open by the fixes of round 193–200, 2026-10-26** (findings F-0086 to
+F-0109, all fixed):
+
+292. **A pill that lies over another element still lights up on hover**,
+     though a drop there now goes to the element under it (F-0092); zoomed
+     out, pills that wholly cover a neighbour are reachable only where they
+     overlap nothing. Pills laid out off other targets would be the fuller
+     answer.
+293. **`makeRoomAround` still pushes a view's invisible frame as one box**
+     when a sibling grows beside it, the pattern F-0093 fixed for take-outs.
+294. **A line kept out of its own ends can go a long way round** (sample,
+     Authorization: under the card into its left port) because the port
+     allocator picks the side first (F-0099).
+295. **Tidy judges label room by the font's advance table** (measured from
+     Chromium on macOS), so one view gets one layout everywhere; on a
+     platform that falls back on another font, the room it leaves can be a
+     little off what the canvas draws (F-0098).
+296. **The table's and the wiki's menus and the Warnier repeat popover were
+     not checked for staying open when a presentation starts** (F-0087).
 
 ### Radical Forge over MCP (2026-10-07)
 

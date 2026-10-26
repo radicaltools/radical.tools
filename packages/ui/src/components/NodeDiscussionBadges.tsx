@@ -1,6 +1,7 @@
 import React from 'react'
 import { useStore } from 'reactflow'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
+import { editingControl } from './editingControl'
 
 /** Screen-sized controls above relations, outside the viewport and left out
  * of an export (Studio's useExport). They follow node geometry without
@@ -35,5 +36,5 @@ export function NodeDiscussionBadges({ counts, onDiscuss }: { counts: NodeDiscus
       </button>,
     )
   }
-  return buttons.length ? <div className="node-discussion-badges" role="group" aria-label="Node discussions">{buttons}</div> : null
+  return buttons.length ? <div {...editingControl} className="node-discussion-badges" role="group" aria-label="Node discussions">{buttons}</div> : null
 }

@@ -184,7 +184,8 @@ Do not walk the same path twice in a row. Each run, choose differently.
 - Run as a subagent, a run may not be allowed to write a report file:
   then the report is its final message.
 - The toolbar's Undo and Redo sit right of the logo. In headless Chromium
-  on macOS, Meta+Z does not reach Studio's undo: press Control+Z.
+  on macOS, Meta+Z does not reach Studio's undo: press `Control+z` (a
+  lower-case letter; Playwright sends `Control+Z` as the key "Z").
 - Use the real controls (buttons by their accessible name, mouse drags),
   as a user would. Reaching into the store proves nothing about the
   product. Type with real keys (`keyboard.type`, `pressSequentially`):

@@ -47,9 +47,10 @@ import {
 } from '@radical/common/c4'
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
 import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
-import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
+import { newLinkFit, relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
+import { editingControl } from './editingControl'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
@@ -174,7 +175,7 @@ function AddMenu({
     : options
 
   return (
-    <div className="wiki-add" ref={ref}>
+    <div {...editingControl} className="wiki-add" ref={ref}>
       <button
         className={`wiki-add-btn ${variant === 'ghost' ? 'ghost' : ''}`}
         onClick={() => {
@@ -496,15 +497,30 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
   // The element Delete was asked for here, and its parent: its page goes
   // to the parent's.
   const leaving = useRef<{ id: string; parentId: string | null } | null>(null)
+  // The page's element is still in the model, but the view's filter leaves
+  // it out now (rewritten as another EARS type): said, as an add the filter
+  // leaves out is, and its page comes back once the view shows it again
+  // (Undo) while the Overview it gave way to is read.
+  const leftOut = useRef<{ viewId: string; id: string } | null>(null)
   useEffect(() => {
-    if (focus) { readFocus.current = focus.id; return }
+    if (focus) { readFocus.current = focus.id; leftOut.current = null; return }
     if (view && focusId && !glossary && readFocus.current === focusId) {
       readFocus.current = null
       const parentId = leaving.current?.id === focusId ? leaving.current.parentId : null
       leaving.current = null
+      if (c4Nodes[focusId]) {
+        leftOut.current = { viewId: view.id, id: focusId }
+        pushNotification(`This view's filter does not show ${c4Nodes[focusId].label} any more.`, 'warning')
+      }
       setWikiFocus(view.id, parentId && c4Nodes[parentId] ? parentId : null)
+      return
     }
-  }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes])
+    const back = leftOut.current
+    if (view && !focusId && back?.viewId === view.id && c4Nodes[back.id] && shownSet?.has(back.id)) {
+      leftOut.current = null
+      setWikiFocus(view.id, back.id)
+    }
+  }, [focus, focusId, glossary, view, setWikiFocus, c4Nodes, shownSet, pushNotification])
 
   // An open properties card goes along to the page read; a closed one (✕
   // too) stays closed. The Overview and Glossary leave it as it is.
@@ -662,16 +678,18 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
     const nests = hierarchy ? relationPhrase(metamodel?.relationTypes[hierarchy], 'in') : undefined
     return childTypesOf(node, c4Nodes, metamodel, typeMeta, viewTypes)
       .sort((a, b) => categoryRank(a.id) - categoryRank(b.id))
-      .map((t) => ({
-        type: t.id,
-        group: nests?.reads ? nests.text : nodeTypeCategory(t.id).label,
+      .flatMap((t): ChildChoice[] => {
+        const group = nests?.reads ? nests.text : nodeTypeCategory(t.id).label
         // A type that nests by a relation (a requirement under a need)
         // becomes a child through that relation, in the same container as
         // `node`; any other is placed inside `node`.
-        ...(hierarchy
-          ? { parentId: node.parentId, link: { relationType: hierarchy, direction: 'out' as const, otherId: node.id } }
-          : { parentId: node.id }),
-      }))
+        if (!hierarchy) return [{ type: t.id, group, parentId: node.id }]
+        const link = { relationType: hierarchy, direction: 'out' as const, otherId: node.id }
+        // With the values the link needs (a part of an aggregate), and
+        // only where the model accepts it (no part of a part).
+        const fit = newLinkFit(ctx, { type: t.id, parentId: node.parentId }, link)
+        return fit ? [{ type: t.id, group, parentId: node.parentId, link, ...(Object.keys(fit).length ? { properties: fit as Record<string, string> } : {}) }] : []
+      })
   }
 
   const existingFor: WikiActions['existingFor'] = (type, under) => {
@@ -802,7 +820,7 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
         sort={pipelineOf(view)?.sort}
       />
       <div className="wiki-page" ref={pageRef} tabIndex={-1} onContextMenu={focus && discussNode ? menuOnRightClick(actions, { nodeId: focus.id }) : undefined}>
-        <div className="wiki-page-mode-toggle">
+        <div {...editingControl} className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
             onClick={() => changePageMode('single')}
@@ -1160,6 +1178,7 @@ function WikiNav({
       </div>
       <input
         type="search"
+        {...editingControl}
         className="wiki-nav-search"
         placeholder="Search pages…"
         aria-label="Search pages"
@@ -1540,7 +1559,7 @@ function WikiStartRow({ hint, types, under, nodes, metamodel, folded, onStart }:
     ))
 
   return (
-    <div className="wiki-write-start">
+    <div {...editingControl} className="wiki-write-start">
       <p className="wiki-write-start-line">
         <span className="wiki-write-start-hint">{hint}:</span>{' '}
         {links(first)}
@@ -1646,7 +1665,7 @@ function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }:
 
   const noun = typeNoun(typeLabel)
   return (
-    <div className="wiki-write">
+    <div {...editingControl} className="wiki-write">
       <textarea
         ref={inputRef}
         className="wiki-write-input"
@@ -2163,7 +2182,7 @@ function WikiElementPage({
     ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
   }
   const tools = (
-    <span className="wiki-tools">
+    <span {...editingControl} className="wiki-tools">
       {!embedded && !presenting && (
         <button
           className={`wiki-tool${carded ? ' active' : ''}`}
@@ -2541,7 +2560,7 @@ function WikiInfobox({
         </dl>
       )}
       {edit && (
-        <div className="wiki-infobox-foot">
+        <div {...editingControl} className="wiki-infobox-foot">
           <button className="wiki-tool" aria-label="Done editing facts" onClick={onDone}>done</button>
         </div>
       )}
@@ -3145,7 +3164,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
             }
           }}
         />
-        <span className="wiki-write-hint">Enter reads the sentence into its parts again. Esc leaves it as it was.</span>
+        <span {...editingControl} className="wiki-write-hint">Enter reads the sentence into its parts again. Esc leaves it as it was.</span>
       </blockquote>
     )
   }
@@ -3155,6 +3174,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
       {content}
       {!readOnly && (
         <button
+          {...editingControl}
           className="wiki-tool ears-rewrite"
           title="Write the whole sentence again: its parts are read from it"
           aria-label="Rewrite the sentence"

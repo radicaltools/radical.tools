@@ -7,6 +7,7 @@ import { composeEarsSentence, machineEntity, requirementStatePhrase } from '@rad
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { wireframeDataUri } from '@radical/common/wireframe'
 import { markdownToPlain } from '@radical/common/markdown'
+import { editingControl } from '../editingControl'
 
 // ─── Diff highlight overlay ────────────────────────────────────────────────
 // ─── Rendering under live physics ───────────────────────────────────────────
@@ -147,7 +148,7 @@ const SimpleNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       <DiffOverlay c4id={data.c4id} />
       <div className="c4-node-simple-label">{data.label}</div>
       {data.hasChildren && canEdit && (
-        <button className="c4-node-collapse-btn c4-node-simple-toggle" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+        <button {...editingControl} className="c4-node-collapse-btn c4-node-simple-toggle" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
           {data.collapsed ? '+' : '−'}
         </button>
       )}
@@ -169,7 +170,7 @@ function ExploreMore({ c4id, label }: { c4id: string; label: string }): React.Re
   const foldExploration = useDiagramStore((s) => s.foldExploration)
   if (!more && !canFold) return null
   return (
-    <div className="explore-more-group nodrag nopan" onMouseDown={(e) => e.stopPropagation()}>
+    <div {...editingControl} className="explore-more-group nodrag nopan" onMouseDown={(e) => e.stopPropagation()}>
       {more > 0 && (
         <button
           type="button"
@@ -307,7 +308,7 @@ export const SystemNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.2)' }}>
         <span style={isExpanded ? { color: solidBg } : undefined}>{data.external ? 'External System' : 'Software System'}</span>
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -366,7 +367,7 @@ export const ContainerNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) 
       <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.18)' }}>
         <span style={isExpanded ? { color: solidBg } : undefined}>Container</span>
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -587,7 +588,7 @@ export const WebAppNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#febc2e' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#28c840' }} />
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" style={{ marginLeft: 'auto' }} onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" style={{ marginLeft: 'auto' }} onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -746,7 +747,7 @@ export const DomainNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => 
       <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.2)' }}>
         <span style={isExpanded ? { color: accent } : undefined}>Domain</span>
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -800,7 +801,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
       <div className="c4-node-header" style={{ background: isExpanded ? 'transparent' : 'rgba(0,0,0,0.2)' }}>
         <span style={isExpanded ? { color: accent } : undefined}>Group</span>
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -1288,7 +1289,7 @@ export const StateMachineNode = memo(({ data, selected }: NodeProps<C4NodeRFData
           State machine{subject ? ` · ${subject}` : ''}
         </span>
         {data.hasChildren && canEdit && (
-          <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
             {data.collapsed ? '+' : '−'}
           </button>
         )}
@@ -1369,7 +1370,7 @@ export const StateNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
             {kind === 'parallel' ? 'Parallel state' : isRegion ? 'Region' : 'State'}
           </span>
           {data.hasChildren && canEdit && (
-            <button className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+            <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
               {data.collapsed ? '+' : '−'}
             </button>
           )}
@@ -1391,7 +1392,7 @@ export const StateNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
         </div>
       )}
       {!isExpanded && data.hasChildren && canEdit && kind !== 'parallel' && (
-        <button className="c4-node-collapse-btn" onClick={onToggle} title="Expand" style={{ position: 'absolute', top: 4, right: 6 }}>+</button>
+        <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title="Expand" style={{ position: 'absolute', top: 4, right: 6 }}>+</button>
       )}
     </div>
   )
@@ -1539,7 +1540,7 @@ function FoldButton({ c4id, collapsed, style }: { c4id: string; collapsed: boole
   const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
   const onToggle = useCallback((e: React.MouseEvent) => { e.stopPropagation(); toggleCollapse(c4id) }, [c4id, toggleCollapse])
   if (!canEdit) return null
-  return <button className="c4-node-collapse-btn" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'} style={style}>{collapsed ? '+' : '−'}</button>
+  return <button {...editingControl} className="c4-node-collapse-btn" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'} style={style}>{collapsed ? '+' : '−'}</button>
 }
 
 export const ProcessNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {

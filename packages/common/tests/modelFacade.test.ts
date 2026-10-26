@@ -149,8 +149,9 @@ describe('createModelFacade', () => {
     expect(f.getViews!()[view].nodeIds).toEqual([b])
     const [milestone] = f.toDiagramData().snapshots!
     expect(milestone.views?.[view]?.nodeIds).toEqual([a, b])
-    // Its list only: the places stay the view's, for every milestone.
-    expect(milestone.views?.[view]?.positions).toEqual({})
+    // Its list only: the places and the rest of the layout stay the view's,
+    // for every milestone.
+    expect(Object.keys(milestone.views![view]).sort()).toEqual(['empty', 'id', 'nodeIds'])
     // An element added since a milestone: it has nothing to keep.
     f.createMilestone!('To-be')
     const c = f.addNode(node('requirement', 'C'))

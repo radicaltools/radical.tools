@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { shownExploration, useDiagramStore } from '../store/diagramStore'
 import { type ExploreChoice, type ExploreLink, explorationLinks, menuRows } from '../store/exploration'
 import { nodeControlAt } from './CollapseToggleMirror'
+import { editingControl } from './editingControl'
 
 /** Distinct neighbours among `links`. */
 const count = (links: ExploreLink[]): number => new Set(links.map((l) => l.id)).size
@@ -168,6 +169,7 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
   return (
     <div
       ref={menuRef}
+      {...editingControl}
       className="explore-menu nodrag nopan"
       role="menu"
       aria-label={`Add to ${label}`}

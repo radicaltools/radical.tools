@@ -314,3 +314,30 @@ for (const mode of ['viewer', 'presenter'] as const) {
     expect(JSON.stringify(await studio.storedDoc())).toBe(saved)
   })
 }
+
+// F-0094: after a box drawn with the special key, React Flow lays a
+// rectangle over the elements it selected: a click with the key on one of
+// them found no element under it and left the selection as it was.
+for (const mode of ['designer', 'viewer', 'presenter'] as const) {
+  test(`after a box selection, a click with the special key on one of the selected takes it out in ${mode}`, async ({ page, studio }) => {
+    await studio.seed()
+    await studio.open('v-containers', mode)
+    await studio.settle()
+    const frame = (await studio.node('bookstore').boundingBox())!
+    const held = await Promise.all(['web', 'api', 'db'].map(async (id) => (await studio.node(id).boundingBox())!))
+    // From the empty canvas above and left of the Bookstore.
+    const from = { x: frame.x - 15, y: frame.y - 15 }
+    const to = { x: Math.max(...held.map((b) => b.x + b.width)) + 8, y: Math.max(...held.map((b) => b.y + b.height)) + 8 }
+    const selected = () => page.locator('.react-flow__node.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')).sort())
+    await page.keyboard.down('Alt')
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(to.x, to.y, { steps: 10 })
+    await page.mouse.up()
+    await expect.poll(selected).toEqual(['api', 'db', 'web'])
+    const api = (await studio.node('api').boundingBox())!
+    await page.mouse.click(api.x + api.width / 2, api.y + api.height / 2)
+    await page.keyboard.up('Alt')
+    await expect.poll(selected).toEqual(['db', 'web'])
+  })
+}

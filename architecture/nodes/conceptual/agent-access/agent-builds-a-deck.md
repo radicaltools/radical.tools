@@ -11,6 +11,8 @@ tests: |
   packages/common/tests/aiDocumentTools.test.ts › milestone tools › let a slide show a milestone, its focus checked against that model
   packages/common/tests/aiDocumentTools.test.ts › milestone tools › re-frame a Studio slide moved to another milestone and unlink slides from a deleted one
   apps/mcp/src/catalogueTools.test.ts › MCP document tools › lays out one view into its own positions and builds a presentation over it
-then: "each slide keeps its view, milestone and focus, a kept slide its view and framing when no viewId is given; a slide framed in Studio keeps its camera until its focus or milestone changes; focus elements outside the view, a focus on a slide with no canvas, unknown views and milestones, and a slide listed twice are refused"
+  packages/common/tests/aiDocumentTools.test.ts › milestone tools › let a slide of a milestone show and focus on what the milestone's views draw
+  packages/common/tests/aiDocumentTools.test.ts › milestone tools › let a slide of a milestone show a view of an element deleted since, which the milestone has alone
+then: "each slide keeps its view, milestone and focus, a kept slide its view and framing when no viewId is given; a slide framed in Studio keeps its camera until its focus or milestone changes; focus elements outside the view, a focus on a slide with no canvas, unknown views and milestones, and a slide listed twice are refused; a slide of a milestone may show and focus on what that milestone's views draw, a view it has alone included"
 when: "an agent creates, renames and updates presentations whose slides show a view, a milestone or focus elements, and deletes one"
 ---

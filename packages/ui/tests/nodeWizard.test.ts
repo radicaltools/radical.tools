@@ -217,6 +217,26 @@ describe('addNodes', () => {
     expect(ids).toHaveLength(1)
     expect(Object.values(store().c4Nodes).map((n) => n.label)).not.toContain('Never reached')
   })
+
+  it('refuses a node whose link the rules refuse, with the reason, instead of adding it unlinked', () => {
+    // A line written under Payment's page: an entity left an aggregate
+    // root, part of another root, was added as one more root, unlinked.
+    const root = store().addNode(draft('entity', 'Payment'))
+    const notices: string[] = []
+    const push = store().pushNotification
+    useDiagramStore.setState({ pushNotification: (m: string) => { notices.push(m) } } as any)
+    try {
+      const ids = store().addNodes([{ node: draft('entity', 'Payment Fee'), links: [{ relationType: 'part-of', direction: 'out', otherId: root }] }])
+      expect(ids).toEqual([])
+      expect(Object.values(store().c4Nodes).map((n) => n.label)).not.toContain('Payment Fee')
+      expect(notices.join(' ')).toMatch(/aggregate root/)
+      // Made a part, it is added with its link.
+      const [part] = store().addNodes([{ node: { ...draft('entity', 'Payment Fee'), kind: 'entity' } as any, links: [{ relationType: 'part-of', direction: 'out', otherId: root }] }])
+      expect(Object.values(store().c4Relations).some((r) => r.sourceId === part && r.targetId === root && r.relationType === 'part-of')).toBe(true)
+    } finally {
+      useDiagramStore.setState({ pushNotification: push } as any)
+    }
+  })
 })
 
 describe('an element a wizard creates inside a container', () => {

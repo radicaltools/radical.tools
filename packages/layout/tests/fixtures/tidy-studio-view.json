@@ -1,0 +1,848 @@
+{
+ "_comment": "The view 'Studio' of the repository's own model (architecture/), as Studio hands it to Tidy (viewLayoutInput) before its first Smart Layout: the Studio container's components among the other containers, in frames. F-0108.",
+ "nodes": {
+  "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+   "id": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5",
+   "type": "group",
+   "label": "Logical & physical",
+   "x": 30,
+   "y": 40,
+   "width": 3515.6389210340417,
+   "height": 3937.9872566247077,
+   "collapsed": false
+  },
+  "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0": {
+   "id": "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0",
+   "type": "system",
+   "label": "AI providers",
+   "x": 2550.4589015916927,
+   "y": 142.19736067359855,
+   "width": 360,
+   "height": 260,
+   "collapsed": false,
+   "parentId": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5"
+  },
+  "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+   "id": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "type": "person",
+   "label": "Architect",
+   "x": 30,
+   "y": 493.45548536817137,
+   "width": 150,
+   "height": 170,
+   "collapsed": false,
+   "parentId": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5"
+  },
+  "984afb23-9553-4ada-aea9-318b97228ce7": {
+   "id": "984afb23-9553-4ada-aea9-318b97228ce7",
+   "type": "system",
+   "label": "AWS",
+   "x": 1664.8563603673902,
+   "y": 120,
+   "width": 360,
+   "height": 260,
+   "collapsed": false,
+   "parentId": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5",
+   "technology": "S3, CloudFront, Route 53, ACM, IAM (Terraform)"
+  },
+  "974cc763-a121-4f53-a92d-18a64562a0c9": {
+   "id": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "type": "system",
+   "label": "radical.tools",
+   "x": 358.8782224827058,
+   "y": 669.7077949534057,
+   "width": 3126.7606985513357,
+   "height": 3238.2794616713018,
+   "collapsed": false,
+   "parentId": "c3073e61-3a0b-4d1f-980b-a65f1e4992f5"
+  },
+  "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+   "id": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "type": "webapp",
+   "label": "Architecture Hub",
+   "x": 222.6571999222176,
+   "y": 120,
+   "width": 210,
+   "height": 140,
+   "collapsed": true,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "technology": "React, Vite"
+  },
+  "811927c5-4edd-41c1-9f8d-c3e4aec08ba9": {
+   "id": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9",
+   "type": "component",
+   "label": "Catalogue browser and viewer",
+   "x": 335.9784579196721,
+   "y": 55.98049449461314,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "technology": "React 18, @radical/ui/viewer"
+  },
+  "60fb9531-8072-4f6d-804d-4a00a373a6ba": {
+   "id": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "type": "container",
+   "label": "Desktop app",
+   "x": 2856.7606985513357,
+   "y": 1057.4548255421896,
+   "width": 300,
+   "height": 200,
+   "collapsed": true,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "technology": "Electron 29"
+  },
+  "e6de1ab9-cff0-402b-a114-9b37b7c33dc5": {
+   "id": "e6de1ab9-cff0-402b-a114-9b37b7c33dc5",
+   "type": "component",
+   "label": "Window manager",
+   "x": 378.0405539148833,
+   "y": 255.98049549461211,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "technology": "Electron main process"
+  },
+  "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+   "id": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5",
+   "type": "database",
+   "label": "Model files",
+   "x": 2168.9115917749987,
+   "y": 1077.0445663181126,
+   "width": 190,
+   "height": 130,
+   "collapsed": false,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "technology": ".radical JSON, Markdown folder, browser storage"
+  },
+  "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+   "id": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "type": "group",
+   "label": "Shared packages",
+   "x": 635.2796627337106,
+   "y": 386.7556900197485,
+   "width": 1513.631929041288,
+   "height": 774.8369743475952,
+   "collapsed": false,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9"
+  },
+  "ff9c535a-4924-4b30-b055-0a329c542dea": {
+   "id": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "type": "component",
+   "label": "@radical/common",
+   "x": 1283.631929041288,
+   "y": 120,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "technology": "TypeScript"
+  },
+  "72ab7d8a-0466-44d3-a97b-8a5675f2dbed": {
+   "id": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "type": "component",
+   "label": "@radical/host-bridge",
+   "x": 30,
+   "y": 425.9611100653517,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "technology": "TypeScript"
+  },
+  "6a9e1c2b-cb04-4d65-93d7-758ba97867ea": {
+   "id": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "type": "component",
+   "label": "@radical/hub-catalogue",
+   "x": 624.280213408623,
+   "y": 485.3466791230992,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "technology": "TypeScript, Vite plugin"
+  },
+  "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa": {
+   "id": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "type": "component",
+   "label": "@radical/layout",
+   "x": 318.3842561645505,
+   "y": 624.8369743475952,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "technology": "TypeScript, ELK.js, WebCoLa"
+  },
+  "3ee58343-871e-42c0-a3f8-f290ad4619b4": {
+   "id": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "type": "component",
+   "label": "@radical/ui",
+   "x": 300.34588810900345,
+   "y": 349.62206382648367,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "1b325efd-3003-4633-94ed-73d17d6f4ea4",
+   "technology": "React, ReactFlow, Zustand"
+  },
+  "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+   "id": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "type": "webapp",
+   "label": "Studio",
+   "x": 200.0369244756306,
+   "y": 1274.6548255421897,
+   "width": 2824.6464183877597,
+   "height": 1716.4246361291118,
+   "collapsed": false,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "technology": "React 18, ReactFlow 11, Zustand, Vite"
+  },
+  "024d390d-832f-4258-8ca2-89530b50877e": {
+   "id": "024d390d-832f-4258-8ca2-89530b50877e",
+   "type": "component",
+   "label": "AI assistant",
+   "x": 1823.874862217236,
+   "y": 438.7109537106875,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "fetch to provider APIs"
+  },
+  "32793ee9-a939-498b-a71e-77831ce7ef4c": {
+   "id": "32793ee9-a939-498b-a71e-77831ce7ef4c",
+   "type": "component",
+   "label": "App shell and routing",
+   "x": 438.67725373772635,
+   "y": 157.77955633813025,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React 18, html-to-image"
+  },
+  "15700a5d-75a0-4f03-be4f-78f596580088": {
+   "id": "15700a5d-75a0-4f03-be4f-78f596580088",
+   "type": "component",
+   "label": "Canvas",
+   "x": 1220.1254299447446,
+   "y": 351.0134401374759,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "ReactFlow 11 (@radical/ui)"
+  },
+  "44fbd164-6749-44bd-9c78-c4661649dd23": {
+   "id": "44fbd164-6749-44bd-9c78-c4661649dd23",
+   "type": "component",
+   "label": "Diagram store",
+   "x": 424.52796045103463,
+   "y": 1522.58848303182,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "Zustand + immer (@radical/ui)"
+  },
+  "45c95a3b-968d-4b77-8fc3-94af06de5087": {
+   "id": "45c95a3b-968d-4b77-8fc3-94af06de5087",
+   "type": "component",
+   "label": "Document store and persistence",
+   "x": 2242.731815172486,
+   "y": 348.94432622591984,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "Zustand, localStorage, IndexedDB, File System Access API"
+  },
+  "08c445dd-e14d-47dd-b4b1-1776a539dcbc": {
+   "id": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
+   "type": "component",
+   "label": "Explorer and properties panels",
+   "x": 2099.5101909061395,
+   "y": 851.88133110808,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React (@radical/ui)"
+  },
+  "21970ab4-f4b1-4215-9f92-6e56d9648013": {
+   "id": "21970ab4-f4b1-4215-9f92-6e56d9648013",
+   "type": "component",
+   "label": "Host adapter",
+   "x": 980.324058748468,
+   "y": 402.58382407201793,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "@radical/host-bridge"
+  },
+  "08e414ea-974c-4a75-8bef-9fd30d3cfaf4": {
+   "id": "08e414ea-974c-4a75-8bef-9fd30d3cfaf4",
+   "type": "component",
+   "label": "Hub catalogue client",
+   "x": 1309.31580361384,
+   "y": 120,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "Zustand, fetch (@radical/ui)"
+  },
+  "43a5a0b6-073d-4a5d-be64-9ff5cd99303a": {
+   "id": "43a5a0b6-073d-4a5d-be64-9ff5cd99303a",
+   "type": "component",
+   "label": "Hub import",
+   "x": 561.7145838688783,
+   "y": 414.6894494178121,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React"
+  },
+  "67e8199c-9c68-4ca4-9cbe-28b449acf5a4": {
+   "id": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+   "type": "component",
+   "label": "Inspector",
+   "x": 1444.614789601489,
+   "y": 309.2183673141775,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React"
+  },
+  "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd": {
+   "id": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd",
+   "type": "component",
+   "label": "Layout runners",
+   "x": 350.1427477686694,
+   "y": 777.5279531916117,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "Web Worker (@radical/ui)"
+  },
+  "8c78dee7-eb8a-4d4f-bc18-187edbb4f172": {
+   "id": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
+   "type": "component",
+   "label": "Metamodel editor",
+   "x": 20,
+   "y": 1576.4246361291118,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "ReactFlow, WebCoLa"
+  },
+  "6d563737-4cfb-4ccd-993e-2f1c5deaf753": {
+   "id": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+   "type": "component",
+   "label": "Presentations and milestones",
+   "x": 1677.3494206923806,
+   "y": 843.7165692784592,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React"
+  },
+  "8976767a-65f3-4b1e-b5c3-db5d61409d0f": {
+   "id": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+   "type": "component",
+   "label": "Radical Forge",
+   "x": 1683.8112383836065,
+   "y": 214.46434950847419,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React"
+  },
+  "20711de8-53e9-42d9-9b91-42327d4b2551": {
+   "id": "20711de8-53e9-42d9-9b91-42327d4b2551",
+   "type": "component",
+   "label": "Treemap, flow and matrix views",
+   "x": 1004.5113419684519,
+   "y": 1166.6427156874872,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React, ReactFlow"
+  },
+  "524d63c4-9a7b-4a79-b14f-11c2c2475a1e": {
+   "id": "524d63c4-9a7b-4a79-b14f-11c2c2475a1e",
+   "type": "component",
+   "label": "Warnier view",
+   "x": 1334.4158500174913,
+   "y": 504.0770889523311,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React (@radical/ui)"
+  },
+  "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086": {
+   "id": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086",
+   "type": "component",
+   "label": "Wiki and table views",
+   "x": 2604.6464183877597,
+   "y": 1483.2472967930762,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "technology": "React (@radical/ui)"
+  },
+  "9617df9e-ab47-46c4-920c-4347b186eb0d": {
+   "id": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "type": "container",
+   "label": "VS Code extension",
+   "x": 30,
+   "y": 3048.2794616713018,
+   "width": 300,
+   "height": 200,
+   "collapsed": true,
+   "parentId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+   "technology": "VS Code API, webview"
+  },
+  "8893c05a-20ad-4bc0-9003-3876600411bb": {
+   "id": "8893c05a-20ad-4bc0-9003-3876600411bb",
+   "type": "component",
+   "label": "Webview loader",
+   "x": 605.978458919672,
+   "y": 55.98049449461314,
+   "width": 200,
+   "height": 120,
+   "collapsed": false,
+   "parentId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "technology": "asWebviewUri, CSP"
+  }
+ },
+ "relations": {
+  "026ecee4-be6e-48c6-8f4b-b269cd9d7ce7": {
+   "id": "026ecee4-be6e-48c6-8f4b-b269cd9d7ce7",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "07f93b1a-37c4-4976-a261-69d6caaa6638": {
+   "id": "07f93b1a-37c4-4976-a261-69d6caaa6638",
+   "label": "browses concepts in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9"
+  },
+  "10adfee0-12c7-4262-ae9c-e137d57c311b": {
+   "id": "10adfee0-12c7-4262-ae9c-e137d57c311b",
+   "label": "edits .radical documents\nreads, writes and watches .c4.json files",
+   "relationType": "interacts",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  "12cea1b1-339a-4901-a4f5-7e767726afe1": {
+   "id": "12cea1b1-339a-4901-a4f5-7e767726afe1",
+   "label": "implements the host contract of",
+   "relationType": "interacts",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed"
+  },
+  "13719c12-0800-40d4-bacc-f31c5a4a56c8": {
+   "id": "13719c12-0800-40d4-bacc-f31c5a4a56c8",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "17ea7c83-c67f-4d82-8d4c-018517577fbf": {
+   "id": "17ea7c83-c67f-4d82-8d4c-018517577fbf",
+   "label": "keeps the route and toolbar in step with",
+   "relationType": "interacts",
+   "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
+   "targetId": "44fbd164-6749-44bd-9c78-c4661649dd23"
+  },
+  "18f155c2-5da5-4f67-8a2d-4ef127e0f9fe": {
+   "id": "18f155c2-5da5-4f67-8a2d-4ef127e0f9fe",
+   "label": "renders concepts with",
+   "relationType": "interacts",
+   "sourceId": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9",
+   "targetId": "3ee58343-871e-42c0-a3f8-f290ad4619b4"
+  },
+  "19b0eb61-cdee-43bc-9104-ce5ccae986c1": {
+   "id": "19b0eb61-cdee-43bc-9104-ce5ccae986c1",
+   "label": "opens, saves and watches files\nreads, writes and polls Markdown folders",
+   "relationType": "interacts",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  "24256a36-bd42-4e6c-98e9-57a6a791a1c0": {
+   "id": "24256a36-bd42-4e6c-98e9-57a6a791a1c0",
+   "label": "computes layouts with",
+   "relationType": "interacts",
+   "sourceId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa"
+  },
+  "24d855a0-2def-4efb-b135-511233b15200": {
+   "id": "24d855a0-2def-4efb-b135-511233b15200",
+   "label": "imports concepts from",
+   "relationType": "interacts",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "32d42f42-dcb3-4ede-a347-feff53b9382f": {
+   "id": "32d42f42-dcb3-4ede-a347-feff53b9382f",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "4042cdea-30ef-4769-83bf-d3dcffbab86e": {
+   "id": "4042cdea-30ef-4769-83bf-d3dcffbab86e",
+   "label": "serialises Markdown folders and imports Structurizr with",
+   "relationType": "interacts",
+   "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "49c2b579-3c95-4eee-8bba-568a40357814": {
+   "id": "49c2b579-3c95-4eee-8bba-568a40357814",
+   "label": "reads and writes .radical files",
+   "relationType": "interacts",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  "4a1fdfdb-a83c-4b34-ab1b-d0bdcea73e1c": {
+   "id": "4a1fdfdb-a83c-4b34-ab1b-d0bdcea73e1c",
+   "label": "models architecture in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "57b8205a-1093-4cfd-a94e-18ee9e08ed38": {
+   "id": "57b8205a-1093-4cfd-a94e-18ee9e08ed38",
+   "label": "lays out the type graph with",
+   "relationType": "interacts",
+   "sourceId": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
+   "targetId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd"
+  },
+  "58d548fe-278c-4b59-b485-05b85d7513a2": {
+   "id": "58d548fe-278c-4b59-b485-05b85d7513a2",
+   "label": "calls with the user's key",
+   "relationType": "interacts",
+   "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
+   "targetId": "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0"
+  },
+  "59e55ee6-653d-4edf-a071-e2fca134ed90": {
+   "id": "59e55ee6-653d-4edf-a071-e2fca134ed90",
+   "label": "chat and Forge with the user's key",
+   "relationType": "interacts",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0",
+   "technology": "HTTPS"
+  },
+  "5dfb2182-8083-4bf4-8956-307571f3bb4a": {
+   "id": "5dfb2182-8083-4bf4-8956-307571f3bb4a",
+   "label": "uses",
+   "relationType": "interacts",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "5e51fc48-a32a-4e90-a981-ff9d2b784564": {
+   "id": "5e51fc48-a32a-4e90-a981-ff9d2b784564",
+   "label": "runs the shared tool catalogue of",
+   "relationType": "interacts",
+   "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "628edb1c-f15e-463d-ac33-a9382ae7fff9": {
+   "id": "628edb1c-f15e-463d-ac33-a9382ae7fff9",
+   "label": "loads the renderer of",
+   "relationType": "interacts",
+   "sourceId": "e6de1ab9-cff0-402b-a114-9b37b7c33dc5",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "702aed74-c69d-460c-8bf8-6a66448c4ee9": {
+   "id": "702aed74-c69d-460c-8bf8-6a66448c4ee9",
+   "label": "edits the model through a facade over",
+   "relationType": "interacts",
+   "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
+   "targetId": "44fbd164-6749-44bd-9c78-c4661649dd23"
+  },
+  "7090b444-5629-4597-b166-cf37a33c5c66": {
+   "id": "7090b444-5629-4597-b166-cf37a33c5c66",
+   "label": "reads and edits the model in",
+   "relationType": "interacts",
+   "sourceId": "20711de8-53e9-42d9-9b91-42327d4b2551",
+   "targetId": "44fbd164-6749-44bd-9c78-c4661649dd23"
+  },
+  "75c73d20-3210-45dd-b2c7-dc38b31d4605": {
+   "id": "75c73d20-3210-45dd-b2c7-dc38b31d4605",
+   "label": "routes edges with",
+   "relationType": "interacts",
+   "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa"
+  },
+  "7ada1466-85b6-400b-983f-c9ce94bf8c88": {
+   "id": "7ada1466-85b6-400b-983f-c9ce94bf8c88",
+   "label": "runs its stages through",
+   "relationType": "interacts",
+   "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+   "targetId": "024d390d-832f-4258-8ca2-89530b50877e"
+  },
+  "7f04037e-6e63-471b-bdb1-ec155ce24a53": {
+   "id": "7f04037e-6e63-471b-bdb1-ec155ce24a53",
+   "label": "uses the host contract of",
+   "relationType": "interacts",
+   "sourceId": "21970ab4-f4b1-4215-9f92-6e56d9648013",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed"
+  },
+  "82d86482-daed-4839-b554-a6c86db99e5c": {
+   "id": "82d86482-daed-4839-b554-a6c86db99e5c",
+   "label": "embeds the web build",
+   "relationType": "interacts",
+   "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "87039db6-cf89-4ba9-b3db-ed11056a182e": {
+   "id": "87039db6-cf89-4ba9-b3db-ed11056a182e",
+   "label": "embeds the web build of",
+   "relationType": "interacts",
+   "sourceId": "8893c05a-20ad-4bc0-9003-3876600411bb",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "89c5bce0-8f60-4412-8a6a-7fea98c93a90": {
+   "id": "89c5bce0-8f60-4412-8a6a-7fea98c93a90",
+   "label": "reads the Hub format and presets of",
+   "relationType": "interacts",
+   "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "8e591782-5ed5-4613-b639-4b37e325b28b": {
+   "id": "8e591782-5ed5-4613-b639-4b37e325b28b",
+   "label": "changes the model and checks the metamodel with",
+   "relationType": "interacts",
+   "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "95edb409-8d57-4b7a-8f03-92ac3ab92fd5": {
+   "id": "95edb409-8d57-4b7a-8f03-92ac3ab92fd5",
+   "label": "starts Smart Layout and live physics in",
+   "relationType": "interacts",
+   "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
+   "targetId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd"
+  },
+  "9bb72bca-5a0c-419e-8a37-038c18602c61": {
+   "id": "9bb72bca-5a0c-419e-8a37-038c18602c61",
+   "label": "lays out with",
+   "relationType": "interacts",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa"
+  },
+  "9d0a0976-8454-409a-b83c-99ed2cf90bd2": {
+   "id": "9d0a0976-8454-409a-b83c-99ed2cf90bd2",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  "9e04957d-c8c6-4e2e-8161-aba2d8034809": {
+   "id": "9e04957d-c8c6-4e2e-8161-aba2d8034809",
+   "label": "uses",
+   "relationType": "interacts",
+   "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "a0766c35-6aaa-4ea8-a8ed-6b8ce288dba0": {
+   "id": "a0766c35-6aaa-4ea8-a8ed-6b8ce288dba0",
+   "label": "injects the boot script of",
+   "relationType": "interacts",
+   "sourceId": "8893c05a-20ad-4bc0-9003-3876600411bb",
+   "targetId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed"
+  },
+  "a1c96637-2b4f-4f24-9cc8-1295ae972b52": {
+   "id": "a1c96637-2b4f-4f24-9cc8-1295ae972b52",
+   "label": "autosaves and watches for outside edits",
+   "relationType": "interacts",
+   "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  "a4d41255-e475-430b-a703-0234f3970d80": {
+   "id": "a4d41255-e475-430b-a703-0234f3970d80",
+   "label": "runs the same renderer",
+   "relationType": "interacts",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "a6a2992c-c0f2-4585-a611-66cc7f007958": {
+   "id": "a6a2992c-c0f2-4585-a611-66cc7f007958",
+   "label": "autosaves and watches for outside edits",
+   "relationType": "interacts",
+   "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  "a8795320-7bbd-482f-a8d6-a2c6e510dfc4": {
+   "id": "a8795320-7bbd-482f-a8d6-a2c6e510dfc4",
+   "label": "models architecture in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  "aa9d9002-4ec1-4f8e-a394-1ef7230f0bac": {
+   "id": "aa9d9002-4ec1-4f8e-a394-1ef7230f0bac",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "ad305d72-73e1-4665-bd21-44a15c3d56c6": {
+   "id": "ad305d72-73e1-4665-bd21-44a15c3d56c6",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "ad337018-f002-4179-9cbb-b741aea65dc5": {
+   "id": "ad337018-f002-4179-9cbb-b741aea65dc5",
+   "label": "falls back to the copy served beside the page of",
+   "relationType": "interacts",
+   "sourceId": "08e414ea-974c-4a75-8bef-9fd30d3cfaf4",
+   "targetId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea"
+  },
+  "ae5d1c8a-d04c-4744-829b-9ba37f5d9864": {
+   "id": "ae5d1c8a-d04c-4744-829b-9ba37f5d9864",
+   "label": "serves studio.radical.tools",
+   "relationType": "interacts",
+   "sourceId": "984afb23-9553-4ada-aea9-318b97228ce7",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "afe86c25-fb85-4328-bdba-8d5545cd1676": {
+   "id": "afe86c25-fb85-4328-bdba-8d5545cd1676",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
+   "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  "b107f7db-766a-4610-a52d-e684f242abdf": {
+   "id": "b107f7db-766a-4610-a52d-e684f242abdf",
+   "label": "edits the metamodel in",
+   "relationType": "interacts",
+   "sourceId": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
+   "targetId": "44fbd164-6749-44bd-9c78-c4661649dd23"
+  },
+  "b5ec6a3f-5515-4283-b2d7-c8ea2f9d25c2": {
+   "id": "b5ec6a3f-5515-4283-b2d7-c8ea2f9d25c2",
+   "label": "serves hub.radical.tools and the catalogue",
+   "relationType": "interacts",
+   "sourceId": "984afb23-9553-4ada-aea9-318b97228ce7",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "bec370d6-64f8-4aa6-b819-35b6c81a767d": {
+   "id": "bec370d6-64f8-4aa6-b819-35b6c81a767d",
+   "label": "uses",
+   "relationType": "interacts",
+   "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "c525ad10-6b9e-4aa0-a266-23caf02c0c02": {
+   "id": "c525ad10-6b9e-4aa0-a266-23caf02c0c02",
+   "label": "opens and saves files",
+   "relationType": "interacts",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5",
+   "technology": "Electron IPC"
+  },
+  "cb6fe137-0aab-4de1-b300-20474e495662": {
+   "id": "cb6fe137-0aab-4de1-b300-20474e495662",
+   "label": "reads and edits the model in",
+   "relationType": "interacts",
+   "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
+   "targetId": "44fbd164-6749-44bd-9c78-c4661649dd23"
+  },
+  "d1012364-e8ee-4950-82d4-6921aec03690": {
+   "id": "d1012364-e8ee-4950-82d4-6921aec03690",
+   "label": "keeps a baseline and refuses conflicts with MdFolderSession of",
+   "relationType": "interacts",
+   "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+   "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  "d5b3529c-5002-4ce7-b561-9396228fa9b6": {
+   "id": "d5b3529c-5002-4ce7-b561-9396228fa9b6",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "dafb4cdd-f3e3-4372-8536-1cef471b4b34": {
+   "id": "dafb4cdd-f3e3-4372-8536-1cef471b4b34",
+   "label": "edits .radical files in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  "e15a0abc-9f23-4140-997b-e26a118f6ced": {
+   "id": "e15a0abc-9f23-4140-997b-e26a118f6ced",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "e5fac5af-416d-4ce3-a69c-de77c8df0afa": {
+   "id": "e5fac5af-416d-4ce3-a69c-de77c8df0afa",
+   "label": "browses concepts in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "ec8e44f7-bce3-4b1c-966e-526b9f0c9d7f": {
+   "id": "ec8e44f7-bce3-4b1c-966e-526b9f0c9d7f",
+   "label": "bundled into",
+   "relationType": "interacts",
+   "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+   "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  "f4a72e78-d8c7-42ef-adef-32e8beba4039": {
+   "id": "f4a72e78-d8c7-42ef-adef-32e8beba4039",
+   "label": "models architecture in",
+   "relationType": "interacts",
+   "sourceId": "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4",
+   "targetId": "32793ee9-a939-498b-a71e-77831ce7ef4c"
+  },
+  "f973852e-3ded-4aef-9bbd-365383b8725c": {
+   "id": "f973852e-3ded-4aef-9bbd-365383b8725c",
+   "label": "suggests matching concepts from",
+   "relationType": "interacts",
+   "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+   "targetId": "08e414ea-974c-4a75-8bef-9fd30d3cfaf4"
+  },
+  "fa44dd78-50bf-4792-a949-9341e16c5b21": {
+   "id": "fa44dd78-50bf-4792-a949-9341e16c5b21",
+   "label": "fetches the catalogue from",
+   "relationType": "interacts",
+   "sourceId": "08e414ea-974c-4a75-8bef-9fd30d3cfaf4",
+   "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  "fb922af7-32b9-45b8-9824-636ecb7de489": {
+   "id": "fb922af7-32b9-45b8-9824-636ecb7de489",
+   "label": "hands selected concepts to (?hub=<ids>)",
+   "relationType": "interacts",
+   "sourceId": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9",
+   "targetId": "43a5a0b6-073d-4a5d-be64-9ff5cd99303a"
+  }
+ },
+ "alignments": [],
+ "frames": [
+  "974cc763-a121-4f53-a92d-18a64562a0c9",
+  "c3073e61-3a0b-4d1f-980b-a65f1e4992f5",
+  "1b325efd-3003-4633-94ed-73d17d6f4ea4"
+ ],
+ "edgeStyle": "curved"
+}

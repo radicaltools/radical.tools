@@ -400,3 +400,50 @@ describe('Move to… with a row', () => {
     })
   }
 })
+
+describe('Move to… the root, on views that do not draw what it left', () => {
+  // A view of systems draws the domains only as invisible frames: nothing
+  // drawn lies where A1 stands once out of A, yet it went clear of the
+  // frame, 320 px off (Payment out of Payments on the sample's Domain
+  // model, and on Payment lifecycle, which draws Payment alone: F-0093).
+  const frames = (): DiagramData => {
+    const data = roots()
+    const all = data.defaultPositions!
+    data.views = [
+      { id: 'systems', name: 'Systems', nodeIds: ['a1', 'a2', 'b1', 'loose'], positions: JSON.parse(JSON.stringify(all)) },
+      { id: 'alone', name: 'A1 alone', nodeIds: ['a1'], positions: { a: { ...all.a }, a1: { ...all.a1 } } },
+    ]
+    return data
+  }
+  const at = (view: string | null): { x: number; y: number } => {
+    s().setActiveView(view)
+    return { x: abs('a1').x, y: abs('a1').y }
+  }
+
+  for (const shown of ['systems', 'alone'] as const) {
+    it(`keeps its place there and on the other such view (taken out on ${shown})`, () => {
+      s().loadDiagram(frames())
+      s().setActiveView(shown)
+      s().reparentNodes(['a1'], null, { quiet: true })
+      expect(s().c4Nodes.a1.parentId).toBeUndefined()
+      expect(at('systems')).toEqual({ x: 30, y: 120 })
+      expect(at('alone')).toEqual({ x: 30, y: 120 })
+      // Clear of what the systems view draws, and a reload moves nothing.
+      s().setActiveView('systems')
+      for (const other of ['a2', 'b1', 'loose']) expect(overlap(abs('a1'), abs(other)), other).toBe(false)
+      s().loadDiagram(JSON.parse(JSON.stringify(s().saveDiagram())) as DiagramData)
+      expect(at('systems')).toEqual({ x: 30, y: 120 })
+      expect(at('alone')).toEqual({ x: 30, y: 120 })
+    })
+  }
+
+  // What a frame holds is drawn: it is in the way.
+  it('goes clear of what the frame holds where it lies on it', () => {
+    const data = frames()
+    data.views![0].positions!.a1 = { ...data.views![0].positions!.a1, x: 200 }
+    s().loadDiagram(data)
+    s().setActiveView('systems')
+    s().reparentNodes(['a1'], null, { quiet: true })
+    for (const other of ['a2', 'b1', 'loose']) expect(overlap(abs('a1'), abs(other)), other).toBe(false)
+  })
+})

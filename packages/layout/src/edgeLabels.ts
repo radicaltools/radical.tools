@@ -28,6 +28,10 @@ export interface LabelTextLine {
   fontSize: number
   /** The rows it may take; longer text is cut with an ellipsis. */
   maxRows?: number
+  /** Drawn in italics (a technology, a type's name in a label's stead). */
+  italic?: boolean
+  /** Kept on one row (cut with an ellipsis), its whole width counted. */
+  nowrap?: boolean
 }
 
 /** The box a label is drawn in (border-box sizing). */
@@ -39,37 +43,132 @@ export interface LabelBoxStyle {
   lineHeight: number
 }
 
-/** Mean glyph width of the UI font, in em. Slightly generous: a label that
- *  is a little smaller than estimated only gets a little more room. */
-const CHAR_EM = 0.56
+/** The font the canvas draws labels in: the UI font (index.css), set on the
+ *  label (RelationEdge) so that the two cannot drift apart. */
+export const LABEL_FONT_FAMILY = "Inter, 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+
+/** The CSS font of a label line, as the canvas draws it and measures it. */
+export function labelFont(fontSize: number, italic = false): string {
+  return `${italic ? 'italic ' : ''}${fontSize}px ${LABEL_FONT_FAMILY}`
+}
+
+/** The width of `text` in `font` (labelFont), in px. */
+export type TextMeasure = (text: string, fontSize: number, italic: boolean) => number
+
+/** Advance widths of the printable ASCII characters (space to tilde) in the
+ *  UI font as Chromium draws it on macOS (the system font, whose spacing
+ *  changes with its size), in thousandths of an em at 12 and 10 px, upright
+ *  and italic: the measure where no canvas can measure (Node: the MCP
+ *  server, tests). Other characters take OTHER_ADVANCE, wide ones (CJK and
+ *  the like) an em. */
+const ADVANCE: Record<10 | 12, { upright: number[]; italic: number[] }> = {
+  12: {
+    upright: [
+      281, 311, 478, 630, 630, 925, 711, 297, 382, 382, 472, 630, 297, 472, 297, 305, 630, 464, 604, 627, 644, 618, 637, 569,
+      639, 637, 297, 297, 630, 630, 630, 513, 918, 674, 657, 716, 727, 596, 572, 747, 742, 268, 538, 659, 568, 874, 742, 771,
+      635, 771, 653, 637, 634, 737, 674, 968, 679, 655, 662, 382, 305, 382, 630, 583, 500, 552, 614, 560, 614, 571, 362, 609,
+      588, 247, 247, 543, 253, 870, 583, 591, 610, 609, 381, 523, 363, 583, 542, 774, 524, 543, 539, 382, 259, 382, 630,
+    ],
+    italic: [
+      282, 311, 437, 633, 648, 918, 711, 253, 382, 382, 459, 648, 297, 472, 297, 362, 630, 466, 604, 627, 644, 619, 637, 570,
+      639, 638, 297, 297, 648, 648, 648, 513, 918, 674, 657, 714, 726, 595, 571, 745, 743, 269, 538, 659, 568, 875, 742, 771,
+      637, 771, 653, 623, 630, 744, 674, 968, 678, 656, 662, 382, 362, 382, 459, 447, 500, 550, 615, 554, 618, 574, 362, 609,
+      594, 252, 252, 530, 252, 870, 585, 592, 612, 611, 386, 514, 363, 583, 542, 774, 527, 543, 539, 382, 362, 382, 648,
+    ],
+  },
+  10: {
+    upright: [
+      293, 323, 489, 642, 642, 937, 723, 309, 394, 394, 483, 642, 309, 483, 309, 316, 642, 476, 615, 639, 655, 630, 648, 581,
+      650, 648, 309, 309, 642, 642, 642, 524, 930, 686, 669, 728, 738, 607, 584, 758, 754, 279, 550, 670, 580, 886, 754, 783,
+      647, 783, 665, 649, 646, 749, 686, 979, 690, 667, 673, 394, 316, 394, 642, 595, 512, 563, 626, 571, 626, 583, 374, 621,
+      600, 259, 258, 555, 265, 882, 595, 603, 622, 621, 393, 535, 375, 595, 554, 786, 536, 555, 551, 394, 271, 394, 642,
+    ],
+    italic: [
+      294, 322, 449, 645, 660, 930, 723, 265, 394, 394, 471, 660, 309, 483, 309, 374, 642, 478, 616, 639, 655, 630, 649, 582,
+      650, 649, 309, 309, 660, 660, 660, 524, 930, 686, 669, 726, 737, 607, 583, 756, 755, 280, 550, 670, 580, 887, 754, 783,
+      648, 783, 665, 635, 642, 756, 686, 979, 690, 668, 673, 394, 374, 394, 471, 459, 512, 562, 626, 566, 629, 586, 374, 621,
+      605, 264, 264, 542, 264, 882, 597, 604, 624, 623, 398, 525, 375, 595, 554, 786, 539, 555, 551, 394, 374, 394, 660,
+    ],
+  },
+}
+const OTHER_ADVANCE = 600
+
+/** The width of `text` from the advance table of the nearest size, in px. */
+export const tableMeasure: TextMeasure = (text, fontSize, italic) => {
+  const sized = ADVANCE[fontSize < 11 ? 10 : 12]
+  const table = italic ? sized.italic : sized.upright
+  let w = 0
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!
+    w += c >= 32 && c < 127 ? table[c - 32] : c >= 0x2e80 ? 1000 : OTHER_ADVANCE
+  }
+  return w * fontSize / 1000
+}
+
+interface Measuring { font: string; measureText(text: string): { width: number } }
+type Offscreen = new (w: number, h: number) => { getContext(kind: '2d'): Measuring | null }
+
+/** Widths measured by a canvas, by font and text. */
+const measured = new Map<string, number>()
+let canvas: Measuring | null | undefined
+
+/** The width of `text` as the browser draws it, where one runs the code (the
+ *  canvas, the Tidy worker): measured on an OffscreenCanvas in the label's
+ *  font, so the size is the drawn one whatever font the platform falls back
+ *  on. Elsewhere, the advance table. */
+export const measureText: TextMeasure = (text, fontSize, italic) => {
+  if (canvas === undefined) {
+    const Canvas = (globalThis as { OffscreenCanvas?: Offscreen }).OffscreenCanvas
+    try { canvas = Canvas ? new Canvas(1, 1).getContext('2d') : null } catch { canvas = null }
+  }
+  if (!canvas) return tableMeasure(text, fontSize, italic)
+  const font = labelFont(fontSize, italic)
+  const key = `${font}|${text}`
+  let w = measured.get(key)
+  if (w === undefined) {
+    if (measured.size > 20_000) measured.clear()
+    canvas.font = font
+    w = canvas.measureText(text).width
+    measured.set(key, w)
+  }
+  return w
+}
 
 /**
- * The size a label box takes, estimated from its text: each line is wrapped
- * word by word at the box's inner width. Rendering is not needed, so the
- * same estimate works on the canvas, in workers and in tests.
+ * The size a label box takes, as the canvas draws it: each line is wrapped
+ * word by word at the box's inner width (a word wider than that is broken,
+ * as overflow-wrap: anywhere does), up to its rows. The box is as wide as
+ * its widest line while every line fits on one row, and as wide as it may
+ * be once one does not (a shrink-to-fit box with a max-width).
  */
-export function estimateLabelSize(lines: LabelTextLine[], style: LabelBoxStyle): LabelSize {
+export function estimateLabelSize(lines: LabelTextLine[], style: LabelBoxStyle, measure: TextMeasure = measureText): LabelSize {
   const inner = style.maxWidth - 2 * style.padX - 2 * style.border
   let width = 0
   let height = 0
   for (const line of lines) {
-    const charW = line.fontSize * CHAR_EM
+    const italic = !!line.italic
+    const words = line.text.split(/\s+/).filter(Boolean)
+    const whole = measure(words.join(' '), line.fontSize, italic)
     let rows = 0
-    let row = 0
-    for (const word of line.text.split(/\s+/).filter(Boolean)) {
-      const w = word.length * charW
-      const next = row === 0 ? w : row + charW + w
-      if (row > 0 && next > inner) {
-        width = Math.max(width, row)
-        rows++
-        row = w
-      } else {
-        row = next
+    if (line.nowrap || whole <= inner) {
+      width = Math.max(width, whole)
+      rows = words.length > 0 ? 1 : 0
+    } else {
+      width = inner
+      let row = ''
+      for (const word of words) {
+        const next = row ? `${row} ${word}` : word
+        if (!row || measure(next, line.fontSize, italic) <= inner) {
+          row = next
+        } else {
+          rows++
+          row = word
+        }
+        // A word wider than the box takes rows of its own.
+        const w = measure(word, line.fontSize, italic)
+        if (row === word && w > inner) rows += Math.ceil(w / inner) - 1
       }
-    }
-    if (row > 0) {
-      width = Math.max(width, row)
-      rows++
+      if (row) rows++
     }
     if (line.maxRows) rows = Math.min(rows, line.maxRows)
     height += rows * line.fontSize * style.lineHeight
@@ -106,15 +205,17 @@ export function relationLabelLines(r: RelationLabelText, nodes?: Record<string, 
   const lines: LabelTextLine[] = []
   const name = r.label
     || (r.relationType === 'transition' ? (nodes ? transitionLabel(r as C4Relation, nodes) : '') : r.typeName ?? r.relationType)
-  if (name) for (const text of name.split('\n')) lines.push({ text, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows })
-  if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize, maxRows: 1 })
+  // A type's name stands in italics for a relation without a name.
+  const italic = !r.label && r.relationType !== 'transition'
+  if (name) for (const text of name.split('\n')) lines.push({ text, fontSize: RELATION_LABEL_BOX.fontSize, maxRows: RELATION_LABEL_BOX.nameRows, italic })
+  if (r.technology) lines.push({ text: `[${r.technology}]`, fontSize: RELATION_LABEL_BOX.techFontSize, maxRows: 1, italic: true, nowrap: true })
   return lines
 }
 
 /** The size of a relation's label box, or null when it has no label. */
-export function relationLabelSize(r: RelationLabelText, nodes?: Record<string, C4Node>): LabelSize | null {
+export function relationLabelSize(r: RelationLabelText, nodes?: Record<string, C4Node>, measure?: TextMeasure): LabelSize | null {
   const lines = relationLabelLines(r, nodes)
-  return lines.length > 0 ? estimateLabelSize(lines, RELATION_LABEL_BOX) : null
+  return lines.length > 0 ? estimateLabelSize(lines, RELATION_LABEL_BOX, measure) : null
 }
 
 // ── Placement ─────────────────────────────────────────────────────────

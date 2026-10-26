@@ -11,6 +11,8 @@ import { C4EdgeRFData } from '@radical/common/c4'
 import { useDiagramStore } from '../../store/diagramStore'
 import { edgeFocus } from '../../store/canvasFocus'
 import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
+import { editingControl } from '../editingControl'
+import { LABEL_FONT_FAMILY } from '@radical/layout/edgeLabels'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -116,7 +118,7 @@ function ReconnectHandle({
   }, [dragging, mouse])
 
   return (
-    <>
+    <g {...editingControl}>
       {/* Draggable handle circle */}
       <circle
         cx={x}
@@ -147,7 +149,7 @@ function ReconnectHandle({
           <circle cx={previewPt.x} cy={previewPt.y} r={4} fill="var(--accent)" opacity={0.6} pointerEvents="none" />
         </>
       )}
-    </>
+    </g>
   )
 }
 
@@ -252,6 +254,8 @@ export const RelationEdge = memo(
                 borderRadius:    4,
                 padding:         `${LABEL_BOX.padY}px ${LABEL_BOX.padX}px`,
                 fontSize:        LABEL_BOX.fontSize,
+                // The font its size is measured in (relationLabelSize).
+                fontFamily:      LABEL_FONT_FAMILY,
                 color:           'var(--text-primary)',
                 pointerEvents:   'none',
                 maxWidth:        LABEL_BOX.maxWidth,

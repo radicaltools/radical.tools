@@ -37,6 +37,7 @@ import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { NodeDiscussionBadges } from './NodeDiscussionBadges'
 import { keepKeysHere } from './keysHere'
+import { editingControl } from './editingControl'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
 import { connectTypes, newElementFilters, viewShownNodes } from '@radical/common/viewPipeline'
@@ -105,6 +106,10 @@ function focusDimmed(n: RFNode): RFNode {
     focusDimmedCopies.set(n, copy)
   }
   return copy
+}
+
+function unselected<T extends { selected?: boolean }>(item: T): T {
+  return item.selected ? { ...item, selected: false } : item
 }
 
 // What the connect gesture offers besides relation types: the element moved
@@ -212,7 +217,7 @@ function ConnectPills({ containerRef, targets, nameOf }: {
         if (!node || node.hidden) return null
         const at = node.positionAbsolute ?? node.position
         return (
-          <div key={id} className="connect-pills-over" style={{ left: at.x, top: at.y, width: node.width ?? 0 }}>
+          <div key={id} {...editingControl} className="connect-pills-over" style={{ left: at.x, top: at.y, width: node.width ?? 0 }}>
             <div className="connect-pills" role="group" aria-label={`Drop on ${nameOf(id)}`} data-connect-over={id}>
               {types.map((t) => t.type === NEST_HOLDS
                 ? <span key={t.type} className="connect-pill holds">{t.text}</span>
@@ -224,6 +229,45 @@ function ConnectPills({ containerRef, targets, nameOf }: {
     </>,
     viewport,
   )
+}
+
+/** What the pointer of `e` is on, for the special key: its target, or where
+ *  that lies over the elements, the element under it seen through. React Flow's rectangle round
+ *  a box selection covers what it selected: a press or click with the key
+ *  there found no element, the gesture did not start and React Flow dragged
+ *  the selection (F-0094). The pills keep their size on screen, so zoomed out
+ *  an element's stand over the element above it: a drop or click on that
+ *  one went to the pill (F-0092). A pill keeps the pointer only where it
+ *  lies over no other element (over its own, or one holding it, it does);
+ *  `pills` false (a press, which no pill takes): never. Returns the element
+ *  to read as the event's target. */
+function pointerTarget(e: MouseEvent, pills = true): HTMLElement | null {
+  const target = e.target as HTMLElement
+  if (!(target instanceof Element) || !target.closest('.react-flow__nodesselection, .connect-pills')) return target
+  let pill: HTMLElement | null = null
+  let through = false
+  for (const el of document.elementsFromPoint(e.clientX, e.clientY) as HTMLElement[]) {
+    if (el.closest('.react-flow__nodesselection')) { through = true; continue }
+    if (el.closest('.connect-pills')) { pill ??= el; through = true; continue }
+    // Seen through: what is under the pointer there, not a line over it.
+    if (through && el.closest('.react-flow__edge, .react-flow__edgelabel-renderer')) continue
+    const id = el.closest<HTMLElement>('.react-flow__node')?.dataset.id
+    const own = pill?.closest<HTMLElement>('.connect-pills')?.dataset.connectOver
+    if (pill && pills && (!id || !own || id === own || holdsNode(id, own))) return pill
+    return el
+  }
+  return pills ? pill : null
+}
+
+/** `outer` holds `inner`, at any depth. */
+function holdsNode(outer: string, inner: string): boolean {
+  const nodes = useDiagramStore.getState().c4Nodes
+  const seen = new Set<string>()
+  for (let p = nodes[inner]?.parentId; p && !seen.has(p); p = nodes[p]?.parentId) {
+    if (p === outer) return true
+    seen.add(p)
+  }
+  return false
 }
 
 // When the grabbed element's parent is selected too, React Flow drags the
@@ -289,6 +333,7 @@ function ConnectionPreviewLine({
 
   return (
     <svg
+      {...editingControl}
       style={{
         position: 'absolute',
         inset: 0,
@@ -336,6 +381,9 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // because someone is browsing or presenting it.
   const isViewMode = appMode !== 'designer'
   const presentationActive = useDiagramStore((s) => s.presentationActive)
+  // A presentation offers no Discuss menu: one open when it started stayed
+  // over the slide and kept the arrows and Space from it (F-0087).
+  useEffect(() => { if (presentationActive) setDiscussionMenu(null) }, [presentationActive])
   const autoFitActive = useDiagramStore((s) => s.autoFitActive)
 
   const rfNodes = useDiagramStore((s) => s.rfNodes)
@@ -448,10 +496,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     record(rfStore.getState().transform)
     // And kept as the view's camera by this viewer, outside the model
     // (viewCameras.ts): a slide's is the slide's, an exploration keeps none.
+    // Only Designer's: Viewer and Presenter open each view at Designer's
+    // camera and keep none of their own (a slide clicked there became the
+    // view's, and Designer opened at it after a reload).
     // Not on mount: React Flow's default camera stands until the view's is placed.
     const keep = (transform: [number, number, number]): void => {
       const s = useDiagramStore.getState()
-      if (s.presentationActive || (s.activeViewId !== null && !s.views[s.activeViewId])) return
+      if (s.appMode !== 'designer' || s.presentationActive || (s.activeViewId !== null && !s.views[s.activeViewId])) return
       noteViewCamera(s.activeViewId, { x: transform[0], y: transform[1], zoom: transform[2] })
     }
     return rfStore.subscribe((s, prev) => {
@@ -1311,7 +1362,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
     const onMouseDown = (e: MouseEvent) => {
       if (!isModHeld(e)) return
-      const nodeId = findNodeId(e.target as HTMLElement)
+      const target = pointerTarget(e, false) ?? e.target as HTMLElement
+      const nodeId = findNodeId(target)
       if (!nodeId) return
 
       // Prevent ReactFlow from seeing this (no drag, no select)
@@ -1324,7 +1376,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       // nesting, which were shown there and lost on the way back).
       if (!editsModel(state)) {
         selectOnlyRef.current = nodeId
-        if ((e.target as HTMLElement).closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
+        if (target.closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
         return
       }
       state.startConnection(nodeId)
@@ -1345,7 +1397,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       if (!connectingRef.current) return
       setConnectMouse({ x: e.clientX, y: e.clientY })
       // Over the panel the element stays the one it stands over.
-      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      const under = pointerTarget(e)
       if (under?.closest('.connect-pills')) return
       setConnectOver(under ? findNodeId(under) : null)
     }
@@ -1354,7 +1406,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       const pressed = selectOnlyRef.current
       selectOnlyRef.current = null
       boxFromRef.current = null
-      if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
+      const target = pointerTarget(e) ?? e.target as HTMLElement
+      if (pressed && findNodeId(target) === pressed) {
         const ids = useDiagramStore.getState().selectedNodeIds
         useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
       }
@@ -1369,7 +1422,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       // Dropped on a field of the target's panel: a relation of that type,
       // or the element moved inside the target.
-      const field = (e.target as HTMLElement).closest<HTMLElement>('[data-connect-target]')
+      const field = target.closest<HTMLElement>('[data-connect-target]')
       const sources = connectSources(state, src)
       if (field) {
         const type = field.dataset.connectType
@@ -1380,13 +1433,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       }
 
       // On the panel beside its fields: the element it stands over.
-      const panel = (e.target as HTMLElement).closest<HTMLElement>('.connect-pills')
-      const nodeId = panel ? panel.dataset.connectOver ?? connectOverRef.current : findNodeId(e.target as HTMLElement)
+      const panel = target.closest<HTMLElement>('.connect-pills')
+      const nodeId = panel ? panel.dataset.connectOver ?? connectOverRef.current : findNodeId(target)
       const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
       // On the empty canvas: out of its container, where it may stand there;
       // where it may not, it stays and a notice says why.
       // (Holding the selection key, React Flow lays its selection pane over it.)
-      const onCanvas = (e.target as HTMLElement).closest('.react-flow') && !(e.target as HTMLElement).closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
+      const onCanvas = target.closest('.react-flow') && !target.closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
       if (!nodeId && onCanvas) nestAll(sources, null)
       // Inside the target, its only offer; nothing on its container.
       else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(sources, nodeId)
@@ -1422,7 +1475,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     // to handle (it adds the element to the selection): React Flow's own
     // multi-selection would take it out again.
     const onClick = (e: MouseEvent) => {
-      if (isModHeld(e) && findNodeId(e.target as HTMLElement)) e.stopPropagation()
+      if (isModHeld(e) && findNodeId(pointerTarget(e, false) ?? e.target as HTMLElement)) e.stopPropagation()
     }
 
     // Capture phase so we intercept before ReactFlow
@@ -1763,7 +1816,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   useEffect(() => {
     if (!relink) return
     const onMove = (e: MouseEvent): void => {
-      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      const under = pointerTarget(e)
       if (under?.closest('.connect-pills')) return
       setConnectOver(under?.closest('.react-flow__node')?.getAttribute('data-id') ?? null)
     }
@@ -1791,6 +1844,11 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
           : focus && !focus.nodes.has(n.id) ? focusDimmed(n) : n
       )
     : rfNodes
+  // An export draws the diagram, not the selection: nothing selected while
+  // it is drawn (useExport), so no outline and no highlighted line.
+  const drawnForExport = useDiagramStore((s) => s.drawnForExport)
+  const shownNodes = drawnForExport ? annotatedNodes.map(unselected) : annotatedNodes
+  const shownEdges = drawnForExport ? rfEdges.map(unselected) : rfEdges
 
   // Edges between a container's children are drawn above the container (so
   // they stay visible and clickable), and one can lie over its expand /
@@ -1828,8 +1886,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       onDragOver={isViewMode ? undefined : onDragOver}
       onDoubleClick={isViewMode ? undefined : onCanvasDoubleClick}
     >
+      {/* Editing a sequence, the bar says how and is left out of an export;
+          shown, it names the sequence, as the caption names the view. */}
       {activeSequenceId && (
-        <div style={{
+        <div {...(isViewMode || presentationActive ? {} : editingControl)} style={{
           position: 'absolute',
           top: 8,
           left: '50%',
@@ -1852,6 +1912,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
             ? <>Sequence: {activeSequenceName ?? activeSequenceId}</>
             : <>Editing: {activeSequenceName ?? activeSequenceId} — click relations to add steps (remove via step list)</>}
           <button
+            {...editingControl}
             onClick={() => setActiveSequence(null)}
             style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1, opacity: 0.85 }}
             title={isViewMode || presentationActive ? 'Close the sequence' : 'Stop editing'}
@@ -1881,9 +1942,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
           <span style={{ color: 'var(--accent)', fontSize: 10 }}>●</span>
           <span>
             Milestone: <strong style={{ color: 'var(--text-primary)' }}>{snapshotName}</strong>
-            {milestoneDirty && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
+            {milestoneDirty && <span {...editingControl} style={{ color: 'var(--accent)', marginLeft: 4 }}>· unsaved</span>}
           </span>
           {!presentationActive && <button
+            {...editingControl}
             title={showDiff ? 'Hide diff' : 'Show changes vs. previous milestone'}
             onClick={toggleShowDiff}
             style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: showDiff ? 'var(--accent)' : 'var(--bg-surface)', color: showDiff ? '#fff' : 'var(--text-muted)', border: '1px solid var(--border-color)', borderRadius: 3 }}
@@ -1898,7 +1960,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
             </span>
           )}
           {milestoneDirty && (
-            <>
+            <span {...editingControl} style={{ display: 'contents' }}>
               <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--border-color)', margin: '0 2px' }} />
               <button
                 title="Apply changes to this and all later milestones"
@@ -1935,14 +1997,14 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
                 onClick={discardMilestoneChanges}
                 style={{ fontSize: 11, padding: '2px 6px', cursor: 'pointer', background: 'none', border: '1px solid var(--border-color)', borderRadius: 3, color: 'var(--text-muted)' }}
               >Discard</button>
-            </>
+            </span>
           )}
         </div>
       )}
       <DeleteConfirmDialog />
       <ReactFlow
-        nodes={annotatedNodes}
-        edges={rfEdges}
+        nodes={shownNodes}
+        edges={shownEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
@@ -2004,8 +2066,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       <RelationTypeMenu containerRef={containerRef} />
       <ExploreMenu containerRef={containerRef} />
-      {discussionMenu && onDiscuss && createPortal(
-        <div ref={discussionMenuRef} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
+      {discussionMenu && onDiscuss && !presentationActive && createPortal(
+        <div ref={discussionMenuRef} {...editingControl} role="menu" aria-label="Node actions" className="relation-type-menu" style={{ position: 'fixed', left: discussionMenu.x, top: discussionMenu.y, zIndex: 1000 }}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDiscussionMenu(null) }}
           onKeyDown={(event) => {
             keepKeysHere(event)
@@ -2031,6 +2093,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       {connectSource && (
         <div
+          {...editingControl}
           style={{
             position: 'absolute',
             top: 12,
@@ -2130,7 +2193,7 @@ function RelationTypeMenu({ containerRef }: { containerRef: React.RefObject<HTML
   const x = Math.max(8, Math.min((at?.x ?? (box?.width ?? 400) / 2), (box?.width ?? 400) - 240))
   const y = Math.max(8, Math.min((at?.y ?? (box?.height ?? 300) / 2), (box?.height ?? 300) - 40 - choice.types.length * 30))
   return (
-    <div ref={menuRef} className="relation-type-menu" role="menu" aria-label={`Relation from ${source} to ${target}`}
+    <div ref={menuRef} {...editingControl} className="relation-type-menu" role="menu" aria-label={`Relation from ${source} to ${target}`}
       style={{ position: 'absolute', left: x, top: y, zIndex: 120 }}>
       <div className="relation-type-menu-title">{source} → {target}: which relation?</div>
       {choice.types.map((t) => {

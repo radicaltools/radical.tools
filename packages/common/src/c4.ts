@@ -450,15 +450,20 @@ export interface DiagramSnapshot {
   relations: Record<string, C4Relation>
   /** Sequences captured at this point in time (optional for backward compat). */
   sequences?: Record<string, DiagramSequence>
-  /** The views this milestone shows its own way (by view id): what was done
-   *  on them in it (a fold, Hide from view, an alignment, a filter) and
-   *  kept by Save as new. Without their places, camera and name: those are
-   *  the view's for every milestone. Every other view is shown as the live
-   *  model has it. A view of an element the live model deleted since (a
-   *  view per element) is the milestone's alone, with its places
-   *  (keepViewsInMilestones). */
-  views?: Record<string, DiagramView>
+  /** What this milestone keeps of a view its own (by view id), over the
+   *  view's one layout (model.milestoneView): only the settings it shows
+   *  another way than the live view, its list of elements where it holds
+   *  some the live model deleted since, and what was done on the view in it
+   *  and kept by Save as new. A view of an element the live model deleted
+   *  since (a view per element) is the milestone's alone, whole, with its
+   *  places (keepViewsInMilestones). */
+  views?: Record<string, MilestoneView>
 }
+
+/** What a milestone keeps of a view (DiagramSnapshot.views): the settings
+ *  it shows another way than the live view, null for one the live view has
+ *  and it has not; or a whole view the milestone has alone. */
+export type MilestoneView = { id: string } & { [K in Exclude<keyof DiagramView, 'id'>]?: DiagramView[K] | null }
 
 /** Saved positions + collapsed state for every node on the canvas */
 export interface SlideCanvasState {

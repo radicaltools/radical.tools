@@ -10,8 +10,8 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
-import { readPipeline, viewShownNodes } from './viewPipeline'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
+import { readPipeline, viewShownNodes, withAncestors } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
 import {
@@ -480,6 +480,7 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
   const moving = ids.filter((id) => state.c4Nodes[id] && (state.c4Nodes[id].parentId ?? null) !== newParentId)
   const movingSet = new Set(moving)
   const siblings = Object.values(state.c4Nodes).filter((n) => (n.parentId ?? null) === newParentId && !movingSet.has(n.id))
+  const childrenOf = (parentId: string): C4Node[] => Object.values(state.c4Nodes).filter((n) => n.parentId === parentId && !movingSet.has(n.id))
   // Measure every node against the original tree before changing any parent.
   const canvases = [
     { positions: state.defaultPositions, view: undefined },
@@ -497,9 +498,16 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
     }
     const overlaps = (a: NodePosition, b: NodePosition): boolean =>
       a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    // A container the view draws only to hold what it shows (its frame,
+    // invisible) is in nobody's way; what it draws inside is (F-0093).
+    const shown = view ? viewShownNodes(view, state.c4Nodes, state.c4Relations) : undefined
+    const held = shown && withAncestors(shown, state.c4Nodes)
+    const inWay = (id: string, at: NodePosition): NodePosition[] => !shown?.has(id) && held?.has(id)
+      ? childrenOf(id).filter((c) => c.id in positions && held.has(c.id)).flatMap((c) => inWay(c.id, positions[c.id]).map((b) => ({ ...b, x: b.x + at.x, y: b.y + at.y })))
+      : [drawn(id, at)]
     // At the top, what it may not lie on: the siblings there, and what was
     // moved there before it.
-    const taken = newParentId ? [] : siblings.filter((s) => s.id in positions).map((s) => drawn(s.id, positions[s.id]))
+    const taken = newParentId ? [] : siblings.filter((s) => s.id in positions).flatMap((s) => inWay(s.id, positions[s.id]))
     return moving.filter((id) => id in positions).map((id) => {
       const abs = absOf(id, positions)
       const box = { ...positions[id], x: abs.x - target.x, y: abs.y - target.y }
@@ -511,7 +519,7 @@ export function reparentNodes(state: ModelState, ids: string[], newParentId: str
       // it there (beside every sibling, it went to the far right).
       const at = drawn(id, box)
       const inside = !newParentId || (!!parent && at.x >= 0 && at.y >= 0 && at.x + at.width <= parent.width && at.y + at.height <= parent.height)
-      const clear = !siblings.some((s) => s.id in positions && overlaps(at, drawn(s.id, positions[s.id])))
+      const clear = !siblings.some((s) => s.id in positions && inWay(s.id, positions[s.id]).some((b) => overlaps(at, b)))
       if (!newParentId) {
         const free = clear ? box : { ...box, ...freePlaceNear(taken, at) }
         taken.push(drawn(id, free))
@@ -605,27 +613,139 @@ export function deleteNode(state: ModelState, id: string): Set<string> {
   return removed
 }
 
-/** What a milestone keeps of a view its own way (DiagramSnapshot.views):
- *  all but where it is looked at. Its places and camera are the view's one
- *  layout for every milestone, and what it is focused on is like a camera. */
-export function milestoneOwnView(view: DiagramView): DiagramView {
-  const { positions: _positions, viewport: _viewport, treemapFocusId: _treemap, wikiFocusId: _wiki, tableActiveTab: _tab, ...rest } = view
-  return { ...rest, positions: {} } as DiagramView
+/** The rule a milestone's view follows. A view has one layout, the live
+ *  model's and every milestone's: its name, folder, places and camera, and
+ *  its folds, line style, alignments, filter and every other setting. A
+ *  milestone keeps of a view its own (DiagramSnapshot.views) only what it
+ *  shows another way, setting by setting:
+ *  - the list of elements, where it holds some the live model deleted
+ *    since (keepViewsInMilestones), and the sequence a flow view plays,
+ *    where it holds one the live model deleted (keepSequenceViewsInMilestones);
+ *  - what was done on the view in it and kept by Save as new;
+ *  and a view of an element the live model deleted since (a view per
+ *  element) whole, with its places. Every other setting it shows as the
+ *  live view has it now, so a live edit reaches every milestone. Propagate
+ *  carries what was done on a view in a milestone (viewEdited) to the live
+ *  view and to the later milestones' own settings, never the milestone's
+ *  copy. milestoneView is "the view as a milestone shows it", and
+ *  milestoneViews all of them: Studio's canvas, its slides, Restore to
+ *  live, the MCP server's slides and radical check read them so. A copy of
+ *  the whole view saved before this rule is read as settings of its own. */
+const SHARED_VIEW_KEYS = new Set(['id', 'name', 'folder', 'positions', 'viewport', 'treemapFocusId', 'wikiFocusId', 'tableActiveTab'])
+
+/** The settings that are lists of ids: an edit adds and takes out ids. */
+const VIEW_ID_LISTS = new Set(['nodeIds', 'collapsedNodeIds', 'expandedNodeIds', 'hiddenRelationIds'])
+
+const sameSetting = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a) === JSON.stringify(b)
+
+/** The view `live` as a milestone that keeps `own` of it shows it. */
+export function milestoneView(live: DiagramView, own: MilestoneView | undefined): DiagramView {
+  if (!own) return live
+  const shown = { ...live } as Record<string, unknown>
+  for (const [key, value] of Object.entries(own)) {
+    if (SHARED_VIEW_KEYS.has(key) || value === undefined) continue
+    if (value === null) delete shown[key]
+    else shown[key] = value
+  }
+  // Its own list says itself whether it lists none.
+  if (own.nodeIds && !('empty' in own)) delete shown.empty
+  return shown as unknown as DiagramView
+}
+
+/** What a milestone that shows the view `live` as `shown` keeps of it (so
+ *  that milestoneView gives `shown` back), or null when it shows it as the
+ *  live model has it. */
+export function milestoneOwnView(shown: DiagramView, live: DiagramView): MilestoneView | null {
+  const a = shown as unknown as Record<string, unknown>
+  const b = live as unknown as Record<string, unknown>
+  const own: Record<string, unknown> = {}
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (SHARED_VIEW_KEYS.has(key) || sameSetting(a[key], b[key])) continue
+    own[key] = a[key] === undefined ? null : a[key]
+  }
+  if (!Object.keys(own).length) return null
+  if ('nodeIds' in own && !('empty' in own)) own.empty = a.empty ?? null
+  return { ...own, id: shown.id } as MilestoneView
+}
+
+/** The views (`views`, the live ones) as the milestone `snap` shows them
+ *  (milestoneView), with those it has alone: the view of an element it
+ *  holds and the live model (`liveNodes`) does not, in its group's folder. */
+export function milestoneViews(views: Record<string, DiagramView>, snap: DiagramSnapshot | undefined, liveNodes?: Record<string, C4Node>): Record<string, DiagramView> {
+  if (!snap?.views) return views
+  let out = views
+  for (const [id, own] of Object.entries(snap.views)) {
+    const live = views[id] as DiagramView | undefined
+    const shown = live ? milestoneView(live, own) : milestoneOnlyView(own, snap, views, liveNodes)
+    if (!shown || shown === live) continue
+    if (out === views) out = { ...views }
+    out[id] = shown
+  }
+  return out
+}
+
+/** The view `own` that milestone `snap` has alone, as shown, if it shows
+ *  it: one of an element it holds that the live model deleted. */
+function milestoneOnlyView(own: MilestoneView, snap: DiagramSnapshot, views: Record<string, DiagramView>, liveNodes: Record<string, C4Node> | undefined): DiagramView | undefined {
+  if (!own.subject || !snap.nodes[own.subject] || liveNodes?.[own.subject] || typeof own.name !== 'string' || !Array.isArray(own.nodeIds)) return undefined
+  const group = own.partOf ? views[own.partOf] : undefined
+  if (own.partOf && !group) return undefined
+  const shown = { ...own, positions: own.positions ?? {} } as Record<string, unknown>
+  for (const [key, value] of Object.entries(shown)) if (value === null) delete shown[key]
+  if (group?.folder) shown.folder = group.folder
+  else if (group) delete shown.folder
+  return shown as unknown as DiagramView
+}
+
+/** `target` with what was done on a view between `before` and `after`, as
+ *  Propagate carries it: a list of ids (the elements, folds, relations
+ *  hidden) loses the ids the edit took out and gains those it added,
+ *  keeping its own others; any other setting the edit changed takes the
+ *  new value. An element id is added where `has` says the model of
+ *  `target` holds it. With `own`, `target` is what a milestone keeps of the
+ *  view (MilestoneView): only the settings it has change. */
+export function viewEdited<T extends DiagramView | MilestoneView>(target: T, before: DiagramView, after: DiagramView, has: (id: string) => boolean, own = false): T {
+  const a = before as unknown as Record<string, unknown>
+  const b = after as unknown as Record<string, unknown>
+  const out = { ...target } as Record<string, unknown>
+  let listed = false
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (SHARED_VIEW_KEYS.has(key) || key === 'empty' || sameSetting(a[key], b[key])) continue
+    if (own && !(key in out)) continue
+    if (key === 'nodeIds') listed = true
+    if (VIEW_ID_LISTS.has(key) && Array.isArray(out[key]) && !sameSetting(out[key], a[key])) {
+      const was = new Set((a[key] ?? []) as string[])
+      const now = new Set((b[key] ?? []) as string[])
+      const list = (out[key] as string[]).filter((id) => now.has(id) || !was.has(id))
+      for (const id of now) if (!was.has(id) && !list.includes(id) && (key !== 'nodeIds' || has(id))) list.push(id)
+      out[key] = list
+    } else if (b[key] === undefined) {
+      if (own) out[key] = null
+      else delete out[key]
+    } else out[key] = key === 'nodeIds' ? (b[key] as string[]).filter(has) : b[key]
+  }
+  if (listed) {
+    // The list says itself whether it lists none.
+    if ((out.nodeIds as string[] | null | undefined)?.length) {
+      if (own && 'empty' in out) out.empty = null
+      else delete out.empty
+    } else if (b.empty) out.empty = true
+  }
+  return out as T
 }
 
 /** The milestones (`snapshots`) as they are once the `removed` elements
  *  leave the live `views` (call it with the views before the delete): a
  *  milestone shows the model as it was, so one that holds an element a
- *  view lists keeps that view's list as it was, as a view of its own
- *  (DiagramSnapshot.views, milestoneOwnView: without the places, which stay
- *  the view's for every milestone). Left to the live view, the milestone's
- *  view and the slide showing it lost the element deleted since. A view the
- *  milestone keeps its own way already keeps its list. A view of one of the
- *  `removed` (a view per element) goes with it from the live model: a
- *  milestone that holds the element keeps all of it, its places too, and
- *  shows it as its own (its group listed one view fewer there). Returns
- *  `snapshots` itself when no milestone changes, else a new array with new
- *  milestones where they changed. */
+ *  view lists keeps that view's list as it was, as its own (milestoneView:
+ *  the rest of the view stays the live view's). Left to the live view, the
+ *  milestone's view and the slide showing it lost the element deleted
+ *  since. A milestone that keeps its own list already keeps it. A view of
+ *  one of the `removed` (a view per element) goes with it from the live
+ *  model: a milestone that holds the element keeps all of it, its places
+ *  too, and shows it as its own (its group listed one view fewer there).
+ *  Returns `snapshots` itself when no milestone changes, else a new array
+ *  with new milestones where they changed. */
 export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Record<string, DiagramView>, removed: Set<string>): DiagramSnapshot[] {
   if (!snapshots.length || !removed.size) return snapshots
   const listing = Object.values(views).filter((v) => !(v.subject && removed.has(v.subject)) && v.nodeIds.some((id) => removed.has(id)))
@@ -633,15 +753,16 @@ export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Recor
   if (!listing.length && !ofRemoved.length) return snapshots
   let out = snapshots
   snapshots.forEach((snap, i) => {
-    const own: Record<string, DiagramView> = {}
+    const own: Record<string, MilestoneView> = {}
     for (const view of listing) {
-      if (snap.views?.[view.id] || !view.nodeIds.some((id) => removed.has(id) && snap.nodes[id])) continue
-      own[view.id] = milestoneOwnView(view)
+      const had = snap.views?.[view.id]
+      if (had?.nodeIds || !view.nodeIds.some((id) => removed.has(id) && snap.nodes[id])) continue
+      own[view.id] = { ...had, id: view.id, nodeIds: [...view.nodeIds], empty: view.empty ?? null }
     }
     for (const view of ofRemoved) {
       const had = snap.views?.[view.id]
       if (!snap.nodes[view.subject!] || (had && Object.keys(had.positions ?? {}).length)) continue
-      own[view.id] = { ...(had ?? milestoneOwnView(view)), positions: { ...view.positions } }
+      own[view.id] = { ...milestoneView(view, had), positions: { ...view.positions } }
     }
     if (!Object.keys(own).length) return
     if (out === snapshots) out = [...snapshots]
@@ -653,18 +774,21 @@ export function keepViewsInMilestones(snapshots: DiagramSnapshot[], views: Recor
 /** The milestones (`snapshots`) as they are once the sequence `sequenceId`
  *  is deleted from the live model, which unlinks the views that play it
  *  (deleteSequence; call it with the `views` before): a milestone that
- *  holds the sequence keeps those views linked, as views of its own
- *  (milestoneOwnView). Left to the live views, a flow view said "No
- *  sequence linked" in a milestone that still has the sequence. Returns
- *  `snapshots` itself when no milestone changes. */
+ *  holds the sequence keeps those views linked, as a setting of its own
+ *  (milestoneView). Left to the live views, a flow view said "No sequence
+ *  linked" in a milestone that still has the sequence. Returns `snapshots`
+ *  itself when no milestone changes. */
 export function keepSequenceViewsInMilestones(snapshots: DiagramSnapshot[], views: Record<string, DiagramView>, sequenceId: string): DiagramSnapshot[] {
   const playing = Object.values(views).filter((v) => v.sequenceId === sequenceId)
   if (!snapshots.length || !playing.length) return snapshots
   let out = snapshots
   snapshots.forEach((snap, i) => {
     if (!snap.sequences?.[sequenceId]) return
-    const own: Record<string, DiagramView> = {}
-    for (const view of playing) if (!snap.views?.[view.id]) own[view.id] = milestoneOwnView(view)
+    const own: Record<string, MilestoneView> = {}
+    for (const view of playing) {
+      const had = snap.views?.[view.id]
+      if (!had || !('sequenceId' in had)) own[view.id] = { ...had, id: view.id, sequenceId }
+    }
     if (!Object.keys(own).length) return
     if (out === snapshots) out = [...snapshots]
     out[i] = { ...snap, views: { ...snap.views, ...own } }

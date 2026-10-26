@@ -8,6 +8,7 @@
 import type { C4Node, C4Relation, DiagramView, Presentation, PresentationSlide } from '../../c4'
 import { fail, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 import { viewShownNodes } from '../../viewPipeline'
+import { milestoneViews } from '../../model'
 import { VIEW_KIND_LABELS, isViewpointKind } from '../../viewpoints'
 
 const randomId = (): string =>
@@ -130,17 +131,21 @@ function parseSlides(tool: string, raw: unknown, ctx: ToolRunContext, existing: 
       snapshotId = s.milestone
     }
     const milestone = snapshotId ? milestones.find((m) => m.id === snapshotId) : undefined
+    // The views as the slide's model has them: a milestone keeps its own
+    // list of a view, and a view of an element deleted since, as Studio
+    // draws them.
+    const shownViews = milestoneViews(views, milestone, ctx.diagram.getNodes())
     // A kept slide keeps its view unless told otherwise, as it keeps its
     // milestone and focus: slides reordered by id and name all lost theirs.
     let viewId: string | null = s.viewId === undefined ? (previous?.viewId ?? null) : null
     if (s.viewId != null) {
       if (typeof s.viewId !== 'string') return `${tool}: slide ${i + 1} has an invalid viewId`
       viewId = ctx.resolveId(s.viewId)
-      if (!(viewId in views)) return `${tool}: slide ${i + 1} has unknown viewId "${s.viewId}"`
+      if (!(viewId in shownViews)) return `${tool}: slide ${i + 1} has unknown viewId "${s.viewId}"`
     }
     let focus: string[] | undefined
     if (s.focus !== undefined) {
-      const parsed = parseFocus(tool, i, s.focus, ctx, viewId ? views[viewId] : undefined, milestone?.nodes ?? ctx.diagram.getNodes(), milestone?.relations ?? ctx.diagram.getRelations())
+      const parsed = parseFocus(tool, i, s.focus, ctx, viewId ? shownViews[viewId] : undefined, milestone?.nodes ?? ctx.diagram.getNodes(), milestone?.relations ?? ctx.diagram.getRelations())
       if (typeof parsed === 'string') return parsed
       focus = parsed
     }

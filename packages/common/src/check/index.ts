@@ -12,7 +12,7 @@
 
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
-import { documentMetamodel } from '../model'
+import { documentMetamodel, milestoneViews } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
@@ -236,7 +236,10 @@ function staleReferences(
   }
   for (const presentation of presentations) {
     for (const slide of presentation.slides) {
-      if (slide.viewId && !viewIds.has(slide.viewId)) findings.push({ path: 'presentations.json', message: `Slide "${slide.name}" of "${presentation.name}" shows view ${slide.viewId}, which the model does not have.` })
+      // A milestone has the views of elements the live model deleted since.
+      const milestone = slide.snapshotId ? milestones.find((m) => m.id === slide.snapshotId) : undefined
+      const shownIds = milestone?.views ? new Set(Object.keys(milestoneViews(Object.fromEntries(views.map((v) => [v.id, v])), milestone, nodes))) : viewIds
+      if (slide.viewId && !shownIds.has(slide.viewId)) findings.push({ path: 'presentations.json', message: `Slide "${slide.name}" of "${presentation.name}" shows view ${slide.viewId}, which the model does not have.` })
       // The model the slide shows: its milestone's, the copy taken when it
       // was added in Studio, else the current one.
       const shown = (slide.snapshotId ? milestones.find((m) => m.id === slide.snapshotId)?.nodes : undefined) ?? slide.modelSnapshot?.nodes ?? nodes

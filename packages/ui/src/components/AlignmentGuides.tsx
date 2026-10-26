@@ -2,6 +2,7 @@ import React from 'react'
 import { useStore, type Node } from 'reactflow'
 import { constraintLines, pinnedNodeIds, type LayoutConstraint } from '@radical/common/c4'
 import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
+import { editingControl } from './editingControl'
 
 /**
  * Dashed guides between the elements of each alignment on the active canvas
@@ -14,8 +15,8 @@ import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
  * columns for a grid, and remove. A selected pinned element (one the
  * user dropped after a drag) shows a pin at its corner that unpins it.
  *
- * Rendered as a ReactFlow child, outside the viewport element that exports
- * capture. The lines sit under React Flow's renderer (z-index 4), so boxes
+ * Rendered as a ReactFlow child; editing controls, left out of an export.
+ * The lines sit under React Flow's renderer (z-index 4), so boxes
  * and edges cover them; the remove buttons sit above it, where they can be
  * clicked. Designer mode only.
  */
@@ -83,7 +84,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
   const layer = { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' } as const
   return (
     <>
-      <svg width="100%" height="100%" style={{ ...layer, zIndex: 3 }} data-testid="alignment-guides">
+      <svg {...editingControl} width="100%" height="100%" style={{ ...layer, zIndex: 3 }} data-testid="alignment-guides">
         <defs>
           <marker id="alignment-guide-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto">
             <path d="M0 0L8 4L0 8z" fill="var(--accent)" stroke="none" />
@@ -112,7 +113,7 @@ function Guides({ constraints }: { constraints: LayoutConstraint[] }): React.Rea
           </g>
         ))}
       </svg>
-      <div style={{ ...layer, zIndex: 5 }}>
+      <div {...editingControl} style={{ ...layer, zIndex: 5 }}>
         {guides.map(({ c, segments }) => {
           // The buttons go on the longest gap, where they cover the least.
           const s = segments.reduce((best, x) => (Math.hypot(x.x2 - x.x1, x.y2 - x.y1) > Math.hypot(best.x2 - best.x1, best.y2 - best.y1) ? x : best))
