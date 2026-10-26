@@ -13,7 +13,7 @@ import type { C4Node, C4Relation, EdgeStyle, PositionMap } from '@radical/common
 import type { Metamodel } from '@radical/common/metamodel'
 import { projectToVisibleGraph } from '../geometry'
 import { computeLayoutMetrics } from '../crossingOpt'
-import { type Alignment, alongAxis, enforceAlignments } from '../constraints'
+import { type Alignment, alignmentError, alongAxis, enforceAlignments } from '../constraints'
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
@@ -98,6 +98,10 @@ const ROUGH_WHEN_TANGLED = 0.5
 /** The closing passes (drawn in, judged afresh, the margin) are repeated until one changes
  *  nothing, at most this many times: what a second run would find, this one takes. */
 const MAX_PASSES = 4
+/** Tidy run again on its own layout at most this many times (runTidyLayout). */
+const MAX_AGAIN = 3
+/** The author's rows and columns hold when their centres, as drawn, are this close (constraints.ts). */
+const ALIGNED = 0.5
 /** A large view's first round takes every move that helps as it comes (first improvement)
  *  instead of judging them all for the single best: hundreds of moves in the time the
  *  best-first round would spend choosing one, so a budget always buys something. */
@@ -108,9 +112,82 @@ export function runTidyLayout(
   options: TidyOptions = {},
 ): TidyLayoutResult {
   const style = options.edgeStyle ?? 'curved'
+  const first = tidyOnce(inputNodes, inputRelations, options, 0)
+  const { nodes, relations, baseline, lines, before } = first
+  const steps = [...first.steps]
+  let { positions, work, budgetOut } = first
+  // What a second run would find, this one takes: Tidy again from the
+  // layout it hands over, as the next Smart Layout would start (a fresh
+  // run judges every move afresh, and the margin it gathers into opens
+  // moves the closing passes took back as a circle), until a run finds
+  // nothing or the budget is spent.
+  for (let again = 0; again < MAX_AGAIN && steps.length && !budgetOut; again++) {
+    const at: Record<string, C4Node> = { ...inputNodes }
+    for (const [id, p] of Object.entries(positions)) {
+      const n = at[id]
+      if (n) at[id] = { ...n, x: p.x, y: p.y, ...(nodes[id]?.collapsed || p.width === undefined ? {} : { width: p.width, height: p.height }) }
+    }
+    const done = steps.length
+    const next = tidyOnce(at, inputRelations, { ...options, onProgress: options.onProgress && ((n, d) => options.onProgress!(done + n, d)) }, work)
+    work = next.work
+    budgetOut = next.budgetOut
+    if (!next.steps.length) break
+    steps.push(...next.steps)
+    positions = next.positions
+  }
+  positions = { ...positions }
+  // The whole diagram from the top left, as every layout hands it over;
+  // not when something is pinned: it stays where the author put it.
+  const roots = Object.keys(positions).filter((id) => !nodes[id].parentId || !nodes[nodes[id].parentId!])
+  if (!first.pinned) {
+    const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
+    for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
+  }
+  const projected = projectPositions(nodes, positions)
+  const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
+  afterLayout.edgeStyle = style
+  const after = totalCost(afterLayout, lines)
+  const score = computeCompositeScore(projected, relations, style)
+  const winner = { name: TIDY_NAME, positions, metrics: computeLayoutMetrics(projected, relations), score }
+  return {
+    baseline,
+    winner,
+    candidates: [winner],
+    planarity: computePlanarityScore(projected, relations),
+    refinement: { before: before.total, after: after.total, iterations: steps.length },
+    keptCurrent: steps.length === 0,
+    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut, work },
+  }
+}
+
+interface Tidied {
+  /** The graph as drawn (projectToVisibleGraph), its metrics and lines as the run found them. */
+  nodes: Record<string, C4Node>
+  relations: Record<string, C4Relation>
+  baseline: ReturnType<typeof computeLayoutMetrics>
+  lines: ReturnType<typeof linesOf>
+  steps: TidyStep[]
+  before: CostParts
+  work: number
+  budgetOut: boolean
+  positions: PositionMap
+  /** Something stayed where the author put it: the layout is not moved to the top left. */
+  pinned: boolean
+}
+
+/** One run of Tidy, as a person makes it: the moves from the canvas as it
+ *  stands, and the layout they lead to (parent-relative, not yet moved to
+ *  the top left). `spent`: the work done before it, for the budget. */
+function tidyOnce(
+  inputNodes: Record<string, C4Node>,
+  inputRelations: Record<string, C4Relation>,
+  options: TidyOptions,
+  spent: number,
+): Tidied {
+  const style = options.edgeStyle ?? 'curved'
   const { nodes, relations } = projectToVisibleGraph(inputNodes, inputRelations)
   const baseline = computeLayoutMetrics(nodes, relations)
-  let work = 0
+  let work = spent
   const outOfTime = (): boolean => (options.budget !== undefined && work >= options.budget) || !!options.shouldStop?.()
   // Round a few elements: everything else is as good as pinned, but the
   // frames holding what moves still follow it.
@@ -139,11 +216,15 @@ export function runTidyLayout(
 
   // The rows and columns the author set hold from the start, and every move
   // keeps them (keepLines): what Tidy hands over is the layout it judged,
-  // so a second run finds it as this one left it.
+  // so a second run finds it as this one left it. Lined up only where they
+  // do not hold as the canvas draws them: the line-up makes room round
+  // every box it finds too close, the rest of the view included, and fits
+  // frames its own way, so on lines that held it moved what no move took.
+  // Nothing pinned, or left out of a Tidy round a selection, is pushed aside.
   const alignments = options.alignments ?? []
   const lineUp = (): void => {
-    if (!alignments.length) return
-    l.setPositions(enforceAlignments(nodes, l.positions(), alignments))
+    if (!alignments.length || alignmentError(nodes, l.positions(), alignments) <= ALIGNED) return
+    l.setPositions(enforceAlignments(nodes, l.positions(), alignments, new Set(l.ids().filter((id) => l.fixed(id)))))
     l.refit()
   }
   {
@@ -535,32 +616,11 @@ export function runTidyLayout(
     l.setPositions(best.positions)
     steps.length = best.steps
   }
-  // The author's rows and columns held all along; lined up once more as
-  // the canvas measures them, before the diagram is moved to the top left,
-  // so what is handed over stands where the next run will find it.
-  let positions = enforceAlignments(nodes, l.positions(), alignments)
-  // The whole diagram from the top left, as every layout hands it over;
-  // not when something is pinned: it stays where the author put it.
-  const roots = l.ids().filter((id) => !l.parentOf(id))
-  if (!pinned.length) {
-    const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
-    for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
-  }
-  const projected = projectPositions(nodes, positions)
-  const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
-  afterLayout.edgeStyle = style
-  const after = totalCost(afterLayout, lines)
-  const score = computeCompositeScore(projected, relations, style)
-  const winner = { name: TIDY_NAME, positions, metrics: computeLayoutMetrics(projected, relations), score }
-  return {
-    baseline,
-    winner,
-    candidates: [winner],
-    planarity: computePlanarityScore(projected, relations),
-    refinement: { before: before.total, after: after.total, iterations: steps.length },
-    keptCurrent: steps.length === 0,
-    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime(), work },
-  }
+  // The author's rows and columns held all along; lined up once more
+  // where the canvas measures them off, so what is handed over stands
+  // where the next run will find it.
+  lineUp()
+  return { nodes, relations, baseline, lines, steps, before, work, budgetOut: outOfTime(), positions: l.positions(), pinned: pinned.length > 0 }
 }
 
 /** What a run did, as Studio's notice and the MCP server's smart_layout tell it: the

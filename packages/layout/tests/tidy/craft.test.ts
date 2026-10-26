@@ -188,6 +188,16 @@ describe('Tidy, the finer points', () => {
     expect(around.tidy.steps.every((s) => Object.keys(s.moved).every((id) => id === 'a' || id === 'b'))).toBe(true)
   })
 
+  it('tidy around leaves a pinned element and those it has no relation with where they are, with a row elsewhere on the view (F-0106)', () => {
+    // a b c in a row the author set; x relates to y and a; d (pinned) and e stand 10 px apart, related to nothing.
+    const nodes = [node('a', 'system', 0, 0), node('b', 'system', 400, 0), node('c', 'system', 800, 0), node('x', 'system', 0, 400), node('y', 'system', 600, 700), node('d', 'system', 1400, 400), node('e', 'system', 1400, 400 + NODE_SIZES.system.height + 10)]
+    const relations = [rel('x', 'y'), rel('a', 'x')]
+    const alignments = resolveAlignments([{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: ['a', 'b', 'c'] }], byId(nodes))
+    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['x'], pinned: ['d'], alignments })
+    for (const id of ['d', 'e']) expect(around.winner.positions[id], id).toMatchObject({ x: byId(nodes)[id].x, y: byId(nodes)[id].y })
+    expect(around.tidy.steps.every((s) => !('d' in s.moved) && !('e' in s.moved))).toBe(true)
+  })
+
   it('a frame holding a pinned element is not moved', () => {
     // s holds the pinned x and y; y relates to z far off. Moving s would carry x along.
     const nodes = [node('s', 'system', 0, 0), node('x', 'container', 40, 120, 's'), node('y', 'container', 340, 120, 's'), node('z', 'container', 2400, 1600)]

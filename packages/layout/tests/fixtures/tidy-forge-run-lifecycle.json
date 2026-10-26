@@ -1,0 +1,283 @@
+{
+ "_comment": "The view 'Forge run lifecycle' of the repository's own model (architecture/), as Studio hands it to Tidy (viewLayoutInput) before its first Smart Layout: a state machine in its domain and group, drawn as frames. F-0107.",
+ "nodes": {
+  "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+   "id": "07ce7238-e6c9-4e78-b08c-514cca305bbd",
+   "type": "group",
+   "label": "Conceptual",
+   "x": 30,
+   "y": 40,
+   "width": 2396,
+   "height": 1590.9999999999998,
+   "collapsed": false
+  },
+  "942e9364-a1a5-450b-a153-741fe9b42e48": {
+   "id": "942e9364-a1a5-450b-a153-741fe9b42e48",
+   "type": "domain",
+   "label": "Radical Forge",
+   "x": 30,
+   "y": 120,
+   "width": 2336,
+   "height": 1440.9999999999998,
+   "collapsed": false,
+   "parentId": "07ce7238-e6c9-4e78-b08c-514cca305bbd",
+   "kind": "supporting"
+  },
+  "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6": {
+   "id": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "type": "state-machine",
+   "label": "Forge run lifecycle",
+   "x": 30,
+   "y": 227.8,
+   "width": 2076,
+   "height": 1183.1999999999998,
+   "collapsed": false,
+   "parentId": "942e9364-a1a5-450b-a153-741fe9b42e48"
+  },
+  "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49": {
+   "id": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "type": "state",
+   "label": "Active",
+   "x": 30,
+   "y": 511.4,
+   "width": 1223.2533333333333,
+   "height": 641.8,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "kind": "normal"
+  },
+  "99e6e487-841f-4780-8027-30efb1cb7b54": {
+   "id": "99e6e487-841f-4780-8027-30efb1cb7b54",
+   "type": "state",
+   "label": "Clarifying",
+   "x": 567.76,
+   "y": 391.8,
+   "width": 320,
+   "height": 220,
+   "collapsed": false,
+   "parentId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "kind": "normal"
+  },
+  "e6b212a6-4c49-4c2d-92e0-f275c7a8c714": {
+   "id": "e6b212a6-4c49-4c2d-92e0-f275c7a8c714",
+   "type": "state",
+   "label": "Generating",
+   "x": 873.2533333333333,
+   "y": 120,
+   "width": 320,
+   "height": 220,
+   "collapsed": false,
+   "parentId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "kind": "normal"
+  },
+  "b2bb3490-6932-4840-954b-8fb603b9f2d1": {
+   "id": "b2bb3490-6932-4840-954b-8fb603b9f2d1",
+   "type": "pseudostate",
+   "label": "start",
+   "x": 30,
+   "y": 286.40000000000003,
+   "width": 36,
+   "height": 36,
+   "collapsed": false,
+   "parentId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "kind": "initial"
+  },
+  "554f5654-2141-4f3c-ac65-15c319776f35": {
+   "id": "554f5654-2141-4f3c-ac65-15c319776f35",
+   "type": "state",
+   "label": "Waiting for the user",
+   "x": 86,
+   "y": 194.40000000000003,
+   "width": 320,
+   "height": 220,
+   "collapsed": false,
+   "parentId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "kind": "normal"
+  },
+  "0c7320ff-82a9-441c-a268-4943e2848f84": {
+   "id": "0c7320ff-82a9-441c-a268-4943e2848f84",
+   "type": "event",
+   "label": "Client gone",
+   "x": 390,
+   "y": 187.79999999999998,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "b140b8c9-5989-44f1-a389-157107a29b01": {
+   "id": "b140b8c9-5989-44f1-a389-157107a29b01",
+   "type": "state",
+   "label": "Closed",
+   "x": 30,
+   "y": 187.79999999999998,
+   "width": 320,
+   "height": 220,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "kind": "final"
+  },
+  "ac88d41d-2dd6-427d-9ed5-fb3541100ebc": {
+   "id": "ac88d41d-2dd6-427d-9ed5-fb3541100ebc",
+   "type": "state",
+   "label": "Finished",
+   "x": 826,
+   "y": 192,
+   "width": 320,
+   "height": 220,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "kind": "final"
+  },
+  "74eb8423-2bd9-4aef-9e5c-bb7f7b1ccd4d": {
+   "id": "74eb8423-2bd9-4aef-9e5c-bb7f7b1ccd4d",
+   "type": "event",
+   "label": "forge_clarify",
+   "x": 1036,
+   "y": 120,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "e75c7208-e119-4ebd-95a8-0640072d8980": {
+   "id": "e75c7208-e119-4ebd-95a8-0640072d8980",
+   "type": "event",
+   "label": "forge_complete_stage",
+   "x": 1246,
+   "y": 187.79999999999998,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "3a88d0b1-67cd-4781-8b30-8afc2216e964": {
+   "id": "3a88d0b1-67cd-4781-8b30-8afc2216e964",
+   "type": "event",
+   "label": "forge_finish",
+   "x": 1456,
+   "y": 187.79999999999998,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "6a870be5-b9d9-449e-9384-e994d25f70e8": {
+   "id": "6a870be5-b9d9-449e-9384-e994d25f70e8",
+   "type": "event",
+   "label": "forge_generate",
+   "x": 1666,
+   "y": 187.79999999999998,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "9625b700-8584-475a-bc9b-b607c42d504d": {
+   "id": "9625b700-8584-475a-bc9b-b607c42d504d",
+   "type": "event",
+   "label": "forge_start",
+   "x": 1876,
+   "y": 187.79999999999998,
+   "width": 170,
+   "height": 52,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
+  },
+  "9a7e0e56-4010-447b-8ae4-59ea7507e676": {
+   "id": "9a7e0e56-4010-447b-8ae4-59ea7507e676",
+   "type": "pseudostate",
+   "label": "start",
+   "x": 750,
+   "y": 187.79999999999998,
+   "width": 36,
+   "height": 36,
+   "collapsed": false,
+   "parentId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "kind": "initial"
+  },
+  "cc7c679d-9419-422e-9747-cf061ba927b6": {
+   "id": "cc7c679d-9419-422e-9747-cf061ba927b6",
+   "type": "entity",
+   "label": "Forge run",
+   "x": 2136,
+   "y": 120,
+   "width": 170,
+   "height": 56,
+   "collapsed": false,
+   "parentId": "942e9364-a1a5-450b-a153-741fe9b42e48",
+   "kind": "aggregate-root"
+  }
+ },
+ "relations": {
+  "125e25b9-0e44-48de-8065-e8b0af4dba7b": {
+   "event": "6a870be5-b9d9-449e-9384-e994d25f70e8",
+   "id": "125e25b9-0e44-48de-8065-e8b0af4dba7b",
+   "relationType": "transition",
+   "sourceId": "99e6e487-841f-4780-8027-30efb1cb7b54",
+   "targetId": "e6b212a6-4c49-4c2d-92e0-f275c7a8c714"
+  },
+  "30d9e3bf-5af9-42e1-b441-e697eb27dbfa": {
+   "actions": "write the .feature files",
+   "event": "3a88d0b1-67cd-4781-8b30-8afc2216e964",
+   "id": "30d9e3bf-5af9-42e1-b441-e697eb27dbfa",
+   "relationType": "transition",
+   "sourceId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "targetId": "ac88d41d-2dd6-427d-9ed5-fb3541100ebc"
+  },
+  "5b17e6e7-fdac-463a-a49b-4e073efa6c0d": {
+   "actions": "write the stage into its view",
+   "event": "e75c7208-e119-4ebd-95a8-0640072d8980",
+   "id": "5b17e6e7-fdac-463a-a49b-4e073efa6c0d",
+   "relationType": "transition",
+   "sourceId": "e6b212a6-4c49-4c2d-92e0-f275c7a8c714",
+   "targetId": "554f5654-2141-4f3c-ac65-15c319776f35"
+  },
+  "6d5115a9-5af3-455d-b006-efb9ad084195": {
+   "event": "0c7320ff-82a9-441c-a268-4943e2848f84",
+   "id": "6d5115a9-5af3-455d-b006-efb9ad084195",
+   "relationType": "transition",
+   "sourceId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
+   "targetId": "b140b8c9-5989-44f1-a389-157107a29b01"
+  },
+  "9a2e0112-2648-4e15-bb96-f3971c95b57d": {
+   "event": "9625b700-8584-475a-bc9b-b607c42d504d",
+   "id": "9a2e0112-2648-4e15-bb96-f3971c95b57d",
+   "relationType": "transition",
+   "sourceId": "9a7e0e56-4010-447b-8ae4-59ea7507e676",
+   "targetId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49"
+  },
+  "a7a3185e-3331-42e8-a88f-4266c112cc96": {
+   "event": "74eb8423-2bd9-4aef-9e5c-bb7f7b1ccd4d",
+   "id": "a7a3185e-3331-42e8-a88f-4266c112cc96",
+   "relationType": "transition",
+   "sourceId": "554f5654-2141-4f3c-ac65-15c319776f35",
+   "targetId": "99e6e487-841f-4780-8027-30efb1cb7b54"
+  },
+  "b55ca9e4-e596-49a7-97aa-f5f9a47d3744": {
+   "id": "b55ca9e4-e596-49a7-97aa-f5f9a47d3744",
+   "relationType": "lifecycle-of",
+   "sourceId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+   "targetId": "cc7c679d-9419-422e-9747-cf061ba927b6"
+  },
+  "c781a060-b9a5-4b04-b79b-c942d3f9b566": {
+   "event": "6a870be5-b9d9-449e-9384-e994d25f70e8",
+   "id": "c781a060-b9a5-4b04-b79b-c942d3f9b566",
+   "relationType": "transition",
+   "sourceId": "554f5654-2141-4f3c-ac65-15c319776f35",
+   "targetId": "e6b212a6-4c49-4c2d-92e0-f275c7a8c714"
+  },
+  "ca442221-ae35-4e01-9cac-9f4bd7299b72": {
+   "id": "ca442221-ae35-4e01-9cac-9f4bd7299b72",
+   "relationType": "transition",
+   "sourceId": "b2bb3490-6932-4840-954b-8fb603b9f2d1",
+   "targetId": "554f5654-2141-4f3c-ac65-15c319776f35"
+  }
+ },
+ "alignments": [],
+ "frames": [
+  "942e9364-a1a5-450b-a153-741fe9b42e48",
+  "07ce7238-e6c9-4e78-b08c-514cca305bbd"
+ ],
+ "edgeStyle": "curved"
+}
