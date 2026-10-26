@@ -150,10 +150,20 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
       return next
     })
   }, [])
+  // Find in the view: the rows of the elements found stand out, the others
+  // are dimmed; Show all in a table keeps only them and the rows they are
+  // under.
+  const find = useDiagramStore((s) => (s.findInView?.query.trim() ? s.findInView : null))
+  const findHits = useMemo(() => (find ? new Set(find.hits) : null), [find])
   const rows = useMemo(() => {
     const folded = [...foldedRows]
-    return folded.length ? allRows.filter((row) => !folded.some((p) => row.path.startsWith(p + '/'))) : allRows
-  }, [allRows, foldedRows])
+    let shown = folded.length ? allRows.filter((row) => !folded.some((p) => row.path.startsWith(p + '/'))) : allRows
+    if (findHits && find?.only) {
+      const hitPaths = shown.filter((row) => findHits.has(row.node.id)).map((row) => row.path)
+      shown = shown.filter((row) => findHits.has(row.node.id) || hitPaths.some((p) => p.startsWith(row.path + '/')))
+    }
+    return shown
+  }, [allRows, foldedRows, findHits, find?.only])
 
   const typeName = (type: string) => metamodel.nodeTypes[type]?.label ?? TYPE_LABELS[type as C4ElementType] ?? type
 
@@ -409,7 +419,7 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
               <tr
                 key={line.row.path}
                 data-node-id={line.row.node.id}
-                className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}`}
+                className={`tv-row tv-chain-row depth-${Math.min(line.row.depth, 3)}${selectedNodeId === line.row.node.id ? ' tv-row-selected' : ''}${findHits ? (findHits.has(line.row.node.id) ? ' tv-row-found' : ' tv-row-dim') : ''}`}
                 tabIndex={-1}
                 onClick={(e) => { e.stopPropagation(); selectNode(line.row.node.id) }}
                 onDoubleClick={(e) => { e.stopPropagation(); openProperties(line.row.node.id) }}

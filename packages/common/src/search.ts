@@ -548,7 +548,7 @@ const quoted = (s: string): string => (/[\s"]/.test(s) ? `"${s.replace(/"/g, '')
 
 /** What may complete the last word typed: a prefix, a view for `in:`, a
  *  type for `type:`, a value of a property. Tab takes the first. */
-export function searchSuggestions(query: string, data: SearchData, limit = 6): SearchSuggestion[] {
+export function searchSuggestions(query: string, data: SearchData, limit = 8): SearchSuggestion[] {
   if (!query || /\s$/.test(query) || query.trimStart().startsWith('>')) return []
   const all = tokens(query)
   const last = all[all.length - 1]

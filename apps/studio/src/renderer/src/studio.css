@@ -2131,6 +2131,116 @@ div.milestone-option { cursor: default; }
   color: white;
   border-color: var(--accent);
 }
+/* ─── Quick search · sections, marks, suggestions ─────────────────── */
+/* The name first: the view chips give way to it. */
+.quick-search-item .quick-search-item-main { flex: 1 1 auto; min-width: 45%; }
+.quick-search-item .quick-search-views { flex-shrink: 1; min-width: 0; overflow: hidden; }
+.qs-section + .qs-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border-subtle, var(--border-color)); }
+.qs-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.qs-section-count { font-weight: 500; letter-spacing: 0; opacity: 0.8; }
+.qs-mark {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+}
+.quick-search-item-sub .qs-mark { font-weight: 600; }
+.qs-snippet-field { font-weight: 600; opacity: 0.85; }
+.qs-scope { padding: 4px 10px 2px; font-size: 11px; color: var(--text-muted); }
+.qs-scope strong { color: var(--text-primary); font-weight: 600; }
+.qs-item-action .quick-search-item-label { font-weight: 500; color: var(--accent); }
+.qs-kind-action, .qs-kind-recent, .qs-kind-command { background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.quick-search-kind-node[style] {
+  background: color-mix(in srgb, var(--type-color) 22%, transparent);
+  color: color-mix(in srgb, var(--type-color) 75%, var(--text-primary));
+}
+.quick-search-kind-folder, .quick-search-kind-sequence, .quick-search-kind-presentation, .quick-search-kind-slide, .quick-search-kind-milestone {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.qs-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle, var(--border-color));
+}
+.qs-suggest-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.qs-suggest-chip.first { border-color: var(--accent); }
+.qs-suggest-chip:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.qs-suggest-label { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; }
+.qs-suggest-hint { color: var(--text-muted); font-size: 10.5px; }
+.qs-suggest-tab { margin-left: auto; font-size: 10px; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; padding: 0 4px; }
+
+/* ─── Find in the view (⌘/Ctrl+F) ─────────────────────────────────── */
+.find-in-view {
+  grid-area: canvas;
+  justify-self: center;
+  align-self: start;
+  position: relative;
+  z-index: 9;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(420px, calc(100% - 32px));
+  padding: 4px 6px 4px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+.find-in-view input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 4px;
+}
+.find-in-view-count { font-size: 11px; color: var(--text-muted); white-space: nowrap; padding: 0 4px; font-variant-numeric: tabular-nums; }
+.find-in-view-count.none { color: #ef4444; }
+.find-in-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.find-in-view-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--text-primary) 10%, transparent); color: var(--text-primary); }
+.find-in-view-btn:disabled { opacity: 0.4; cursor: default; }
+.find-in-view-btn.active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+
 /* ─── Quick search · AI agent additions ───────────────────────────── */
 .quick-search-bar { width: var(--qs-w); left: var(--qs-x); }
 .quick-search-bar.ai-mode {

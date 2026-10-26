@@ -144,6 +144,16 @@ function uid(): string {
   return crypto.randomUUID()
 }
 
+/** Find in the view: see DiagramStore.findInView. */
+export interface FindInView {
+  query: string
+  hits: string[]
+  /** The hit stepped onto, -1 before the first step. */
+  index: number
+  /** A table shows only the hits and the rows they are under. */
+  only: boolean
+}
+
 // ─── Undo / Redo history ────────────────────────────────────────────────────
 
 interface HistoryEntry {
@@ -3474,6 +3484,12 @@ interface DiagramStore {
   selectionFocus: boolean
   /** Flips Focus and saves it to the studio settings. */
   toggleSelectionFocus: () => void
+  /** Find in the view (⌘/Ctrl+F): the words typed, the elements of the
+   *  view shown they find (in the view's order), the one stepped onto, and
+   *  whether a table shows only those. While it is open the canvas dims the
+   *  rest (canvasFocus.ts) and a table its other rows. null: closed. */
+  findInView: FindInView | null
+  setFindInView: (find: FindInView | null) => void
   zoomIn: () => void
   zoomOut: () => void
 
@@ -4363,6 +4379,7 @@ export const useDiagramStore = create<DiagramStore>()(
       connectionModifier: 'alt' as const,
       autoFitActive: loadStudioSettings().smartFit,
       selectionFocus: loadStudioSettings().selectionFocus,
+      findInView: null,
       canUndo: false,
       canRedo: false,
       snapshots: initSnapshots,
@@ -7527,6 +7544,10 @@ export const useDiagramStore = create<DiagramStore>()(
         if (moved) get()._markMilestoneEdit()
         if (moved) continuousKick()
         if (!landing) _dragLanded()
+      },
+
+      setFindInView(find) {
+        set((state) => { state.findInView = find })
       },
 
       toggleSelectionFocus() {

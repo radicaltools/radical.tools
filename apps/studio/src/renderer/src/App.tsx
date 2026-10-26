@@ -18,6 +18,8 @@ import { MilestoneChip } from '@radical/ui/components/MilestoneChip'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
 import { SelectionActionBar } from '@radical/ui/components/SelectionActions'
 import { QuickSearch } from './components/QuickSearch'
+import { FindInView } from './components/FindInView'
+import { useRegisterCommands } from './commands'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
@@ -92,6 +94,16 @@ function AppInner(): React.ReactElement {
   const toggleLeft = useCallback(() => {
     setLeftCollapsed((c) => { localStorage.setItem(LS_LEFT, c ? '0' : '1'); return !c })
   }, [])
+  // Something shown in the left panel (Quick Search's pick of a folder or
+  // a sequence) opens it when it is folded away.
+  useEffect(() => {
+    const show = (): void => setLeftCollapsed((c) => { if (c) localStorage.setItem(LS_LEFT, '0'); return false })
+    window.addEventListener('radical:show-left-panel', show)
+    return () => window.removeEventListener('radical:show-left-panel', show)
+  }, [])
+  useRegisterCommands('app', () => [
+    { id: 'panel.left', title: leftCollapsed ? 'Show the left panel' : 'Hide the left panel', group: 'Panels', run: toggleLeft, when: () => !['metamodel', 'inspector'].includes(useDiagramStore.getState().appMode) },
+  ], [leftCollapsed, toggleLeft])
   // Run Radical layout automatically on first load — but only when nodes have
   // no saved positions yet (all at origin). Skip if positions were loaded from file.
   useEffect(() => {
@@ -134,6 +146,7 @@ function AppInner(): React.ReactElement {
       <PresentationBar />
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
       {!isInspector && <QuickSearch />}
+      {!isPresenting && !isInspector && !isMetamodel && <FindInView />}
       {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />

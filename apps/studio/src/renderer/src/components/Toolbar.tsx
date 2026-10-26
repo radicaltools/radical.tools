@@ -8,7 +8,9 @@ import { BranchChangesButton } from './BranchChanges'
 import { NavHistory } from './NavHistory'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
-import { dropPendingMode, useShownMode } from '../route'
+import { dropPendingMode, placeGone, useShownMode } from '../route'
+import { useRegisterCommands } from '../commands'
+import { goBack, goForward } from '../navHistory'
 import { DocumentManagerModal } from './DocumentManager'
 import { AISettingsModal } from './AISettingsModal'
 import { AboutDialog } from './AboutDialog'
@@ -896,6 +898,36 @@ export function Toolbar(): React.ReactElement {
 
   const bar = useRef<HTMLDivElement>(null)
   const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
+
+  // The toolbar's and the rail's actions, for `>` in Quick Search.
+  useRegisterCommands('toolbar', () => {
+    const state = () => useDiagramStore.getState()
+    const mode = (m: Parameters<typeof setAppMode>[0], title: string) => ({
+      id: `mode.${m}`, title, group: 'Perspective', run: () => setAppMode(m), when: () => state().appMode !== m,
+    })
+    return [
+      mode('designer', 'Designer: edit the model'),
+      mode('viewer', 'Viewer: explore the model'),
+      mode('presenter', 'Presenter: build and play presentations'),
+      mode('inspector', 'Inspector: model quality and changes'),
+      mode('metamodel', 'Metamodel editor'),
+      { id: 'edit.undo', title: 'Undo', group: 'Edit', keys: '⌘Z', run: () => state().undo(), when: () => state().appMode === 'designer' && state().canUndo },
+      { id: 'edit.redo', title: 'Redo', group: 'Edit', keys: '⌘⇧Z', run: () => state().redo(), when: () => state().appMode === 'designer' && state().canRedo },
+      { id: 'nav.back', title: 'Go back', group: 'Navigate', keys: 'Alt+←', run: () => goBack(placeGone) },
+      { id: 'nav.forward', title: 'Go forward', group: 'Navigate', keys: 'Alt+→', run: () => goForward(placeGone) },
+      { id: 'present.start', title: 'Start presentation', group: 'Present', keys: 'F5', run: () => state().startPresentation(), when: () => state().presentationSlides.length > 0 },
+      { id: 'models.manage', title: 'Models…', group: 'Models', run: handleManage },
+      { id: 'hub.open', title: 'Import from Radical Hub…', group: 'Models', run: handleOpenHub, when: () => state().appMode === 'designer' },
+      { id: 'forge.open', title: 'Radical Forge: generate a model from a description', group: 'AI', run: handleOpenForge, when: () => aiReady(loadAISettings()) },
+      { id: 'ai.settings', title: 'AI providers…', group: 'AI', run: handleOpenAISettings },
+      { id: 'export.png', title: 'Export as PNG', group: 'Export', run: handleExportPNG },
+      { id: 'export.svg', title: 'Export as SVG', group: 'Export', run: handleExportSVG },
+      { id: 'export.copy', title: 'Copy image to clipboard', group: 'Export', run: () => { void copyToClipboard() } },
+      { id: 'settings.theme', title: theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme', group: 'Settings', run: toggleTheme, when: () => !isVSCode },
+      { id: 'settings.smartFit', title: autoFitActive ? 'Smart fit: turn off' : 'Smart fit: turn on', group: 'Settings', run: toggleAutoFit },
+      { id: 'about', title: 'About Radical Studio', group: 'Help', run: handleOpenAbout },
+    ]
+  }, [theme, autoFitActive, setAppMode, handleManage, handleOpenHub, handleOpenForge, handleOpenAISettings, handleExportPNG, handleExportSVG, copyToClipboard, toggleTheme, toggleAutoFit, handleOpenAbout, isVSCode])
 
   return (
     <div className={`toolbar${compact ? ' compact' : ''}`} ref={bar}>

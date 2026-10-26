@@ -18,6 +18,8 @@ interface FocusState {
   selectionFocus?: boolean
   /** An export is being drawn: it shows the diagram, nothing dimmed. */
   drawnForExport?: boolean
+  /** Find in the view: its hits are what stays, whatever Focus says. */
+  findInView?: { query: string; hits: readonly string[] } | null
 }
 
 export interface CanvasFocus {
@@ -83,30 +85,60 @@ export function canvasFocus(
   return { nodes: focusNodes, edges: focusEdges, frame }
 }
 
+/** The focus of find in the view: its hits, and the containers they are
+ *  in, as they are; the lines between two hits; the rest dimmed. The camera
+ *  frames the hit selected, or all of them before a step. */
+export function findFocus(nodes: readonly Node[], edges: readonly Edge[], hits: readonly string[], selectedNodeIds: readonly string[]): CanvasFocus {
+  const byId = new Map(nodes.filter((n) => !n.hidden).map((n) => [n.id, n]))
+  const all = new Map(nodes.map((n) => [n.id, n]))
+  const found = new Set<string>()
+  for (const id of hits) {
+    // A hit inside a folded container: the container stands for it.
+    let at: Node | undefined = all.get(id)
+    while (at && !byId.has(at.id)) at = at.parentNode ? all.get(at.parentNode) : undefined
+    if (at) found.add(at.id)
+  }
+  const focusNodes = new Set(found)
+  for (const id of found) {
+    for (let p = byId.get(id)?.parentNode; p && !focusNodes.has(p); p = byId.get(p)?.parentNode) focusNodes.add(p)
+  }
+  const focusEdges = new Set<string>()
+  for (const e of edges) if (!e.hidden && found.has(e.source) && found.has(e.target)) focusEdges.add(e.id)
+  const selected = selectedNodeIds.filter((id) => found.has(id))
+  return { nodes: focusNodes, edges: focusEdges, frame: new Set(selected.length ? selected : found) }
+}
+
 let last: {
   nodes: readonly Node[]
   edges: readonly Edge[]
   selectedNodeIds: readonly string[]
   selectedEdgeId: string | null
+  find: FocusState['findInView']
   focus: CanvasFocus | null
 } | null = null
 
 /** The focus of the canvas now, computed once per change of what it reads. */
 export function selectCanvasFocus(s: FocusState): CanvasFocus | null {
-  if (s.selectionFocus === false || s.drawnForExport) return null
+  if (s.drawnForExport) return null
+  const find = s.findInView?.query.trim() ? s.findInView : null
+  if (!find && s.selectionFocus === false) return null
   if (
     !last ||
     last.nodes !== s.rfNodes ||
     last.edges !== s.rfEdges ||
     last.selectedNodeIds !== s.selectedNodeIds ||
-    last.selectedEdgeId !== s.selectedEdgeId
+    last.selectedEdgeId !== s.selectedEdgeId ||
+    last.find !== find
   ) {
     last = {
       nodes: s.rfNodes,
       edges: s.rfEdges,
       selectedNodeIds: s.selectedNodeIds,
       selectedEdgeId: s.selectedEdgeId,
-      focus: canvasFocus(s.rfNodes, s.rfEdges, s.selectedNodeIds, s.selectedEdgeId),
+      find,
+      focus: find
+        ? findFocus(s.rfNodes, s.rfEdges, find.hits, s.selectedNodeIds)
+        : canvasFocus(s.rfNodes, s.rfEdges, s.selectedNodeIds, s.selectedEdgeId),
     }
   }
   return last.focus
