@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, RELATION_LABEL_BOX, type LabelEdge, type RelationLabelText } from '../src/edgeLabels'
+import { estimateLabelSize, labelOverlaps, placeEdgeLabels, relationLabelLines, relationLabelSize, RELATION_LABEL_BOX, type LabelEdge, type RelationLabelText } from '../src/edgeLabels'
 import type { C4Node } from '@radical/common/c4'
 import { computeRoutedEdge, type RoutingObstacle } from '../src/edgeRouting'
 import { Position } from '../src/side'
@@ -20,6 +20,29 @@ describe('estimateLabelSize', () => {
     expect(long.w).toBeLessThanOrEqual(200)
     expect(long.h).toBeGreaterThan(2 * short.h)
     expect(withTech.h).toBeCloseTo(short.h + 14 * 1.4)
+  })
+})
+
+describe('relationLabelSize', () => {
+  it('sizes a label as the canvas draws it: one row while the name fits, the full width once it wraps', () => {
+    // Drawn by Chromium on macOS (the system UI font) in the sample's System
+    // Context view. The label box is as wide as its widest line until a line
+    // wraps, then as wide as it may be. 'Identity & AML screening' was taken
+    // for 108x50, its name on two rows, while it was drawn 156x35 on one.
+    const drawn: [RelationLabelText, number, number][] = [
+      [{ label: 'Identity & AML screening', technology: 'REST / JSON' }, 156, 35],
+      [{ label: 'Bulk payments & treasury', technology: 'HTTPS / Browser' }, 159, 35],
+      [{ label: 'Views accounts & transfers', technology: 'HTTPS / Browser' }, 160, 50],
+      [{ label: 'Works fraud cases & supports customers', technology: 'HTTPS / SSO' }, 160, 50],
+      [{ label: 'Card authorisation', technology: 'ISO 8583' }, 118, 35],
+      [{ label: 'Sends wire transfers', technology: 'SWIFT MT103' }, 130, 35],
+      [{ label: 'Admin API calls\nAPI calls\nAPI calls' }, 101, 53],
+    ]
+    for (const [r, w, h] of drawn) {
+      const size = relationLabelSize(r)!
+      expect(Math.abs(size.w - w), `${r.label}: ${size.w} wide, drawn ${w}`).toBeLessThanOrEqual(3)
+      expect(Math.abs(size.h - h), `${r.label}: ${size.h} high, drawn ${h}`).toBeLessThanOrEqual(1)
+    }
   })
 })
 
