@@ -129,13 +129,16 @@ export function runTidyLayout(
   // puts persons on top, outside systems at the edge, frames as blocks and
   // their children in layers by flow. The moves then start from a sketch
   // instead of tidying a pile one element at a time (which a person would
-  // not do either). Not round a selection, nor with pins to keep.
-  const piled = l.ids().filter((id) => l.overlaps(id)).length
+  // not do either). Not round a selection, nor with pins to keep. A large
+  // view still tangled after a run is not sketched again unless the sketch
+  // reads better: another run continues from the canvas.
+  const piled = l.ids().filter((id) => l.overlaps(id)).length > PILE_SHARE * l.ids().length
   const tangled = lines.length > 0 && (before.crossings + before.overdraws) > ROUGH_WHEN_TANGLED * lines.length
-  if (!options.around?.length && !pinned.length && (piled > PILE_SHARE * l.ids().length || (l.ids().length > ROUGH_FROM && tangled))) {
+  if (!options.around?.length && !pinned.length && (piled || (l.ids().length > ROUGH_FROM && tangled))) {
     const wasPositions = l.positions()
     l.setPositions(applyRadicalLayout(nodes, relations))
     l.refit()
+    if (!piled && totalCost(l, lines).total >= before.total) l.setPositions(wasPositions)
     const now = l.positions()
     const moved: PositionMap = {}
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
