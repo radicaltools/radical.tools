@@ -17,6 +17,9 @@ import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radic
 import { FolderModel } from './folderModel'
 import { drawnSize } from '@radical/layout/geometry'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
+import { documentMetamodel } from '@radical/common/model'
+import { TIDY_BUDGET, costRows, formatPart, runTidyLayout } from '@radical/layout/tidy'
+import { viewLayoutInput } from '@radical/layout/viewInput'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -636,6 +639,68 @@ describe('long Smart Layout runs', () => {
     expect(whole.text).toContain('Unpinned 2 elements')
     after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
     expect(after.defaultLayoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
+  it('gives a large view the layout Studio gives it, within Studio\'s budget (F-0080)', async () => {
+    // 200 systems on a grid, linked across it: Tidy needs more than one
+    // run's budget. It ran with no budget (minutes on the sample's whole
+    // model) and handed over another layout than Studio's.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const count = 200
+    data.nodes = Array.from({ length: count }, (_, i) => ({ id: `n${i}`, type: 'system', label: `N${i}`, x: (i % 10) * 400, y: Math.floor(i / 10) * 300, width: 240, height: 160, collapsed: false }))
+    data.relations = Array.from({ length: count - 1 }, (_, k) => ({ id: `r${k + 1}`, sourceId: `n${((k + 1) * 7) % count}`, targetId: `n${k + 1}`, relationType: 'interacts' }))
+    data.views = [{ id: 'v', name: 'Whole', nodeIds: [], positions: Object.fromEntries(data.nodes.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }])) } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    // What Studio's Smart Layout hands over on the same canvas.
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const view = saved.views!.find((v) => v.id === 'v')!
+    const nodes = Object.fromEntries(saved.nodes.map((n) => [n.id, { ...n, ...view.positions[n.id] }]))
+    const input = viewLayoutInput(view, nodes, Object.fromEntries(saved.relations.map((r) => [r.id, r])), view.layoutConstraints)
+    const studio = runTidyLayout(input.nodes, input.relations, {
+      alignments: input.alignments, edgeStyle: 'curved', metamodel: documentMetamodel(saved.metamodel, saved.nodes), pinned: [], budget: TIDY_BUDGET, frames: [...input.frames],
+    })
+    expect(studio.tidy.budgetOut).toBe(true)
+
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { viewId: 'v' })
+    expect(outcome.ok, outcome.text).toBe(true)
+    expect(outcome.text).toContain('run it again for more')
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const positions = after.views!.find((v) => v.id === 'v')!.positions
+    const apart = Object.keys(positions).filter((id) => Math.hypot(positions[id].x - studio.winner.positions[id].x, positions[id].y - studio.winner.positions[id].y) > 1)
+    expect(apart).toEqual([])
+  }, 180_000)
+
+  it('tells the agent the numbers Studio shows for the same layout (F-0082)', async () => {
+    // Four in a row above four below, the top row in reverse order. It
+    // reported other counts of the same layout ('crossings 76 -> 75' where
+    // Studio said 'crossings 44 → 21'): Studio reports Tidy's cost parts.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      ...[0, 1, 2, 3].map((i) => ({ id: `t${i}`, type: 'system', label: `T${i}`, x: i * 400, y: 0, width: 240, height: 160, collapsed: false })),
+      ...[0, 1, 2, 3].map((i) => ({ id: `b${i}`, type: 'system', label: `B${i}`, x: i * 400, y: 500, width: 240, height: 160, collapsed: false })),
+    ] as never
+    data.relations = [0, 1, 2, 3].map((i) => ({ id: `r${i}`, sourceId: `t${3 - i}`, targetId: `b${i}`, relationType: 'interacts' }))
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const input = viewLayoutInput(undefined, Object.fromEntries(saved.nodes.map((n) => [n.id, n])), Object.fromEntries(saved.relations.map((r) => [r.id, r])), saved.defaultLayoutConstraints)
+    const { tidy } = runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle: 'curved', metamodel: documentMetamodel(saved.metamodel, saved.nodes), pinned: [], frames: [...input.frames] })
+    const crossings = costRows(tidy.before, tidy.after).find((p) => p.key === 'crossings')!
+    expect(crossings.before).toBeGreaterThan(crossings.after)
+
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', {})
+    expect(outcome.ok, outcome.text).toBe(true)
+    expect(outcome.text).toContain(`${tidy.steps.length} move${tidy.steps.length === 1 ? '' : 's'}`)
+    expect(outcome.text).toContain(`crossings ${formatPart(crossings.before)}\u2009→\u2009${formatPart(crossings.after)}`)
   }, 60_000)
 
   it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {

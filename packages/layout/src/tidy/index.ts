@@ -17,7 +17,7 @@ import { type Alignment, enforceAlignments } from '../constraints'
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
-import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
+import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, costRows, formatPart, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
 import { candidateMoves, compactMoves, gatherMoves, untangleMoves, type Move } from './moves'
 export { type CostParts, PART_LABELS, costRows, formatPart } from './cost'
 
@@ -36,8 +36,10 @@ export interface TidyReport {
   after: CostParts
   /** True when no move helped: the canvas was left as it was. */
   unchanged: boolean
-  /** True when the time budget (or a stop) ended the tidying before it was done. */
+  /** True when the budget (or a stop) ended the tidying before it was done. */
   budgetOut: boolean
+  /** The work done, as a budget counts it. */
+  work: number
 }
 
 export interface TidyLayoutResult extends SmartLayoutResult {
@@ -61,11 +63,18 @@ export interface TidyOptions {
   onProgress?: (done: number, description: string) => void
   /** Asked before each round: true stops the tidying with what was done. */
   shouldStop?: () => boolean
-  /** Stop after this many milliseconds, with what was done. */
-  budgetMs?: number
+  /** Stop after this much work, with what was done. Work is moves judged, each
+   *  counted as many times as the view has elements (judging one takes longer on
+   *  a larger view); not time, so a view gets the same layout on any machine. */
+  budget?: number
 }
 
 export const TIDY_NAME = 'Tidy'
+/** The budget Studio and the MCP server give a run (TidyOptions.budget): on the
+ *  sample's whole-model view (283 elements, 10 000 moves judged) about 770 moves,
+ *  some ten seconds in a browser; a view of 30 elements is tidied to the end.
+ *  A view that needs more is tidied again. */
+export const TIDY_BUDGET = 2_830_000
 const MAX_STEPS = 400
 /** Two moves ahead: this many of the best rejected moves are tried, those within this much of paying off. */
 const LOOKAHEAD_WIDTH = 6
@@ -98,8 +107,8 @@ export function runTidyLayout(
   const style = options.edgeStyle ?? 'curved'
   const { nodes, relations } = projectToVisibleGraph(inputNodes, inputRelations)
   const baseline = computeLayoutMetrics(nodes, relations)
-  const started = Date.now()
-  const outOfTime = (): boolean => (options.budgetMs !== undefined && Date.now() - started > options.budgetMs) || !!options.shouldStop?.()
+  let work = 0
+  const outOfTime = (): boolean => (options.budget !== undefined && work >= options.budget) || !!options.shouldStop?.()
   // Round a few elements: everything else is as good as pinned, but the
   // frames holding what moves still follow it.
   let pinned = options.pinned ?? []
@@ -117,6 +126,7 @@ export function runTidyLayout(
   }
   const l = new Layout(nodes, options.metamodel, pinned, options.frames)
   l.edgeStyle = style
+  const judgementWork = l.ids().length
   const lines = linesOf(l, relations)
   const before = totalCost(l, lines)
   const steps: TidyStep[] = []
@@ -207,6 +217,7 @@ export function runTidyLayout(
     }
   }
   const judge = (move: Move): { gain: number; after: Map<string, Box> | null } => {
+    work += judgementWork
     const moved = new Set(move.ids)
     // Tried first, to know what it changes: the cost before and after is
     // then judged on the same elements (the room round where the moved
@@ -449,8 +460,20 @@ export function runTidyLayout(
     planarity: computePlanarityScore(projected, relations),
     refinement: { before: before.total, after: after.total, iterations: steps.length },
     keptCurrent: steps.length === 0,
-    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime() },
+    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime(), work },
   }
+}
+
+/** What a run did, as Studio's notice and the MCP server's smart_layout tell it: the
+ *  moves, and the three parts of the reader's cost that gained most. */
+export function tidySummary(tidy: TidyReport): string {
+  const arrow = '\u2009\u2192\u2009'
+  const gained = costRows(tidy.before, tidy.after)
+    .sort((p, q) => (q.before - q.after) * q.weight - (p.before - p.after) * p.weight)
+    .filter((p) => p.before - p.after > 0.05).slice(0, 3)
+    .map((p) => `${p.label.toLowerCase()} ${formatPart(p.before)}${arrow}${formatPart(p.after)}`)
+  const n = tidy.steps.length
+  return `${n} move${n === 1 ? '' : 's'}${tidy.budgetOut ? ' (run it again for more)' : ''}${gained.length ? ` — ${gained.join(', ')}` : ''}`
 }
 
 function ancestors(l: Layout, id: string): string[] {
