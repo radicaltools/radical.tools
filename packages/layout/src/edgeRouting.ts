@@ -402,17 +402,20 @@ function bezierHitsObstacles(
  *  `keepOuts` (the blocks behind the ends' sides) are blocked unpadded: the
  *  exit cells lie EXIT_DIST out, and a keep-out padded by OBS_PAD reached the
  *  exit's neighbours on some grid offsets, walling it in, so no route was
- *  found and the line went straight over the nodes in its way. */
+ *  found and the line went straight over the nodes in its way. `ends` (the
+ *  boxes of the joined elements) block only the grid points inside them, so
+ *  that the cells round an exit stay open whatever the grid's offset. */
 function routeAround(
   s: Pt, sSide: Position, t: Pt, tSide: Position,
   obstacles: RoutingObstacle[],
   keepOuts: RoutingObstacle[] = [],
+  ends: RoutingObstacle[] = [],
 ): Pt[] | null {
   // Build a bounding box that contains all obstacles + endpoints + margin.
   const margin = OBS_PAD * 2 + EXIT_DIST * 2
   let minX = Math.min(s.x, t.x), minY = Math.min(s.y, t.y)
   let maxX = Math.max(s.x, t.x), maxY = Math.max(s.y, t.y)
-  for (const o of [...obstacles, ...keepOuts]) {
+  for (const o of [...obstacles, ...keepOuts, ...ends]) {
     if (o.x - OBS_PAD < minX) minX = o.x - OBS_PAD
     if (o.y - OBS_PAD < minY) minY = o.y - OBS_PAD
     if (o.x + o.w + OBS_PAD > maxX) maxX = o.x + o.w + OBS_PAD
@@ -438,6 +441,13 @@ function routeAround(
   }
   for (const o of obstacles) block(o, OBS_PAD)
   for (const o of keepOuts) block(o, 0)
+  for (const o of ends) {
+    const c0 = Math.max(0, Math.ceil((o.x - minX) / CELL)), c1 = Math.min(cols - 1, Math.floor((o.x + o.w - minX) / CELL))
+    const r0 = Math.max(0, Math.ceil((o.y - minY) / CELL)), r1 = Math.min(rows - 1, Math.floor((o.y + o.h - minY) / CELL))
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) blocked[r * cols + c] = 1
+    }
+  }
 
   // Compute grid entry/exit points (one cell off the border, along the side normal).
   const sExit = extendPt(s.x, s.y, sSide, EXIT_DIST)
@@ -589,6 +599,14 @@ function curveThrough(s: Pt, sSide: Position, t: Pt, tSide: Position, route: Pt[
   return { path, points }
 }
 
+/** The ends' boxes an edge from `s` to `t` keeps out of: not one that holds
+ *  the other end's port (a relation to an element inside it, or to one it
+ *  overlaps), which the edge has to cross. */
+function endBlocks(s: Pt, t: Pt, ends: RoutingObstacle[]): RoutingObstacle[] {
+  const inside = (p: Pt, o: RoutingObstacle) => p.x > o.x + 1 && p.x < o.x + o.w - 1 && p.y > o.y + 1 && p.y < o.y + o.h - 1
+  return ends.filter((o) => o.w > 0 && o.h > 0 && !inside(s, o) && !inside(t, o))
+}
+
 /** A block behind the side at `p`, inside the node the side belongs to. */
 function keepOut(p: Pt, side: Position): RoutingObstacle {
   const depth = 60, half = 40
@@ -630,22 +648,29 @@ export interface RoutedEdge {
 /** `obstacles` are tested against the direct curve; when it hits one, the
  *  edge is routed around `allObstacles()` (default: the same list). Callers
  *  with many nodes pass only those inside directCurveBox as `obstacles`, or
- *  an ObstacleSet answering point queries from a spatial index. */
+ *  an ObstacleSet answering point queries from a spatial index. `ends` are
+ *  the boxes of the elements the edge joins: it enters them only at its
+ *  ports (see endBlocks). */
 export function computeRoutedEdge(
   sx: number, sy: number, srcSide: Position,
   tx: number, ty: number, tgtSide: Position,
   obstacles: RoutingObstacle[] | ObstacleSet,
   allObstacles?: () => RoutingObstacle[],
   style: EdgeStyle = 'curved',
+  ends: RoutingObstacle[] = [],
 ): RoutedEdge {
   const s = { x: sx, y: sy }
   const t = { x: tx, y: ty }
   const { c1, c2 } = bezierControlPoints(s, srcSide, t, tgtSide)
   const direct = style === 'orthogonal' ? orthogonalConnector(s, srcSide, t, tgtSide) : null
+  const own = endBlocks(s, t, ends)
 
   // The direct line (the Bézier, or the Z / L connector) when no node is in
-  // its way; the route around them otherwise, drawn in the same style.
-  const hits = direct ? polylineHitsObstacles(direct, obstacles, HIT_PAD) : bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD)
+  // its way and it keeps out of its own ends; the route around them
+  // otherwise, drawn in the same style.
+  const hits = direct
+    ? polylineHitsObstacles(direct, obstacles, HIT_PAD) || polylineHitsObstacles(direct, own, 0)
+    : bezierHitsObstacles(s, c1, c2, t, obstacles, HIT_PAD) || bezierHitsObstacles(s, c1, c2, t, own, 0)
   const plain = (): RoutedEdge => direct ? orthogonalEdge(direct) : bezierEdge(s, c1, c2, t, srcSide, tgtSide)
   if (!hits) return plain()
 
@@ -654,14 +679,19 @@ export function computeRoutedEdge(
   const set = Array.isArray(obstacles) ? null : obstacles
   const hopeless = !allObstacles && !!set?.bounds && routingCells(s, t, set.bounds()) > MAX_ROUTING_CELLS
   const all = hopeless ? [] : allObstacles ? allObstacles() : set ? set.all() : obstacles as RoutingObstacle[]
-  // The nodes the relation joins are not obstacles, so the route could run
-  // through one of them and reach its side from behind; a keep-out block
-  // behind each side makes it come in from the front.
-  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, all, [keepOut(s, srcSide), keepOut(t, tgtSide)])
+  // The nodes the relation joins are not obstacles (it ends on their
+  // borders), so the route could run through one of them and reach its side
+  // from behind: their boxes are blocked, and a keep-out block behind each
+  // side makes it come in from the front when the boxes are not known. When
+  // no route keeps out of the ends, the one that only keeps out of the
+  // keep-outs.
+  const keepOuts = [keepOut(s, srcSide), keepOut(t, tgtSide)]
+  const outside = hopeless || own.length === 0 ? null : routeAround(s, srcSide, t, tgtSide, all, keepOuts, own)
+  const polyline = outside ?? (hopeless ? null : routeAround(s, srcSide, t, tgtSide, all, keepOuts))
   // Routing failed (grid too big, or unreachable) — the direct line.
   if (!polyline || polyline.length < 2) return plain()
   if (style === 'orthogonal') return orthogonalEdge(polyline)
-  const curve = curveThrough(s, srcSide, t, tgtSide, polyline, all)
+  const curve = curveThrough(s, srcSide, t, tgtSide, polyline, outside ? [...all, ...own] : all)
   const mid = polyMidpoint(curve.points)
   return { path: curve.path, labelX: mid.x, labelY: mid.y, points: curve.points }
 }

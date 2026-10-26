@@ -376,14 +376,16 @@ export function routeMetamodelEdges(graph: MetamodelGraph, positions: Record<str
     if (!a) continue
     // Only type boxes are obstacles; edges cross category frames freely.
     const obstacles: RoutingObstacle[] = []
+    const ends: RoutingObstacle[] = []
     for (const v of views.values()) {
-      if (v.id === e.source || v.id === e.target) continue
-      obstacles.push({ x: v.positionAbsolute.x, y: v.positionAbsolute.y, w: v.width, h: v.height })
+      const box = { x: v.positionAbsolute.x, y: v.positionAbsolute.y, w: v.width, h: v.height }
+      if (v.id === e.source || v.id === e.target) ends.push(box)
+      else obstacles.push(box)
     }
     const r = computeRoutedEdge(
       a.sourcePoint.x, a.sourcePoint.y, a.sourceSide,
       a.targetPoint.x, a.targetPoint.y, a.targetSide,
-      obstacles,
+      obstacles, undefined, 'curved', ends,
     )
     routes[e.id] = {
       path: r.path,

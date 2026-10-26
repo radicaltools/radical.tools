@@ -163,4 +163,36 @@ describe('routes around nodes', () => {
       }
     }
   })
+
+  it('never runs through its own ends: a line enters the elements it joins only at its ports', () => {
+    // The sample's Authorization view: "Denied by default" (right side) to
+    // the left side of "Everyone sees only theirs", with no way in from the
+    // left past the card beside it. Only the keep-out behind the port kept
+    // the route out of its end, so it ran down through the rest of the card
+    // and came back into its left side from below.
+    const source = { x: 861.5, y: 505.2, w: 200, h: 80 }
+    const target = { x: 1496.3, y: 890.7, w: 200, h: 80 }
+    const scene: Rect[] = [
+      { x: 457.2, y: 804.1, w: 280, h: 180 }, { x: 1104.8, y: 918.6, w: 200, h: 80 }, { x: 1252.5, y: 797.6, w: 200, h: 80 },
+      { x: 1131.4, y: 563.7, w: 200, h: 80 }, { x: 451.9, y: 114.6, w: 200, h: 80 }, { x: 885.5, y: 785.2, w: 200, h: 80 },
+      { x: 471.7, y: 1047.2, w: 200, h: 80 }, { x: 767, y: 1317.5, w: 200, h: 80 }, { x: 1039.5, y: 1259.9, w: 200, h: 80 },
+      { x: 977.9, y: 1531.2, w: 200, h: 80 }, { x: 480.8, y: 656.6, w: 180, h: 52 }, { x: 1019.7, y: 211.3, w: 200, h: 80 },
+      { x: 348.7, y: 477.4, w: 200, h: 80 }, { x: 981.2, y: 1045.1, w: 200, h: 80 }, { x: 1162.1, y: 334.3, w: 200, h: 80 },
+    ]
+    for (const style of ['orthogonal', 'curved'] as const) {
+      for (let shift = 0; shift < 15; shift++) {
+        const far = { x: 0 - shift, y: 0 - shift, w: 60, h: 40 }
+        const r = computeRoutedEdge(1061.5, 545.2, Position.Right, 1496.3, 906.7, Position.Left, [...scene, far], undefined, style, [source, target])
+        for (const end of [source, target]) {
+          const core = { x: end.x + 4, y: end.y + 4, w: end.w - 8, h: end.h - 8 }
+          expect(through(r.points, core), `${style}, grid shifted ${shift} px`).toBe(false)
+        }
+        // And still around the others.
+        for (const o of scene) {
+          const core = { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 }
+          expect(through(r.points, core), `${style}, grid shifted ${shift} px`).toBe(false)
+        }
+      }
+    }
+  })
 })
