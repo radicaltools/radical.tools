@@ -1262,6 +1262,9 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // In Viewer and Presenter: the element pressed with the key, which a
   // release on it adds to the selection or takes out.
   const selectOnlyRef = useRef<string | null>(null)
+  // There, a frame pressed with the key: a drag from it draws a box over
+  // what it holds, as one from the empty canvas does (where it starts).
+  const boxFromRef = useRef<{ x: number; y: number } | null>(null)
   const [connectMouse, setConnectMouse] = useState<{ x: number; y: number } | null>(null)
   // The element the line is drawn over: its panel of relation types shows.
   const [connectOver, setConnectOver] = useState<string | null>(null)
@@ -1298,13 +1301,26 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       // Viewer and Presenter do not edit: the key only adds the element to
       // the selection or takes it out (no line, no pills, no relation or
       // nesting, which were shown there and lost on the way back).
-      if (!editsModel(state)) { selectOnlyRef.current = nodeId; return }
+      if (!editsModel(state)) {
+        selectOnlyRef.current = nodeId
+        if ((e.target as HTMLElement).closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
+        return
+      }
       state.startConnection(nodeId)
       connectingRef.current = true
       setConnectMouse({ x: e.clientX, y: e.clientY })
     }
 
     const onMouseMove = (e: MouseEvent) => {
+      // Drawn on from a frame in Viewer or Presenter: React Flow's box
+      // starts on the empty canvas only, so it is started there, at the
+      // press, and the release is no click on the frame.
+      const from = boxFromRef.current
+      if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) {
+        boxFromRef.current = null
+        selectOnlyRef.current = null
+        el.querySelector('.react-flow__pane')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: from.x, clientY: from.y, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }))
+      }
       if (!connectingRef.current) return
       setConnectMouse({ x: e.clientX, y: e.clientY })
       // Over the panel the element stays the one it stands over.
@@ -1316,6 +1332,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     const onMouseUp = (e: MouseEvent) => {
       const pressed = selectOnlyRef.current
       selectOnlyRef.current = null
+      boxFromRef.current = null
       if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
         const ids = useDiagramStore.getState().selectedNodeIds
         useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
