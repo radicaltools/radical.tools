@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { DiagramView, PresentationSlide } from '@radical/common/c4'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
+import { keepKeysHere } from '@radical/ui/components/keysHere'
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
 
@@ -195,7 +196,7 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
             onKeyDown={e => {
               if (e.key === 'Enter') commitRename()
               if (e.key === 'Escape') { setDraftName(slide.name); setEditing(false) }
-              e.stopPropagation()
+              keepKeysHere(e)
             }}
             onClick={e => e.stopPropagation()} />
         ) : (

@@ -577,6 +577,17 @@ function typingInTextField(target: EventTarget | null): boolean {
   return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
 }
 
+/** Before a presentation starts from F5, the focus leaves what has it, as a
+ *  click elsewhere would take it: a name being typed (the table's F2, a
+ *  Warnier step, a slide's name, the card) is committed on that blur, and a
+ *  menu that closes when it loses the focus closes. The presentation took the
+ *  field away with no blur, and the typed name was lost; a menu stayed over
+ *  the slide with the keys. */
+function letGoOfFocus(): void {
+  const el = document.activeElement
+  if (el instanceof HTMLElement && el !== document.body) el.blur()
+}
+
 /** The Inspector perspective, with how many errors and warnings the check
  *  finds in the model now. Greyed out while the model has no report of
  *  `radical check --report` beside it: there is nothing to inspect yet. */
@@ -741,7 +752,10 @@ export function Toolbar(): React.ReactElement {
         if (keysTakenByDialog(e.target)) return
         const state = useDiagramStore.getState()
         if (state.presentationActive) state.stopPresentation()
-        else state.startPresentation()
+        else {
+          if (state.presentationSlides.length > 0) letGoOfFocus()
+          state.startPresentation()
+        }
         return
       }
       const mod = e.metaKey || e.ctrlKey
