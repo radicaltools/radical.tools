@@ -46,10 +46,13 @@ const EXPORT_TARGETS = '.canvas-area, .wiki-view, .tv-wrap, .mx-wrap, .treemap-w
 /** Parts of a view that are there to edit it, not what it shows: the
  *  wiki's page mode, add, edit and writing lines and its search box, the
  *  table's add buttons, the hierarchy's Size by and Levels, the Warnier
- *  view's step buttons. An export showed them. */
+ *  view's step buttons; on the canvas, the discussion icons beside the
+ *  elements, an exploration's bar and the + and − of its elements, and the
+ *  menus and pills drawn over it. An export showed them. */
 const EDITING_CONTROLS = [
   'wiki-page-mode-toggle', 'wiki-add', 'wiki-tools', 'wiki-write', 'wiki-nav-search',
   'tv-add-btn', 'tm-bc-sizeby', 'wn-actions', 'wn-add-first', 'wn-add', 'wn-empty-add',
+  'node-discussion-badges', 'explore-bar', 'explore-more-group', 'explore-menu', 'relation-type-menu', 'connect-pills',
 ]
 
 /** What an export leaves out: the canvas's background grid, the panels and

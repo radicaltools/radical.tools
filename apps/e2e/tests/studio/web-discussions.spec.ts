@@ -3,6 +3,7 @@ import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
 import type { Discussions } from '@radical/common/discussions'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 
 let folder: ModelFolder
 test.beforeEach(async ({ page, studio }) => {
@@ -182,3 +183,23 @@ test('a browser write failure keeps the draft, creates no empty discussion file 
   await expect(panel.getByRole('status')).toHaveText('Posted.')
   expect((JSON.parse((await folder.files())['discussions.json']) as Discussions).threads).toHaveLength(1)
 })
+
+// The icons are there to open discussions, not part of the diagram: an
+// export showed them beside the elements (F-0067).
+test('an export of the view leaves out the discussion icons', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  await panel.getByLabel('Comment (Markdown supported)').fill('Is the customer a person or a company?')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await panel.getByRole('button', { name: 'Close discussions' }).click()
+  await expect(page.locator('button[data-discussion-node="customer"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  const download = page.waitForEvent('download')
+  await page.getByText('Export as SVG…', { exact: true }).click()
+  const svg = await readFile(await (await download).path(), 'utf8')
+  expect(svg).toContain('Customer')
+  expect(svg).not.toContain('node-discussion-badge')
+  expect(svg).not.toContain('data-discussion-node')
+})
+

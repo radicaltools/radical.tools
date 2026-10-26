@@ -2,8 +2,9 @@ import React from 'react'
 import { useStore } from 'reactflow'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 
-/** Screen-sized controls above relations, outside the viewport exported as a
- * diagram. They follow node geometry without changing its size or model data. */
+/** Screen-sized controls above relations, outside the viewport and left out
+ * of an export (Studio's useExport). They follow node geometry without
+ * changing its size or model data. */
 export function NodeDiscussionBadges({ counts, onDiscuss }: { counts: NodeDiscussionCounts; onDiscuss: (nodeId: string) => void }): React.ReactElement | null {
   const [tx, ty, zoom] = useStore((s) => s.transform)
   const nodes = useStore((s) => s.nodeInternals)
