@@ -227,3 +227,78 @@ test('a slide shown in Presenter leaves the view\'s camera Designer\'s, also aft
   await studio.settle()
   expect(await transform()).toBe(designer)
 })
+
+// The slide's name field kept every key from Studio, F5 and Cmd/Ctrl+P too:
+// the browser took them, and its reload lost the name being typed, or its
+// print dialog opened (F-0086).
+test('F5 and Cmd/Ctrl+P in a slide\'s name field are Studio\'s: F5 saves the name and presents', async ({ page, studio }) => {
+  await page.evaluate(() => {
+    const w = window as unknown as { __keys: string[] }
+    w.__keys = []
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F5' || e.key === 'p') setTimeout(() => w.__keys.push(`${e.key} prevented: ${e.defaultPrevented}`))
+    }, true)
+  })
+  const keys = (): Promise<string[]> => page.evaluate(() => (window as unknown as { __keys: string[] }).__keys)
+  const input = page.locator('.pres-slide-name-input')
+  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Context' }).dblclick()
+  await input.fill('Opening slide')
+  await page.keyboard.press('ControlOrMeta+p')
+  await studio.settle()
+  await expect.poll(keys).toEqual(['p prevented: true'])
+  await page.keyboard.press('Escape')
+  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Opening slide' }).dblclick()
+  await input.fill('First slide')
+  await page.keyboard.press('F5')
+  await studio.settle()
+  await expect.poll(keys).toEqual(['p prevented: true', 'F5 prevented: true'])
+  await expect(page.locator('.pres-hud')).toContainText('First slide')
+  await expect(page.getByText('1 / 2')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await studio.settle()
+  await expect(page.locator('.pres-slide-card .pres-slide-name').first()).toHaveText('First slide')
+})
+
+// F5 pressed while a name is typed saves it, then presents, as the
+// properties card does: the table's F2 field and a Warnier step's name went
+// away with the view, unsaved (F-0109).
+test('F5 while a name is typed in the table or in a Warnier step saves it, then presents', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 40, y: 900, width: 220, height: 80, collapsed: false, ...props })
+    doc.nodes.push(
+      node('checkout', 'process', 'Checkout', { width: 900, height: 360 }),
+      node('take', 'step', 'Take the order', { parentId: 'checkout', order: 1 }),
+    )
+    doc.views.push({ id: 'v-steps', name: 'Steps', kind: 'warnier', nodeIds: ['checkout', 'take'], positions: {} })
+  })
+  const presentAndEnd = async (): Promise<void> => {
+    await page.keyboard.press('F5')
+    await studio.settle()
+    await expect(page.getByText('1 / 2')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await studio.settle()
+    await expect(page.getByText('1 / 2')).toHaveCount(0)
+  }
+  const saved = async (id: string): Promise<string | undefined> => {
+    await studio.advance(3000)
+    return (await studio.storedDoc()).nodes.find((n) => n.id === id)?.label
+  }
+
+  await studio.open('v-table')
+  await studio.row('db').click()
+  await page.keyboard.press('F2')
+  await page.locator('.tv-cell-input').fill('Order Store')
+  await presentAndEnd()
+  await expect(studio.row('db')).toContainText('Order Store')
+  await expect.poll(() => saved('db')).toBe('Order Store')
+
+  await studio.open('v-steps')
+  const diagram = page.getByLabel('Warnier diagram')
+  await diagram.locator('.wn-label', { hasText: 'Take the order' }).click()
+  await page.keyboard.press('F2')
+  await diagram.locator('.wn-name-input').fill('Take the payment')
+  await presentAndEnd()
+  await expect(diagram.locator('.wn-name', { hasText: 'Take the payment' })).toBeVisible()
+  await expect.poll(() => saved('take')).toBe('Take the payment')
+})

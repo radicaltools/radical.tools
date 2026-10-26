@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeViewFolder } from '@radical/common/c4'
 import { onExploration, useDiagramStore } from '../store/diagramStore'
+import { editingControl } from './editingControl'
 
 /**
  * The bar of an exploration (Explore from here) over the canvas, where a
@@ -32,7 +33,7 @@ export function ExploreBar(): React.ReactElement | null {
     if (saveExploration(saving.name, saving.folder)) setSaving(null)
   }
   return (
-    <div className="explore-bar" role="toolbar" aria-label="Exploration">
+    <div {...editingControl} className="explore-bar" role="toolbar" aria-label="Exploration">
       <span className="explore-bar-name">
         Explore: <strong>{exploration.name.replace(/^Explore: /, '')}</strong>
       </span>

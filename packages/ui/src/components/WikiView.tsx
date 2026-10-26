@@ -50,6 +50,7 @@ import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilte
 import { newLinkFit, relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
+import { editingControl } from './editingControl'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
 type AddNode = ReturnType<typeof useDiagramStore.getState>['addNode']
@@ -174,7 +175,7 @@ function AddMenu({
     : options
 
   return (
-    <div className="wiki-add" ref={ref}>
+    <div {...editingControl} className="wiki-add" ref={ref}>
       <button
         className={`wiki-add-btn ${variant === 'ghost' ? 'ghost' : ''}`}
         onClick={() => {
@@ -819,7 +820,7 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
         sort={pipelineOf(view)?.sort}
       />
       <div className="wiki-page" ref={pageRef} tabIndex={-1} onContextMenu={focus && discussNode ? menuOnRightClick(actions, { nodeId: focus.id }) : undefined}>
-        <div className="wiki-page-mode-toggle">
+        <div {...editingControl} className="wiki-page-mode-toggle">
           <button
             className={pageMode === 'single' ? 'active' : ''}
             onClick={() => changePageMode('single')}
@@ -1177,6 +1178,7 @@ function WikiNav({
       </div>
       <input
         type="search"
+        {...editingControl}
         className="wiki-nav-search"
         placeholder="Search pages…"
         aria-label="Search pages"
@@ -1557,7 +1559,7 @@ function WikiStartRow({ hint, types, under, nodes, metamodel, folded, onStart }:
     ))
 
   return (
-    <div className="wiki-write-start">
+    <div {...editingControl} className="wiki-write-start">
       <p className="wiki-write-start-line">
         <span className="wiki-write-start-hint">{hint}:</span>{' '}
         {links(first)}
@@ -1663,7 +1665,7 @@ function WikiWriteLine({ type, typeLabel, under, autoFocus = false, onWritten }:
 
   const noun = typeNoun(typeLabel)
   return (
-    <div className="wiki-write">
+    <div {...editingControl} className="wiki-write">
       <textarea
         ref={inputRef}
         className="wiki-write-input"
@@ -2180,7 +2182,7 @@ function WikiElementPage({
     ;(window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel?.()
   }
   const tools = (
-    <span className="wiki-tools">
+    <span {...editingControl} className="wiki-tools">
       {!embedded && !presenting && (
         <button
           className={`wiki-tool${carded ? ' active' : ''}`}
@@ -2558,7 +2560,7 @@ function WikiInfobox({
         </dl>
       )}
       {edit && (
-        <div className="wiki-infobox-foot">
+        <div {...editingControl} className="wiki-infobox-foot">
           <button className="wiki-tool" aria-label="Done editing facts" onClick={onDone}>done</button>
         </div>
       )}
@@ -3162,7 +3164,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
             }
           }}
         />
-        <span className="wiki-write-hint">Enter reads the sentence into its parts again. Esc leaves it as it was.</span>
+        <span {...editingControl} className="wiki-write-hint">Enter reads the sentence into its parts again. Esc leaves it as it was.</span>
       </blockquote>
     )
   }
@@ -3172,6 +3174,7 @@ function EarsSentenceEditor({ node, nodeId, subject: subjectProp, statePhrase, r
       {content}
       {!readOnly && (
         <button
+          {...editingControl}
           className="wiki-tool ears-rewrite"
           title="Write the whole sentence again: its parts are read from it"
           aria-label="Rewrite the sentence"

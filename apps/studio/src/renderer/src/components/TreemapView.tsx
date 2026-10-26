@@ -5,6 +5,7 @@ import type { C4Node, C4Relation } from '@radical/common/c4'
 import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { pipelineOf, viewShownNodes } from '@radical/common/viewPipeline'
 import { propertiesPanelCover } from '@radical/ui/components/propertiesCover'
+import { editingControl } from '@radical/ui/components/editingControl'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -544,7 +545,7 @@ export function TreemapView(): React.ReactElement {
 
         <div className="tm-bc-spacer" />
 
-        <label className="tm-bc-sizeby" title="How to size rectangles">
+        <label {...editingControl} className="tm-bc-sizeby" title="How to size rectangles">
           Size:
           <select
             value={sizeBy}
@@ -556,7 +557,7 @@ export function TreemapView(): React.ReactElement {
           </select>
         </label>
 
-        <label className="tm-bc-sizeby" title="How many descendant levels to render below the current focus">
+        <label {...editingControl} className="tm-bc-sizeby" title="How many descendant levels to render below the current focus">
           Levels:
           <select
             value={maxDepth === Infinity ? 'all' : String(maxDepth)}
@@ -576,6 +577,7 @@ export function TreemapView(): React.ReactElement {
 
         {focusId !== null && (
           <button
+            {...editingControl}
             className="tm-bc-back"
             onClick={handleBack}
             title="Zoom out one level (Esc)"

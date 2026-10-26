@@ -9,6 +9,7 @@ import { AddPicker, type PickerWay } from './AddPicker'
 import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
 import { MarkdownText } from './MarkdownText'
 import { WikiMenu } from './WikiMenu'
+import { editingControl } from './editingControl'
 
 // ─── Table view ──────────────────────────────────────────────────────────────
 // Shows what the view's steps give (viewPipeline.ts, set in the Nodes panel)
@@ -433,7 +434,7 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
                 <td className="tv-td">{renderSummary(line.row.node)}</td>
               </tr>
             ) : (
-              <tr key={`${line.under?.path ?? ''}+`} className="tv-add-row">
+              <tr key={`${line.under?.path ?? ''}+`} {...editingControl} className="tv-add-row">
                 <td className="tv-td" colSpan={2}>
                   <button className="tv-add-btn"
                     aria-label={line.under ? `Add under ${line.under.node.label}` : 'Add at the top'}

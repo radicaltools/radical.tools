@@ -80,6 +80,42 @@ test('an exploration is exported without its bar and its + and −', async ({ pa
   for (const control of ['explore-bar', 'explore-more', 'explore-menu']) expect(svg, control).not.toContain(control)
 })
 
+// An export is a picture of the diagram, not of the editor: the Unpin pin of
+// a pinned element and the guide of a row with its buttons were drawn in it,
+// with the selection's outline and its focus dimming the rest (F-0088).
+test('an export leaves out the pin, the alignment guides, the −/+ and the selection', async ({ page, studio }) => {
+  await studio.open('v-containers')
+  // Dropped after a drag, Payment Provider is pinned; selected, it shows its pin.
+  const box = (await studio.node('payments').boundingBox())!
+  await page.mouse.move(box.x + 40, box.y + 15)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 80, box.y + 60, { steps: 8 })
+  await page.mouse.up()
+  await studio.settle()
+  await studio.node('payments').click()
+  await expect(page.getByTestId('unpin-node')).toBeVisible()
+  // Kept in a row with Customer: the guide and its buttons show while one is selected.
+  await studio.node('customer').click()
+  await studio.node('payments').click({ modifiers: ['Alt'] })
+  await page.getByRole('button', { name: /^Align/ }).click()
+  await page.getByRole('menuitem', { name: /Keep in a row/ }).click()
+  await studio.settle()
+  await studio.node('payments').click()
+  await expect(page.getByTestId('alignment-guides')).toBeAttached()
+  await expect(page.getByRole('button', { name: 'Remove row alignment' })).toBeVisible()
+  await expect(page.locator('.react-flow__node.focus-dim').first()).toBeAttached()
+  await expect(page.locator('.c4-node-collapse-btn').first()).toBeAttached()
+  const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+  expect(svg).toContain('Payment Provider')
+  for (const control of ['alignment-guide', 'Unpin', 'Remove row alignment', 'c4-node-collapse-btn', 'data-editing-control', '<button', 'focus-dim']) {
+    expect(svg, control).not.toContain(control)
+  }
+  expect(svg, 'a selected element').not.toMatch(/class="[^"]*react-flow__node[^"]*\bselected\b/)
+  // The canvas keeps the selection and its focus.
+  await expect(studio.node('payments')).toHaveClass(/\bselected\b/)
+  await expect(page.locator('.react-flow__node.focus-dim').first()).toBeAttached()
+})
+
 test.describe('views without a canvas', () => {
   // Export looked for the canvas only: on a table, wiki, matrix or
   // hierarchy view the menu items did nothing, with no file and no notice.

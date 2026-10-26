@@ -13,6 +13,7 @@ import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
+import { editingControl } from '@radical/ui/components/editingControl'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -278,7 +279,7 @@ export function MatrixView(): React.ReactElement {
     <main className="mx-wrap">
       <div className="mx-toolbar">
         <span className="mx-title">Relationship Matrix</span>
-        <span className="mx-hint">
+        <span {...editingControl} className="mx-hint">
           {readonly
             ? 'rows → columns · click a marked cell to select'
             : 'rows → columns · click an empty cell to create a relation · click a marked cell to select · click again to remove'}
@@ -371,6 +372,7 @@ export function MatrixView(): React.ReactElement {
       {popup && (
         <div
           ref={popupRef}
+          {...editingControl}
           className="mx-popup"
           style={{ left: popupAt?.left ?? popup.x, top: popupAt?.top ?? popup.y, visibility: popupAt ? undefined : 'hidden' }}
         >

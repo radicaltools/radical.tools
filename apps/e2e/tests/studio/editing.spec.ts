@@ -251,6 +251,21 @@ test('undo and redo', async ({ page, studio }) => {
   await expect(studio.nodes).toHaveCount(4)
 })
 
+// Chrome on Windows and Linux sends Ctrl+Shift+Z as key 'Z', and with Caps
+// Lock on Ctrl+Z is one too: the shortcut was compared with 'z' (F-0101).
+test('Ctrl+Shift+Z redoes and Ctrl+Z undoes whatever the letter\'s case', async ({ page, studio }) => {
+  await studio.addFromPalette('Software System', await studio.nearBottom())
+  await expect(studio.nodes).toHaveCount(4)
+  await page.keyboard.press('Control+z')
+  await expect(studio.nodes).toHaveCount(3)
+  await page.keyboard.press('Control+Shift+Z')
+  await expect(studio.nodes).toHaveCount(4)
+  await page.keyboard.press('Control+Z')
+  await expect(studio.nodes).toHaveCount(3)
+  await page.keyboard.press('Control+Y')
+  await expect(studio.nodes).toHaveCount(4)
+})
+
 // Runs 65 to 69 (decided 2026-10-21): Viewer and Presenter showed Undo and
 // Redo enabled, and they did nothing. Undo belongs to Designer.
 test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor show none', async ({ page, studio }) => {

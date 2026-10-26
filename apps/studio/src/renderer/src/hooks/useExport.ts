@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { toPng, toSvg } from 'html-to-image'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { isEditingControl } from '@radical/ui/components/editingControl'
 import { useDocumentsStore } from '../store/documentStore'
 
 function sanitizeFilename(name: string): string {
@@ -16,22 +17,23 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-/** Zoomed out, the canvas hides relation labels it is too small to read
+/** Draws the canvas for an export, resolving with the undo once it is drawn.
+ *  Zoomed out, the canvas hides relation labels it is too small to read
  *  (data-edge-labels, see Canvas), and does not place them. An export is
- *  read at its own size, so it shows them all, placed: resolves, once the
- *  edges have drawn them, with the undo. */
-function showAllEdgeLabels(el: HTMLElement): Promise<() => void> {
+ *  read at its own size, so it shows them all, placed. And it shows the
+ *  diagram, not the selection: no outline, no highlighted line, nothing
+ *  dimmed by its focus. */
+function drawForExport(el: HTMLElement): Promise<() => void> {
   const detail = el.dataset.edgeLabels
   el.dataset.edgeLabels = 'full'
   const store = useDiagramStore.getState()
   const placed = store.allEdgeLabelsShown
-  if (!placed) useDiagramStore.setState({ allEdgeLabelsShown: true })
+  useDiagramStore.setState({ allEdgeLabelsShown: true, drawnForExport: true })
   const restore = () => {
     if (detail === undefined) delete el.dataset.edgeLabels
     else el.dataset.edgeLabels = detail
-    if (!placed) useDiagramStore.setState({ allEdgeLabelsShown: false })
+    useDiagramStore.setState({ allEdgeLabelsShown: placed, drawnForExport: false })
   }
-  if (placed) return Promise.resolve(restore)
   // Two frames: React re-renders the edges, then the browser lays them out.
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(restore))))
 }
@@ -43,27 +45,17 @@ function showAllEdgeLabels(el: HTMLElement): Promise<() => void> {
  *  screen to export"). */
 const EXPORT_TARGETS = '.canvas-area, .wiki-view, .tv-wrap, .mx-wrap, .treemap-wrap-outer, .warnier-view'
 
-/** Parts of a view that are there to edit it, not what it shows: the
- *  wiki's page mode, add, edit and writing lines and its search box, the
- *  table's add buttons, the hierarchy's Size by and Levels, the Warnier
- *  view's step buttons; on the canvas, the discussion icons beside the
- *  elements, an exploration's bar and the + and − of its elements, and the
- *  menus and pills drawn over it. An export showed them. */
-const EDITING_CONTROLS = [
-  'wiki-page-mode-toggle', 'wiki-add', 'wiki-tools', 'wiki-write', 'wiki-nav-search',
-  'tv-add-btn', 'tm-bc-sizeby', 'wn-actions', 'wn-add-first', 'wn-add', 'wn-empty-add',
-  'node-discussion-badges', 'explore-bar', 'explore-more-group', 'explore-menu', 'relation-type-menu', 'connect-pills',
-]
-
 /** What an export leaves out: the canvas's background grid, the panels and
- *  bars around it, and the editing controls. */
+ *  bars around it, and every editing control (editingControl.ts: the
+ *  buttons, pins, guides, menus and bars that are there to edit the view,
+ *  not what it shows). */
 function exportFilter(node: HTMLElement | SVGElement): boolean {
   if (!(node instanceof Element)) return true
+  if (isEditingControl(node)) return false
   const cls = node.getAttribute('class') ?? ''
   if (cls.includes('react-flow__background')) return false
   if (cls.includes('toolbar') || cls.includes('left-panel') || cls.includes('right-panel')) return false
-  if (cls.includes('sel-bar') || cls.includes('edge-action') || cls.includes('quick-search')) return false
-  return ![...node.classList].some((t) => EDITING_CONTROLS.some((c) => t === c || t.startsWith(`${c}-`)))
+  return !(cls.includes('sel-bar') || cls.includes('edge-action') || cls.includes('quick-search'))
 }
 
 function exportTarget(): HTMLElement | null {
@@ -108,7 +100,7 @@ export function useExport(): {
     const el = exportTarget()
     if (!el) return
     setExportBusy(true)
-    const labelsShown = showAllEdgeLabels(el)
+    const labelsShown = drawForExport(el)
     const filename = buildFilename()
     const options = {
       cacheBust: true,
@@ -132,7 +124,7 @@ export function useExport(): {
     const el = exportTarget()
     if (!el) return
     setExportBusy(true)
-    const labelsShown = showAllEdgeLabels(el)
+    const labelsShown = drawForExport(el)
     const options = {
       cacheBust: true,
       backgroundColor: getComputedStyle(el).backgroundColor || '#1e1e2e',
