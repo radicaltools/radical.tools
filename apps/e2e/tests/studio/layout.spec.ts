@@ -101,7 +101,7 @@ test('continuous layout glides the view into place after an add', async ({ page,
   }
   expect(seen.length, `glided through ${seen.join(' → ')}`).toBeGreaterThanOrEqual(4)
   const doc = await studio.storedDoc()
-  expect(doc.views.find((v: { id: string }) => v.id === 'v-context')).toMatchObject({ continuousLayout: true })
+  expect(doc.views?.find((v) => v.id === 'v-context')).toMatchObject({ continuousLayout: true })
   expect(await studio.layoutViolations()).toEqual([])
 })
 
