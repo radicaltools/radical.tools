@@ -8404,8 +8404,15 @@ export const useDiagramStore = create<DiagramStore>()(
           // diff comes back after (Esc cleared it, the toggle still on).
           diffHighlight: get().diffHighlight,
           views: get().views,
+          // A slide shows what it holds: the selection made before, drawn
+          // on it, selected an element and dimmed the rest. It comes back
+          // after.
+          selection: { nodeIds: [...get().selectedNodeIds], edgeId: get().selectedEdgeId },
         }
-        set((state) => { state.presentationActive = true })
+        set((state) => {
+          state.presentationActive = true
+          showSelection(state as DiagramStore, [], null)
+        })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
         // flips off before the user can grab anything (rfNodes carry
         // draggable per-node, which would otherwise override the
@@ -8417,7 +8424,7 @@ export const useDiagramStore = create<DiagramStore>()(
       stopPresentation() {
         set((state) => { state.presentationActive = false; state.slideTreemapFocus = null; state.slideWikiPage = null })
         const pre = (window as any).__prePresState as
-          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView> }
+          | { c4Nodes: Record<string, C4Node>; c4Relations: Record<string, C4Relation>; activeViewId: string | null; diffHighlight?: DiagramStore['diffHighlight']; views?: Record<string, DiagramView>; selection?: { nodeIds: string[]; edgeId: string | null } }
           | undefined
         get().setDiffHighlight(pre?.diffHighlight ?? {})
         if (pre) {
@@ -8430,6 +8437,7 @@ export const useDiagramStore = create<DiagramStore>()(
           ;(window as any).__prePresState = undefined
         }
         get()._sync()
+        if (pre?.selection) set((state) => { showSelection(state as DiagramStore, pre.selection!.nodeIds, pre.selection!.edgeId) })
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
         // restored c4Nodes positions instead of the slide-shown ones.
