@@ -66,6 +66,20 @@ test('an export zoomed out keeps the relation labels the canvas hides', async ({
   await expect(studio.canvas).toHaveAttribute('data-edge-labels', 'none')
 })
 
+// An exploration's bar, and the + and − of its elements, are there to grow
+// it, not part of the diagram: an export showed them (F-0067).
+test('an exploration is exported without its bar and its + and −', async ({ page, studio }) => {
+  await studio.open('v-containers')
+  await studio.node('api').dblclick()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
+  await expect(page.locator('.explore-bar')).toContainText('Explore: API')
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.explore-more').first()).toBeVisible()
+  const svg = (await exportAs(page, 'Export as SVG…')).data.toString('utf8')
+  expect(svg).toContain('API')
+  for (const control of ['explore-bar', 'explore-more', 'explore-menu']) expect(svg, control).not.toContain(control)
+})
+
 test.describe('views without a canvas', () => {
   // Export looked for the canvas only: on a table, wiki, matrix or
   // hierarchy view the menu items did nothing, with no file and no notice.

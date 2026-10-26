@@ -1,4 +1,16 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from '../../support/fixtures'
+
+// The middle of a relation's drawn line, on screen: a route around elements
+// can leave the centre of its box on something else.
+async function edgeMid(page: Page, id: string): Promise<{ x: number; y: number }> {
+  return page.locator(`[data-testid="rf__edge-${id}"] path.react-flow__edge-interaction`).first().evaluate((el) => {
+    const path = el as SVGPathElement
+    const p = path.getPointAtLength(path.getTotalLength() / 2)
+    const m = path.getScreenCTM()!
+    return { x: p.x * m.a + m.e, y: p.y * m.d + m.f }
+  })
+}
 
 // The properties card (RightPanel) on the bookstore System Context view:
 // it lies over the canvas's right side, so the canvas keeps its size.
@@ -49,7 +61,8 @@ test('a click selects, a double-click opens the card, which then follows the sel
 
   // A relation opens its card on a double-click too.
   await studio.open('v-containers')
-  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().dblclick({ force: true })
+  const r4 = await edgeMid(page, 'r4')
+  await page.mouse.dblclick(r4.x, r4.y)
   await expect(studio.properties.getByRole('region', { name: 'Actions' }).getByRole('button', { name: /^Change source…/ })).toBeVisible()
 
   // A table row: a click selects, F2 renames, a double-click opens the card.
@@ -200,13 +213,15 @@ test('one element\'s actions are in its card, several elements\' in a bar over t
 
 test('a relation\'s card changes its ends and hides it from the view', async ({ page, studio }) => {
   await studio.open('v-containers')
-  await page.locator('[data-testid="rf__edge-r4"] path.react-flow__edge-interaction').first().dblclick({ force: true })
+  const r4 = await edgeMid(page, 'r4')
+  await page.mouse.dblclick(r4.x, r4.y)
   const actions = studio.properties.getByRole('region', { name: 'Actions' })
   await actions.getByRole('button', { name: /^Change source…/ }).click()
   await actions.getByRole('menuitem', { name: /^Web App/ }).click()
   await expect.poll(async () => ((await studio.storedDoc()).relations as Array<{ id: string; sourceId: string }>).find((r) => r.id === 'r4')?.sourceId).toBe('web')
 
-  await page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first().click({ force: true })
+  const r3 = await edgeMid(page, 'r3')
+  await page.mouse.click(r3.x, r3.y)
   await actions.getByRole('button', { name: 'Hide from view' }).click()
   await expect(page.getByTestId('rf__edge-r3')).toHaveCount(0)
   await expect(studio.properties).toHaveCount(0)

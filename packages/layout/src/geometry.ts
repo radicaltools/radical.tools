@@ -242,8 +242,8 @@ export function liesClearInParent(
  * The nodes moved into another parent (`ids`, already under it) on one
  * canvas, by the rule for moves: one keeps its place where it lies inside
  * its new parent and clear of its new siblings (liesClearInParent);
- * otherwise it goes inside the parent beside its siblings
- * (placeBesideSiblings). The parents then fit what they hold, and where
+ * otherwise it goes inside the parent beside its siblings (gridSlotIn),
+ * and at the top to the free place nearest it (freeSpotNear). The parents then fit what they hold, and where
  * one grew its siblings make room for it (makeRoomAround), level by level
  * up the tree, as an expand does. `fit` refits one parent to its children
  * (the store's, which knows the view's folds); headless, fitShown. A moved
@@ -271,9 +271,13 @@ export function settleMovedNodes(
         const counts = (s: C4Node): boolean => s.id !== id && !waiting.has(s.id) && on.shown(s)
         // In a parent, the next cell of its children's grid.
         const box = on.boxOf(node)
+        // At the top, the free place nearest where it stands: taken out of
+        // a container it lies over that container, now a sibling, and
+        // beside every sibling it went to the far right of the canvas.
         const at = node.parentId && nodes[node.parentId]
           ? gridSlotIn(nodes, node.parentId, { width: box.w, height: box.h }, (s) => counts(s), { width: on.boxOf(nodes[node.parentId]).w, height: on.boxOf(nodes[node.parentId]).h })
-          : placeBesideSiblings(nodes, node.parentId, counts)
+          : freeSpotNear(Object.values(nodes).filter((s) => !s.parentId && counts(s)).map((s) => { const b = on.boxOf(s); return { x: b.x, y: b.y, width: b.w, height: b.h } }),
+            { width: box.w, height: box.h }, { x: box.x + box.w / 2, y: box.y + box.h / 2 })
         node.x = at.x
         node.y = at.y
         touched.push(id)
@@ -851,6 +855,8 @@ export function projectToVisibleGraph(
     const kept = rolledUpLine.get(key)
     if (kept) {
       if (r.label) projected[kept] = { ...projected[kept], label: projected[kept].label ? `${projected[kept].label}\n${r.label}` : r.label }
+      // A technology only when they all use it (deriveRFEdges).
+      if (projected[kept].technology !== r.technology) projected[kept] = { ...projected[kept], technology: undefined }
       continue
     }
     rolledUpLine.set(key, id)

@@ -205,6 +205,9 @@ test.describe('the special key', () => {
     await studio.settle()
     await studio.node('customer').click()
     await studio.node('clerk').click({ modifiers: ['Alt'] })
+    // The camera frames the two selected; Staff may lie outside that.
+    await page.getByRole('button', { name: 'Fit All' }).click()
+    await studio.settle()
     await page.keyboard.down('Alt')
     await altDrag(page, studio.node('clerk'), studio.node('staff'))
     await page.keyboard.up('Alt')
@@ -269,4 +272,53 @@ test.describe('the special key', () => {
     await expect(page.locator('.react-flow__node[data-id="zone"]')).not.toHaveClass(/connect-target/)
     await page.keyboard.up('Alt')
   })
+})
+
+// F-0071: the pills were drawn in their element, under the lines raised
+// above it: on a folded container joined to the selected element by a
+// rolled-up line, the line lay over its "inside" pill and took the drop,
+// which then did nothing and said nothing.
+test('the pills lie over the lines: a drop on the inside pill of a folded container nests, with a line ending at it', async ({ page, studio }) => {
+  await studio.openSample('view-core')
+  await studio.node('dom-risk').locator('.c4-node-collapse-btn').first().click()
+  await studio.settle()
+  await studio.node('ctn-evtbus').click()
+  await studio.settle()
+  const parentOf = async () => ((await studio.storedDoc(studio.activeDocId())).nodes as Array<{ id: string; parentId?: string }>).find((n) => n.id === 'ctn-evtbus')?.parentId
+  expect(await parentOf()).toBe('dom-banking')
+  const bus = (await studio.node('ctn-evtbus').boundingBox())!
+  const risk = (await studio.node('dom-risk').boundingBox())!
+  await page.keyboard.down('Alt')
+  await page.mouse.move(bus.x + 12, bus.y + 8)
+  await page.mouse.down()
+  await page.mouse.move(risk.x + risk.width / 2, risk.y + risk.height / 2, { steps: 8 })
+  const inside = page.getByRole('group', { name: 'Drop on Risk & Data' }).locator('.connect-pill', { hasText: 'inside' })
+  const pill = (await inside.boundingBox())!
+  const at = { x: pill.x + pill.width / 2, y: pill.y + pill.height / 2 }
+  await page.mouse.move(at.x, at.y, { steps: 3 })
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.connect-pill'), [at.x, at.y])).toBe(true)
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  await expect(page.getByText('Moved 1 node into Group.')).toBeVisible()
+  await expect.poll(parentOf).toBe('dom-risk')
+})
+
+test('a drop on the holds pill says the element is there already', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  await studio.settle()
+  await studio.node('api').click()
+  await studio.settle()
+  const api = (await studio.node('api').boundingBox())!
+  const bookstore = (await studio.node('bookstore').boundingBox())!
+  await page.keyboard.down('Alt')
+  await page.mouse.move(api.x + api.width / 2, api.y + api.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bookstore.x + 20, bookstore.y + 10, { steps: 8 })
+  const holds = page.getByRole('group', { name: 'Drop on Bookstore' }).locator('.connect-pill', { hasText: 'holds' })
+  const pill = (await holds.boundingBox())!
+  await page.mouse.move(pill.x + pill.width / 2, pill.y + pill.height / 2, { steps: 3 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  await expect(page.getByText('"API" is already in "Bookstore": nothing to move.')).toBeVisible()
 })

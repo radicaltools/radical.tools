@@ -5,13 +5,14 @@
  * elements gather by type, frames are no larger than their children need,
  * and a row is put in the order of what it relates to.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { runTidyLayout } from '../../src/tidy'
 import { Layout } from '../../src/tidy/layout'
 import { buildIndex, linesOf, totalCost } from '../../src/tidy/cost'
 import { builtInGovernanceMetamodel, type Metamodel } from '@radical/common/metamodel'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, type C4Node, type C4Relation } from '@radical/common/c4'
-import { compoundPadding } from '../../src/geometry'
+import { compoundPadding, projectToVisibleGraph } from '../../src/geometry'
+import { alignmentError, resolveAlignments } from '../../src/constraints'
 
 function node(id: string, type: string, x: number, y: number, parentId?: string, extra: Partial<C4Node> = {}): C4Node {
   return { id, type: type as C4Node['type'], label: id, collapsed: false, x, y, ...NODE_SIZES[type as keyof typeof NODE_SIZES], ...(parentId ? { parentId } : {}), ...extra } as C4Node
@@ -124,15 +125,15 @@ describe('Tidy, the finer points', () => {
     expect(box('sys').h).toBe(Math.max(box('api').h + pad.top + pad.bottom, COLLAPSED_HEIGHT.system))
   })
 
-  it('a time budget stops the tidying with what was done', () => {
-    // A chain of 30 elements on a grid: more moves than fit in a budget of a moment.
+  it('a budget stops the tidying with what was done', () => {
+    // A chain of 30 elements on a grid: more moves than fit in a budget of one judgement.
     const nodes: C4Node[] = [], relations: C4Relation[] = []
     for (let i = 0; i < 30; i++) {
       nodes.push(node(`n${i}`, 'container', (i % 5) * 400, Math.floor(i / 5) * 300))
       if (i) relations.push(rel(`n${i - 1}`, `n${i}`))
     }
     const reported: number[] = []
-    const result = runTidyLayout(byId(nodes), byId(relations), { budgetMs: 1, onProgress: (done) => reported.push(done) })
+    const result = runTidyLayout(byId(nodes), byId(relations), { budget: 1, onProgress: (done) => reported.push(done) })
     expect(result.tidy.budgetOut).toBe(true)
     expect(reported).toEqual(result.tidy.steps.map((_, i) => i + 1))
     const whole = runTidyLayout(byId(nodes), byId(relations))
@@ -142,6 +143,25 @@ describe('Tidy, the finer points', () => {
     let rounds = 0
     const stopped = runTidyLayout(byId(nodes), byId(relations), { shouldStop: () => ++rounds > 3 })
     expect(stopped.tidy.budgetOut).toBe(true)
+  }, 60_000)
+
+  it('a budget is counted in work: the same layout on a slow machine as on a fast one (F-0080)', () => {
+    const nodes: C4Node[] = [], relations: C4Relation[] = []
+    for (let i = 0; i < 30; i++) {
+      nodes.push(node(`n${i}`, 'container', (i % 5) * 400, Math.floor(i / 5) * 300))
+      if (i) relations.push(rel(`n${i - 1}`, `n${i}`))
+    }
+    const fast = runTidyLayout(byId(nodes), byId(relations), { budget: 200 })
+    expect(fast.tidy.budgetOut).toBe(true)
+    expect(fast.tidy.work).toBeGreaterThanOrEqual(200)
+    // A machine where every look at the clock finds another second gone.
+    let clock = 0
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000))
+    try {
+      const slow = runTidyLayout(byId(nodes), byId(relations), { budget: 200 })
+      expect(slow.winner.positions).toEqual(fast.winner.positions)
+      expect(slow.tidy.steps.length).toBe(fast.tidy.steps.length)
+    } finally { now.mockRestore() }
   }, 60_000)
 
   it('tidy around moves only the given elements and what they relate to', () => {
@@ -208,23 +228,58 @@ describe('Tidy, the finer points', () => {
       nodes.push(node(`n${i}`, 'container', (i % 10) * 400, Math.floor(i / 10) * 300))
       if (i) relations.push(rel(`n${(i * 7) % 150}`, `n${i}`))
     }
-    const large = runTidyLayout(byId(nodes), byId(relations), { budgetMs: 1 })
+    const large = runTidyLayout(byId(nodes), byId(relations), { budget: 1 })
     expect(large.tidy.steps[0]?.kind).toBe('rough')
     // A large view that reads well (a chain along the grid) starts from where it stands.
     const calm = byId(nodes.map((n, i) => ({ ...n, x: (i % 10) * 400, y: Math.floor(i / 10) * 300 })))
     const chain = byId(nodes.slice(1).map((n, i) => rel(`n${i}`, n.id)))
-    expect(runTidyLayout(calm, chain, { budgetMs: 1 }).tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
+    expect(runTidyLayout(calm, chain, { budget: 1 }).tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
     // A pile of a few elements too; a small view that stands apart starts from the canvas.
     const pile = runTidyLayout(byId([node('a', 'system', 0, 0), node('b', 'system', 10, 10), node('c', 'system', 20, 20)]), byId([rel('a', 'b'), rel('b', 'c')]))
     expect(pile.tidy.steps[0]?.kind).toBe('rough')
     const small = runTidyLayout(byId([node('a', 'system', 0, 0), node('b', 'system', 600, 0), node('c', 'system', 0, 500)]), byId([rel('a', 'b'), rel('b', 'c')]))
     expect(small.tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
     // Nor round a selection, nor with pins: what stands stays.
-    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['n3'], budgetMs: 1 })
+    const around = runTidyLayout(byId(nodes), byId(relations), { around: ['n3'], budget: 1 })
     expect(around.tidy.steps.some((s) => s.kind === 'rough')).toBe(false)
     // Cut by its budget right after the sketch, it hands over nothing worse than the start.
     expect(large.tidy.after.total).toBeLessThanOrEqual(large.tidy.before.total + 0.01)
   }, 60_000)
+
+  it('a row the author set holds through tidying, and a second run keeps the layout', { timeout: 60_000 }, () => {
+    // A pile of systems with containers and databases, people and ADRs, five
+    // of them in a row the author set: lined up from the first run, so the
+    // second finds nothing left to do.
+    const nodes: C4Node[] = [], relations: C4Relation[] = []
+    for (let i = 0; i < 8; i++) {
+      nodes.push(node(`sys${i}`, 'system', (i % 4) * 15, Math.floor(i / 4) * 15))
+      for (let k = 0; k < 3; k++) {
+        nodes.push(node(`sys${i}-c${k}`, 'container', 40 + k * 10, 120 + k * 10, `sys${i}`))
+        if (k) relations.push(rel(`sys${i}-c${k - 1}`, `sys${i}-c${k}`))
+      }
+      nodes.push(node(`sys${i}-db`, 'database', 50, 130, `sys${i}`))
+      relations.push(rel(`sys${i}-c0`, `sys${i}-db`))
+      if (i % 2 === 0) { nodes.push(node(`person${i}`, 'person', i * 15 + 10, 10)); relations.push(rel(`person${i}`, `sys${i}-c0`)) }
+      if (i % 3 === 0) { nodes.push(node(`adr${i}`, 'adr', i * 15 + 20, 20)); relations.push({ ...rel(`adr${i}`, `sys${i}`), relationType: 'constrains' }) }
+      if (i) relations.push(rel(`sys${i - 1}-c0`, `sys${i}-c0`))
+    }
+    const row = ['adr0', 'sys3', 'person6', 'adr6', 'sys5']
+    const run = (at: Record<string, C4Node>) => {
+      const alignments = resolveAlignments([{ id: 'row', type: 'align', axis: 'horizontal', nodeIds: row }], at)
+      const result = runTidyLayout(at, byId(relations), { alignments })
+      const laidOut: Record<string, C4Node> = {}
+      for (const [id, n] of Object.entries(at)) laidOut[id] = { ...n, ...(result.winner.positions[id] ?? {}) }
+      return { result, laidOut, error: alignmentError(projectToVisibleGraph(laidOut, byId(relations)).nodes, {}, alignments) }
+    }
+    const first = run(byId(nodes))
+    expect(first.error).toBeLessThan(1)
+    const again = run(first.laidOut)
+    expect(again.result.tidy.steps.map((s) => s.description)).toEqual([])
+    expect(again.result.keptCurrent).toBe(true)
+    expect(again.error).toBeLessThan(1)
+    // What it hands over is what it judged: the cost it reports is the layout's.
+    expect(again.result.tidy.after.total).toBeCloseTo(first.result.tidy.after.total, 3)
+  })
 
   it('a row is reordered to uncross its lines', () => {
     // Four in a row above four below, the top row in reverse order: every line crosses.

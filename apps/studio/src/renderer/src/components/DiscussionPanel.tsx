@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useSyncExternalStore } from 'react'
 import { commentRows, type DiscussionComment } from '@radical/common/discussions'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
+import { keepKeysHere } from '@radical/ui/components/keysHere'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { discussionSession } from '../discussions/session'
 
@@ -24,6 +25,26 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
     return session.watch()
   }, [session, target.nodeId])
 
+  // Post comment and Resolve thread are disabled while they save, and a
+  // disabled button loses the focus to the page: Escape, taken by the panel,
+  // no longer closed it. The panel holds the focus meanwhile, then gives it
+  // back to the button, or to the comment field when the button cannot take
+  // it (Post comment, the draft emptied).
+  const focusAfter = useRef<HTMLElement | null>(null)
+  const holdFocus = (control: HTMLElement | null): void => {
+    focusAfter.current = control
+    panel.current?.focus({ preventScroll: true })
+  }
+  useEffect(() => {
+    const control = focusAfter.current
+    if (pending || !control) return
+    focusAfter.current = null
+    // Unless the focus went somewhere else meanwhile.
+    if (document.activeElement !== panel.current && document.activeElement !== document.body) return
+    if (control.isConnected && !(control as HTMLButtonElement).disabled) control.focus()
+    else input.current?.focus()
+  }, [pending])
+
   const reply = (threadId: string, parent: DiscussionComment): void => {
     session.edit(target.nodeId, { reply: { threadId, parent } })
     input.current?.focus()
@@ -34,9 +55,9 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
     element?.focus({ preventScroll: true })
   }
   return (
-    <aside className="discussion-panel" role="dialog" aria-labelledby="discussion-title" ref={panel}
+    <aside className="discussion-panel" role="dialog" aria-labelledby="discussion-title" ref={panel} tabIndex={-1}
       onKeyDown={(event) => {
-        event.stopPropagation()
+        keepKeysHere(event)
         if (event.key === 'Escape') { event.preventDefault(); onClose() }
       }}>
       <header className="discussion-header">
@@ -55,7 +76,7 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
             <div className="discussion-thread-heading">
               <strong>{thread.resolved ? 'Resolved' : 'Open thread'}</strong>
               <button type="button" disabled={pending || !!snapshot.fileError || !!draft.uncertain}
-                onClick={() => { void session.setResolved(target.nodeId, thread) }}>{thread.resolved ? 'Reopen thread' : 'Resolve thread'}</button>
+                onClick={(event) => { holdFocus(event.currentTarget); void session.setResolved(target.nodeId, thread) }}>{thread.resolved ? 'Reopen thread' : 'Resolve thread'}</button>
             </div>
             {commentRows(thread).map(({ comment, depth }) => {
               const parent = comment.parentCommentId ? thread.comments.find((c) => c.id === comment.parentCommentId) : undefined
@@ -74,11 +95,12 @@ export function DiscussionPanel({ target, onClose }: { target: DiscussionTarget;
             {thread.resolved && <p className="discussion-note">Reopen this thread to reply.</p>}
           </section>
         ))}
-        <form className="discussion-composer" onSubmit={(event) => { event.preventDefault(); void session.post(target.nodeId, label) }}>
+        <form className="discussion-composer" onSubmit={(event) => { event.preventDefault(); holdFocus(input.current); void session.post(target.nodeId, label) }}>
           <h3>{draft.reply ? 'Reply' : 'Start a thread'}</h3>
           {draft.reply && <div className="discussion-reply-target">
             <span>Replying to {draft.reply.parent.email ?? 'Anonymous'}: {draft.reply.parent.body.slice(0, 100)}</span>
-            <button type="button" disabled={locked} onClick={() => session.edit(target.nodeId, { reply: undefined })}>Start a new thread instead</button>
+            {/* The button goes with the reply: the focus goes on to the comment. */}
+            <button type="button" disabled={locked} onClick={() => { session.edit(target.nodeId, { reply: undefined }); input.current?.focus() }}>Start a new thread instead</button>
           </div>}
           <label htmlFor="discussion-body">Comment (Markdown supported)</label>
           <textarea id="discussion-body" ref={input} value={draft.body} disabled={locked} rows={5}

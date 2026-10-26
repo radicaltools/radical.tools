@@ -171,6 +171,38 @@ test('zooming with the wheel wins over a fit still animating', async ({ page, st
   await expect(page.locator('.autofit-active')).toHaveCount(1)
 })
 
+test('while Smart Layout tidies, its Stop button and the controls beside it stay where they are (F-0083)', async ({ page, studio }) => {
+  // Squeezed so the boxes overlap: Tidy has many moves to make, each shown.
+  await studio.seedDocument(gridDocument({ x: 150, y: 90 }))
+  await studio.open(WHOLE)
+  const smart = page.getByRole('button', { name: 'Smart Layout', exact: true })
+  const idle = (await smart.boundingBox())!
+  await smart.click()
+  await expect(page.getByRole('button', { name: /^Stop/ })).toBeVisible()
+  // Every frame for up to three seconds: where the Stop button and Fit All
+  // are, and what the controls say about the move.
+  const seen = await page.evaluate(() => new Promise<{ stop: string[]; fit: string[]; said: string[] }>((resolve) => {
+    const stop = new Set<string>(), fit = new Set<string>(), said = new Set<string>()
+    const at = (el: Element | null | undefined) => { const r = el!.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}` }
+    const end = performance.now() + 3000
+    const sample = () => {
+      const bar = document.querySelector('.canvas-controls')
+      const button = [...(bar?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim().startsWith('Stop'))
+      if (!bar || !button || performance.now() > end) { resolve({ stop: [...stop], fit: [...fit], said: [...said] }); return }
+      stop.add(at(button))
+      fit.add(at([...bar.querySelectorAll('button')].find((b) => b.textContent!.includes('Fit All'))))
+      said.add(bar.textContent!)
+      requestAnimationFrame(sample)
+    }
+    sample()
+  }))
+  // The moves were shown as they came…
+  expect(seen.said.length).toBeGreaterThan(2)
+  // …and nothing moved under the pointer.
+  expect(seen.stop).toEqual([`${Math.round(idle.x)},${Math.round(idle.y)} ${Math.round(idle.width)}x${Math.round(idle.height)}`])
+  expect(seen.fit).toHaveLength(1)
+})
+
 /** A 15 × 15 grid of linked systems, laid out near rest (or squeezed so
  *  they overlap, far from it). */
 function gridDocument(spacing = { x: 420, y: 300 }): string {
@@ -230,6 +262,29 @@ test('a drag moves only the dragged node, and the drop pins it', async ({ page, 
   await studio.node('n7_7').click()
   await page.getByTestId('unpin-node').click()
   await expect.poll(async () => wholeConstraints(studio)).toEqual([])
+})
+
+test('a click on a pinned container\'s pin unpins it, and leaves it expanded (F-0075)', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-containers')
+  const pins = async () => ((await studio.storedDoc()).views!.find((v) => v.id === 'v-containers') as { layoutConstraints?: Array<{ type: string; nodeIds: string[] }> })
+    .layoutConstraints?.filter((c) => c.type === 'pin').flatMap((c) => c.nodeIds) ?? []
+  // Dragged by its header and dropped: pinned.
+  const bookstore = studio.node('bookstore')
+  const box = (await bookstore.boundingBox())!
+  await page.mouse.move(box.x + 150, box.y + 40)
+  await page.mouse.down()
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + 150, box.y + 40 + 12 * i)
+  await page.mouse.up()
+  await expect.poll(pins).toContain('bookstore')
+  await bookstore.click({ position: { x: 150, y: 40 } })
+  // The pin sits at the corner, within reach of the container's −: the
+  // click is the pin's, not the −'s.
+  const pin = (await page.getByTestId('unpin-node').boundingBox())!
+  await page.mouse.click(pin.x + pin.width / 2, pin.y + pin.height / 2)
+  await expect.poll(pins).not.toContain('bookstore')
+  for (const child of ['web', 'api', 'db']) await expect(studio.node(child)).toBeVisible()
+  await expect(bookstore.getByTitle('Collapse')).toHaveCount(1)
 })
 
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {

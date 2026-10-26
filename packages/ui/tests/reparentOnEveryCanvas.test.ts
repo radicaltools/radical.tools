@@ -308,6 +308,23 @@ describe('Move to… the root', () => {
     s().setActiveView('other')
     expect(violations()).toEqual([])
   })
+
+  // At the top it lay on the domain it was taken out of, now its sibling,
+  // and went beside every root element, to the far right of the canvas:
+  // Payment out of Payments on the sample's Domain model view (F-0072).
+  it('keeps it near where it stood, clear of what it was taken out of, on every canvas', () => {
+    const near = (was: { x: number; y: number }): number => Math.hypot(s().c4Nodes.a2.x - was.x, s().c4Nodes.a2.y - was.y)
+    for (const [shown, other] of [['other', null], [null, 'other']] as const) {
+      s().loadDiagram(roots())
+      s().setActiveView(shown)
+      s().reparentNodes(['a2'], null, { quiet: true })
+      expect(violations()).toEqual([])
+      expect(near({ x: 360, y: 120 })).toBeLessThan(500)
+      s().setActiveView(other)
+      expect(violations()).toEqual([])
+      expect(near({ x: 360, y: 120 })).toBeLessThan(500)
+    }
+  })
 })
 
 /** Root systems S1, S3; S2 holds Q0 and Q1. The view "folded" folds S2. */

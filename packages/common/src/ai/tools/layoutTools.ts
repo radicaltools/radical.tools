@@ -41,7 +41,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
   return [
     {
       name: 'smart_layout',
-      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. Call it after adding or moving several nodes.",
+      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. A large view gets as much work as one Smart Layout in Studio, the same layout, and the result says 'run it again for more' when more would help. Call it after adding or moving several nodes.",
       inputSchema: {
         type: 'object',
         properties: {

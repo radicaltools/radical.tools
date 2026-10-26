@@ -32,6 +32,17 @@ describe('the lines a layout sees', () => {
     expect(rolledUp.label).toBe('renders with\nkeeps the model with')
   })
 
+  it('gives a rolled-up line the technology of its relations only when they share it', () => {
+    const tech = (r1: string, r2: string) => {
+      const withTech = { ...relations, r1: { ...relations.r1, technology: r1 }, r2: { ...relations.r2, technology: r2 } }
+      const drawn = [viewLayoutInput(view, nodes, withTech).relations.r1, projectToVisibleGraph({ ...nodes, studio: { ...nodes.studio, collapsed: true } }, withTech).relations.r1]
+      return drawn.map((r) => r.technology)
+    }
+    expect(tech('TypeScript', 'TypeScript')).toEqual(['TypeScript', 'TypeScript'])
+    // The first relation's alone read as the line's.
+    expect(tech('TypeScript', 'JSON')).toEqual([undefined, undefined])
+  })
+
   it('holds shown elements in the containers they sit in, as frames no line ends at', () => {
     // The view lists the two components, not Studio: Studio is a frame.
     const components = { ...view, nodeIds: ['canvas', 'store', 'common'] }

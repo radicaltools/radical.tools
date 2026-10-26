@@ -13,11 +13,11 @@ import type { C4Node, C4Relation, EdgeStyle, PositionMap } from '@radical/common
 import type { Metamodel } from '@radical/common/metamodel'
 import { projectToVisibleGraph } from '../geometry'
 import { computeLayoutMetrics } from '../crossingOpt'
-import { type Alignment, enforceAlignments } from '../constraints'
+import { type Alignment, alongAxis, enforceAlignments } from '../constraints'
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
-import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
+import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, costRows, formatPart, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
 import { candidateMoves, compactMoves, gatherMoves, untangleMoves, type Move } from './moves'
 export { type CostParts, PART_LABELS, costRows, formatPart } from './cost'
 
@@ -36,8 +36,10 @@ export interface TidyReport {
   after: CostParts
   /** True when no move helped: the canvas was left as it was. */
   unchanged: boolean
-  /** True when the time budget (or a stop) ended the tidying before it was done. */
+  /** True when the budget (or a stop) ended the tidying before it was done. */
   budgetOut: boolean
+  /** The work done, as a budget counts it. */
+  work: number
 }
 
 export interface TidyLayoutResult extends SmartLayoutResult {
@@ -61,11 +63,18 @@ export interface TidyOptions {
   onProgress?: (done: number, description: string) => void
   /** Asked before each round: true stops the tidying with what was done. */
   shouldStop?: () => boolean
-  /** Stop after this many milliseconds, with what was done. */
-  budgetMs?: number
+  /** Stop after this much work, with what was done. Work is moves judged, each
+   *  counted as many times as the view has elements (judging one takes longer on
+   *  a larger view); not time, so a view gets the same layout on any machine. */
+  budget?: number
 }
 
 export const TIDY_NAME = 'Tidy'
+/** The budget Studio and the MCP server give a run (TidyOptions.budget): on the
+ *  sample's whole-model view (283 elements, 10 000 moves judged) about 770 moves,
+ *  some ten seconds in a browser; a view of 30 elements is tidied to the end.
+ *  A view that needs more is tidied again. */
+export const TIDY_BUDGET = 2_830_000
 const MAX_STEPS = 400
 /** Two moves ahead: this many of the best rejected moves are tried, those within this much of paying off. */
 const LOOKAHEAD_WIDTH = 6
@@ -86,6 +95,9 @@ const ROUGH_FROM = 120
 const KIN_JUDGED = 12
 const PILE_SHARE = 0.3
 const ROUGH_WHEN_TANGLED = 0.5
+/** The closing passes (drawn in, judged afresh, the margin) are repeated until one changes
+ *  nothing, at most this many times: what a second run would find, this one takes. */
+const MAX_PASSES = 4
 /** A large view's first round takes every move that helps as it comes (first improvement)
  *  instead of judging them all for the single best: hundreds of moves in the time the
  *  best-first round would spend choosing one, so a budget always buys something. */
@@ -98,8 +110,8 @@ export function runTidyLayout(
   const style = options.edgeStyle ?? 'curved'
   const { nodes, relations } = projectToVisibleGraph(inputNodes, inputRelations)
   const baseline = computeLayoutMetrics(nodes, relations)
-  const started = Date.now()
-  const outOfTime = (): boolean => (options.budgetMs !== undefined && Date.now() - started > options.budgetMs) || !!options.shouldStop?.()
+  let work = 0
+  const outOfTime = (): boolean => (options.budget !== undefined && work >= options.budget) || !!options.shouldStop?.()
   // Round a few elements: everything else is as good as pinned, but the
   // frames holding what moves still follow it.
   let pinned = options.pinned ?? []
@@ -117,22 +129,50 @@ export function runTidyLayout(
   }
   const l = new Layout(nodes, options.metamodel, pinned, options.frames)
   l.edgeStyle = style
+  const judgementWork = l.ids().length
   const lines = linesOf(l, relations)
   const before = totalCost(l, lines)
   const steps: TidyStep[] = []
-  const startPositions = l.positions()
+  // A pile, or a large tangled view, as the canvas has it (for the rough layout below).
+  const piled = l.ids().filter((id) => l.overlaps(id)).length > PILE_SHARE * l.ids().length
+  const tangled = lines.length > 0 && (before.crossings + before.overdraws) > ROUGH_WHEN_TANGLED * lines.length
+
+  // The rows and columns the author set hold from the start, and every move
+  // keeps them (keepLines): what Tidy hands over is the layout it judged,
+  // so a second run finds it as this one left it.
+  const alignments = options.alignments ?? []
+  const lineUp = (): void => {
+    if (!alignments.length) return
+    l.setPositions(enforceAlignments(nodes, l.positions(), alignments))
+    l.refit()
+  }
+  {
+    const wasPositions = l.positions()
+    lineUp()
+    const now = l.positions()
+    const moved: PositionMap = {}
+    for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
+    if (Object.keys(moved).length) {
+      const description = 'The rows and columns set on the view lined up'
+      steps.push({ kind: 'align', description, gain: 0, moved })
+      options.onProgress?.(steps.length, description)
+    }
+  }
+  const start = { cost: steps.length ? totalCost(l, lines).total : before.total, positions: l.positions(), steps: steps.length }
 
   // A large view, or a pile, is sketched first: the semantic layered layout
   // puts persons on top, outside systems at the edge, frames as blocks and
   // their children in layers by flow. The moves then start from a sketch
   // instead of tidying a pile one element at a time (which a person would
-  // not do either). Not round a selection, nor with pins to keep.
-  const piled = l.ids().filter((id) => l.overlaps(id)).length
-  const tangled = lines.length > 0 && (before.crossings + before.overdraws) > ROUGH_WHEN_TANGLED * lines.length
-  if (!options.around?.length && !pinned.length && (piled > PILE_SHARE * l.ids().length || (l.ids().length > ROUGH_FROM && tangled))) {
+  // not do either). Not round a selection, nor with pins to keep. A large
+  // view still tangled after a run is not sketched again unless the sketch
+  // reads better: another run continues from the canvas.
+  if (!options.around?.length && !pinned.length && (piled || (l.ids().length > ROUGH_FROM && tangled))) {
     const wasPositions = l.positions()
     l.setPositions(applyRadicalLayout(nodes, relations))
     l.refit()
+    lineUp()
+    if (!piled && totalCost(l, lines).total >= start.cost) l.setPositions(wasPositions)
     const now = l.positions()
     const moved: PositionMap = {}
     for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -143,15 +183,82 @@ export function runTidyLayout(
     }
   }
 
+  // Every layout the moves passed through, by where the boxes stand, with
+  // the number of steps that led there. Moves that come back to one went
+  // round in a circle (their gains, judged locally, added up to more than
+  // the whole changed): the circle is taken back and the round ends.
+  const seen = new Map<string, number>()
+  const stateKey = (): string => {
+    let h1 = 0, h2 = 0
+    for (const id of l.ids()) {
+      const b = l.box(id)!
+      const x = Math.round(b.x), y = Math.round(b.y)
+      h1 = (Math.imul(h1, 31) + x) | 0; h1 = (Math.imul(h1, 31) + y) | 0
+      h2 = (Math.imul(h2, 37) ^ (x * 7919 + y)) | 0
+    }
+    return `${h1}:${h2}`
+  }
+  // Where it started, so moves that come back to it (the loose elements
+  // to the margin and back) are seen to have gone round.
+  seen.set(stateKey(), steps.length)
+
+  // The members of the author's rows and columns where a move found them;
+  // after it, a row a member left follows it (the others moved along that
+  // axis, with what they hold), or, where that is not clear of the rest,
+  // the member is put back on the row; the move fails when neither is
+  // clear or a row is left out of its order.
+  const lineIds = [...new Set(alignments.flatMap((a) => a.ids))].filter((id) => l.box(id))
+  const lineReach = [...new Set(lineIds.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+  const held = (): Map<string, Box> | null => (lineIds.length ? l.snapshot(lineIds) : null)
+  const keepLines = (was: Map<string, Box> | null): boolean => {
+    if (!was) return true
+    const offsets = (a: Alignment): { id: string; d: number }[] => {
+      const key = a.axis === 'x' ? 'cx' : 'cy'
+      return a.ids.filter((id) => was.has(id)).map((id) => ({ id, d: l.box(id)![key] - was.get(id)![key] }))
+    }
+    const level = (ds: { d: number }[]): boolean => ds.every((m) => Math.abs(m.d - ds[0].d) < 0.01)
+    const shift = (a: Alignment, id: string, d: number): void => l.moveBy(id, a.axis === 'x' ? d : 0, a.axis === 'y' ? d : 0)
+    const repair = (follow: boolean): boolean => {
+      for (let round = 0; round < 3; round++) {
+        let off = false
+        for (const a of alignments) {
+          const ds = offsets(a)
+          if (level(ds)) continue
+          off = true
+          const moved = ds.filter((m) => Math.abs(m.d) >= 0.01)
+          if (follow && level(moved)) { for (const m of ds) if (Math.abs(m.d) < 0.01) shift(a, m.id, moved[0].d) }
+          else for (const m of moved) shift(a, m.id, -m.d)
+        }
+        if (!off) break
+      }
+      for (const a of alignments) {
+        if (!level(offsets(a))) return false
+        const along = alongAxis(a) === 'x' ? 'cx' : 'cy'
+        for (const chain of a.orders) {
+          const ids = chain.filter((id) => was.has(id))
+          for (let k = 1; k < ids.length; k++) {
+            if (was.get(ids[k - 1])![along] < was.get(ids[k])![along] && l.box(ids[k - 1])![along] >= l.box(ids[k])![along]) return false
+          }
+        }
+      }
+      return l.allClear(lineIds)
+    }
+    const moved = l.snapshot(lineReach)
+    if (repair(true)) return true
+    l.restore(moved)
+    return repair(false)
+  }
+
   // First the loose elements out of the way, whatever the cost says: they
   // have no lines for it to see. And again at the end, to the margin the
   // tidied diagram has.
   const take = (moves: Move[]): void => {
     for (const move of moves) {
-      const touched = [...new Set(move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+      const touched = [...new Set([...move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]), ...lineReach])]
       const wasPositions = l.positions()
       const was = l.snapshot(touched)
-      if (!move.apply(l)) { l.restore(was); continue }
+      const lined = held()
+      if (!move.apply(l) || !keepLines(lined)) { l.restore(was); continue }
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -162,10 +269,11 @@ export function runTidyLayout(
   take(untangleMoves(l, nodes))
   const gather = (): void => {
     for (const move of gatherMoves(l, nodes, lines)) {
-      const touched = [...new Set(move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]))]
+      const touched = [...new Set([...move.ids.flatMap((id) => [id, ...l.descendants(id), ...ancestors(l, id)]), ...lineReach])]
       const wasPositions = l.positions()
       const was = l.snapshot(touched)
-      if (!move.apply(l)) { l.restore(was); continue }
+      const lined = held()
+      if (!move.apply(l) || !keepLines(lined)) { l.restore(was); continue }
       const now = l.positions()
       const moved: PositionMap = {}
       for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
@@ -183,7 +291,7 @@ export function runTidyLayout(
   // The best layout seen, by the whole cost: a run cut short by its budget,
   // or one whose local judgements added up wrong, hands that over, never
   // anything worse than it started from.
-  let best = { cost: before.total, positions: startPositions, steps: 0 }
+  let best = start
   const checkpoint = (): void => {
     const cost = totalCost(l, lines).total
     if (cost < best.cost) best = { cost, positions: l.positions(), steps: steps.length }
@@ -207,15 +315,20 @@ export function runTidyLayout(
     }
   }
   const judge = (move: Move): { gain: number; after: Map<string, Box> | null } => {
+    work += judgementWork
     const moved = new Set(move.ids)
     // Tried first, to know what it changes: the cost before and after is
     // then judged on the same elements (the room round where the moved
     // ones were and where they are).
     l.begin()
+    const lined = held()
     const done = move.apply(l)
     if (!done) { l.rollback(); return { gain: -Infinity, after: null } }
     settle(l.journalBoxes())
+    if (!keepLines(lined)) { l.rollback(); return { gain: -Infinity, after: null } }
     const touched = l.changed()
+    // A member put back on its line moved too: its lines are judged with the move.
+    for (const id of touched) if (lined?.has(id)) moved.add(id)
     const after = l.snapshot(touched)
     const was = l.journalBoxes()
     const roomy = new Set<string>()
@@ -240,21 +353,6 @@ export function runTidyLayout(
     updateIndex(l, index, touched)
     const costWas = localCost(l, lines, moved, index, roomy, shifted, changed)
     return { gain: costWas - costNow, after }
-  }
-  // Every layout the moves passed through, by where the boxes stand, with
-  // the number of steps that led there. Moves that come back to one went
-  // round in a circle (their gains, judged locally, added up to more than
-  // the whole changed): the circle is taken back and the round ends.
-  const seen = new Map<string, number>()
-  const stateKey = (): string => {
-    let h1 = 0, h2 = 0
-    for (const id of l.ids()) {
-      const b = l.box(id)!
-      const x = Math.round(b.x), y = Math.round(b.y)
-      h1 = (Math.imul(h1, 31) + x) | 0; h1 = (Math.imul(h1, 31) + y) | 0
-      h2 = (Math.imul(h2, 37) ^ (x * 7919 + y)) | 0
-    }
-    return `${h1}:${h2}`
   }
   let looped = false
   const circled = (): boolean => {
@@ -389,45 +487,58 @@ export function runTidyLayout(
   seen.set(stateKey(), steps.length)
   improve()
 
-  // Drawn in at the end: every move that costs nothing is taken.
-  const drawnIn = new Set<string>()
-  for (const move of compactMoves(l, nodes, lines)) {
-    if (outOfTime()) break
-    index = buildIndex(l, lines)
-    const fresh = judge(move)
-    if (!fresh.after || fresh.gain < -0.001) continue
-    const wasPositions = l.positions()
-    l.restore(fresh.after)
-    const now = l.positions()
-    const moved: PositionMap = {}
-    for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
-    if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved }); options.onProgress?.(steps.length, move.description) }
-    for (const id of Object.keys(moved)) { drawnIn.add(id); for (const sb of l.childrenOf(l.parentOf(id))) drawnIn.add(sb) }
-  }
-  // What the drawing in made possible: judged again where something moved.
-  stale = new Set(drawnIn)
-  for (const id of drawnIn) for (const x of lines) { if (x.a === id) stale.add(x.b); if (x.b === id) stale.add(x.a) }
-  improve()
-  // A last look at every move, every gain judged afresh rather than kept
-  // from earlier rounds: what is left now, a second run would find.
-  stale = null
-  improve()
-  // The loose elements to the margin the diagram has now; that opens moves
-  // of its own (a row with one of them), which a second run would take, so
-  // they are taken now, as long as the margin keeps moving.
-  for (let round = 0; round < 3; round++) {
-    const done = steps.length
-    gather()
-    if (steps.length === done || outOfTime()) break
+  // The closing passes, until one changes nothing: a run that ends with
+  // moves still to take hands the next run its work (a drawing in that
+  // opened a row, a margin that moved), and Smart Layout run again on its
+  // own layout should find nothing left to tidy.
+  for (let pass = 0; pass < MAX_PASSES && !outOfTime(); pass++) {
+    const at = stateKey()
+    // Drawn in at the end: every move that costs nothing is taken.
+    const drawnIn = new Set<string>()
+    for (const move of compactMoves(l, nodes, lines)) {
+      if (outOfTime()) break
+      index = buildIndex(l, lines)
+      const fresh = judge(move)
+      if (!fresh.after || fresh.gain < -0.001) continue
+      const wasPositions = l.positions()
+      l.restore(fresh.after)
+      const now = l.positions()
+      const moved: PositionMap = {}
+      for (const id of Object.keys(now)) if (!same(wasPositions[id], now[id])) moved[id] = now[id]
+      if (Object.keys(moved).length) { steps.push({ kind: move.kind, description: move.description, gain: Math.max(0, fresh.gain), moved }); options.onProgress?.(steps.length, move.description) }
+      for (const id of Object.keys(moved)) { drawnIn.add(id); for (const sb of l.childrenOf(l.parentOf(id))) drawnIn.add(sb) }
+    }
+    // What the drawing in made possible: judged again where something moved.
+    if (drawnIn.size) {
+      stale = new Set(drawnIn)
+      for (const id of drawnIn) for (const x of lines) { if (x.a === id) stale.add(x.b); if (x.b === id) stale.add(x.a) }
+      improve()
+    }
+    // A last look at every move, every gain judged afresh rather than kept
+    // from earlier rounds: what is left now, a second run would find.
     stale = null
     improve()
+    // The loose elements to the margin the diagram has now; that opens moves
+    // of its own (a row with one of them), which a second run would take, so
+    // they are taken now, as long as the margin keeps moving.
+    for (let round = 0; round < 3; round++) {
+      const done = steps.length
+      gather()
+      if (steps.length === done || outOfTime()) break
+      stale = null
+      improve()
+    }
+    if (stateKey() === at) break
   }
   checkpoint()
   if (totalCost(l, lines).total > best.cost + 0.01) {
     l.setPositions(best.positions)
     steps.length = best.steps
   }
-  let positions = l.positions()
+  // The author's rows and columns held all along; lined up once more as
+  // the canvas measures them, before the diagram is moved to the top left,
+  // so what is handed over stands where the next run will find it.
+  let positions = enforceAlignments(nodes, l.positions(), alignments)
   // The whole diagram from the top left, as every layout hands it over;
   // not when something is pinned: it stays where the author put it.
   const roots = l.ids().filter((id) => !l.parentOf(id))
@@ -435,7 +546,6 @@ export function runTidyLayout(
     const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
     for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
   }
-  positions = enforceAlignments(nodes, positions, options.alignments ?? [])
   const projected = projectPositions(nodes, positions)
   const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
   afterLayout.edgeStyle = style
@@ -449,8 +559,20 @@ export function runTidyLayout(
     planarity: computePlanarityScore(projected, relations),
     refinement: { before: before.total, after: after.total, iterations: steps.length },
     keptCurrent: steps.length === 0,
-    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime() },
+    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut: outOfTime(), work },
   }
+}
+
+/** What a run did, as Studio's notice and the MCP server's smart_layout tell it: the
+ *  moves, and the three parts of the reader's cost that gained most. */
+export function tidySummary(tidy: TidyReport): string {
+  const arrow = '\u2009\u2192\u2009'
+  const gained = costRows(tidy.before, tidy.after)
+    .sort((p, q) => (q.before - q.after) * q.weight - (p.before - p.after) * p.weight)
+    .filter((p) => p.before - p.after > 0.05).slice(0, 3)
+    .map((p) => `${p.label.toLowerCase()} ${formatPart(p.before)}${arrow}${formatPart(p.after)}`)
+  const n = tidy.steps.length
+  return `${n} move${n === 1 ? '' : 's'}${tidy.budgetOut ? ' (run it again for more)' : ''}${gained.length ? ` — ${gained.join(', ')}` : ''}`
 }
 
 function ancestors(l: Layout, id: string): string[] {

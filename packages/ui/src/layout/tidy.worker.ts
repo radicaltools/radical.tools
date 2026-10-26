@@ -6,7 +6,7 @@
  *                | { type: 'result', result }
  *                | { type: 'error', message }
  * Stopping it is terminating it: the run is synchronous, so no message
- * reaches it meanwhile; the time budget runs inside.
+ * reaches it meanwhile; the budget runs inside.
  */
 import { runTidyLayout, type TidyLayoutResult, type TidyOptions } from '@radical/layout/tidy'
 import type { C4Node, C4Relation } from '@radical/common/c4'

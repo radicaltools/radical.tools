@@ -454,7 +454,9 @@ export interface DiagramSnapshot {
    *  on them in it (a fold, Hide from view, an alignment, a filter) and
    *  kept by Save as new. Without their places, camera and name: those are
    *  the view's for every milestone. Every other view is shown as the live
-   *  model has it. */
+   *  model has it. A view of an element the live model deleted since (a
+   *  view per element) is the milestone's alone, with its places
+   *  (keepViewsInMilestones). */
   views?: Record<string, DiagramView>
 }
 

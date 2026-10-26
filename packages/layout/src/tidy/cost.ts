@@ -17,10 +17,11 @@
  * only those (localCost); the whole layout is summed once, for the report.
  */
 import type { C4Relation } from '@radical/common/c4'
-import { type LayoutFlow, relationLayoutHint } from '@radical/common/metamodel'
+import { type LayoutFlow, relationLayoutHint, relationTypeName } from '@radical/common/metamodel'
 import type { Layout } from './layout'
 import { distributePorts, pickSides } from '../portAllocator'
 import { orthogonalConnector, type Pt } from '../edgeRouting'
+import { relationLabelSize, type LabelSize } from '../edgeLabels'
 import { Position } from '../side'
 
 export type Ends = { ax: number; ay: number; bx: number; by: number }
@@ -58,7 +59,7 @@ export const BRUSH = 0.2
 export const W_GRID = 1.5
 /** Per mean element size the gaps on an element's two sides in its row (or column) differ, capped. */
 export const W_EVEN = 1.5
-/** Per relation label drawn over an element it does not join, or over another label. */
+/** Per relation label drawn over an element (the ends of its own line too) or over another label. */
 export const W_LABEL = 3
 /** Per bend of an orthogonal line (an L has one, a Z two). */
 export const W_BEND = 2
@@ -103,21 +104,43 @@ export function formatPart(v: number): string {
   return Math.abs(v - Math.round(v)) < 0.005 ? String(Math.round(v)) : v.toFixed(1)
 }
 
-/** A label's box: the canvas draws the name at 17 px, about 0.56 em per character, with room round it. */
-export const LABEL_CHAR = 17 * 0.56
-export const LABEL_PAD = 16
-export const LABEL_HEIGHT = 24
+/** The part of a frame a label must not cover: its header, where its name is (edgeGeometry.ts). */
+export const FRAME_HEADER = 60
 /** Centres this close share a row or a column. */
 export const STRAIGHT_TOLERANCE = 2
 
-/** A drawn relation, with which way its type reads (layoutHints.ts) and its label, if any. */
-export interface Line { id: string; a: string; b: string; flow: LayoutFlow; axis: 'vertical' | 'horizontal' | 'free'; label?: string }
+/** A drawn relation, with which way its type reads (layoutHints.ts) and the size of its label, if it has one. */
+export interface Line { id: string; a: string; b: string; flow: LayoutFlow; axis: 'vertical' | 'horizontal' | 'free'; label?: LabelSize }
 
-/** Where a line's label is drawn: a box at its middle. */
-export function labelBox(g: LineGeom, label: string): { x0: number; y0: number; x1: number; y1: number } {
-  const w = Math.max(40, label.length * LABEL_CHAR + LABEL_PAD), h = LABEL_HEIGHT
-  const mx = (g.ax + g.bx) / 2, my = (g.ay + g.by) / 2
-  return { x0: mx - w / 2, y0: my - h / 2, x1: mx + w / 2, y1: my + h / 2 }
+/** Where a line's label is drawn: a box at the middle of its path. */
+export function labelBox(g: LineGeom, size: LabelSize): { x0: number; y0: number; x1: number; y1: number } {
+  const { x: mx, y: my } = pathMiddle(g.path)
+  return { x0: mx - size.w / 2, y0: my - size.h / 2, x1: mx + size.w / 2, y1: my + size.h / 2 }
+}
+
+/** The point halfway along a path, where the canvas puts a label first. */
+function pathMiddle(path: Pt[]): Pt {
+  let total = 0
+  for (let i = 1; i < path.length; i++) total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y)
+  let rest = total / 2
+  for (let i = 1; i < path.length; i++) {
+    const seg = Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y)
+    if (rest <= seg && seg > 0) return { x: path[i - 1].x + (path[i].x - path[i - 1].x) * rest / seg, y: path[i - 1].y + (path[i].y - path[i - 1].y) * rest / seg }
+    rest -= seg
+  }
+  return path[path.length - 1]
+}
+
+/** Whether a label's box lies over element `id` as the canvas's label
+ *  placement sees it (placeEdgeLabels): over a leaf, its line's own ends
+ *  too (a label wider than the gap between them covers both names), and
+ *  over a frame's header; not over a frame that holds an end of the line,
+ *  nor one the canvas does not draw. */
+function labelCovers(l: Layout, line: Line, id: string, lb: ReturnType<typeof labelBox>): boolean {
+  if (l.holds(id, line.a) || l.holds(id, line.b) || l.isTight(id)) return false
+  const r = l.box(id)!
+  const h = l.isFrame(id) ? Math.min(r.h, FRAME_HEADER) : r.h
+  return r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + h
 }
 
 /** The lines between drawn elements neither of which holds the other. */
@@ -128,7 +151,14 @@ export function linesOf(l: Layout, relations: Record<string, C4Relation>): Line[
     if (!l.box(r.sourceId) || !l.box(r.targetId) || r.sourceId === r.targetId) continue
     if (l.holds(r.sourceId, r.targetId) || l.holds(r.targetId, r.sourceId)) continue
     const hint = relationLayoutHint(r.relationType, l.metamodel)
-    const label = r.label?.trim()
+    // The label as the canvas draws it (relationLabelLines): the name (or
+    // the type, as it reads), the technology below. A relation with neither
+    // name nor technology shows its type's name, which is not counted yet:
+    // Tidy sets elements the sibling gap apart, narrower than most of those
+    // names, and would give up its conventions to keep them clear.
+    const name = r.label?.trim()
+    const typeName = (): string | undefined => r.relationType && l.metamodel ? relationTypeName(l.metamodel, r.relationType, true, { from: l.nodes[r.sourceId].type, to: l.nodes[r.targetId].type }) : undefined
+    const label = name || r.technology ? relationLabelSize({ ...r, label: name, typeName: typeName() }, l.nodes) ?? undefined : undefined
     out.push({ id, a: r.sourceId, b: r.targetId, flow: hint.flow, axis: hint.axis ?? 'free', ...(label ? { label } : {}) })
   }
   return out
@@ -477,7 +507,7 @@ export function buildIndex(l: Layout, all: Line[]): CostIndex {
   return { all, lineGrid, labelGrid, boxGrid, lineIndex, geom, ports, lineAt, labelAt, boxAt, linesOf }
 }
 
-function labelExtent(g: LineGeom, label: string): Extent {
+function labelExtent(g: LineGeom, label: LabelSize): Extent {
   const b = labelBox(g, label)
   return [b.x0, b.y0, b.x1, b.y1]
 }
@@ -636,13 +666,9 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
     if (!overBox(line, e, id, brush)) return
     if (overBox(line, e, id, -2)) parts.overdraws++; else parts.brushes++
   }
-  // A label over an element it does not join, or over another line's label.
+  // A label over an element (its line's own ends too), or over another line's label.
   const labelOver = (p: Line, lb: ReturnType<typeof labelBox>): void => {
-    for (const id of boxGrid.near(lb.x0, lb.y0, lb.x1, lb.y1)) {
-      if (id === p.a || id === p.b || l.holds(id, p.a) || l.holds(id, p.b)) continue
-      const r = l.box(id)!
-      if (r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + r.h) parts.labels++
-    }
+    for (const id of boxGrid.near(lb.x0, lb.y0, lb.x1, lb.y1)) if (labelCovers(l, p, id, lb)) parts.labels++
     for (const q of index.labelGrid.near(lb.x0, lb.y0, lb.x1, lb.y1)) {
       if (q === p || !q.label || (mineSet.has(q) && lineIndex.get(q)! < lineIndex.get(p)!)) continue
       const o = labelBox(geomOf(index, q), q.label)
@@ -672,9 +698,7 @@ function costOf(l: Layout, all: Line[], mine: Line[], ids: string[], moved: Read
         if (!mineSet.has(q)) overOrBrush(q, geomOf(index, q), id)
       }
       for (const q of index.labelGrid.near(r.x, r.y, r.x + r.w, r.y + r.h)) {
-        if (mineSet.has(q) || id === q.a || id === q.b || l.holds(id, q.a) || l.holds(id, q.b)) continue
-        const lb = labelBox(geomOf(index, q), q.label!)
-        if (r.x < lb.x1 && lb.x0 < r.x + r.w && r.y < lb.y1 && lb.y0 < r.y + r.h) parts.labels++
+        if (!mineSet.has(q) && labelCovers(l, q, id, labelBox(geomOf(index, q), q.label!))) parts.labels++
       }
     }
   }

@@ -398,16 +398,21 @@ function bezierHitsObstacles(
 }
 
 /** Run A* on a grid built from obstacles; returns world-space polyline
- *  including the start/end border points, or null if no path was found. */
+ *  including the start/end border points, or null if no path was found.
+ *  `keepOuts` (the blocks behind the ends' sides) are blocked unpadded: the
+ *  exit cells lie EXIT_DIST out, and a keep-out padded by OBS_PAD reached the
+ *  exit's neighbours on some grid offsets, walling it in, so no route was
+ *  found and the line went straight over the nodes in its way. */
 function routeAround(
   s: Pt, sSide: Position, t: Pt, tSide: Position,
   obstacles: RoutingObstacle[],
+  keepOuts: RoutingObstacle[] = [],
 ): Pt[] | null {
   // Build a bounding box that contains all obstacles + endpoints + margin.
   const margin = OBS_PAD * 2 + EXIT_DIST * 2
   let minX = Math.min(s.x, t.x), minY = Math.min(s.y, t.y)
   let maxX = Math.max(s.x, t.x), maxY = Math.max(s.y, t.y)
-  for (const o of obstacles) {
+  for (const o of [...obstacles, ...keepOuts]) {
     if (o.x - OBS_PAD < minX) minX = o.x - OBS_PAD
     if (o.y - OBS_PAD < minY) minY = o.y - OBS_PAD
     if (o.x + o.w + OBS_PAD > maxX) maxX = o.x + o.w + OBS_PAD
@@ -422,15 +427,17 @@ function routeAround(
   if (cols * rows > MAX_ROUTING_CELLS) return null
 
   const blocked = new Uint8Array(cols * rows)
-  for (const o of obstacles) {
-    const c0 = clamp(Math.floor((o.x - OBS_PAD - minX) / CELL), 0, cols - 1)
-    const c1 = clamp(Math.ceil((o.x + o.w + OBS_PAD - minX) / CELL), 0, cols - 1)
-    const r0 = clamp(Math.floor((o.y - OBS_PAD - minY) / CELL), 0, rows - 1)
-    const r1 = clamp(Math.ceil((o.y + o.h + OBS_PAD - minY) / CELL), 0, rows - 1)
+  const block = (o: RoutingObstacle, pad: number) => {
+    const c0 = clamp(Math.floor((o.x - pad - minX) / CELL), 0, cols - 1)
+    const c1 = clamp(Math.ceil((o.x + o.w + pad - minX) / CELL), 0, cols - 1)
+    const r0 = clamp(Math.floor((o.y - pad - minY) / CELL), 0, rows - 1)
+    const r1 = clamp(Math.ceil((o.y + o.h + pad - minY) / CELL), 0, rows - 1)
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) blocked[r * cols + c] = 1
     }
   }
+  for (const o of obstacles) block(o, OBS_PAD)
+  for (const o of keepOuts) block(o, 0)
 
   // Compute grid entry/exit points (one cell off the border, along the side normal).
   const sExit = extendPt(s.x, s.y, sSide, EXIT_DIST)
@@ -650,7 +657,7 @@ export function computeRoutedEdge(
   // The nodes the relation joins are not obstacles, so the route could run
   // through one of them and reach its side from behind; a keep-out block
   // behind each side makes it come in from the front.
-  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, [...all, keepOut(s, srcSide), keepOut(t, tgtSide)])
+  const polyline = hopeless ? null : routeAround(s, srcSide, t, tgtSide, all, [keepOut(s, srcSide), keepOut(t, tgtSide)])
   // Routing failed (grid too big, or unreachable) — the direct line.
   if (!polyline || polyline.length < 2) return plain()
   if (style === 'orthogonal') return orthogonalEdge(polyline)

@@ -34,6 +34,16 @@ describe('relationLabelLines', () => {
     expect(size.w).toBeLessThanOrEqual(maxWidth)
   })
 
+  it('gives each relation of a rolled-up line a line of its own', () => {
+    // A line drawn to a folded container stands for several relations: their
+    // names joined with a line break, each drawn on its own (RelationEdge).
+    const lines = relationLabelLines({ label: 'Admin API calls\nAPI calls\nAPI calls' })
+    expect(lines.map((l) => l.text)).toEqual(['Admin API calls', 'API calls', 'API calls'])
+    expect(lines.map((l) => l.maxRows)).toEqual([2, 2, 2])
+    const { fontSize, lineHeight, padY, border } = RELATION_LABEL_BOX
+    expect(estimateLabelSize(lines, RELATION_LABEL_BOX).h).toBeCloseTo(3 * fontSize * lineHeight + 2 * padY + 2 * border)
+  })
+
   it('gives a transition room for `event [guard] / actions ^raised`, by event name', () => {
     const nodes = {
       pay: { id: 'pay', type: 'event', label: 'Pay', collapsed: false, x: 0, y: 0, width: 1, height: 1 },

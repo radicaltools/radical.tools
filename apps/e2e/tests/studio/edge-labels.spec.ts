@@ -54,3 +54,17 @@ test('a long relation name is cut after two lines, and shown whole while the rel
   await expect.poll(lines).toBeGreaterThan(2)
   expect(await cut()).toBe(false)
 })
+
+// A line drawn to a folded container stands for several relations of what
+// lies inside (F-0078): the sample's Digital Channels -> Core Banking Platform
+// for "Admin API calls" [HTTPS / Admin API] and two "API calls" [HTTPS /
+// REST]. Its label lists them one a line, and shows no technology, as no
+// one technology is theirs: it read "Admin API calls API calls API calls"
+// with the first relation's technology, as if it were one admin relation.
+test('a rolled-up line lists its relations one a line, without one relation\'s technology', async ({ page, studio }) => {
+  await studio.openSample()
+  const label = page.locator('.relation-label', { hasText: 'Admin API calls' })
+  await expect(label).toHaveCount(1)
+  await expect(label.locator('.relation-label-name')).toHaveText(['Admin API calls', 'API calls', 'API calls'])
+  await expect(label.locator('.relation-label-tech')).toHaveCount(0)
+})

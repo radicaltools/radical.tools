@@ -3,6 +3,7 @@ import { ModelFolder, test } from '../../support/folder'
 import type { Page } from '@playwright/test'
 import type { Discussions } from '@radical/common/discussions'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 
 let folder: ModelFolder
 test.beforeEach(async ({ page, studio }) => {
@@ -181,4 +182,70 @@ test('a browser write failure keeps the draft, creates no empty discussion file 
   await panel.getByRole('button', { name: 'Post comment' }).click()
   await expect(panel.getByRole('status')).toHaveText('Posted.')
   expect((JSON.parse((await folder.files())['discussions.json']) as Discussions).threads).toHaveLength(1)
+})
+
+// The icons are there to open discussions, not part of the diagram: an
+// export showed them beside the elements (F-0067).
+test('an export of the view leaves out the discussion icons', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  await panel.getByLabel('Comment (Markdown supported)').fill('Is the customer a person or a company?')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await panel.getByRole('button', { name: 'Close discussions' }).click()
+  await expect(page.locator('button[data-discussion-node="customer"]')).toBeVisible()
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  const download = page.waitForEvent('download')
+  await page.getByText('Export as SVG…', { exact: true }).click()
+  const svg = await readFile(await (await download).path(), 'utf8')
+  expect(svg).toContain('Customer')
+  expect(svg).not.toContain('node-discussion-badge')
+  expect(svg).not.toContain('data-discussion-node')
+})
+
+// The panel keeps its keys from the canvas, and kept F5 and Cmd/Ctrl+P from
+// Studio as well: the browser reloaded the page, and the draft was lost, or
+// opened its print dialog (F-0068).
+test('F5 and Cmd/Ctrl+P pressed in the comment field are taken as in any dialog of Studio', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  const body = panel.getByLabel('Comment (Markdown supported)')
+  await body.fill('A long draft')
+  await page.evaluate(() => {
+    const w = window as unknown as { __keys: string[] }
+    w.__keys = []
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F5' || e.key === 'p') setTimeout(() => w.__keys.push(`${e.key} prevented: ${e.defaultPrevented}`))
+    }, true)
+  })
+  await page.keyboard.press('F5')
+  await page.keyboard.press('ControlOrMeta+p')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __keys?: string[] }).__keys)).toEqual(['F5 prevented: true', 'p prevented: true'])
+  await expect(body).toHaveValue('A long draft')
+  await expect(body).toBeFocused()
+})
+
+// Post comment and Resolve thread are disabled while they save, and Start a
+// new thread instead goes away: the focus fell to the page, and Escape no
+// longer closed the panel (F-0069).
+test('the focus stays in the discussion panel after Post comment, Resolve thread and Start a new thread instead', async ({ page }) => {
+  await moveToFolder(page)
+  const panel = await discuss(page)
+  const body = panel.getByLabel('Comment (Markdown supported)')
+  await body.fill('Is the customer a person or a company?')
+  await panel.getByRole('button', { name: 'Post comment' }).click()
+  await expect(panel.getByRole('status')).toHaveText('Posted.')
+  await expect(body).toBeFocused()
+  await panel.getByRole('button', { name: 'Resolve thread' }).click()
+  await expect(panel.getByRole('button', { name: 'Reopen thread' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+  await discuss(page)
+  await panel.getByRole('button', { name: 'Reopen thread' }).click()
+  await expect(panel.getByRole('button', { name: 'Resolve thread' })).toBeFocused()
+  await panel.getByRole('button', { name: 'Reply', exact: true }).click()
+  await panel.getByRole('button', { name: 'Start a new thread instead' }).click()
+  await expect(body).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
 })
