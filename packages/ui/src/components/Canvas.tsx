@@ -226,6 +226,45 @@ function ConnectPills({ containerRef, targets, nameOf }: {
   )
 }
 
+/** What the pointer of `e` is on, for the special key: its target, or where
+ *  that lies over the elements, the element under it seen through. React Flow's rectangle round
+ *  a box selection covers what it selected: a press or click with the key
+ *  there found no element, the gesture did not start and React Flow dragged
+ *  the selection (F-0094). The pills keep their size on screen, so zoomed out
+ *  an element's stand over the element above it: a drop or click on that
+ *  one went to the pill (F-0092). A pill keeps the pointer only where it
+ *  lies over no other element (over its own, or one holding it, it does);
+ *  `pills` false (a press, which no pill takes): never. Returns the element
+ *  to read as the event's target. */
+function pointerTarget(e: MouseEvent, pills = true): HTMLElement | null {
+  const target = e.target as HTMLElement
+  if (!(target instanceof Element) || !target.closest('.react-flow__nodesselection, .connect-pills')) return target
+  let pill: HTMLElement | null = null
+  let through = false
+  for (const el of document.elementsFromPoint(e.clientX, e.clientY) as HTMLElement[]) {
+    if (el.closest('.react-flow__nodesselection')) { through = true; continue }
+    if (el.closest('.connect-pills')) { pill ??= el; through = true; continue }
+    // Seen through: what is under the pointer there, not a line over it.
+    if (through && el.closest('.react-flow__edge, .react-flow__edgelabel-renderer')) continue
+    const id = el.closest<HTMLElement>('.react-flow__node')?.dataset.id
+    const own = pill?.closest<HTMLElement>('.connect-pills')?.dataset.connectOver
+    if (pill && pills && (!id || !own || id === own || holdsNode(id, own))) return pill
+    return el
+  }
+  return pills ? pill : null
+}
+
+/** `outer` holds `inner`, at any depth. */
+function holdsNode(outer: string, inner: string): boolean {
+  const nodes = useDiagramStore.getState().c4Nodes
+  const seen = new Set<string>()
+  for (let p = nodes[inner]?.parentId; p && !seen.has(p); p = nodes[p]?.parentId) {
+    if (p === outer) return true
+    seen.add(p)
+  }
+  return false
+}
+
 // When the grabbed element's parent is selected too, React Flow drags the
 // parent and leaves the grabbed one out of what it moves (handing over
 // no node, or one that does not move): the first element it drags stands
@@ -1311,7 +1350,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
     const onMouseDown = (e: MouseEvent) => {
       if (!isModHeld(e)) return
-      const nodeId = findNodeId(e.target as HTMLElement)
+      const target = pointerTarget(e, false) ?? e.target as HTMLElement
+      const nodeId = findNodeId(target)
       if (!nodeId) return
 
       // Prevent ReactFlow from seeing this (no drag, no select)
@@ -1324,7 +1364,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       // nesting, which were shown there and lost on the way back).
       if (!editsModel(state)) {
         selectOnlyRef.current = nodeId
-        if ((e.target as HTMLElement).closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
+        if (target.closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
         return
       }
       state.startConnection(nodeId)
@@ -1345,7 +1385,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       if (!connectingRef.current) return
       setConnectMouse({ x: e.clientX, y: e.clientY })
       // Over the panel the element stays the one it stands over.
-      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      const under = pointerTarget(e)
       if (under?.closest('.connect-pills')) return
       setConnectOver(under ? findNodeId(under) : null)
     }
@@ -1354,7 +1394,8 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       const pressed = selectOnlyRef.current
       selectOnlyRef.current = null
       boxFromRef.current = null
-      if (pressed && findNodeId(e.target as HTMLElement) === pressed) {
+      const target = pointerTarget(e) ?? e.target as HTMLElement
+      if (pressed && findNodeId(target) === pressed) {
         const ids = useDiagramStore.getState().selectedNodeIds
         useDiagramStore.getState().setSelectedNodeIds(ids.includes(pressed) ? ids.filter((id) => id !== pressed) : [...ids, pressed])
       }
@@ -1369,7 +1410,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 
       // Dropped on a field of the target's panel: a relation of that type,
       // or the element moved inside the target.
-      const field = (e.target as HTMLElement).closest<HTMLElement>('[data-connect-target]')
+      const field = target.closest<HTMLElement>('[data-connect-target]')
       const sources = connectSources(state, src)
       if (field) {
         const type = field.dataset.connectType
@@ -1380,13 +1421,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       }
 
       // On the panel beside its fields: the element it stands over.
-      const panel = (e.target as HTMLElement).closest<HTMLElement>('.connect-pills')
-      const nodeId = panel ? panel.dataset.connectOver ?? connectOverRef.current : findNodeId(e.target as HTMLElement)
+      const panel = target.closest<HTMLElement>('.connect-pills')
+      const nodeId = panel ? panel.dataset.connectOver ?? connectOverRef.current : findNodeId(target)
       const offered = nodeId ? connectTargetsRef.current?.get(nodeId)?.map((t) => t.type) ?? [] : []
       // On the empty canvas: out of its container, where it may stand there;
       // where it may not, it stays and a notice says why.
       // (Holding the selection key, React Flow lays its selection pane over it.)
-      const onCanvas = (e.target as HTMLElement).closest('.react-flow') && !(e.target as HTMLElement).closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
+      const onCanvas = target.closest('.react-flow') && !target.closest('.react-flow__node, .react-flow__edge, .react-flow__panel, .connect-pills')
       if (!nodeId && onCanvas) nestAll(sources, null)
       // Inside the target, its only offer; nothing on its container.
       else if (nodeId && offered.length === 1 && offered[0] === NEST_INSIDE) nestAll(sources, nodeId)
@@ -1422,7 +1463,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     // to handle (it adds the element to the selection): React Flow's own
     // multi-selection would take it out again.
     const onClick = (e: MouseEvent) => {
-      if (isModHeld(e) && findNodeId(e.target as HTMLElement)) e.stopPropagation()
+      if (isModHeld(e) && findNodeId(pointerTarget(e, false) ?? e.target as HTMLElement)) e.stopPropagation()
     }
 
     // Capture phase so we intercept before ReactFlow
@@ -1763,7 +1804,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   useEffect(() => {
     if (!relink) return
     const onMove = (e: MouseEvent): void => {
-      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+      const under = pointerTarget(e)
       if (under?.closest('.connect-pills')) return
       setConnectOver(under?.closest('.react-flow__node')?.getAttribute('data-id') ?? null)
     }
