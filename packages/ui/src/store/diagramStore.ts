@@ -2732,6 +2732,11 @@ function deriveRFEdges(
     return d
   }
 
+  // How a relation's type reads, and what a relation without a name shows
+  // in its stead: its type, or nothing for a transition (RelationEdge).
+  const typeNameOf = (rel: C4Relation, type: string) => relationTypeName(metamodel, type, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined)
+  const shownTypeName = (rel: C4Relation) => rel.relationType && rel.relationType !== 'transition' ? typeNameOf(rel, rel.relationType) : undefined
+
   for (const rel of Object.values(relations)) {
     if (!nodes[rel.sourceId] || !nodes[rel.targetId]) continue
     if (hiddenRelationIds && hiddenRelationIds.has(rel.id)) continue
@@ -2768,9 +2773,12 @@ function deriveRFEdges(
       // A technology only when they all use it: the first one's alone
       // read as the whole line's.
       if (existing?.data && existing.data.technology !== rel.technology) existing.data.technology = undefined
-      const label = relationDisplayLabel(rel, nodes)
+      // One a line, each by its name, or by its type as a line of its own
+      // shows it (the first one's type, until now in the label's stead).
+      const label = relationDisplayLabel(rel, nodes) ?? shownTypeName(rel)
       if (existing && label) {
-        const joined = existing.data?.label ? `${existing.data.label}\n${label}` : label
+        const first = existing.data?.label ?? (existing.data?.relationType === 'transition' ? undefined : existing.data?.typeName)
+        const joined = first ? `${first}\n${label}` : label
         existing.label = joined
         if (existing.data) existing.data.label = joined
       }
@@ -2801,7 +2809,7 @@ function deriveRFEdges(
         label: relationDisplayLabel(rel, nodes),
         technology: rel.technology,
         relationType: rel.relationType,
-        ...(rel.relationType ? { typeName: relationTypeName(metamodel, rel.relationType, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined) } : {}),
+        ...(rel.relationType ? { typeName: typeNameOf(rel, rel.relationType) } : {}),
         isVirtual,
         ...(isVirtual ? { relationIds: [rel.id] } : {}),
       },

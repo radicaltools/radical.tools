@@ -176,6 +176,15 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
       excludeIds.has(c.id) || c.ancestors.includes(source) || c.ancestors.includes(target))
   }
 
+  // The boxes of an edge's own ends, which it enters only at its ports.
+  const endsOf = (source: string, target: string): RoutingObstacle[] => {
+    if (moving) return []
+    return [source, target].flatMap((id) => {
+      const c = candidates.byId.get(id)
+      return c?.visible ? [c.rect] : []
+    })
+  }
+
   let routes = new Map<string, RouteEntry>()
   for (const e of edges) {
     const alloc = ports.get(e.id)
@@ -187,7 +196,7 @@ export function edgeGeometry(nodes: NodeInternals, edges: RFEdges, moving: boole
       routes.set(e.id, prev)
       continue
     }
-    const route = computeRoutedEdge(sp.x, sp.y, alloc.sourceSide, tp.x, tp.y, alloc.targetSide, obstaclesFor(e.source, e.target), undefined, style)
+    const route = computeRoutedEdge(sp.x, sp.y, alloc.sourceSide, tp.x, tp.y, alloc.targetSide, obstaclesFor(e.source, e.target), undefined, style, endsOf(e.source, e.target))
     routes.set(e.id, { key, route, box: routeBox(sp, alloc.sourceSide, tp, alloc.targetSide, route) })
   }
   routeCache = routes

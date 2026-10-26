@@ -12,6 +12,7 @@ import { useDiagramStore } from '../../store/diagramStore'
 import { edgeFocus } from '../../store/canvasFocus'
 import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
 import { editingControl } from '../editingControl'
+import { LABEL_FONT_FAMILY } from '@radical/layout/edgeLabels'
 
 // ─── Custom arrowhead ─────────────────────────────────────────────────────────
 
@@ -253,6 +254,8 @@ export const RelationEdge = memo(
                 borderRadius:    4,
                 padding:         `${LABEL_BOX.padY}px ${LABEL_BOX.padX}px`,
                 fontSize:        LABEL_BOX.fontSize,
+                // The font its size is measured in (relationLabelSize).
+                fontFamily:      LABEL_FONT_FAMILY,
                 color:           'var(--text-primary)',
                 pointerEvents:   'none',
                 maxWidth:        LABEL_BOX.maxWidth,

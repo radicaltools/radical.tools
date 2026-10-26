@@ -356,6 +356,8 @@ function renderEdges(
     ? grid.without((it) => it.id === sId || it.id === tId || !!ancestors![sId]?.has(it.id) || !!ancestors![tId]?.has(it.id)
         || !!ancestors![it.id]?.has(sId) || !!ancestors![it.id]?.has(tId))
     : []
+  // The boxes of its ends, which a routed relation enters only at its ports.
+  const endsOf = (sId: string, tId: string) => grid ? [sId, tId].map((id) => ({ x: abs[id].x, y: abs[id].y, w: abs[id].w, h: abs[id].h })) : []
 
   // Relations per side of each element.
   const onSide = new Map<string, number>()
@@ -385,7 +387,7 @@ function renderEdges(
       if (dotT < 0) stubLoopPenalty += dotT * dotT
     }
     // As the canvas draws it in this style: direct, or around elements.
-    const route = computeRoutedEdge(sp.x, sp.y, port.sourceSide, tp.x, tp.y, port.targetSide, obstaclesFor(e.sourceId, e.targetId), undefined, style)
+    const route = computeRoutedEdge(sp.x, sp.y, port.sourceSide, tp.x, tp.y, port.targetSide, obstaclesFor(e.sourceId, e.targetId), undefined, style, endsOf(e.sourceId, e.targetId))
     lines.set(e.id, { e, points: route.points })
   }
   if (style === 'orthogonal') {
