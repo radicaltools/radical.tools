@@ -448,10 +448,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     record(rfStore.getState().transform)
     // And kept as the view's camera by this viewer, outside the model
     // (viewCameras.ts): a slide's is the slide's, an exploration keeps none.
+    // Only Designer's: Viewer and Presenter open each view at Designer's
+    // camera and keep none of their own (a slide clicked there became the
+    // view's, and Designer opened at it after a reload).
     // Not on mount: React Flow's default camera stands until the view's is placed.
     const keep = (transform: [number, number, number]): void => {
       const s = useDiagramStore.getState()
-      if (s.presentationActive || (s.activeViewId !== null && !s.views[s.activeViewId])) return
+      if (s.appMode !== 'designer' || s.presentationActive || (s.activeViewId !== null && !s.views[s.activeViewId])) return
       noteViewCamera(s.activeViewId, { x: transform[0], y: transform[1], zoom: transform[2] })
     }
     return rfStore.subscribe((s, prev) => {
