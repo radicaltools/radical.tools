@@ -124,6 +124,22 @@ describe('radical check', () => {
       'Slide "Now" of "Deck" focuses on 1 element(s) the model it shows does not have: gone.',
     ])
   })
+
+  // F-0104: a slide Studio added of a milestone's view of an element the
+  // live model deleted since was reported as showing a view the model lacks.
+  it('takes a slide of a view its milestone has alone as a view the model has', () => {
+    const data = complete()
+    const sm = { id: 'sm', type: 'system', label: 'Lifecycle', x: 0, y: 0, width: 1, height: 1, collapsed: false }
+    data.snapshots = [{ id: 'm', name: 'As-is', timestamp: 0, nodes: { sm }, relations: {}, views: { pl: { id: 'pl', name: 'Payment lifecycle', subject: 'sm', nodeIds: ['sm'], positions: {} } } } as never]
+    const slide = { snapshotId: 'm', viewport: { x: 0, y: 0, zoom: 0 } }
+    data.presentations = [{ id: 'p', name: 'Deck', slides: [
+      { ...slide, id: 'a', name: 'Then', viewId: 'pl' },
+      { ...slide, id: 'b', name: 'Now', snapshotId: null, viewId: 'pl' },
+    ] }]
+    expect(check(data).findings.filter((f) => f.rule === 'stale-reference').map((f) => f.message)).toEqual([
+      'Slide "Now" of "Deck" shows view pl, which the model does not have.',
+    ])
+  })
 })
 
 describe('radical check: the folder', () => {

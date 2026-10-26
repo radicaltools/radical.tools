@@ -71,6 +71,25 @@ describe('A view edited while a milestone is shown', () => {
     expect(s().views.v.nodeIds).toEqual([])
   })
 
+  // F-0105: an agent's write read while the edit was not saved yet showed
+  // the view as saved again: the element came back, the chip still said
+  // unsaved, and Propagate left it on the live view.
+  it('stays done when a change made outside Studio is read, and Propagate makes it the live view\'s', () => {
+    s().removeNodeFromView('v', 'bank')
+    s().dismissMilestonePrompt()
+    const data = structuredClone(s().saveDiagram())
+    data.nodes.find((n) => n.id === 'web')!.label = 'Web X'
+    s().loadDiagram(data, { outsideChange: true })
+    expect(s().activeSnapshotId).toBe(early)
+    expect(s().milestoneDirty).toBe(true)
+    expect(s().rfNodes.map((n) => n.id)).not.toContain('bank')
+    s().commitMilestoneChanges('propagate')
+    s().discardMilestoneChanges()
+    expect(s().c4Nodes.web.label).toBe('Web X')
+    expect(savedView('v').nodeIds).not.toContain('bank')
+    expect(savedView('v').nodeIds).toContain('web')
+  })
+
   it('an alignment and Unpin all are taken back by Discard', () => {
     s().addAlignment('horizontal', ['api', 'web'])
     expect(s().views.v.layoutConstraints?.length).toBe(1)
@@ -431,6 +450,20 @@ describe('Save as new and the view edits made in the milestone', () => {
     expect(s().views.v).toMatchObject({ name: 'Shop view', folder: 'Shop' })
     expect(s().views.v.collapsedNodeIds).toContain('shop')
     expect(json(s().views.v.positions)).toBe(json(savedView('v').positions))
+  })
+
+  // The milestone keeps of the view only what was done on it there: what the
+  // live view changes since, and the milestone did not, reaches it.
+  it('show what is done on the live view since, where the milestone did not change it', () => {
+    const made = savedAsNew()
+    s().discardMilestoneChanges()
+    s().setViewEdgeStyle('v', 'orthogonal')
+    s().addAlignment('horizontal', ['api', 'web'])
+    s().selectMilestone(made)
+    expect(s().views.v.edgeStyle).toBe('orthogonal')
+    expect(s().views.v.layoutConstraints?.length).toBe(1)
+    expect(s().views.v.collapsedNodeIds).toContain('shop')
+    expect(s().views.v.nodeIds).not.toContain('bank')
   })
 
   it('Propagate from that milestone carries only what was edited in it now', () => {

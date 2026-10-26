@@ -114,9 +114,12 @@ if (typeof window !== 'undefined') {
       data.relations = Object.values(live.relations)
       data.sequences = Object.values(live.sequences)
       // A view an edit of Designer's milestone changed is saved as the live
-      // model has it (liveBackup.views).
+      // model has it (liveBackup.views), and one it has alone, of an
+      // element the live model deleted, is none of the live views.
       const parked = pre.activeSnapshotId ? pre.liveBackup : null
-      data.views = Object.values(pre.views).map((v) => parked?.views?.[v.id] ?? v)
+      data.views = Object.values(pre.views)
+        .filter((v) => !(parked && v.subject && !parked.nodes[v.subject]))
+        .map((v) => parked?.views?.[v.id] ?? v)
       data.defaultPositions = parked?.defaultPositions ?? pre.defaultPositions
     }
     return data
