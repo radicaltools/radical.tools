@@ -334,3 +334,33 @@ test('> lists the commands and runs the one picked', async ({ page, studio }) =>
   await page.keyboard.type('>import from radical hub')
   await expect(page.locator('.quick-search-hint')).toContainText('No command matches.')
 })
+
+// 2026-10-27: the views of every hit, as chips, cut each other and the names
+// short; the list comes first, where to open a hit is a step of its own.
+test('a hit lists its views as a next step, and opens in the one picked', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('Orders DB')
+  const hit = page.locator('.quick-search-item[data-kind="element"]').first()
+  await expect(hit).toContainText('Orders DB')
+  await expect(hit.locator('.qs-places')).toHaveText(/^3 views/)
+  await expect(page.locator('.quick-search-view-chip')).toHaveCount(0)
+
+  await page.keyboard.press('ArrowRight')
+  const places = page.locator('.qs-place')
+  await expect(page.locator('.qs-open-in-head')).toContainText('Open Orders DB in')
+  // The view Enter opens first, the others after it, All elements last.
+  await expect(places).toHaveText([/^VIEWContainers/, /Place Order Flow|Element Table/, /Place Order Flow|Element Table/, /^ALLAll elements/])
+  await expect(places.first()).toContainText('opens with ↵')
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.locator('.qs-section[aria-label="Elements"]')).toBeVisible()
+
+  await page.keyboard.press('ArrowRight')
+  const table = await places.allTextContents()
+  for (let i = 0; i < table.findIndex((t) => t.includes('Element Table')); i++) await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/v\/v-table/)
+  await expect(studio.row('db')).toHaveClass(/tv-row-selected/)
+})

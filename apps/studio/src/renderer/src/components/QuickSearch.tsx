@@ -15,8 +15,8 @@ import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI } from '../ai/settings'
-import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
-import type { DiagramView } from '@radical/common/c4'
+import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, viewTypeName, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
+import { normalizeViewFolder, type DiagramView } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
 import { revealViewFolder, useLeftPanelSection } from '@radical/ui/components/RightPanel'
 import { availableCommands, useCommands, type Command } from '../commands'
@@ -355,6 +355,32 @@ export function QuickSearch(): React.ReactElement | null {
     return out
   }
 
+  // The second step: where to open an element or relation hit (→, or the
+  // count of views at its right). The view a pick opens comes first, then
+  // the others as pickViewFor ranks them, then All elements.
+  const [openIn, setOpenIn] = useState<SearchHit | null>(null)
+  const [openHover, setOpenHover] = useState(0)
+  useEffect(() => { setOpenIn(null) }, [q])
+  const places = useMemo<Place[]>(() => {
+    if (!openIn) return []
+    const rel = openIn.kind === 'relation' ? c4Relations[openIn.id] : undefined
+    const best = rel ? pickViewFor([rel.sourceId, rel.targetId], activeViewId, views, viewNodeSets) : pickViewForNode(openIn.id)
+    const size = (id: string): number => viewNodeSets[id]?.size ?? 0
+    const ids = viewsShowing(openIn).sort((a, b) =>
+      Number(b === best) - Number(a === best) || PLACE_RANK(views[a]) - PLACE_RANK(views[b]) || size(a) - size(b) || views[a].name.localeCompare(views[b].name))
+    const out: Place[] = ids.map((id) => {
+      const v = views[id]
+      const folder = normalizeViewFolder(v.folder)
+      return { viewId: id, label: v.name, sub: [viewTypeName(v), folder, `${size(id)} element${size(id) === 1 ? '' : 's'}`].filter(Boolean).join(' · '), best: id === best, current: id === activeViewId }
+    })
+    out.push({ viewId: null, label: 'All elements', sub: 'Every element of the model, no view', best: best === null, current: activeViewId === null })
+    return out
+  }, [openIn, c4Relations, activeViewId, views, viewNodeSets]) // eslint-disable-line react-hooks/exhaustive-deps
+  const showPlaces = (hit: SearchHit): void => { setOpenIn(hit); setOpenHover(0); inputRef.current?.focus() }
+  useEffect(() => {
+    wrapRef.current?.querySelector('.qs-place.active')?.scrollIntoView({ block: 'nearest' })
+  }, [openHover])
+
   // Open the containers around the target that the view shown has
   // collapsed (the store decides per view, see expandAncestors).
   const expandAncestors = (nodeId: string): void => useDiagramStore.getState().expandAncestors(nodeId)
@@ -481,7 +507,22 @@ export function QuickSearch(): React.ReactElement | null {
   }
 
   const onInputKey = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'ArrowDown') {
+    if (openIn) {
+      // Where to open the hit: ↑ ↓ choose, Enter opens, ← or Esc go back.
+      if (e.key === 'ArrowDown') { e.preventDefault(); setOpenHover((h) => Math.min(h + 1, places.length - 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setOpenHover((h) => Math.max(0, h - 1)); return }
+      if (e.key === 'Enter') { e.preventDefault(); const p = places[openHover]; if (p) pickHit(openIn, p.viewId); return }
+      if (e.key === 'ArrowLeft' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpenIn(null); return }
+    }
+    if (e.key === 'ArrowRight') {
+      // → at the end of the words: where to open the hit highlighted.
+      const r = items[hover]
+      const el = e.currentTarget
+      if (r?.type === 'hit' && (r.hit.kind === 'element' || r.hit.kind === 'relation') && el.selectionStart === el.value.length) {
+        e.preventDefault()
+        showPlaces(r.hit)
+      }
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHover((h) => Math.min(h + 1, Math.max(0, items.length - 1)))
     } else if (e.key === 'ArrowUp') {
@@ -702,7 +743,7 @@ export function QuickSearch(): React.ReactElement | null {
           )}
 
           {/* The prefixes, or what completes the word typed (Tab takes the first). */}
-          {!aiMode && !parsed.command && (q.trim() === '' || suggestions.length > 0) && (
+          {!aiMode && !openIn && !parsed.command && (q.trim() === '' || suggestions.length > 0) && (
             <div className="qs-suggest" aria-label={q.trim() ? 'Suggestions' : 'Prefixes'}>
               {(q.trim() ? suggestions.map((sg) => ({ key: sg.query, label: sg.label, hint: sg.hint, query: sg.query }))
                 : PREFIX_CHIPS.map((c) => ({ key: c.prefix, label: c.prefix, hint: c.hint, query: c.prefix }))
@@ -726,7 +767,7 @@ export function QuickSearch(): React.ReactElement | null {
           <div className="quick-search-results">
             {!aiMode && q.trim() === '' && !aiBusy && !aiLast && (
               <div className="quick-search-hint">
-                Type to search. <kbd>↑</kbd> <kbd>↓</kbd> navigate, <kbd>↵</kbd> jump, <kbd>⇧</kbd>+<kbd>↵</kbd> in <em>all nodes</em>, <kbd>&gt;</kbd> commands
+                Type to search. <kbd>↑</kbd> <kbd>↓</kbd> navigate, <kbd>↵</kbd> jump, <kbd>→</kbd> choose the view, <kbd>&gt;</kbd> commands
                 {aiConfigured && (<>, <kbd>⌘</kbd>+<kbd>↵</kbd> ask AI, <kbd>Tab</kbd> AI mode</>)}.
               </div>
             )}
@@ -739,7 +780,35 @@ export function QuickSearch(): React.ReactElement | null {
             {!aiMode && parsed.scope && q.trim() !== '' && (
               <div className="qs-scope">In <strong>{parsed.scope.name}</strong></div>
             )}
-            {(() => {
+            {openIn && (
+              <div className="qs-section" role="group" aria-label="Open in">
+                <div className="qs-open-in-head">
+                  <button type="button" className="qs-open-in-back" title="Back to the results (←)" aria-label="Back to the results"
+                    onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenIn(null)}>‹</button>
+                  <span>Open <strong>{openIn.label}</strong> in</span>
+                </div>
+                {places.map((p, i) => (
+                  <div
+                    key={p.viewId ?? 'all'}
+                    className={`quick-search-item qs-place${i === openHover ? ' active' : ''}`}
+                    onMouseEnter={() => setOpenHover(i)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickHit(openIn, p.viewId)}
+                    role="button"
+                    tabIndex={-1}
+                  >
+                    <span className="quick-search-kind quick-search-kind-view">{p.viewId ? 'VIEW' : 'ALL'}</span>
+                    <span className="quick-search-item-main">
+                      <span className="quick-search-item-label">{p.label}</span>
+                      <span className="quick-search-item-sub">{p.sub}</span>
+                    </span>
+                    {p.best && <span className="qs-place-tag">opens with ↵</span>}
+                    {p.current && <span className="qs-place-tag">shown</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!openIn && (() => {
               let at = -1
               return sections.map((sec) => (
                 <div key={sec.id} className="qs-section" role="group" aria-label={sec.title}>
@@ -760,7 +829,7 @@ export function QuickSearch(): React.ReactElement | null {
                         role="button"
                         tabIndex={-1}
                       >
-                        <ItemBody item={item} views={views} activeViewId={activeViewId} viewsShowing={viewsShowing} onChip={(vid) => item.type === 'hit' && pickHit(item.hit, vid)} metamodel={metamodel} />
+                        <ItemBody item={item} views={views} viewsShowing={viewsShowing} onPlaces={() => item.type === 'hit' && showPlaces(item.hit)} metamodel={metamodel} />
                       </div>
                     )
                   })}
@@ -807,6 +876,16 @@ type Item =
 
 interface Section { id: string; title: string; count: number; items: Item[] }
 
+/** Where a hit can open: a view (null: All elements). */
+interface Place { viewId: string | null; label: string; sub: string; best: boolean; current: boolean }
+
+/** The order of the views to open a hit in, as pickViewFor prefers them: a
+ *  diagram, then a table, wiki, hierarchy or Warnier view, then a matrix or flow. */
+function PLACE_RANK(v: DiagramView | undefined): number {
+  const kind = v?.kind ?? 'static'
+  return kind === 'static' || kind === 'explore' ? 0 : kind === 'matrix' || kind === 'dynamic' ? 2 : 1
+}
+
 const SECTION_TITLES: Record<SearchKind, string> = {
   view: 'Views', folder: 'Folders', element: 'Elements', relation: 'Relations',
   sequence: 'Sequences', presentation: 'Presentations', slide: 'Slides', milestone: 'Milestones',
@@ -845,12 +924,11 @@ function Marked({ text, marks }: { text: string; marks: Mark[] }): React.ReactEl
   return <>{parts}</>
 }
 
-function ItemBody({ item, views, activeViewId, viewsShowing, onChip, metamodel }: {
+function ItemBody({ item, views, viewsShowing, onPlaces, metamodel }: {
   item: Item
   views: Record<string, DiagramView>
-  activeViewId: string | null
   viewsShowing: (hit: SearchHit) => string[]
-  onChip: (viewId: string | null) => void
+  onPlaces: () => void
   metamodel: Metamodel
 }): React.ReactElement {
   if (item.type === 'more' || item.type === 'table') {
@@ -888,7 +966,7 @@ function ItemBody({ item, views, activeViewId, viewsShowing, onChip, metamodel }
     )
   }
   const r = item.hit
-  const chips = r.kind === 'element' || r.kind === 'relation' ? viewsShowing(r) : null
+  const shownIn = r.kind === 'element' || r.kind === 'relation' ? viewsShowing(r).length : null
   const typeColor = r.kind === 'element' && r.type ? metamodel.nodeTypes[r.type]?.color : undefined
   return (
     <>
@@ -904,36 +982,15 @@ function ItemBody({ item, views, activeViewId, viewsShowing, onChip, metamodel }
             : viewDetail(r, views)}
         </span>
       </span>
-      {chips && (
-        <span className="quick-search-views" title="Click to open in this scope">
-          {/* "All nodes" chip — opens with no active view filter */}
-          <span
-            className={`quick-search-view-chip all${activeViewId === null ? ' active' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => { e.stopPropagation(); onChip(null) }}
-            title="Open in All nodes (no view filter)"
-          >
-            All
-          </span>
-          {chips.slice(0, 2).map((vid) => (
-            <span
-              key={vid}
-              className={`quick-search-view-chip${vid === activeViewId ? ' active' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => { e.stopPropagation(); onChip(vid) }}
-              title={`Open in view: ${views[vid]?.name ?? vid}`}
-            >
-              {views[vid]?.name ?? vid}
-            </span>
-          ))}
-          {chips.length > 2 && (
-            <span className="quick-search-view-chip more" title={chips.slice(2).map((vid) => views[vid]?.name ?? vid).join(', ')}>+{chips.length - 2}</span>
-          )}
-          {r.kind === 'element' && chips.length === 0 && (
-            <span className="quick-search-view-chip model-only" title="Exists in the model but not in any view">
-              model only
-            </span>
-          )}
+      {shownIn !== null && (
+        <span
+          className={`qs-places${shownIn === 0 ? ' none' : ''}`}
+          role="button"
+          title={shownIn === 0 ? 'In no view: opens in All elements (→ to choose)' : 'Choose the view to open it in (→)'}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.stopPropagation(); onPlaces() }}
+        >
+          {shownIn === 0 ? 'model only' : `${shownIn} view${shownIn === 1 ? '' : 's'}`}<span className="qs-places-chevron" aria-hidden>›</span>
         </span>
       )}
     </>
