@@ -44,6 +44,9 @@
     <!-- ── Hero ── -->
     <section class="hero">
       <div class="eyebrow">
+        <!-- The deploy stamps the product version (apps/cli/package.json). -->
+        <a class="eyebrow-release" href="https://github.com/radicaltools/radical.tools/releases/latest" target="_blank" rel="noopener">v__VERSION__ · What's new →</a>
+        <span class="sep">/</span>
         <span class="eyebrow-tag">MIT</span>
         <span class="sep">/</span><span>open source</span>
         <span class="sep">/</span><span>C4 · DDD · governance</span>
@@ -309,7 +312,17 @@
       </div>
       <div class="cta-row">
         <a class="cta" href="https://studio.radical.tools" target="_blank" rel="noopener">Open Studio in the browser</a>
+        <a class="cta ghost" href="https://github.com/radicaltools/radical.tools/releases/latest" target="_blank" rel="noopener">Download the desktop app</a>
         <a class="cta ghost" href="https://hub.radical.tools" target="_blank" rel="noopener">Explore the Hub</a>
+      </div>
+      <!-- Get started: from an empty folder to a connected agent (apps/cli/launcher). -->
+      <div class="get-started">
+        <div class="get-started-label">Get started: connect your coding agent to a new model</div>
+        <div class="get-started-cmd">
+          <code>curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup</code>
+          <button type="button" class="copy" data-copy="curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup">Copy</button>
+        </div>
+        <p class="hero-note">In an empty folder, with or without Node.js. Windows: <code>curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code>. With Node.js: <code>npx @radicaltools/cli setup</code>. <a href="manual.html#mcp">More in the manual</a></p>
       </div>
     </section>
 
@@ -371,5 +384,15 @@
     </span>
   </footer>
 
+  <script>
+    // Copy buttons: the command they carry, then "Copied" for a moment.
+    for (const button of document.querySelectorAll('[data-copy]')) {
+      button.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(button.dataset.copy) } catch { return }
+        button.textContent = 'Copied'
+        setTimeout(() => { button.textContent = 'Copy' }, 1500)
+      })
+    }
+  </script>
 </body>
 </html>

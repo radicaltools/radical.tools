@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- radical.tools: the home page names the released version, linked to its GitHub Release (what is new, the desktop installers), adds *Download the desktop app* beside *Open Studio in the browser*, and shows how to start: `curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup` with a Copy button, and the commands for Windows and for those with Node.js
+
 ## [0.3.0] - 2026-10-27
 
 ### Added
