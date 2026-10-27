@@ -203,7 +203,7 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .hero-note a:hover { text-decoration: underline; }
 
 /* Get started: one command, dark in both themes as the code blocks. */
-.get-started { max-width: 640px; margin: 28px auto 0; }
+.get-started { max-width: 640px; margin: 0 auto; }
 .get-started-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
 .get-started-tabs { display: flex; justify-content: center; gap: 4px; margin-bottom: 8px; }
 .get-started-tabs button {
@@ -231,7 +231,12 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .get-started .hero-note { margin-top: 10px; line-height: 1.7; }
 
 /* ── The product in one picture (hero) ───────────────────────────── */
-.map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 30px; }
+.map-wrap { width: 100%; overflow-x: auto; margin: 0 auto; }
+/* A line between the map, the buttons and Get started, so they read apart. */
+.hero-rule {
+  width: min(760px, 86%); height: 1px; margin: 56px auto; border: 0;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
 .map { display: block; width: 100%; min-width: 680px; height: auto; margin: 0 auto; }
 .map .box { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.2; }
 .map .core { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.4; }
@@ -278,6 +283,7 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .map-tall .file { font-size: 11.5px; }
 @media (max-width: 760px) {
   .map-wrap { overflow: visible; }
+  .hero-rule { margin: 40px auto; }
   .map { display: none; }
   .map-tall { display: block; min-width: 0; }
 }
