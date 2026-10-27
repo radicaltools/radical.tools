@@ -806,6 +806,14 @@
         <h3>Set it up</h3>
         <p>With Node.js 20.11 or newer, run the guided setup in your repository. It asks for the model folder (an empty one becomes a new model) and the agents to connect, writes the server into each agent's configuration, offers the git hooks for <em>Changes on branch</em>, and checks that the server answers:</p>
 <pre class="code"><code>npx @radicaltools/cli setup</code></pre>
+        <p>No Node.js yet? In a new, empty folder, fetch the launcher and run the same setup through it. It finds Node.js, or asks and downloads it into <code>~/.radical/node</code>, and the agents you connect start the server through it. In a folder that is not yet a git repository, setup offers to start one:</p>
+<pre class="code"><code><span class="cm"># macOS, Linux</span>
+mkdir my-system &amp;&amp; cd my-system
+curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup
+
+<span class="cm"># Windows</span>
+mkdir my-system &amp;&amp; cd my-system
+curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code></pre>
         <p>Restart the agents it connected. Later, <code>radical doctor</code> says what stops an agent from reaching the model: a moved folder, a missing <code>node</code>, a server of another version. The <a href="reference.html#setup">Reference</a> lists where each agent keeps its servers. To register the package by hand instead, use absolute paths:</p>
 <pre class="code"><code><span class="cm"># Claude Code</span>
 claude mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-model

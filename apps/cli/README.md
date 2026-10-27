@@ -27,6 +27,27 @@ npx @radicaltools/cli setup            # asks for the folder, the agents and the
 npx @radicaltools/cli setup architecture --client claude-code --client codex --yes
 ```
 
+No Node.js yet? Start from an empty folder with the launcher, which finds Node.js or
+downloads it, then runs the CLI:
+
+```sh
+mkdir my-system && cd my-system
+curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup      # macOS, Linux
+curl.exe -fsSLO https://radical.tools/radical.cmd && radical.cmd setup  # Windows
+```
+
+The launcher (`radical.sh`, `radical.cmd`) takes Node.js 20.11 or later with `npx`
+beside it from the `PATH`, else from `~/.radical/node`. With neither, it asks (or takes
+`--yes`) and downloads the latest Node.js 24 for the platform from nodejs.org into
+`~/.radical/node`, checked against its SHA-256 sum. It runs any command:
+`sh radical.sh check architecture`, and `sh radical.sh mcp --folder …` runs the MCP
+server without asking anything. `radical setup` run through it pins its version line
+(`default_version`, `DEFAULT_VERSION` in `radical.cmd`) to the CLI's, makes `radical.sh`
+executable, and has every agent and the git hooks start the server and the CLI through
+it, so they find the same Node.js. Commit it with the model; `RADICAL_VERSION=latest sh
+radical.sh setup` moves the project to the latest release. `RADICAL_HOME` and
+`RADICAL_NODE_MIRROR` change where Node.js goes and where it comes from.
+
 1. **Node**: checks the version (20.11 or later).
 2. **Folder**: a missing or empty folder becomes a new model (`--metamodel radical`, the
    default, or `c4`); a folder that holds other files and no `radical.md` is refused.
@@ -45,8 +66,9 @@ npx @radicaltools/cli setup architecture --client claude-code --client codex --y
    file is copied to `<file>.bak` before it changes. An entry that is already there is
    left alone; another server of the same name is replaced only when you say so
    (`--name <name>` adds this one beside it).
-4. **Hooks**: in a git repository, `radical hooks install` for the folder, so Studio's
-   *Changes on branch* has the branch's base (`--no-hooks` leaves them alone).
+4. **Hooks**: `radical hooks install` for the folder, so Studio's *Changes on branch*
+   has the branch's base (`--no-hooks` leaves them alone). Outside a git repository it
+   asks, in a terminal, to start one in the working directory first.
 5. **Check**: `radical doctor` for the folder (`--no-doctor` skips it).
 
 In a terminal each question shows its default; press Enter to take it. Without a

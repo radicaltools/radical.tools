@@ -20,6 +20,7 @@ brings the line up to date when the CLI or node has moved. A hook written
 in another language than sh is left alone: the message says what to call
 from it. A CLI inside the repository is named by its path from the top,
 so each worktree runs its own, and the hook says when it is not built there.
+Run through radical.sh in the repository, the hook runs it again.
 
   folder              the model folder (default: the working directory)
 
@@ -99,9 +100,15 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     // A CLI run from npx's cache (npx @radicaltools/cli setup) through npx
     // with its version: npm clears that cache, and the script with it.
     const viaNpx = !inRepo && script !== null && /[\\/]_npx[\\/]/.test(script)
-    const command = viaNpx ? `npx -y ${cliPackage()}` : io.cli ? `${io.cli.node} ${quote(inRepo ? fromTop : script!)}` : io.command ?? 'radical'
+    // A CLI run through radical.sh in the repository through it again: it
+    // finds the Node.js it downloaded, which may be on no PATH.
+    const launcherEnv = (io.env ?? process.env).RADICAL_LAUNCHER
+    const launcher = launcherEnv?.endsWith('.sh') ? relative(top, await realpath(launcherEnv).catch(() => launcherEnv)) : null
+    const viaLauncher = launcher !== null && !launcher.startsWith('..') && !isAbsolute(launcher)
+    const command = viaLauncher ? `sh ${quote(launcher)}`
+      : viaNpx ? `npx -y ${cliPackage()}` : io.cli ? `${io.cli.node} ${quote(inRepo ? fromTop : script!)}` : io.command ?? 'radical'
     const run = `${command} diff ${folderArg} --save-base --quiet </dev/null || true`
-    const line = inRepo
+    const line = inRepo && !viaLauncher
       ? `if [ -f ${quote(fromTop)} ]; then ${run}; else echo ${quote(`radical hooks: ${fromTop} is not in this working tree, so the base of ${relative(top, root) || '.'} was not saved; build the CLI there, or install the hooks again.`)} >&2; fi`
       : run
     const written: string[] = []

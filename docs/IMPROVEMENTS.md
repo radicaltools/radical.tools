@@ -738,7 +738,9 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     click for those agents, writing the same entry. On Windows a user
     configuration names `npx.cmd` by its absolute path but sets no `PATH`
     for it; Claude Desktop on Windows has not been tried. `radical doctor`
-    could also say when a newer version is on npm.
+    could also say when a newer version is on npm. `radical.cmd` is run only
+    by CI on windows-latest; nobody has run it on a Windows desktop or with
+    Claude Desktop starting `radical.cmd mcp`.
 61. **A reference property given text is dropped without a word.** A
     state-driven requirement added with `precondition_state: "the standard
     input is not a terminal"` (2026-10-27) came back `ok` with the field
@@ -746,6 +748,11 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     `precondition`. Only `radical check` (requirement-incomplete) found it.
     A write could refuse a reference property whose value names no node, or
     warn, as `event` and `raises` on a transition are checked.
+62. **An element named like another gets a file named `-2` without a word.**
+    The scenario "Setup through the launcher", added beside the requirement of
+    that name (2026-10-27), was written to `setup-through-the-launcher-2.md`;
+    only the file listing showed it. `add_node` could warn that the label is
+    taken in the folder, so the agent picks a name that says what differs.
 
 ### Reverse-engineered requirements (2026-10-06)
 

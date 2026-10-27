@@ -172,3 +172,39 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts
       - run: npm run test:package -w ./apps/mcp
+
+  launcher:
+    name: Launcher (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    # The launchers run the published CLI: this checks that they find or
+    # download Node.js on each platform, not this commit's CLI.
+    steps:
+      - uses: actions/checkout@v4
+      - name: radical.sh with no Node.js on the PATH downloads it
+        if: runner.os != 'Windows'
+        run: |
+          out=$(env -i HOME="$RUNNER_TEMP/home" PATH=/usr/bin:/bin RADICAL_YES=1 sh apps/cli/launcher/radical.sh --version)
+          echo "$out"
+          echo "$out" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+          [ -x /usr/bin/node ] || ls "$RUNNER_TEMP/home/.radical/node"
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Windows'
+        with:
+          node-version: 24
+      - name: radical.cmd with Node.js on the PATH
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call apps\cli\launcher\radical.cmd --version
+      - name: radical.cmd with no Node.js on the PATH downloads it
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set "PATH=C:\Windows\System32;C:\Windows"
+          set "RADICAL_HOME=%RUNNER_TEMP%\radical"
+          set "RADICAL_YES=1"
+          call apps\cli\launcher\radical.cmd --version || exit /b 1
+          dir "%RADICAL_HOME%\node"

@@ -103,6 +103,16 @@ describe('radical doctor', () => {
     expect(notModel.out).toContain('✗ does not read as a model: it has no valid radical.md')
     expect(notModel.out).toContain('! no agent is set up for docs: radical setup docs')
 
+    // Outside a git repository: a warning, not a crash.
+    const outside = join(root, 'outside')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'Outside'))) {
+      await mkdir(dirname(join(outside, path)), { recursive: true })
+      await writeFile(join(outside, path), content)
+    }
+    const noGit = await run(root, home, ['doctor', 'outside', '--no-start'])
+    expect(noGit.err).toBe('')
+    expect(noGit.out).toContain('! is not in a git repository')
+
     expect((await run(repo, home, ['doctor', '--timeout', 'x'])).code).toBe(2)
   })
 })

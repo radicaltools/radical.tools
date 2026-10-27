@@ -1,13 +1,14 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { copyFile, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { buildInfo, releaseOf } from '@radical/common/version'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, placeOf, sameEntry, shown, type Client, type ClientId } from './agentConfig'
+import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, pinLauncher, placeOf, sameEntry, shown, type Client, type ClientId } from './agentConfig'
 import { doctorCommand } from './doctor'
 import { hooksCommand } from './hooks'
 import type { Io } from './check'
@@ -24,8 +25,9 @@ Connects your coding agents to a Radical model folder, step by step:
   2. Folder    a missing or empty folder becomes a new model
   3. Agents    adds the MCP server for the folder to each agent's
                configuration, pinned to this version (other entries stay)
-  4. Hooks     in a git repository, the hooks that save the model's base for
-               Studio's Changes on branch (radical hooks install)
+  4. Hooks     the hooks that save the model's base for Studio's Changes on
+               branch (radical hooks install); outside a git repository it
+               asks, in a terminal, to start one in the working directory
   5. Check     radical doctor for the folder
 
 In a terminal it asks each question with its default; press Enter to take
@@ -47,6 +49,10 @@ defaults: the folder architecture, the agents it finds installed.
 Claude Code's .mcp.json and VS Code's .vscode/mcp.json go to the top of the
 repository, to share through git; Claude Desktop's, Cursor's and Codex's
 configurations are your own, backed up to <file>.bak before a change.
+
+Run through the launcher (sh radical.sh setup, radical.cmd setup), it pins
+the launcher to this version and every agent starts the server through it,
+with the Node.js the launcher finds or downloaded.
 
 Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could
 not run.`
@@ -127,11 +133,26 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   }
   const real = existsSync(folder) ? await realpath(folder) : folder
   const git = async (...gitArgs: string[]) => (await exec('git', gitArgs, { cwd: existsSync(real) ? real : io.cwd, windowsHide: true })).stdout.trim()
-  const top = await git('rev-parse', '--show-toplevel').then((path) => realpath(path), () => null)
+  let top = await git('rev-parse', '--show-toplevel').then((path) => realpath(path), () => null)
   const place = placeOf(io, top ?? await realpath(io.cwd))
 
   // ── 3. The agents ──
   io.out('3/5 Agents')
+  if (place.launcher) {
+    // The project keeps its launcher at this version, as the agents' servers.
+    const release = releaseOf(io.version ?? buildInfo().version)
+    const name = shown(place.launcher, place)
+    const text = await readFile(place.launcher, 'utf8').catch(() => null)
+    const pinned = text === null || release.includes('-dev') ? text : pinLauncher(text, release)
+    if (pinned === null) io.out(`  ✗ ${name} does not read`)
+    else if (pinned === text) io.out(`  ✓ ${name} runs ${release.includes('-dev') ? 'the latest version' : release}`)
+    else if (dry) io.out(`  would pin ${name} to ${release}`)
+    else {
+      await writeFile(place.launcher, pinned)
+      io.out(`  + pinned ${name} to ${release}`)
+    }
+    if (!dry && place.launcher.endsWith('.sh')) await chmod(place.launcher, 0o755).catch(() => undefined)
+  }
   const found = CLIENTS.filter((client) => client.installed(place))
   let chosen: Client[]
   if (values.client?.length) chosen = CLIENTS.filter((client) => values.client!.includes(client.id))
@@ -177,6 +198,14 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
 
   // ── 4. The git hooks ──
   io.out('4/5 Git hooks')
+  if (!top && !values['no-hooks'] && ask && await confirm('  Not in a git repository. Start one here (git init)?')) {
+    if (dry) io.out('  would run: git init')
+    else {
+      await exec('git', ['init', '-q'], { cwd: io.cwd, windowsHide: true })
+      top = await realpath(io.cwd)
+      io.out('  + started a git repository')
+    }
+  }
   if (!top) io.out('  - not in a git repository: no hooks')
   else if (values['no-hooks']) io.out('  - left alone (--no-hooks)')
   else if (!(await confirm('  Add the git hooks that save the model\'s base for Studio\'s Changes on branch?'))) io.out('  - left alone')

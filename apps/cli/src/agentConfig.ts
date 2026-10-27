@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { buildInfo, releaseOf } from '@radical/common/version'
@@ -11,7 +11,10 @@ import type { Io } from './check'
 // is shared through git, so it names npx from the PATH and the folder by its
 // path from the top of the repository. A user file belongs to an app that may
 // be started from the Dock, without the shell's PATH: it names npx by its
-// absolute path, with node's directory on the server's PATH.
+// absolute path, with node's directory on the server's PATH. Run through the
+// launcher (radical.sh, radical.cmd), every entry starts the server through
+// it instead: it finds Node.js as it did for the CLI, and its version line
+// pins the server.
 
 export type ClientId = 'claude-code' | 'claude-desktop' | 'codex' | 'cursor' | 'vscode'
 
@@ -32,16 +35,21 @@ export interface Place {
   top: string
   /** The node running this command line. */
   execPath: string
+  /** The launcher this command line was run through (RADICAL_LAUNCHER), if any. */
+  launcher?: string
 }
 
 export function placeOf(io: Io, top: string): Place {
+  const env = io.env ?? process.env
+  const launcher = env.RADICAL_LAUNCHER && existsSync(env.RADICAL_LAUNCHER) ? realpathSync(env.RADICAL_LAUNCHER) : undefined
   return {
     cwd: io.cwd,
     home: io.home ?? homedir(),
-    env: io.env ?? process.env,
+    env,
     platform: io.platform ?? process.platform,
     top,
     execPath: io.execPath ?? process.execPath,
+    launcher,
   }
 }
 
@@ -108,15 +116,24 @@ export function npxBesideNode(place: Place): string | null {
 
 /** The entry for `client` that serves `folder` (absolute). */
 export function entryFor(client: Client, folder: string, place: Place, pkg = mcpPackage()): ServerEntry {
-  const npx = npxName(place)
-  if (client.scope === 'project') {
-    const fromTop = relative(place.top, folder).replace(/\\/g, '/') || '.'
-    const arg = client.id === 'vscode' ? (fromTop === '.' ? '${workspaceFolder}' : `\${workspaceFolder}/${fromTop}`) : fromTop
-    return { command: npx, args: ['-y', pkg, '--folder', arg] }
+  const project = client.scope === 'project'
+  // A project file names a path in the repository from its top.
+  const named = (path: string) => {
+    const fromTop = relative(place.top, path).replace(/\\/g, '/') || '.'
+    if (!project || fromTop.startsWith('..') || isAbsolute(fromTop)) return path
+    if (client.id !== 'vscode') return fromTop
+    return fromTop === '.' ? '${workspaceFolder}' : `\${workspaceFolder}/${fromTop}`
   }
   const absolute = npxBesideNode(place)
-  const entry: ServerEntry = { command: absolute ?? npx, args: ['-y', pkg, '--folder', folder] }
-  if (absolute && !isWindows(place)) entry.env = { PATH: [dirname(absolute), '/usr/local/bin', '/usr/bin', '/bin'].join(':') }
+  let entry: ServerEntry
+  if (place.launcher) {
+    const launcher = named(place.launcher)
+    const args = ['mcp', '--folder', named(folder)]
+    entry = isWindows(place) ? { command: launcher, args } : { command: 'sh', args: [launcher, ...args] }
+  } else {
+    entry = { command: project ? npxName(place) : absolute ?? npxName(place), args: ['-y', pkg, '--folder', named(folder)] }
+  }
+  if (!project && absolute && !isWindows(place)) entry.env = { PATH: [dirname(absolute), '/usr/local/bin', '/usr/bin', '/bin'].join(':') }
   return entry
 }
 
@@ -290,11 +307,41 @@ export const CLIENTS: readonly Client[] = [
 
 export const CLIENT_IDS = CLIENTS.map((client) => client.id)
 
-/** A server that runs the Radical MCP server: the package, its bin, or a
- *  build of apps/mcp. */
+const LAUNCHER = /(^|[\\/])radical\.(sh|cmd)$/i
+
+/** The launcher an entry starts the server through, as it names it. */
+export function launcherOf(entry: ServerEntry): string | null {
+  const words = [entry.command, ...entry.args]
+  const at = words.findIndex((word) => LAUNCHER.test(word))
+  return at >= 0 && words[at + 1] === 'mcp' ? words[at] : null
+}
+
+/** A server that runs the Radical MCP server: the package, its bin, a
+ *  build of apps/mcp, or the launcher's mcp. */
 export function isRadicalServer(entry: ServerEntry): boolean {
   const words = [entry.command, ...entry.args]
-  return words.some((word) => word.includes('@radicaltools/mcp') || /(^|[\\/])radical-mcp(\.cmd)?$/.test(word) || /mcp[\\/]dist[\\/]index\.js$/.test(word))
+  return launcherOf(entry) !== null
+    || words.some((word) => word.includes('@radicaltools/mcp') || /(^|[\\/])radical-mcp(\.cmd)?$/.test(word) || /mcp[\\/]dist[\\/]index\.js$/.test(word))
+}
+
+/** `entry` as its agent runs it: ${workspaceFolder} expanded, as VS Code does. */
+export function expanded(entry: ServerEntry, place: Place): ServerEntry {
+  const expand = (word: string) => word.replace(/\$\{workspaceFolder\}/g, place.top)
+  return { ...entry, command: expand(entry.command), args: entry.args.map(expand) }
+}
+
+/** The launcher's path an entry names (absolute), resolved as its agent would. */
+export function launcherPath(entry: ServerEntry, client: Client, place: Place): string | null {
+  const named = launcherOf(expanded(entry, place))
+  return named === null ? null : resolve(client.base(place), named)
+}
+
+/** The version line of the launcher at `path`: radical setup pins it. */
+export const LAUNCHER_VERSION = /^(\s*(?:set ")?(?:default_version|DEFAULT_VERSION)=)([^"\r\n]*)/m
+
+/** The launcher's text with its version line set to `version`. */
+export function pinLauncher(text: string, version: string): string {
+  return text.replace(LAUNCHER_VERSION, (_, head: string) => `${head}${version}`)
 }
 
 /** The folder an entry serves (absolute), and how it was written. */
@@ -302,17 +349,23 @@ export function folderOf(entry: ServerEntry, client: Client, place: Place): stri
   const at = entry.args.indexOf('--folder')
   const raw = at >= 0 ? entry.args[at + 1] : undefined
   if (!raw) return null
-  const expanded = raw.replace(/\$\{workspaceFolder\}/g, place.top)
-  return isAbsolute(expanded) ? expanded : resolve(client.base(place), expanded)
+  const path = raw.replace(/\$\{workspaceFolder\}/g, place.top)
+  return isAbsolute(path) ? path : resolve(client.base(place), path)
 }
 
-/** The version an entry pins (@radicaltools/mcp@0.2.0), if it pins one. */
-export function pinnedVersion(entry: ServerEntry): string | null {
+/** The version an entry pins (@radicaltools/mcp@0.2.0, or the version line
+ *  of the launcher it goes through), if it pins one. */
+export function pinnedVersion(entry: ServerEntry, client: Client, place: Place): string | null {
   for (const arg of entry.args) {
     const pinned = /@radicaltools\/mcp@(.+)$/.exec(arg)
     if (pinned) return pinned[1]
   }
-  return null
+  const launcher = launcherPath(entry, client, place)
+  if (!launcher) return null
+  let text: string
+  try { text = readFileSync(launcher, 'utf8') } catch { return null }
+  const version = LAUNCHER_VERSION.exec(text)?.[2]
+  return version && version !== 'latest' ? version : null
 }
 
 /** `path` for a message: from the working directory when inside it, else with ~ for home. */

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { existsSync, statSync } from 'node:fs'
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { builtInC4Metamodel } from '@radical/common/metamodel'
 import { main } from './cli'
@@ -142,5 +143,47 @@ describe('radical setup', () => {
     expect(await readFile(w.codex, 'utf8')).toContain('[mcp_servers.radical]')
     expect((await json(join(w.repo, '.mcp.json'))).mcpServers.radical.args.at(-1)).toBe('model')
     expect(await readFile(join(w.repo, '.git', 'hooks', 'post-checkout'), 'utf8')).toContain(HOOK_MARKER)
+  })
+
+  it('through the launcher, pins it and starts each agent\'s server through it, in a git repository it starts', async () => {
+    const w = await world()
+    const fresh = join(w.root, 'fresh')
+    await mkdir(fresh)
+    const launcher = join(fresh, 'radical.sh')
+    await copyFile(fileURLToPath(new URL('../launcher/radical.sh', import.meta.url)), launcher)
+    await mkdir(join(w.home, '.config', 'Claude'), { recursive: true })
+    const env = { PATH: '/usr/bin:/bin', RADICAL_LAUNCHER: launcher }
+    const questions: string[] = []
+    const answers = ['', '', 'yes', '']
+    const first = await run(w, ['setup', '--no-doctor', '--client', 'claude-code', '--client', 'claude-desktop'],
+      { cwd: fresh, env, ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
+    expect(first.err).toBe('')
+    expect(first.code).toBe(0)
+    expect(questions[2]).toBe('  Not in a git repository. Start one here (git init)? [yes]: ')
+    expect(first.out).toContain('+ pinned radical.sh to 0.2.0')
+    expect(first.out).toContain('+ started a git repository')
+    expect(await readFile(launcher, 'utf8')).toMatch(/^default_version=0\.2\.0$/m)
+    expect(statSync(launcher).mode & 0o111).toBe(0o111)
+    expect((await json(join(fresh, '.mcp.json'))).mcpServers.radical)
+      .toEqual({ type: 'stdio', command: 'sh', args: ['radical.sh', 'mcp', '--folder', 'architecture'] })
+    expect((await json(w.desktop)).mcpServers.radical).toEqual({
+      command: 'sh', args: [launcher, 'mcp', '--folder', join(fresh, 'architecture')],
+      env: { PATH: `${w.bin}:/usr/local/bin:/usr/bin:/bin` },
+    })
+    expect(await readFile(join(fresh, '.git', 'hooks', 'post-checkout'), 'utf8'))
+      .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff "architecture" --save-base --quiet </dev/null || true\n`)
+
+    const again = await run(w, ['setup', 'architecture', '--yes', '--no-doctor', '--client', 'claude-code'], { cwd: fresh, env })
+    expect(again.out).toContain('✓ radical.sh runs 0.2.0')
+    expect(again.out).toContain('✓ Claude Code: .mcp.json already runs "radical" for the folder')
+
+    const doctor = await run(w, ['doctor', 'architecture', '--no-start'], { cwd: fresh, env })
+    expect(doctor.out).toContain('✓ Claude Code "radical" (.mcp.json) serves architecture through radical.sh (0.2.0)')
+    expect(doctor.out).toContain('✓ Claude Desktop "radical" (~/.config/Claude/claude_desktop_config.json) serves architecture through radical.sh (0.2.0)')
+    expect(doctor.code).toBe(0)
+    await rm(launcher)
+    const gone = await run(w, ['doctor', 'architecture', '--no-start'], { cwd: fresh, env })
+    expect(gone.code).toBe(1)
+    expect(gone.out).toContain('✗ Claude Code "radical" (.mcp.json): its launcher radical.sh is not there: download it from https://radical.tools/radical.sh')
   })
 })

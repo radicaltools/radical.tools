@@ -396,6 +396,21 @@
         <p><code>radical setup [folder]</code> connects coding agents to a model folder in five steps: Node, the folder (a missing or empty one becomes a new model; one with other files and no <code>radical.md</code> is refused), the agents, the git hooks (<code>radical hooks install</code>) and <code>radical doctor</code>. In a terminal it asks each question with its default; without one, or with <code>--yes</code>, it takes the options and the defaults.</p>
 <pre class="code"><code>npx @radicaltools/cli setup
 npx @radicaltools/cli setup architecture --client claude-code --client codex --yes</code></pre>
+        <p>Outside a git repository, setup asks in a terminal whether to start one in the working directory before it adds the hooks.</p>
+        <h3>The launcher</h3>
+        <p><code>radical.sh</code> (macOS, Linux) and <code>radical.cmd</code> (Windows), at <code>https://radical.tools/radical.sh</code> and <code>/radical.cmd</code>, run the CLI where Node.js is missing: <code>sh radical.sh setup</code>, <code>radical.cmd setup</code>, or any other command. They take Node.js 20.11 or later with <code>npx</code> beside it from the <code>PATH</code>, else from <code>~/.radical/node</code>; with neither they ask, or take <code>--yes</code>, and download the latest Node.js 24 for the platform from nodejs.org, checked against its SHA-256 sum. <code>radical.sh mcp --folder …</code> runs the MCP server and never asks.</p>
+        <p>Setup run through a launcher pins its version line (<code>default_version</code>, <code>DEFAULT_VERSION</code> in <code>radical.cmd</code>) to the CLI's version, makes <code>radical.sh</code> executable, and writes each agent's entry as <code>sh radical.sh mcp --folder …</code> (<code>radical.cmd mcp</code> on Windows), with the launcher's path from the top of the repository in a project file and its absolute path in a user file. The git hooks run <code>sh radical.sh diff</code>. Commit the launcher with the model, and the project keeps one version for the CLI and every agent.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Variable</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>RADICAL_VERSION</code></td><td>The version to run this once, e.g. <code>latest</code>; setup then pins that version.</td></tr>
+              <tr><td><code>RADICAL_HOME</code></td><td>Where downloaded Node.js goes. Default: <code>~/.radical</code>.</td></tr>
+              <tr><td><code>RADICAL_NODE_MIRROR</code></td><td>Where Node.js comes from. Default: <code>https://nodejs.org/dist</code>.</td></tr>
+              <tr><td><code>RADICAL_YES</code></td><td>Downloads Node.js without asking, as <code>--yes</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Option</th><th>What it does</th></tr></thead>

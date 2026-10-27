@@ -43,7 +43,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 
 **VS Code:** an extension that opens `.radical` files right in the editor lives in [apps/vscode](apps/vscode).
 
-**Your coding agent:** `npx @radicaltools/cli setup` connects Claude Code, Claude Desktop, Codex, Cursor or VS Code to a model folder, step by step, and `radical doctor` checks the connection ([CLI usage](apps/cli/README.md#radical-setup)).
+**Your coding agent:** `npx @radicaltools/cli setup` connects Claude Code, Claude Desktop, Codex, Cursor or VS Code to a model folder, step by step, and `radical doctor` checks the connection ([CLI usage](apps/cli/README.md#radical-setup)). No Node.js yet? In an empty folder, `curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup` (or `radical.cmd` on Windows) downloads it first.
 
 ## Features
 

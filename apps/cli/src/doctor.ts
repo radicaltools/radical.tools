@@ -8,7 +8,7 @@ import { deserializeFromMdFolder, isValidMdFolderManifest } from '@radical/commo
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { compareVersions, displayVersion, releaseOf } from '@radical/common/version'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { CLIENTS, folderOf, isRadicalServer, onPath, pinnedVersion, placeOf, shown, type Client, type Place, type ServerEntry } from './agentConfig'
+import { CLIENTS, expanded, folderOf, isRadicalServer, launcherOf, launcherPath, onPath, pinnedVersion, placeOf, shown, type Client, type Place, type ServerEntry } from './agentConfig'
 import { hooksSaveBase } from './hooks'
 import type { Io } from './check'
 
@@ -125,7 +125,7 @@ export async function doctorCommand(args: string[], io: Io): Promise<number> {
   const topOf = async (dir: string) => {
     let at = dir
     while (!existsSync(at) && dirname(at) !== at) at = dirname(at)
-    return realpath(await git(at, 'rev-parse', '--show-toplevel')).catch(() => null)
+    return git(at, 'rev-parse', '--show-toplevel').then((path) => realpath(path)).catch(() => null)
   }
   const top = await topOf(folder ?? io.cwd)
   const place = placeOf(io, top ?? io.cwd)
@@ -183,16 +183,21 @@ export async function doctorCommand(args: string[], io: Io): Promise<number> {
       }
       configured++
       const before = problems
-      const command = isAbsolute(entry.command) ? (existsSync(entry.command) ? entry.command : null) : onPath(entry.command, place, entry.env?.PATH)
-      if (!command) fail(`${where}: its command ${entry.command} is not there${entry.env?.PATH ? ` (PATH ${entry.env.PATH})` : ''}: radical setup writes it again`)
+      const run = expanded(entry, place)
+      const command = isAbsolute(run.command) ? (existsSync(run.command) ? run.command : null) : onPath(run.command, place, entry.env?.PATH)
+      const launcher = launcherPath(entry, client, place)
+      // On Windows the launcher itself is the command; its own check follows.
+      if (!command && run.command !== launcherOf(run)) fail(`${where}: its command ${entry.command} is not there${entry.env?.PATH ? ` (PATH ${entry.env.PATH})` : ''}: radical setup writes it again`)
+      if (launcher && !existsSync(launcher)) fail(`${where}: its launcher ${shown(launcher, place)} is not there: download it from https://radical.tools/${launcher.endsWith('.cmd') ? 'radical.cmd' : 'radical.sh'}`)
       if (!servesReal) fail(`${where}: names no --folder`)
       else if (!existsSync(resolve(servesReal, 'radical.md')) && !folder) fail(`${where}: serves ${shown(servesReal, place)}, which holds no model`)
-      const pinned = pinnedVersion(entry)
+      const pinned = pinnedVersion(entry, client, place)
       if (pinned && compareVersions(pinned, mine) !== 0 && !releaseOf(mine).includes('-dev')) {
         warn(`${where} runs MCP server ${pinned}, this CLI is ${releaseOf(mine)}: radical setup pins it to ${releaseOf(mine)}`)
       }
       if (problems === before) {
-        ok(`${where} serves ${servesReal ? shown(servesReal, place) : '?'}${pinned ? ` with @radicaltools/mcp@${pinned}` : ''}`)
+        const how = launcher ? ` through ${shown(launcher, place)}${pinned ? ` (${pinned})` : ''}` : pinned ? ` with @radicaltools/mcp@${pinned}` : ''
+        ok(`${where} serves ${servesReal ? shown(servesReal, place) : '?'}${how}`)
         toStart.push({ client, name, entry })
       }
     }
@@ -205,7 +210,7 @@ export async function doctorCommand(args: string[], io: Io): Promise<number> {
   if (!values['no-start'] && toStart.length) {
     io.out('Servers')
     for (const { client, name, entry } of toStart) {
-      const answer = await askServer(entry, client.base(place), place, timeout * 1000)
+      const answer = await askServer(expanded(entry, place), client.base(place), place, timeout * 1000)
       const where = `${client.label} "${name}"`
       if (answer.error) { fail(`${where}: the server ${answer.error}`); continue }
       ok(`${where}: MCP server ${answer.version ?? '?'} answers${answer.nodes !== undefined ? ` (${answer.nodes} elements)` : ''}`)
