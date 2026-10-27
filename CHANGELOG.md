@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- The manual, the reference and the CLI's README say how to connect several models to one agent: `radical setup <folder> --name <name>` once per folder, each server's tools under its own name
 - One mark for the whole family: “r.” on a dark tile, in `tools/brand/radical-mark.svg`. It is the icon of the desktop app and the VS Code extension (from the next release), the logo in the top bar of radical.tools and the Hub, the mark on Studio's welcome screen, and the favicon of radical.tools, Studio and the Hub, which had none. `node tools/generate-icons.mjs` renders every icon from it
 - The manual's *Getting started* ends with how to start from the terminal (the launcher, or npx) to connect a coding agent, and *Command line* opens with how to run the CLI, a table of its commands and *The launcher*
 - radical.tools: a thin line sets the home page's buttons and *Get started* apart from the map

@@ -76,6 +76,21 @@ terminal, or with `--yes`, it asks nothing: the folder `architecture`, the agent
 finds installed, the hooks in a repository. `--dry-run` prints every change and writes
 nothing. Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could not run.
 
+**Several models.** One server serves one folder. To connect more models to the same
+agents, run setup once per folder with a name of its own:
+
+```sh
+radical setup payments/architecture --name radical-payments
+radical setup billing/architecture  --name radical-billing
+```
+
+The agent sees each server's tools under its name (in Claude Code
+`mcp__radical-payments__get_model_summary`), so they never collide; a name that says
+which model it is helps the agent pick the right one. Without `--name` the second setup
+finds `radical` taken and replaces it, asking first in a terminal (with `--yes`, it does not ask). Keep one server per folder: two
+servers writing the same folder get in each other's way (Studio on the same folder is
+fine).
+
 ### radical setup --status
 
 Checks what an agent needs to work on a model folder, and changes nothing:
