@@ -4,7 +4,13 @@ This local stdio MCP server lets Codex read and edit one Radical **Markdown mode
 
 ## Install and connect
 
-Use Node.js 20.11 or newer. Run the published server without cloning this repository:
+Use Node.js 20.11 or newer. The quickest way to connect an agent is the CLI's guided setup, which writes the entry below into each agent's configuration and checks that the server answers:
+
+```sh
+npx @radicaltools/cli setup /absolute/path/to/my-model
+```
+
+To do it by hand, run the published server without cloning this repository:
 
 ```sh
 npx -y @radicaltools/mcp --folder /absolute/path/to/my-model

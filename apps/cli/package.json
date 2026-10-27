@@ -1,7 +1,7 @@
 {
   "name": "@radicaltools/cli",
   "version": "0.2.0",
-  "description": "Check, diff and export Radical Markdown architecture models, and fuzz a project against them, from the command line.",
+  "description": "Connect coding agents to Radical Markdown architecture models, check, diff and export them, and fuzz a project against them, from the command line.",
   "license": "MIT",
   "homepage": "https://radical.tools",
   "repository": {
@@ -10,7 +10,7 @@
     "directory": "apps/cli"
   },
   "bugs": "https://github.com/radicaltools/radical.tools/issues",
-  "keywords": ["cli", "architecture", "c4", "radical", "model-validation"],
+  "keywords": ["cli", "architecture", "c4", "radical", "model-validation", "mcp"],
   "type": "module",
   "bin": {
     "radical": "dist/index.js"

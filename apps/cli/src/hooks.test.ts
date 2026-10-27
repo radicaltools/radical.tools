@@ -161,6 +161,21 @@ describe('radical hooks', () => {
     expect(stderr).toContain('tools/record.mjs is not in this working tree, so the base of model was not saved')
   })
 
+  it('runs a CLI from npx\'s cache through npx, which npm may clear', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    await mkdir(join(cwd, 'model'))
+    const cache = await mkdtemp(join(tmpdir(), 'radical-npm-'))
+    dirs.push(cache)
+    const script = join(cache, '_npx', 'a1b2', 'node_modules', '@radicaltools', 'cli', 'dist', 'index.js')
+    const code = await main(['hooks', 'install', 'model'], { cwd, cli: { node: `"${process.execPath}"`, script }, out: () => {}, err: () => {} })
+    expect(code).toBe(0)
+    const text = await readFile(join(cwd, '.git/hooks/post-commit'), 'utf8')
+    expect(text).toMatch(/\nnpx -y @radicaltools\/cli(@\d\S*)? diff "model" --save-base --quiet <\/dev\/null \|\| true\n/)
+    expect(text).not.toContain('_npx')
+  })
+
   it('exits 2 outside git and on a wrong action', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
     dirs.push(cwd)

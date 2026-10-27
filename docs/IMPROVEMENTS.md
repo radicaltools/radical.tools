@@ -726,6 +726,26 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     (2026-10-26) the related requirements were found by reading the folder's
     files instead. A plain word could search labels and descriptions, and the
     error could show the forms it takes.
+59. **`smart_layout` on a view takes its pins off without asking.** After
+    adding the Setup and Doctor commands (2026-10-27), laying out the
+    "Components" view to place them unpinned two elements someone had pinned
+    there, so it was left as it was and only the CLI and MCP server views
+    were laid out. An agent that only wants room for what it added needs a
+    `keepPins` option (Tidy around keeps pins, but it needs the elements
+    named, and the view's other new lines are not tidied).
+60. **Next steps for `radical setup` (2026-10-27).** A Claude Desktop
+    extension (`.mcpb`) and a Claude Code plugin would make connecting one
+    click for those agents, writing the same entry. On Windows a user
+    configuration names `npx.cmd` by its absolute path but sets no `PATH`
+    for it; Claude Desktop on Windows has not been tried. `radical doctor`
+    could also say when a newer version is on npm.
+61. **A reference property given text is dropped without a word.** A
+    state-driven requirement added with `precondition_state: "the standard
+    input is not a terminal"` (2026-10-27) came back `ok` with the field
+    missing; `precondition_state` holds a state's id, the text belongs in
+    `precondition`. Only `radical check` (requirement-incomplete) found it.
+    A write could refuse a reference property whose value names no node, or
+    warn, as `event` and `raises` on a transition are checked.
 
 ### Reverse-engineered requirements (2026-10-06)
 

@@ -53,6 +53,8 @@ try {
   assert.match(radical('--version').trim(), new RegExp(`^${manifest.version.replace(/\./g, '\\.')}(\\+[0-9a-f]{7,})?$`))
   assert.match(radical('--help'), /Usage: radical/)
   assert.match(radical('export', 'confluence', '--help'), /--view/)
+  assert.match(radical('setup', '--help'), /--client <id>/)
+  assert.match(radical('doctor', '--help'), /--no-start/)
   assert.match(radical('check', '--list-rules'), /folder-manifest/)
 
   const model = join(project, 'model')

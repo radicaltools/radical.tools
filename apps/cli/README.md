@@ -18,6 +18,61 @@ Or run it without a global install:
 npx @radicaltools/cli check path/to/model
 ```
 
+## radical setup
+
+Connects your coding agents to a model folder, step by step:
+
+```sh
+npx @radicaltools/cli setup            # asks for the folder, the agents and the hooks
+npx @radicaltools/cli setup architecture --client claude-code --client codex --yes
+```
+
+1. **Node**: checks the version (20.11 or later).
+2. **Folder**: a missing or empty folder becomes a new model (`--metamodel radical`, the
+   default, or `c4`); a folder that holds other files and no `radical.md` is refused.
+3. **Agents**: adds the MCP server for the folder to each agent's configuration, pinned
+   to the CLI's version (`@radicaltools/mcp@<version>`), keeping every other entry.
+
+   | Agent | File | Names |
+   | --- | --- | --- |
+   | Claude Code (`claude-code`) | `.mcp.json` at the top of the repository | `npx`, the folder by its path from the top |
+   | VS Code (`vscode`) | `.vscode/mcp.json` at the top of the repository | `npx`, `${workspaceFolder}/<folder>` |
+   | Claude Desktop (`claude-desktop`) | `claude_desktop_config.json` in the app's settings folder | `npx` by its absolute path, node's directory on `PATH`, the absolute folder |
+   | Cursor (`cursor`) | `~/.cursor/mcp.json` | as Claude Desktop |
+   | Codex (`codex`) | `~/.codex/config.toml` (or `$CODEX_HOME`) | as Claude Desktop, in `[mcp_servers.<name>]` |
+
+   The project files are meant to be committed, so teammates get the server too. A user
+   file is copied to `<file>.bak` before it changes. An entry that is already there is
+   left alone; another server of the same name is replaced only when you say so
+   (`--name <name>` adds this one beside it).
+4. **Hooks**: in a git repository, `radical hooks install` for the folder, so Studio's
+   *Changes on branch* has the branch's base (`--no-hooks` leaves them alone).
+5. **Check**: `radical doctor` for the folder (`--no-doctor` skips it).
+
+In a terminal each question shows its default; press Enter to take it. Without a
+terminal, or with `--yes`, it asks nothing: the folder `architecture`, the agents it
+finds installed, the hooks in a repository. `--dry-run` prints every change and writes
+nothing. Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could not run.
+
+## radical doctor
+
+Checks what an agent needs to work on a model folder:
+
+```sh
+npx @radicaltools/cli doctor architecture
+```
+
+It reports Node and the CLI's version; whether the folder reads as a model and the git
+hooks save its base; every agent configuration that holds a Radical MCP server, with the
+folder it serves, a command or folder that is not there, and a server pinned to another
+version than the CLI's; then it starts each server configured for the folder, with the
+agent's own command, arguments and environment, and asks it for `get_model_summary`
+over stdio. `--no-start` only reads the configurations; `--timeout <s>` (default 120,
+as npx may download the package first) limits each server. Without a folder it checks
+the working directory when it holds a model, else every Radical server configured.
+Exit status: 0 nothing is broken (warnings, marked `!`, allowed), 1 something is
+(marked `✗`), 2 it could not run.
+
 ## radical export confluence
 
 Export a particular wiki view from a Radical Markdown model folder. The full
