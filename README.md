@@ -43,6 +43,8 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 
 **VS Code:** an extension that opens `.radical` files right in the editor lives in [apps/vscode](apps/vscode).
 
+**Your coding agent:** `npx @radicaltools/cli setup` connects Claude Code, Claude Desktop, Codex, Cursor or VS Code to a model folder, step by step, and `radical setup --status` checks the connection ([CLI usage](apps/cli/README.md#radical-setup)). No Node.js yet? In an empty folder, `curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup` (or `radical.cmd` on Windows) downloads it first.
+
 ## Features
 
 - **C4 model**: Person, Software System, Container, Component, Database, Web App, Queue, Group, joined by *Interacts*
@@ -65,6 +67,7 @@ Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothi
 - **radical fuzz** (Radical Crucible): runs a project's fuzz files, random sequences of actions with the system's rules checked after every step, by plan; a survey records each new way a rule breaks as a finding to fix or decide, and every rule of a fuzz file is a test case the model can name ([CLI usage](apps/cli/README.md#radical-fuzz), [docs/CRUCIBLE.md](docs/CRUCIBLE.md)); **radical harden** turns a finding into a test (a fuzz finding replays its own steps) and gates a test: it must fail without the fix, pass with it, and pass several runs at once; **radical explore** prepares an exploratory round of agents (one build, a folder, ports and an area per run, a brief of what changed in the code and the model), re-runs their scripts and records their findings
 - **Confluence publication**: export a selected wiki view as Markdown or HTML, or publish a managed Confluence Cloud page tree with requirements, scenarios and links; Radical stays the source of truth ([CLI usage](apps/cli/README.md#radical-export-confluence))
 - **MCP server**: [@radicaltools/mcp](apps/mcp) lets Claude Code, Claude Desktop or Codex read and edit a Markdown model folder, with the same tools as the AI assistant
+- **radical setup** and **radical setup --status**: connect your agents to a model folder in one guided command (a new model in an empty folder, an MCP server entry in each agent's configuration, pinned to the CLI's version, the git hooks), and check every link from Node to a server that answers for the folder
 - **Models**: kept in the browser, in one `.radical` file or in a folder of Markdown files (git-friendly); Structurizr DSL import
 - **Export**: PNG/SVG export and copy to clipboard of any view
 

@@ -86,6 +86,12 @@ jobs:
           # Stamping the commit sha busts browser + CDN caches on every deploy.
           sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" apps/web/*.html
 
+      - name: Add the launchers
+        run: |
+          # radical.tools/radical.sh and /radical.cmd: curl them into a new
+          # folder and run setup (apps/cli/launcher).
+          cp apps/cli/launcher/radical.sh apps/cli/launcher/radical.cmd apps/web/
+
       - name: Sync marketing website to S3
         run: |
           # Static site under apps/web/ — HTML/CSS/screenshots.
@@ -110,7 +116,7 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/usecases.html" "/manual.html" "/reference.html" "/docs.js" "/style.css" "/landing.css" "/theme.js"
+            --paths "/index.html" "/usecases.html" "/manual.html" "/reference.html" "/docs.js" "/style.css" "/landing.css" "/theme.js" "/radical.sh" "/radical.cmd"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
       # Built from apps/hub (the viewer runs on Studio's canvas and panels,

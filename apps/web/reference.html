@@ -57,6 +57,7 @@
           <ul>
             <li><a href="#cli">radical check</a></li>
             <li><a href="#base">Changes on branch</a></li>
+            <li><a href="#setup">radical setup</a></li>
             <li><a href="#mcp">MCP server</a></li>
             <li><a href="#agent">Editing beside an agent</a></li>
           </ul>
@@ -390,17 +391,73 @@
         </ul>
       </section>
 
+      <section class="doc-section" id="setup">
+        <h2>radical setup</h2>
+        <p><code>radical setup [folder]</code> connects coding agents to a model folder in five steps: Node, the folder (a missing or empty one becomes a new model; one with other files and no <code>radical.md</code> is refused), the agents, the git hooks (<code>radical hooks install</code>) and <code>radical status</code>. In a terminal it asks each question with its default; without one, or with <code>--yes</code>, it takes the options and the defaults.</p>
+<pre class="code"><code>npx @radicaltools/cli setup
+npx @radicaltools/cli setup architecture --client claude-code --client codex --yes</code></pre>
+        <p>Outside a git repository, setup asks in a terminal whether to start one in the working directory before it adds the hooks.</p>
+        <h3>The launcher</h3>
+        <p><code>radical.sh</code> (macOS, Linux) and <code>radical.cmd</code> (Windows), at <code>https://radical.tools/radical.sh</code> and <code>/radical.cmd</code>, run the CLI where Node.js is missing: <code>sh radical.sh setup</code>, <code>radical.cmd setup</code>, or any other command. They take Node.js 20.11 or later with <code>npx</code> beside it from the <code>PATH</code>, else from <code>~/.radical/node</code>; with neither they ask, or take <code>--yes</code>, and download the latest Node.js 24 for the platform from nodejs.org, checked against its SHA-256 sum. <code>radical.sh mcp --folder …</code> runs the MCP server and never asks.</p>
+        <p>Setup run through a launcher pins its version line (<code>default_version</code>, <code>DEFAULT_VERSION</code> in <code>radical.cmd</code>) to the CLI's version, makes <code>radical.sh</code> executable, and writes each agent's entry as <code>sh radical.sh mcp --folder …</code> (<code>radical.cmd mcp</code> on Windows), with the launcher's path from the top of the repository in a project file and its absolute path in a user file. The git hooks run <code>sh radical.sh diff</code>. Commit the launcher with the model, and the project keeps one version for the CLI and every agent.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Variable</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>RADICAL_VERSION</code></td><td>The version to run this once, e.g. <code>latest</code>; setup then pins that version.</td></tr>
+              <tr><td><code>RADICAL_HOME</code></td><td>Where downloaded Node.js goes. Default: <code>~/.radical</code>.</td></tr>
+              <tr><td><code>RADICAL_NODE_MIRROR</code></td><td>Where Node.js comes from. Default: <code>https://nodejs.org/dist</code>.</td></tr>
+              <tr><td><code>RADICAL_YES</code></td><td>Downloads Node.js without asking, as <code>--yes</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>[folder]</code></td><td>The model folder. Default: <code>architecture</code>.</td></tr>
+              <tr><td><code>--client &lt;id&gt;</code></td><td>An agent to connect: <code>claude-code</code>, <code>claude-desktop</code>, <code>codex</code>, <code>cursor</code>, <code>vscode</code>; repeat for more. Default: the ones found installed.</td></tr>
+              <tr><td><code>--metamodel radical|c4</code></td><td>The metamodel of a new model. Default: <code>radical</code>.</td></tr>
+              <tr><td><code>--name &lt;name&gt;</code></td><td>The server's name in the configurations. Default: <code>radical</code>.</td></tr>
+              <tr><td><code>--no-hooks</code></td><td>Leaves the git hooks alone.</td></tr>
+              <tr><td><code>--no-check</code></td><td>Ends without the checks.</td></tr>
+              <tr><td><code>--status</code></td><td>Changes nothing: only the checks, for the folder named, else the working directory or <code>architecture</code> in it when it holds a model, else every server configured.</td></tr>
+              <tr><td><code>--no-start</code></td><td>Checks the configurations without starting a server.</td></tr>
+              <tr><td><code>--timeout &lt;s&gt;</code></td><td>Seconds a server has to answer. Default: 120, as npx may download the package first.</td></tr>
+              <tr><td><code>--dry-run</code></td><td>Prints every change and writes nothing.</td></tr>
+              <tr><td><code>-y</code>, <code>--yes</code></td><td>Asks nothing.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Each entry runs <code>npx -y @radicaltools/mcp@&lt;the CLI's version&gt; --folder …</code>. Other entries stay; an entry already there is left alone, and another server of the same name is replaced only when you agree.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Agent</th><th>File</th><th>Written as</th></tr></thead>
+            <tbody>
+              <tr><td>Claude Code</td><td><code>.mcp.json</code> at the top of the repository</td><td><code>npx</code>; the folder by its path from the top. Commit it to share the server.</td></tr>
+              <tr><td>VS Code</td><td><code>.vscode/mcp.json</code> at the top of the repository</td><td><code>npx</code>; <code>${workspaceFolder}/&lt;folder&gt;</code>.</td></tr>
+              <tr><td>Claude Desktop</td><td><code>claude_desktop_config.json</code> (macOS <code>~/Library/Application Support/Claude/</code>, Windows <code>%APPDATA%\Claude\</code>, Linux <code>~/.config/Claude/</code>)</td><td><code>npx</code> by its absolute path, node's directory on the server's <code>PATH</code> (the app does not see your shell's), the absolute folder. Backed up to <code>.bak</code>.</td></tr>
+              <tr><td>Cursor</td><td><code>~/.cursor/mcp.json</code></td><td>As Claude Desktop.</td></tr>
+              <tr><td>Codex</td><td><code>~/.codex/config.toml</code> (or <code>$CODEX_HOME</code>)</td><td>As Claude Desktop, in <code>[mcp_servers.&lt;name&gt;]</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>radical setup --status [folder]</code> changes nothing and reports Node, whether the folder reads as a model and its hooks save the base, and every agent configuration with a Radical MCP server: the folder it serves, a command or folder that is not there, a version other than the CLI's. Then it starts each server for the folder with the agent's command, arguments and environment and asks it for <code>get_model_summary</code>. <code>--no-start</code> only reads the configurations; <code>--timeout &lt;s&gt;</code> limits each server (default 120: npx may download the package first).</p>
+        <p>Exit status: 0 set up / nothing is broken, 1 a step or a check failed, 2 it could not run.</p>
+      </section>
+
       <section class="doc-section" id="mcp">
         <h2>MCP server</h2>
         <p>Runs locally over stdio, bound to one Markdown folder. Node.js 20.11 or newer.</p>
 <pre class="code"><code>npx -y @radicaltools/mcp --folder /absolute/path/to/my-model   <span class="cm"># waits for MCP messages on stdin</span>
 radical-mcp --version</code></pre>
-        <p>Claude Desktop: add it under <code>mcpServers</code> in <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code>) and restart the app. Give the full path to <code>node</code>, because the app does not see your shell's PATH.</p>
+        <p><a href="#setup"><code>radical setup</code></a> writes the entry for you. By hand, for Claude Desktop: add it under <code>mcpServers</code> in <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code>) and restart the app. Give the full path to <code>npx</code> and put node's directory on the server's <code>PATH</code>, because the app does not see your shell's.</p>
 <pre class="code"><code>{
   "mcpServers": {
-    "radical-folder": {
-      "command": "/usr/local/bin/node",
-      "args": ["/path/to/radical.tools/apps/mcp/dist/index.js", "--folder", "/path/to/my-model"]
+    "radical": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@radicaltools/mcp@0.2.0", "--folder", "/path/to/my-model"],
+      "env": { "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
     }
   }
 }</code></pre>

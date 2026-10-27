@@ -46,6 +46,17 @@ export interface Io {
    *  a file: in place of `command`, the hooks name a script inside the
    *  repository by its path from the top, so each working tree runs its own. */
   cli?: { node: string; script: string }
+  /** Asks a question in a terminal and returns the answer; absent when
+   *  nobody can answer (radical setup then takes its defaults). */
+  ask?: (question: string) => Promise<string>
+  /** Where radical setup (and its --status) find the agents' configurations
+   *  (default: the process's home, environment, platform and node). */
+  home?: string
+  env?: Record<string, string | undefined>
+  platform?: NodeJS.Platform
+  execPath?: string
+  /** The version this CLI pins the MCP server to and compares with (default: its build's). */
+  version?: string
 }
 
 /** Runs `radical check` with `args` (after the command name); returns the exit status. */
