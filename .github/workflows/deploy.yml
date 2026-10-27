@@ -85,6 +85,10 @@ jobs:
           # HTML references landing.css / style.css / theme.js as `?v=__BUILD__`.
           # Stamping the commit sha busts browser + CDN caches on every deploy.
           sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" apps/web/*.html
+          # The home page names the released version, the one the CLI carries.
+          version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' apps/cli/package.json)
+          test -n "$version"
+          sed -i "s/__VERSION__/$version/g" apps/web/*.html
 
       - name: Add the launchers
         run: |

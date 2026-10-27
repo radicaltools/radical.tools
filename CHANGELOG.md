@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- radical.tools: the home page names the released version, linked to its GitHub Release (what is new, the desktop installers), adds *Download the desktop app* beside *Open Studio in the browser*, and shows how to start in one command, in a tab per system (macOS · Linux, Windows, With Node.js; Windows first on Windows), each with a Copy button
+- radical.tools: the home page no longer has *Made for*, and the use cases page no longer ends with *Start anywhere*
+
 ## [0.3.0] - 2026-10-27
 
 ### Added
