@@ -814,7 +814,7 @@ curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup
 <span class="cm"># Windows</span>
 mkdir my-system &amp;&amp; cd my-system
 curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code></pre>
-        <p>Restart the agents it connected. Later, <code>radical status</code> says what stops an agent from reaching the model: a moved folder, a missing <code>node</code>, a server of another version. The <a href="reference.html#setup">Reference</a> lists where each agent keeps its servers. To register the package by hand instead, use absolute paths:</p>
+        <p>Restart the agents it connected. Later, <code>radical setup --status</code> says what stops an agent from reaching the model: a moved folder, a missing <code>node</code>, a server of another version. The <a href="reference.html#setup">Reference</a> lists where each agent keeps its servers. To register the package by hand instead, use absolute paths:</p>
 <pre class="code"><code><span class="cm"># Claude Code</span>
 claude mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-model
 
@@ -849,7 +849,7 @@ codex mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-mo
           <li><code>check.json</code> in the model folder sets each rule's severity and a baseline, and goals in percent. <code>--ratchet</code> lowers baselines to what the check finds now, never raises them.</li>
           <li>Exit status 0 means no errors, 1 errors, 2 the check could not run. <code>--format github</code> writes annotations for GitHub Actions.</li>
         </ul>
-        <p><code>radical setup</code> connects your agents to a model folder and <code>radical status</code> checks the connection (see <a href="#mcp">MCP server</a>). <code>radical diff</code> prints the changes on branch and saves the base; <code>radical hooks install</code> adds the git hooks that keep it fresh. Every option is in the <a href="reference.html#cli">Reference</a>. The commands that test the product itself (<code>radical fuzz</code>, <code>harden</code> and <code>explore</code>) are documented for contributors in <a href="https://github.com/radicaltools/radical.tools/blob/main/docs/CRUCIBLE.md" target="_blank" rel="noopener">docs/CRUCIBLE.md</a>.</p>
+        <p><code>radical setup</code> connects your agents to a model folder and <code>radical setup --status</code> checks the connection (see <a href="#mcp">MCP server</a>). <code>radical diff</code> prints the changes on branch and saves the base; <code>radical hooks install</code> adds the git hooks that keep it fresh. Every option is in the <a href="reference.html#cli">Reference</a>. The commands that test the product itself (<code>radical fuzz</code>, <code>harden</code> and <code>explore</code>) are documented for contributors in <a href="https://github.com/radicaltools/radical.tools/blob/main/docs/CRUCIBLE.md" target="_blank" rel="noopener">docs/CRUCIBLE.md</a>.</p>
         <div class="doc-tip">
           <strong>Good to know.</strong> This repository checks its own architecture model this way on every push. The Inspector shows the result of the same check in Studio.
         </div>

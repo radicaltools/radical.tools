@@ -69,19 +69,20 @@ radical.sh setup` moves the project to the latest release. `RADICAL_HOME` and
 4. **Hooks**: `radical hooks install` for the folder, so Studio's *Changes on branch*
    has the branch's base (`--no-hooks` leaves them alone). Outside a git repository it
    asks, in a terminal, to start one in the working directory first.
-5. **Check**: `radical status` for the folder (`--no-check` skips it).
+5. **Check**: the checks of `--status` for the folder (`--no-check` skips them).
 
 In a terminal each question shows its default; press Enter to take it. Without a
 terminal, or with `--yes`, it asks nothing: the folder `architecture`, the agents it
 finds installed, the hooks in a repository. `--dry-run` prints every change and writes
 nothing. Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could not run.
 
-## radical status
+### radical setup --status
 
-Checks what an agent needs to work on a model folder:
+Checks what an agent needs to work on a model folder, and changes nothing:
 
 ```sh
-npx @radicaltools/cli status architecture
+npx @radicaltools/cli setup --status architecture
+sh radical.sh setup --status                       # through the launcher
 ```
 
 It reports Node and the CLI's version; whether the folder reads as a model and the git
@@ -91,7 +92,8 @@ version than the CLI's; then it starts each server configured for the folder, wi
 agent's own command, arguments and environment, and asks it for `get_model_summary`
 over stdio. `--no-start` only reads the configurations; `--timeout <s>` (default 120,
 as npx may download the package first) limits each server. Without a folder it checks
-the working directory when it holds a model, else every Radical server configured.
+the working directory, or `architecture` in it, when it holds a model, else every Radical
+server configured. `--status` takes no option that would change something.
 Exit status: 0 nothing is broken (warnings, marked `!`, allowed), 1 something is
 (marked `✗`), 2 it could not run.
 

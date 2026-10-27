@@ -19,6 +19,7 @@ const exec = promisify(execFile)
 const METAMODELS = { radical: builtInGovernanceMetamodel, c4: builtInC4Metamodel } as const
 
 export const SETUP_USAGE = `Usage: radical setup [folder] [options]
+       radical setup --status [folder] [--no-start] [--timeout <s>]
 
 Connects your coding agents to a Radical model folder, step by step:
   1. Node      checks the version
@@ -28,7 +29,7 @@ Connects your coding agents to a Radical model folder, step by step:
   4. Hooks     the hooks that save the model's base for Studio's Changes on
                branch (radical hooks install); outside a git repository it
                asks, in a terminal, to start one in the working directory
-  5. Check     radical status for the folder
+  5. Check     the checks of --status for the folder
 
 In a terminal it asks each question with its default; press Enter to take
 it. Otherwise (or with --yes) it asks nothing and takes the options and the
@@ -42,9 +43,21 @@ defaults: the folder architecture, the agents it finds installed.
                       and governance, default) or c4
   --name <name>       the server's name in the configurations (default: radical)
   --no-hooks          leave the git hooks alone
-  --no-check          end without the checks of radical status
+  --no-check          end without the checks of --status
   --dry-run           print what it would change and write nothing
   -y, --yes           ask nothing
+
+  --status            change nothing: check what an agent needs to work on
+                      the folder (default: the working directory, or
+                      architecture in it, when it holds a model; else every
+                      server configured): Node, the folder and its git hooks,
+                      every agent configuration with a Radical MCP server
+                      (its command, the folder it serves, the version it
+                      pins), then start each server for the folder as its
+                      agent would and ask it for the model's summary
+  --no-start          check the configurations without starting a server
+  --timeout <s>       seconds a server has to answer (default 120: npx may
+                      download the package first)
 
 Claude Code's .mcp.json and VS Code's .vscode/mcp.json go to the top of the
 repository, to share through git; Claude Desktop's, Cursor's and Codex's
@@ -54,8 +67,8 @@ Run through the launcher (sh radical.sh setup, radical.cmd setup), it pins
 the launcher to this version and every agent starts the server through it,
 with the Node.js the launcher finds or downloaded.
 
-Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could
-not run.`
+Exit status: 0 set up and checked (with --status: nothing is broken), 1 a
+step or a check failed, 2 it could not run.`
 
 /** Runs `radical setup` with `args` (after the command name); returns the exit status. */
 export async function setupCommand(args: string[], io: Io): Promise<number> {
@@ -70,6 +83,9 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
         name: { type: 'string', default: 'radical' },
         'no-hooks': { type: 'boolean', default: false },
         'no-check': { type: 'boolean', default: false },
+        status: { type: 'boolean', default: false },
+        'no-start': { type: 'boolean', default: false },
+        timeout: { type: 'string', default: '120' },
         'dry-run': { type: 'boolean', default: false },
         yes: { type: 'boolean', short: 'y', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -85,6 +101,16 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   if (positionals.length > 1 || unknown.length || (values.metamodel && !(values.metamodel in METAMODELS)) || !values.name.trim()) {
     io.err(`${unknown.length ? `Unknown agent: ${unknown.join(', ')}\n\n` : ''}${SETUP_USAGE}`)
     return 2
+  }
+  const timeout = Number(values.timeout)
+  if (!(timeout > 0)) { io.err(SETUP_USAGE); return 2 }
+  const check = (folder?: string) => statusCommand({ folder, start: !values['no-start'], timeoutMs: timeout * 1000 }, io)
+  if (values.status) {
+    if (values.client || values.metamodel || values['dry-run'] || values['no-hooks'] || values['no-check']) {
+      io.err(`radical setup: --status changes nothing; it takes a folder, --no-start and --timeout.\n\n${SETUP_USAGE}`)
+      return 2
+    }
+    return check(positionals[0])
   }
   const dry = values['dry-run']
   const ask = values.yes ? undefined : io.ask
@@ -218,8 +244,8 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   // ── 5. Check ──
   io.out('5/5 Check')
   if (dry) { io.out('  - dry run: nothing was written'); return failed ? 1 : 0 }
-  if (values['no-check']) io.out('  - skipped (--no-check); radical status checks it later')
-  const code = values['no-check'] ? 0 : await statusCommand([relative(io.cwd, real) || '.'], io)
+  if (values['no-check']) io.out('  - skipped (--no-check); radical setup --status checks it later')
+  const code = values['no-check'] ? 0 : await check(relative(io.cwd, real) || '.')
   if (chosen.length) {
     io.out('\nNext: restart the agents you connected (quit Claude Desktop and Cursor fully, run /mcp in Claude Code), '
       + `ask one to call get_model_summary, and open ${folderArg} in Studio (https://studio.radical.tools, Models → Open folder…) to watch it work.`)

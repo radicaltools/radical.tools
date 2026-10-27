@@ -37,7 +37,7 @@ async function run(cwd: string, home: string, args: string[]) {
   return { code, out, err }
 }
 
-describe('radical status', () => {
+describe('radical setup --status', () => {
   it('reports what works and what stops the agent, and starts the servers for the folder', async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
     dirs.push(root)
@@ -71,7 +71,7 @@ describe('radical status', () => {
     const codex = join(home, '.codex', 'config.toml')
     await writeFile(codex, `[mcp_servers.radical]\ncommand = "/nowhere/npx"\nargs = ["-y", "@radicaltools/mcp@0.2.0", "--folder", ${JSON.stringify(folder)}]\n`)
 
-    const broken = await run(repo, home, ['status', 'architecture'])
+    const broken = await run(repo, home, ['setup', '--status', 'architecture'])
     expect(broken.err).toBe('')
     expect(broken.code).toBe(1)
     expect(broken.out).toContain(`✓ Node.js ${process.versions.node}`)
@@ -86,19 +86,19 @@ describe('radical status', () => {
     expect(broken.out).toContain('1 problem found.')
 
     await writeFile(codex, `[mcp_servers.radical]\ncommand = ${JSON.stringify(npx)}\nargs = ["-y", "@radicaltools/mcp@0.2.0", "--folder", ${JSON.stringify(folder)}]\nenv = { PATH = ${JSON.stringify(dirname(process.execPath))} }\n`)
-    const working = await run(repo, home, ['status', 'architecture'])
+    const working = await run(repo, home, ['setup', '--status', 'architecture'])
     expect(working.code).toBe(0)
     expect(working.out).toContain('✓ Codex "radical": MCP server 0.2.0 answers (3 elements)')
     expect(working.out).toContain('Nothing is broken.')
 
-    const configured = await run(repo, home, ['status', 'architecture', '--no-start'])
+    const configured = await run(repo, home, ['setup', '--status', 'architecture', '--no-start'])
     expect(configured.code).toBe(0)
     expect(configured.out).not.toContain('Servers')
     expect(configured.out).not.toContain('answers')
 
     await mkdir(join(repo, 'docs'))
     await writeFile(join(repo, 'docs', 'readme.txt'), 'notes')
-    const notModel = await run(repo, home, ['status', 'docs', '--no-start'])
+    const notModel = await run(repo, home, ['setup', '--status', 'docs', '--no-start'])
     expect(notModel.code).toBe(1)
     expect(notModel.out).toContain('✗ does not read as a model: it has no valid radical.md')
     expect(notModel.out).toContain('! no agent is set up for docs: radical setup docs')
@@ -109,10 +109,18 @@ describe('radical status', () => {
       await mkdir(dirname(join(outside, path)), { recursive: true })
       await writeFile(join(outside, path), content)
     }
-    const noGit = await run(root, home, ['status', 'outside', '--no-start'])
+    const noGit = await run(root, home, ['setup', '--status', 'outside', '--no-start'])
     expect(noGit.err).toBe('')
     expect(noGit.out).toContain('! is not in a git repository')
 
-    expect((await run(repo, home, ['status', '--timeout', 'x'])).code).toBe(2)
+    expect((await run(repo, home, ['setup', '--status', '--timeout', 'x'])).code).toBe(2)
+    // The folder named architecture in the working directory, by default.
+    const byDefault = await run(repo, home, ['setup', '--status', '--no-start'])
+    expect(byDefault.out).toContain('Model folder architecture')
+    // It changes nothing, so it takes no option that would.
+    const mixed = await run(repo, home, ['setup', '--status', '--client', 'codex'])
+    expect(mixed.code).toBe(2)
+    expect(mixed.err).toContain('--status changes nothing')
+    expect((await run(repo, home, ['status'])).code).toBe(2)
   })
 })

@@ -737,7 +737,7 @@ MCP server and exposed to Claude Code in `.mcp.json`. Found while setting it up:
     extension (`.mcpb`) and a Claude Code plugin would make connecting one
     click for those agents, writing the same entry. On Windows a user
     configuration names `npx.cmd` by its absolute path but sets no `PATH`
-    for it; Claude Desktop on Windows has not been tried. `radical status`
+    for it; Claude Desktop on Windows has not been tried. `radical setup --status`
     could also say when a newer version is on npm. `radical.cmd` is run only
     by CI on windows-latest; nobody has run it on a Windows desktop or with
     Claude Desktop starting `radical.cmd mcp`.

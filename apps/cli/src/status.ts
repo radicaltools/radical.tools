@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { parseArgs, promisify } from 'node:util'
+import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isValidMdFolderManifest } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { compareVersions, displayVersion, releaseOf } from '@radical/common/version'
@@ -14,22 +14,14 @@ import type { Io } from './check'
 
 const exec = promisify(execFile)
 
-export const STATUS_USAGE = `Usage: radical status [folder] [options]
-
-Checks what an agent needs to work on a model folder: Node, the folder (it
-reads as a model, and the git hooks save its base for Studio), every agent
-configuration that holds a Radical MCP server (Claude Code, Claude Desktop,
-Codex, Cursor, VS Code), its command, the folder it serves and the version it
-pins; then starts each server configured for the folder as its agent would
-and asks it for the model's summary over stdio.
-
-  folder              the model folder (default: the working directory when
-                      it holds a model, else every server configured)
-  --no-start          check the configurations without starting a server
-  --timeout <s>       seconds a server has to answer (default 120: npx may
-                      download the package first)
-
-Exit status: 0 nothing is broken, 1 something is, 2 it could not run.`
+/** What `radical setup --status` checks: the folder (else the working
+ *  directory, or architecture in it, when it holds a model; else every
+ *  server configured), and whether to start the servers. */
+export interface StatusOptions {
+  folder?: string
+  start: boolean
+  timeoutMs: number
+}
 
 /** The server's answer to initialize and get_model_summary over stdio. */
 interface Answer { version?: string; nodes?: number; error?: string }
@@ -84,43 +76,28 @@ export function askServer(entry: ServerEntry, cwd: string, place: Place, timeout
         }
       }
     })
-    send(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'radical-status', version: displayVersion() } })
+    send(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'radical-setup', version: displayVersion() } })
   })
 }
 
-/** Runs `radical status` with `args` (after the command name); returns the exit status. */
-export async function statusCommand(args: string[], io: Io): Promise<number> {
-  let parsed
-  try {
-    parsed = parseArgs({
-      args,
-      allowPositionals: true,
-      options: {
-        'no-start': { type: 'boolean', default: false },
-        timeout: { type: 'string', default: '120' },
-        help: { type: 'boolean', short: 'h', default: false },
-      },
-    })
-  } catch (error) {
-    io.err(`${(error as Error).message}\n\n${STATUS_USAGE}`)
-    return 2
-  }
-  const { values, positionals } = parsed
-  if (values.help) { io.out(STATUS_USAGE); return 0 }
-  const timeout = Number(values.timeout)
-  if (positionals.length > 1 || !(timeout > 0)) { io.err(STATUS_USAGE); return 2 }
-
+/** Checks what an agent needs to work on a model folder: Node, the folder
+ *  (it reads as a model, the git hooks save its base for Studio), every agent
+ *  configuration that holds a Radical MCP server (its command, the folder it
+ *  serves, the version it pins), then starts each server for the folder as its
+ *  agent would and asks it for the model's summary over stdio. Writes nothing;
+ *  returns 0 when nothing is broken, else 1. */
+export async function statusCommand(options: StatusOptions, io: Io): Promise<number> {
   let problems = 0
   const ok = (text: string) => io.out(`  ✓ ${text}`)
   const warn = (text: string) => io.out(`  ! ${text}`)
   const fail = (text: string) => { problems++; io.out(`  ✗ ${text}`) }
 
-  // The folder: the one named, else the working directory when it is a model.
-  const named = positionals[0]
-  const candidate = resolve(io.cwd, named ?? '.')
-  const folder = named !== undefined || existsSync(resolve(candidate, 'radical.md'))
-    ? await realpath(candidate).catch(() => candidate)
-    : null
+  // The folder: the one named, else the working directory or architecture in
+  // it when it is a model.
+  const named = options.folder
+  const candidate = named !== undefined ? resolve(io.cwd, named)
+    : ['.', 'architecture'].map((path) => resolve(io.cwd, path)).find((path) => existsSync(resolve(path, 'radical.md')))
+  const folder = candidate ? await realpath(candidate).catch(() => candidate) : null
   const git = async (cwd: string, ...gitArgs: string[]) => (await exec('git', gitArgs, { cwd, windowsHide: true })).stdout.trim()
   const topOf = async (dir: string) => {
     let at = dir
@@ -207,10 +184,10 @@ export async function statusCommand(args: string[], io: Io): Promise<number> {
     else warn('no agent is set up for a Radical model: radical setup <folder>')
   }
 
-  if (!values['no-start'] && toStart.length) {
+  if (options.start && toStart.length) {
     io.out('Servers')
     for (const { client, name, entry } of toStart) {
-      const answer = await askServer(expanded(entry, place), client.base(place), place, timeout * 1000)
+      const answer = await askServer(expanded(entry, place), client.base(place), place, options.timeoutMs)
       const where = `${client.label} "${name}"`
       if (answer.error) { fail(`${where}: the server ${answer.error}`); continue }
       ok(`${where}: MCP server ${answer.version ?? '?'} answers${answer.nodes !== undefined ? ` (${answer.nodes} elements)` : ''}`)

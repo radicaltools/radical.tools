@@ -49,7 +49,7 @@ export interface Io {
   /** Asks a question in a terminal and returns the answer; absent when
    *  nobody can answer (radical setup then takes its defaults). */
   ask?: (question: string) => Promise<string>
-  /** Where radical setup and radical status find the agents' configurations
+  /** Where radical setup (and its --status) find the agents' configurations
    *  (default: the process's home, environment, platform and node). */
   home?: string
   env?: Record<string, string | undefined>
