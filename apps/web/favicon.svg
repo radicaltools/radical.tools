@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- The radical.tools mark: "r." on a dark tile, the dot of radical.tools.
+       The one source of every icon: the desktop app's and the VS Code
+       extension's, the favicons and the logo of radical.tools, Hub and
+       Studio. After a change: node tools/generate-icons.mjs -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d2340"/>
+      <stop offset="1" stop-color="#121528"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6ea8ff"/>
+      <stop offset="1" stop-color="#8b7bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="34" fill="url(#tile)"/>
+  <rect x=".75" y=".75" width="126.5" height="126.5" rx="33.25" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.5"/>
+  <path d="M44 94V64A24 24 0 0 1 68 40H72" fill="none" stroke="url(#ink)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="86" cy="94" r="10" fill="#8b7bff"/>
+</svg>

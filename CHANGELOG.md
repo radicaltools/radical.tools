@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- One mark for the whole family: “r.” on a dark tile, in `tools/brand/radical-mark.svg`. It is the icon of the desktop app and the VS Code extension (from the next release), the logo in the top bar of radical.tools and the Hub, the mark on Studio's welcome screen, and the favicon of radical.tools, Studio and the Hub, which had none. `node tools/generate-icons.mjs` renders every icon from it
 - The manual's *Getting started* ends with how to start from the terminal (the launcher, or npx) to connect a coding agent, and *Command line* opens with how to run the CLI, a table of its commands and *The launcher*
 - radical.tools: a thin line sets the home page's buttons and *Get started* apart from the map
 - radical.tools: the home page names the released version, linked to its GitHub Release (what is new, the desktop installers), adds *Download the desktop app* beside *Open Studio in the browser*, and shows how to start in one command, in a tab per system (macOS · Linux, Windows, With Node.js; Windows first on Windows), each with a Copy button

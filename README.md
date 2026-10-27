@@ -199,7 +199,7 @@ packages/
   node-files/     @radical/node-files: model folders on disk for Node (MCP, CLI)
 architecture/     The architecture model of radical.tools itself, checked in CI
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
-tools/            Repo-wide scripts (check-workspaces.mjs, test-reports.mjs, generate-icon.js)
+tools/            Repo-wide scripts (check-workspaces.mjs, test-reports.mjs, generate-icons.mjs)
 docs/             Architecture notes and improvement log
 ```
 

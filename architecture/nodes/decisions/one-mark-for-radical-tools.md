@@ -1,0 +1,11 @@
+---
+id: "df8f747e-807f-465c-8a1c-714b12943406"
+type: "adr"
+label: "One mark for radical.tools"
+alternatives: "An R monogram on the blue square (the site’s mark, refined, with or without a node at its leg): close to what the site had, but the R is common among developer tools. The radical sign √, with or without a node: a pun on the name, but not a letter. An R drawn as a graph of nodes: unreadable at 16 px. A dot in a ring, or two nodes and an edge: read as a record button or a link. Keeping the graph as Studio’s own icon: two marks in one family."
+consequences: "One file changes the mark everywhere, after running the generator; tools/brand.test.mjs fails when a copy differs from the source or an icon is missing. The VS Code publish no longer draws its icon. The new icon reaches the desktop installers and the Marketplace with the next release. The Hub’s top-bar logo is no longer emerald: the Hub keeps its palette, the family keeps its mark."
+context: "The family showed three marks. radical.tools and the Hub had an R on a blue-to-violet square, drawn in CSS. The desktop app and the VS Code extension had a graph on a navy square, drawn pixel by pixel by tools/generate-icon.js: no anti-aliasing, square corners, and the VS Code publish workflow drew it again on every release. Studio’s welcome screen had a third mark, a dot in a dashed ring. No page had a favicon. The product owner noticed the desktop app’s icon differed from the site’s and chose a new mark from several drafts."
+date: "2026-10-27"
+decision: "One mark everywhere: “r.” on a dark tile, the letter in a blue-to-violet gradient and the dot of radical.tools, in tools/brand/radical-mark.svg. That file is the one source. tools/generate-icons.mjs renders the desktop app’s icon (1024 px, with the margin macOS icons keep), the VS Code extension’s icon (128 px) and the Apple touch icons (180 px) through Playwright, and copies the SVG as favicon.svg into the website, Studio and the Hub. The top-bar logo of radical.tools and the Hub shows that favicon.svg; Studio’s welcome screen imports one more copy in its sources (apps/studio/src/renderer/src/radical-mark.svg), as a workspace imports only its own files and the VS Code webview serves only what its page names. The generated files are committed."
+status: "accepted"
+---

@@ -22,7 +22,7 @@ export function SiteNav({ studioUrl, theme, onToggleTheme, onHub }: SiteNavProps
   const themeLabel = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
   return (
     <header className="site-nav">
-      <a className="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><span className="site-nav-mark">R</span></a>
+      <a className="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><img className="site-nav-mark" src="./favicon.svg" alt="" /></a>
       <nav className="site-nav-links">
         <a className="site-nav-btn" href="https://radical.tools">Home</a>
         <a className="site-nav-btn" href="https://radical.tools/usecases.html">Use cases</a>
