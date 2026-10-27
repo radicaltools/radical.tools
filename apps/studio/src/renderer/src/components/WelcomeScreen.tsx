@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { documents } from '../store/documentStore'
 import { aiReady, loadAISettings } from '../ai/settings'
 import { BrowserIcon, ModelRow, NewModelStep, OpenSources, StepRow, openSample } from './ModelSteps'
+// The mark of radical.tools: a copy of tools/brand/radical-mark.svg that
+// tools/generate-icons.mjs writes (ADR "One mark for radical.tools").
+import radicalMark from '../radical-mark.svg?url'
 
 interface Props {
   onDismiss: () => void
@@ -112,14 +115,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
         {/* ── Left column: what this is ── */}
         <div className="welcome-left">
           <div className="welcome-wordmark">
-            <svg className="welcome-wordmark-icon" width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <circle cx="14" cy="14" r="4.5" fill="#3b6fe6"/>
-                <circle cx="14" cy="14" r="12" stroke="#3b6fe6" strokeWidth="1.5" fill="none" strokeDasharray="3 2"/>
-                <circle cx="14" cy="2"  r="2" fill="#3b6fe6" opacity="0.45"/>
-                <circle cx="14" cy="26" r="2" fill="#3b6fe6" opacity="0.45"/>
-                <circle cx="2"  cy="14" r="2" fill="#3b6fe6" opacity="0.45"/>
-                <circle cx="26" cy="14" r="2" fill="#3b6fe6" opacity="0.45"/>
-            </svg>
+            <img className="welcome-wordmark-icon" src={radicalMark} width={28} height={28} alt="" />
             <span className="welcome-wordmark-text">studio <span className="welcome-wordmark-by">by radical<em>.tools</em></span></span>
           </div>
           {/* The website's words (apps/web/index.html), so both say the same. */}

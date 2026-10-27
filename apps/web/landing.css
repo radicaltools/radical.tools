@@ -117,13 +117,8 @@ h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
   color: var(--text); text-decoration: none;
 }
 .site-nav-logo em { font-style: normal; color: var(--accent); }
-.site-nav-mark {
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px; color: #fff; font-weight: 800; font-size: 14px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed));
-  box-shadow: var(--shadow-sm);
-}
+/* The mark of radical.tools (tools/brand/radical-mark.svg). */
+.site-nav-mark { width: 28px; height: 28px; display: block; }
 .site-nav-links { display: flex; align-items: center; gap: 6px; flex: 1; margin-left: 14px; }
 .site-nav-sep { width: 1px; height: 22px; background: var(--border); margin: 0 8px; opacity: 0.8; }
 /* First separator pushes Hub / Studio / GitHub / theme to the right edge. */

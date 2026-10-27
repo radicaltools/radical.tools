@@ -56,10 +56,6 @@ jobs:
         run: npm run build:web
         # Produces: apps/studio/out/renderer/index.html  +  apps/studio/out/renderer/assets/**
 
-      # ── Generate icon (idempotent) ───────────────────────────────────────────
-      - name: Generate extension icon
-        run: node tools/generate-icon.js
-
       # ── Extension ────────────────────────────────────────────────────────────
       - name: Bundle web renderer into extension
         working-directory: apps/vscode
