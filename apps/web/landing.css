@@ -205,6 +205,15 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 /* Get started: one command, dark in both themes as the code blocks. */
 .get-started { max-width: 640px; margin: 28px auto 0; }
 .get-started-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
+.get-started-tabs { display: flex; justify-content: center; gap: 4px; margin-bottom: 8px; }
+.get-started-tabs button {
+  height: 26px; padding: 0 10px; border-radius: 7px;
+  border: 1px solid transparent; background: none; color: var(--muted);
+  font: 500 12px/1 inherit; cursor: pointer;
+}
+.get-started-tabs button:hover { color: var(--text); }
+.get-started-tabs button[aria-selected="true"] { color: var(--text); border-color: var(--border); background: color-mix(in srgb, var(--bg-panel) 85%, transparent); }
+.get-started-cmd[hidden] { display: none; }
 .get-started-cmd {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 8px 8px 16px;
@@ -220,7 +229,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 }
 .get-started-cmd .copy:hover { background: #26263e; }
 .get-started .hero-note { margin-top: 10px; line-height: 1.7; }
-.get-started .hero-note code { overflow-wrap: anywhere; }
 
 /* ── The product in one picture (hero) ───────────────────────────── */
 .map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 30px; }
@@ -402,39 +410,13 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 }
 .uc-benefits li b { color: var(--text); font-weight: 600; }
 .uc-benefits code { font-size: 0.9em; color: var(--text); }
+/* The last use case leaves room before the footer. */
+.uc:last-of-type { margin-bottom: 72px; }
 .uc-links { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
 .uc-links a { font-size: 13px; font-weight: 500; color: var(--accent); }
 .uc-links a:hover { text-decoration: underline; }
-.uc-start { padding: 40px 0 72px; text-align: center; }
-.uc-start h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
-.uc-path {
-  list-style: none; counter-reset: step;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
-  margin: 0 auto 26px;
-}
-.uc-path li {
-  --c: var(--accent);
-  counter-increment: step;
-  padding: 18px 16px 16px; text-align: left;
-  border-radius: var(--radius-xl); border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-panel) 80%, transparent);
-  font-size: 13.5px; line-height: 1.5; color: var(--muted);
-}
-.uc-path li::before {
-  content: counter(step);
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 50%; margin-bottom: 10px;
-  font-size: 12px; font-weight: 700; color: var(--c);
-  background: color-mix(in srgb, var(--c) 16%, transparent);
-}
-.uc-path li b { display: block; color: var(--text); font-weight: 600; }
-.uc-start .lead { margin-bottom: 22px; }
 @media (max-width: 760px) {
   .uc { padding: 22px 18px 18px; }
   .uc-body { grid-template-columns: 1fr; gap: 22px; }
   .uc h2 { font-size: 20px; }
-  .uc-path { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 480px) {
-  .uc-path { grid-template-columns: 1fr; }
 }

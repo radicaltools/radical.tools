@@ -318,11 +318,15 @@
       <!-- Get started: from an empty folder to a connected agent (apps/cli/launcher). -->
       <div class="get-started">
         <div class="get-started-label">Get started: connect your coding agent to a new model</div>
-        <div class="get-started-cmd">
-          <code>curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup</code>
-          <button type="button" class="copy" data-copy="curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup">Copy</button>
+        <div class="get-started-tabs" role="tablist" aria-label="Your system">
+          <button type="button" role="tab" aria-selected="true" data-os="sh">macOS · Linux</button>
+          <button type="button" role="tab" aria-selected="false" data-os="win">Windows</button>
+          <button type="button" role="tab" aria-selected="false" data-os="npx">With Node.js</button>
         </div>
-        <p class="hero-note">In an empty folder, with or without Node.js. Windows: <code>curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code>. With Node.js: <code>npx @radicaltools/cli setup</code>. <a href="manual.html#mcp">More in the manual</a></p>
+        <div class="get-started-cmd" data-os="sh"><code>curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup</code><button type="button" class="copy">Copy</button></div>
+        <div class="get-started-cmd" data-os="win" hidden><code>curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code><button type="button" class="copy">Copy</button></div>
+        <div class="get-started-cmd" data-os="npx" hidden><code>npx @radicaltools/cli setup</code><button type="button" class="copy">Copy</button></div>
+        <p class="hero-note">In an empty folder: it downloads Node.js when there is none, starts a model and connects your coding agent to it. <a href="manual.html#mcp">More in the manual</a></p>
       </div>
     </section>
 
@@ -385,10 +389,18 @@
   </footer>
 
   <script>
-    // Copy buttons: the command they carry, then "Copied" for a moment.
-    for (const button of document.querySelectorAll('[data-copy]')) {
+    // Get started: a tab per system, Windows first on Windows; Copy takes the
+    // command shown beside it, then says "Copied" for a moment.
+    const tabs = document.querySelectorAll('.get-started-tabs [data-os]')
+    const show = (os) => {
+      for (const tab of tabs) tab.setAttribute('aria-selected', String(tab.dataset.os === os))
+      for (const cmd of document.querySelectorAll('.get-started-cmd')) cmd.hidden = cmd.dataset.os !== os
+    }
+    for (const tab of tabs) tab.addEventListener('click', () => show(tab.dataset.os))
+    if (/Windows/.test(navigator.userAgent)) show('win')
+    for (const button of document.querySelectorAll('.get-started-cmd .copy')) {
       button.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(button.dataset.copy) } catch { return }
+        try { await navigator.clipboard.writeText(button.previousElementSibling.textContent) } catch { return }
         button.textContent = 'Copied'
         setTimeout(() => { button.textContent = 'Copy' }, 1500)
       })
