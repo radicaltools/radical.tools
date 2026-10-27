@@ -571,13 +571,25 @@
 
       <section class="doc-section" id="navigation">
         <h2>Search &amp; navigation</h2>
+        <p>Quick Search finds any place in the model by a few words: views and their folders, elements, relations, sequences, presentations with their slides, and milestones.</p>
         <figure class="doc-shot">
-          <img class="shot-light" src="screenshots/search-light.png?v=__BUILD__" alt="Quick Search open with the query Payment, listing matching views, nodes and relations with the views they appear in" loading="lazy" />
-          <img class="shot-dark" src="screenshots/search-dark.png?v=__BUILD__" alt="Quick Search open with the query Payment, listing matching views, nodes and relations with the views they appear in" loading="lazy" />
-          <figcaption><kbd>⌘/Ctrl+P</kbd> searches elements, relations and views. Each hit lists the views it appears in.</figcaption>
+          <img class="shot-light" src="screenshots/search-light.png?v=__BUILD__" alt="Quick Search open with the query Payment: hits in sections Views, Elements, Relations and more, each with its count, the matched part in bold" loading="lazy" />
+          <img class="shot-dark" src="screenshots/search-dark.png?v=__BUILD__" alt="Quick Search open with the query Payment: hits in sections Views, Elements, Relations and more, each with its count, the matched part in bold" loading="lazy" />
+          <figcaption><kbd>⌘/Ctrl+P</kbd> lists the hits in sections; each element says how many views show it.</figcaption>
         </figure>
         <ul>
-          <li><strong>Quick Search</strong> is in the middle of the top bar on every view. Results are ranked across names, types, descriptions and technology. <kbd>Enter</kbd> selects the element on the view you are in, or on a view that shows it; <kbd>Shift+Enter</kbd> picks it in <em>All elements</em>. With an AI provider configured, <em>✨</em> turns the box into the <a href="#ai">assistant</a>.</li>
+          <li><strong>Quick Search</strong> is in the middle of the top bar on every view. Every word must match, in any order, without case or accents; <code>ps</code> finds <em>Payment Service</em> by its initials. A match in a description or property shows the words around it. <kbd>Enter</kbd> goes there: a view opens, an element is selected where a view shows it (<kbd>→</kbd> first lists the views to choose from, <kbd>Shift+Enter</kbd> picks it in <em>All elements</em>), a slide opens in Presenter (<kbd>Shift+Enter</kbd> plays from it), a folder opens in the list of views. With an AI provider configured, <em>✨</em> turns the box into the <a href="#ai">assistant</a>.</li>
+          <li><strong>Prefixes</strong> narrow it: <code>v:</code> views, <code>f:</code> folders, <code>e:</code> elements, <code>r:</code> relations, <code>s:</code> sequences, <code>p:</code> presentations and slides, <code>m:</code> milestones; <code>@</code> the view shown, <code>in:</code> a view by name, <code>type:</code> a type, <code>status:accepted</code> a property's value. The box suggests what fits; <kbd>Tab</kbd> takes the first. See <a href="reference.html#search">the prefixes</a>.</li>
+          <li><strong>Nothing typed</strong>, it lists the places you visited last. <strong><code>&gt;</code></strong> lists the commands of the toolbar and the canvas.</li>
+          <li><strong>Show all in a table</strong> under the elements found opens <em>All elements</em> with only those rows.</li>
+        </ul>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/find-light.png?v=__BUILD__" alt="The find bar over the Core Banking canvas with the word service: the elements found stand out, the rest is dimmed, the first hit selected" loading="lazy" />
+          <img class="shot-dark" src="screenshots/find-dark.png?v=__BUILD__" alt="The find bar over the Core Banking canvas with the word service: the elements found stand out, the rest is dimmed, the first hit selected" loading="lazy" />
+          <figcaption><kbd>⌘/Ctrl+F</kbd> finds in the view shown and dims the rest.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Find in the view</strong> (<kbd>⌘/Ctrl+F</kbd>) searches the elements of the view shown. A canvas dims the rest, a table its other rows; <kbd>Enter</kbd> and <kbd>Shift+Enter</kbd> go from one hit to the next. On a wiki it goes to the wiki's own search.</li>
           <li><strong>Back and Forward</strong> (<em>‹ ›</em> beside the search, <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd>) walk the places you have been: views, perspectives, selected elements. The clock lists them.</li>
           <li><strong>From the card</strong>: the <em>Views</em> list at its foot opens any view that shows the element, with it selected and in sight.</li>
           <li><strong>Deep links</strong>: the URL always names the place on screen, so any view, element, milestone or slide can be bookmarked or shared. See <a href="reference.html#links">Deep links</a>.</li>

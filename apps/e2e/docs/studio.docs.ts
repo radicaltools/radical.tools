@@ -263,6 +263,16 @@ test('search', async ({ page, shot }) => {
   await shot('search')
 })
 
+test('find', async ({ page, shot }) => {
+  await open(page, 'view-core')
+  await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('ControlOrMeta+f')
+  await page.keyboard.type('service')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(900)
+  await shot('find')
+})
+
 test('milestones', async ({ page, shot }) => {
   await open(page, 'view-payments', 'designer', '/s/snap-v2')
   await page.getByRole('tab', { name: 'Milestones' }).click()

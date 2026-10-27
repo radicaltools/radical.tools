@@ -35,6 +35,7 @@
     "./formats/agentActivity": "./src/formats/agentActivity.ts",
     "./formats/modelBase": "./src/formats/modelBase.ts",
     "./formats/exportGherkin": "./src/formats/exportGherkin.ts",
+    "./search": "./src/search.ts",
     "./ai/queryLanguage": "./src/ai/queryLanguage.ts",
     "./ai/diagramFacade": "./src/ai/diagramFacade.ts",
     "./ai/modelFacade": "./src/ai/modelFacade.ts",

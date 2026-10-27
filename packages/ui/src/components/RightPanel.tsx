@@ -163,6 +163,17 @@ function SectionIcon({ id }: { id: PanelSectionId }) {
 
 /** The left panel's open section, picked on the activity rail. */
 export const useLeftPanelSection = create<{ open: PanelSectionId }>()(() => ({ open: 'views' }))
+/** A folder of the list of views to show (Quick Search's pick of one):
+ *  `at` tells one ask from the next. */
+export const useViewFolderReveal = create<{ path: string | null; at: number }>()(() => ({ path: null, at: 0 }))
+/** Opens the list of views on folder `path`: the panel open on Views, the
+ *  folder and those it is in unfolded, its row scrolled into sight and
+ *  marked a moment. */
+export function revealViewFolder(path: string): void {
+  useLeftPanelSection.setState({ open: 'views' })
+  useViewFolderReveal.setState({ path, at: Date.now() })
+  window.dispatchEvent(new CustomEvent('radical:show-left-panel'))
+}
 /** Where the app puts its own actions on the activity rail: at its top
  *  (Studio's models, as VS Code's explorer) and at its foot (settings). */
 export const useRailSlot = create<{ el: HTMLElement | null; top: HTMLElement | null }>()(() => ({ el: null, top: null }))
@@ -1463,6 +1474,31 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
       return next
     })
   }, [activeFolder])
+  // A folder asked for (revealViewFolder): it and those it is in open,
+  // then its row is brought into sight, once drawn, and marked.
+  const reveal = useViewFolderReveal()
+  const [flashFolder, setFlashFolder] = useState<string | null>(null)
+  useEffect(() => {
+    const path = reveal.path
+    if (!path) return
+    const ancestors = path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))
+    setClosed((prev) => {
+      if (!ancestors.some((p) => prev.has(p))) return prev
+      const next = new Set(prev)
+      ancestors.forEach((p) => next.delete(p))
+      return next
+    })
+    setFlashFolder(path)
+    let tries = 0
+    const show = () => {
+      const row = listRef.current?.querySelector(`[data-folder-path="${CSS.escape(path)}"]`)
+      if (row && row.getClientRects().length) row.scrollIntoView?.({ block: 'nearest' })
+      else if (tries++ < 10) requestAnimationFrame(show)
+    }
+    requestAnimationFrame(show)
+    const timer = setTimeout(() => setFlashFolder(null), 1600)
+    return () => clearTimeout(timer)
+  }, [reveal.at]) // eslint-disable-line react-hooks/exhaustive-deps
   const toggleFolder = (path: string) => setClosed((prev) => {
     const next = new Set(prev)
     if (next.has(path)) next.delete(path); else next.add(path)
@@ -1552,7 +1588,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     const open = !closed.has(folder.path)
     return (
       <div key={`folder:${folder.path}`} className="lp-folder">
-        <div className={`lp-folder-row${open ? ' open' : ''}`}>
+        <div className={`lp-folder-row${open ? ' open' : ''}${flashFolder === folder.path ? ' lp-folder-found' : ''}`} data-folder-path={folder.path}>
           <button
             className="lp-folder-toggle"
             onClick={() => toggleFolder(folder.path)}

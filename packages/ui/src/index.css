@@ -1501,6 +1501,8 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 /* Folders of views: a row that opens and closes, its views indented
    under a thin guide line. */
 .lp-folder { display: flex; flex-direction: column; gap: 4px; }
+/* A folder Quick Search picked: marked a moment. */
+.lp-folder-row.lp-folder-found { background: color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 5px; transition: background 600ms ease; }
 .lp-folder-row {
   display: flex; align-items: center; gap: 2px;
   border-radius: 6px;
@@ -4617,6 +4619,9 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* The selected row reads at a glance in both themes: a clear accent tint,
    an accent bar down its left edge and its text at full strength (a 10%
    tint was hard to find). */
+/* Find in the view: the rows found stand out, the others are dimmed. */
+.tv-row-dim > td { opacity: 0.35; }
+.tv-row-found > td:first-child { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
 .tv-row-selected, .tv-row-selected:hover { background: color-mix(in srgb, var(--accent) 26%, var(--bg-panel)) !important; }
 .tv-row-selected > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .tv-row-selected .tv-cell-value, .tv-row-selected .tv-cell-readonly { color: var(--text-primary); }

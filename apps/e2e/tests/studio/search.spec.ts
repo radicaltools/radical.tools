@@ -141,3 +141,226 @@ test('a pick of a relation opens a view that draws it, with it selected', async 
   await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1)
   await expect(page.locator('.react-flow__edge.selected')).toHaveAttribute('data-testid', 'rf__edge-r1')
 })
+
+// ── Every kind of place (asked for 2026-10-26) ───────────────────────────────
+
+/** The bookstore with its views in folders, a third slide and a milestone,
+ *  all named with "order". */
+function bookstoreWithPlaces(): Record<string, any> {
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.views.find((v: { id: string }) => v.id === 'v-context').folder = 'Order area'
+  doc.views.find((v: { id: string }) => v.id === 'v-containers').folder = 'Order area/Inside'
+  doc.presentations[0].slides.push({ id: 'slide-3', name: 'Order flow', snapshotId: null, viewId: 'v-order', viewport: { x: 0, y: 0, zoom: 1 } })
+  doc.snapshots = [{
+    id: 'm-1', name: 'Order rework', timestamp: 1,
+    nodes: Object.fromEntries(doc.nodes.map((n: { id: string }) => [n.id, n])),
+    relations: Object.fromEntries(doc.relations.map((r: { id: string }) => [r.id, r])),
+    sequences: Object.fromEntries(doc.sequences.map((s: { id: string }) => [s.id, s])),
+  }]
+  return doc
+}
+
+const section = (page: import('@playwright/test').Page, title: string) => page.locator(`.qs-section[aria-label="${title}"]`)
+
+test('Quick Search finds views, folders, sequences, slides and milestones, in sections', async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify(bookstoreWithPlaces()))
+  await studio.open('v-table')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('order')
+
+  // A view by its name or its folder.
+  await expect(section(page, 'Views').locator('.quick-search-item')).toHaveText([/./, /./, /./])
+  await expect(section(page, 'Views')).toContainText('Place Order Flow')
+  await expect(section(page, 'Views')).toContainText('System Context')
+  await expect(section(page, 'Views').locator('.qs-section-count')).toHaveText('3')
+  await expect(section(page, 'Folders')).toContainText('Order area')
+  await expect(section(page, 'Elements')).toContainText('Orders DB')
+  await expect(section(page, 'Sequences')).toContainText('Place Order')
+  await expect(section(page, 'Slides')).toContainText('Order flow')
+  await expect(section(page, 'Slides')).toContainText('Main · slide 3')
+  await expect(section(page, 'Milestones')).toContainText('Order rework')
+  // The part that matched is marked.
+  await expect(section(page, 'Elements').locator('.qs-mark').first()).toHaveText('Order')
+
+  // A sequence opens the flow view that plays it.
+  await section(page, 'Sequences').locator('.quick-search-item').first().click()
+  await expect(page).toHaveURL(/\/v\/v-order$/)
+  // A milestone is shown.
+  await search.click()
+  await page.keyboard.type('m: rework')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/s\//)
+})
+
+test('a folder pick shows it open in the list of views', async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify(bookstoreWithPlaces()))
+  await studio.open('v-table')
+  // The folder it is in is folded away.
+  await page.locator('.lp-folder-row[data-folder-path="Order area"] .lp-folder-toggle').click()
+  await expect(page.locator('.lp-folder-row[data-folder-path="Order area/Inside"]')).toHaveCount(0)
+
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('f: inside')
+  await expect(page.locator('.quick-search-item').first()).toContainText('Inside')
+  await page.keyboard.press('Enter')
+  const row = page.locator('.lp-folder-row[data-folder-path="Order area/Inside"]')
+  await expect(row).toBeVisible()
+  await expect(row).toHaveClass(/lp-folder-found/)
+  await expect(page.locator('.lp-view-card', { hasText: 'Containers' }).first()).toBeVisible()
+})
+
+test('a pick of a slide opens it in Presenter, and Shift+Enter plays the presentation from it', async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify(bookstoreWithPlaces()))
+  await studio.open('v-context')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('p: order flow')
+  await expect(page.locator('.quick-search-item').first()).toContainText('Order flow')
+  await page.keyboard.press('Enter')
+  // Presenter, on the slide and the view it shows.
+  await expect(page).toHaveURL(/\/m\/presenter\/v\/v-order$/)
+  await expect(page.locator('.pres-slide-card.active')).toContainText('Order flow')
+
+  await search.click()
+  await page.keyboard.type('p: containers')
+  await expect(page.locator('.quick-search-item').first()).toContainText('Containers')
+  await page.keyboard.press('Shift+Enter')
+  await expect(page).toHaveURL(/\/p\/pres-main\/play\/1\/sl\/1$/)
+})
+
+test('prefixes narrow the search: @ to the view shown, in: to a view, type: and a property', async ({ page, studio }) => {
+  await studio.seedDocument(JSON.stringify({
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      node('shop', 'system', 'Shop', { x: 40, y: 40, width: 600, height: 300 }),
+      node('api', 'container', 'Use API', { parentId: 'shop', x: 40, y: 80 }),
+      node('adr1', 'adr', 'Use Postgres', { status: 'accepted' }),
+      node('adr2', 'adr', 'Use Kafka', { status: 'proposed' }),
+    ],
+    relations: [], sequences: [], snapshots: [], presentations: [],
+    views: [
+      { id: 'v-api', name: 'API only', kind: 'table', nodeIds: ['api'], positions: {} },
+      { id: 'v-adr', name: 'Decisions', kind: 'table', nodeIds: ['adr1', 'adr2'], positions: {} },
+    ],
+  }))
+  await studio.open('v-api')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  const items = page.locator('.quick-search-item')
+  await search.click()
+
+  // @: the view shown has one "use".
+  await page.keyboard.type('@ use')
+  await expect(page.locator('.qs-scope')).toContainText('API only')
+  await expect(items).toHaveCount(1)
+  await expect(items.first()).toContainText('Use API')
+
+  // in: suggests the views, and Tab takes the first.
+  await search.fill('in:')
+  await expect(page.locator('.qs-suggest-chip').first()).toContainText('API only')
+  await page.keyboard.press('End')
+  await page.keyboard.type('Dec')
+  await page.keyboard.press('Tab')
+  await expect(search).toHaveValue('in:Decisions ')
+  await page.keyboard.type('use')
+  await expect(section(page, 'Elements').locator('.quick-search-item[data-kind="element"]')).toHaveCount(2)
+
+  // type: and a property's value.
+  await search.fill('type:adr status:accepted')
+  await expect(items).toHaveCount(1)
+  await expect(items.first()).toContainText('Use Postgres')
+
+  // v: only views.
+  await search.fill('v: api')
+  await expect(page.locator('.qs-section')).toHaveCount(1)
+  await expect(section(page, 'Views')).toContainText('API only')
+})
+
+test('the empty bar lists the places visited, and a pick goes back there', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  await page.locator('.lp-view-card', { hasText: 'Containers' }).first().click()
+  await expect(page).toHaveURL(/\/v\/v-containers$/)
+  await page.locator('.lp-view-card', { hasText: 'Element Table' }).first().click()
+  await expect(page).toHaveURL(/\/v\/v-table$/)
+
+  await page.locator('.quick-search-bar').getByPlaceholder(/^Search/).click()
+  const recent = section(page, 'Recent').locator('.quick-search-item')
+  // Newest first, the one shown left out.
+  await expect(recent.first()).toContainText('Containers')
+  await expect(recent.nth(1)).toContainText('System Context')
+  await expect(section(page, 'Recent')).not.toContainText('Element Table')
+  await recent.nth(1).click()
+  await expect(page).toHaveURL(/\/v\/v-context$/)
+})
+
+test('Show all in a table lists only the elements found', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  await page.locator('.quick-search-bar').getByPlaceholder(/^Search/).click()
+  await page.keyboard.type('order')
+  await page.locator('.quick-search-item', { hasText: /Show all \d+ elements in a table/ }).click()
+  await expect(page).toHaveURL(/\/v\/all$/)
+  await expect(page.locator('.find-in-view input')).toHaveValue('order')
+  await expect(studio.row('db')).toBeVisible()
+  await expect(studio.row('api')).toBeVisible()
+  await expect(studio.row('customer')).toHaveCount(0)
+  // Closing the find bar shows every row again.
+  await page.getByRole('button', { name: 'Close find' }).click()
+  await expect(studio.row('customer')).toBeVisible()
+})
+
+test('> lists the commands and runs the one picked', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('>undo')
+  // Nothing done yet: nothing to undo.
+  await expect(page.locator('.quick-search-hint')).toContainText('No command matches.')
+  await search.fill('>viewer')
+  await expect(section(page, 'Commands').locator('.quick-search-item').first()).toContainText('Viewer')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/m\/viewer\//)
+
+  const before = await page.locator('html').getAttribute('data-theme')
+  await search.click()
+  await page.keyboard.type('>theme')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', before ?? 'dark')
+  // Designer's own commands are not listed in Viewer.
+  await search.click()
+  await page.keyboard.type('>import from radical hub')
+  await expect(page.locator('.quick-search-hint')).toContainText('No command matches.')
+})
+
+// 2026-10-27: the views of every hit, as chips, cut each other and the names
+// short; the list comes first, where to open a hit is a step of its own.
+test('a hit lists its views as a next step, and opens in the one picked', async ({ page, studio }) => {
+  await studio.seed()
+  await studio.open('v-context')
+  const search = page.locator('.quick-search-bar').getByPlaceholder(/^Search/)
+  await search.click()
+  await page.keyboard.type('Orders DB')
+  const hit = page.locator('.quick-search-item[data-kind="element"]').first()
+  await expect(hit).toContainText('Orders DB')
+  await expect(hit.locator('.qs-places')).toHaveText(/^3 views/)
+  await expect(page.locator('.quick-search-view-chip')).toHaveCount(0)
+
+  await page.keyboard.press('ArrowRight')
+  const places = page.locator('.qs-place')
+  await expect(page.locator('.qs-open-in-head')).toContainText('Open Orders DB in')
+  // The view Enter opens first, the others after it, All elements last.
+  await expect(places).toHaveText([/^VIEWContainers/, /Place Order Flow|Element Table/, /Place Order Flow|Element Table/, /^ALLAll elements/])
+  await expect(places.first()).toContainText('opens with ↵')
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.locator('.qs-section[aria-label="Elements"]')).toBeVisible()
+
+  await page.keyboard.press('ArrowRight')
+  const table = await places.allTextContents()
+  for (let i = 0; i < table.findIndex((t) => t.includes('Element Table')); i++) await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/v\/v-table/)
+  await expect(studio.row('db')).toHaveClass(/tv-row-selected/)
+})

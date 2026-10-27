@@ -13,17 +13,27 @@ import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/format
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
 import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
-import { isViewGroup, viewsOfGroup } from '@radical/common/model'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI } from '../ai/settings'
+import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, viewTypeName, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
+import { normalizeViewFolder, type DiagramView } from '@radical/common/c4'
+import type { Metamodel } from '@radical/common/metamodel'
+import { revealViewFolder, useLeftPanelSection } from '@radical/ui/components/RightPanel'
+import { availableCommands, useCommands, type Command } from '../commands'
+import { goTo, sinceText, useNavHistory, type NavEntry } from '../navHistory'
+import { dropPendingMode, placeGone } from '../route'
+import { openFindInView } from './FindInView'
 
 /**
  * Cmd/Ctrl+P quick-search palette.
  *
- * Searches every node label/description/type and every relation label across
- * the current model. Picking a result selects it (and pans + zooms onto a
- * node hit, so the user can find "Payment Service" in a 60-node diagram in
- * one keystroke).
+ * Searches every kind of place in the model (views and their folders,
+ * elements, relations, sequences, presentations and their slides,
+ * milestones) with @radical/common/search, in sections with their counts;
+ * prefixes narrow it, and `>` lists the commands (commands.ts). Picking a
+ * result goes there (and pans + zooms onto an element, so the user can find
+ * "Payment Service" in a 60-node diagram in one keystroke). Nothing typed,
+ * it lists the places visited last.
  *
  * Lives outside the canvas so it is always reachable, no matter which mode
  * (designer / viewer / presenter) the user is in.
@@ -39,6 +49,12 @@ export function QuickSearch(): React.ReactElement | null {
   const selectEdge = useDiagramStore((s) => s.selectEdge)
   const setSelectedNodeIds = useDiagramStore((s) => s.setSelectedNodeIds)
   const presentationActive = useDiagramStore((s) => s.presentationActive)
+  const sequences = useDiagramStore((s) => s.sequences)
+  const presentations = useDiagramStore((s) => s.presentations)
+  const snapshots = useDiagramStore((s) => s.snapshots)
+  const navEntries = useNavHistory((s) => s.entries)
+  const navIndex = useNavHistory((s) => s.index)
+  const commandOwners = useCommands((s) => s.owners)
 
   // An agent's Forge run on this folder (over MCP): the Forge button pulses
   // while it works or waits for the user, and opens a read-only view of it.
@@ -249,102 +265,77 @@ export function QuickSearch(): React.ReactElement | null {
   // null (means "no view filter").
   const pickViewForNode = (nodeId: string): string | null => pickViewFor(nodeId, activeViewId, views, viewNodeSets)
 
-  type Result =
-    | { kind: 'node'; id: string; label: string; sub: string; viewIds: string[]; score: number }
-    | { kind: 'edge'; id: string; label: string; sub: string; viewIds: string[]; score: number }
-    | { kind: 'view'; id: string; label: string; sub: string; score: number }
+  // What the search reads: the model's places, the elements each view
+  // shows, and the view shown for `@`.
+  const searchData = useMemo<SearchData>(() => ({
+    nodes: c4Nodes,
+    relations: c4Relations,
+    views,
+    sequences,
+    presentations,
+    milestones: snapshots,
+    metamodel,
+    viewNodes: viewNodeSets,
+    current: {
+      id: activeViewId,
+      name: activeViewId ? (views[activeViewId]?.name ?? 'this view') : 'All elements',
+      nodes: activeViewId ? (viewNodeSets[activeViewId] ?? null) : null,
+    },
+  }), [c4Nodes, c4Relations, views, sequences, presentations, snapshots, metamodel, viewNodeSets, activeViewId])
 
-  const results = useMemo<Result[]>(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return []
+  const parsed = useMemo(() => parseSearch(q, searchData), [q, searchData])
+  const suggestions = useMemo(() => (aiMode ? [] : searchSuggestions(q, searchData)), [aiMode, q, searchData])
 
-    const score = (haystack: string): number => {
-      const lower = haystack.toLowerCase()
-      const idx = lower.indexOf(needle)
-      if (idx === -1) return 0
-      // Prefer prefix matches and shorter strings.
-      let s = 1000 - idx * 10
-      if (idx === 0) s += 500
-      s -= Math.max(0, haystack.length - needle.length)
-      return s
+  const sections = useMemo<Section[]>(() => {
+    if (aiMode) return []
+    if (parsed.command) {
+      const words = parsed.words
+      const list = availableCommands().filter((c) => {
+        const text = foldText(`${c.title} ${c.group}`)
+        return words.every((w) => text.includes(w))
+      })
+      return [{ id: 'command', title: 'Commands', count: list.length, items: list.map((command) => ({ key: `cmd:${command.id}`, type: 'command' as const, command })) }]
     }
+    if (!q.trim()) {
+      // The places visited last, newest first, the one shown left out.
+      const seen = new Set<string>()
+      const items: Item[] = []
+      for (let i = navEntries.length - 1; i >= 0 && items.length < RECENT_MAX; i--) {
+        const entry = navEntries[i]
+        if (i === navIndex || seen.has(entry.hash) || placeGone(entry)) continue
+        seen.add(entry.hash)
+        items.push({ key: `recent:${i}`, type: 'recent', entry, index: i })
+      }
+      return items.length ? [{ id: 'recent', title: 'Recent', count: items.length, items }] : []
+    }
+    const { hits } = searchModel(searchData, parsed)
+    const activeSet = activeViewId ? viewNodeSets[activeViewId] : undefined
+    // What the view shown holds comes first among equals.
+    const scored = (h: SearchHit): number => h.score + (activeSet && (h.kind === 'element' ? activeSet.has(h.id) : false) ? 8 : 0)
+    const byKind = new Map<SearchKind, SearchHit[]>()
+    for (const h of hits) {
+      const list = byKind.get(h.kind)
+      if (list) list.push(h)
+      else byKind.set(h.kind, [h])
+    }
+    const narrowed = !!parsed.kinds
+    const out: Array<Section & { best: number }> = []
+    for (const kind of SEARCH_KINDS) {
+      const list = (byKind.get(kind) ?? []).sort((a, b) => scored(b) - scored(a))
+      if (!list.length) continue
+      const limit = narrowed ? NARROWED_MAX : SECTION_MAX[kind]
+      const items: Item[] = list.slice(0, limit).map((hit) => ({ key: `${kind}:${hit.id}`, type: 'hit', hit }))
+      if (list.length > limit && !narrowed) {
+        const prefix = KIND_PREFIXES.find((p) => p.kinds.includes(kind))!.prefix
+        items.push({ key: `more:${kind}`, type: 'more', label: `List all ${list.length} ${SECTION_TITLES[kind].toLowerCase()}`, query: `${prefix} ${q.trim()}` })
+      }
+      if (kind === 'element' && list.length >= 2) items.push({ key: 'table', type: 'table', count: list.length })
+      out.push({ id: kind, title: SECTION_TITLES[kind], count: list.length, items, best: scored(list[0]) })
+    }
+    return out.sort((a, b) => b.best - a.best)
+  }, [aiMode, parsed, q, searchData, navEntries, navIndex, activeViewId, viewNodeSets, commandOwners]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const out: Result[] = []
-    // When a view is active, give nodes/edges that already live in it a
-    // small score boost so they surface first. Results outside the active
-    // view still appear (search is always over the full model) — they just
-    // sort below in-view matches.
-    const inViewBoost = activeViewId ? 200 : 0
-    const activeViewSet = activeViewId ? viewNodeSets[activeViewId] : undefined
-    for (const n of Object.values(c4Nodes)) {
-      const label = n.label || n.type
-      const candidates = [label, n.description ?? '', n.type, n.technology ?? '']
-      const best = Math.max(...candidates.map(score))
-      if (best > 0) {
-        const inViews: string[] = []
-        for (const [vid, set] of Object.entries(viewNodeSets)) {
-          if (set.has(n.id)) inViews.push(vid)
-        }
-        const inActive = !!activeViewSet?.has(n.id)
-        out.push({
-          kind: 'node',
-          id: n.id,
-          label,
-          sub: pathOf(n.id),
-          viewIds: inViews,
-          score: best + (inActive ? inViewBoost : 0),
-        })
-      }
-    }
-    for (const r of Object.values(c4Relations)) {
-      const src = c4Nodes[r.sourceId]
-      const tgt = c4Nodes[r.targetId]
-      if (!src || !tgt) continue
-      const label = r.label || `${src.label} → ${tgt.label}`
-      const candidates = [r.label ?? '', src.label, tgt.label]
-      const best = Math.max(...candidates.map(score))
-      if (best > 0) {
-        const inActive = activeViewSet
-          ? activeViewSet.has(r.sourceId) && activeViewSet.has(r.targetId)
-          : false
-        // A relation is "in" a view when both endpoints are in that view.
-        const inViews: string[] = []
-        for (const [vid, set] of Object.entries(viewNodeSets)) {
-          if (set.has(r.sourceId) && set.has(r.targetId)) inViews.push(vid)
-        }
-        out.push({
-          kind: 'edge',
-          id: r.id,
-          label,
-          sub: `${src.label} → ${tgt.label}`,
-          viewIds: inViews,
-          score: best + (inActive ? inViewBoost : 0),
-        })
-      }
-    }
-    for (const v of Object.values(views)) {
-      const best = score(v.name)
-      if (best > 0) {
-        const set = viewNodeSets[v.id]
-        const count = set ? set.size : v.nodeIds.length
-        // A group of views per element opens on its first view (setActiveView).
-        const group = isViewGroup(v, metamodel) ? viewsOfGroup(views, v.id).length : null
-        out.push({
-          kind: 'view',
-          id: v.id,
-          label: v.name,
-          sub: group !== null ? `Group · ${group} view${group === 1 ? '' : 's'}` : `View · ${count} node${count === 1 ? '' : 's'}`,
-          // Bias views slightly above raw nodes/edges of the same score so
-          // typing a view name surfaces the view itself first.
-          score: best + 50,
-        })
-      }
-    }
-    out.sort((a, b) => b.score - a.score)
-    return out.slice(0, 30)
-    // pathOf intentionally omitted — recomputed cheaply each render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, c4Nodes, c4Relations, views, viewNodeSets, activeViewId, metamodel])
+  const items = useMemo(() => sections.flatMap((sec) => sec.items), [sections])
 
   // Reset hover when the result list shape changes.
   useEffect(() => { setHover(0) }, [q])
@@ -354,19 +345,69 @@ export function QuickSearch(): React.ReactElement | null {
     wrapRef.current?.querySelector('.quick-search-item.active')?.scrollIntoView({ block: 'nearest' })
   }, [hover])
 
+  // The views that show an element, or both ends of a relation.
+  const viewsShowing = (hit: SearchHit): string[] => {
+    const rel = hit.kind === 'relation' ? c4Relations[hit.id] : undefined
+    const out: string[] = []
+    for (const [vid, set] of Object.entries(viewNodeSets)) {
+      if (rel ? set.has(rel.sourceId) && set.has(rel.targetId) : set.has(hit.id)) out.push(vid)
+    }
+    return out
+  }
+
+  // The second step: where to open an element or relation hit (→, or the
+  // count of views at its right). The view a pick opens comes first, then
+  // the others as pickViewFor ranks them, then All elements.
+  const [openIn, setOpenIn] = useState<SearchHit | null>(null)
+  const [openHover, setOpenHover] = useState(0)
+  useEffect(() => { setOpenIn(null) }, [q])
+  const places = useMemo<Place[]>(() => {
+    if (!openIn) return []
+    const rel = openIn.kind === 'relation' ? c4Relations[openIn.id] : undefined
+    const best = rel ? pickViewFor([rel.sourceId, rel.targetId], activeViewId, views, viewNodeSets) : pickViewForNode(openIn.id)
+    const size = (id: string): number => viewNodeSets[id]?.size ?? 0
+    const ids = viewsShowing(openIn).sort((a, b) =>
+      Number(b === best) - Number(a === best) || PLACE_RANK(views[a]) - PLACE_RANK(views[b]) || size(a) - size(b) || views[a].name.localeCompare(views[b].name))
+    const out: Place[] = ids.map((id) => {
+      const v = views[id]
+      const folder = normalizeViewFolder(v.folder)
+      return { viewId: id, label: v.name, sub: [viewTypeName(v), folder, `${size(id)} element${size(id) === 1 ? '' : 's'}`].filter(Boolean).join(' · '), best: id === best, current: id === activeViewId }
+    })
+    out.push({ viewId: null, label: 'All elements', sub: 'Every element of the model, no view', best: best === null, current: activeViewId === null })
+    return out
+  }, [openIn, c4Relations, activeViewId, views, viewNodeSets]) // eslint-disable-line react-hooks/exhaustive-deps
+  const showPlaces = (hit: SearchHit): void => { setOpenIn(hit); setOpenHover(0); inputRef.current?.focus() }
+  useEffect(() => {
+    wrapRef.current?.querySelector('.qs-place.active')?.scrollIntoView({ block: 'nearest' })
+  }, [openHover])
 
   // Open the containers around the target that the view shown has
   // collapsed (the store decides per view, see expandAncestors).
   const expandAncestors = (nodeId: string): void => useDiagramStore.getState().expandAncestors(nodeId)
 
+  const done = (): void => {
+    setFocused(false)
+    setQ('')
+    inputRef.current?.blur()
+  }
+
+  // Presenter on a presentation, showing slide `index`; `play` plays it from there.
+  const openSlide = (presentationId: string, index: number, play: boolean): void => {
+    dropPendingMode()
+    const s = useDiagramStore.getState()
+    s.setAppMode('presenter')
+    s.setActivePresentation(presentationId)
+    if (!useDiagramStore.getState().presentationSlides.length) return
+    useDiagramStore.getState().previewSlide(index)
+    if (play) requestAnimationFrame(() => useDiagramStore.getState().startPresentation())
+  }
+
   // `viewOverride` lets the caller decide where to open the result:
   //   undefined  → smart pick (current view if it has the node, else any view containing it)
   //   null       → open in "all nodes" mode (no active view filter)
   //   string     → open in that specific view id
-  const pickResult = (r: Result, viewOverride?: string | null): void => {
-    setFocused(false)
-    setQ('')
-    inputRef.current?.blur()
+  const pickHit = (r: SearchHit, viewOverride?: string | null, shift = false): void => {
+    done()
     // Bring back the properties card if ✕ hid it, so the freshly-selected
     // object's details show right after jumping.
     const expandRight = (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel
@@ -376,7 +417,23 @@ export function QuickSearch(): React.ReactElement | null {
       setActiveView(r.id)
       return
     }
-    if (r.kind === 'node') {
+    if (r.kind === 'folder') {
+      revealViewFolder(r.id)
+      return
+    }
+    if (r.kind === 'sequence') {
+      // The flow view that plays it, else the sequence in its list.
+      const flow = Object.values(views).find((v) => v.kind === 'dynamic' && v.sequenceId === r.id)
+      if (flow) { setActiveView(flow.id); return }
+      useLeftPanelSection.setState({ open: 'sequences' })
+      window.dispatchEvent(new CustomEvent('radical:show-left-panel'))
+      if (useDiagramStore.getState().appMode === 'designer') useDiagramStore.getState().setActiveSequence(r.id)
+      return
+    }
+    if (r.kind === 'presentation') { openSlide(r.id, 0, shift); return }
+    if (r.kind === 'slide') { openSlide(r.presentationId!, r.slideIndex ?? 0, shift); return }
+    if (r.kind === 'milestone') { useDiagramStore.getState().selectMilestone(r.id); return }
+    if (r.kind === 'element') {
       // The same node can be present in many views. If the active view does
       // not show this node, jump to a view that does — otherwise the canvas
       // would not paint the selection ring and pan would do nothing useful.
@@ -401,37 +458,73 @@ export function QuickSearch(): React.ReactElement | null {
       }
       if (needSwitch) setTimeout(apply, 80)
       else requestAnimationFrame(apply)
-    } else {
-      // Edge: switch into a view that shows both its ends (a relation is
-      // drawn only there; one with its source alone drew another line).
-      const rel = c4Relations[r.id]
-      if (rel) {
-        const targetView = viewOverride === undefined ? pickViewFor([rel.sourceId, rel.targetId], activeViewId, views, viewNodeSets) : viewOverride
-        const needSwitch = targetView !== activeViewId
-        if (needSwitch) setActiveView(targetView)
-        const apply = (): void => {
-          // Both endpoints need to be visible — expand collapsed ancestors
-          // on either side before centring the camera.
-          expandAncestors(rel.sourceId)
-          expandAncestors(rel.targetId)
-          selectEdge(r.id)
-          requestAnimationFrame(() => {
-            const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
-            focus?.(rel.sourceId, { zoom: 1.0, duration: 500 })
-          })
-        }
-        if (needSwitch) setTimeout(apply, 80)
-        else requestAnimationFrame(apply)
-      } else {
+      return
+    }
+    // Relation: switch into a view that shows both its ends (a relation is
+    // drawn only there; one with its source alone drew another line).
+    const rel = c4Relations[r.id]
+    if (rel) {
+      const targetView = viewOverride === undefined ? pickViewFor([rel.sourceId, rel.targetId], activeViewId, views, viewNodeSets) : viewOverride
+      const needSwitch = targetView !== activeViewId
+      if (needSwitch) setActiveView(targetView)
+      const apply = (): void => {
+        // Both endpoints need to be visible — expand collapsed ancestors
+        // on either side before centring the camera.
+        expandAncestors(rel.sourceId)
+        expandAncestors(rel.targetId)
         selectEdge(r.id)
+        requestAnimationFrame(() => {
+          const focus = (window as unknown as { __rfFocusNode?: (id: string, opts?: { zoom?: number; duration?: number }) => void }).__rfFocusNode
+          focus?.(rel.sourceId, { zoom: 1.0, duration: 500 })
+        })
       }
+      if (needSwitch) setTimeout(apply, 80)
+      else requestAnimationFrame(apply)
+    } else {
+      selectEdge(r.id)
+    }
+  }
+
+  const pickItem = (item: Item, viewOverride?: string | null, shift = false): void => {
+    if (item.type === 'hit') { pickHit(item.hit, viewOverride, shift); return }
+    if (item.type === 'more') {
+      setQ(item.query)
+      setHover(0)
+      inputRef.current?.focus()
+      return
+    }
+    const query = q
+    done()
+    if (item.type === 'table') {
+      // All elements, a table, with only what the search found.
+      setActiveView(null)
+      requestAnimationFrame(() => openFindInView(query, true))
+    } else if (item.type === 'recent') {
+      goTo(item.index)
+    } else {
+      item.command.run()
     }
   }
 
   const onInputKey = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'ArrowDown') {
+    if (openIn) {
+      // Where to open the hit: ↑ ↓ choose, Enter opens, ← or Esc go back.
+      if (e.key === 'ArrowDown') { e.preventDefault(); setOpenHover((h) => Math.min(h + 1, places.length - 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setOpenHover((h) => Math.max(0, h - 1)); return }
+      if (e.key === 'Enter') { e.preventDefault(); const p = places[openHover]; if (p) pickHit(openIn, p.viewId); return }
+      if (e.key === 'ArrowLeft' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpenIn(null); return }
+    }
+    if (e.key === 'ArrowRight') {
+      // → at the end of the words: where to open the hit highlighted.
+      const r = items[hover]
+      const el = e.currentTarget
+      if (r?.type === 'hit' && (r.hit.kind === 'element' || r.hit.kind === 'relation') && el.selectionStart === el.value.length) {
+        e.preventDefault()
+        showPlaces(r.hit)
+      }
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setHover((h) => Math.min(h + 1, Math.max(0, results.length - 1)))
+      setHover((h) => Math.min(h + 1, Math.max(0, items.length - 1)))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setHover((h) => Math.max(0, h - 1))
@@ -447,9 +540,13 @@ export function QuickSearch(): React.ReactElement | null {
         if (q.trim()) void runAI(q)
         return
       }
-      const r = results[hover]
-      if (r) pickResult(r, e.shiftKey ? null : undefined)
-      else if (q.trim() && aiConfigured) void runAI(q)
+      const r = items[hover]
+      if (r) pickItem(r, e.shiftKey ? null : undefined, e.shiftKey)
+      else if (q.trim() && !parsed.command && aiConfigured) void runAI(q)
+    } else if (e.key === 'Tab' && !e.shiftKey && suggestions.length > 0) {
+      // Tab takes the first suggestion: a prefix, a view, a type, a value.
+      e.preventDefault()
+      setQ(suggestions[0].query)
     } else if (e.key === 'Tab' && !e.shiftKey && q.trim() === '' && aiConfigured) {
       // Quick-toggle into AI mode when the input is empty.
       e.preventDefault()
@@ -501,8 +598,8 @@ export function QuickSearch(): React.ReactElement | null {
             aiMode
               ? `Ask ${aiProviderLabel} to change the model… (↵ to send)`
               : aiConfigured
-                ? `Search ${Object.keys(c4Nodes).length} nodes · ${Object.keys(c4Relations).length} relations  —  ⌘/Ctrl+↵ to ask AI`
-                : `Search ${Object.keys(c4Nodes).length} nodes · ${Object.keys(c4Relations).length} relations`
+                ? 'Search views, elements, slides…  > commands  —  ⌘/Ctrl+↵ to ask AI'
+                : 'Search views, elements, slides…  > commands'
           }
           spellCheck={false}
           autoComplete="off"
@@ -645,83 +742,110 @@ export function QuickSearch(): React.ReactElement | null {
             </div>
           )}
 
+          {/* The prefixes, or what completes the word typed (Tab takes the first). */}
+          {!aiMode && !openIn && !parsed.command && (q.trim() === '' || suggestions.length > 0) && (
+            <div className="qs-suggest" aria-label={q.trim() ? 'Suggestions' : 'Prefixes'}>
+              {(q.trim() ? suggestions.map((sg) => ({ key: sg.query, label: sg.label, hint: sg.hint, query: sg.query }))
+                : PREFIX_CHIPS.map((c) => ({ key: c.prefix, label: c.prefix, hint: c.hint, query: c.prefix }))
+              ).map((chip, i) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className={`qs-suggest-chip${q.trim() && i === 0 ? ' first' : ''}`}
+                  title={chip.hint}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { setQ(chip.query); inputRef.current?.focus() }}
+                >
+                  <span className="qs-suggest-label">{chip.label}</span>
+                  {chip.hint && <span className="qs-suggest-hint">{chip.hint}</span>}
+                </button>
+              ))}
+              {q.trim() !== '' && <kbd className="qs-suggest-tab">Tab</kbd>}
+            </div>
+          )}
+
           <div className="quick-search-results">
             {!aiMode && q.trim() === '' && !aiBusy && !aiLast && (
               <div className="quick-search-hint">
-                Type to search. <kbd>↑</kbd> <kbd>↓</kbd> navigate, <kbd>↵</kbd> jump, <kbd>⇧</kbd>+<kbd>↵</kbd> in <em>all nodes</em>
+                Type to search. <kbd>↑</kbd> <kbd>↓</kbd> navigate, <kbd>↵</kbd> jump, <kbd>→</kbd> choose the view, <kbd>&gt;</kbd> commands
                 {aiConfigured && (<>, <kbd>⌘</kbd>+<kbd>↵</kbd> ask AI, <kbd>Tab</kbd> AI mode</>)}.
               </div>
             )}
-            {!aiMode && q.trim() !== '' && results.length === 0 && !aiBusy && (
+            {!aiMode && q.trim() !== '' && items.length === 0 && suggestions.length === 0 && !aiBusy && (
               <div className="quick-search-hint">
-                No matches.
-                {aiConfigured ? (<> Press <kbd>⌘</kbd>+<kbd>↵</kbd> (or click below) to ask AI.</>) : null}
+                {parsed.missingView ? <>No view named “{parsed.missingView}”.</> : parsed.command ? 'No command matches.' : 'No matches.'}
+                {aiConfigured && !parsed.command ? (<> Press <kbd>⌘</kbd>+<kbd>↵</kbd> (or click below) to ask AI.</>) : null}
               </div>
             )}
-            {results.map((r, i) => (
-              <div
-                key={`${r.kind}:${r.id}`}
-                className={`quick-search-item${i === hover ? ' active' : ''}`}
-                onMouseEnter={() => setHover(i)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => pickResult(r, e.shiftKey ? null : undefined)}
-                role="button"
-                tabIndex={-1}
-              >
-                <span className={`quick-search-kind quick-search-kind-${r.kind}`}>
-                  {r.kind === 'node' ? 'NODE' : r.kind === 'edge' ? 'REL' : 'VIEW'}
-                </span>
-                <span className="quick-search-item-main">
-                  <span className="quick-search-item-label">{r.label}</span>
-                  <span className="quick-search-item-sub">{r.sub}</span>
-                </span>
-                {(r.kind === 'node' || r.kind === 'edge') && (
-                  <span className="quick-search-views" title="Click to open in this scope">
-                    {/* "All nodes" chip — opens with no active view filter */}
-                    <span
-                      className={`quick-search-view-chip all${activeViewId === null ? ' active' : ''}`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => { e.stopPropagation(); pickResult(r, null) }}
-                      title="Open in All nodes (no view filter)"
-                    >
-                      All
+            {!aiMode && parsed.scope && q.trim() !== '' && (
+              <div className="qs-scope">In <strong>{parsed.scope.name}</strong></div>
+            )}
+            {openIn && (
+              <div className="qs-section" role="group" aria-label="Open in">
+                <div className="qs-open-in-head">
+                  <button type="button" className="qs-open-in-back" title="Back to the results (←)" aria-label="Back to the results"
+                    onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenIn(null)}>‹</button>
+                  <span>Open <strong>{openIn.label}</strong> in</span>
+                </div>
+                {places.map((p, i) => (
+                  <div
+                    key={p.viewId ?? 'all'}
+                    className={`quick-search-item qs-place${i === openHover ? ' active' : ''}`}
+                    onMouseEnter={() => setOpenHover(i)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickHit(openIn, p.viewId)}
+                    role="button"
+                    tabIndex={-1}
+                  >
+                    <span className="quick-search-kind quick-search-kind-view">{p.viewId ? 'VIEW' : 'ALL'}</span>
+                    <span className="quick-search-item-main">
+                      <span className="quick-search-item-label">{p.label}</span>
+                      <span className="quick-search-item-sub">{p.sub}</span>
                     </span>
-                    {r.viewIds.slice(0, 3).map((vid) => (
-                      <span
-                        key={vid}
-                        className={`quick-search-view-chip${vid === activeViewId ? ' active' : ''}`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={(e) => { e.stopPropagation(); pickResult(r, vid) }}
-                        title={`Open in view: ${views[vid]?.name ?? vid}`}
-                      >
-                        {views[vid]?.name ?? vid}
-                      </span>
-                    ))}
-                    {r.viewIds.length > 3 && (
-                      <span className="quick-search-view-chip more" title={`${r.viewIds.length - 3} more view${r.viewIds.length - 3 === 1 ? '' : 's'}`}>+{r.viewIds.length - 3}</span>
-                    )}
-                    {r.kind === 'node' && r.viewIds.length === 0 && (
-                      <span
-                        className="quick-search-view-chip model-only"
-                        title="Exists in the model but not in any view"
-                      >
-                        model only
-                      </span>
-                    )}
-                  </span>
-                )}
+                    {p.best && <span className="qs-place-tag">opens with ↵</span>}
+                    {p.current && <span className="qs-place-tag">shown</span>}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {!openIn && (() => {
+              let at = -1
+              return sections.map((sec) => (
+                <div key={sec.id} className="qs-section" role="group" aria-label={sec.title}>
+                  <div className="qs-section-head">
+                    <span>{sec.title}</span>
+                    <span className="qs-section-count">{sec.count}</span>
+                  </div>
+                  {sec.items.map((item) => {
+                    const i = ++at
+                    return (
+                      <div
+                        key={item.key}
+                        className={`quick-search-item${i === hover ? ' active' : ''}${item.type === 'more' || item.type === 'table' ? ' qs-item-action' : ''}`}
+                        data-kind={item.type === 'hit' ? item.hit.kind : item.type}
+                        onMouseEnter={() => setHover(i)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => pickItem(item, e.shiftKey ? null : undefined, e.shiftKey)}
+                        role="button"
+                        tabIndex={-1}
+                      >
+                        <ItemBody item={item} views={views} viewsShowing={viewsShowing} onPlaces={() => item.type === 'hit' && showPlaces(item.hit)} metamodel={metamodel} />
+                      </div>
+                    )
+                  })}
+                </div>
+              ))
+            })()}
 
             {/* Ask AI action — visible while typing in search mode (only when configured) */}
-            {!aiMode && aiConfigured && q.trim() !== '' && !aiBusy && (
+            {!aiMode && aiConfigured && q.trim() !== '' && !parsed.command && !aiBusy && (
               <div
                 className="quick-search-item"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void runAI(q)}
                 role="button"
                 tabIndex={-1}
-                style={{ borderTop: results.length > 0 ? '1px solid var(--border-subtle)' : undefined }}
+                style={{ borderTop: items.length > 0 ? '1px solid var(--border-subtle)' : undefined }}
                 title={aiNeedsKey ? `Set an API key for ${aiProviderLabel} first` : `Ask ${aiProviderLabel} (${aiModelLabel})`}
               >
                 <span className="quick-search-kind quick-search-kind-ai">AI</span>
@@ -741,3 +865,145 @@ export function QuickSearch(): React.ReactElement | null {
   )
 }
 
+// ── Results ──────────────────────────────────────────────────────────────────
+
+type Item =
+  | { key: string; type: 'hit'; hit: SearchHit }
+  | { key: string; type: 'more'; label: string; query: string }
+  | { key: string; type: 'table'; count: number }
+  | { key: string; type: 'recent'; entry: NavEntry; index: number }
+  | { key: string; type: 'command'; command: Command }
+
+interface Section { id: string; title: string; count: number; items: Item[] }
+
+/** Where a hit can open: a view (null: All elements). */
+interface Place { viewId: string | null; label: string; sub: string; best: boolean; current: boolean }
+
+/** The order of the views to open a hit in, as pickViewFor prefers them: a
+ *  diagram, then a table, wiki, hierarchy or Warnier view, then a matrix or flow. */
+function PLACE_RANK(v: DiagramView | undefined): number {
+  const kind = v?.kind ?? 'static'
+  return kind === 'static' || kind === 'explore' ? 0 : kind === 'matrix' || kind === 'dynamic' ? 2 : 1
+}
+
+const SECTION_TITLES: Record<SearchKind, string> = {
+  view: 'Views', folder: 'Folders', element: 'Elements', relation: 'Relations',
+  sequence: 'Sequences', presentation: 'Presentations', slide: 'Slides', milestone: 'Milestones',
+}
+/** How many hits a section shows before its Show all. */
+const SECTION_MAX: Record<SearchKind, number> = {
+  view: 5, folder: 3, element: 8, relation: 4, sequence: 3, presentation: 3, slide: 4, milestone: 3,
+}
+/** Under a prefix: its kind alone, this many. */
+const NARROWED_MAX = 60
+const RECENT_MAX = 8
+
+const KIND_BADGES: Record<SearchKind, string> = {
+  view: 'VIEW', folder: 'FOLDER', element: 'NODE', relation: 'REL', sequence: 'SEQ', presentation: 'DECK', slide: 'SLIDE', milestone: 'MILE',
+}
+
+const PREFIX_CHIPS: ReadonlyArray<{ prefix: string; hint: string }> = [
+  ...KIND_PREFIXES.map((p) => ({ prefix: p.prefix, hint: `Only ${p.label}` })),
+  { prefix: '@', hint: 'In the view shown' },
+  { prefix: 'in:', hint: 'In a view, by its name' },
+  { prefix: 'type:', hint: 'Of a type' },
+  { prefix: '>', hint: 'Commands' },
+]
+
+/** `text` with its marked ranges in bold. */
+function Marked({ text, marks }: { text: string; marks: Mark[] }): React.ReactElement {
+  if (!marks.length) return <>{text}</>
+  const parts: React.ReactNode[] = []
+  let at = 0
+  marks.forEach(([a, b], i) => {
+    if (a > at) parts.push(text.slice(at, a))
+    parts.push(<mark key={i} className="qs-mark">{text.slice(a, b)}</mark>)
+    at = b
+  })
+  if (at < text.length) parts.push(text.slice(at))
+  return <>{parts}</>
+}
+
+function ItemBody({ item, views, viewsShowing, onPlaces, metamodel }: {
+  item: Item
+  views: Record<string, DiagramView>
+  viewsShowing: (hit: SearchHit) => string[]
+  onPlaces: () => void
+  metamodel: Metamodel
+}): React.ReactElement {
+  if (item.type === 'more' || item.type === 'table') {
+    return (
+      <>
+        <span className="quick-search-kind qs-kind-action" aria-hidden>{item.type === 'table' ? '▦' : '…'}</span>
+        <span className="quick-search-item-main">
+          <span className="quick-search-item-label">{item.type === 'table' ? `Show all ${item.count} elements in a table` : item.label}</span>
+        </span>
+      </>
+    )
+  }
+  if (item.type === 'recent') {
+    const e = item.entry
+    return (
+      <>
+        <span className="quick-search-kind qs-kind-recent">{e.element ? 'NODE' : 'VIEW'}</span>
+        <span className="quick-search-item-main">
+          <span className="quick-search-item-label">{e.element?.label ?? e.where}</span>
+          <span className="quick-search-item-sub">{[e.element ? e.where : null, e.mode, sinceText(e.at)].filter(Boolean).join(' · ')}</span>
+        </span>
+      </>
+    )
+  }
+  if (item.type === 'command') {
+    return (
+      <>
+        <span className="quick-search-kind qs-kind-command">{'>'}</span>
+        <span className="quick-search-item-main">
+          <span className="quick-search-item-label">{item.command.title}</span>
+          <span className="quick-search-item-sub">{item.command.group}</span>
+        </span>
+        {item.command.keys && <kbd className="quick-search-kbd">{item.command.keys}</kbd>}
+      </>
+    )
+  }
+  const r = item.hit
+  const shownIn = r.kind === 'element' || r.kind === 'relation' ? viewsShowing(r).length : null
+  const typeColor = r.kind === 'element' && r.type ? metamodel.nodeTypes[r.type]?.color : undefined
+  return (
+    <>
+      <span className={`quick-search-kind quick-search-kind-${r.kind === 'element' ? 'node' : r.kind === 'relation' ? 'edge' : r.kind}`}
+        style={typeColor ? { ['--type-color' as string]: typeColor } : undefined}>
+        {KIND_BADGES[r.kind]}
+      </span>
+      <span className="quick-search-item-main">
+        <span className="quick-search-item-label"><Marked text={r.label} marks={r.marks} /></span>
+        <span className="quick-search-item-sub">
+          {r.snippet
+            ? <>{r.snippet.field && <span className="qs-snippet-field">{r.snippet.field}: </span>}<Marked text={r.snippet.text} marks={r.snippet.marks} /></>
+            : viewDetail(r, views)}
+        </span>
+      </span>
+      {shownIn !== null && (
+        <span
+          className={`qs-places${shownIn === 0 ? ' none' : ''}`}
+          role="button"
+          title={shownIn === 0 ? 'In no view: opens in All elements (→ to choose)' : 'Choose the view to open it in (→)'}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.stopPropagation(); onPlaces() }}
+        >
+          {shownIn === 0 ? 'model only' : `${shownIn} view${shownIn === 1 ? '' : 's'}`}<span className="qs-places-chevron" aria-hidden>›</span>
+        </span>
+      )}
+    </>
+  )
+}
+
+/** What a hit's second line says: a view's count of elements, or a group's
+ *  views, before its type and folder. */
+function viewDetail(r: SearchHit, views: Record<string, DiagramView>): string {
+  if (r.kind !== 'view') return r.detail
+  const v = views[r.id]
+  if (!v) return r.detail
+  const members = Object.values(views).filter((x) => x.partOf === v.id).length
+  if (r.detail.startsWith('Views per element')) return `Group · ${members} view${members === 1 ? '' : 's'}${r.detail.slice('Views per element'.length)}`
+  return r.detail
+}
