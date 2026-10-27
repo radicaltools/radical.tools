@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-27
+
 ### Added
 - `radical setup [folder]` (`npx @radicaltools/cli setup`) connects your coding agents to a model folder step by step: it starts a model in an empty folder, adds the MCP server for the folder to Claude Code's `.mcp.json`, VS Code's `.vscode/mcp.json`, and Claude Desktop's, Cursor's and Codex's own configuration, pinned to the CLI's version and keeping every other entry (user files backed up to `.bak`; apps started from the Dock get npx by its absolute path), offers the git hooks, and ends with `radical status`. In a terminal it asks each question with its default; otherwise, or with `--yes`, it takes the options and defaults; `--dry-run` shows the changes first
 - The launcher, `radical.sh` and `radical.cmd` on radical.tools: from an empty folder, `sh radical.sh setup` (`radical.cmd setup` on Windows) finds Node.js 20.11 or later, or asks and downloads Node.js 24 from nodejs.org into `~/.radical/node`, checked against its SHA-256 sum, and runs the CLI. Setup run through it pins its version, and the agents and git hooks start the server and the CLI through it. Outside a git repository, setup now asks to start one
@@ -287,4 +289,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/radicaltools/radical.tools/releases/tag/v0.3.0
