@@ -53,7 +53,8 @@ exit /b 1
 
 :download
 set "DIST=%RADICAL_NODE_MIRROR%/latest-v%NODE_LINE%.x"
-set "WORK=%TEMP%\radical-node-%RANDOM%%RANDOM%"
+rem Unpacked beside where it goes: move cannot take a folder to another drive.
+set "WORK=%RADICAL_HOME%\node\.download-%RANDOM%%RANDOM%"
 mkdir "%WORK%" || exit /b 1
 curl.exe -fsSL "%DIST%/SHASUMS256.txt" -o "%WORK%\sums"
 if errorlevel 1 (
@@ -88,13 +89,20 @@ if errorlevel 1 (
   echo radical.cmd: could not unpack %NAME%.zip. 1>&2
   goto failed
 )
-if not exist "%RADICAL_HOME%\node" mkdir "%RADICAL_HOME%\node"
 if exist "%RADICAL_HOME%\node\%NAME%" rmdir /s /q "%RADICAL_HOME%\node\%NAME%"
-move "%WORK%\%NAME%" "%RADICAL_HOME%\node\%NAME%" >nul
-if errorlevel 1 (
-  echo radical.cmd: could not move Node.js into %RADICAL_HOME%\node. 1>&2
-  goto failed
+rem A virus scanner may still hold the files just unpacked: try again.
+set "TRIES=0"
+:move
+move "%WORK%\%NAME%" "%RADICAL_HOME%\node\%NAME%" >nul 2>nul
+if not errorlevel 1 goto moved
+set /a TRIES+=1
+if %TRIES% lss 5 (
+  ping -n 3 127.0.0.1 >nul
+  goto move
 )
+echo radical.cmd: could not move Node.js into %RADICAL_HOME%\node. 1>&2
+goto failed
+:moved
 rmdir /s /q "%WORK%"
 set "BIN=%RADICAL_HOME%\node\%NAME%\"
 echo Node.js is in %RADICAL_HOME%\node\%NAME%. 1>&2
