@@ -282,35 +282,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
   .map-tall { display: block; min-width: 0; }
 }
 
-/* ── Who it is for ───────────────────────────────────────────────── */
-.who { padding: 0 0 72px; }
-.who h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
-.who-list {
-  list-style: none;
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-}
-.who-card {
-  --c: var(--accent);
-  display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto 1fr; column-gap: 12px; row-gap: 4px; align-items: center;
-  padding: 16px 18px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-panel) 80%, transparent);
-}
-.who-icon {
-  width: 28px; height: 28px; border-radius: 7px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--c) 14%, transparent);
-}
-.who-icon svg { width: 14px; height: 14px; fill: var(--c); }
-.who-role { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
-.who-text { grid-column: 2; font-size: 13px; line-height: 1.5; color: var(--muted); }
-.who-link { grid-column: 2; align-self: end; margin-top: 6px; font-size: 13px; font-weight: 500; color: var(--accent); }
-.who-text { align-self: start; }
-.who-link:hover { text-decoration: underline; }
-.who-more { margin-top: 16px; text-align: center; font-size: 13.5px; font-weight: 500; }
-.who-more a { color: var(--accent); }
-.who-more a:hover { text-decoration: underline; }
 
 /* ── Code blocks (the manual reuses them) ────────────────────── */
 .code {
@@ -339,7 +310,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .hero { padding: 44px 0 36px; }
-  .who-list { grid-template-columns: 1fr; }
   .cta-row { flex-direction: column; align-items: stretch; max-width: 340px; margin: 0 auto; }
   .cta { justify-content: center; }
   .eyebrow { flex-wrap: wrap; justify-content: center; }
