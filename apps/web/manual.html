@@ -154,6 +154,17 @@
           <figcaption>The Welcome screen. The sample is the fastest way to see most of this guide.</figcaption>
         </figure>
         <p>Studio opens a model in <em>Viewer</em>, read-only. Switch to <em>Designer</em> in the top bar to edit. A model you have just created opens in Designer.</p>
+        <h3>From the terminal</h3>
+        <p>To work on the model with a coding agent (Claude Code, Claude Desktop, Codex, Cursor, VS Code), start in an empty folder. One command finds Node.js or downloads it, starts a model and connects your agent to it:</p>
+<pre class="code"><code><span class="cm"># macOS, Linux</span>
+curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup
+
+<span class="cm"># Windows</span>
+curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup
+
+<span class="cm"># With Node.js 20.11 or newer, in your repository</span>
+npx @radicaltools/cli setup</code></pre>
+        <p>Then open the same folder in Studio (<em>Models → Open folder…</em>) to watch the agent work. <a href="#mcp">MCP server</a> says what the agent can do, <a href="#cli">Command line</a> what else the CLI does. The desktop installers for macOS, Windows and Linux are on the <a href="https://github.com/radicaltools/radical.tools/releases/latest" target="_blank" rel="noopener">latest release</a>.</p>
       </section>
 
       <section class="doc-section" id="workspace">
@@ -808,7 +819,7 @@
         <h3>Set it up</h3>
         <p>With Node.js 20.11 or newer, run the guided setup in your repository. It asks for the model folder (an empty one becomes a new model) and the agents to connect, writes the server into each agent's configuration, offers the git hooks for <em>Changes on branch</em>, and checks that the server answers:</p>
 <pre class="code"><code>npx @radicaltools/cli setup</code></pre>
-        <p>No Node.js yet? In a new, empty folder, fetch the launcher and run the same setup through it. It finds Node.js, or asks and downloads it into <code>~/.radical/node</code>, and the agents you connect start the server through it. In a folder that is not yet a git repository, setup offers to start one:</p>
+        <p>No Node.js yet? In a new, empty folder, fetch the <a href="#cli-launcher">launcher</a> and run the same setup through it. It finds Node.js, or asks and downloads it, and the agents you connect start the server through it. In a folder that is not yet a git repository, setup offers to start one:</p>
 <pre class="code"><code><span class="cm"># macOS, Linux</span>
 mkdir my-system &amp;&amp; cd my-system
 curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup
@@ -822,7 +833,7 @@ claude mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-m
 
 <span class="cm"># Codex</span>
 codex mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-model</code></pre>
-        <p>Claude Desktop takes the same command under <code>mcpServers</code> in its config file, with the full path to <code>npx</code>. A missing or empty folder becomes a new model; <code>--metamodel c4</code> picks plain C4. Pin a version (<code>@radicaltools/mcp@0.2.0</code>) and keep it at the version of your Studio. The <a href="reference.html#mcp">Reference</a> has the Desktop config and every tool.</p>
+        <p>Claude Desktop takes the same command under <code>mcpServers</code> in its config file, with the full path to <code>npx</code>. A missing or empty folder becomes a new model; <code>--metamodel c4</code> picks plain C4. Pin a version (<code>@radicaltools/mcp@0.3.0</code>) and keep it at the version of your Studio. The <a href="reference.html#mcp">Reference</a> has the Desktop config and every tool.</p>
         <h3>Working alongside Studio</h3>
         <ul>
           <li>Open the same folder in Studio. It reloads when the agent writes, marks new and changed elements for a few seconds, and draws removed ones as ghosts, so you can follow the agent.</li>
@@ -843,6 +854,23 @@ codex mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-mo
 
       <section class="doc-section" id="cli">
         <h2>Command line</h2>
+        <p>The <code>radical</code> command works on a Markdown model folder: it connects agents, checks the model in CI, lists what changed on a branch and exports it. Run it with npx, which needs Node.js 20.11 or newer, or through the launcher, which does not:</p>
+<pre class="code"><code>npx @radicaltools/cli &lt;command&gt;          <span class="cm"># or: npm install -g @radicaltools/cli, then radical &lt;command&gt;</span>
+sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &lt;command&gt; on Windows</span></code></pre>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>setup [folder]</code></td><td>Connects your coding agents to the folder, step by step: a new model in an empty folder, the MCP server in each agent's configuration, the git hooks. See <a href="#mcp">MCP server</a>.</td></tr>
+              <tr><td><code>setup --status</code></td><td>Changes nothing: checks Node, the folder, each agent's entry, and that each server answers.</td></tr>
+              <tr><td><code>check [folder]</code></td><td>Checks the model with the Inspector's rules, and the tests it names, for CI. Below.</td></tr>
+              <tr><td><code>diff [folder]</code></td><td>Lists what changed in the model on this branch; <code>--save-base</code> keeps the base for <a href="#changes">Changes on branch</a>.</td></tr>
+              <tr><td><code>hooks install [folder]</code></td><td>Adds the git hooks that save that base after a checkout, a commit or a pull.</td></tr>
+              <tr><td><code>export confluence</code></td><td>Exports a wiki view as Markdown or HTML, or publishes it to Confluence Cloud.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Check in CI</h3>
         <p><code>radical check</code> checks a Markdown folder with the rules the Inspector runs, so CI can fail when the model is broken or a test it names fails. It reads the files and never changes the model.</p>
 <pre class="code"><code>npx -y @radicaltools/cli check path/to/my-model --report reports</code></pre>
         <ul>
@@ -851,7 +879,14 @@ codex mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-mo
           <li><code>check.json</code> in the model folder sets each rule's severity and a baseline, and goals in percent. <code>--ratchet</code> lowers baselines to what the check finds now, never raises them.</li>
           <li>Exit status 0 means no errors, 1 errors, 2 the check could not run. <code>--format github</code> writes annotations for GitHub Actions.</li>
         </ul>
-        <p><code>radical setup</code> connects your agents to a model folder and <code>radical setup --status</code> checks the connection (see <a href="#mcp">MCP server</a>). <code>radical diff</code> prints the changes on branch and saves the base; <code>radical hooks install</code> adds the git hooks that keep it fresh. Every option is in the <a href="reference.html#cli">Reference</a>. The commands that test the product itself (<code>radical fuzz</code>, <code>harden</code> and <code>explore</code>) are documented for contributors in <a href="https://github.com/radicaltools/radical.tools/blob/main/docs/CRUCIBLE.md" target="_blank" rel="noopener">docs/CRUCIBLE.md</a>.</p>
+        <h3 id="cli-launcher">The launcher</h3>
+        <p><code>radical.sh</code> (macOS, Linux) and <code>radical.cmd</code> (Windows) run the CLI where Node.js is missing. Download one into the folder from <a href="https://radical.tools/radical.sh">radical.tools/radical.sh</a> or <a href="https://radical.tools/radical.cmd">radical.tools/radical.cmd</a>.</p>
+        <ul>
+          <li>It uses Node.js 20.11 or newer from the <code>PATH</code>, else one it downloaded before into <code>~/.radical/node</code>. With neither, it asks, then downloads Node.js 24 from nodejs.org and checks it against its published SHA-256 sum.</li>
+          <li>It runs any command: <code>sh radical.sh check architecture</code>. <code>sh radical.sh mcp</code> runs the MCP server, as the agents do; it never asks anything.</li>
+          <li><code>setup</code> run through it pins its version, and the agents and the git hooks go through it too. Commit it with the model, and the team and every agent use one version. <code>RADICAL_VERSION=latest sh radical.sh setup</code> moves the project to the latest release.</li>
+        </ul>
+        <p>Every option is in the <a href="reference.html#cli">Reference</a>. The commands that test the product itself (<code>radical fuzz</code>, <code>harden</code> and <code>explore</code>) are documented for contributors in <a href="https://github.com/radicaltools/radical.tools/blob/main/docs/CRUCIBLE.md" target="_blank" rel="noopener">docs/CRUCIBLE.md</a>.</p>
         <div class="doc-tip">
           <strong>Good to know.</strong> This repository checks its own architecture model this way on every push. The Inspector shows the result of the same check in Studio.
         </div>
