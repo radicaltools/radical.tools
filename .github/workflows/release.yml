@@ -65,6 +65,10 @@ jobs:
           # Unsigned builds for now — see README "Install" for the Gatekeeper /
           # SmartScreen workaround. Add CSC_LINK / APPLE_ID secrets to sign.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # The 0.3.0 installers rebuilt with the new app icon (ADR "One mark
+          # for radical.tools"): the code is v0.3.0's, so the build is that
+          # release, shown as 0.3.0; its commit stays this branch's.
+          RADICAL_TAGS: v0.3.0
 
       - uses: actions/upload-artifact@v4
         with:
