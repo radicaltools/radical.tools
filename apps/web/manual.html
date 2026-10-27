@@ -827,6 +827,10 @@ curl -fsSLO https://radical.tools/radical.sh &amp;&amp; sh radical.sh setup
 <span class="cm"># Windows</span>
 mkdir my-system &amp;&amp; cd my-system
 curl.exe -fsSLO https://radical.tools/radical.cmd &amp;&amp; radical.cmd setup</code></pre>
+        <p><strong>Several models.</strong> One server serves one folder. To give an agent more models, run setup once per folder, each with a name of its own:</p>
+<pre class="code"><code>radical setup payments/architecture --name radical-payments
+radical setup billing/architecture  --name radical-billing</code></pre>
+        <p>The agent sees each server's tools under its name, so they never collide; a name that says which model it is helps it pick the right one, as does saying it: “in the payments model, add…”. Without <code>--name</code> the second setup finds a server named <code>radical</code> already there and replaces it, asking first in a terminal. Keep to one server per folder: two servers writing one folder get in each other's way, while Studio open on the same folder is fine.</p>
         <p>Restart the agents it connected. Later, <code>radical setup --status</code> says what stops an agent from reaching the model: a moved folder, a missing <code>node</code>, a server of another version. The <a href="reference.html#setup">Reference</a> lists where each agent keeps its servers. To register the package by hand instead, use absolute paths:</p>
 <pre class="code"><code><span class="cm"># Claude Code</span>
 claude mcp add radical-folder -- npx -y @radicaltools/mcp --folder /path/to/my-model

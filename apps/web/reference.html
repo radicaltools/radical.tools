@@ -420,7 +420,7 @@ npx @radicaltools/cli setup architecture --client claude-code --client codex --y
               <tr><td><code>[folder]</code></td><td>The model folder. Default: <code>architecture</code>.</td></tr>
               <tr><td><code>--client &lt;id&gt;</code></td><td>An agent to connect: <code>claude-code</code>, <code>claude-desktop</code>, <code>codex</code>, <code>cursor</code>, <code>vscode</code>; repeat for more. Default: the ones found installed.</td></tr>
               <tr><td><code>--metamodel radical|c4</code></td><td>The metamodel of a new model. Default: <code>radical</code>.</td></tr>
-              <tr><td><code>--name &lt;name&gt;</code></td><td>The server's name in the configurations. Default: <code>radical</code>.</td></tr>
+              <tr><td><code>--name &lt;name&gt;</code></td><td>The server's name in the configurations. Default: <code>radical</code>. A name per folder connects several models to one agent: <code>radical setup payments/architecture --name radical-payments</code>; the agent sees each server's tools under its name.</td></tr>
               <tr><td><code>--no-hooks</code></td><td>Leaves the git hooks alone.</td></tr>
               <tr><td><code>--no-check</code></td><td>Ends without the checks.</td></tr>
               <tr><td><code>--status</code></td><td>Changes nothing: only the checks, for the folder named, else the working directory or <code>architecture</code> in it when it holds a model, else every server configured.</td></tr>
