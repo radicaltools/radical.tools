@@ -231,8 +231,12 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .get-started .hero-note { margin-top: 10px; line-height: 1.7; }
 
 /* ── The product in one picture (hero) ───────────────────────────── */
-/* Room under the map, so the buttons below read apart from it. */
-.map-wrap { width: 100%; overflow-x: auto; margin: 0 auto 120px; }
+.map-wrap { width: 100%; overflow-x: auto; margin: 0 auto; }
+/* A line between the map and the buttons, so they read apart. */
+.hero-rule {
+  width: min(760px, 86%); height: 1px; margin: 56px auto; border: 0;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
 .map { display: block; width: 100%; min-width: 680px; height: auto; margin: 0 auto; }
 .map .box { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.2; }
 .map .core { fill: var(--bg-panel); stroke: var(--border); stroke-width: 1.4; }
@@ -278,7 +282,8 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .map-tall .key { font-size: 11px; }
 .map-tall .file { font-size: 11.5px; }
 @media (max-width: 760px) {
-  .map-wrap { overflow: visible; margin-bottom: 72px; }
+  .map-wrap { overflow: visible; }
+  .hero-rule { margin: 40px auto; }
   .map { display: none; }
   .map-tall { display: block; min-width: 0; }
 }
