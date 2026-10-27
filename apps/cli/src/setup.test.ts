@@ -55,7 +55,7 @@ describe('radical setup', () => {
     await mkdir(join(w.home, '.codex'), { recursive: true })
     await writeFile(w.codex, '[model]\nname = "o3"\n\n[mcp_servers.other]\ncommand = "x"\n\n[profiles.fast]\nmodel = "mini"\n')
 
-    const first = await run(w, ['setup', 'architecture', '--yes', '--no-doctor', ...allClients])
+    const first = await run(w, ['setup', 'architecture', '--yes', '--no-check', ...allClients])
     expect(first.err).toBe('')
     expect(first.code).toBe(0)
     expect(first.out).toContain('+ started a new model (radical metamodel) in architecture')
@@ -81,7 +81,7 @@ describe('radical setup', () => {
     // Again: nothing changes.
     const files = [join(w.repo, '.mcp.json'), join(w.repo, '.vscode', 'mcp.json'), w.desktop, w.codex, w.cursor]
     const before = await Promise.all(files.map((file) => readFile(file, 'utf8')))
-    const second = await run(w, ['setup', 'architecture', '--yes', '--no-doctor', ...allClients])
+    const second = await run(w, ['setup', 'architecture', '--yes', '--no-check', ...allClients])
     expect(second.code).toBe(0)
     expect(second.out).toContain('✓ architecture holds a model')
     expect(second.out.match(/already runs "radical"/g)).toHaveLength(5)
@@ -89,7 +89,7 @@ describe('radical setup', () => {
 
     // An entry changed by hand is replaced; a Codex table keeps its place.
     await writeFile(w.codex, before[3].replace('"-y", ', '').replace('[profiles.fast]', '[mcp_servers.radical.env]\nHOME = "/x"\n\n[profiles.fast]'))
-    const replaced = await run(w, ['setup', 'architecture', '--yes', '--no-doctor', '--client', 'codex'])
+    const replaced = await run(w, ['setup', 'architecture', '--yes', '--no-check', '--client', 'codex'])
     expect(replaced.out).toContain('+ replaced "radical" in Codex')
     expect(codex.read(await readFile(w.codex, 'utf8')).radical).toEqual(user)
     expect((await readFile(w.codex, 'utf8')).match(/\[mcp_servers\.radical/g)).toHaveLength(1)
@@ -120,7 +120,7 @@ describe('radical setup', () => {
     await mkdir(join(w.home, '.cursor'))
     const questions: string[] = []
     const answers = ['model', 'c4', '1 5', 'n']
-    const asked = await run(w, ['setup', '--no-doctor'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
+    const asked = await run(w, ['setup', '--no-check'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(asked.code).toBe(0)
     expect(questions).toEqual([
       '  Model folder [architecture]: ',
@@ -136,7 +136,7 @@ describe('radical setup', () => {
     expect(existsSync(join(w.repo, '.git', 'hooks', 'post-checkout'))).toBe(false)
 
     // No terminal: the agents found, the default folder, the hooks.
-    const quiet = await run(w, ['setup', '--no-doctor'])
+    const quiet = await run(w, ['setup', '--no-check'])
     expect(quiet.code).toBe(0)
     expect(quiet.out).toContain('+ started a new model (radical metamodel) in architecture')
     expect((await json(w.cursor)).mcpServers.radical.args.at(-1)).toBe(join(w.repo, 'architecture'))
@@ -155,7 +155,7 @@ describe('radical setup', () => {
     const env = { PATH: '/usr/bin:/bin', RADICAL_LAUNCHER: launcher }
     const questions: string[] = []
     const answers = ['', '', 'yes', '']
-    const first = await run(w, ['setup', '--no-doctor', '--client', 'claude-code', '--client', 'claude-desktop'],
+    const first = await run(w, ['setup', '--no-check', '--client', 'claude-code', '--client', 'claude-desktop'],
       { cwd: fresh, env, ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(first.err).toBe('')
     expect(first.code).toBe(0)
@@ -173,16 +173,16 @@ describe('radical setup', () => {
     expect(await readFile(join(fresh, '.git', 'hooks', 'post-checkout'), 'utf8'))
       .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff "architecture" --save-base --quiet </dev/null || true\n`)
 
-    const again = await run(w, ['setup', 'architecture', '--yes', '--no-doctor', '--client', 'claude-code'], { cwd: fresh, env })
+    const again = await run(w, ['setup', 'architecture', '--yes', '--no-check', '--client', 'claude-code'], { cwd: fresh, env })
     expect(again.out).toContain('✓ radical.sh runs 0.2.0')
     expect(again.out).toContain('✓ Claude Code: .mcp.json already runs "radical" for the folder')
 
-    const doctor = await run(w, ['doctor', 'architecture', '--no-start'], { cwd: fresh, env })
-    expect(doctor.out).toContain('✓ Claude Code "radical" (.mcp.json) serves architecture through radical.sh (0.2.0)')
-    expect(doctor.out).toContain('✓ Claude Desktop "radical" (~/.config/Claude/claude_desktop_config.json) serves architecture through radical.sh (0.2.0)')
-    expect(doctor.code).toBe(0)
+    const status = await run(w, ['status', 'architecture', '--no-start'], { cwd: fresh, env })
+    expect(status.out).toContain('✓ Claude Code "radical" (.mcp.json) serves architecture through radical.sh (0.2.0)')
+    expect(status.out).toContain('✓ Claude Desktop "radical" (~/.config/Claude/claude_desktop_config.json) serves architecture through radical.sh (0.2.0)')
+    expect(status.code).toBe(0)
     await rm(launcher)
-    const gone = await run(w, ['doctor', 'architecture', '--no-start'], { cwd: fresh, env })
+    const gone = await run(w, ['status', 'architecture', '--no-start'], { cwd: fresh, env })
     expect(gone.code).toBe(1)
     expect(gone.out).toContain('✗ Claude Code "radical" (.mcp.json): its launcher radical.sh is not there: download it from https://radical.tools/radical.sh')
   })

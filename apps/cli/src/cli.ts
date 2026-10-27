@@ -6,7 +6,7 @@ import { FUZZ_USAGE, fuzzCommand } from './fuzz'
 import { HARDEN_USAGE, hardenCommand } from './harden'
 import { EXPLORE_USAGE, exploreCommand } from './explore'
 import { SETUP_USAGE, setupCommand } from './setup'
-import { DOCTOR_USAGE, doctorCommand } from './doctor'
+import { STATUS_USAGE, statusCommand } from './status'
 import { displayVersion } from '@radical/common/version'
 
 const USAGE = `Usage: radical <command> [options]
@@ -14,8 +14,8 @@ const USAGE = `Usage: radical <command> [options]
 Commands:
   setup [folder]   connect your coding agents to a model folder, step by step
                    (radical setup --help)
-  doctor [folder]  check that an agent can work on the folder
-                   (radical doctor --help)
+  status [folder]  check that an agent can work on the folder
+                   (radical status --help)
   check [folder]   check a Radical Markdown model folder (radical check --help)
   diff [folder]    what changed in the model since its version in git
                    (radical diff --help)
@@ -39,7 +39,7 @@ Commands:
 export async function main(args: string[], io: Io): Promise<number> {
   const [command, ...rest] = args
   if (command === 'setup') return setupCommand(rest, io)
-  if (command === 'doctor') return doctorCommand(rest, io)
+  if (command === 'status') return statusCommand(rest, io)
   if (command === 'check') return checkCommand(rest, io)
   if (command === 'diff') return diffCommand(rest, io)
   if (command === 'hooks') return hooksCommand(rest, io)
@@ -49,7 +49,7 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'explore') return exploreCommand(rest, io)
   if (command === '--version' || command === '-v') { io.out(displayVersion()); return 0 }
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
-    io.out(rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'doctor' ? DOCTOR_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
+    io.out(rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'status' ? STATUS_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
     return 0
   }
   io.err(`Unknown command: ${command}\n\n${USAGE}`)

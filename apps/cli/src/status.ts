@@ -14,7 +14,7 @@ import type { Io } from './check'
 
 const exec = promisify(execFile)
 
-export const DOCTOR_USAGE = `Usage: radical doctor [folder] [options]
+export const STATUS_USAGE = `Usage: radical status [folder] [options]
 
 Checks what an agent needs to work on a model folder: Node, the folder (it
 reads as a model, and the git hooks save its base for Studio), every agent
@@ -84,12 +84,12 @@ export function askServer(entry: ServerEntry, cwd: string, place: Place, timeout
         }
       }
     })
-    send(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'radical-doctor', version: displayVersion() } })
+    send(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'radical-status', version: displayVersion() } })
   })
 }
 
-/** Runs `radical doctor` with `args` (after the command name); returns the exit status. */
-export async function doctorCommand(args: string[], io: Io): Promise<number> {
+/** Runs `radical status` with `args` (after the command name); returns the exit status. */
+export async function statusCommand(args: string[], io: Io): Promise<number> {
   let parsed
   try {
     parsed = parseArgs({
@@ -102,13 +102,13 @@ export async function doctorCommand(args: string[], io: Io): Promise<number> {
       },
     })
   } catch (error) {
-    io.err(`${(error as Error).message}\n\n${DOCTOR_USAGE}`)
+    io.err(`${(error as Error).message}\n\n${STATUS_USAGE}`)
     return 2
   }
   const { values, positionals } = parsed
-  if (values.help) { io.out(DOCTOR_USAGE); return 0 }
+  if (values.help) { io.out(STATUS_USAGE); return 0 }
   const timeout = Number(values.timeout)
-  if (positionals.length > 1 || !(timeout > 0)) { io.err(DOCTOR_USAGE); return 2 }
+  if (positionals.length > 1 || !(timeout > 0)) { io.err(STATUS_USAGE); return 2 }
 
   let problems = 0
   const ok = (text: string) => io.out(`  ✓ ${text}`)

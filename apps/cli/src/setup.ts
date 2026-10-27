@@ -9,7 +9,7 @@ import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/
 import { buildInfo, releaseOf } from '@radical/common/version'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, pinLauncher, placeOf, sameEntry, shown, type Client, type ClientId } from './agentConfig'
-import { doctorCommand } from './doctor'
+import { statusCommand } from './status'
 import { hooksCommand } from './hooks'
 import type { Io } from './check'
 
@@ -28,7 +28,7 @@ Connects your coding agents to a Radical model folder, step by step:
   4. Hooks     the hooks that save the model's base for Studio's Changes on
                branch (radical hooks install); outside a git repository it
                asks, in a terminal, to start one in the working directory
-  5. Check     radical doctor for the folder
+  5. Check     radical status for the folder
 
 In a terminal it asks each question with its default; press Enter to take
 it. Otherwise (or with --yes) it asks nothing and takes the options and the
@@ -42,7 +42,7 @@ defaults: the folder architecture, the agents it finds installed.
                       and governance, default) or c4
   --name <name>       the server's name in the configurations (default: radical)
   --no-hooks          leave the git hooks alone
-  --no-doctor         end without radical doctor's checks
+  --no-check          end without the checks of radical status
   --dry-run           print what it would change and write nothing
   -y, --yes           ask nothing
 
@@ -69,7 +69,7 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
         metamodel: { type: 'string' },
         name: { type: 'string', default: 'radical' },
         'no-hooks': { type: 'boolean', default: false },
-        'no-doctor': { type: 'boolean', default: false },
+        'no-check': { type: 'boolean', default: false },
         'dry-run': { type: 'boolean', default: false },
         yes: { type: 'boolean', short: 'y', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -218,8 +218,8 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   // ── 5. Check ──
   io.out('5/5 Check')
   if (dry) { io.out('  - dry run: nothing was written'); return failed ? 1 : 0 }
-  if (values['no-doctor']) io.out('  - skipped (--no-doctor); radical doctor checks it later')
-  const code = values['no-doctor'] ? 0 : await doctorCommand([relative(io.cwd, real) || '.'], io)
+  if (values['no-check']) io.out('  - skipped (--no-check); radical status checks it later')
+  const code = values['no-check'] ? 0 : await statusCommand([relative(io.cwd, real) || '.'], io)
   if (chosen.length) {
     io.out('\nNext: restart the agents you connected (quit Claude Desktop and Cursor fully, run /mcp in Claude Code), '
       + `ask one to call get_model_summary, and open ${folderArg} in Studio (https://studio.radical.tools, Models → Open folder…) to watch it work.`)

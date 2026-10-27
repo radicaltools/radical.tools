@@ -54,7 +54,7 @@ try {
   assert.match(radical('--help'), /Usage: radical/)
   assert.match(radical('export', 'confluence', '--help'), /--view/)
   assert.match(radical('setup', '--help'), /--client <id>/)
-  assert.match(radical('doctor', '--help'), /--no-start/)
+  assert.match(radical('status', '--help'), /--no-start/)
   assert.match(radical('check', '--list-rules'), /folder-manifest/)
 
   const model = join(project, 'model')

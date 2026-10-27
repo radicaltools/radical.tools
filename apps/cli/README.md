@@ -69,19 +69,19 @@ radical.sh setup` moves the project to the latest release. `RADICAL_HOME` and
 4. **Hooks**: `radical hooks install` for the folder, so Studio's *Changes on branch*
    has the branch's base (`--no-hooks` leaves them alone). Outside a git repository it
    asks, in a terminal, to start one in the working directory first.
-5. **Check**: `radical doctor` for the folder (`--no-doctor` skips it).
+5. **Check**: `radical status` for the folder (`--no-check` skips it).
 
 In a terminal each question shows its default; press Enter to take it. Without a
 terminal, or with `--yes`, it asks nothing: the folder `architecture`, the agents it
 finds installed, the hooks in a repository. `--dry-run` prints every change and writes
 nothing. Exit status: 0 set up and checked, 1 a step or a check failed, 2 it could not run.
 
-## radical doctor
+## radical status
 
 Checks what an agent needs to work on a model folder:
 
 ```sh
-npx @radicaltools/cli doctor architecture
+npx @radicaltools/cli status architecture
 ```
 
 It reports Node and the CLI's version; whether the folder reads as a model and the git

@@ -6,7 +6,7 @@ import type { Io } from './check'
 
 // ─── Where each agent keeps its MCP servers ──────────────────────────────────
 //
-// radical setup writes one entry per agent and radical doctor reads them back
+// radical setup writes one entry per agent and radical status reads them back
 // (ADR "Guided setup in the CLI"). A project file (.mcp.json, .vscode/mcp.json)
 // is shared through git, so it names npx from the PATH and the folder by its
 // path from the top of the repository. A user file belongs to an app that may
@@ -18,7 +18,7 @@ import type { Io } from './check'
 
 export type ClientId = 'claude-code' | 'claude-desktop' | 'codex' | 'cursor' | 'vscode'
 
-/** How an agent starts a server: what radical setup writes, what doctor runs. */
+/** How an agent starts a server: what radical setup writes, what radical status runs. */
 export interface ServerEntry {
   command: string
   args: string[]
