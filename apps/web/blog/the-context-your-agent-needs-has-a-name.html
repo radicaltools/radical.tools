@@ -79,8 +79,21 @@
 
 <h2 id="your-model">Your model, not a standard one</h2>
 <p>Every company should define its own model and adjust it as it learns. The standards are there to be borrowed from, not adopted whole. ArchiMate is a serious piece of work, but for most organisations it is over-engineered: some sixty element types, most of which nobody will use, and a learning curve that kills adoption before it starts. TOGAF’s ADM is a method for an enterprise architecture function with a budget, not for a product team of forty people. UML and SysML have the notation for almost anything and, for that reason, for nothing in particular. A small metamodel your team actually fills in beats a complete one that stays empty.</p>
-<p>My minimal set follows the three layers above. The building blocks, the node types if you like, are requirements, scenarios, mockups, processes, states, the C4 elements (yes, C4), decision records and fitness functions. None of them is new. EARS gives requirements a testable form, Gherkin gives scenarios one. Processes and states have had BPMN and statecharts since before most of the people writing about AI were born. Domain-driven design supplies the entities and aggregates the states belong to. C4 is Simon Brown’s answer to how much of UML a team actually needs for structure. Decision records are Michael Nygard’s, fitness functions come from <em>Building Evolutionary Architectures</em>. That set is enough to describe most systems I have worked on, and enough for an agent to do real work with.</p>
-<p>And the model is a graph. A requirement is verified by a scenario; a scenario is illustrated by a mockup; a state machine is the lifecycle of an entity; a component satisfies a requirement; a decision constrains a component; a fitness function implements the decision. Diagrams, tables and documents are views of that graph. Edit the graph and the views stay true. Edit the diagram and you are back in draw.io.</p>
+<p>My minimal set follows the three layers above. None of its building blocks is new; each has a source older than the current wave of tooling.</p>
+<ul>
+  <li>Needs: the brief, the notes from the workshop, the ticket as the customer wrote it. Kept as they came, because the raw words are evidence. ISO 29148 has separated stakeholder needs from requirements for this reason.</li>
+  <li>Requirements, derived from the needs and written in EARS, so that each one has an unambiguous, testable form.</li>
+  <li>Scenarios, in Gherkin, each one verifying a requirement.</li>
+  <li>Mockups, where a scenario involves a screen.</li>
+  <li>Processes, of the kind BPMN has drawn since 2004.</li>
+  <li>The domain model: entities, their attributes and the relations between them, as domain-driven design describes them. It is the vocabulary everything else uses.</li>
+  <li>State machines, one per entity whose lifecycle matters, in Harel’s statecharts from 1987.</li>
+  <li>The C4 elements. Yes, C4: Simon Brown’s answer to how much of UML a team needs for structure.</li>
+  <li>Decision records, as Michael Nygard described them.</li>
+  <li>Fitness functions, from <em>Building Evolutionary Architectures</em>.</li>
+</ul>
+<p>That set is enough to describe most systems I have worked on, and enough for an agent to do real work with.</p>
+<p>What makes it a model rather than a pile of documents is the relations between the blocks. A requirement derives from a need. A scenario verifies the requirement. A component satisfies it. A decision constrains the component, and a fitness function checks that the decision still holds. A state machine is the lifecycle of one entity, and a process moves entities through those states. The model is that graph. Diagrams, tables and documents are views of it: edit the graph and the views stay true, edit the diagram and you are back in draw.io.</p>
 
 <h2 id="use">How people and agents use it</h2>
 <p>The same three ways. Read it, to learn the constraints and the current state before changing anything. Write it, to model: a new system from a brief, or an old one from the code nobody documented. Read it again, to check that what was built is aligned with what was decided.</p>
