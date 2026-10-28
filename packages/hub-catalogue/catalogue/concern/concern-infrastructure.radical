@@ -83,7 +83,7 @@
           {
             "value": "paas",
             "label": "a managed container platform (PaaS)",
-            "description": "The provider runs the platform; you hand it a container or code. Google Cloud Run, Azure Container Apps or App Service, AWS App Runner or ECS on Fargate. Pick it by default for web apps and APIs when no platform team exists. Not in our own data centre, where OpenShift is Kubernetes."
+            "description": "The provider runs the platform; you hand it a container or code. Google Cloud Run, Azure Container Apps or App Service, AWS App Runner or ECS on Fargate. Pick it by default for web apps and APIs when no platform team exists. In our own data centre there is no provider to run it: it is provided on our Kubernetes with Knative instead."
           },
           {
             "value": "kubernetes",
@@ -93,7 +93,7 @@
           {
             "value": "serverless",
             "label": "serverless functions",
-            "description": "AWS Lambda, Azure Functions or Google Cloud Functions, run per event and billed per invocation. Pick it for spiky or event-driven work with short executions, when idle cost should be zero. Not in our own data centre, where Knative or OpenFaaS run on Kubernetes."
+            "description": "AWS Lambda, Azure Functions or Google Cloud Functions, run per event and billed per invocation. Pick it for spiky or event-driven work with short executions, when idle cost should be zero. In our own data centre there is no provider to run it: functions run on our Kubernetes with Knative Functions or OpenFaaS instead."
           },
           {
             "value": "vms",
@@ -132,7 +132,7 @@
           {
             "value": "onprem",
             "label": "our own data centre",
-            "description": "Servers and virtualisation we run. Pick it when data may not leave the premises, the load is steady enough that owned hardware is cheaper, or regulation demands it, and people run the hardware. Only with Kubernetes or virtual machines, and with Terraform or Pulumi."
+            "description": "Servers and virtualisation we run. Pick it when data may not leave the premises, the load is steady enough that owned hardware is cheaper, or regulation demands it, and people run the hardware. A managed platform or functions are then provided on our own Kubernetes (Knative), the cloud's own infrastructure tool means Terraform, and no cloud budget applies."
           }
         ]
       },
@@ -156,7 +156,7 @@
           {
             "value": "native",
             "label": "the cloud's own (CloudFormation or CDK on AWS, Bicep on Azure)",
-            "description": "AWS CloudFormation or the AWS CDK, or Azure Bicep, with state kept by the cloud. Pick it when only one of these two clouds is used and its newest features matter on the day they ship. Not with Google Cloud (Infrastructure Manager runs Terraform) or our own data centre."
+            "description": "AWS CloudFormation or the AWS CDK, or Azure Bicep, with state kept by the cloud. Pick it when only one of these two clouds is used and its newest features matter on the day they ship. Not with Google Cloud (its Infrastructure Manager runs Terraform) or our own data centre: with those, the infrastructure is written in Terraform."
           }
         ]
       },
@@ -186,19 +186,19 @@
       },
       {
         "key": "BUDGET_MONTHLY",
-        "label": "What is the monthly cloud budget of the account or subscription (in the billing currency)? One per account: bind it once",
+        "label": "What is the monthly cloud budget of the account or subscription (in the billing currency)? One per account: bind it once. Only in a public cloud",
         "defaultValue": "5000",
         "type": "number"
       },
       {
         "key": "BUDGET_ALERT_PERCENT",
-        "label": "At what share of the budget, forecast for the month, does an alert go out (%)?",
+        "label": "At what share of the budget, forecast for the month, does an alert go out (%)? Only in a public cloud",
         "defaultValue": "80",
         "type": "number"
       },
       {
         "key": "COST_STEP",
-        "label": "Above what monthly cost increase does a change need the budget owner's approval (billing currency)?",
+        "label": "Above what monthly cost increase does a change need the budget owner's approval (billing currency)? Only in a public cloud",
         "defaultValue": "500",
         "type": "number"
       },
@@ -234,7 +234,7 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "define 100% of the infrastructure in {{IAC}} code in version control, applied only by the pipeline after a reviewed plan, with 0 changes made by hand to any shared environment",
+      "action": "define 100% of the infrastructure as code in version control, in the tool the infrastructure-as-code decision names, applied only by the pipeline after a reviewed plan, with 0 changes made by hand to any shared environment",
       "rationale": "Code can be reviewed, repeated and rebuilt after a disaster; a console click can do none of these (AWS Well-Architected, Operational Excellence: perform operations as code)."
     },
     {
@@ -300,6 +300,30 @@
       "hubWhen": {
         "IAC": [
           "terraform"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "req-cost-review-fallback",
+      "type": "requirement",
+      "label": "Cost shown in review",
+      "x": 260,
+      "y": 780,
+      "ears_type": "event-driven",
+      "trigger": "a change to the infrastructure code is proposed",
+      "action": "show its estimated monthly cost change in the pull request, and require the budget owner's approval when it adds more than {{COST_STEP}} a month",
+      "rationale": "The cheapest moment to question a cost is before it is incurred (FinOps Framework, shift-left cost estimation).",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp"
         ]
       }
     },
@@ -308,7 +332,7 @@
       "type": "requirement",
       "label": "Cost estimated in review",
       "x": 260,
-      "y": 780,
+      "y": 910,
       "ears_type": "event-driven",
       "trigger": "a change to the infrastructure code adds or resizes a priced resource",
       "action": "attach the provider's pricing-calculator estimate of the monthly change to the pull request, and require the budget owner's approval when it adds more than {{COST_STEP}} a month",
@@ -316,8 +340,33 @@
       "unchecked": "No tool estimates the cost of Pulumi, CloudFormation or Bicep changes: the reviewer attaches the pricing-calculator estimate to each infrastructure pull request, and the budget owner approves in the review above {{COST_STEP}} a month before it is merged.",
       "hubWhen": {
         "IAC": [
-          "pulumi",
+          "pulumi"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "req-cost-estimate-native",
+      "type": "requirement",
+      "label": "Cost estimated in review",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "event-driven",
+      "trigger": "a change to the infrastructure code adds or resizes a priced resource",
+      "action": "attach the provider's pricing-calculator estimate of the monthly change to the pull request, and require the budget owner's approval when it adds more than {{COST_STEP}} a month",
+      "rationale": "The cheapest moment to question a cost is before it is incurred; no estimator reads Pulumi or CloudFormation code, so the reviewer makes the estimate (FinOps Framework, shift-left cost estimation).",
+      "unchecked": "No tool estimates the cost of Pulumi, CloudFormation or Bicep changes: the reviewer attaches the pricing-calculator estimate to each infrastructure pull request, and the budget owner approves in the review above {{COST_STEP}} a month before it is merged.",
+      "hubWhen": {
+        "IAC": [
           "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
         ]
       }
     },
@@ -326,7 +375,7 @@
       "type": "requirement",
       "label": "Stateless and scaled",
       "x": 260,
-      "y": 910,
+      "y": 1170,
       "ears_type": "ubiquitous",
       "action": "keep the element stateless, with no local file or session surviving an instance restart, run at least 2 instances in production and scale out automatically on load",
       "rationale": "A platform may stop or move any instance at any time; stateless processes make that harmless (The Twelve-Factor App, VI. Processes and IX. Disposability).",
@@ -346,9 +395,9 @@
       "type": "requirement",
       "label": "Workloads well specified",
       "x": 260,
-      "y": 1040,
+      "y": 1300,
       "ears_type": "ubiquitous",
-      "action": "give every workload resource requests and limits, readiness and liveness probes, at least 2 replicas with a PodDisruptionBudget in production, and a non-root, read-only root file system",
+      "action": "give every workload CPU and memory requests and a memory limit, readiness and liveness probes, at least 2 replicas with a PodDisruptionBudget in production, and a non-root, read-only root file system",
       "rationale": "Without these the scheduler cannot place, protect or restart pods correctly, and one pod can starve its node (Kubernetes documentation, configuration best practices; CIS Benchmarks for Kubernetes).",
       "hubWhen": {
         "HOSTING": [
@@ -357,11 +406,30 @@
       }
     },
     {
+      "id": "req-k8s-onprem",
+      "type": "requirement",
+      "label": "Workloads well specified",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "give every workload CPU and memory requests and a memory limit, readiness and liveness probes, at least 2 replicas with a PodDisruptionBudget in production, and a non-root, read-only root file system",
+      "rationale": "Without these the scheduler cannot place, protect or restart pods correctly, and one pod can starve its node (Kubernetes documentation, configuration best practices; CIS Benchmarks for Kubernetes).",
+      "hubWhen": {
+        "HOSTING": [
+          "paas",
+          "serverless"
+        ],
+        "CLOUD": [
+          "onprem"
+        ]
+      }
+    },
+    {
       "id": "req-functions",
       "type": "requirement",
       "label": "Functions bounded",
       "x": 260,
-      "y": 1170,
+      "y": 1560,
       "ears_type": "ubiquitous",
       "action": "give every function a concurrency or instance limit that protects what it calls, and a dead-letter queue or failure destination for failed asynchronous events; cold starts are bounded as the Capacity and scaling pack decides",
       "rationale": "Unbounded functions scale until something downstream breaks, and silently lose failed events (AWS Well-Architected, Serverless Applications Lens).",
@@ -381,7 +449,7 @@
       "type": "requirement",
       "label": "Machines are replaced",
       "x": 260,
-      "y": 1300,
+      "y": 1690,
       "ears_type": "ubiquitous",
       "action": "build every machine from a versioned image that records its build time, replace machines instead of changing them, with 0 changes over SSH in production and no machine running an image older than 30 days",
       "rationale": "Machines changed by hand drift apart and cannot be rebuilt; images rebuilt monthly carry the operating system's patches (AWS Well-Architected, Reliability: immutable infrastructure).",
@@ -396,10 +464,10 @@
       "type": "requirement",
       "label": "Served only through the CDN",
       "x": 260,
-      "y": 1430,
+      "y": 1820,
       "ears_type": "ubiquitous",
-      "action": "serve the files only through the CDN over TLS with HSTS, from an origin bucket that refuses direct requests, with a cache lifetime on every response",
-      "rationale": "An origin reachable directly bypasses the CDN's TLS, caching and protections; files served without a cache lifetime hit the origin on every request (AWS Well-Architected, Security and Performance Efficiency).",
+      "action": "serve the files only through the CDN over TLS with HSTS, from an origin bucket that refuses direct requests, with every content-hashed asset cached for a year and every HTML page revalidated on each request",
+      "rationale": "An origin reachable directly bypasses the CDN's TLS, caching and protections; a hashed asset never changes, so it can be cached for a year, while a page cached without revalidation keeps users on an old build after a publish (AWS Well-Architected, Security and Performance Efficiency).",
       "hubWhen": {
         "HOSTING": [
           "cdn"
@@ -411,7 +479,7 @@
       "type": "requirement",
       "label": "Ephemeral environments cleaned up",
       "x": 260,
-      "y": 1560,
+      "y": 1950,
       "ears_type": "event-driven",
       "trigger": "a pull request is closed, or its environment has been idle for {{EPHEMERAL_HOURS}} hours",
       "action": "destroy its environment and everything in it within 1 hour",
@@ -427,7 +495,7 @@
       "type": "requirement",
       "label": "Tested artefact promoted",
       "x": 260,
-      "y": 1690,
+      "y": 2080,
       "ears_type": "event-driven",
       "trigger": "a release is promoted to production",
       "action": "deploy exactly the artefact, by digest, that the latest staging deployment tested",
@@ -508,6 +576,29 @@
       "hubWhen": {
         "IAC": [
           "terraform"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "sc-cost-review-fallback",
+      "type": "scenario",
+      "label": "Costly change approved",
+      "x": 520,
+      "y": 780,
+      "given": "a pull request that adds a large database instance",
+      "when": "the cost estimate shows more than {{COST_STEP}} a month",
+      "then": "the pull request cannot be merged until the budget owner adds the budget-approved label",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp"
         ]
       }
     },
@@ -516,14 +607,37 @@
       "type": "scenario",
       "label": "Costly change approved",
       "x": 520,
-      "y": 780,
+      "y": 910,
       "given": "a pull request that adds a large database instance",
       "when": "the reviewer's estimate shows more than {{COST_STEP}} a month",
       "then": "the pull request is not merged until the budget owner approves it",
       "hubWhen": {
         "IAC": [
-          "pulumi",
+          "pulumi"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "sc-cost-estimate-native",
+      "type": "scenario",
+      "label": "Costly change approved",
+      "x": 520,
+      "y": 1040,
+      "given": "a pull request that adds a large database instance",
+      "when": "the reviewer's estimate shows more than {{COST_STEP}} a month",
+      "then": "the pull request is not merged until the budget owner approves it",
+      "hubWhen": {
+        "IAC": [
           "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
         ]
       }
     },
@@ -532,7 +646,7 @@
       "type": "scenario",
       "label": "Instance lost harmlessly",
       "x": 520,
-      "y": 910,
+      "y": 1170,
       "given": "the production service with its scaling settings read",
       "when": "one of its instances is stopped by the platform",
       "then": "at least 2 were running, a replacement starts within the autoscaling range, and no request or session is lost beyond retries",
@@ -552,8 +666,8 @@
       "type": "scenario",
       "label": "Incomplete manifest refused",
       "x": 520,
-      "y": 1040,
-      "given": "a deployment without resource limits or a readiness probe",
+      "y": 1300,
+      "given": "a deployment without a memory limit or a readiness probe",
       "when": "the manifest check runs",
       "then": "it fails naming what is missing",
       "hubWhen": {
@@ -563,11 +677,30 @@
       }
     },
     {
+      "id": "sc-k8s-onprem",
+      "type": "scenario",
+      "label": "Incomplete manifest refused",
+      "x": 520,
+      "y": 1430,
+      "given": "a deployment without a memory limit or a readiness probe",
+      "when": "the manifest check runs",
+      "then": "it fails naming what is missing",
+      "hubWhen": {
+        "HOSTING": [
+          "paas",
+          "serverless"
+        ],
+        "CLOUD": [
+          "onprem"
+        ]
+      }
+    },
+    {
       "id": "sc-functions",
       "type": "scenario",
       "label": "Burst stays bounded",
       "x": 520,
-      "y": 1170,
+      "y": 1560,
       "given": "a burst of events far above normal",
       "when": "the functions process it",
       "then": "concurrency stays at its limit, the database is not overloaded, and failed events land in the dead-letter queue",
@@ -587,7 +720,7 @@
       "type": "scenario",
       "label": "Old image replaced",
       "x": 520,
-      "y": 1300,
+      "y": 1690,
       "given": "a machine whose image was built 31 days ago",
       "when": "the image-age alert evaluates",
       "then": "it fires and the machine is replaced from the current image",
@@ -602,10 +735,10 @@
       "type": "scenario",
       "label": "Origin refuses direct request",
       "x": 520,
-      "y": 1430,
+      "y": 1820,
       "given": "the deployed site",
-      "when": "a page is requested through the CDN and the same file directly from the origin",
-      "then": "the CDN answers over TLS with HSTS and a cache lifetime, and the origin refuses",
+      "when": "a page and one of its hashed assets are requested through the CDN, and the page directly from the origin",
+      "then": "the CDN answers over TLS with HSTS, the page marked for revalidation and the asset cached for a year, and the origin refuses",
       "hubWhen": {
         "HOSTING": [
           "cdn"
@@ -617,7 +750,7 @@
       "type": "scenario",
       "label": "Environment removed",
       "x": 520,
-      "y": 1560,
+      "y": 1950,
       "given": "an ephemeral environment of a pull request",
       "when": "the pull request is merged",
       "then": "within 1 hour the environment and its resources are gone",
@@ -632,7 +765,7 @@
       "type": "scenario",
       "label": "Tested artefact promoted",
       "x": 520,
-      "y": 1690,
+      "y": 2080,
       "given": "a build tested on staging",
       "when": "it is released",
       "then": "the same artefact, by digest, runs in production, and a different digest is refused",
@@ -653,12 +786,17 @@
       "status": "accepted",
       "date": "",
       "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
-      "decision": "The element runs as a container on a managed platform in {{CLOUD}}: Google Cloud Run, Azure Container Apps (App Service for plain web apps), or AWS App Runner or ECS on Fargate, with at least 2 instances in production and autoscaling above them. Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner's approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choosing the platform: the one in the chosen cloud that runs plain containers with scale-to-zero or autoscaling and managed TLS; avoid platform-specific build packs so the container can move.",
+      "decision": "The element runs as a container on a managed platform in {{CLOUD}}: Google Cloud Run, Azure Container Apps (App Service for plain web apps), or AWS App Runner or ECS on Fargate, with at least 2 instances in production and autoscaling above them. The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choosing the platform: the one in the chosen cloud that runs plain containers with scale-to-zero or autoscaling and managed TLS; avoid platform-specific build packs so the container can move.",
       "consequences": "• No nodes, clusters or operating systems to patch; scaling, TLS and rollouts come with the platform.\n• Limits on what can run: request timeouts, no privileged containers, limited networking and sidecars.\n• Tied to the provider's platform, but a plain container moves to another with little change.\n• Per-request or per-instance billing; two instances kept warm are the floor of the bill.",
       "alternatives": "1. Kubernetes: runs anything, at the cost of running a cluster.\n2. Serverless functions: lower idle cost, a different programming model.\n3. Virtual machines: full control, all the operations work.",
       "hubWhen": {
         "HOSTING": [
           "paas"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
         ]
       }
     },
@@ -672,7 +810,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
-      "decision": "The element runs as containers on Kubernetes in {{CLOUD}}: Amazon EKS, Azure AKS or Google GKE (Autopilot where it fits), or OpenShift or Rancher on premises. Manifests are Helm charts under charts/<name> or Kustomize overlays deployed by GitOps (Argo CD or Flux); every workload has requests and limits, probes, a PodDisruptionBudget and runs as non-root with a read-only root file system. The clusters themselves: Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner's approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours. Argo CD shows drift of the manifests. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose Kubernetes only with a platform team, or a managed offering that removes node operations.",
+      "decision": "The element runs as containers on Kubernetes in {{CLOUD}}: Amazon EKS, Azure AKS or Google GKE (Autopilot where it fits), or OpenShift or Rancher on premises. Manifests are Helm charts under charts/<name> or Kustomize overlays deployed by GitOps (Argo CD or Flux); every workload has requests and limits, probes, a PodDisruptionBudget and runs as non-root with a read-only root file system. The clusters and what surrounds them are infrastructure like any other: The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. Argo CD shows drift of the manifests. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose Kubernetes only with a platform team, or a managed offering that removes node operations.",
       "consequences": "• Runs anything that fits in a container, with the same model in every cloud and on premises.\n• A platform to run: cluster upgrades every few months (each minor is supported for about 14 months), add-ons, networking, security policies.\n• A large ecosystem (CNCF) for observability, policy, service mesh and operators, each one more thing to keep up.\n• Cost depends on packing workloads well; requests that are too high waste nodes.",
       "alternatives": "1. A managed container platform: far less to run, fewer options.\n2. Serverless functions: no cluster at all, a different programming model.\n3. Nomad or plain container hosts: simpler, smaller ecosystem.",
       "hubWhen": {
@@ -691,12 +829,17 @@
       "status": "accepted",
       "date": "",
       "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
-      "decision": "The element runs as serverless functions in {{CLOUD}}: AWS Lambda, Azure Functions or Google Cloud Functions (Cloud Run functions), triggered by HTTP through an API gateway and by queues and events. Each function has a concurrency or instance limit and a dead-letter queue or failure destination for asynchronous events. Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner's approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours. The AWS SAM or the Serverless Framework may sit on top of the infrastructure tool. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose functions for event-driven and spiky work with executions under a few minutes; long-running or steady-load work goes to containers.",
+      "decision": "The element runs as serverless functions in {{CLOUD}}: AWS Lambda, Azure Functions or Google Cloud Functions (Cloud Run functions), triggered by HTTP through an API gateway and by queues and events. Each function has a concurrency or instance limit and a dead-letter queue or failure destination for asynchronous events. The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. The AWS SAM or the Serverless Framework may sit on top of the infrastructure tool. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose functions for event-driven and spiky work with executions under a few minutes; long-running or steady-load work goes to containers.",
       "consequences": "• No servers to run; scales from zero to large bursts, billed per invocation.\n• Cold starts add latency to the first requests; execution time, payload size and connections are limited.\n• Steady high load can cost more than containers; the bill follows traffic, so budgets and alerts matter.\n• Closely tied to the provider's events, gateway and permissions model; moving is a rewrite of the glue.",
       "alternatives": "1. A managed container platform with scale-to-zero (Cloud Run, Container Apps): containers without cold-start limits on code shape.\n2. Kubernetes with KEDA for event-driven scaling.\n3. Virtual machines: steady cost, no limits, all the operations.",
       "hubWhen": {
         "HOSTING": [
           "serverless"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
         ]
       }
     },
@@ -710,7 +853,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
-      "decision": "The element runs on virtual machines in {{CLOUD}} (EC2 Auto Scaling groups, Azure Virtual Machine Scale Sets, Google Compute Engine managed instance groups, or VMware or Proxmox on premises), built from versioned images made with Packer that record their build time, and replaced rather than changed; configuration at boot with cloud-init or Ansible, and no changes over SSH in production. Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner's approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose machines only for what cannot run in a container: licensed or legacy software, special kernels or hardware.",
+      "decision": "The element runs on virtual machines in {{CLOUD}} (EC2 Auto Scaling groups, Azure Virtual Machine Scale Sets, Google Compute Engine managed instance groups, or VMware or Proxmox on premises), built from versioned images made with Packer that record their build time, and replaced rather than changed; configuration at boot with cloud-init or Ansible, and no changes over SSH in production. The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose machines only for what cannot run in a container: licensed or legacy software, special kernels or hardware.",
       "consequences": "• Full control: any software, any kernel, any agent.\n• All the operations work: operating system patches, image builds, scaling groups, load balancers.\n• Slower to scale and to roll out than containers; images must be rebuilt at least monthly.\n• Steady, predictable cost; reserved instances or savings plans reduce it.",
       "alternatives": "1. A managed container platform: no machines to patch, if the software fits in a container.\n2. Kubernetes: containers with control, plus a cluster to run.\n3. Configuration management on long-lived machines (Ansible, Puppet): familiar, but machines drift apart.",
       "hubWhen": {
@@ -729,12 +872,140 @@
       "status": "accepted",
       "date": "",
       "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
-      "decision": "The element is a set of pre-built files in a private bucket in {{CLOUD}}, served only through a CDN over TLS with HSTS: Amazon CloudFront with S3 (origin access control), Azure Front Door with Blob Storage, Cloud CDN with Cloud Storage, or a static host such as Cloudflare Pages or Netlify; on premises, a web server with a cache in front. Hashed assets are cached for a year, HTML revalidated, as the Frontend stack pack's caching rules say. Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner's approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose it only when nothing runs on request; an API behind the same domain is its own element with its own hosting.",
+      "decision": "The element is a set of pre-built files in a private bucket in {{CLOUD}}, served only through a CDN over TLS with HSTS: Amazon CloudFront with S3 (origin access control), Azure Front Door with Blob Storage, Cloud CDN with Cloud Storage, or a static host such as Cloudflare Pages or Netlify; on premises, a web server with a cache in front. Hashed assets are cached for a year, HTML revalidated, as the Frontend stack pack's caching rules say. The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack. Choose it only when nothing runs on request; an API behind the same domain is its own element with its own hosting.",
       "consequences": "• Nothing to run, patch or scale; the cheapest and most available hosting there is.\n• Every page is the same for everyone until the next publish; personalisation and sign-in need another element.\n• The origin must stay private, or the CDN's TLS, caching and protections are bypassed.\n• Cache invalidation on publish is the one operational step; a bad publish is undone by publishing the previous build.",
       "alternatives": "1. A managed container platform serving the files: more to run, no CDN edge unless added.\n2. A web server on a virtual machine: full control, all the operations work.\n3. Server rendering: personalised pages, a server to run and scale.",
       "hubWhen": {
         "HOSTING": [
           "cdn"
+        ]
+      }
+    },
+    {
+      "id": "adr-onprem-platform",
+      "type": "adr",
+      "label": "A platform on our own Kubernetes",
+      "x": 780,
+      "y": 650,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The hosting chosen, {{HOSTING}}, has no provider to run it in our own data centre, so the platform team provides the same model on our Kubernetes (OpenShift or Rancher): Knative Serving runs containers that scale with requests, down to zero, and Knative Functions or OpenFaaS run functions triggered by HTTP and by events. Every workload has CPU and memory requests and a memory limit, probes, at least 2 replicas with a PodDisruptionBudget in production, and runs as non-root with a read-only root file system. The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours. Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack.",
+      "consequences": "• The element keeps the platform's programming model: a container or a function, scaled for it.\n• Someone runs the cluster and Knative: upgrades, capacity and the hardware under them are the platform team's work.\n• Scaling stops at the hardware we own; bursts beyond it wait or fail.\n• Moving to a public cloud later is a change of platform, not of the element.",
+      "alternatives": "1. Plain Kubernetes Deployments without Knative: one model less, no scale to zero.\n2. Virtual machines: no cluster, all the operations work.\n3. A public cloud's managed platform: no cluster to run, if the data may leave the premises.",
+      "hubWhen": {
+        "HOSTING": [
+          "paas",
+          "serverless"
+        ],
+        "CLOUD": [
+          "onprem"
+        ]
+      }
+    },
+    {
+      "id": "adr-budget",
+      "type": "adr",
+      "label": "Cloud spend held to a budget",
+      "x": 780,
+      "y": 780,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The account (AWS account, Azure subscription or Google Cloud billing account) has a monthly cost budget of {{BUDGET_MONTHLY}} in the billing currency, with a forecast alert at {{BUDGET_ALERT_PERCENT}}% to the owning team and the budget owner; the budget is part of the infrastructure code (aws_budgets_budget, azurerm_consumption_budget_subscription, google_billing_budget). One budget per account, bound once, not per element. A change that adds more than {{COST_STEP}} a month needs the budget owner's approval: with Terraform, Infracost shows the change in the pull request and a label records the approval; with Pulumi or the cloud's own tool, which no estimator reads, the reviewer attaches the pricing calculator's estimate.",
+      "consequences": "• Overspend is seen within the month, from the forecast, not on the invoice.\n• Every costly change has a named approver before it ships.\n• The budget and the approval step need an owner who answers within a day, or changes wait.",
+      "alternatives": "1. Monthly review of the invoice: no tooling, and the money is spent before anyone looks.\n2. Hard spending caps: they stop the bill and the service with it.",
+      "hubWhen": {
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "adr-iac-terraform",
+      "type": "adr",
+      "label": "Infrastructure in Terraform",
+      "x": 780,
+      "y": 910,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The infrastructure is described in Terraform (OpenTofu where an open-source licence matters): one root per environment under envs/<environment>/, shared modules versioned, state in a remote backend with locking (S3, Azure Storage, Google Cloud Storage or HCP Terraform). Every pull request produces a plan, checked by Checkov against the security and tagging baseline; only the pipeline applies, after review; a refresh-only plan every {{DRIFT_HOURS}} hours reports drift.",
+      "consequences": "• One language and workflow for every cloud and most SaaS products.\n• The state file is critical and holds secrets: its backend, locking and access need care.\n• HCL has limited abstraction; large estates need module conventions.",
+      "alternatives": "1. Pulumi: the same providers in a general-purpose language.\n2. The cloud's own tool (CloudFormation, Bicep): state kept by the cloud, one cloud only.",
+      "hubWhen": {
+        "IAC": [
+          "terraform"
+        ]
+      }
+    },
+    {
+      "id": "adr-iac-pulumi",
+      "type": "adr",
+      "label": "Infrastructure in Pulumi",
+      "x": 780,
+      "y": 1040,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The infrastructure is written with Pulumi in the language the team already uses, one stack per environment, state in Pulumi Cloud or a self-managed backend (S3, Azure Blob Storage, Google Cloud Storage). A CrossGuard policy pack runs with every preview and stops on a mandatory violation of the security and tagging baseline; only the pipeline runs pulumi up, after review; a refreshed preview every {{DRIFT_HOURS}} hours reports drift.",
+      "consequences": "• Loops, functions, types and unit tests for infrastructure, in the team's language.\n• Infrastructure code can grow as complex as application code; it needs the same review discipline.\n• Fewer ready-made scanners and cost estimators read Pulumi than Terraform.",
+      "alternatives": "1. Terraform: the widest ecosystem of scanners and estimators.\n2. The cloud's own tool: one cloud, state kept by the cloud.",
+      "hubWhen": {
+        "IAC": [
+          "pulumi"
+        ]
+      }
+    },
+    {
+      "id": "adr-iac-native",
+      "type": "adr",
+      "label": "Infrastructure in the cloud's own tool",
+      "x": 780,
+      "y": 1170,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The infrastructure is described in the cloud's own tool: CloudFormation, written directly or synthesised from the AWS CDK, on AWS; Bicep on Azure. Templates live under infra/ with a parameter file per environment, and the cloud keeps the state. Checkov scans the templates in every pull request; tags are enforced at deployment by AWS Organizations tag policies or Azure Policy; only the pipeline deploys, after review; CloudFormation drift detection or a Bicep what-if every {{DRIFT_HOURS}} hours reports drift.",
+      "consequences": "• No state to run, and the newest services on the day they ship.\n• One cloud only: a second cloud or a SaaS product needs another tool.\n• Fewer policy and cost tools read the templates than read Terraform.",
+      "alternatives": "1. Terraform: every cloud and SaaS, a state backend to run.\n2. Pulumi: a general-purpose language, the same providers as Terraform.",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
+        ]
+      }
+    },
+    {
+      "id": "adr-iac-native-fallback",
+      "type": "adr",
+      "label": "Infrastructure in Terraform, as the cloud has no tool of its own",
+      "x": 780,
+      "y": 1300,
+      "concern": "infrastructure",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.",
+      "decision": "The cloud's own tool was chosen, but {{CLOUD}} has no CloudFormation or Bicep: Google Cloud's own tool, Infrastructure Manager, deploys Terraform configurations, and our own data centre has no provider tool at all. The infrastructure is therefore described in Terraform, deployed through Infrastructure Manager on Google Cloud and by the pipeline in our own data centre: one root per environment under envs/<environment>/, state in a remote backend with locking, a plan checked by Checkov in every pull request, applied only after review, and a refresh-only plan every {{DRIFT_HOURS}} hours reporting drift.",
+      "consequences": "• The checks of this pack for Terraform apply as they are.\n• On Google Cloud, Infrastructure Manager keeps the state and the deployment history; elsewhere the backend is ours to run.\n• HCL has limited abstraction; large estates need module conventions.",
+      "alternatives": "1. Pulumi: the same providers in a general-purpose language.\n2. Deployment Manager on Google Cloud: retired in favour of Infrastructure Manager.",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp",
+          "onprem"
         ]
       }
     },
@@ -754,17 +1025,40 @@
       }
     },
     {
+      "id": "ff-checkov-fallback",
+      "type": "fitness-fn",
+      "label": "Plans pass policy",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "0 failed Checkov checks of the baseline (encryption, public access, open admin ports) and 0 taggable resources without owner, environment and cost-centre tags (labels on Google Cloud) in the plan of every pull request",
+      "description": "Checkov scans the Terraform plan in every pull request with its built-in checks and a custom tagging policy over every taggable resource type of every provider (AWS and Azure resources carry tags, Google Cloud resources labels), and fails on any finding. Rules of your own go into Conftest policies over the same plan JSON.\n\nTool: Checkov\n\n```yaml\n# policies/required_tags.yaml — custom check, run with --external-checks-dir policies\nmetadata:\n  id: CKV2_ORG_TAGS\n  name: Taggable resources carry owner, environment and cost-centre tags (labels on Google Cloud)\n  category: GENERAL_SECURITY\ndefinition:\n  or:\n    - and:\n        - { cond_type: attribute, resource_types: taggable, attribute: tags.owner, operator: exists }\n        - { cond_type: attribute, resource_types: taggable, attribute: tags.environment, operator: exists }\n        - { cond_type: attribute, resource_types: taggable, attribute: tags.cost-centre, operator: exists }\n    - and:\n        - { cond_type: attribute, resource_types: taggable, attribute: labels.owner, operator: exists }\n        - { cond_type: attribute, resource_types: taggable, attribute: labels.environment, operator: exists }\n        - { cond_type: attribute, resource_types: taggable, attribute: labels.cost-centre, operator: exists }\n# CI, in envs/<environment>:\n#   terraform plan -out tf.plan && terraform show -json tf.plan > tf.json\n#   checkov -f tf.json --framework terraform_plan --external-checks-dir ../../policies --compact\n```",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp",
+          "onprem"
+        ]
+      }
+    },
+    {
       "id": "ff-checkov-native",
       "type": "fitness-fn",
       "label": "Templates pass policy",
       "x": 1040,
-      "y": 130,
+      "y": 260,
       "category": "structural",
       "threshold": "0 failed Checkov checks of the baseline (encryption, public access, open admin ports) in the CloudFormation or Bicep templates of every pull request",
       "description": "Checkov scans the CloudFormation (synthesised from the CDK with cdk synth) or Bicep templates under infra/ in every pull request with its built-in checks and fails on any finding. Tags are enforced at deploy time by the cloud (AWS Organizations tag policies, Azure Policy \"Require a tag on resources\"), not by this check.\n\nTool: Checkov\n\n```bash\n#!/usr/bin/env bash\n# CloudFormation (AWS, incl. cdk synth output) and Bicep (Azure) templates under infra/\nset -euo pipefail\ncheckov --directory infra --framework cloudformation,bicep --compact\n```",
       "hubWhen": {
         "IAC": [
           "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
         ]
       }
     },
@@ -773,7 +1067,7 @@
       "type": "fitness-fn",
       "label": "Previews pass policy",
       "x": 1040,
-      "y": 260,
+      "y": 390,
       "category": "structural",
       "threshold": "0 mandatory policy violations in the preview of every pull request: missing owner, environment or cost-centre tags on the listed resource types, public storage",
       "description": "A Pulumi CrossGuard policy pack runs with every preview and update and stops on a mandatory violation. The tag rule covers the listed resource types of AWS, Azure and Google Cloud (labels there); the public-storage rule knows each cloud's bucket setting. Extend the lists with the resource types the stacks use.\n\nTool: Pulumi CrossGuard (@pulumi/policy)\n\n```ts\n// policy/index.ts — pulumi preview --policy-pack policy\nimport { PolicyPack, type ResourceValidationArgs } from '@pulumi/policy'\n\nconst TAGGED = new Set([\n  'aws:ec2/instance:Instance', 'aws:rds/instance:Instance', 'aws:s3/bucketV2:BucketV2', 'aws:ecs/service:Service', 'aws:lambda/function:Function',\n  'azure-native:compute:VirtualMachine', 'azure-native:storage:StorageAccount', 'azure-native:app:ContainerApp', 'azure-native:web:WebApp',\n  'gcp:compute/instance:Instance', 'gcp:storage/bucket:Bucket', 'gcp:cloudrunv2/service:Service', 'gcp:cloudfunctions2/function:Function',\n])\nconst PRIVATE: Record<string, (props: Record<string, any>) => boolean> = {\n  'aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock': (p) => p.blockPublicAcls && p.blockPublicPolicy,\n  'azure-native:storage:StorageAccount': (p) => p.allowBlobPublicAccess === false,\n  'gcp:storage/bucket:Bucket': (p) => p.publicAccessPrevention === 'enforced',\n}\n\nnew PolicyPack('baseline', {\n  policies: [\n    {\n      name: 'required-tags', enforcementLevel: 'mandatory',\n      description: 'Every listed resource carries owner, environment and cost-centre tags (labels on Google Cloud).',\n      validateResource: (args: ResourceValidationArgs, report) => {\n        if (!TAGGED.has(args.type)) return\n        const tags = args.props.tags ?? args.props.labels ?? {}\n        for (const tag of ['owner', 'environment', 'cost-centre']) if (!tags[tag]) report(`${args.type} ${args.name}: missing tag \"${tag}\"`)\n      },\n    },\n    {\n      name: 'no-public-storage', enforcementLevel: 'mandatory',\n      description: 'Public access is blocked on every bucket.',\n      validateResource: (args: ResourceValidationArgs, report) => {\n        const isPrivate = PRIVATE[args.type]\n        if (isPrivate && !isPrivate(args.props)) report(`${args.type} ${args.name}: public access must be blocked`)\n      },\n    },\n  ],\n})\n```",
@@ -788,7 +1082,7 @@
       "type": "fitness-fn",
       "label": "Drift detected",
       "x": 1040,
-      "y": 390,
+      "y": 520,
       "category": "operational",
       "threshold": "A drift check every {{DRIFT_HOURS}} hours per environment; 0 unexplained differences between code and infrastructure",
       "description": "A scheduled pipeline runs a refresh-only plan in each environment's root; exit code 2 means the infrastructure differs from the code, and the job opens an issue for the owning team.\n\nTool: Terraform (plan -detailed-exitcode) with the GitHub CLI\n\n```bash\n#!/usr/bin/env bash\n# scheduled every {{DRIFT_HOURS}} hours, in envs/$ENVIRONMENT\nset -uo pipefail\nterraform init -input=false >/dev/null\nterraform plan -refresh-only -detailed-exitcode -input=false -no-color > drift.txt\ncase $? in\n  0) echo \"no drift\" ;;\n  2) gh issue create --title \"Drift in $ENVIRONMENT\" --body-file drift.txt --label drift; exit 1 ;;\n  *) echo \"plan failed\"; exit 1 ;;\nesac\n```",
@@ -799,11 +1093,30 @@
       }
     },
     {
+      "id": "ff-drift-terraform-fallback",
+      "type": "fitness-fn",
+      "label": "Drift detected",
+      "x": 1040,
+      "y": 650,
+      "category": "operational",
+      "threshold": "A drift check every {{DRIFT_HOURS}} hours per environment; 0 unexplained differences between code and infrastructure",
+      "description": "A scheduled pipeline runs a refresh-only plan in each environment's root; exit code 2 means the infrastructure differs from the code, and the job opens an issue for the owning team.\n\nTool: Terraform (plan -detailed-exitcode) with the GitHub CLI\n\n```bash\n#!/usr/bin/env bash\n# scheduled every {{DRIFT_HOURS}} hours, in envs/$ENVIRONMENT\nset -uo pipefail\nterraform init -input=false >/dev/null\nterraform plan -refresh-only -detailed-exitcode -input=false -no-color > drift.txt\ncase $? in\n  0) echo \"no drift\" ;;\n  2) gh issue create --title \"Drift in $ENVIRONMENT\" --body-file drift.txt --label drift; exit 1 ;;\n  *) echo \"plan failed\"; exit 1 ;;\nesac\n```",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp",
+          "onprem"
+        ]
+      }
+    },
+    {
       "id": "ff-drift-pulumi",
       "type": "fitness-fn",
       "label": "Drift detected",
       "x": 1040,
-      "y": 520,
+      "y": 780,
       "category": "operational",
       "threshold": "A drift check every {{DRIFT_HOURS}} hours per stack; 0 unexplained differences between code and infrastructure",
       "description": "A scheduled pipeline refreshes each stack in preview and fails when anything changed outside the code; Pulumi Deployments can run the same as a scheduled drift detection.\n\nTool: Pulumi (preview --refresh --expect-no-changes)\n\n```bash\n#!/usr/bin/env bash\n# scheduled every {{DRIFT_HOURS}} hours per stack\nset -euo pipefail\npulumi stack select \"$STACK\"\npulumi preview --refresh --expect-no-changes --diff --non-interactive\n```",
@@ -818,13 +1131,17 @@
       "type": "fitness-fn",
       "label": "Drift detected",
       "x": 1040,
-      "y": 650,
+      "y": 910,
       "category": "operational",
       "threshold": "A drift check every {{DRIFT_HOURS}} hours; 0 CloudFormation stacks in DRIFTED state, 0 resources a Bicep what-if would change",
       "description": "A scheduled job runs the part for the cloud in use (the CLOUD variable of the pipeline): on AWS it starts CloudFormation drift detection on every stack and fails when one is DRIFTED; on Azure it runs a what-if of the deployed Bicep template against the resource group and fails on any change other than NoChange or Ignore.\n\nTool: AWS CloudFormation drift detection (AWS CLI); Azure: az deployment group what-if\n\n```bash\n#!/usr/bin/env bash\n# scheduled every {{DRIFT_HOURS}} hours; the pipeline sets CLOUD to aws or azure\nset -euo pipefail\nfailed=0\ncase \"$CLOUD\" in\n  aws)\n    for stack in $(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \\\n                   --query 'StackSummaries[].StackName' --output text); do\n      id=$(aws cloudformation detect-stack-drift --stack-name \"$stack\" --query StackDriftDetectionId --output text)\n      until [ \"$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id \"$id\" \\\n                --query DetectionStatus --output text)\" != DETECTION_IN_PROGRESS ]; do sleep 5; done\n      status=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id \"$id\" \\\n               --query StackDriftStatus --output text)\n      [ \"$status\" != DRIFTED ] || { echo \"$stack has drifted\"; failed=1; }\n    done ;;\n  azure)\n    changes=$(az deployment group what-if --resource-group \"$RESOURCE_GROUP\" --template-file infra/main.bicep \\\n      --parameters \"infra/$ENVIRONMENT.bicepparam\" --no-pretty-print --exclude-change-types NoChange Ignore \\\n      --query 'changes[].[resourceId, changeType]' --output tsv)\n    [ -z \"$changes\" ] || { echo \"$changes\"; failed=1; } ;;\nesac\nexit $failed\n```",
       "hubWhen": {
         "IAC": [
           "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
         ]
       }
     },
@@ -833,7 +1150,7 @@
       "type": "fitness-fn",
       "label": "Budget alert in place (AWS Budgets)",
       "x": 1040,
-      "y": 780,
+      "y": 1040,
       "category": "operational",
       "threshold": "A monthly cost budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}}% or lower exists in the account the element runs in",
       "description": "A scheduled job reads the account's budgets through the cloud's CLI and fails when none is a monthly cost budget of {{BUDGET_MONTHLY}} with an enabled forecast notification at {{BUDGET_ALERT_PERCENT}}% or lower; the budget itself is part of the infrastructure code. One budget per account: bind this pack's budget details once per account, not per element.\n\nTool: AWS CLI (budgets)\n\n```bash\n#!/usr/bin/env bash\n# scheduled: the account's monthly cost budget with a forecast alert exists\nset -euo pipefail\naccount=$(aws sts get-caller-identity --query Account --output text)\nname=$(aws budgets describe-budgets --account-id \"$account\" \\\n  --query \"Budgets[?BudgetType=='COST' && TimeUnit=='MONTHLY' && to_number(BudgetLimit.Amount)==\\`{{BUDGET_MONTHLY}}\\`].BudgetName | [0]\" --output text)\n[ \"$name\" != None ] || { echo \"no monthly cost budget of {{BUDGET_MONTHLY}} in account $account\"; exit 1; }\naws budgets describe-notifications-for-budget --account-id \"$account\" --budget-name \"$name\" \\\n  --query \"Notifications[?NotificationType=='FORECASTED' && ThresholdType=='PERCENTAGE' && Threshold<=\\`{{BUDGET_ALERT_PERCENT}}\\`]\" --output text | grep -q . \\\n  || { echo \"budget $name has no forecast alert at {{BUDGET_ALERT_PERCENT}} % or lower\"; exit 1; }\n```",
@@ -848,7 +1165,7 @@
       "type": "fitness-fn",
       "label": "Budget alert in place (Azure Cost Management)",
       "x": 1040,
-      "y": 910,
+      "y": 1170,
       "category": "operational",
       "threshold": "A monthly cost budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}}% or lower exists in the account the element runs in",
       "description": "A scheduled job reads the account's budgets through the cloud's CLI and fails when none is a monthly cost budget of {{BUDGET_MONTHLY}} with an enabled forecast notification at {{BUDGET_ALERT_PERCENT}}% or lower; the budget itself is part of the infrastructure code. One budget per account: bind this pack's budget details once per account, not per element.\n\nTool: Azure CLI (consumption budget) with jq\n\n```bash\n#!/usr/bin/env bash\n# scheduled: the subscription's monthly budget with a forecast alert exists\nset -euo pipefail\naz consumption budget list --output json | jq -e --argjson amount {{BUDGET_MONTHLY}} --argjson pct {{BUDGET_ALERT_PERCENT}} '\n  map(select(.timeGrain == \"Monthly\" and .amount == $amount\n    and any(.notifications[]?; .enabled and .thresholdType == \"Forecasted\" and .threshold <= $pct))) | length > 0' >/dev/null \\\n  || { echo \"no monthly budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}} % or lower in this subscription\"; exit 1; }\n```",
@@ -863,7 +1180,7 @@
       "type": "fitness-fn",
       "label": "Budget alert in place (Cloud Billing budgets)",
       "x": 1040,
-      "y": 1040,
+      "y": 1300,
       "category": "operational",
       "threshold": "A monthly cost budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}}% or lower exists in the account the element runs in",
       "description": "A scheduled job reads the account's budgets through the cloud's CLI and fails when none is a monthly cost budget of {{BUDGET_MONTHLY}} with an enabled forecast notification at {{BUDGET_ALERT_PERCENT}}% or lower; the budget itself is part of the infrastructure code. One budget per account: bind this pack's budget details once per account, not per element.\n\nTool: gcloud (billing budgets) with jq\n\n```bash\n#!/usr/bin/env bash\n# scheduled: the billing account's monthly budget with a forecast alert exists\nset -euo pipefail\ngcloud billing budgets list --billing-account \"$BILLING_ACCOUNT\" --format=json | jq -e --argjson amount {{BUDGET_MONTHLY}} --argjson pct {{BUDGET_ALERT_PERCENT}} '\n  map(select((.budgetFilter.calendarPeriod // \"MONTH\") == \"MONTH\" and (.amount.specifiedAmount.units | tonumber) == $amount\n    and any(.thresholdRules[]?; .spendBasis == \"FORECASTED_SPEND\" and (.thresholdPercent * 100) <= $pct))) | length > 0' >/dev/null \\\n  || { echo \"no monthly budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}} % or lower on $BILLING_ACCOUNT\"; exit 1; }\n```",
@@ -878,13 +1195,36 @@
       "type": "fitness-fn",
       "label": "Cost change in review",
       "x": 1040,
-      "y": 1170,
+      "y": 1430,
       "category": "process",
       "threshold": "100% of infrastructure pull requests show the monthly cost change; above {{COST_STEP}} a month the check fails until the pull request carries the label budget-approved",
       "description": "Infracost compares the cost of the pull request's Terraform with the main branch and comments the difference; the step then fails above the limit unless the budget owner has added the label budget-approved, which only they may add (a CODEOWNERS-protected label rule or a workflow that checks who added it).\n\nTool: Infracost with the GitHub CLI\n\n```bash\ninfracost breakdown --path . --format json --out-file base.json        # run on the main branch checkout\ninfracost diff --path . --compare-to base.json --format json --out-file diff.json\ninfracost comment github --path diff.json --repo \"$GITHUB_REPOSITORY\" \\\n  --pull-request \"$PR_NUMBER\" --github-token \"$GITHUB_TOKEN\" --behavior update\nincrease=$(jq -r '(.diffTotalMonthlyCost // \"0\") | tonumber | floor' diff.json)\napproved=$(gh pr view \"$PR_NUMBER\" --json labels -q '.labels[].name' | grep -cx budget-approved || true)\n[ \"$increase\" -le {{COST_STEP}} ] || [ \"$approved\" -gt 0 ] \\\n  || { echo \"adds $increase a month: the budget owner adds the label budget-approved\"; exit 1; }\n```",
       "hubWhen": {
         "IAC": [
           "terraform"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure",
+          "gcp"
+        ]
+      }
+    },
+    {
+      "id": "ff-infracost-fallback",
+      "type": "fitness-fn",
+      "label": "Cost change in review",
+      "x": 1040,
+      "y": 1560,
+      "category": "process",
+      "threshold": "100% of infrastructure pull requests show the monthly cost change; above {{COST_STEP}} a month the check fails until the pull request carries the label budget-approved",
+      "description": "Infracost compares the cost of the pull request's Terraform with the main branch and comments the difference; the step then fails above the limit unless the budget owner has added the label budget-approved, which only they may add (a CODEOWNERS-protected label rule or a workflow that checks who added it).\n\nTool: Infracost with the GitHub CLI\n\n```bash\ninfracost breakdown --path . --format json --out-file base.json        # run on the main branch checkout\ninfracost diff --path . --compare-to base.json --format json --out-file diff.json\ninfracost comment github --path diff.json --repo \"$GITHUB_REPOSITORY\" \\\n  --pull-request \"$PR_NUMBER\" --github-token \"$GITHUB_TOKEN\" --behavior update\nincrease=$(jq -r '(.diffTotalMonthlyCost // \"0\") | tonumber | floor' diff.json)\napproved=$(gh pr view \"$PR_NUMBER\" --json labels -q '.labels[].name' | grep -cx budget-approved || true)\n[ \"$increase\" -le {{COST_STEP}} ] || [ \"$approved\" -gt 0 ] \\\n  || { echo \"adds $increase a month: the budget owner adds the label budget-approved\"; exit 1; }\n```",
+      "hubWhen": {
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp"
         ]
       }
     },
@@ -893,7 +1233,7 @@
       "type": "fitness-fn",
       "label": "Scaled on ECS on Fargate",
       "x": 1040,
-      "y": 1300,
+      "y": 1690,
       "category": "operational",
       "threshold": "The production service runs at least 2 instances and autoscales above that minimum",
       "description": "A check after each deploy reads the production service's scaling settings from ECS on Fargate and fails when fewer than 2 instances are kept or no autoscaling range exists above them.\n\nTool: AWS CLI (ecs, application-autoscaling); App Runner: describe-service and its auto-scaling configuration's MinSize\n\n```bash\n#!/usr/bin/env bash\n# production: the service keeps at least 2 tasks and has an autoscaling target above them\nset -euo pipefail\ndesired=$(aws ecs describe-services --cluster \"$CLUSTER\" --services \"$SERVICE\" --query 'services[0].desiredCount' --output text)\nread -r min max < <(aws application-autoscaling describe-scalable-targets --service-namespace ecs \\\n  --resource-ids \"service/$CLUSTER/$SERVICE\" --query 'ScalableTargets[0].[MinCapacity, MaxCapacity]' --output text)\n[ \"$desired\" -ge 2 ] && [ \"$min\" != None ] && [ \"$min\" -ge 2 ] && [ \"$max\" -gt \"$min\" ] \\\n  || { echo \"desired $desired, autoscaling $min-$max (at least 2, scaling above it)\"; exit 1; }\n```",
@@ -911,7 +1251,7 @@
       "type": "fitness-fn",
       "label": "Scaled on Container Apps",
       "x": 1040,
-      "y": 1430,
+      "y": 1820,
       "category": "operational",
       "threshold": "The production service runs at least 2 instances and autoscales above that minimum",
       "description": "A check after each deploy reads the production service's scaling settings from Container Apps and fails when fewer than 2 instances are kept or no autoscaling range exists above them.\n\nTool: Azure CLI (containerapp)\n\n```bash\n#!/usr/bin/env bash\n# production: the container app keeps at least 2 replicas and scales above them\nset -euo pipefail\nread -r min max < <(az containerapp show --name \"$APP\" --resource-group \"$RESOURCE_GROUP\" \\\n  --query '[properties.template.scale.minReplicas, properties.template.scale.maxReplicas]' --output tsv)\n[ \"$min\" -ge 2 ] && [ \"$max\" -gt \"$min\" ] || { echo \"replicas $min-$max (at least 2, scaling above it)\"; exit 1; }\n```",
@@ -929,7 +1269,7 @@
       "type": "fitness-fn",
       "label": "Scaled on Cloud Run",
       "x": 1040,
-      "y": 1560,
+      "y": 1950,
       "category": "operational",
       "threshold": "The production service runs at least 2 instances and autoscales above that minimum",
       "description": "A check after each deploy reads the production service's scaling settings from Cloud Run and fails when fewer than 2 instances are kept or no autoscaling range exists above them.\n\nTool: gcloud (run services) with jq\n\n```bash\n#!/usr/bin/env bash\n# production: the service keeps at least 2 instances and scales above them\nset -euo pipefail\nread -r min max < <(gcloud run services describe \"$SERVICE\" --region \"$REGION\" --format=json \\\n  | jq -r '.spec.template.metadata.annotations | \"\\(.[\"autoscaling.knative.dev/minScale\"] // 0) \\(.[\"autoscaling.knative.dev/maxScale\"] // 0)\"')\n[ \"$min\" -ge 2 ] && [ \"$max\" -gt \"$min\" ] || { echo \"instances $min-$max (at least 2, scaling above it)\"; exit 1; }\n```",
@@ -947,13 +1287,32 @@
       "type": "fitness-fn",
       "label": "Manifests well specified",
       "x": 1040,
-      "y": 1690,
+      "y": 2080,
       "category": "structural",
-      "threshold": "0 critical kube-score findings (missing requests or limits, probes, PodDisruptionBudget, non-root user, read-only root file system) in the rendered manifests",
-      "description": "The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score.\n\nTool: kube-score\n\n```bash\nhelm template order-api charts/order-api -f charts/order-api/values-production.yaml \\\n  | kube-score score - --output-format ci\n```",
+      "threshold": "0 critical kube-score findings in the rendered manifests (CPU and memory requests, memory limit, probes, replicas, PodDisruptionBudget, non-root user and group, read-only root file system, and kube-score's correctness checks), with the default checks the requirement does not ask for switched off",
+      "description": "The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score. The defaults that ask for more than the requirement (a CPU limit, ephemeral-storage requests and limits, pull policy Always, a NetworkPolicy per pod, host anti-affinity) are switched off; network reachability is not decided in this pack.\n\nTool: kube-score\n\n```bash\nhelm template order-api charts/order-api -f charts/order-api/values-production.yaml \\\n  | kube-score score - --output-format ci \\\n      --ignore-container-cpu-limit \\\n      --ignore-test container-ephemeral-storage-request-and-limit \\\n      --ignore-test container-image-pull-policy \\\n      --ignore-test pod-networkpolicy \\\n      --ignore-test deployment-has-host-podantiaffinity \\\n      --ignore-test statefulset-has-host-podantiaffinity\n```",
       "hubWhen": {
         "HOSTING": [
           "kubernetes"
+        ]
+      }
+    },
+    {
+      "id": "ff-kube-score-onprem",
+      "type": "fitness-fn",
+      "label": "Manifests well specified",
+      "x": 1040,
+      "y": 2210,
+      "category": "structural",
+      "threshold": "0 critical kube-score findings in the rendered manifests (CPU and memory requests, memory limit, probes, replicas, PodDisruptionBudget, non-root user and group, read-only root file system, and kube-score's correctness checks), with the default checks the requirement does not ask for switched off",
+      "description": "The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score. The defaults that ask for more than the requirement (a CPU limit, ephemeral-storage requests and limits, pull policy Always, a NetworkPolicy per pod, host anti-affinity) are switched off; network reachability is not decided in this pack.\n\nTool: kube-score\n\n```bash\nhelm template order-api charts/order-api -f charts/order-api/values-production.yaml \\\n  | kube-score score - --output-format ci \\\n      --ignore-container-cpu-limit \\\n      --ignore-test container-ephemeral-storage-request-and-limit \\\n      --ignore-test container-image-pull-policy \\\n      --ignore-test pod-networkpolicy \\\n      --ignore-test deployment-has-host-podantiaffinity \\\n      --ignore-test statefulset-has-host-podantiaffinity\n```",
+      "hubWhen": {
+        "HOSTING": [
+          "paas",
+          "serverless"
+        ],
+        "CLOUD": [
+          "onprem"
         ]
       }
     },
@@ -962,10 +1321,10 @@
       "type": "fitness-fn",
       "label": "Lambda functions bounded",
       "x": 1040,
-      "y": 1820,
+      "y": 2340,
       "category": "structural",
-      "threshold": "100% of functions have reserved concurrency and a dead-letter queue or on-failure destination",
-      "description": "A check after each deploy lists the account's functions and fails on one without a reserved concurrency or without either a dead-letter queue or an on-failure destination.\n\nTool: AWS CLI (lambda)\n\n```bash\n#!/usr/bin/env bash\n# every function: a reserved concurrency and a dead-letter queue or on-failure destination\nset -euo pipefail\nfail=0\nfor fn in $(aws lambda list-functions --query 'Functions[].FunctionName' --output text); do\n  reserved=$(aws lambda get-function-concurrency --function-name \"$fn\" --query ReservedConcurrentExecutions --output text)\n  dlq=$(aws lambda get-function-configuration --function-name \"$fn\" --query 'DeadLetterConfig.TargetArn' --output text)\n  dest=$(aws lambda get-function-event-invoke-config --function-name \"$fn\" \\\n    --query 'DestinationConfig.OnFailure.Destination' --output text 2>/dev/null || echo None)\n  [ \"$reserved\" != None ] || { echo \"$fn: no reserved concurrency\"; fail=1; }\n  [ \"$dlq\" != None ] || [ \"$dest\" != None ] || { echo \"$fn: no dead-letter queue or on-failure destination\"; fail=1; }\ndone\nexit $fail\n```",
+      "threshold": "100% of functions have a concurrency limit (reserved concurrency, or a maximum concurrency on every SQS trigger) and a dead-letter queue or on-failure destination",
+      "description": "A check after each deploy lists the account's functions and fails on one with neither a reserved concurrency nor a maximum concurrency on each of its SQS triggers (the event source mapping's ScalingConfig, which caps the function's pollers without carving from the account's pool), or without either a dead-letter queue or an on-failure destination. Provisioned concurrency keeps instances warm but sets no ceiling, so it does not count as a limit.\n\nTool: AWS CLI (lambda) with jq\n\n```bash\n#!/usr/bin/env bash\n# every function: a concurrency limit (reserved, or a maximum on every SQS trigger)\n# and a dead-letter queue or on-failure destination\nset -euo pipefail\nfail=0\nfor fn in $(aws lambda list-functions --query 'Functions[].FunctionName' --output text); do\n  reserved=$(aws lambda get-function-concurrency --function-name \"$fn\" --query ReservedConcurrentExecutions --output text)\n  read -r sqs unbounded < <(aws lambda list-event-source-mappings --function-name \"$fn\" --output json | jq -r '\n    [.EventSourceMappings[] | select(.EventSourceArn | startswith(\"arn:aws:sqs:\"))]\n    | \"\\(length) \\(map(select(.ScalingConfig.MaximumConcurrency == null)) | length)\"')\n  dlq=$(aws lambda get-function-configuration --function-name \"$fn\" --query 'DeadLetterConfig.TargetArn' --output text)\n  dest=$(aws lambda get-function-event-invoke-config --function-name \"$fn\" \\\n    --query 'DestinationConfig.OnFailure.Destination' --output text 2>/dev/null || echo None)\n  if [ \"$reserved\" = None ] && { [ \"$sqs\" -eq 0 ] || [ \"$unbounded\" -gt 0 ]; }; then\n    echo \"$fn: no concurrency limit (reserved, or a maximum concurrency on every SQS trigger)\"; fail=1\n  fi\n  [ \"$dlq\" != None ] || [ \"$dest\" != None ] || { echo \"$fn: no dead-letter queue or on-failure destination\"; fail=1; }\ndone\nexit $fail\n```",
       "hubWhen": {
         "HOSTING": [
           "serverless"
@@ -980,7 +1339,7 @@
       "type": "fitness-fn",
       "label": "Azure Functions functions bounded",
       "x": 1040,
-      "y": 1950,
+      "y": 2470,
       "category": "structural",
       "threshold": "100% of function apps have a scale-out limit (functionAppScaleLimit above 0)",
       "description": "A check after each deploy lists the subscription's function apps and fails on one whose site configuration has no scale-out limit. Failed Service Bus and Event Hubs events dead-letter on the queue itself, which the Messaging pack decides; Flex Consumption apps carry the limit in az functionapp scale config show instead.\n\nTool: Azure CLI (functionapp)\n\n```bash\n#!/usr/bin/env bash\n# every function app: a scale-out limit\nset -euo pipefail\nfail=0\nwhile IFS=$'\\t' read -r name group; do\n  limit=$(az functionapp config show --name \"$name\" --resource-group \"$group\" --query functionAppScaleLimit --output tsv)\n  [ \"${limit:-0}\" -gt 0 ] || { echo \"$name: no scale-out limit (functionAppScaleLimit)\"; fail=1; }\ndone < <(az functionapp list --query '[].[name, resourceGroup]' --output tsv)\nexit $fail\n```",
@@ -998,7 +1357,7 @@
       "type": "fitness-fn",
       "label": "Cloud Run functions functions bounded",
       "x": 1040,
-      "y": 2080,
+      "y": 2600,
       "category": "structural",
       "threshold": "100% of functions have a maximum instance count, and every event-triggered one an explicit retry policy",
       "description": "A check after each deploy lists the project's functions (2nd gen) and fails on one without a maximum instance count or, for an event trigger, without an explicit retry policy; failed events dead-letter on the Pub/Sub subscription, which the Messaging pack decides.\n\nTool: gcloud (functions)\n\n```bash\n#!/usr/bin/env bash\n# every function: a maximum instance count; event-triggered ones an explicit retry policy\nset -euo pipefail\nfail=0\nwhile IFS=, read -r name max trigger retry; do\n  [ -n \"$max\" ] && [ \"$max\" -gt 0 ] || { echo \"$name: no maximum instance count\"; fail=1; }\n  [ -z \"$trigger\" ] || [ -n \"$retry\" ] || { echo \"$name: event trigger without an explicit retry policy\"; fail=1; }\ndone < <(gcloud functions list --v2 --format='csv[no-heading](name, serviceConfig.maxInstanceCount, eventTrigger.trigger, eventTrigger.retryPolicy)')\nexit $fail\n```",
@@ -1016,7 +1375,7 @@
       "type": "fitness-fn",
       "label": "No machine on an old image",
       "x": 1040,
-      "y": 2210,
+      "y": 2730,
       "category": "operational",
       "threshold": "0 machines whose image was built more than 30 days ago; the alert opens a ticket after 1 hour",
       "description": "Packer bakes the build time into /etc/image-release; at boot, cloud-init writes it as a node_exporter textfile metric, and a Prometheus rule fires for any machine whose image is older than 30 days, in every cloud and on premises alike.\n\nTool: Prometheus with node_exporter (textfile collector)\n\n```yaml\n# at boot (cloud-init), from the file Packer baked in: /etc/image-release holds BUILD_DATE=<epoch seconds>\n#   . /etc/image-release && echo \"image_build_timestamp_seconds $BUILD_DATE\" > /var/lib/node_exporter/textfile/image.prom\ngroups:\n  - name: machine-images\n    rules:\n      - alert: MachineImageOlderThan30Days\n        expr: time() - image_build_timestamp_seconds > 30 * 86400\n        for: 1h\n        labels: { severity: ticket }\n        annotations:\n          summary: \"{{ $labels.instance }} runs an image built {{ $value | humanizeDuration }} ago; replace it from the current image\"\n```",
@@ -1031,10 +1390,10 @@
       "type": "fitness-fn",
       "label": "Only through the CDN",
       "x": 1040,
-      "y": 2340,
+      "y": 2860,
       "category": "operational",
-      "threshold": "The site answers over TLS with an HSTS header and a cache lifetime; the origin answers a direct request for the same file with 403 or 404",
-      "description": "A check after each deploy fetches the site through the CDN and reads its headers, then requests a file directly from the origin bucket's URL and expects it refused.\n\nTool: curl (post-deploy check)\n\n```bash\n#!/usr/bin/env bash\n# SITE_URL: through the CDN; ORIGIN_URL: the bucket's own endpoint\nset -euo pipefail\nheaders=$(curl -fsSI \"$SITE_URL/\" | tr -d '\\r')\ngrep -qi '^strict-transport-security:' <<<\"$headers\" || { echo \"no HSTS header on $SITE_URL\"; exit 1; }\ngrep -qiE '^cache-control:.*max-age=[1-9]' <<<\"$headers\" || { echo \"no cache lifetime on $SITE_URL\"; exit 1; }\ncode=$(curl -s -o /dev/null -w '%{http_code}' \"$ORIGIN_URL/index.html\")\n[ \"$code\" = 403 ] || [ \"$code\" = 404 ] || { echo \"origin $ORIGIN_URL answers $code to a direct request (must refuse)\"; exit 1; }\n```",
+      "threshold": "The site answers over TLS with an HSTS header; its page with Cache-Control no-cache (or max-age=0 with must-revalidate) and a content-hashed asset with max-age=31536000; the origin answers a direct request for the page with 403, 404 or 409",
+      "description": "A check after each deploy fetches the page and one content-hashed asset of the build through the CDN and reads their headers against adr-cdn's caching rule (hashed assets cached for a year, the page revalidated), then requests the page directly from the origin bucket's URL and expects it refused: 403 or 404 from S3 and Cloud Storage, 409 (PublicAccessNotPermitted) from Azure Blob Storage with public access off.\n\nTool: curl (post-deploy check)\n\n```bash\n#!/usr/bin/env bash\n# SITE_URL: through the CDN; ORIGIN_URL: the bucket's own endpoint;\n# ASSET_PATH: one content-hashed file of this build (by default the first script under dist/assets)\nset -euo pipefail\nasset=${ASSET_PATH:-$(cd dist && ls assets/*.js | head -n 1)}\npage=$(curl -fsSI \"$SITE_URL/\" | tr -d '\\r')\ngrep -qi '^strict-transport-security:' <<<\"$page\" || { echo \"no HSTS header on $SITE_URL\"; exit 1; }\npage_cc=$(grep -i '^cache-control:' <<<\"$page\" || true)\n[[ \"$page_cc\" =~ no-cache ]] || { [[ \"$page_cc\" =~ max-age=0([^0-9]|$) ]] && [[ \"$page_cc\" =~ must-revalidate ]]; } \\\n  || { echo \"the page is not revalidated on each request ($page_cc)\"; exit 1; }\nasset_cc=$(curl -fsSI \"$SITE_URL/$asset\" | tr -d '\\r' | grep -i '^cache-control:' || true)\n[[ \"$asset_cc\" =~ max-age=31536000 ]] || { echo \"$asset is not cached for a year ($asset_cc)\"; exit 1; }\ncode=$(curl -s -o /dev/null -w '%{http_code}' \"$ORIGIN_URL/index.html\")\n[ \"$code\" = 403 ] || [ \"$code\" = 404 ] || [ \"$code\" = 409 ] \\\n  || { echo \"origin $ORIGIN_URL answers $code to a direct request (must refuse)\"; exit 1; }\n```",
       "hubWhen": {
         "HOSTING": [
           "cdn"
@@ -1046,7 +1405,7 @@
       "type": "fitness-fn",
       "label": "No forgotten environments (namespaces)",
       "x": 1040,
-      "y": 2470,
+      "y": 2990,
       "category": "operational",
       "threshold": "0 ephemeral namespaces alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours",
       "description": "A scheduled job lists the namespaces labelled as ephemeral, deletes those whose pull request is closed or whose last deploy (an annotation the deploy writes) is past the limit, and reports what it removed. Runs on Linux (GNU date).\n\nTool: kubectl with the GitHub CLI (scheduled job)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nlimit=$(( $(date +%s) - {{EPHEMERAL_HOURS}} * 3600 ))\nkubectl get ns -l env-type=ephemeral -o json \\\n  | jq -r '.items[] | [.metadata.name, .metadata.labels.pr, (.metadata.annotations[\"last-deploy\"] // \"\")] | @tsv' |\nwhile IFS=$'\\t' read -r ns pr last; do\n  state=$(gh pr view \"$pr\" --repo \"$GITHUB_REPOSITORY\" --json state -q .state)\n  if [ \"$state\" != OPEN ] || [ -z \"$last\" ] || [ \"$(date -d \"$last\" +%s)\" -lt \"$limit\" ]; then\n    echo \"deleting $ns (PR $pr $state, last deploy ${last:-unknown})\"; kubectl delete ns \"$ns\" --wait=false\n  fi\ndone\n```",
@@ -1064,7 +1423,7 @@
       "type": "fitness-fn",
       "label": "No forgotten environments (workspaces)",
       "x": 1040,
-      "y": 2600,
+      "y": 3120,
       "category": "operational",
       "threshold": "0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours",
       "description": "A scheduled job lists the Terraform workspaces named pr-<number>, destroys those whose pull request is closed or last updated past the limit, and deletes the workspace. Runs on Linux (GNU date).\n\nTool: Terraform with the GitHub CLI (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# in envs/ephemeral; workspaces are named pr-<number>\nset -euo pipefail\nlimit=$(( $(date +%s) - {{EPHEMERAL_HOURS}} * 3600 ))\nfor ws in $(terraform workspace list | tr -d '* ' | grep -E '^pr-[0-9]+$'); do\n  pr=${ws#pr-}\n  read -r state updated < <(gh pr view \"$pr\" --repo \"$GITHUB_REPOSITORY\" --json state,updatedAt -q '\"\\(.state) \\(.updatedAt)\"')\n  if [ \"$state\" != OPEN ] || [ \"$(date -d \"$updated\" +%s)\" -lt \"$limit\" ]; then\n    echo \"destroying $ws (PR $pr $state, last activity $updated)\"\n    terraform workspace select \"$ws\"\n    terraform destroy -auto-approve -input=false -var \"pr=$pr\"\n    terraform workspace select default && terraform workspace delete \"$ws\"\n  fi\ndone\n```",
@@ -1084,11 +1443,39 @@
       }
     },
     {
+      "id": "ff-ephemeral-terraform-fallback",
+      "type": "fitness-fn",
+      "label": "No forgotten environments (workspaces)",
+      "x": 1040,
+      "y": 3250,
+      "category": "operational",
+      "threshold": "0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours",
+      "description": "A scheduled job lists the Terraform workspaces named pr-<number>, destroys those whose pull request is closed or last updated past the limit, and deletes the workspace. Runs on Linux (GNU date).\n\nTool: Terraform with the GitHub CLI (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# in envs/ephemeral; workspaces are named pr-<number>\nset -euo pipefail\nlimit=$(( $(date +%s) - {{EPHEMERAL_HOURS}} * 3600 ))\nfor ws in $(terraform workspace list | tr -d '* ' | grep -E '^pr-[0-9]+$'); do\n  pr=${ws#pr-}\n  read -r state updated < <(gh pr view \"$pr\" --repo \"$GITHUB_REPOSITORY\" --json state,updatedAt -q '\"\\(.state) \\(.updatedAt)\"')\n  if [ \"$state\" != OPEN ] || [ \"$(date -d \"$updated\" +%s)\" -lt \"$limit\" ]; then\n    echo \"destroying $ws (PR $pr $state, last activity $updated)\"\n    terraform workspace select \"$ws\"\n    terraform destroy -auto-approve -input=false -var \"pr=$pr\"\n    terraform workspace select default && terraform workspace delete \"$ws\"\n  fi\ndone\n```",
+      "hubWhen": {
+        "ENVIRONMENTS": [
+          "ephemeral"
+        ],
+        "HOSTING": [
+          "paas",
+          "serverless",
+          "vms",
+          "cdn"
+        ],
+        "IAC": [
+          "native"
+        ],
+        "CLOUD": [
+          "gcp",
+          "onprem"
+        ]
+      }
+    },
+    {
       "id": "ff-ephemeral-pulumi",
       "type": "fitness-fn",
       "label": "No forgotten environments (stacks)",
       "x": 1040,
-      "y": 2730,
+      "y": 3380,
       "category": "operational",
       "threshold": "0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours",
       "description": "A scheduled job lists the stacks named pr-<number> with their last update, destroys those whose pull request is closed or last updated past the limit, and removes the stack. Runs on Linux (GNU date).\n\nTool: Pulumi with the GitHub CLI (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# stacks are named pr-<number>\nset -euo pipefail\nlimit=$(( $(date +%s) - {{EPHEMERAL_HOURS}} * 3600 ))\npulumi stack ls --json | jq -r '.[] | select(.name | test(\"^pr-[0-9]+$\")) | \"\\(.name) \\(.lastUpdate // \"\")\"' |\nwhile read -r stack last; do\n  pr=${stack#pr-}\n  state=$(gh pr view \"$pr\" --repo \"$GITHUB_REPOSITORY\" --json state -q .state)\n  if [ \"$state\" != OPEN ] || [ -z \"$last\" ] || [ \"$(date -d \"$last\" +%s)\" -lt \"$limit\" ]; then\n    echo \"destroying $stack (PR $pr $state, last update ${last:-unknown})\"\n    pulumi destroy --stack \"$stack\" --yes --non-interactive && pulumi stack rm \"$stack\" --yes\n  fi\ndone\n```",
@@ -1112,7 +1499,7 @@
       "type": "fitness-fn",
       "label": "No forgotten environments (stacks and resource groups)",
       "x": 1040,
-      "y": 2860,
+      "y": 3510,
       "category": "operational",
       "threshold": "0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours",
       "description": "A scheduled job runs the part for the cloud in use (the CLOUD variable): on AWS it lists the CloudFormation stacks tagged pr=<number>, on Azure the resource groups tagged pr=<number>, and deletes those whose pull request is closed or last updated past the limit. Runs on Linux (GNU date).\n\nTool: AWS CLI (cloudformation) or Azure CLI (group) with the GitHub CLI (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# the pipeline sets CLOUD to aws or azure; ephemeral stacks or resource groups are tagged pr=<number>\nset -euo pipefail\nlimit=$(( $(date +%s) - {{EPHEMERAL_HOURS}} * 3600 ))\ngone() { [ \"$(gh pr view \"$1\" --repo \"$GITHUB_REPOSITORY\" --json state -q .state)\" != OPEN ] || [ \"$(date -d \"$2\" +%s)\" -lt \"$limit\" ]; }\ncase \"$CLOUD\" in\n  aws)\n    aws cloudformation describe-stacks \\\n      --query \"Stacks[?Tags[?Key=='pr']].[StackName, Tags[?Key=='pr'].Value | [0], LastUpdatedTime || CreationTime]\" --output text |\n    while IFS=$'\\t' read -r stack pr updated; do\n      if gone \"$pr\" \"$updated\"; then echo \"deleting $stack (PR $pr)\"; aws cloudformation delete-stack --stack-name \"$stack\"; fi\n    done ;;\n  azure)\n    az group list --query \"[?tags.pr].[name, tags.pr]\" --output tsv |\n    while IFS=$'\\t' read -r group pr; do\n      updated=$(gh pr view \"$pr\" --repo \"$GITHUB_REPOSITORY\" --json updatedAt -q .updatedAt)\n      if gone \"$pr\" \"$updated\"; then echo \"deleting $group (PR $pr)\"; az group delete --name \"$group\" --yes --no-wait; fi\n    done ;;\nesac\n```",
@@ -1128,6 +1515,10 @@
         ],
         "IAC": [
           "native"
+        ],
+        "CLOUD": [
+          "aws",
+          "azure"
         ]
       }
     },
@@ -1136,7 +1527,7 @@
       "type": "fitness-fn",
       "label": "Environments share their code",
       "x": 1040,
-      "y": 2990,
+      "y": 3640,
       "category": "structural",
       "threshold": "The test environment's and production's folders under envs/ differ only in their variable files",
       "description": "A check in every pull request compares the test environment's root with production's, ignoring the variable files of the tool in use (tfvars, Pulumi stack configuration, Bicep or CloudFormation parameter files); any other difference, a module version or an extra resource, fails it.\n\nTool: diff (CI job)\n\n```bash\n#!/usr/bin/env bash\n# TEST_ENV: staging, or test when there is no staging\nset -euo pipefail\ndiff -rq \"envs/${TEST_ENV:-staging}\" envs/production \\\n  --exclude='*.tfvars' --exclude='*.auto.tfvars' --exclude='Pulumi.*.yaml' --exclude='*.bicepparam' --exclude='*.params.json' \\\n  && echo \"environments share the same code\" \\\n  || { echo \"the environments differ beyond their variable files (above)\"; exit 1; }\n```"
@@ -1146,7 +1537,7 @@
       "type": "fitness-fn",
       "label": "Only the tested digest reaches production",
       "x": 1040,
-      "y": 3120,
+      "y": 3770,
       "category": "process",
       "threshold": "The digest the production deploy job deploys equals the digest recorded by the latest staging deployment; any other digest fails the job",
       "description": "The staging deploy job records the image digest in the payload of the GitHub deployment it creates; the production deploy job reads the latest staging deployment's payload and refuses to continue with any other digest, so production never gets a rebuild or a newer image than staging tested.\n\nTool: GitHub CLI (deployments API) in the deploy pipeline\n\n```bash\n#!/usr/bin/env bash\n# production deploy step; IMAGE_DIGEST is what this job is about to deploy\nset -euo pipefail\ntested=$(gh api \"repos/$GITHUB_REPOSITORY/deployments?environment=staging&per_page=1\" -q '.[0].payload.digest')\n[ \"$tested\" = \"$IMAGE_DIGEST\" ] || { echo \"production would get $IMAGE_DIGEST; staging tested $tested\"; exit 1; }\n# the staging deploy job created its deployment with:\n#   gh api \"repos/$GITHUB_REPOSITORY/deployments\" -f ref=\"$GITHUB_SHA\" -f environment=staging -f \"payload[digest]=$IMAGE_DIGEST\"\n```",
@@ -1196,8 +1587,20 @@
       "relationType": "derives"
     },
     {
+      "id": "req-cost-review-fallback--derives--need",
+      "sourceId": "req-cost-review-fallback",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
       "id": "req-cost-estimate--derives--need",
       "sourceId": "req-cost-estimate",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-cost-estimate-native--derives--need",
+      "sourceId": "req-cost-estimate-native",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -1210,6 +1613,12 @@
     {
       "id": "req-k8s--derives--need",
       "sourceId": "req-k8s",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-k8s-onprem--derives--need",
+      "sourceId": "req-k8s-onprem",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -1280,9 +1689,21 @@
       "relationType": "verifies"
     },
     {
+      "id": "sc-cost-review-fallback--verifies--req-cost-review-fallback",
+      "sourceId": "sc-cost-review-fallback",
+      "targetId": "req-cost-review-fallback",
+      "relationType": "verifies"
+    },
+    {
       "id": "sc-cost-estimate--verifies--req-cost-estimate",
       "sourceId": "sc-cost-estimate",
       "targetId": "req-cost-estimate",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-cost-estimate-native--verifies--req-cost-estimate-native",
+      "sourceId": "sc-cost-estimate-native",
+      "targetId": "req-cost-estimate-native",
       "relationType": "verifies"
     },
     {
@@ -1295,6 +1716,12 @@
       "id": "sc-k8s--verifies--req-k8s",
       "sourceId": "sc-k8s",
       "targetId": "req-k8s",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-k8s-onprem--verifies--req-k8s-onprem",
+      "sourceId": "sc-k8s-onprem",
+      "targetId": "req-k8s-onprem",
       "relationType": "verifies"
     },
     {
@@ -1328,303 +1755,81 @@
       "relationType": "verifies"
     },
     {
-      "id": "ff-checkov--implements--adr-paas",
+      "id": "ff-checkov--implements--adr-iac-terraform",
       "sourceId": "ff-checkov",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-terraform",
       "relationType": "implements"
     },
     {
-      "id": "ff-checkov--implements--adr-kubernetes",
-      "sourceId": "ff-checkov",
-      "targetId": "adr-kubernetes",
+      "id": "ff-checkov-fallback--implements--adr-iac-native-fallback",
+      "sourceId": "ff-checkov-fallback",
+      "targetId": "adr-iac-native-fallback",
       "relationType": "implements"
     },
     {
-      "id": "ff-checkov--implements--adr-serverless",
-      "sourceId": "ff-checkov",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov--implements--adr-vms",
-      "sourceId": "ff-checkov",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov--implements--adr-cdn",
-      "sourceId": "ff-checkov",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov-native--implements--adr-paas",
+      "id": "ff-checkov-native--implements--adr-iac-native",
       "sourceId": "ff-checkov-native",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-native",
       "relationType": "implements"
     },
     {
-      "id": "ff-checkov-native--implements--adr-kubernetes",
-      "sourceId": "ff-checkov-native",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov-native--implements--adr-serverless",
-      "sourceId": "ff-checkov-native",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov-native--implements--adr-vms",
-      "sourceId": "ff-checkov-native",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-checkov-native--implements--adr-cdn",
-      "sourceId": "ff-checkov-native",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-crossguard--implements--adr-paas",
+      "id": "ff-crossguard--implements--adr-iac-pulumi",
       "sourceId": "ff-crossguard",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-pulumi",
       "relationType": "implements"
     },
     {
-      "id": "ff-crossguard--implements--adr-kubernetes",
-      "sourceId": "ff-crossguard",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-crossguard--implements--adr-serverless",
-      "sourceId": "ff-crossguard",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-crossguard--implements--adr-vms",
-      "sourceId": "ff-crossguard",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-crossguard--implements--adr-cdn",
-      "sourceId": "ff-crossguard",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-terraform--implements--adr-paas",
+      "id": "ff-drift-terraform--implements--adr-iac-terraform",
       "sourceId": "ff-drift-terraform",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-terraform",
       "relationType": "implements"
     },
     {
-      "id": "ff-drift-terraform--implements--adr-kubernetes",
-      "sourceId": "ff-drift-terraform",
-      "targetId": "adr-kubernetes",
+      "id": "ff-drift-terraform-fallback--implements--adr-iac-native-fallback",
+      "sourceId": "ff-drift-terraform-fallback",
+      "targetId": "adr-iac-native-fallback",
       "relationType": "implements"
     },
     {
-      "id": "ff-drift-terraform--implements--adr-serverless",
-      "sourceId": "ff-drift-terraform",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-terraform--implements--adr-vms",
-      "sourceId": "ff-drift-terraform",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-terraform--implements--adr-cdn",
-      "sourceId": "ff-drift-terraform",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-pulumi--implements--adr-paas",
+      "id": "ff-drift-pulumi--implements--adr-iac-pulumi",
       "sourceId": "ff-drift-pulumi",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-pulumi",
       "relationType": "implements"
     },
     {
-      "id": "ff-drift-pulumi--implements--adr-kubernetes",
-      "sourceId": "ff-drift-pulumi",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-pulumi--implements--adr-serverless",
-      "sourceId": "ff-drift-pulumi",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-pulumi--implements--adr-vms",
-      "sourceId": "ff-drift-pulumi",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-pulumi--implements--adr-cdn",
-      "sourceId": "ff-drift-pulumi",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-native--implements--adr-paas",
+      "id": "ff-drift-native--implements--adr-iac-native",
       "sourceId": "ff-drift-native",
-      "targetId": "adr-paas",
+      "targetId": "adr-iac-native",
       "relationType": "implements"
     },
     {
-      "id": "ff-drift-native--implements--adr-kubernetes",
-      "sourceId": "ff-drift-native",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-native--implements--adr-serverless",
-      "sourceId": "ff-drift-native",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-native--implements--adr-vms",
-      "sourceId": "ff-drift-native",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift-native--implements--adr-cdn",
-      "sourceId": "ff-drift-native",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-aws--implements--adr-paas",
+      "id": "ff-budget-aws--implements--adr-budget",
       "sourceId": "ff-budget-aws",
-      "targetId": "adr-paas",
+      "targetId": "adr-budget",
       "relationType": "implements"
     },
     {
-      "id": "ff-budget-aws--implements--adr-kubernetes",
-      "sourceId": "ff-budget-aws",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-aws--implements--adr-serverless",
-      "sourceId": "ff-budget-aws",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-aws--implements--adr-vms",
-      "sourceId": "ff-budget-aws",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-aws--implements--adr-cdn",
-      "sourceId": "ff-budget-aws",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-azure--implements--adr-paas",
+      "id": "ff-budget-azure--implements--adr-budget",
       "sourceId": "ff-budget-azure",
-      "targetId": "adr-paas",
+      "targetId": "adr-budget",
       "relationType": "implements"
     },
     {
-      "id": "ff-budget-azure--implements--adr-kubernetes",
-      "sourceId": "ff-budget-azure",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-azure--implements--adr-serverless",
-      "sourceId": "ff-budget-azure",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-azure--implements--adr-vms",
-      "sourceId": "ff-budget-azure",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-azure--implements--adr-cdn",
-      "sourceId": "ff-budget-azure",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-gcp--implements--adr-paas",
+      "id": "ff-budget-gcp--implements--adr-budget",
       "sourceId": "ff-budget-gcp",
-      "targetId": "adr-paas",
+      "targetId": "adr-budget",
       "relationType": "implements"
     },
     {
-      "id": "ff-budget-gcp--implements--adr-kubernetes",
-      "sourceId": "ff-budget-gcp",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-gcp--implements--adr-serverless",
-      "sourceId": "ff-budget-gcp",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-gcp--implements--adr-vms",
-      "sourceId": "ff-budget-gcp",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-budget-gcp--implements--adr-cdn",
-      "sourceId": "ff-budget-gcp",
-      "targetId": "adr-cdn",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-infracost--implements--adr-paas",
+      "id": "ff-infracost--implements--adr-budget",
       "sourceId": "ff-infracost",
-      "targetId": "adr-paas",
+      "targetId": "adr-budget",
       "relationType": "implements"
     },
     {
-      "id": "ff-infracost--implements--adr-kubernetes",
-      "sourceId": "ff-infracost",
-      "targetId": "adr-kubernetes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-infracost--implements--adr-serverless",
-      "sourceId": "ff-infracost",
-      "targetId": "adr-serverless",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-infracost--implements--adr-vms",
-      "sourceId": "ff-infracost",
-      "targetId": "adr-vms",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-infracost--implements--adr-cdn",
-      "sourceId": "ff-infracost",
-      "targetId": "adr-cdn",
+      "id": "ff-infracost-fallback--implements--adr-budget",
+      "sourceId": "ff-infracost-fallback",
+      "targetId": "adr-budget",
       "relationType": "implements"
     },
     {
@@ -1649,6 +1854,12 @@
       "id": "ff-kube-score--implements--adr-kubernetes",
       "sourceId": "ff-kube-score",
       "targetId": "adr-kubernetes",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-kube-score-onprem--implements--adr-onprem-platform",
+      "sourceId": "ff-kube-score-onprem",
+      "targetId": "adr-onprem-platform",
       "relationType": "implements"
     },
     {
@@ -1712,6 +1923,42 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-ephemeral-terraform--implements--adr-onprem-platform",
+      "sourceId": "ff-ephemeral-terraform",
+      "targetId": "adr-onprem-platform",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-terraform-fallback--implements--adr-paas",
+      "sourceId": "ff-ephemeral-terraform-fallback",
+      "targetId": "adr-paas",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-terraform-fallback--implements--adr-serverless",
+      "sourceId": "ff-ephemeral-terraform-fallback",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-terraform-fallback--implements--adr-vms",
+      "sourceId": "ff-ephemeral-terraform-fallback",
+      "targetId": "adr-vms",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-terraform-fallback--implements--adr-cdn",
+      "sourceId": "ff-ephemeral-terraform-fallback",
+      "targetId": "adr-cdn",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-terraform-fallback--implements--adr-onprem-platform",
+      "sourceId": "ff-ephemeral-terraform-fallback",
+      "targetId": "adr-onprem-platform",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-ephemeral-pulumi--implements--adr-paas",
       "sourceId": "ff-ephemeral-pulumi",
       "targetId": "adr-paas",
@@ -1736,6 +1983,12 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-ephemeral-pulumi--implements--adr-onprem-platform",
+      "sourceId": "ff-ephemeral-pulumi",
+      "targetId": "adr-onprem-platform",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-ephemeral-native--implements--adr-paas",
       "sourceId": "ff-ephemeral-native",
       "targetId": "adr-paas",
@@ -1757,6 +2010,12 @@
       "id": "ff-ephemeral-native--implements--adr-cdn",
       "sourceId": "ff-ephemeral-native",
       "targetId": "adr-cdn",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ephemeral-native--implements--adr-onprem-platform",
+      "sourceId": "ff-ephemeral-native",
+      "targetId": "adr-onprem-platform",
       "relationType": "implements"
     },
     {
@@ -1790,6 +2049,12 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-parity--implements--adr-onprem-platform",
+      "sourceId": "ff-parity",
+      "targetId": "adr-onprem-platform",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-promote--implements--adr-paas",
       "sourceId": "ff-promote",
       "targetId": "adr-paas",
@@ -1817,6 +2082,12 @@
       "id": "ff-promote--implements--adr-cdn",
       "sourceId": "ff-promote",
       "targetId": "adr-cdn",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-promote--implements--adr-onprem-platform",
+      "sourceId": "ff-promote",
+      "targetId": "adr-onprem-platform",
       "relationType": "implements"
     }
   ]

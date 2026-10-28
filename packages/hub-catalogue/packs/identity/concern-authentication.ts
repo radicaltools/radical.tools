@@ -143,7 +143,7 @@ const pack: PackSpec = {
     {
       id: 'adr-none', label: 'Nobody signs in', when: { IDENTITY: ['none'] },
       context: `${FORCES} Here no person needs to be told apart: the element serves the same to everyone who reaches it.`,
-      decision: 'No person signs in: the element has no sign-in and no session for people and keeps no person\'s credential; everything people reach is public and safe for anyone. Calls from other systems: {{MACHINE}}; where other systems do call, they authenticate as decided there, and that is the only credential the element checks. Anything that would need to know which person is calling is out of scope until this decision is superseded.',
+      decision: 'No person signs in: the element has no sign-in and no session for people and keeps no person\'s credential; everything people reach is public and safe for anyone. Other systems: {{MACHINE}}. Any credential the element checks belongs to a calling system, never to a person. Anything that would need to know which person is calling is out of scope until this decision is superseded.',
       consequences: '• Nothing to steal at sign-in and nothing to revoke for people.\n• Any feature that depends on who the user is (their own data, rights, an audit of who did what) needs this decision superseded first.\n• Abuse is limited by what the element offers, not by who asks: rate limits and the shape of the operations matter more.',
       alternatives: '1. Sign-in through an external identity provider, kept for later.\n2. A shared secret for everyone: no real identity, and a secret everyone knows is not one.',
     },
@@ -282,7 +282,7 @@ it('refuses breached and mis-sized passwords, stores the rest as Argon2id', asyn
   expect((await signUp('Aq7!tRw9')).status).toBe(201)      // 8 characters
   expect((await signUp(crypto.randomUUID().repeat(2).slice(0, 64))).status).toBe(201)
   const { rows } = await db.query('select password_hash from users')
-  for (const { password_hash } of rows) expect(password_hash).toMatch(/^\\$argon2id\\$v=19\\$m=(19456|[2-9]\\d{4,}|\\d{6,}),t=([2-9]|\\d{2,}),p=\\d+\\$/)
+  for (const { password_hash } of rows) expect(password_hash).toMatch(/^\\$argon2id\\$v=19\\$m=(1945[6-9]|194[6-9]\\d|19[5-9]\\d\\d|[2-9]\\d{4}|[1-9]\\d{5,}),t=([2-9]|\\d{2,}),p=\\d+\\$/)
 })`,
     },
     {

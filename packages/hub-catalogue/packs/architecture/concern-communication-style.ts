@@ -1,16 +1,74 @@
-import type { PackSpec, When } from '../../src/packSpec'
+import type { AdrSpec, FitnessSpec, PackSpec, RequirementSpec, When } from '../../src/packSpec'
 
 const DEFAULT_ADRS = ['adr-sync', 'adr-commands', 'adr-events', 'adr-streams']
 const ASYNC: When = { DEFAULT: ['commands', 'events', 'streams'] }
 const PUBLISHED: When = { DEFAULT: ['events', 'streams'] }
 const CHOREOGRAPHY: When = { FLOWS: ['choreography'], DEFAULT: ['events', 'streams'] }
+/** Choreography asked for with a default that publishes nothing: flows are orchestrated instead. */
+const ORCHESTRATED_FALLBACK: When = { FLOWS: ['choreography'], DEFAULT: ['sync', 'commands'] }
+const FALLBACK_SENTENCE = 'Choreography was chosen, but it needs published events and the default ({{DEFAULT}}) publishes none, so flows across parts are orchestrated. '
 const FORCES = 'The system\'s own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.'
+
+const orchestratedRequirement = (id: string, label: string, when: When, because: string): RequirementSpec => ({
+  id, label, when, ears_type: 'ubiquitous',
+  action: 'run every business flow that spans more than one part as a workflow in the orchestrator, with each instance\'s current step and history visible, a compensation declared for every step that changes data, and the flow finished or compensated within {{FLOW_MINUTES}} minutes',
+  rationale: `${because}An orchestrator keeps the steps of a flow in one place and its state visible per instance (microservices.io, Saga: orchestration).`,
+  scenario: { label: 'Failed step compensated', given: 'the place-order workflow with reserve stock, take payment and book shipping', when: 'the payment is declined', then: 'the workflow releases the stock, ends as failed, and its history shows each step' },
+})
+
+const orchestrationAdr = (id: string, label: string, when: When, lead: string): AdrSpec => ({
+  id, label, when,
+  decision: `${lead}Every business flow across parts runs as a workflow in an orchestrator: Temporal for flows written as code, Camunda 8 where the flow is modelled in BPMN with business people, AWS Step Functions on AWS. The workflow calls each part\'s commands, keeps the state and history of each instance, retries steps with backoff, waits on timers and human tasks, and runs a declared compensation for every completed step that changed data when a later one fails (saga semantics as in the Data consistency pack). A flow finishes or is compensated within {{FLOW_MINUTES}} minutes. The workflow belongs to the part that owns the business outcome.`,
+  consequences: '• Each flow is written in one place and each instance\'s state is visible and searchable.\n• Timeouts, retries and compensation come from the engine instead of hand-written state machines.\n• The orchestrator is a component to run (or pay for) and must be highly available.\n• The owning part knows every step: a change to a step means changing the workflow too.',
+  alternatives: '1. Choreography: no central component, but flows are visible only through tracing.\n2. Hand-written state machines in a database table: no engine, but timers, retries and history to build.\n3. Distributed transactions (two-phase commit): unsupported by most brokers and services, and blocking.',
+})
+
+const workflowCheck = (id: string, when: When, adr: string, req: string): FitnessSpec => ({
+  id, label: 'Workflows compensate', when, category: 'structural', implements: [adr], checks: [req],
+  threshold: 'Every workflow has a test in which each step that changes data fails once and the earlier steps are compensated',
+  description: 'Workflow tests run in Temporal\'s time-skipping test environment with the activities mocked; for each step the test makes it fail with a non-retryable failure and verifies the compensations of the earlier steps ran.',
+  tool: 'Temporal TypeScript SDK (@temporalio/testing) with Vitest; for the JVM: Temporal\'s TestWorkflowExtension with JUnit 5',
+  language: 'ts',
+  snippet: `import { WorkflowFailedError } from '@temporalio/client'
+import { ApplicationFailure } from '@temporalio/common'
+import { TestWorkflowEnvironment } from '@temporalio/testing'
+import { Worker } from '@temporalio/worker'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import type * as activities from '../src/activities'
+import { placeOrder } from '../src/workflows'
+
+const ORDER = { id: 'order-1', sku: 'SKU-1', quantity: 2, amountCents: 4200 }   // the workflow's input, as src/workflows declares it
+
+let env: TestWorkflowEnvironment
+beforeAll(async () => { env = await TestWorkflowEnvironment.createTimeSkipping() })
+afterAll(async () => { await env?.teardown() })
+
+it('releases the stock when the payment is declined', async () => {
+  const mocks = {
+    reserveStock: vi.fn(async () => 'reservation-1'),
+    releaseStock: vi.fn(async () => {}),
+    charge: vi.fn(async () => { throw ApplicationFailure.nonRetryable('declined', 'PaymentDeclined') }),
+    bookShipping: vi.fn(async () => 'shipment-1'),
+  } satisfies typeof activities
+  const worker = await Worker.create({
+    connection: env.nativeConnection,
+    taskQueue: 'test',
+    workflowsPath: new URL('../src/workflows.ts', import.meta.url).pathname,
+    activities: mocks,
+  })
+  await expect(worker.runUntil(
+    env.client.workflow.execute(placeOrder, { args: [ORDER], workflowId: 'order-1', taskQueue: 'test' }),
+  )).rejects.toBeInstanceOf(WorkflowFailedError)
+  expect(mocks.releaseStock).toHaveBeenCalledWith('reservation-1')
+  expect(mocks.bookShipping).not.toHaveBeenCalled()
+})`,
+})
 
 const pack: PackSpec = {
   id: 'concern-communication-style',
   name: 'Communication style',
   group: 'architecture',
-  description: 'How the system\'s own parts talk to each other: synchronous calls, commands over queues, published events or streams; when to deviate from the default, how deep a chain of calls may go, how contracts between the parts are written and checked, and who coordinates a flow across parts. The snippets are TypeScript (Vitest, pact-js, Temporal\'s TypeScript SDK) with Spectral, Buf, oasdiff, Conftest and Prometheus; each tool line names the JVM or .NET equivalent.',
+  description: 'How the system\'s own parts talk to each other: synchronous calls, commands over queues, published events or streams; when to deviate from the default, how deep a chain of calls may go, how contracts between the parts are written and checked, and who coordinates a flow across parts. The snippets are TypeScript (Vitest, pact-js, Temporal\'s TypeScript SDK) with Spectral, Buf, oasdiff, Conftest and Prometheus; each tool line names the JVM equivalent.',
   tags: ['architecture', 'communication', 'rest', 'grpc', 'messaging', 'events', 'event-driven', 'streaming', 'choreography', 'orchestration', 'asyncapi'],
   concern: {
     id: 'communication-style',
@@ -54,11 +112,11 @@ const pack: PackSpec = {
     },
     {
       key: 'FLOWS', title: 'Multi-step flows', label: 'Who coordinates a business flow that spans several parts?',
-      hint: 'Placing an order may reserve stock, take payment and book shipping in three parts. Someone has to know the steps, and what to undo when one fails (all-or-nothing semantics are the Data consistency pack). Choreography is available only with published events or streams as the default.',
+      hint: 'Placing an order may reserve stock, take payment and book shipping in three parts. Someone has to know the steps, and what to undo when one fails (all-or-nothing semantics are the Data consistency pack). Choreography is available only with published events or streams as the default; with synchronous calls or commands it falls back to an orchestrator.',
       default: 'orchestration',
       options: [
         { value: 'orchestration', label: 'an orchestrator runs each flow', description: 'A workflow engine (Temporal, Camunda, AWS Step Functions) runs each flow as code or a model: it calls each part, keeps the state, retries and compensates. Pick it for flows with more than three steps, branches, timeouts or human tasks, or when someone must see where each instance is.' },
-        { value: 'choreography', label: 'parts react to each other\'s events', description: 'No coordinator: each part reacts to events of others and publishes its own. Pick it for short flows (up to three steps) where each reaction belongs to a different team; longer flows become hard to follow. Only with published events or event streams as the default: with synchronous calls or commands nothing is published to react to.' },
+        { value: 'choreography', label: 'parts react to each other\'s events', description: 'No coordinator: each part reacts to events of others and publishes its own. Pick it for short flows (up to three steps) where each reaction belongs to a different team; longer flows become hard to follow. Only with published events or event streams as the default: with synchronous calls or commands nothing is published to react to, and flows are orchestrated instead.' },
         { value: 'local', label: 'no flow spans parts', description: 'Every business operation completes inside one part and one local transaction; boundaries are drawn so that this holds. Pick it for a monolith or modular monolith, or services cut so that no operation needs two of them.' },
       ],
     },
@@ -81,7 +139,7 @@ const pack: PackSpec = {
   ],
   need: {
     label: 'Parts talk without failing together',
-    text: 'The system\'s parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json.',
+    text: 'The system\'s parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/.',
   },
   forces: FORCES,
   requirements: [
@@ -137,12 +195,8 @@ const pack: PackSpec = {
       rationale: 'Replay is what a stream offers over a queue: views can be rebuilt and new consumers added without asking the producers (Fowler, What do you mean by "Event-Driven"?, event sourcing and streams).',
       scenario: { label: 'View rebuilt by replay', given: 'a consumer whose view was lost', when: 'it is reset to the start of the log', then: 'it rebuilds the view from the retained events without any producer being involved' },
     },
-    {
-      id: 'req-orchestrated', label: 'Flows run in the orchestrator', when: { FLOWS: ['orchestration'] }, ears_type: 'ubiquitous',
-      action: 'run every business flow that spans more than one part as a workflow in the orchestrator, with each instance\'s current step and history visible, a compensation declared for every step that changes data, and the flow finished or compensated within {{FLOW_MINUTES}} minutes',
-      rationale: 'An orchestrator keeps the steps of a flow in one place and its state visible per instance (microservices.io, Saga: orchestration).',
-      scenario: { label: 'Failed step compensated', given: 'the place-order workflow with reserve stock, take payment and book shipping', when: 'the payment is declined', then: 'the workflow releases the stock, ends as failed, and its history shows each step' },
-    },
+    orchestratedRequirement('req-orchestrated', 'Flows run in the orchestrator', { FLOWS: ['orchestration'] }, ''),
+    orchestratedRequirement('req-orchestrated-fallback', 'Flows run in an orchestrator for want of events', ORCHESTRATED_FALLBACK, 'Choreography needs published events and this default publishes none, so the orchestrator takes the flows. '),
     {
       id: 'req-choreographed', label: 'Choreographed flows are traced', when: CHOREOGRAPHY, ears_type: 'unwanted-behaviour',
       unwanted_condition: 'a flow that spans parts has started and not reached its end event within {{FLOW_MINUTES}} minutes',
@@ -174,13 +228,13 @@ const pack: PackSpec = {
   adrs: [
     {
       id: 'adr-sync', label: 'Synchronous calls by default', when: { DEFAULT: ['sync'] },
-      decision: 'Parts talk by synchronous request and response by default: {{SYNC_API}}, with clients generated from the contracts. Every call carries the remaining deadline of the user\'s request (gRPC deadlines, or the X-Request-Deadline header the server honours, as an absolute Unix epoch in milliseconds); a user request spends at most {{CALL_BUDGET_MS}} ms in calls between parts and a chain is at most {{MAX_DEPTH}} calls deep. A command over a queue or an event is used instead, recorded as an exception, when the caller does not need the result to answer, the work takes longer than the budget, several parts react, or the callee may be down longer than the caller can wait. Flows across parts are orchestrated or stay local (their own decision; choreography needs published events). Contract checks: {{CONTRACTS}}.',
+      decision: 'Parts talk by synchronous request and response by default: {{SYNC_API}}, with clients generated from the contracts. Every call carries the remaining deadline of the user\'s request (gRPC deadlines, or the X-Request-Deadline header the server honours, as an absolute Unix epoch in milliseconds); a user request spends at most {{CALL_BUDGET_MS}} ms in calls between parts and a chain is at most {{MAX_DEPTH}} calls deep. A command over a queue or an event is used instead, recorded as an exception, when the caller does not need the result to answer, the work takes longer than the budget, several parts react, or the callee may be down longer than the caller can wait. Flows across parts are orchestrated or stay local, as the flows decision records; choreography needs published events, so with this default it falls back to the orchestrator. Contract checks: {{CONTRACTS}}.',
       consequences: '• Simplest to write, follow and debug: one request, one trace, an answer or an error.\n• The caller is only as available as everything it calls: availabilities multiply along a chain, hence the depth limit.\n• Overload spreads upstream unless deadlines and load shedding stop it.\n• Work that takes long or must survive a callee being down needs the recorded exceptions.',
       alternatives: '1. Commands over queues: callers do not wait, at the cost of answering later.\n2. Published events: no temporal coupling, at the cost of copies and eventual consistency.\n3. A service mesh to add retries and timeouts: helps, but does not remove the coupling of waiting.',
     },
     {
       id: 'adr-commands', label: 'Commands over queues by default', when: { DEFAULT: ['commands'] },
-      decision: 'A part that needs another to do something sends a command to that part\'s own queue (RabbitMQ or Azure Service Bus queues, Amazon SQS; one owning part per queue) and answers its own caller with the command\'s id; the receiver replies with an outcome message the sender correlates by id, within {{PROPAGATION_SECONDS}} seconds at the 99th percentile while it is up. Queries that need an answer now stay synchronous ({{SYNC_API}}), at most {{MAX_DEPTH}} calls deep, each carrying the remaining deadline and spending at most {{CALL_BUDGET_MS}} ms per user request. Messages are described in AsyncAPI; delivery guarantees, deduplication and dead-lettering follow the Messaging pack. Flows across parts are orchestrated or stay local (their own decision; choreography needs published events). Contract checks: {{CONTRACTS}}.',
+      decision: 'A part that needs another to do something sends a command to that part\'s own queue (RabbitMQ or Azure Service Bus queues, Amazon SQS; one owning part per queue) and answers its own caller with the command\'s id; the receiver replies with an outcome message the sender correlates by id, within {{PROPAGATION_SECONDS}} seconds at the 99th percentile while it is up. Queries that need an answer now stay synchronous ({{SYNC_API}}), at most {{MAX_DEPTH}} calls deep, each carrying the remaining deadline and spending at most {{CALL_BUDGET_MS}} ms per user request. Messages are described in AsyncAPI; delivery guarantees, deduplication and dead-lettering follow the Messaging pack. Flows across parts are orchestrated or stay local, as the flows decision records; choreography needs published events, so with this default it falls back to the orchestrator. Contract checks: {{CONTRACTS}}.',
       consequences: '• Senders keep working while a receiver is busy or down; bursts wait in the queue.\n• Users see an accepted state and the outcome later, so screens and APIs must show pending work.\n• Each queue has one owner, so who executes a command is never in doubt.\n• Following a request means following a correlation id across messages.',
       alternatives: '1. Synchronous calls: immediate answers, coupled availability.\n2. Published events: receivers decide what to do, no one is told to do anything.\n3. A shared job table polled by workers: no broker, but a database used as a queue.',
     },
@@ -208,12 +262,8 @@ const pack: PackSpec = {
       consequences: '• Binary, fast, with deadlines and streaming built into the protocol.\n• Browsers and scripts need gRPC-Web, Connect or a gateway; people cannot try the API with curl.\n• Field numbers are forever: a removed or retyped field is a break Buf refuses.',
       alternatives: '1. HTTP and JSON with OpenAPI: readable by people and browsers, slower per call.\n2. gRPC only where volume demands it, HTTP elsewhere: two client stacks to keep.',
     },
-    {
-      id: 'adr-orchestration', label: 'Flows run by an orchestrator', when: { FLOWS: ['orchestration'] },
-      decision: 'Every business flow across parts runs as a workflow in an orchestrator: Temporal for flows written as code, Camunda 8 where the flow is modelled in BPMN with business people, AWS Step Functions on AWS. The workflow calls each part\'s commands, keeps the state and history of each instance, retries steps with backoff, waits on timers and human tasks, and runs a declared compensation for every completed step that changed data when a later one fails (saga semantics as in the Data consistency pack). A flow finishes or is compensated within {{FLOW_MINUTES}} minutes. The workflow belongs to the part that owns the business outcome.',
-      consequences: '• Each flow is written in one place and each instance\'s state is visible and searchable.\n• Timeouts, retries and compensation come from the engine instead of hand-written state machines.\n• The orchestrator is a component to run (or pay for) and must be highly available.\n• The owning part knows every step: a change to a step means changing the workflow too.',
-      alternatives: '1. Choreography: no central component, but flows are visible only through tracing.\n2. Hand-written state machines in a database table: no engine, but timers, retries and history to build.\n3. Distributed transactions (two-phase commit): unsupported by most brokers and services, and blocking.',
-    },
+    orchestrationAdr('adr-orchestration', 'Flows run by an orchestrator', { FLOWS: ['orchestration'] }, ''),
+    orchestrationAdr('adr-orchestration-fallback', 'Flows run by an orchestrator, as nothing is published', ORCHESTRATED_FALLBACK, FALLBACK_SENTENCE),
     {
       id: 'adr-choreography', label: 'Flows by choreography', when: CHOREOGRAPHY,
       decision: 'Flows across parts are choreographed: each part reacts to the events of others and publishes its own, and no part coordinates the flow. Every flow is documented as an event chain (which part reacts to which event and what it publishes) in the AsyncAPI documents and a flow diagram in the model; every event carries the flow\'s correlation id. A process monitor subscribes to the start and end events of each flow and reports an instance not finished within {{FLOW_MINUTES}} minutes. A flow that grows past three steps or needs timeouts is moved to an orchestrator by a new ADR.',
@@ -242,8 +292,8 @@ const pack: PackSpec = {
   fitness: [
     {
       id: 'ff-depth', label: 'Call chains within depth', category: 'holistic', implements: DEFAULT_ADRS, checks: ['req-depth'],
-      threshold: '0 traces of the end-to-end journeys with more than {{MAX_DEPTH}} nested synchronous calls between parts',
-      description: 'The parts started for the end-to-end suite export their spans over OTLP to a Jaeger container; each journey is run with a traceparent header the test generates, the trace is fetched from Jaeger\'s query API by that id, and the test follows each span\'s parents counting nested HTTP and gRPC client spans (database calls are not counted). A new call that deepens a chain fails the test. The helper test/e2e/traces.ts is shared with the other trace-based checks of this pack.',
+      threshold: '0 traces of the end-to-end journeys with more than {{MAX_DEPTH}} nested synchronous calls between parts, and 0 in which a part is reached again through its own calls',
+      description: 'The parts started for the end-to-end suite export their spans over OTLP to a Jaeger container; each journey is run with a traceparent header the test generates, the trace is fetched from Jaeger\'s query API by that id, and the test follows each span\'s parents counting nested HTTP and gRPC client spans that another part continues with a server span (database calls and calls to systems outside are not counted), and fails when one part serves twice in a line of nested calls (a cycle). The HTTP method is read under the stable name http.request.method and the old http.method, so SDKs on either semantic convention are counted. A new call that deepens a chain fails the test. The helper test/e2e/traces.ts is shared with the other trace-based checks of this pack.',
       tool: 'Vitest with Jaeger (jaegertracing/jaeger, OTLP in on 4318, query API on 16686; the /api/traces endpoint is Jaeger\'s internal JSON API); for the JVM: the same test with JUnit 5 and RestClient',
       language: 'ts',
       snippet: `// test/e2e/traces.ts — the parts export spans over OTLP to the Jaeger container started for the suite
@@ -267,36 +317,49 @@ export async function trace(traceId: string): Promise<Span[]> {
   throw new Error(\`trace \${traceId} did not settle\`)
 }
 
-const toSpans = (trace: any): Span[] => trace.spans.map((s: any) => {
-  const tag = (key: string) => s.tags.find((t: any) => t.key === key)?.value
-  const kind = tag('span.kind')
-  return {
-    id: s.spanID,
-    parent: s.references.find((r: any) => r.refType === 'CHILD_OF')?.spanID,
-    service: trace.processes[s.processID].serviceName,
-    kind,
-    method: tag('http.request.method'),
-    durationMs: s.duration / 1000,
-    rpc: kind === 'client' && (tag('http.request.method') !== undefined || tag('rpc.system') !== undefined),
-  }
-})
+// A call between parts is an HTTP or gRPC client span that a server span of another part continues;
+// a call to a system outside has no server span in the trace and is not counted. The HTTP method is
+// read under the stable semantic-convention name and the old one (SDKs still emitting http.method).
+const toSpans = (trace: any): Span[] => {
+  const spans = trace.spans.map((s: any) => {
+    const tag = (key: string) => s.tags.find((t: any) => t.key === key)?.value
+    const method = tag('http.request.method') ?? tag('http.method')
+    return {
+      id: s.spanID,
+      parent: s.references.find((r: any) => r.refType === 'CHILD_OF')?.spanID,
+      service: trace.processes[s.processID].serviceName,
+      kind: tag('span.kind'),
+      method,
+      durationMs: s.duration / 1000,
+      rpc: tag('span.kind') === 'client' && (method !== undefined || tag('rpc.system') !== undefined),
+    }
+  })
+  return spans.map((s: Span) => ({ ...s, rpc: s.rpc && spans.some((x: Span) => x.kind === 'server' && x.parent === s.id) }))
+}
 
 // test/e2e/depth.test.ts
 import { expect, it } from 'vitest'
 import { journeys } from './journeys'   // the journeys of the suite; each takes the headers to send with its first request
 import { newTraceId, trace, traceparent, type Span } from './traces'
 
-const depth = (spans: Span[], s: Span): number => {
-  let d = 0
-  for (let p: Span | undefined = s; p; p = spans.find((x) => x.id === p!.parent)) if (p.rpc) d++
-  return d
+const ancestry = (spans: Span[], s: Span): Span[] => {
+  const line: Span[] = []
+  for (let p: Span | undefined = s; p; p = spans.find((x) => x.id === p!.parent)) line.push(p)
+  return line
+}
+const depth = (spans: Span[], s: Span) => ancestry(spans, s).filter((p) => p.rpc).length
+// a part reached again through its own calls: its service serves twice in one line of server spans
+const cycle = (spans: Span[], s: Span) => {
+  const served = ancestry(spans, s).filter((p) => p.kind === 'server').map((p) => p.service)
+  return new Set(served).size < served.length
 }
 
-it.each(journeys)('$name goes at most {{MAX_DEPTH}} calls deep', async (journey) => {
+it.each(journeys)('$name goes at most {{MAX_DEPTH}} calls deep, without cycles', async (journey) => {
   const traceId = newTraceId()
   await journey.run({ traceparent: traceparent(traceId) })   // the parts continue the trace
   const spans = await trace(traceId)
   expect(Math.max(0, ...spans.map((s) => depth(spans, s)))).toBeLessThanOrEqual({{MAX_DEPTH}})
+  expect(spans.filter((s) => cycle(spans, s)).map((s) => s.service)).toEqual([])
 })`,
     },
     {
@@ -325,9 +388,9 @@ it('a request spends at most {{CALL_BUDGET_MS}} ms in calls between parts (p99 o
 }, 600_000)`,
     },
     {
-      id: 'ff-deadline', label: 'Expired deadline stops the call', category: 'structural', implements: DEFAULT_ADRS, checks: ['req-deadline'],
+      id: 'ff-deadline', label: 'Expired deadline stops the call', when: { SYNC_API: ['rest'] }, category: 'structural', implements: ['adr-rest'], checks: ['req-deadline'],
       threshold: 'A request whose deadline passes during a call to another part is answered with 504 within {{CALL_BUDGET_MS}} ms and the called part is not called again',
-      description: 'A test starts a stand-in for the called part that answers after 500 ms, points the part under test at it, sends a request whose X-Request-Deadline is 50 ms away and expects a 504 well within the budget and a single downstream call. For gRPC the deadline is the protocol\'s own and the stand-in is a slow gRPC server.',
+      description: 'A test starts a stand-in for the called part that answers after 500 ms, points the part under test at it, sends a request whose X-Request-Deadline is 50 ms away and expects a 504 well within the budget and a single downstream call.',
       tool: 'Vitest with a Node http server as the slow part; for the JVM: the same test with JUnit 5 and WireMock\'s fixed delay',
       language: 'ts',
       snippet: `import http from 'node:http'
@@ -351,6 +414,50 @@ it('gives up when the deadline has passed', async () => {
 })`,
     },
     {
+      id: 'ff-deadline-grpc', label: 'Expired gRPC deadline stops the call', when: { SYNC_API: ['grpc'] }, category: 'structural', implements: ['adr-grpc'], checks: ['req-deadline'],
+      threshold: 'A call whose deadline is 50 ms away ends with DEADLINE_EXCEEDED within {{CALL_BUDGET_MS}} ms, the called part receives the same deadline, and it is called once',
+      description: 'A test starts a stand-in for the called part as a gRPC server that answers after 500 ms, points the part under test at it, calls the part under test with a deadline 50 ms away and expects DEADLINE_EXCEEDED within the budget. The stand-in records the deadline it was given: it must be set and no later than the caller\'s (the part passed it on rather than starting a fresh one), and it is called once (no retry past the deadline). Both sides use pass-through serializers with empty messages, so no generated code is needed; an empty message is a valid Protocol Buffers message whose fields all hold their defaults.',
+      tool: 'Vitest with @grpc/grpc-js; for the JVM: the same test with JUnit 5, grpc-java\'s in-process server and Context.current().getDeadline()',
+      language: 'ts',
+      snippet: `import * as grpc from '@grpc/grpc-js'
+import { afterAll, beforeAll, expect, it } from 'vitest'
+
+// a stand-in for the part called downstream, answering after 500 ms;
+// the part under test is started with DOWNSTREAM_GRPC=localhost:18082 and served at PART_GRPC
+const raw = { serialize: (b: Buffer) => b, deserialize: (b: Buffer) => b }
+const method = (path: string) => ({ path, requestStream: false, responseStream: false, requestSerialize: raw.serialize, requestDeserialize: raw.deserialize, responseSerialize: raw.serialize, responseDeserialize: raw.deserialize })
+
+const seen: Array<number> = []   // the deadline of each downstream call, in epoch milliseconds
+const slow = new grpc.Server()
+slow.addService({ GetStock: method('/inventory.v1.InventoryService/GetStock') }, {
+  GetStock: (call: grpc.ServerUnaryCall<Buffer, Buffer>, done: grpc.sendUnaryData<Buffer>) => {
+    const d = call.getDeadline()
+    seen.push(d instanceof Date ? d.getTime() : d)   // Infinity when the caller set none
+    setTimeout(() => done(null, Buffer.alloc(0)), 500)
+  },
+})
+beforeAll(() => new Promise<void>((resolve, reject) =>
+  slow.bindAsync('localhost:18082', grpc.ServerCredentials.createInsecure(), (err) => (err ? reject(err) : resolve())),
+))
+afterAll(() => slow.forceShutdown())
+
+it('gives up when the deadline has passed and passes the deadline on', async () => {
+  const client = new grpc.Client(process.env.PART_GRPC!, grpc.credentials.createInsecure())
+  const started = Date.now()
+  const deadline = started + 50
+  const code = await new Promise<grpc.status>((resolve) => client.makeUnaryRequest(
+    '/ordering.v1.OrderingService/GetOrderStatus', raw.serialize, raw.deserialize, Buffer.alloc(0),
+    new grpc.Metadata(), { deadline }, (err) => resolve(err ? err.code : grpc.status.OK),
+  ))
+  expect(code).toBe(grpc.status.DEADLINE_EXCEEDED)
+  expect(Date.now() - started).toBeLessThan({{CALL_BUDGET_MS}})
+  await new Promise((r) => setTimeout(r, 600))   // room for a retry, which must not come
+  expect(seen).toHaveLength(1)
+  expect(seen[0]).toBeLessThanOrEqual(deadline + 20)   // the caller's deadline, give or take the clock's rounding
+  client.close()
+})`,
+    },
+    {
       id: 'ff-command-reply', label: 'Commands accepted and answered', when: { DEFAULT: ['commands'] }, category: 'structural', implements: ['adr-commands'], checks: ['req-commands'],
       threshold: 'A command\'s outcome reply arrives within {{PROPAGATION_SECONDS}} seconds while the receiver is up; a command sent while the receiver is down is answered within {{PROPAGATION_SECONDS}} seconds of its restart',
       description: 'An integration test starts RabbitMQ in a container and the receiving part against it, sends a command to the receiver\'s queue and waits for the correlated reply on the sender\'s reply queue; a second test stops the receiver, sends, restarts it and expects the reply.',
@@ -359,7 +466,7 @@ it('gives up when the deadline has passed', async () => {
       snippet: `import { randomUUID } from 'node:crypto'
 import amqp from 'amqplib'
 import { RabbitMQContainer, type StartedRabbitMQContainer } from '@testcontainers/rabbitmq'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, it } from 'vitest'
 import { startInventory, type RunningPart } from './parts'   // starts the receiving part against the broker
 
 let rabbit: StartedRabbitMQContainer
@@ -397,15 +504,14 @@ it('answers a command sent while the receiver was down, once it is back', async 
   const id = randomUUID()
   await send(id)
   inventory = await startInventory({ AMQP_URL: rabbit.getAmqpUrl() })
-  await replyTo(id, {{PROPAGATION_SECONDS}} * 1000)
-  expect(inventory.running).toBe(true)
+  await replyTo(id, {{PROPAGATION_SECONDS}} * 1000)   // rejects when no reply comes in time
 })`,
     },
     {
       id: 'ff-asyncapi', label: 'Message contracts valid', when: PUBLISHED, category: 'structural', implements: ['adr-events', 'adr-streams'], checks: ['req-contracts'],
       threshold: '0 AsyncAPI validation errors, 0 Spectral warnings, and every topic declared for the broker described in an AsyncAPI document',
-      description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the topics declared as Strimzi KafkaTopic manifests; a topic no document describes fails the job.',
-      tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq in GitHub Actions; for a managed Kafka declared in Terraform: the same comparison over terraform show -json',
+      description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the topics declared for the broker: Strimzi KafkaTopic manifests under platform/kafka/topics, and the topics of a managed broker (aws_sns_topic, google_pubsub_topic, azurerm_servicebus_topic, confluent_kafka_topic) read from the Terraform state under infra/ with the job\'s read access to it. A topic no document describes fails the job, and so does finding no topic at all.',
+      tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions',
       language: 'yaml',
       snippet: `# .github/workflows/contracts.yml   (.spectral-asyncapi.yaml holds: extends: ["spectral:asyncapi"])
 jobs:
@@ -416,18 +522,31 @@ jobs:
       - run: |
           for doc in services/*/asyncapi.yaml; do npx -y @asyncapi/cli validate "$doc"; done
       - run: npx -y @stoplight/spectral-cli lint "services/*/asyncapi.yaml" --ruleset .spectral-asyncapi.yaml --fail-severity warn
+      - uses: hashicorp/setup-terraform@v3.1.2   # pin by commit SHA in your repository
       - run: |
           # every topic declared for the broker is described in some AsyncAPI document
+          shopt -s nullglob
           yq '.channels[].address' services/*/asyncapi.yaml | sort -u > described.txt
-          yq '.spec.topicName // .metadata.name' platform/kafka/topics/*.yaml | sort -u > used.txt
+          manifests=(platform/kafka/topics/*.yaml)   # Strimzi KafkaTopic manifests
+          if [ \${#manifests[@]} -gt 0 ]; then yq '.spec.topicName // .metadata.name' "\${manifests[@]}"; fi > used.txt
+          if [ -d infra ]; then                       # topics of a managed broker, from the Terraform state
+            terraform -chdir=infra init -input=false > /dev/null
+            terraform -chdir=infra show -json | jq -r '
+              def modules: ., (.child_modules[]? | modules);
+              .values.root_module | modules | .resources[]?
+              | select(.type | IN("aws_sns_topic", "google_pubsub_topic", "azurerm_servicebus_topic", "confluent_kafka_topic"))
+              | .values.name // .values.topic_name' >> used.txt
+          fi
+          sort -u -o used.txt used.txt
+          [ -s used.txt ] || { echo "no topics found in platform/kafka/topics or infra/"; exit 1; }
           comm -23 used.txt described.txt | tee undescribed.txt
           [ ! -s undescribed.txt ]`,
     },
     {
       id: 'ff-asyncapi-queues', label: 'Command contracts valid', when: { DEFAULT: ['commands'] }, category: 'structural', implements: ['adr-commands'], checks: ['req-contracts'],
       threshold: '0 AsyncAPI validation errors, 0 Spectral warnings, and every queue declared for the broker described in an AsyncAPI document',
-      description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the queues in the RabbitMQ definitions file the broker is loaded with; a queue no document describes fails the job.',
-      tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq and jq in GitHub Actions; for Azure Service Bus or SQS declared in Terraform: the same comparison over terraform show -json',
+      description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the queues declared for the broker: the RabbitMQ definitions file the broker is loaded with, and the queues of a managed broker (aws_sqs_queue, azurerm_servicebus_queue) read from the Terraform state under infra/. A queue no document describes fails the job, and so does finding no queue at all.',
+      tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions',
       language: 'yaml',
       snippet: `# .github/workflows/contracts.yml   (.spectral-asyncapi.yaml holds: extends: ["spectral:asyncapi"])
 jobs:
@@ -438,10 +557,21 @@ jobs:
       - run: |
           for doc in services/*/asyncapi.yaml; do npx -y @asyncapi/cli validate "$doc"; done
       - run: npx -y @stoplight/spectral-cli lint "services/*/asyncapi.yaml" --ruleset .spectral-asyncapi.yaml --fail-severity warn
+      - uses: hashicorp/setup-terraform@v3.1.2   # pin by commit SHA in your repository
       - run: |
-          # every queue in the broker's definitions is described in some AsyncAPI document
+          # every queue declared for the broker is described in some AsyncAPI document
           yq '.channels[].address' services/*/asyncapi.yaml | sort -u > described.txt
-          jq -r '.queues[].name' platform/rabbitmq/definitions.json | sort -u > used.txt
+          defs=platform/rabbitmq/definitions.json
+          if [ -f "$defs" ]; then jq -r '.queues[].name' "$defs"; fi > used.txt
+          if [ -d infra ]; then                       # queues of a managed broker, from the Terraform state
+            terraform -chdir=infra init -input=false > /dev/null
+            terraform -chdir=infra show -json | jq -r '
+              def modules: ., (.child_modules[]? | modules);
+              .values.root_module | modules | .resources[]?
+              | select(.type | IN("aws_sqs_queue", "azurerm_servicebus_queue")) | .values.name' >> used.txt
+          fi
+          sort -u -o used.txt used.txt
+          [ -s used.txt ] || { echo "no queues found in $defs or infra/"; exit 1; }
           comm -23 used.txt described.txt | tee undescribed.txt
           [ ! -s undescribed.txt ]`,
     },
@@ -585,44 +715,8 @@ it('honours every consumer\\'s pact', () =>
 //   npx --package=@pact-foundation/pact-cli pact-broker record-deployment --pacticipant ordering --version "$GIT_SHA" \\
 //     --environment production --broker-base-url "$PACT_BROKER_URL" --broker-token "$PACT_BROKER_TOKEN"`,
     },
-    {
-      id: 'ff-workflow', label: 'Workflows compensate', when: { FLOWS: ['orchestration'] }, category: 'structural', implements: ['adr-orchestration'], checks: ['req-orchestrated'],
-      threshold: 'Every workflow has a test in which each step that changes data fails once and the earlier steps are compensated',
-      description: 'Workflow tests run in Temporal\'s time-skipping test environment with the activities mocked; for each step the test makes it fail with a non-retryable failure and verifies the compensations of the earlier steps ran.',
-      tool: 'Temporal TypeScript SDK (@temporalio/testing) with Vitest; for the JVM: Temporal\'s TestWorkflowExtension with JUnit 5',
-      language: 'ts',
-      snippet: `import { WorkflowFailedError } from '@temporalio/client'
-import { ApplicationFailure } from '@temporalio/common'
-import { TestWorkflowEnvironment } from '@temporalio/testing'
-import { Worker } from '@temporalio/worker'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import type * as activities from '../src/activities'
-import { placeOrder } from '../src/workflows'
-
-let env: TestWorkflowEnvironment
-beforeAll(async () => { env = await TestWorkflowEnvironment.createTimeSkipping() })
-afterAll(async () => { await env?.teardown() })
-
-it('releases the stock when the payment is declined', async () => {
-  const mocks = {
-    reserveStock: vi.fn(async () => 'reservation-1'),
-    releaseStock: vi.fn(async () => {}),
-    charge: vi.fn(async () => { throw ApplicationFailure.nonRetryable('declined', 'PaymentDeclined') }),
-    bookShipping: vi.fn(async () => 'shipment-1'),
-  } satisfies typeof activities
-  const worker = await Worker.create({
-    connection: env.nativeConnection,
-    taskQueue: 'test',
-    workflowsPath: new URL('../src/workflows.ts', import.meta.url).pathname,
-    activities: mocks,
-  })
-  await expect(worker.runUntil(
-    env.client.workflow.execute(placeOrder, { args: [ORDER], workflowId: 'order-1', taskQueue: 'test' }),
-  )).rejects.toBeInstanceOf(WorkflowFailedError)
-  expect(mocks.releaseStock).toHaveBeenCalledWith('reservation-1')
-  expect(mocks.bookShipping).not.toHaveBeenCalled()
-})`,
-    },
+    workflowCheck('ff-workflow', { FLOWS: ['orchestration'] }, 'adr-orchestration', 'req-orchestrated'),
+    workflowCheck('ff-workflow-fallback', ORCHESTRATED_FALLBACK, 'adr-orchestration-fallback', 'req-orchestrated-fallback'),
     {
       id: 'ff-stuck-flows', label: 'Stuck flows alerted', when: CHOREOGRAPHY, category: 'operational', implements: ['adr-choreography'], checks: ['req-choreographed'],
       threshold: '0 flow instances open longer than {{FLOW_MINUTES}} minutes without an alert',

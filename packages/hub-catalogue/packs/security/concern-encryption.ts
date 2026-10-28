@@ -1,6 +1,6 @@
 import type { PackSpec } from '../../src/packSpec'
 
-const FORCES = 'Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and "inside our network" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.'
+const FORCES = 'Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and "inside our network" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and Istio manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, certificates issued by hand in cert-inventory.txt, and the application under src/ with its tests under tests/. The cloud snippets (Config rules, key policy, key rotation and age, private network) are for AWS; each tool line names the Azure and Google equivalent.'
 const TRANSIT = ['adr-mtls', 'adr-internal-tls', 'adr-private']
 const REST = ['adr-provider-keys', 'adr-cmk', 'adr-field']
 const OWN_KEYS = { AT_REST: ['cmk', 'field'] }
@@ -30,7 +30,7 @@ const pack: PackSpec = {
   questions: [
     {
       key: 'TLS', title: 'TLS from outside', label: 'Which TLS versions do outside callers get?',
-      hint: 'Every version and cipher suite you accept is one an attacker may downgrade to; every one you drop is a client that stops working.',
+      hint: 'Every version and cipher suite you accept is one an attacker may downgrade to; every one you drop is a client that stops working. This question and the certificate one are about the endpoints outside callers reach: when the pack lands on a database or queue, answer them for the public edge of the system that holds it.',
       default: 'intermediate',
       options: [
         { value: 'modern', label: 'TLS 1.3', description: 'Mozilla\'s "modern" profile, nothing older offered: no legacy suites to misconfigure, forward secrecy always. Pick it when every client is a current browser, mobile app or SDK (Android 10+, iOS 12.2+, Java 11+, OpenSSL 1.1.1+).' },
@@ -42,14 +42,14 @@ const pack: PackSpec = {
       hint: 'TLS that ends at the load balancer leaves everything behind it in clear text; whether that is acceptable depends on who else can see that network.',
       default: 'mtls',
       options: [
-        { value: 'mtls', label: 'mutual TLS in a service mesh', description: 'Istio, Linkerd or Cilium give every workload a certificate and encrypt and authenticate every hop, with no change to the code. Pick it on Kubernetes with many services, or when zero trust inside the cluster is required.' },
+        { value: 'mtls', label: 'mutual TLS in an Istio service mesh', description: 'Istio gives every workload a certificate and encrypts and authenticates every hop, with no change to the code. Pick it on Kubernetes with many services, or when zero trust inside the cluster is required. The checks are written for Istio; Linkerd does the same with other resources, so with it the checks are rewritten.' },
         { value: 'tls', label: 'TLS on every connection, server certificates only', description: 'The load balancer re-encrypts to the element; the element connects to databases and queues with TLS and verifies their certificates. Pick it without a mesh, or for a handful of elements; callers are not authenticated by the connection.' },
         { value: 'private', label: 'clear text inside a private network', description: 'TLS ends at the edge; traffic inside stays on a private network the cloud provider encrypts at the physical layer. Pick it only for a single VPC or VNet with no peering, no shared tenants, and no card or health data.' },
       ],
     },
     {
       key: 'AT_REST', title: 'Keys at rest', label: 'Who holds the keys for stored data?',
-      hint: 'Disk encryption with the provider\'s keys stops a stolen disk; it does not stop anyone who can query the database or call the storage API.',
+      hint: 'Disk encryption with the provider\'s keys stops a stolen disk; it does not stop anyone who can query the database or call the storage API. Answered for the stores themselves: on a database or queue for that store, on an application for the stores it writes to.',
       default: 'cmk',
       options: [
         { value: 'provider', label: 'provider-managed keys', description: 'The default encryption of the managed database, object store and disks, with keys the provider creates and rotates. Pick it when no regulation or contract asks you to control the keys and the data is not highly sensitive; the rotation question is then the provider\'s.' },
@@ -63,12 +63,12 @@ const pack: PackSpec = {
       default: 'automatic',
       options: [
         { value: 'automatic', label: 'automatic rotation of the key material', description: 'The KMS creates new key material on schedule and keeps old versions for decryption only (AWS KMS automatic rotation, Key Vault rotation policy, Cloud KMS rotation period). Pick it unless a standard requires re-encryption; data stays as it is.' },
-        { value: 'reencrypt', label: 'new keys with re-encryption of data', description: 'A new key is created, data (or its data keys) is re-encrypted, and the old key is disabled. Pick it when a standard or contract sets a cryptoperiod for the data itself (PCI DSS 3.6, some government work), or after a suspected key compromise.' },
+        { value: 'reencrypt', label: 'new keys with re-encryption of data', description: 'A new key is created, data (or its data keys) is re-encrypted, and the old key is disabled. Pick it when a standard or contract sets a cryptoperiod for the data itself (PCI DSS 3.6, some government work). A suspected compromise is handled this way under either answer.' },
       ],
     },
     {
       key: 'CERTS', title: 'Certificates', label: 'How are TLS certificates issued and renewed?',
-      hint: 'Expired certificates are one of the most common causes of outages; the cure is renewal nobody has to remember.',
+      hint: 'Expired certificates are one of the most common causes of outages; the cure is renewal nobody has to remember. About the certificates of the endpoints outside callers reach, as the TLS question.',
       default: 'acme',
       options: [
         { value: 'acme', label: 'automatically, with ACME or the cloud\'s certificate manager', description: 'Let\'s Encrypt through cert-manager or Caddy, or AWS Certificate Manager, Azure or Google managed certificates, renewed by software. Pick it for public endpoints and anything the platform can terminate.' },
@@ -159,10 +159,10 @@ const pack: PackSpec = {
       scenario: { label: 'Old key disabled', given: 'data encrypted under a key {{KEY_ROTATE_DAYS}} days old', when: 'the rotation runs', then: 'within 30 days every record decrypts under the new key and the old key is disabled' },
     },
     {
-      id: 'req-key-compromise', label: 'Compromised key replaced fast', when: { AT_REST: ['cmk', 'field'], ROTATION: ['reencrypt'] }, ears_type: 'event-driven',
+      id: 'req-key-compromise', label: 'Compromised key replaced fast', when: OWN_KEYS, ears_type: 'event-driven',
       trigger: 'an encryption key is suspected to be compromised',
       action: 'create a new key, re-encrypt the data or its data keys under it within 72 hours, and disable the old key',
-      rationale: 'A key that may be known to someone else protects nothing; the drill is what makes 72 hours real (NIST SP 800-57 Pt 1, 5.3; PCI DSS v4.0.1 3.7.5).',
+      rationale: 'A key that may be known to someone else protects nothing, and automatic rotation does not help: the old material stays usable for decryption. The drill is what makes 72 hours real (NIST SP 800-57 Pt 1, 5.3; PCI DSS v4.0.1 3.7.5).',
       scenario: { label: 'Compromise drill', given: 'a key declared compromised in a drill', when: 'the re-encryption runbook is followed', then: 'within 72 hours every record decrypts under the new key and the old key is disabled, and the time taken is recorded' },
       unchecked: 'a key-compromise drill the security owner runs twice a year on a copy of production data, timed against the 72 hours; no tool can run it.',
     },
@@ -184,9 +184,9 @@ const pack: PackSpec = {
   adrs: [
     {
       id: 'adr-mtls', label: 'Mutual TLS in a service mesh', when: { INTERNAL: ['mtls'] },
-      decision: 'Outside callers get {{TLS}} at the edge (Mozilla profile, HSTS); certificates are issued {{CERTS}}. Between our own elements, a service mesh in strict mode encrypts and authenticates every hop with mutual TLS and certificates that expire within 24 hours; databases and managed queues outside the mesh are reached with TLS and certificate verification. Choosing the mesh: Linkerd for the least to run and automatic mTLS by default; Istio when you also need fine-grained traffic and authorisation policies; Cilium when it already runs as the network plugin. Judge by the operational load, the sidecar or sidecar-less model and the certificate authority it can chain to.',
+      decision: 'Outside callers get {{TLS}} at the edge (Mozilla profile, HSTS); certificates are issued {{CERTS}}. Between our own elements, an Istio service mesh with a mesh-wide PeerAuthentication in STRICT mode encrypts and authenticates every hop with mutual TLS and workload certificates that expire within 24 hours (Istio\'s default lifetime); databases and managed queues outside the mesh are reached with TLS and certificate verification. Istio runs with sidecars, or in ambient mode when the sidecars\' cost matters; its CA can chain to the company\'s PKI through a plugged-in intermediate.',
       consequences: '• Every hop is encrypted and authenticated without changes to the code.\n• Callers inside get identities that authorisation policies can use.\n• The mesh is on every request\'s path: its upgrades and its CA are now critical.\n• Traffic to managed services outside the mesh still needs its own TLS settings.\n• Where TLS 1.2 is still offered to outside callers, whether it can be dropped is reviewed once a year.',
-      alternatives: '1. TLS on every connection, configured per element: no mesh to run, but no caller identity and more places to get wrong.\n2. Clear text inside a private network: simplest, and safe only while the network is ours alone.',
+      alternatives: '1. Linkerd: the least to run, mutual TLS on by default; its policy resources differ (Server, default inbound policy all-authenticated), so the checks would be rewritten for it.\n2. Cilium mutual authentication with WireGuard encryption: no sidecars where Cilium already runs as the network plugin, with a different identity model to check.\n3. TLS on every connection, configured per element: no mesh to run, but no caller identity and more places to get wrong.\n4. Clear text inside a private network: simplest, and safe only while the network is ours alone.',
     },
     {
       id: 'adr-internal-tls', label: 'TLS on every connection', when: { INTERNAL: ['tls'] },
@@ -208,13 +208,13 @@ const pack: PackSpec = {
     },
     {
       id: 'adr-cmk', label: 'Customer-managed keys at rest', when: { AT_REST: ['cmk'] },
-      decision: 'Stored data is encrypted with AES-256 under customer-managed keys in the cloud\'s KMS (AWS KMS, Azure Key Vault or Managed HSM, Google Cloud KMS), one key per element and environment, with a key policy that lets only the element\'s identity use it and only key administrators manage it, the two sets of principals disjoint and the administrators\' actions listed rather than kms:*; every use is logged by the provider\'s audit trail. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Choose an HSM-backed tier (CloudHSM, Managed HSM, Cloud HSM) when a standard requires FIPS 140-3 level 3, and an external key store only when a contract requires the keys outside the provider.',
-      consequences: '• We decide and can prove who may decrypt, and can disable a key to make data unreadable.\n• A deleted or disabled key makes data unrecoverable: deletion has a waiting period and needs two people.\n• KMS calls cost money and add latency on every data key fetch; caching data keys keeps it small.',
+      decision: 'Stored data is encrypted with AES-256 under customer-managed keys in the cloud\'s KMS (AWS KMS, Azure Key Vault or Managed HSM, Google Cloud KMS), one key per element and environment, with a key policy that lets only the element\'s identity use it and only key administrators manage it, the two sets of principals disjoint and the administrators\' actions listed rather than kms:*; every use is logged by the provider\'s audit trail. On AWS the policy keeps the statement AWS documents for every key, which gives the account root kms:* so that the key can never become unmanageable; it lets IAM policies in the account grant use of the key, so those are reviewed with the key policy, and the key-policy check exempts that one principal. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. A key suspected compromised is replaced whatever the rotation: a new key, the data or its data keys re-encrypted under it within 72 hours, the old key disabled. Choose an HSM-backed tier (CloudHSM, Managed HSM, Cloud HSM) when a standard requires FIPS 140-3 level 3, and an external key store only when a contract requires the keys outside the provider.',
+      consequences: '• We decide and can prove who may decrypt, and can disable a key to make data unreadable.\n• On AWS the account-root statement means an IAM policy in the account can grant use of the key: the key policy alone does not prove who may decrypt.\n• A deleted or disabled key makes data unrecoverable: deletion has a waiting period and needs two people.\n• KMS calls cost money and add latency on every data key fetch; caching data keys keeps it small.',
       alternatives: '1. Provider-managed keys: no work, no control.\n2. Application-level field encryption on top: protects the most sensitive fields from anyone who can query the database.',
     },
     {
       id: 'adr-field', label: 'Sensitive fields encrypted by the application', when: { AT_REST: ['field'] },
-      decision: 'The application encrypts {{SENSITIVE_FIELDS}} before writing them, with envelope encryption: AES-256-GCM data keys per record or tenant, wrapped by a customer-managed key in the KMS. Everything else is encrypted at rest under customer-managed keys, one key per element and environment, with a key policy that lets only the element\'s identity use it and only key administrators manage it, the two sets disjoint; every use is logged by the provider\'s audit trail. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Library: Google Tink or the AWS Encryption SDK in the element, or HashiCorp Vault Transit when several languages must share the keys; never cryptography written by hand. Fields that must be searched get a separate keyed hash (HMAC-SHA-256) for exact matches.',
+      decision: 'The application encrypts {{SENSITIVE_FIELDS}} before writing them, with envelope encryption: AES-256-GCM data keys per record or tenant, wrapped by a customer-managed key in the KMS. Everything else is encrypted at rest under customer-managed keys, one key per element and environment, with a key policy that lets only the element\'s identity use it and only key administrators manage it, the two sets disjoint (on AWS apart from the account-root statement AWS documents for every key, which keeps the key manageable and lets IAM policies grant use, so those are reviewed with it); every use is logged by the provider\'s audit trail. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. A key suspected compromised is replaced whatever the rotation: a new key, the data keys re-encrypted under it within 72 hours, the old key disabled. Library: Google Tink or the AWS Encryption SDK in the element, or HashiCorp Vault Transit when several languages must share the keys; never cryptography written by hand. Fields that must be searched get a separate keyed hash (HMAC-SHA-256) for exact matches.',
       consequences: '• Database administrators, backups, replicas and SQL injection see only ciphertext for those fields.\n• Those fields cannot be sorted, range-queried or full-text searched in the database.\n• Migrations and analytics must go through the application or the KMS to read them.\n• Losing the KMS key loses those fields, even in backups.',
       alternatives: '1. Customer-managed keys at rest only: transparent to the application, but visible to anyone who can query.\n2. Tokenisation by a vault service (for cards, a PCI provider): takes the data out of scope entirely, adds a dependency.\n3. Database column encryption (Always Encrypted, pgcrypto): less code, but keys or plaintext pass through the database.',
     },
@@ -229,7 +229,9 @@ const pack: PackSpec = {
       snippet: `#!/usr/bin/env bash
 set -euo pipefail
 while read -r endpoint; do
-  docker run --rm -v "$PWD":/out drwetter/testssl.sh:3.2 --quiet --warnings off --jsonfile "/out/$endpoint.json" "$endpoint"
+  # testssl.sh exits non-zero on ambiguous results too, so the JSON decides; --ip one: one entry per check, not one per address
+  docker run --rm -v "$PWD":/out drwetter/testssl.sh:3.2 --quiet --warnings off --ip one --jsonfile "/out/$endpoint.json" "$endpoint" || true
+  [ -s "$endpoint.json" ] || { echo "$endpoint: scan produced no result"; exit 1; }
   jq -e '
     ([.[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length == 0)
     and ([.[] | select(.id == "TLS1_3")] | length == 1 and all(.finding | startswith("offered")))
@@ -251,7 +253,9 @@ done < endpoints.txt`,
       snippet: `#!/usr/bin/env bash
 set -euo pipefail
 while read -r endpoint; do
-  docker run --rm -v "$PWD":/out drwetter/testssl.sh:3.2 --quiet --warnings off --jsonfile "/out/$endpoint.json" "$endpoint"
+  # testssl.sh exits non-zero on ambiguous results too, so the JSON decides; --ip one: one entry per check, not one per address
+  docker run --rm -v "$PWD":/out drwetter/testssl.sh:3.2 --quiet --warnings off --ip one --jsonfile "/out/$endpoint.json" "$endpoint" || true
+  [ -s "$endpoint.json" ] || { echo "$endpoint: scan produced no result"; exit 1; }
   jq -e '
     ([.[] | select(.severity == "HIGH" or .severity == "CRITICAL")] | length == 0)
     and ([.[] | select(.id | IN("TLS1_2", "TLS1_3"))] | length == 2 and all(.finding | startswith("offered")))
@@ -306,6 +310,29 @@ deny contains msg if {
   not setting.mode == "STRICT"
   msg := sprintf("%s/%s turns off mutual TLS on port %v", [p.metadata.namespace, p.metadata.name, port])
 }`,
+    },
+    {
+      id: 'ff-mesh-cert-ttl', label: 'Mesh certificates short-lived', when: { INTERNAL: ['mtls'] }, category: 'operational', implements: ['adr-mtls'], checks: ['req-mtls'],
+      threshold: '0 meshed pods whose workload certificate is valid for more than 24 more hours',
+      description: 'A scheduled job lists the pods with an istio-proxy sidecar (a container, or a native sidecar among the init containers), reads each one\'s workload certificate (the SDS secret named default) with istioctl, and fails on one that will still be valid in 24 hours, which means the mesh issues certificates that live longer than decided. Together with Mesh in strict mode (configuration) it checks the requirement.',
+      tool: 'istioctl proxy-config secret, kubectl, jq and openssl (sidecar mode; in ambient mode: istioctl ztunnel-config certificates)',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+set -euo pipefail
+fail=0
+pods=$(kubectl get pods -A -o json | jq -r '.items[]
+  | select(any((.spec.containers + (.spec.initContainers // []))[]; .name == "istio-proxy"))
+  | "\\(.metadata.name).\\(.metadata.namespace)"')
+for pod in $pods; do
+  istioctl proxy-config secret "$pod" -o json \\
+    | jq -r '[.dynamicActiveSecrets[] | select(.name == "default")][0].secret.tlsCertificate.certificateChain.inlineBytes' \\
+    | base64 --decode > leaf.pem
+  # -checkend succeeds when the certificate is still valid after the given seconds
+  if openssl x509 -in leaf.pem -noout -checkend 86400 > /dev/null; then
+    echo "$pod: workload certificate valid for more than 24 more hours"; fail=1
+  fi
+done
+exit $fail`,
     },
     {
       id: 'ff-backend-tls', label: 'Backends refuse clear text', when: { INTERNAL: ['tls'] }, category: 'structural', implements: ['adr-internal-tls'], checks: ['req-internal-tls'],
@@ -469,51 +496,65 @@ resource "aws_config_config_rule" "buckets_our_key" {
     },
     {
       id: 'ff-key-policy', label: 'Key use and administration apart', when: OWN_KEYS, category: 'structural', implements: ['adr-cmk', 'adr-field'], checks: ['req-key-access'],
-      threshold: 'In every aws_kms_key policy of the plan: the principals allowed to use the key are a subset of the element\'s roles, 0 principals may both use and administer it, and 0 statements grant use to *',
-      description: 'A Conftest policy over the Terraform plan parses each KMS key policy and fails when a principal outside the element\'s roles may encrypt or decrypt, when one principal appears in both a use and an administration statement (kms:* counts as both), or when use is open to everyone. Every KMS call is logged by CloudTrail by default.',
-      tool: 'Conftest (Open Policy Agent) over terraform show -json (AWS; for Azure: Key Vault RBAC assignments, for Google: IAM bindings on the key ring, checked the same way)',
+      threshold: 'In every KMS key policy of the plan (aws_kms_key and aws_kms_key_policy), apart from the account-root statement AWS documents: the principals allowed to use the key are a subset of the element\'s roles, 0 principals may both use and administer it, and 0 statements grant use to *',
+      description: 'A Conftest policy over the Terraform plan parses each KMS key policy and fails when a principal outside the element\'s roles may encrypt or decrypt, when one principal appears in both a use and an administration statement (kms:* counts as both), or when use is open to everyone (Principal "*" or {"AWS": "*"}). The account root (arn:aws:iam::<account>:root, or the bare account id) is exempt: AWS documents the statement that gives it kms:* as the one that keeps a key manageable, and the IAM policies it lets grant use are reviewed with the key policy, as adr-cmk says. A policy the plan cannot know yet (computed from another resource) is not checked; write it as a literal or a data source known at plan time. Every KMS call is logged by CloudTrail by default.',
+      tool: 'Conftest (Open Policy Agent, rego.v1) over terraform show -json (AWS; for Azure: Key Vault RBAC assignments, for Google: IAM bindings on the key ring, checked the same way)',
       language: 'rego',
       snippet: `package main
 
 import rego.v1
 
+account := "123456789012"                                         # the account the keys live in
 element_roles := {"arn:aws:iam::123456789012:role/order-api"}   # the element's own identities
 
-use_actions := {"kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKey*", "kms:GenerateDataKeyWithoutPlaintext", "kms:ReEncrypt*", "kms:ReEncryptFrom", "kms:ReEncryptTo", "kms:*"}
-admin_actions := {"kms:Create*", "kms:Put*", "kms:Update*", "kms:Enable*", "kms:Disable*", "kms:Revoke*", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion", "kms:TagResource", "kms:UntagResource", "kms:*"}
+# AWS's documented statement "Enable IAM User Permissions" gives the account root kms:*;
+# it keeps the key manageable and is exempt (IAM policies are reviewed with the key policy)
+account_root := {sprintf("arn:aws:iam::%s:root", [account]), account}
+
+use_actions := {"kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKey*", "kms:GenerateDataKeyWithoutPlaintext", "kms:ReEncrypt*", "kms:ReEncryptFrom", "kms:ReEncryptTo", "kms:*", "*"}
+admin_actions := {"kms:Create*", "kms:Put*", "kms:Update*", "kms:Enable*", "kms:Disable*", "kms:Revoke*", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion", "kms:TagResource", "kms:UntagResource", "kms:*", "*"}
 
 as_set(x) := {x} if is_string(x)
 as_set(x) := {v | some v in x} if is_array(x)
 
-keys contains rc if {
+statements(policy) := s if { s := json.unmarshal(policy).Statement; is_array(s) }
+statements(policy) := [s] if { s := json.unmarshal(policy).Statement; is_object(s) }
+
+principals(s) := {"*"} if s.Principal == "*"
+principals(s) := as_set(s.Principal.AWS) if is_object(s.Principal)
+
+policies[rc.address] := rc.change.after.policy if {
   some rc in input.resource_changes
-  rc.type == "aws_kms_key"
+  rc.type in {"aws_kms_key", "aws_kms_key_policy"}
   is_string(rc.change.after.policy)
 }
 
-allows(rc, actions) := {p |
-  some s in json.unmarshal(rc.change.after.policy).Statement
-  s.Effect == "Allow"
-  count(as_set(s.Action) & actions) > 0
-  some p in as_set(s.Principal.AWS)
+allows(policy, actions) := granted - account_root if {
+  granted := {p |
+    some s in statements(policy)
+    s.Effect == "Allow"
+    count(as_set(s.Action) & actions) > 0
+    some p in principals(s)
+  }
 }
 
 deny contains msg if {
-  some rc in keys
-  some p in allows(rc, use_actions) - element_roles
-  msg := sprintf("%s: %s may use the key but is not the element's identity", [rc.address, p])
+  some address, policy in policies
+  some p in allows(policy, use_actions) - element_roles
+  p != "*"
+  msg := sprintf("%s: %s may use the key but is not the element's identity", [address, p])
 }
 
 deny contains msg if {
-  some rc in keys
-  some p in allows(rc, use_actions) & allows(rc, admin_actions)
-  msg := sprintf("%s: %s may both use and administer the key", [rc.address, p])
+  some address, policy in policies
+  some p in allows(policy, use_actions) & allows(policy, admin_actions)
+  msg := sprintf("%s: %s may both use and administer the key", [address, p])
 }
 
 deny contains msg if {
-  some rc in keys
-  "*" in allows(rc, use_actions)
-  msg := sprintf("%s: anyone may use the key", [rc.address])
+  some address, policy in policies
+  "*" in allows(policy, use_actions)
+  msg := sprintf("%s: anyone may use the key", [address])
 }`,
     },
     {
@@ -552,15 +593,38 @@ done`,
     {
       id: 'ff-field', label: 'Fields stored as ciphertext', when: { AT_REST: ['field'] }, category: 'structural', implements: ['adr-field'], checks: ['req-field'],
       threshold: '0 of the listed sensitive fields readable as plaintext in the database',
-      description: 'An integration test saves a record through the element, reads the row directly from the database and fails if any of the sensitive fields holds the original value.',
-      tool: 'Vitest with Testcontainers (PostgreSQL) (or the test runner of your stack)',
+      description: 'An integration test starts PostgreSQL in a container, runs the element\'s migrations, saves a record through the element\'s repository for each sensitive field, reads the row directly from the database and fails if the column holds the original value, or if the element cannot read it back.',
+      tool: 'Vitest with Testcontainers (@testcontainers/postgresql) and node-postgres; for the JVM: JUnit 5 with Testcontainers\' PostgreSQLContainer and JdbcTemplate',
       language: 'ts',
-      snippet: `it('stores sensitive fields as ciphertext', async () => {
-  const card = '4111111111111111'
-  const { id } = await customers.create({ name: 'Ada', cardNumber: card })
-  const { rows } = await pg.query('select card_number from customers where id = $1', [id])
-  expect(rows[0].card_number).not.toContain(card)
-  expect((await customers.get(id)).cardNumber).toBe(card)
+      snippet: `import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import pg from 'pg'
+import { afterAll, beforeAll, expect, it } from 'vitest'
+import { migrate } from '../src/db/migrate'        // the element's schema migrations
+import { customerStore } from '../src/customers'   // the element's repository; encrypts through the KMS client it is given
+import { localKms } from './fixtures/kms'          // a KMS stand-in with a local key (Tink's fake KMS client, or LocalStack's KMS)
+
+// one entry per field of: {{SENSITIVE_FIELDS}}
+const SENSITIVE = [
+  { field: 'cardNumber', column: 'card_number', value: '4111111111111111' },
+  { field: 'nationalId', column: 'national_id', value: '85010112345' },
+  { field: 'healthNote', column: 'health_note', value: 'type 1 diabetes' },
+] as const
+
+let container: StartedPostgreSqlContainer
+let pool: pg.Pool
+beforeAll(async () => {
+  container = await new PostgreSqlContainer('postgres:17').start()
+  pool = new pg.Pool({ connectionString: container.getConnectionUri() })
+  await migrate(pool)
+}, 120_000)
+afterAll(async () => { await pool.end(); await container.stop() })
+
+it.each(SENSITIVE)('stores $field as ciphertext and reads it back', async ({ field, column, value }) => {
+  const customers = customerStore(pool, localKms())
+  const { id } = await customers.create({ name: 'Ada', [field]: value })
+  const { rows } = await pool.query(\`select \${column}::text as stored from customers where id = $1\`, [id])
+  expect(rows[0].stored).not.toContain(value)
+  expect((await customers.get(id))[field]).toBe(value)
 })`,
     },
     {

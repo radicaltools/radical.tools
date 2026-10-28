@@ -1,17 +1,26 @@
-import type { FitnessSpec, PackSpec } from '../../src/packSpec'
+import type { FitnessSpec, PackSpec, RequirementSpec, When } from '../../src/packSpec'
 
-const HOSTINGS = ['adr-paas', 'adr-kubernetes', 'adr-serverless', 'adr-vms', 'adr-cdn']
+const HOSTINGS = ['adr-paas', 'adr-kubernetes', 'adr-serverless', 'adr-vms', 'adr-cdn', 'adr-onprem-platform']
 /** The hosting models whose ephemeral environments are not Kubernetes namespaces. */
 const NOT_K8S = ['paas', 'serverless', 'vms', 'cdn']
 const PUBLIC_CLOUDS = ['aws', 'azure', 'gcp']
+/** Where the cloud's own infrastructure tool (CloudFormation, Bicep) exists. */
+const NATIVE: When = { IAC: ['native'], CLOUD: ['aws', 'azure'] }
+/** Terraform as chosen, and as the fallback where the cloud's own tool was asked for but none exists. */
+const TERRAFORM: Array<{ suffix: string; when: When; adr: string }> = [
+  { suffix: '', when: { IAC: ['terraform'] }, adr: 'adr-iac-terraform' },
+  { suffix: '-fallback', when: { IAC: ['native'], CLOUD: ['gcp', 'onprem'] }, adr: 'adr-iac-native-fallback' },
+]
+/** A managed platform or functions asked for in our own data centre: provided on our Kubernetes. */
+const ONPREM_PLATFORM: When = { HOSTING: ['paas', 'serverless'], CLOUD: ['onprem'] }
 const FORCES = 'This element is deployed and runs somewhere, and that somewhere has to be chosen, built and paid for. The forces: managed platforms take operations work off the team but limit what can run and tie it to a provider, while Kubernetes and virtual machines run anything at the price of running them; the cloud or data centre is chosen once and rarely left, by skills, existing contracts, services needed and where data may live; infrastructure built by hand in a console cannot be reviewed, repeated or rebuilt after a disaster; environments that differ from production hide the bugs that only production shows; cloud spend grows quietly with every resource nobody switches off; and changes made outside the code drift from it until the next apply undoes or breaks them.'
 const ELSEWHERE = 'Rollouts and canaries: as decided in the Deployment and rollback pack. Capacity and scaling: as decided in the Capacity and scaling pack. The engine of a database: hosted as decided in the Data store pack.'
-const COMMON = 'Infrastructure is built with {{IAC}}; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository. Monthly budget of the account: {{BUDGET_MONTHLY}}, forecast alert at {{BUDGET_ALERT_PERCENT}}%, the budget owner\'s approval above {{COST_STEP}} a month of added cost; drift checked every {{DRIFT_HOURS}} hours.'
+const COMMON = 'The infrastructure is code, written and checked as the infrastructure-as-code decision records and applied only by the pipeline; environments: {{ENVIRONMENTS}}, built from envs/<environment>/ in one repository; drift checked every {{DRIFT_HOURS}} hours.'
 
 /** The budget-exists check, one per public cloud. */
 function budget(cloud: string, label: string, tool: string, snippet: string): FitnessSpec {
   return {
-    id: `ff-budget-${cloud}`, label: `Budget alert in place (${label})`, when: { CLOUD: [cloud] }, category: 'operational', implements: HOSTINGS, checks: ['req-budget'],
+    id: `ff-budget-${cloud}`, label: `Budget alert in place (${label})`, when: { CLOUD: [cloud] }, category: 'operational', implements: ['adr-budget'], checks: ['req-budget'],
     threshold: `A monthly cost budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}}% or lower exists in the account the element runs in`,
     description: `A scheduled job reads the account's budgets through the cloud's CLI and fails when none is a monthly cost budget of {{BUDGET_MONTHLY}} with an enabled forecast notification at {{BUDGET_ALERT_PERCENT}}% or lower; the budget itself is part of the infrastructure code. One budget per account: bind this pack's budget details once per account, not per element.`,
     tool,
@@ -40,15 +49,116 @@ function functions(cloud: string, platform: string, threshold: string, descripti
   }
 }
 
-/** The forgotten-environment check for environments that are not Kubernetes namespaces, one per IaC tool. */
-function ephemeral(iac: string, label: string, description: string, tool: string, snippet: string): FitnessSpec {
-  return {
-    id: `ff-ephemeral-${iac}`, label: `No forgotten environments (${label})`, when: { ENVIRONMENTS: ['ephemeral'], HOSTING: NOT_K8S, IAC: [iac] }, category: 'operational', implements: ['adr-paas', 'adr-serverless', 'adr-vms', 'adr-cdn'], checks: ['req-ephemeral'],
+/** The forgotten-environment check for environments that are not Kubernetes namespaces, one per IaC tool
+ *  (and per answer that picks the tool). */
+function ephemeral(iac: string, whens: Array<{ suffix: string; when: When }>, label: string, description: string, tool: string, snippet: string): FitnessSpec[] {
+  return whens.map(({ suffix, when }) => ({
+    id: `ff-ephemeral-${iac}${suffix}`, label: `No forgotten environments (${label})`, when: { ENVIRONMENTS: ['ephemeral'], HOSTING: NOT_K8S, ...when }, category: 'operational', implements: ['adr-paas', 'adr-serverless', 'adr-vms', 'adr-cdn', 'adr-onprem-platform'], checks: ['req-ephemeral'],
     threshold: '0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours',
     description: `${description} Runs on Linux (GNU date).`,
     tool, language: 'bash', snippet,
-  }
+  }))
 }
+
+const costReview = (id: string, when: When): RequirementSpec => ({
+  id, label: 'Cost shown in review', when, ears_type: 'event-driven',
+  trigger: 'a change to the infrastructure code is proposed',
+  action: 'show its estimated monthly cost change in the pull request, and require the budget owner\'s approval when it adds more than {{COST_STEP}} a month',
+  rationale: 'The cheapest moment to question a cost is before it is incurred (FinOps Framework, shift-left cost estimation).',
+  scenario: { label: 'Costly change approved', given: 'a pull request that adds a large database instance', when: 'the cost estimate shows more than {{COST_STEP}} a month', then: 'the pull request cannot be merged until the budget owner adds the budget-approved label' },
+})
+
+const costEstimate = (id: string, when: When): RequirementSpec => ({
+  id, label: 'Cost estimated in review', when, ears_type: 'event-driven',
+  trigger: 'a change to the infrastructure code adds or resizes a priced resource',
+  action: 'attach the provider\'s pricing-calculator estimate of the monthly change to the pull request, and require the budget owner\'s approval when it adds more than {{COST_STEP}} a month',
+  rationale: 'The cheapest moment to question a cost is before it is incurred; no estimator reads Pulumi or CloudFormation code, so the reviewer makes the estimate (FinOps Framework, shift-left cost estimation).',
+  scenario: { label: 'Costly change approved', given: 'a pull request that adds a large database instance', when: 'the reviewer\'s estimate shows more than {{COST_STEP}} a month', then: 'the pull request is not merged until the budget owner approves it' },
+  unchecked: 'No tool estimates the cost of Pulumi, CloudFormation or Bicep changes: the reviewer attaches the pricing-calculator estimate to each infrastructure pull request, and the budget owner approves in the review above {{COST_STEP}} a month before it is merged.',
+})
+
+const k8sRequirement = (id: string, when: When): RequirementSpec => ({
+  id, label: 'Workloads well specified', when, ears_type: 'ubiquitous',
+  action: 'give every workload CPU and memory requests and a memory limit, readiness and liveness probes, at least 2 replicas with a PodDisruptionBudget in production, and a non-root, read-only root file system',
+  rationale: 'Without these the scheduler cannot place, protect or restart pods correctly, and one pod can starve its node (Kubernetes documentation, configuration best practices; CIS Benchmarks for Kubernetes).',
+  scenario: { label: 'Incomplete manifest refused', given: 'a deployment without a memory limit or a readiness probe', when: 'the manifest check runs', then: 'it fails naming what is missing' },
+})
+
+const checkov = ({ suffix, when, adr }: (typeof TERRAFORM)[number]): FitnessSpec => ({
+  id: `ff-checkov${suffix}`, label: 'Plans pass policy', when, category: 'structural', implements: [adr], checks: ['req-policy'],
+  threshold: '0 failed Checkov checks of the baseline (encryption, public access, open admin ports) and 0 taggable resources without owner, environment and cost-centre tags (labels on Google Cloud) in the plan of every pull request',
+  description: 'Checkov scans the Terraform plan in every pull request with its built-in checks and a custom tagging policy over every taggable resource type of every provider (AWS and Azure resources carry tags, Google Cloud resources labels), and fails on any finding. Rules of your own go into Conftest policies over the same plan JSON.',
+  tool: 'Checkov',
+  language: 'yaml',
+  snippet: `# policies/required_tags.yaml — custom check, run with --external-checks-dir policies
+metadata:
+  id: CKV2_ORG_TAGS
+  name: Taggable resources carry owner, environment and cost-centre tags (labels on Google Cloud)
+  category: GENERAL_SECURITY
+definition:
+  or:
+    - and:
+        - { cond_type: attribute, resource_types: taggable, attribute: tags.owner, operator: exists }
+        - { cond_type: attribute, resource_types: taggable, attribute: tags.environment, operator: exists }
+        - { cond_type: attribute, resource_types: taggable, attribute: tags.cost-centre, operator: exists }
+    - and:
+        - { cond_type: attribute, resource_types: taggable, attribute: labels.owner, operator: exists }
+        - { cond_type: attribute, resource_types: taggable, attribute: labels.environment, operator: exists }
+        - { cond_type: attribute, resource_types: taggable, attribute: labels.cost-centre, operator: exists }
+# CI, in envs/<environment>:
+#   terraform plan -out tf.plan && terraform show -json tf.plan > tf.json
+#   checkov -f tf.json --framework terraform_plan --external-checks-dir ../../policies --compact`,
+})
+
+const terraformDrift = ({ suffix, when, adr }: (typeof TERRAFORM)[number]): FitnessSpec => ({
+  id: `ff-drift-terraform${suffix}`, label: 'Drift detected', when, category: 'operational', implements: [adr], checks: ['req-drift', 'req-iac'],
+  threshold: 'A drift check every {{DRIFT_HOURS}} hours per environment; 0 unexplained differences between code and infrastructure',
+  description: 'A scheduled pipeline runs a refresh-only plan in each environment\'s root; exit code 2 means the infrastructure differs from the code, and the job opens an issue for the owning team.',
+  tool: 'Terraform (plan -detailed-exitcode) with the GitHub CLI',
+  language: 'bash',
+  snippet: `#!/usr/bin/env bash
+# scheduled every {{DRIFT_HOURS}} hours, in envs/$ENVIRONMENT
+set -uo pipefail
+terraform init -input=false >/dev/null
+terraform plan -refresh-only -detailed-exitcode -input=false -no-color > drift.txt
+case $? in
+  0) echo "no drift" ;;
+  2) gh issue create --title "Drift in $ENVIRONMENT" --body-file drift.txt --label drift; exit 1 ;;
+  *) echo "plan failed"; exit 1 ;;
+esac`,
+})
+
+const infracost = (id: string, when: When, req: string): FitnessSpec => ({
+  id, label: 'Cost change in review', when, category: 'process', implements: ['adr-budget'], checks: [req],
+  threshold: '100% of infrastructure pull requests show the monthly cost change; above {{COST_STEP}} a month the check fails until the pull request carries the label budget-approved',
+  description: 'Infracost compares the cost of the pull request\'s Terraform with the main branch and comments the difference; the step then fails above the limit unless the budget owner has added the label budget-approved, which only they may add (a CODEOWNERS-protected label rule or a workflow that checks who added it).',
+  tool: 'Infracost with the GitHub CLI',
+  language: 'bash',
+  snippet: `infracost breakdown --path . --format json --out-file base.json        # run on the main branch checkout
+infracost diff --path . --compare-to base.json --format json --out-file diff.json
+infracost comment github --path diff.json --repo "$GITHUB_REPOSITORY" \\
+  --pull-request "$PR_NUMBER" --github-token "$GITHUB_TOKEN" --behavior update
+increase=$(jq -r '(.diffTotalMonthlyCost // "0") | tonumber | floor' diff.json)
+approved=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' | grep -cx budget-approved || true)
+[ "$increase" -le {{COST_STEP}} ] || [ "$approved" -gt 0 ] \\
+  || { echo "adds $increase a month: the budget owner adds the label budget-approved"; exit 1; }`,
+})
+
+const kubeScore = (id: string, when: When, adr: string, req: string): FitnessSpec => ({
+  id, label: 'Manifests well specified', when, category: 'structural', implements: [adr], checks: [req],
+  threshold: '0 critical kube-score findings in the rendered manifests (CPU and memory requests, memory limit, probes, replicas, PodDisruptionBudget, non-root user and group, read-only root file system, and kube-score\'s correctness checks), with the default checks the requirement does not ask for switched off',
+  description: 'The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score. The defaults that ask for more than the requirement (a CPU limit, ephemeral-storage requests and limits, pull policy Always, a NetworkPolicy per pod, host anti-affinity) are switched off; network reachability is not decided in this pack.',
+  tool: 'kube-score',
+  language: 'bash',
+  snippet: `helm template order-api charts/order-api -f charts/order-api/values-production.yaml \\
+  | kube-score score - --output-format ci \\
+      --ignore-container-cpu-limit \\
+      --ignore-test container-ephemeral-storage-request-and-limit \\
+      --ignore-test container-image-pull-policy \\
+      --ignore-test pod-networkpolicy \\
+      --ignore-test deployment-has-host-podantiaffinity \\
+      --ignore-test statefulset-has-host-podantiaffinity`,
+})
 
 const pack: PackSpec = {
   id: 'concern-infrastructure',
@@ -81,9 +191,9 @@ const pack: PackSpec = {
       hint: 'The hosting model decides how much of the platform the team runs itself, what the element may do (long requests, background work, state), and how it scales and is billed. A database\'s engine is hosted as the Data store pack decides.',
       default: 'paas',
       options: [
-        { value: 'paas', label: 'a managed container platform (PaaS)', description: 'The provider runs the platform; you hand it a container or code. Google Cloud Run, Azure Container Apps or App Service, AWS App Runner or ECS on Fargate. Pick it by default for web apps and APIs when no platform team exists. Not in our own data centre, where OpenShift is Kubernetes.' },
+        { value: 'paas', label: 'a managed container platform (PaaS)', description: 'The provider runs the platform; you hand it a container or code. Google Cloud Run, Azure Container Apps or App Service, AWS App Runner or ECS on Fargate. Pick it by default for web apps and APIs when no platform team exists. In our own data centre there is no provider to run it: it is provided on our Kubernetes with Knative instead.' },
         { value: 'kubernetes', label: 'containers on Kubernetes', description: 'Managed Kubernetes (EKS, AKS, GKE) or an on-premises distribution (OpenShift, Rancher). Pick it when many services share a platform run by a platform team, or workloads need what a PaaS cannot (sidecars, operators, custom networking, portability).' },
-        { value: 'serverless', label: 'serverless functions', description: 'AWS Lambda, Azure Functions or Google Cloud Functions, run per event and billed per invocation. Pick it for spiky or event-driven work with short executions, when idle cost should be zero. Not in our own data centre, where Knative or OpenFaaS run on Kubernetes.' },
+        { value: 'serverless', label: 'serverless functions', description: 'AWS Lambda, Azure Functions or Google Cloud Functions, run per event and billed per invocation. Pick it for spiky or event-driven work with short executions, when idle cost should be zero. In our own data centre there is no provider to run it: functions run on our Kubernetes with Knative Functions or OpenFaaS instead.' },
         { value: 'vms', label: 'virtual machines', description: 'Virtual machines built from images, behind a load balancer. Pick it for software that cannot be containerised (licensed products, legacy runtimes, special kernels) or an on-premises virtualisation platform.' },
         { value: 'cdn', label: 'static files on object storage behind a CDN', description: 'Pre-built files in a private bucket served through a CDN with TLS: Amazon CloudFront with S3, Azure Front Door with Blob Storage, Cloud CDN with Cloud Storage, or a static host (Cloudflare Pages, Netlify). Pick it for a front end built in advance (the Frontend stack pack\'s static rendering) or documentation; nothing runs on request.' },
       ],
@@ -96,7 +206,7 @@ const pack: PackSpec = {
         { value: 'aws', label: 'Amazon Web Services', description: 'The broadest set of services and regions. Pick it when the team knows AWS, or you need its specific services (DynamoDB, the widest serverless set).' },
         { value: 'azure', label: 'Microsoft Azure', description: 'Strong with Microsoft identity (Entra ID), .NET and enterprise agreements. Pick it when the organisation runs on Microsoft 365 and Entra ID, or has an Azure commitment.' },
         { value: 'gcp', label: 'Google Cloud', description: 'Strong in Kubernetes (GKE), data and analytics (BigQuery) and Cloud Run. Pick it when those services decide, or the team knows Google Cloud. Its own infrastructure tool (Infrastructure Manager) runs Terraform: answer Terraform below.' },
-        { value: 'onprem', label: 'our own data centre', description: 'Servers and virtualisation we run. Pick it when data may not leave the premises, the load is steady enough that owned hardware is cheaper, or regulation demands it, and people run the hardware. Only with Kubernetes or virtual machines, and with Terraform or Pulumi.' },
+        { value: 'onprem', label: 'our own data centre', description: 'Servers and virtualisation we run. Pick it when data may not leave the premises, the load is steady enough that owned hardware is cheaper, or regulation demands it, and people run the hardware. A managed platform or functions are then provided on our own Kubernetes (Knative), the cloud\'s own infrastructure tool means Terraform, and no cloud budget applies.' },
       ],
     },
     {
@@ -106,7 +216,7 @@ const pack: PackSpec = {
       options: [
         { value: 'terraform', label: 'Terraform or OpenTofu', description: 'HCL with providers for every cloud and many SaaS products, state in a remote backend. Pick it by default, and whenever more than one cloud or SaaS is involved; OpenTofu when an open-source licence matters.' },
         { value: 'pulumi', label: 'Pulumi', description: 'Infrastructure in TypeScript, Python, Go or C#, with the same providers. Pick it when the team would rather write infrastructure in the language it already uses, with loops, functions and tests.' },
-        { value: 'native', label: 'the cloud\'s own (CloudFormation or CDK on AWS, Bicep on Azure)', description: 'AWS CloudFormation or the AWS CDK, or Azure Bicep, with state kept by the cloud. Pick it when only one of these two clouds is used and its newest features matter on the day they ship. Not with Google Cloud (Infrastructure Manager runs Terraform) or our own data centre.' },
+        { value: 'native', label: 'the cloud\'s own (CloudFormation or CDK on AWS, Bicep on Azure)', description: 'AWS CloudFormation or the AWS CDK, or Azure Bicep, with state kept by the cloud. Pick it when only one of these two clouds is used and its newest features matter on the day they ship. Not with Google Cloud (its Infrastructure Manager runs Terraform) or our own data centre: with those, the infrastructure is written in Terraform.' },
       ],
     },
     {
@@ -121,9 +231,9 @@ const pack: PackSpec = {
     },
   ],
   details: [
-    { key: 'BUDGET_MONTHLY', label: 'What is the monthly cloud budget of the account or subscription (in the billing currency)? One per account: bind it once', default: '5000', number: true },
-    { key: 'BUDGET_ALERT_PERCENT', label: 'At what share of the budget, forecast for the month, does an alert go out (%)?', default: '80', number: true },
-    { key: 'COST_STEP', label: 'Above what monthly cost increase does a change need the budget owner\'s approval (billing currency)?', default: '500', number: true },
+    { key: 'BUDGET_MONTHLY', label: 'What is the monthly cloud budget of the account or subscription (in the billing currency)? One per account: bind it once. Only in a public cloud', default: '5000', number: true },
+    { key: 'BUDGET_ALERT_PERCENT', label: 'At what share of the budget, forecast for the month, does an alert go out (%)? Only in a public cloud', default: '80', number: true },
+    { key: 'COST_STEP', label: 'Above what monthly cost increase does a change need the budget owner\'s approval (billing currency)? Only in a public cloud', default: '500', number: true },
     { key: 'DRIFT_HOURS', label: 'Within how many hours must drift from the code be detected?', default: '24', number: true },
     { key: 'EPHEMERAL_HOURS', label: 'After how many hours is an idle ephemeral environment destroyed?', default: '72', number: true },
   ],
@@ -135,7 +245,7 @@ const pack: PackSpec = {
   requirements: [
     {
       id: 'req-iac', label: 'Infrastructure is code', ears_type: 'ubiquitous',
-      action: 'define 100% of the infrastructure in {{IAC}} code in version control, applied only by the pipeline after a reviewed plan, with 0 changes made by hand to any shared environment',
+      action: 'define 100% of the infrastructure as code in version control, in the tool the infrastructure-as-code decision names, applied only by the pipeline after a reviewed plan, with 0 changes made by hand to any shared environment',
       rationale: 'Code can be reviewed, repeated and rebuilt after a disaster; a console click can do none of these (AWS Well-Architected, Operational Excellence: perform operations as code).',
       scenario: { label: 'Change goes through the pipeline', given: 'a change to the infrastructure', when: 'it is proposed', then: 'it arrives as a pull request with a plan, only the pipeline applies it after review, and a change made by hand shows up in the next drift check' },
     },
@@ -166,33 +276,18 @@ const pack: PackSpec = {
       rationale: 'Cloud spend grows quietly; a forecast alert leaves time to act within the month (FinOps Framework, budget management; AWS Well-Architected, Cost Optimization).',
       scenario: { label: 'Forecast alert', given: 'an account with a monthly budget of {{BUDGET_MONTHLY}}', when: 'the forecast passes {{BUDGET_ALERT_PERCENT}}% of it', then: 'the owning team and the budget owner are alerted the same day' },
     },
-    {
-      id: 'req-cost-review', label: 'Cost shown in review', when: { IAC: ['terraform'] }, ears_type: 'event-driven',
-      trigger: 'a change to the infrastructure code is proposed',
-      action: 'show its estimated monthly cost change in the pull request, and require the budget owner\'s approval when it adds more than {{COST_STEP}} a month',
-      rationale: 'The cheapest moment to question a cost is before it is incurred (FinOps Framework, shift-left cost estimation).',
-      scenario: { label: 'Costly change approved', given: 'a pull request that adds a large database instance', when: 'the cost estimate shows more than {{COST_STEP}} a month', then: 'the pull request cannot be merged until the budget owner adds the budget-approved label' },
-    },
-    {
-      id: 'req-cost-estimate', label: 'Cost estimated in review', when: { IAC: ['pulumi', 'native'] }, ears_type: 'event-driven',
-      trigger: 'a change to the infrastructure code adds or resizes a priced resource',
-      action: 'attach the provider\'s pricing-calculator estimate of the monthly change to the pull request, and require the budget owner\'s approval when it adds more than {{COST_STEP}} a month',
-      rationale: 'The cheapest moment to question a cost is before it is incurred; no estimator reads Pulumi or CloudFormation code, so the reviewer makes the estimate (FinOps Framework, shift-left cost estimation).',
-      scenario: { label: 'Costly change approved', given: 'a pull request that adds a large database instance', when: 'the reviewer\'s estimate shows more than {{COST_STEP}} a month', then: 'the pull request is not merged until the budget owner approves it' },
-      unchecked: 'No tool estimates the cost of Pulumi, CloudFormation or Bicep changes: the reviewer attaches the pricing-calculator estimate to each infrastructure pull request, and the budget owner approves in the review above {{COST_STEP}} a month before it is merged.',
-    },
+    costReview('req-cost-review', { IAC: ['terraform'], CLOUD: PUBLIC_CLOUDS }),
+    costReview('req-cost-review-fallback', { IAC: ['native'], CLOUD: ['gcp'] }),
+    costEstimate('req-cost-estimate', { IAC: ['pulumi'], CLOUD: PUBLIC_CLOUDS }),
+    costEstimate('req-cost-estimate-native', NATIVE),
     {
       id: 'req-paas', label: 'Stateless and scaled', when: { HOSTING: ['paas'], CLOUD: PUBLIC_CLOUDS }, ears_type: 'ubiquitous',
       action: 'keep the element stateless, with no local file or session surviving an instance restart, run at least 2 instances in production and scale out automatically on load',
       rationale: 'A platform may stop or move any instance at any time; stateless processes make that harmless (The Twelve-Factor App, VI. Processes and IX. Disposability).',
       scenario: { label: 'Instance lost harmlessly', given: 'the production service with its scaling settings read', when: 'one of its instances is stopped by the platform', then: 'at least 2 were running, a replacement starts within the autoscaling range, and no request or session is lost beyond retries' },
     },
-    {
-      id: 'req-k8s', label: 'Workloads well specified', when: { HOSTING: ['kubernetes'] }, ears_type: 'ubiquitous',
-      action: 'give every workload resource requests and limits, readiness and liveness probes, at least 2 replicas with a PodDisruptionBudget in production, and a non-root, read-only root file system',
-      rationale: 'Without these the scheduler cannot place, protect or restart pods correctly, and one pod can starve its node (Kubernetes documentation, configuration best practices; CIS Benchmarks for Kubernetes).',
-      scenario: { label: 'Incomplete manifest refused', given: 'a deployment without resource limits or a readiness probe', when: 'the manifest check runs', then: 'it fails naming what is missing' },
-    },
+    k8sRequirement('req-k8s', { HOSTING: ['kubernetes'] }),
+    k8sRequirement('req-k8s-onprem', ONPREM_PLATFORM),
     {
       id: 'req-functions', label: 'Functions bounded', when: { HOSTING: ['serverless'], CLOUD: PUBLIC_CLOUDS }, ears_type: 'ubiquitous',
       action: 'give every function a concurrency or instance limit that protects what it calls, and a dead-letter queue or failure destination for failed asynchronous events; cold starts are bounded as the Capacity and scaling pack decides',
@@ -207,9 +302,9 @@ const pack: PackSpec = {
     },
     {
       id: 'req-cdn', label: 'Served only through the CDN', when: { HOSTING: ['cdn'] }, ears_type: 'ubiquitous',
-      action: 'serve the files only through the CDN over TLS with HSTS, from an origin bucket that refuses direct requests, with a cache lifetime on every response',
-      rationale: 'An origin reachable directly bypasses the CDN\'s TLS, caching and protections; files served without a cache lifetime hit the origin on every request (AWS Well-Architected, Security and Performance Efficiency).',
-      scenario: { label: 'Origin refuses direct request', given: 'the deployed site', when: 'a page is requested through the CDN and the same file directly from the origin', then: 'the CDN answers over TLS with HSTS and a cache lifetime, and the origin refuses' },
+      action: 'serve the files only through the CDN over TLS with HSTS, from an origin bucket that refuses direct requests, with every content-hashed asset cached for a year and every HTML page revalidated on each request',
+      rationale: 'An origin reachable directly bypasses the CDN\'s TLS, caching and protections; a hashed asset never changes, so it can be cached for a year, while a page cached without revalidation keeps users on an old build after a publish (AWS Well-Architected, Security and Performance Efficiency).',
+      scenario: { label: 'Origin refuses direct request', given: 'the deployed site', when: 'a page and one of its hashed assets are requested through the CDN, and the page directly from the origin', then: 'the CDN answers over TLS with HSTS, the page marked for revalidation and the asset cached for a year, and the origin refuses' },
     },
     {
       id: 'req-ephemeral', label: 'Ephemeral environments cleaned up', when: { ENVIRONMENTS: ['ephemeral'] }, ears_type: 'event-driven',
@@ -228,19 +323,19 @@ const pack: PackSpec = {
   ],
   adrs: [
     {
-      id: 'adr-paas', label: 'Runs on a managed platform', when: { HOSTING: ['paas'] },
+      id: 'adr-paas', label: 'Runs on a managed platform', when: { HOSTING: ['paas'], CLOUD: PUBLIC_CLOUDS },
       decision: `The element runs as a container on a managed platform in {{CLOUD}}: Google Cloud Run, Azure Container Apps (App Service for plain web apps), or AWS App Runner or ECS on Fargate, with at least 2 instances in production and autoscaling above them. ${COMMON} ${ELSEWHERE} Choosing the platform: the one in the chosen cloud that runs plain containers with scale-to-zero or autoscaling and managed TLS; avoid platform-specific build packs so the container can move.`,
       consequences: '• No nodes, clusters or operating systems to patch; scaling, TLS and rollouts come with the platform.\n• Limits on what can run: request timeouts, no privileged containers, limited networking and sidecars.\n• Tied to the provider\'s platform, but a plain container moves to another with little change.\n• Per-request or per-instance billing; two instances kept warm are the floor of the bill.',
       alternatives: '1. Kubernetes: runs anything, at the cost of running a cluster.\n2. Serverless functions: lower idle cost, a different programming model.\n3. Virtual machines: full control, all the operations work.',
     },
     {
       id: 'adr-kubernetes', label: 'Runs on Kubernetes', when: { HOSTING: ['kubernetes'] },
-      decision: `The element runs as containers on Kubernetes in {{CLOUD}}: Amazon EKS, Azure AKS or Google GKE (Autopilot where it fits), or OpenShift or Rancher on premises. Manifests are Helm charts under charts/<name> or Kustomize overlays deployed by GitOps (Argo CD or Flux); every workload has requests and limits, probes, a PodDisruptionBudget and runs as non-root with a read-only root file system. The clusters themselves: ${COMMON} Argo CD shows drift of the manifests. ${ELSEWHERE} Choose Kubernetes only with a platform team, or a managed offering that removes node operations.`,
+      decision: `The element runs as containers on Kubernetes in {{CLOUD}}: Amazon EKS, Azure AKS or Google GKE (Autopilot where it fits), or OpenShift or Rancher on premises. Manifests are Helm charts under charts/<name> or Kustomize overlays deployed by GitOps (Argo CD or Flux); every workload has requests and limits, probes, a PodDisruptionBudget and runs as non-root with a read-only root file system. The clusters and what surrounds them are infrastructure like any other: ${COMMON} Argo CD shows drift of the manifests. ${ELSEWHERE} Choose Kubernetes only with a platform team, or a managed offering that removes node operations.`,
       consequences: '• Runs anything that fits in a container, with the same model in every cloud and on premises.\n• A platform to run: cluster upgrades every few months (each minor is supported for about 14 months), add-ons, networking, security policies.\n• A large ecosystem (CNCF) for observability, policy, service mesh and operators, each one more thing to keep up.\n• Cost depends on packing workloads well; requests that are too high waste nodes.',
       alternatives: '1. A managed container platform: far less to run, fewer options.\n2. Serverless functions: no cluster at all, a different programming model.\n3. Nomad or plain container hosts: simpler, smaller ecosystem.',
     },
     {
-      id: 'adr-serverless', label: 'Runs as serverless functions', when: { HOSTING: ['serverless'] },
+      id: 'adr-serverless', label: 'Runs as serverless functions', when: { HOSTING: ['serverless'], CLOUD: PUBLIC_CLOUDS },
       decision: `The element runs as serverless functions in {{CLOUD}}: AWS Lambda, Azure Functions or Google Cloud Functions (Cloud Run functions), triggered by HTTP through an API gateway and by queues and events. Each function has a concurrency or instance limit and a dead-letter queue or failure destination for asynchronous events. ${COMMON} The AWS SAM or the Serverless Framework may sit on top of the infrastructure tool. ${ELSEWHERE} Choose functions for event-driven and spiky work with executions under a few minutes; long-running or steady-load work goes to containers.`,
       consequences: '• No servers to run; scales from zero to large bursts, billed per invocation.\n• Cold starts add latency to the first requests; execution time, payload size and connections are limited.\n• Steady high load can cost more than containers; the bill follows traffic, so budgets and alerts matter.\n• Closely tied to the provider\'s events, gateway and permissions model; moving is a rewrite of the glue.',
       alternatives: '1. A managed container platform with scale-to-zero (Cloud Run, Container Apps): containers without cold-start limits on code shape.\n2. Kubernetes with KEDA for event-driven scaling.\n3. Virtual machines: steady cost, no limits, all the operations.',
@@ -257,35 +352,47 @@ const pack: PackSpec = {
       consequences: '• Nothing to run, patch or scale; the cheapest and most available hosting there is.\n• Every page is the same for everyone until the next publish; personalisation and sign-in need another element.\n• The origin must stay private, or the CDN\'s TLS, caching and protections are bypassed.\n• Cache invalidation on publish is the one operational step; a bad publish is undone by publishing the previous build.',
       alternatives: '1. A managed container platform serving the files: more to run, no CDN edge unless added.\n2. A web server on a virtual machine: full control, all the operations work.\n3. Server rendering: personalised pages, a server to run and scale.',
     },
-  ],
-  fitness: [
     {
-      id: 'ff-checkov', label: 'Plans pass policy', when: { IAC: ['terraform'] }, category: 'structural', implements: HOSTINGS, checks: ['req-policy'],
-      threshold: '0 failed Checkov checks of the baseline (encryption, public access, open admin ports) and 0 taggable resources without owner, environment and cost-centre tags (labels on Google Cloud) in the plan of every pull request',
-      description: 'Checkov scans the Terraform plan in every pull request with its built-in checks and a custom tagging policy over every taggable resource type of every provider (AWS and Azure resources carry tags, Google Cloud resources labels), and fails on any finding. Rules of your own go into Conftest policies over the same plan JSON.',
-      tool: 'Checkov',
-      language: 'yaml',
-      snippet: `# policies/required_tags.yaml — custom check, run with --external-checks-dir policies
-metadata:
-  id: CKV2_ORG_TAGS
-  name: Taggable resources carry owner, environment and cost-centre tags (labels on Google Cloud)
-  category: GENERAL_SECURITY
-definition:
-  or:
-    - and:
-        - { cond_type: attribute, resource_types: taggable, attribute: tags.owner, operator: exists }
-        - { cond_type: attribute, resource_types: taggable, attribute: tags.environment, operator: exists }
-        - { cond_type: attribute, resource_types: taggable, attribute: tags.cost-centre, operator: exists }
-    - and:
-        - { cond_type: attribute, resource_types: taggable, attribute: labels.owner, operator: exists }
-        - { cond_type: attribute, resource_types: taggable, attribute: labels.environment, operator: exists }
-        - { cond_type: attribute, resource_types: taggable, attribute: labels.cost-centre, operator: exists }
-# CI, in envs/<environment>:
-#   terraform plan -out tf.plan && terraform show -json tf.plan > tf.json
-#   checkov -f tf.json --framework terraform_plan --external-checks-dir ../../policies --compact`,
+      id: 'adr-onprem-platform', label: 'A platform on our own Kubernetes', when: ONPREM_PLATFORM,
+      decision: `The hosting chosen, {{HOSTING}}, has no provider to run it in our own data centre, so the platform team provides the same model on our Kubernetes (OpenShift or Rancher): Knative Serving runs containers that scale with requests, down to zero, and Knative Functions or OpenFaaS run functions triggered by HTTP and by events. Every workload has CPU and memory requests and a memory limit, probes, at least 2 replicas with a PodDisruptionBudget in production, and runs as non-root with a read-only root file system. ${COMMON} ${ELSEWHERE}`,
+      consequences: '• The element keeps the platform\'s programming model: a container or a function, scaled for it.\n• Someone runs the cluster and Knative: upgrades, capacity and the hardware under them are the platform team\'s work.\n• Scaling stops at the hardware we own; bursts beyond it wait or fail.\n• Moving to a public cloud later is a change of platform, not of the element.',
+      alternatives: '1. Plain Kubernetes Deployments without Knative: one model less, no scale to zero.\n2. Virtual machines: no cluster, all the operations work.\n3. A public cloud\'s managed platform: no cluster to run, if the data may leave the premises.',
     },
     {
-      id: 'ff-checkov-native', label: 'Templates pass policy', when: { IAC: ['native'] }, category: 'structural', implements: HOSTINGS, checks: ['req-policy'],
+      id: 'adr-budget', label: 'Cloud spend held to a budget', when: { CLOUD: PUBLIC_CLOUDS },
+      decision: 'The account (AWS account, Azure subscription or Google Cloud billing account) has a monthly cost budget of {{BUDGET_MONTHLY}} in the billing currency, with a forecast alert at {{BUDGET_ALERT_PERCENT}}% to the owning team and the budget owner; the budget is part of the infrastructure code (aws_budgets_budget, azurerm_consumption_budget_subscription, google_billing_budget). One budget per account, bound once, not per element. A change that adds more than {{COST_STEP}} a month needs the budget owner\'s approval: with Terraform, Infracost shows the change in the pull request and a label records the approval; with Pulumi or the cloud\'s own tool, which no estimator reads, the reviewer attaches the pricing calculator\'s estimate.',
+      consequences: '• Overspend is seen within the month, from the forecast, not on the invoice.\n• Every costly change has a named approver before it ships.\n• The budget and the approval step need an owner who answers within a day, or changes wait.',
+      alternatives: '1. Monthly review of the invoice: no tooling, and the money is spent before anyone looks.\n2. Hard spending caps: they stop the bill and the service with it.',
+    },
+    {
+      id: 'adr-iac-terraform', label: 'Infrastructure in Terraform', when: { IAC: ['terraform'] },
+      decision: 'The infrastructure is described in Terraform (OpenTofu where an open-source licence matters): one root per environment under envs/<environment>/, shared modules versioned, state in a remote backend with locking (S3, Azure Storage, Google Cloud Storage or HCP Terraform). Every pull request produces a plan, checked by Checkov against the security and tagging baseline; only the pipeline applies, after review; a refresh-only plan every {{DRIFT_HOURS}} hours reports drift.',
+      consequences: '• One language and workflow for every cloud and most SaaS products.\n• The state file is critical and holds secrets: its backend, locking and access need care.\n• HCL has limited abstraction; large estates need module conventions.',
+      alternatives: '1. Pulumi: the same providers in a general-purpose language.\n2. The cloud\'s own tool (CloudFormation, Bicep): state kept by the cloud, one cloud only.',
+    },
+    {
+      id: 'adr-iac-pulumi', label: 'Infrastructure in Pulumi', when: { IAC: ['pulumi'] },
+      decision: 'The infrastructure is written with Pulumi in the language the team already uses, one stack per environment, state in Pulumi Cloud or a self-managed backend (S3, Azure Blob Storage, Google Cloud Storage). A CrossGuard policy pack runs with every preview and stops on a mandatory violation of the security and tagging baseline; only the pipeline runs pulumi up, after review; a refreshed preview every {{DRIFT_HOURS}} hours reports drift.',
+      consequences: '• Loops, functions, types and unit tests for infrastructure, in the team\'s language.\n• Infrastructure code can grow as complex as application code; it needs the same review discipline.\n• Fewer ready-made scanners and cost estimators read Pulumi than Terraform.',
+      alternatives: '1. Terraform: the widest ecosystem of scanners and estimators.\n2. The cloud\'s own tool: one cloud, state kept by the cloud.',
+    },
+    {
+      id: 'adr-iac-native', label: 'Infrastructure in the cloud\'s own tool', when: NATIVE,
+      decision: 'The infrastructure is described in the cloud\'s own tool: CloudFormation, written directly or synthesised from the AWS CDK, on AWS; Bicep on Azure. Templates live under infra/ with a parameter file per environment, and the cloud keeps the state. Checkov scans the templates in every pull request; tags are enforced at deployment by AWS Organizations tag policies or Azure Policy; only the pipeline deploys, after review; CloudFormation drift detection or a Bicep what-if every {{DRIFT_HOURS}} hours reports drift.',
+      consequences: '• No state to run, and the newest services on the day they ship.\n• One cloud only: a second cloud or a SaaS product needs another tool.\n• Fewer policy and cost tools read the templates than read Terraform.',
+      alternatives: '1. Terraform: every cloud and SaaS, a state backend to run.\n2. Pulumi: a general-purpose language, the same providers as Terraform.',
+    },
+    {
+      id: 'adr-iac-native-fallback', label: 'Infrastructure in Terraform, as the cloud has no tool of its own', when: TERRAFORM[1].when,
+      decision: 'The cloud\'s own tool was chosen, but {{CLOUD}} has no CloudFormation or Bicep: Google Cloud\'s own tool, Infrastructure Manager, deploys Terraform configurations, and our own data centre has no provider tool at all. The infrastructure is therefore described in Terraform, deployed through Infrastructure Manager on Google Cloud and by the pipeline in our own data centre: one root per environment under envs/<environment>/, state in a remote backend with locking, a plan checked by Checkov in every pull request, applied only after review, and a refresh-only plan every {{DRIFT_HOURS}} hours reporting drift.',
+      consequences: '• The checks of this pack for Terraform apply as they are.\n• On Google Cloud, Infrastructure Manager keeps the state and the deployment history; elsewhere the backend is ours to run.\n• HCL has limited abstraction; large estates need module conventions.',
+      alternatives: '1. Pulumi: the same providers in a general-purpose language.\n2. Deployment Manager on Google Cloud: retired in favour of Infrastructure Manager.',
+    },
+  ],
+  fitness: [
+    ...TERRAFORM.map(checkov),
+    {
+      id: 'ff-checkov-native', label: 'Templates pass policy', when: NATIVE, category: 'structural', implements: ['adr-iac-native'], checks: ['req-policy'],
       threshold: '0 failed Checkov checks of the baseline (encryption, public access, open admin ports) in the CloudFormation or Bicep templates of every pull request',
       description: 'Checkov scans the CloudFormation (synthesised from the CDK with cdk synth) or Bicep templates under infra/ in every pull request with its built-in checks and fails on any finding. Tags are enforced at deploy time by the cloud (AWS Organizations tag policies, Azure Policy "Require a tag on resources"), not by this check.',
       tool: 'Checkov',
@@ -296,7 +403,7 @@ set -euo pipefail
 checkov --directory infra --framework cloudformation,bicep --compact`,
     },
     {
-      id: 'ff-crossguard', label: 'Previews pass policy', when: { IAC: ['pulumi'] }, category: 'structural', implements: HOSTINGS, checks: ['req-policy'],
+      id: 'ff-crossguard', label: 'Previews pass policy', when: { IAC: ['pulumi'] }, category: 'structural', implements: ['adr-iac-pulumi'], checks: ['req-policy'],
       threshold: '0 mandatory policy violations in the preview of every pull request: missing owner, environment or cost-centre tags on the listed resource types, public storage',
       description: 'A Pulumi CrossGuard policy pack runs with every preview and update and stops on a mandatory violation. The tag rule covers the listed resource types of AWS, Azure and Google Cloud (labels there); the public-storage rule knows each cloud\'s bucket setting. Extend the lists with the resource types the stacks use.',
       tool: 'Pulumi CrossGuard (@pulumi/policy)',
@@ -337,25 +444,9 @@ new PolicyPack('baseline', {
   ],
 })`,
     },
+    ...TERRAFORM.map(terraformDrift),
     {
-      id: 'ff-drift-terraform', label: 'Drift detected', when: { IAC: ['terraform'] }, category: 'operational', implements: HOSTINGS, checks: ['req-drift', 'req-iac'],
-      threshold: 'A drift check every {{DRIFT_HOURS}} hours per environment; 0 unexplained differences between code and infrastructure',
-      description: 'A scheduled pipeline runs a refresh-only plan in each environment\'s root; exit code 2 means the infrastructure differs from the code, and the job opens an issue for the owning team.',
-      tool: 'Terraform (plan -detailed-exitcode) with the GitHub CLI',
-      language: 'bash',
-      snippet: `#!/usr/bin/env bash
-# scheduled every {{DRIFT_HOURS}} hours, in envs/$ENVIRONMENT
-set -uo pipefail
-terraform init -input=false >/dev/null
-terraform plan -refresh-only -detailed-exitcode -input=false -no-color > drift.txt
-case $? in
-  0) echo "no drift" ;;
-  2) gh issue create --title "Drift in $ENVIRONMENT" --body-file drift.txt --label drift; exit 1 ;;
-  *) echo "plan failed"; exit 1 ;;
-esac`,
-    },
-    {
-      id: 'ff-drift-pulumi', label: 'Drift detected', when: { IAC: ['pulumi'] }, category: 'operational', implements: HOSTINGS, checks: ['req-drift', 'req-iac'],
+      id: 'ff-drift-pulumi', label: 'Drift detected', when: { IAC: ['pulumi'] }, category: 'operational', implements: ['adr-iac-pulumi'], checks: ['req-drift', 'req-iac'],
       threshold: 'A drift check every {{DRIFT_HOURS}} hours per stack; 0 unexplained differences between code and infrastructure',
       description: 'A scheduled pipeline refreshes each stack in preview and fails when anything changed outside the code; Pulumi Deployments can run the same as a scheduled drift detection.',
       tool: 'Pulumi (preview --refresh --expect-no-changes)',
@@ -367,7 +458,7 @@ pulumi stack select "$STACK"
 pulumi preview --refresh --expect-no-changes --diff --non-interactive`,
     },
     {
-      id: 'ff-drift-native', label: 'Drift detected', when: { IAC: ['native'] }, category: 'operational', implements: HOSTINGS, checks: ['req-drift', 'req-iac'],
+      id: 'ff-drift-native', label: 'Drift detected', when: NATIVE, category: 'operational', implements: ['adr-iac-native'], checks: ['req-drift', 'req-iac'],
       threshold: 'A drift check every {{DRIFT_HOURS}} hours; 0 CloudFormation stacks in DRIFTED state, 0 resources a Bicep what-if would change',
       description: 'A scheduled job runs the part for the cloud in use (the CLOUD variable of the pipeline): on AWS it starts CloudFormation drift detection on every stack and fails when one is DRIFTED; on Azure it runs a what-if of the deployed Bicep template against the resource group and fails on any change other than NoChange or Ignore.',
       tool: 'AWS CloudFormation drift detection (AWS CLI); Azure: az deployment group what-if',
@@ -419,21 +510,8 @@ gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" --format=json |
   map(select((.budgetFilter.calendarPeriod // "MONTH") == "MONTH" and (.amount.specifiedAmount.units | tonumber) == $amount
     and any(.thresholdRules[]?; .spendBasis == "FORECASTED_SPEND" and (.thresholdPercent * 100) <= $pct))) | length > 0' >/dev/null \\
   || { echo "no monthly budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}} % or lower on $BILLING_ACCOUNT"; exit 1; }`),
-    {
-      id: 'ff-infracost', label: 'Cost change in review', when: { IAC: ['terraform'] }, category: 'process', implements: HOSTINGS, checks: ['req-cost-review'],
-      threshold: '100% of infrastructure pull requests show the monthly cost change; above {{COST_STEP}} a month the check fails until the pull request carries the label budget-approved',
-      description: 'Infracost compares the cost of the pull request\'s Terraform with the main branch and comments the difference; the step then fails above the limit unless the budget owner has added the label budget-approved, which only they may add (a CODEOWNERS-protected label rule or a workflow that checks who added it).',
-      tool: 'Infracost with the GitHub CLI',
-      language: 'bash',
-      snippet: `infracost breakdown --path . --format json --out-file base.json        # run on the main branch checkout
-infracost diff --path . --compare-to base.json --format json --out-file diff.json
-infracost comment github --path diff.json --repo "$GITHUB_REPOSITORY" \\
-  --pull-request "$PR_NUMBER" --github-token "$GITHUB_TOKEN" --behavior update
-increase=$(jq -r '(.diffTotalMonthlyCost // "0") | tonumber | floor' diff.json)
-approved=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' | grep -cx budget-approved || true)
-[ "$increase" -le {{COST_STEP}} ] || [ "$approved" -gt 0 ] \\
-  || { echo "adds $increase a month: the budget owner adds the label budget-approved"; exit 1; }`,
-    },
+    infracost('ff-infracost', { IAC: ['terraform'], CLOUD: PUBLIC_CLOUDS }, 'req-cost-review'),
+    infracost('ff-infracost-fallback', { IAC: ['native'], CLOUD: ['gcp'] }, 'req-cost-review-fallback'),
     paas('aws', 'ECS on Fargate', 'AWS CLI (ecs, application-autoscaling); App Runner: describe-service and its auto-scaling configuration\'s MinSize', `#!/usr/bin/env bash
 # production: the service keeps at least 2 tasks and has an autoscaling target above them
 set -euo pipefail
@@ -454,27 +532,26 @@ set -euo pipefail
 read -r min max < <(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \\
   | jq -r '.spec.template.metadata.annotations | "\\(.["autoscaling.knative.dev/minScale"] // 0) \\(.["autoscaling.knative.dev/maxScale"] // 0)"')
 [ "$min" -ge 2 ] && [ "$max" -gt "$min" ] || { echo "instances $min-$max (at least 2, scaling above it)"; exit 1; }`),
-    {
-      id: 'ff-kube-score', label: 'Manifests well specified', when: { HOSTING: ['kubernetes'] }, category: 'structural', implements: ['adr-kubernetes'], checks: ['req-k8s'],
-      threshold: '0 critical kube-score findings (missing requests or limits, probes, PodDisruptionBudget, non-root user, read-only root file system) in the rendered manifests',
-      description: 'The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score.',
-      tool: 'kube-score',
-      language: 'bash',
-      snippet: `helm template order-api charts/order-api -f charts/order-api/values-production.yaml \\
-  | kube-score score - --output-format ci`,
-    },
-    functions('aws', 'Lambda', '100% of functions have reserved concurrency and a dead-letter queue or on-failure destination',
-      'A check after each deploy lists the account\'s functions and fails on one without a reserved concurrency or without either a dead-letter queue or an on-failure destination.',
-      'AWS CLI (lambda)', `#!/usr/bin/env bash
-# every function: a reserved concurrency and a dead-letter queue or on-failure destination
+    kubeScore('ff-kube-score', { HOSTING: ['kubernetes'] }, 'adr-kubernetes', 'req-k8s'),
+    kubeScore('ff-kube-score-onprem', ONPREM_PLATFORM, 'adr-onprem-platform', 'req-k8s-onprem'),
+    functions('aws', 'Lambda', '100% of functions have a concurrency limit (reserved concurrency, or a maximum concurrency on every SQS trigger) and a dead-letter queue or on-failure destination',
+      'A check after each deploy lists the account\'s functions and fails on one with neither a reserved concurrency nor a maximum concurrency on each of its SQS triggers (the event source mapping\'s ScalingConfig, which caps the function\'s pollers without carving from the account\'s pool), or without either a dead-letter queue or an on-failure destination. Provisioned concurrency keeps instances warm but sets no ceiling, so it does not count as a limit.',
+      'AWS CLI (lambda) with jq', `#!/usr/bin/env bash
+# every function: a concurrency limit (reserved, or a maximum on every SQS trigger)
+# and a dead-letter queue or on-failure destination
 set -euo pipefail
 fail=0
 for fn in $(aws lambda list-functions --query 'Functions[].FunctionName' --output text); do
   reserved=$(aws lambda get-function-concurrency --function-name "$fn" --query ReservedConcurrentExecutions --output text)
+  read -r sqs unbounded < <(aws lambda list-event-source-mappings --function-name "$fn" --output json | jq -r '
+    [.EventSourceMappings[] | select(.EventSourceArn | startswith("arn:aws:sqs:"))]
+    | "\\(length) \\(map(select(.ScalingConfig.MaximumConcurrency == null)) | length)"')
   dlq=$(aws lambda get-function-configuration --function-name "$fn" --query 'DeadLetterConfig.TargetArn' --output text)
   dest=$(aws lambda get-function-event-invoke-config --function-name "$fn" \\
     --query 'DestinationConfig.OnFailure.Destination' --output text 2>/dev/null || echo None)
-  [ "$reserved" != None ] || { echo "$fn: no reserved concurrency"; fail=1; }
+  if [ "$reserved" = None ] && { [ "$sqs" -eq 0 ] || [ "$unbounded" -gt 0 ]; }; then
+    echo "$fn: no concurrency limit (reserved, or a maximum concurrency on every SQS trigger)"; fail=1
+  fi
   [ "$dlq" != None ] || [ "$dest" != None ] || { echo "$fn: no dead-letter queue or on-failure destination"; fail=1; }
 done
 exit $fail`),
@@ -520,18 +597,25 @@ groups:
     },
     {
       id: 'ff-cdn-origin', label: 'Only through the CDN', when: { HOSTING: ['cdn'] }, category: 'operational', implements: ['adr-cdn'], checks: ['req-cdn'],
-      threshold: 'The site answers over TLS with an HSTS header and a cache lifetime; the origin answers a direct request for the same file with 403 or 404',
-      description: 'A check after each deploy fetches the site through the CDN and reads its headers, then requests a file directly from the origin bucket\'s URL and expects it refused.',
+      threshold: 'The site answers over TLS with an HSTS header; its page with Cache-Control no-cache (or max-age=0 with must-revalidate) and a content-hashed asset with max-age=31536000; the origin answers a direct request for the page with 403, 404 or 409',
+      description: 'A check after each deploy fetches the page and one content-hashed asset of the build through the CDN and reads their headers against adr-cdn\'s caching rule (hashed assets cached for a year, the page revalidated), then requests the page directly from the origin bucket\'s URL and expects it refused: 403 or 404 from S3 and Cloud Storage, 409 (PublicAccessNotPermitted) from Azure Blob Storage with public access off.',
       tool: 'curl (post-deploy check)',
       language: 'bash',
       snippet: `#!/usr/bin/env bash
-# SITE_URL: through the CDN; ORIGIN_URL: the bucket's own endpoint
+# SITE_URL: through the CDN; ORIGIN_URL: the bucket's own endpoint;
+# ASSET_PATH: one content-hashed file of this build (by default the first script under dist/assets)
 set -euo pipefail
-headers=$(curl -fsSI "$SITE_URL/" | tr -d '\\r')
-grep -qi '^strict-transport-security:' <<<"$headers" || { echo "no HSTS header on $SITE_URL"; exit 1; }
-grep -qiE '^cache-control:.*max-age=[1-9]' <<<"$headers" || { echo "no cache lifetime on $SITE_URL"; exit 1; }
+asset=\${ASSET_PATH:-$(cd dist && ls assets/*.js | head -n 1)}
+page=$(curl -fsSI "$SITE_URL/" | tr -d '\\r')
+grep -qi '^strict-transport-security:' <<<"$page" || { echo "no HSTS header on $SITE_URL"; exit 1; }
+page_cc=$(grep -i '^cache-control:' <<<"$page" || true)
+[[ "$page_cc" =~ no-cache ]] || { [[ "$page_cc" =~ max-age=0([^0-9]|$) ]] && [[ "$page_cc" =~ must-revalidate ]]; } \\
+  || { echo "the page is not revalidated on each request ($page_cc)"; exit 1; }
+asset_cc=$(curl -fsSI "$SITE_URL/$asset" | tr -d '\\r' | grep -i '^cache-control:' || true)
+[[ "$asset_cc" =~ max-age=31536000 ]] || { echo "$asset is not cached for a year ($asset_cc)"; exit 1; }
 code=$(curl -s -o /dev/null -w '%{http_code}' "$ORIGIN_URL/index.html")
-[ "$code" = 403 ] || [ "$code" = 404 ] || { echo "origin $ORIGIN_URL answers $code to a direct request (must refuse)"; exit 1; }`,
+[ "$code" = 403 ] || [ "$code" = 404 ] || [ "$code" = 409 ] \\
+  || { echo "origin $ORIGIN_URL answers $code to a direct request (must refuse)"; exit 1; }`,
     },
     {
       id: 'ff-ephemeral-k8s', label: 'No forgotten environments (namespaces)', when: { ENVIRONMENTS: ['ephemeral'], HOSTING: ['kubernetes'] }, category: 'operational', implements: ['adr-kubernetes'], checks: ['req-ephemeral'],
@@ -551,7 +635,7 @@ while IFS=$'\\t' read -r ns pr last; do
   fi
 done`,
     },
-    ephemeral('terraform', 'workspaces', 'A scheduled job lists the Terraform workspaces named pr-<number>, destroys those whose pull request is closed or last updated past the limit, and deletes the workspace.',
+    ...ephemeral('terraform', TERRAFORM, 'workspaces', 'A scheduled job lists the Terraform workspaces named pr-<number>, destroys those whose pull request is closed or last updated past the limit, and deletes the workspace.',
       'Terraform with the GitHub CLI (scheduled job)', `#!/usr/bin/env bash
 # in envs/ephemeral; workspaces are named pr-<number>
 set -euo pipefail
@@ -566,7 +650,7 @@ for ws in $(terraform workspace list | tr -d '* ' | grep -E '^pr-[0-9]+$'); do
     terraform workspace select default && terraform workspace delete "$ws"
   fi
 done`),
-    ephemeral('pulumi', 'stacks', 'A scheduled job lists the stacks named pr-<number> with their last update, destroys those whose pull request is closed or last updated past the limit, and removes the stack.',
+    ...ephemeral('pulumi', [{ suffix: '', when: { IAC: ['pulumi'] } }], 'stacks', 'A scheduled job lists the stacks named pr-<number> with their last update, destroys those whose pull request is closed or last updated past the limit, and removes the stack.',
       'Pulumi with the GitHub CLI (scheduled job)', `#!/usr/bin/env bash
 # stacks are named pr-<number>
 set -euo pipefail
@@ -580,7 +664,7 @@ while read -r stack last; do
     pulumi destroy --stack "$stack" --yes --non-interactive && pulumi stack rm "$stack" --yes
   fi
 done`),
-    ephemeral('native', 'stacks and resource groups', 'A scheduled job runs the part for the cloud in use (the CLOUD variable): on AWS it lists the CloudFormation stacks tagged pr=<number>, on Azure the resource groups tagged pr=<number>, and deletes those whose pull request is closed or last updated past the limit.',
+    ...ephemeral('native', [{ suffix: '', when: NATIVE }], 'stacks and resource groups', 'A scheduled job runs the part for the cloud in use (the CLOUD variable): on AWS it lists the CloudFormation stacks tagged pr=<number>, on Azure the resource groups tagged pr=<number>, and deletes those whose pull request is closed or last updated past the limit.',
       'AWS CLI (cloudformation) or Azure CLI (group) with the GitHub CLI (scheduled job)', `#!/usr/bin/env bash
 # the pipeline sets CLOUD to aws or azure; ephemeral stacks or resource groups are tagged pr=<number>
 set -euo pipefail

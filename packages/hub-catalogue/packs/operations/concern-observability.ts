@@ -68,8 +68,8 @@ const pack: PackSpec = {
   ],
   details: [
     { key: 'LOG_DAYS', label: 'How long are logs kept (days)?', default: '30', number: true },
-    { key: 'SAMPLE_PERCENT', label: 'Share of ordinary traces kept (%). Only with head or tail sampling', default: '10', number: true },
-    { key: 'SLOW_TRACE_MS', label: 'A trace slower than this is always kept (ms); set it at the latency objective decided in the Capacity and scaling pack. Only with tail sampling', default: '500', number: true },
+    { key: 'SAMPLE_PERCENT', label: 'Share of ordinary traces kept (%). Only with OpenTelemetry and head or tail sampling', default: '10', number: true },
+    { key: 'SLOW_TRACE_MS', label: 'A trace slower than this is always kept (ms); set it at the latency objective decided in the Capacity and scaling pack. Only with OpenTelemetry and tail sampling', default: '500', number: true },
   ],
   need: {
     label: 'Health seen, failures explained',
@@ -106,9 +106,9 @@ const pack: PackSpec = {
     {
       id: 'req-hours', label: 'Out-of-hours alerts wait', when: { ONCALL: ['hours'] }, ears_type: 'state-driven',
       precondition: 'outside working hours',
-      action: 'turn alerts into tickets for the next working day instead of calling anyone, and show the outage on the status page within 5 minutes',
+      action: 'turn alerts into tickets for the next working day instead of calling anyone, and show the outage on the status page within 1 minute of the alert',
       rationale: 'Without on-call, users still need to know the service is down and that it is known; the ticket makes sure the morning starts with it.',
-      scenario: { label: 'Night outage', given: 'an outage at 23:00', when: 'the burn-rate alert fires', then: 'nobody is called, a ticket waits for the morning, and the status page shows the outage within 5 minutes' },
+      scenario: { label: 'Night outage', given: 'an outage at 23:00', when: 'the burn-rate alert fires', then: 'nobody is called, a ticket waits for the morning, and the status page shows the outage within 1 minute of the alert' },
     },
     {
       id: 'req-retention', label: 'Logs deleted after retention', ears_type: 'ubiquitous',
@@ -157,7 +157,7 @@ const pack: PackSpec = {
     },
     {
       id: 'adr-logs', label: 'Structured logs and metrics', when: { SIGNALS: ['logs'] },
-      decision: 'The element writes structured JSON log lines to standard output, each with a correlation id taken from the incoming X-Request-ID or traceparent header or created at the edge, and passes that id on in every call it makes. It exposes request rate, errors and duration as Prometheus metrics (or OpenTelemetry metrics with the same semantic conventions, which the indicator queries assume) on its own endpoint. A shipper (Fluent Bit, Vector or Grafana Alloy) sends the logs to the log store: Loki, Elasticsearch or OpenSearch, or the cloud\'s own (CloudWatch Logs, Azure Monitor Logs). No tracing. The availability objective and its burn-rate alerts are decided in the Availability pack and measured with {{SLI}}; alerts reach {{ONCALL}}. Log lines: shaped and redacted as decided in the Error handling and logging conventions pack; logs kept {{LOG_DAYS}} days.',
+      decision: 'The element writes structured JSON log lines to standard output, each with a correlation id taken from the incoming X-Request-ID or traceparent header or created at the edge, and passes that id on in every call it makes. It exposes request rate, errors and duration as the OpenTelemetry HTTP server metric (http.server.request.duration, which Prometheus scrapes as http_server_request_duration_seconds with the label http_response_status_code) on its own endpoint, through the OpenTelemetry metrics SDK with its Prometheus exporter; the indicator queries read that name. A framework\'s own metrics (Micrometer\'s http_server_requests_seconds with the label status) are fine too, with the indicator queries rewritten for them. A shipper (Fluent Bit, Vector or Grafana Alloy) sends the logs to the log store: Loki, Elasticsearch or OpenSearch, or the cloud\'s own (CloudWatch Logs, Azure Monitor Logs). No tracing. The availability objective and its burn-rate alerts are decided in the Availability pack and measured with {{SLI}}; alerts reach {{ONCALL}}. Log lines: shaped and redacted as decided in the Error handling and logging conventions pack; logs kept {{LOG_DAYS}} days.',
       consequences: '• Less to run and to pay for than three signals.\n• A request across elements is followed by its correlation id, by hand, and where its time went is guessed from timestamps.\n• Adding tracing later is easier if the correlation id is already the traceparent.',
       alternatives: '1. OpenTelemetry with traces: more to run, but a slow request explains itself.\n2. Unstructured text logs: nothing to set up, but they cannot be searched or counted reliably.',
     },
@@ -169,7 +169,7 @@ const pack: PackSpec = {
     },
     {
       id: 'adr-hours', label: 'Alerts in working hours', when: { ONCALL: ['hours'] },
-      decision: 'Burn-rate alerts reach the team in working hours through the team channel (Slack or Microsoft Teams) and a mobile notification; outside working hours, Alertmanager\'s time intervals route them to tickets for the next working day instead. The same alerts reach the status page\'s incoming webhook (Instatus, Grafana OnCall\'s status page, or a small bridge to Atlassian Statuspage\'s incidents API) within a minute, so users know the outage is known. Only symptoms alert; every alert links its runbook.',
+      decision: 'Burn-rate alerts reach the team in working hours through the team channel (Slack or Microsoft Teams) and a mobile notification; outside working hours, Alertmanager\'s time intervals route them to tickets for the next working day instead. The same alerts reach the status page\'s incoming webhook (Instatus, Grafana OnCall\'s status page, or a small bridge to Atlassian Statuspage\'s incidents API) within 1 minute of firing, so users know the outage is known. Only symptoms alert; every alert links its runbook.',
       consequences: '• Nobody is woken; no on-call cost.\n• An outage at night lasts until the morning: one such night can use a month\'s budget at 99.9 %, which the objective decided in the Availability pack must allow.\n• The status page carries the communication outside hours.',
       alternatives: '1. An on-call rotation around the clock: night outages are fixed at night, at the cost of a paid rotation.\n2. Best effort by whoever sees the alert: no cost, no promise, and burnout of the conscientious few.',
     },
@@ -179,7 +179,7 @@ const pack: PackSpec = {
       id: 'ff-sli-request', label: 'Request indicator recorded', when: { SLI: ['request'] }, category: 'operational', implements: SIGNAL_ADRS,
       checks: ['req-sli-request'],
       threshold: 'The good and total request rates are recorded from the edge metrics; a unit test over the rules counts a 200 as good, a 500 as bad and a 404 as invalid',
-      description: 'Recording rules in the repository compute the good and total request rates from the server\'s request histogram, leaving 4xx answers out; promtool runs a unit test over them in the pipeline with synthetic series, so a change that counts a 500 as good or a 404 as a request fails the build. The Availability pack\'s SLO spec uses the same queries.',
+      description: 'Recording rules in the repository compute the good and total request rates from the server\'s request histogram, leaving 4xx answers out; promtool runs a unit test over them in the pipeline with synthetic series, so a change that counts a 500 as good or a 404 as a request fails the build. The Availability pack\'s SLO spec uses the same queries. The metric is the OpenTelemetry HTTP server metric as Prometheus names it; for Micrometer, read http_server_requests_seconds_count with the label status instead, in the rules and the test alike.',
       tool: 'promtool test rules (Prometheus)',
       language: 'yaml',
       snippet: `# sli.rules.yaml
@@ -280,6 +280,7 @@ receivers:
 # CI step
 - run: |
     amtool check-config alertmanager.yml
+    # --verify.receivers compares the matched receivers comma-joined in route order
     amtool config routes test --config.file=alertmanager.yml --verify.receivers=pagerduty-oncall severity=page service=order-api
     amtool config routes test --config.file=alertmanager.yml --verify.receivers=tickets severity=ticket service=order-api`,
     },
@@ -321,9 +322,9 @@ receivers:
     {
       id: 'ff-hours-routing', label: 'Night alerts become tickets, the status page knows', when: { ONCALL: ['hours'] }, category: 'process', implements: ['adr-hours'],
       checks: ['req-alert', 'req-hours'],
-      threshold: 'Page alerts match the status-page, team-channel and tickets receivers in the routing tree, the status-page route waits at most 1 minute, and the configuration is valid',
-      description: 'The Alertmanager routing sends page alerts to the status page\'s webhook within a minute, to the team channel during the working-hours time interval and to tickets outside it; a pipeline step validates the configuration and the receivers with amtool whenever it changes. amtool does not evaluate time intervals, so the channel-or-ticket split is confirmed once after a change by adding a test alert (amtool alert add severity=page) outside hours and seeing the ticket.',
-      tool: 'amtool (Prometheus Alertmanager time intervals)',
+      threshold: 'Page alerts match the status-page, team-channel and tickets receivers in the routing tree, in that order; the status-page route sets group_wait to at most 1 minute; the configuration is valid',
+      description: 'The Alertmanager routing sends page alerts to the status page\'s webhook within a minute, to the team channel during the working-hours time interval and to tickets outside it; a pipeline step validates the configuration and the receivers with amtool whenever it changes, and reads the status-page route\'s group_wait with yq. --verify.receivers compares the receivers comma-joined in route order, so the list follows the order of the routes. amtool does not evaluate time intervals, so the channel-or-ticket split is confirmed once after a change by adding a test alert (amtool alert add severity=page) outside hours and seeing the ticket.',
+      tool: 'amtool (Prometheus Alertmanager time intervals) and yq',
       language: 'yaml',
       snippet: `# alertmanager.yml (excerpt)
 time_intervals:
@@ -357,7 +358,10 @@ receivers:
 # CI step
 - run: |
     amtool check-config alertmanager.yml
-    amtool config routes test --config.file=alertmanager.yml --verify.receivers=status-page,team-channel,tickets severity=page`,
+    # the receivers in route order, comma-joined: the check is order-sensitive
+    amtool config routes test --config.file=alertmanager.yml --verify.receivers=status-page,team-channel,tickets severity=page
+    wait=$(yq '.route.routes[] | select(.receiver == "status-page") | .group_wait' alertmanager.yml)
+    [[ "$wait" =~ ^([0-9]|[1-5][0-9]|60)s$|^1m$ ]] || { echo "status-page route waits $wait, more than 1 minute"; exit 1; }`,
     },
     {
       id: 'ff-retention', label: 'Log retention enforced', category: 'structural', implements: SIGNAL_ADRS,
@@ -393,68 +397,114 @@ jobs:
       id: 'ff-trace-propagation', label: 'Traces stay whole', when: OTEL, category: 'structural', implements: ['adr-otel'],
       checks: ['req-trace'],
       threshold: 'A request through the element and its outgoing calls yields exactly 1 trace id, with as many client spans as outgoing calls, each carrying the traceparent',
-      description: 'An integration test registers the HTTP instrumentation before the app is loaded, sends a request with a known traceparent, lets the element make its outgoing calls to a stub, and checks that every finished span carries that trace id, that there is a client span per call, and that the stub received the traceparent header on each.',
-      tool: 'Vitest with the OpenTelemetry InMemorySpanExporter and HttpInstrumentation',
+      description: 'An integration test registers the HTTP instrumentation before the app is loaded, serves the app on a port of its own, sends it a request with a known traceparent, lets the element make its outgoing calls to a stub, and checks that every finished span carries that trace id, that there is a client span per call, and that the stub received the traceparent header on each. The instrumentation patches http in the test process too, so the test\'s own request to the app is excluded by its port (ignoreOutgoingRequestHook): otherwise it would get a client span in a fresh trace and its traceparent would be overwritten. Under Vitest the modules are ES modules, which the instrumentation does not see being loaded; requiring node:http once after registering applies the patch to the module object the app shares (an app that imports named functions from node:http needs the instrumentation\'s ESM hook, node --import with @opentelemetry/instrumentation/hook.mjs, instead).',
+      tool: 'Vitest with supertest, the OpenTelemetry InMemorySpanExporter and HttpInstrumentation (OpenTelemetry JS SDK 2.x); for the JVM: the OpenTelemetry Java agent\'s testing exporter with JUnit 5',
       language: 'ts',
-      snippet: `import { SpanKind } from '@opentelemetry/api'
+      snippet: `import http from 'node:http'
+import { createRequire } from 'node:module'
+import type { AddressInfo } from 'node:net'
+import { SpanKind } from '@opentelemetry/api'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import request from 'supertest'
+import { afterAll, expect, it, vi } from 'vitest'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
 provider.register()
-registerInstrumentations({ instrumentations: [new HttpInstrumentation()] })
+let appPort = -1
+registerInstrumentations({ instrumentations: [new HttpInstrumentation({
+  ignoreOutgoingRequestHook: (req) => Number(req.port) === appPort,   // the test's own request is not one of the element's calls
+})] })
+createRequire(import.meta.url)('node:http')       // the instrumentation patches on require: the app and the test share this module
 const { app } = await import('../src/app')        // loaded after the instrumentation, so http is patched
 const { stub } = await import('./stubs/partner')  // records every request the element sends it
+const server = http.createServer(app).listen(0)
+appPort = (server.address() as AddressInfo).port
+afterAll(() => { server.close() })
 
 it('keeps one trace across the element and its outgoing calls', async () => {
   const traceId = '4bf92f3577b34da6a3ce929d0e0e4736'
-  await request(app).get('/orders/42').set('traceparent', \`00-\${traceId}-00f067aa0ba902b7-01\`).expect(200)
+  exporter.reset()
+  await request(server).get('/orders/42').set('traceparent', \`00-\${traceId}-00f067aa0ba902b7-01\`).expect(200)
+  await vi.waitFor(() => expect(exporter.getFinishedSpans().some((s) => s.kind === SpanKind.SERVER)).toBe(true))
   const spans = exporter.getFinishedSpans()
   expect(new Set(spans.map((s) => s.spanContext().traceId))).toEqual(new Set([traceId]))
   expect(spans.filter((s) => s.kind === SpanKind.CLIENT)).toHaveLength(stub.requests.length)
+  expect(stub.requests.length).toBeGreaterThan(0)
   for (const r of stub.requests) expect(r.headers.traceparent).toContain(traceId)
 })`,
     },
     {
       id: 'ff-head-sampling', label: 'SDK samples at the root', when: { SIGNALS: ['otel'], SAMPLING: ['head'] }, category: 'structural', implements: ['adr-otel'],
       checks: ['req-sample-head'],
-      threshold: 'Every container of the element sets OTEL_TRACES_SAMPLER=parentbased_traceidratio and OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100',
-      description: 'A policy over the Kubernetes manifests fails the pipeline when a container of the element does not configure the SDK\'s parent-based trace-id-ratio sampler with the agreed share; parent-based means only the first element decides and the others follow. On other platforms the same two variables go in the service\'s environment and the same check reads it.',
-      tool: 'Conftest (Open Policy Agent)',
+      threshold: 'Every container of the element\'s Deployments, StatefulSets and DaemonSets sets OTEL_TRACES_SAMPLER=parentbased_traceidratio and OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100, directly or from a ConfigMap in the same manifests',
+      description: 'A policy over all the rendered manifests at once fails the pipeline when a container does not configure the SDK\'s parent-based trace-id-ratio sampler with the agreed share; parent-based means only the first element decides and the others follow. A value is read from env (value, or valueFrom.configMapKeyRef) or from a ConfigMap the container takes whole with envFrom, so the ConfigMaps must be among the manifests checked; an unset ratio counts as the SDK\'s default of 1. On other platforms the same two variables go in the service\'s environment and the same check reads it.',
+      tool: 'Conftest (Open Policy Agent, rego.v1): conftest test --combine manifests/',
       language: 'rego',
-      snippet: `package main
+      snippet: `# conftest test --combine manifests/
+package main
 
 import rego.v1
 
-env(c) := {e.name: e.value | some e in c.env}
+docs contains d if { some f in input; is_array(f.contents); some d in f.contents }
+docs contains d if { some f in input; is_object(f.contents); d := f.contents }
+
+workloads contains w if { some w in docs; w.kind in {"Deployment", "StatefulSet", "DaemonSet"} }
+
+config_map(name) := object.get(cm, "data", {}) if { some cm in docs; cm.kind == "ConfigMap"; cm.metadata.name == name }
+
+has_env(c, name) if { some e in c.env; e.name == name }
+
+env_value(c, name) := v if { some e in c.env; e.name == name; v := e.value }
+env_value(c, name) := v if {
+  some e in c.env
+  e.name == name
+  ref := e.valueFrom.configMapKeyRef
+  entries := config_map(ref.name)
+  v := entries[ref.key]
+}
+env_value(c, name) := v if {
+  not has_env(c, name)
+  some f in c.envFrom
+  entries := config_map(f.configMapRef.name)
+  v := entries[name]
+}
+
+sampler_arg(c) := to_number(env_value(c, "OTEL_TRACES_SAMPLER_ARG"))
+sampler_arg(c) := 1 if not env_value(c, "OTEL_TRACES_SAMPLER_ARG")   # the SDK's default
 
 deny contains msg if {
-  input.kind == "Deployment"
-  some c in input.spec.template.spec.containers
-  object.get(env(c), "OTEL_TRACES_SAMPLER", "") != "parentbased_traceidratio"
-  msg := sprintf("%s: container %s must set OTEL_TRACES_SAMPLER=parentbased_traceidratio", [input.metadata.name, c.name])
+  some w in workloads
+  some c in w.spec.template.spec.containers
+  not env_value(c, "OTEL_TRACES_SAMPLER") == "parentbased_traceidratio"
+  msg := sprintf("%s/%s: container %s must set OTEL_TRACES_SAMPLER=parentbased_traceidratio", [w.kind, w.metadata.name, c.name])
 }
 
 deny contains msg if {
-  input.kind == "Deployment"
-  some c in input.spec.template.spec.containers
-  to_number(object.get(env(c), "OTEL_TRACES_SAMPLER_ARG", "1")) != {{SAMPLE_PERCENT}} / 100
-  msg := sprintf("%s: container %s must set OTEL_TRACES_SAMPLER_ARG to the agreed share of traces", [input.metadata.name, c.name])
+  some w in workloads
+  some c in w.spec.template.spec.containers
+  sampler_arg(c) != {{SAMPLE_PERCENT}} / 100
+  msg := sprintf("%s/%s: container %s must set OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100", [w.kind, w.metadata.name, c.name])
 }`,
     },
     {
       id: 'ff-tail-sampling', label: 'Error traces always kept', when: { SIGNALS: ['otel'], SAMPLING: ['tail'] }, category: 'operational', implements: ['adr-otel'],
       checks: ['req-sample-tail'],
       threshold: 'The Collector\'s tail sampling policy keeps traces with an error status or slower than {{SLOW_TRACE_MS}} ms and {{SAMPLE_PERCENT}} % of the rest; the configuration validates',
-      description: 'The Collector\'s tail sampling policy is kept in the repository and validated with the Collector\'s own validate command in the pipeline, so a policy that drops errors or a mistyped field fails the build before it runs.',
+      description: 'The Collector\'s configuration, with its tail sampling policy, is kept in the repository whole (receivers, processors, exporters and the traces pipeline) and validated with the Collector\'s own validate command in the pipeline, so a mistyped field or a component the pipeline names but nobody defines fails the build before it runs; reviewing the policy against the threshold is part of the change.',
       tool: 'OpenTelemetry Collector contrib (tail_sampling processor; otelcol-contrib validate)',
       language: 'yaml',
       snippet: `# collector.yaml   (CI: otelcol-contrib validate --config=collector.yaml)
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
 processors:
+  batch: {}
   tail_sampling:
     decision_wait: 10s
     num_traces: 100000
@@ -468,6 +518,10 @@ processors:
       - name: the-rest
         type: probabilistic
         probabilistic: { sampling_percentage: {{SAMPLE_PERCENT}} }
+exporters:
+  otlp:
+    endpoint: tempo-distributor.observability.svc:4317   # your trace backend
+    tls: { insecure: true }                               # inside the cluster; TLS as the Encryption pack decides
 service:
   pipelines:
     traces:
@@ -478,12 +532,13 @@ service:
     {
       id: 'ff-keep-all', label: 'Nothing sampled, kept 7 days', when: { SIGNALS: ['otel'], SAMPLING: ['all'] }, category: 'structural', implements: ['adr-otel'],
       checks: ['req-sample-all'],
-      threshold: 'The SDK sampler is always_on, the Collector\'s traces pipeline has no sampling processor, and the trace store keeps blocks for at least 168 h',
+      threshold: 'Every container of the element (at least one) sets the SDK sampler to always_on, the Collector\'s traces pipeline has no sampling processor, and the trace store keeps blocks for at least 168 h',
       description: 'A pipeline step reads the element\'s manifest, the Collector configuration and the trace store\'s configuration from the repository and fails when any of the three would drop or expire traces early. For a hosted backend, the retention check reads the backend\'s settings API instead.',
       tool: 'yq in the CI pipeline (Grafana Tempo for the trace store)',
       language: 'bash',
       snippet: `# every container of the element samples nothing away
-yq -e '[.spec.template.spec.containers[].env[] | select(.name == "OTEL_TRACES_SAMPLER") | .value] | all_c(. == "always_on")' k8s/order-api.yaml
+# (at least one container, and each sets OTEL_TRACES_SAMPLER=always_on itself)
+yq -e '(.spec.template.spec.containers | length > 0) and (.spec.template.spec.containers | all_c((.env // []) | any_c(.name == "OTEL_TRACES_SAMPLER" and .value == "always_on")))' k8s/order-api.yaml
 # the Collector's traces pipeline has no sampling processor
 yq -e '[.service.pipelines.traces.processors[] | select(test("sampl"))] | length == 0' collector.yaml
 # Tempo keeps blocks for at least 7 days (168h)
