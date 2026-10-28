@@ -18,7 +18,15 @@ describe('studio settings', () => {
     updateStudioSettings({ selectionFocus: false }, storage)
     updateStudioSettings({ smartFit: false }, storage)
     const next = updateStudioSettings({ nodeWizardOnCreate: false }, storage)
-    expect(next).toEqual({ nodeWizardOnCreate: false, smartFit: false, alignKeepsOrder: true, selectionFocus: false })
+    expect(next).toEqual({ nodeWizardOnCreate: false, smartFit: false, alignKeepsOrder: true, selectionFocus: false, specialKey: 'alt', setupDone: false })
     expect(loadStudioSettings(storage)).toEqual(next)
+  })
+
+  it('keeps the special key and the finished setup, and a key it does not know is Alt', () => {
+    const storage = memoryStorage()
+    updateStudioSettings({ specialKey: 'shift', setupDone: true }, storage)
+    expect(loadStudioSettings(storage)).toMatchObject({ specialKey: 'shift', setupDone: true })
+    storage.setItem('radical-studio-settings', JSON.stringify({ specialKey: 'f13' }))
+    expect(loadStudioSettings(storage)).toMatchObject({ specialKey: 'alt', setupDone: false })
   })
 })

@@ -143,6 +143,18 @@
           Radical.Tools runs in the browser at <a href="https://studio.radical.tools" target="_blank" rel="noopener">studio.radical.tools</a>, with no account and nothing uploaded, or as a desktop app.
           The Welcome screen asks one thing: a new model or an existing one.
         </p>
+        <p>On the first start, the <em>Setup</em> wizard comes first, one step per topic. Each choice applies at once, and <em>Skip setup</em> keeps the defaults.</p>
+        <ul>
+          <li><strong>Theme</strong>: <em>System</em> (follows the operating system), <em>Light</em> or <em>Dark</em>.</li>
+          <li><strong>Special key</strong>: the key held to connect, nest, pick several elements and drop without a wizard.</li>
+          <li><strong>Canvas</strong>: <em>Focus</em>, <em>Smart fit</em> and <em>Wizard on create</em>.</li>
+          <li><strong>AI provider</strong>: Ollama, OpenAI, Claude or Gemini, with its key, for Radical Forge and the chat.</li>
+        </ul>
+        <figure class="doc-shot">
+          <img class="shot-light" src="screenshots/setup-light.png?v=__BUILD__" alt="Setup wizard at its Special key step: what the key does and the four keys to pick" loading="lazy" />
+          <img class="shot-dark" src="screenshots/setup-dark.png?v=__BUILD__" alt="Setup wizard at its Special key step: what the key does and the four keys to pick" loading="lazy" />
+          <figcaption>The Setup wizard. <em>Settings → Setup…</em> opens it again.</figcaption>
+        </figure>
         <ul>
           <li><strong>New model</strong> — pick the metamodel (<em>Radical</em>, or plain <em>C4</em>), its views and where to keep it: this browser, one <code>.radical</code> file, or a folder of Markdown files. <em>Views of the metamodel</em> (the default) starts the model with <em>All elements</em> as a structure and a view of each of the metamodel's viewpoints in the folders <em>Conceptual</em>, <em>Logical</em> and <em>Governance</em>, a viewpoint that draws one element as a group of views per element; <em>Customise…</em> leaves any out, and <em>Empty</em> starts with none. With an AI provider set up, <em>Create with Radical Forge</em> starts the model from a description instead.</li>
           <li><strong>Open</strong> — a recent model, a file, a folder, a Structurizr DSL workspace or the sample.</li>
@@ -176,7 +188,7 @@ npx @radicaltools/cli setup</code></pre>
         </figure>
         <ul>
           <li><strong>Top bar</strong> — the name of the model open, marked LOCAL (in this browser), FILE or FOLDER (on disk), with <a href="#changes">Changes on branch</a> beside it. Then Undo and Redo, Back and Forward with a History, Quick Search in the middle (<kbd>⌘/Ctrl+P</kbd>), the Forge button, and the four perspectives: <em>Designer</em> edits, <em>Viewer</em> explores read-only, <em>Presenter</em> plays slide decks, <em>Inspector</em> shows what <code>radical check</code> says.</li>
-          <li><strong>Activity rail</strong> — along the left edge from top to bottom, as in VS Code. At the top the folder, <em>Models</em>: <em>Manage models…</em> and <em>Import from Hub…</em>. Below it the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot <em>Settings</em>: theme, Smart fit, line style, the special key, wizards on create, the <em>metamodel editor</em>, <em>AI</em> (providers, Radical Forge), <em>Export</em> (PNG, SVG, clipboard) and <em>About Radical Studio</em> with the version to quote in a bug report.</li>
+          <li><strong>Activity rail</strong> — along the left edge from top to bottom, as in VS Code. At the top the folder, <em>Models</em>: <em>Manage models…</em> and <em>Import from Hub…</em>. Below it the three sections of the left panel: <em>Views</em>, <em>Milestones</em>, <em>Sequences</em>. At the foot <em>Settings</em>: theme (System, Light or Dark), Smart fit, line style, the special key, wizards on create, the <em>metamodel editor</em>, <em>AI</em> (providers, Radical Forge), <em>Export</em> (PNG, SVG, clipboard) <em>Setup…</em>, the first start's wizard again, and <em>About Radical Studio</em> with the version to quote in a bug report.</li>
           <li><strong>Left panel</strong> — the open section. <em>Views</em> starts with <em>All elements</em>, the whole model as a table, then one card per view, in folders if you made any. Drag its inner edge to widen it.</li>
           <li><strong>Canvas</strong> — the palette stands down its left side: drag a type onto the canvas. At the bottom: <em>Fit All</em>, zoom, <em>Focus</em> and <em>Smart Layout</em>. The chip in the top-left names the view, or the milestone you are looking at. Zoomed far out, elements are drawn as coloured blocks with large names so a big model stays readable.</li>
           <li><strong>Properties card</strong> — double-click an element, a relation or a row (or pick a sequence) and its card slides over the right side; a click only selects, and an open card then shows what you select, until <em>✕</em> or a click on the empty canvas. The head has the type, the name and where it sits; each attribute is a row you edit in place; long texts are Markdown sections. The foot stays in sight: <em>Views</em> lists every view that shows the element (a click opens it there), then the element's <em>Actions</em>, then <em>Delete</em>.</li>

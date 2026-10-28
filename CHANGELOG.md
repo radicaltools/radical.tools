@@ -7,13 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Setup wizard on Studio's first start, in the browser and the desktop app: one step each for the theme, the special key, the canvas (Focus, Smart fit, Wizard on create) and an AI provider with its key. Every choice applies at once; *Skip setup* keeps the defaults, and the wizard does not open on its own again. *Settings → Setup…* opens it later. Browsers that used Studio before do not see it
+- The System theme, which follows the operating system's light or dark appearance as it changes. It is the default, where Studio was always dark before
+
 ### Changed
+- *Settings → Theme* picks System, Light or Dark, in place of the *Light mode* / *Dark mode* switch
 - The manual, the reference and the CLI's README say how to connect several models to one agent: `radical setup <folder> --name <name>` once per folder, each server's tools under its own name
 - One mark for the whole family: “r.” on a dark tile, in `tools/brand/radical-mark.svg`. It is the icon of the desktop app and the VS Code extension (from the next release), the logo in the top bar of radical.tools and the Hub, the mark on Studio's welcome screen, and the favicon of radical.tools, Studio and the Hub, which had none. `node tools/generate-icons.mjs` renders every icon from it
 - The manual's *Getting started* ends with how to start from the terminal (the launcher, or npx) to connect a coding agent, and *Command line* opens with how to run the CLI, a table of its commands and *The launcher*
 - radical.tools: a thin line sets the home page's buttons and *Get started* apart from the map
 - radical.tools: the home page names the released version, linked to its GitHub Release (what is new, the desktop installers), adds *Download the desktop app* beside *Open Studio in the browser*, and shows how to start in one command, in a tab per system (macOS · Linux, Windows, With Node.js; Windows first on Windows), each with a Copy button
 - radical.tools: the home page no longer has *Made for*, and the use cases page no longer ends with *Start anywhere*
+
+### Fixed
+- The special key chosen under Settings stays after a reload; it went back to Alt/Option
 
 ## [0.3.0] - 2026-10-27
 

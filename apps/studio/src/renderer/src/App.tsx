@@ -21,6 +21,8 @@ import { QuickSearch } from './components/QuickSearch'
 import { FindInView } from './components/FindInView'
 import { useRegisterCommands } from './commands'
 import { WelcomeScreen } from './components/WelcomeScreen'
+import { SetupWizard, OPEN_SETUP_EVENT } from './components/SetupWizard'
+import { firstStart } from './firstStart'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
@@ -91,6 +93,15 @@ function AppInner(): React.ReactElement {
   // hasn't chosen a model, so a clean URL must stay clean. A deep link skips
   // the splash (showWelcome starts false), so sync runs immediately.
   useRouteSync(!showWelcome)
+  // The Setup wizard: over the Welcome screen on the first start, and from
+  // Settings → Setup… later.
+  const [setupOpen, setSetupOpen] = useState(firstStart)
+  const closeSetup = useCallback(() => setSetupOpen(false), [])
+  useEffect(() => {
+    const open = (): void => setSetupOpen(true)
+    window.addEventListener(OPEN_SETUP_EVENT, open)
+    return () => window.removeEventListener(OPEN_SETUP_EVENT, open)
+  }, [])
   const toggleLeft = useCallback(() => {
     setLeftCollapsed((c) => { localStorage.setItem(LS_LEFT, c ? '0' : '1'); return !c })
   }, [])
@@ -153,6 +164,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
       {isMetamodel && !isPresenting && <MetamodelEditor />}
       {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} />}
+      <SetupWizard open={setupOpen} onClose={closeSetup} />
     </div>
   )
 }
