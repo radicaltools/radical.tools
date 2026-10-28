@@ -25,7 +25,7 @@ function good(): HubRadicalDoc {
       { id: 'need', type: 'need', label: 'N' },
       { id: 'req', type: 'requirement', label: 'R' },
       { id: 'sc', type: 'scenario', label: 'S' },
-      { id: 'adr', type: 'adr', label: 'D', concern: 'x' },
+      { id: 'adr', type: 'adr', label: 'D', concern: 'x', decision: 'We do {{A}}, {{B}} and {{C}}.' },
       { id: 'ff', type: 'fitness-fn', label: 'F', description: 'Checked by a test.\n\nTool: Vitest\n\n```ts\nit("x", () => {})\n```' },
     ],
     relations: [
@@ -58,6 +58,29 @@ describe('concernPackProblems', () => {
       'fitness function "ff" names no tool (a "Tool: …" line in its description)',
       'fitness function "ff" carries no snippet to copy (a fenced block in its description)',
     ]))
+  })
+
+  it('names what is wrong in the texts and across the answers', () => {
+    const doc = good()
+    doc.hub.templateParams = [
+      { ...question('A'), options: [option('a', 'Pick it when {{NUM}} is small.'), { ...option('b'), label: 'b of {{NUM}}' }] },
+      question('B'), { ...question('C'), options: [option('a'), option('b'), option('c')] },
+      { key: 'NUM', label: 'How many?', defaultValue: '5' }, { key: 'M', label: 'Unused?', defaultValue: '1' },
+    ]
+    doc.nodes[1] = { id: 'req', type: 'requirement', label: 'R', ears_type: 'state-driven', precondition: 'while it rains', action: 'keep {{NUM}} and {{ZZZ}} dry', hubWhen: { C: ['a'] } }
+    doc.nodes[3] = { id: 'adr', type: 'adr', label: 'D', concern: 'x', decision: 'We do {{A}} and {{B}}.', hubWhen: { C: ['a', 'b'] } }
+    doc.nodes[4].description = 'Checked by a test.\n\nTool: Vitest\n\n```ts\nconst MAX = 5   // NUM\n```'
+    expect(concernPackProblems(doc)).toEqual(expect.arrayContaining([
+      'node "req" action: {{ZZZ}} names no question or detail of the pack',
+      'detail M is asked but no text uses {{M}}',
+      'question A: option "b" has {{…}} in its label; a label fills the texts and is not filled itself',
+      'question A: option "a" has {{…}} in its description; the wizard shows it as written',
+      'fitness function "ff": a line names NUM in a comment but hard-codes its value; use {{NUM}}: const MAX = 5   // NUM',
+      'requirement "req": precondition starts with "while", which the EARS sentence adds itself',
+      'question C: option "c" decides nothing: no element is imported for it and no decision names {{C}}',
+      'fitness function "ff" is imported with none of the decisions it implements for {"A":"a","B":"a","C":"c"}',
+    ]))
+    expect(concernPackProblems(doc)).not.toEqual(expect.arrayContaining([expect.stringContaining('option "a" decides nothing')]))
   })
 })
 

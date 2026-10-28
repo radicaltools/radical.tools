@@ -442,5 +442,93 @@ export function concernPackProblems(doc: HubRadicalDoc): string[] {
     if (!/```[\s\S]+?```/.test(text)) errors.push(`fitness function "${f.id}" carries no snippet to copy (a fenced block in its description)`)
   }
   for (const s of ofType('scenario')) if (!has('verifies', s.id as string)) errors.push(`scenario "${s.id}" verifies nothing`)
+  errors.push(...textProblems(doc))
+  errors.push(...variantProblems(doc))
+  return errors
+}
+
+const TOKENS = /\{\{([A-Z0-9_]+)\}\}/g
+
+/** Every string a pack's elements and hub block hold, with where it is. */
+function packTexts(doc: HubRadicalDoc): Array<{ where: string; text: string }> {
+  const out: Array<{ where: string; text: string }> = [{ where: 'hub.description', text: doc.hub.description ?? '' }]
+  for (const n of doc.nodes) for (const [key, value] of Object.entries(n)) {
+    if (typeof value === 'string' && key !== 'id' && key !== 'type') out.push({ where: `node "${n.id}" ${key}`, text: value })
+  }
+  return out
+}
+
+/** What is wrong in the texts: a `{{KEY}}` naming no question or detail, a
+ *  detail no text uses, a token in an option (an option's label fills the
+ *  texts and its description is shown as written, so neither is filled), a
+ *  snippet that hard-codes a detail's value beside a `# KEY` comment, and an
+ *  EARS clause that repeats the keyword the sentence adds ("While while…"). */
+function textProblems(doc: HubRadicalDoc): string[] {
+  const errors: string[] = []
+  const params = doc.hub.templateParams ?? []
+  const keys = new Set(params.map((p) => p.key))
+  const used = new Set<string>()
+  for (const { where, text } of packTexts(doc)) {
+    for (const m of text.matchAll(TOKENS)) {
+      used.add(m[1])
+      if (!keys.has(m[1])) errors.push(`${where}: {{${m[1]}}} names no question or detail of the pack`)
+    }
+  }
+  for (const p of params) {
+    if (!p.options?.length && !used.has(p.key)) errors.push(`detail ${p.key} is asked but no text uses {{${p.key}}}`)
+    for (const o of p.options ?? []) {
+      if (/\{\{/.test(o.label)) errors.push(`question ${p.key}: option "${o.value}" has {{…}} in its label; a label fills the texts and is not filled itself`)
+      if (/\{\{/.test(o.description ?? '')) errors.push(`question ${p.key}: option "${o.value}" has {{…}} in its description; the wizard shows it as written`)
+    }
+  }
+  for (const n of doc.nodes) {
+    if (n.type === 'fitness-fn') {
+      for (const line of String(n.description ?? '').split('\n')) {
+        const m = line.match(/(?:#|\/\/|--)\s*([A-Z][A-Z0-9_]+)\b/)
+        if (m && keys.has(m[1]) && !line.includes(`{{${m[1]}}}`)) errors.push(`fitness function "${n.id}": a line names ${m[1]} in a comment but hard-codes its value; use {{${m[1]}}}: ${line.trim()}`)
+      }
+    }
+    if (n.type === 'requirement') {
+      for (const [key, word] of [['precondition', 'while'], ['trigger', 'when'], ['unwanted_condition', 'if']] as const) {
+        const text = n[key]
+        if (typeof text === 'string' && new RegExp(`^\\s*${word}\\b`, 'i').test(text)) errors.push(`requirement "${n.id}": ${key} starts with "${word}", which the EARS sentence adds itself`)
+      }
+    }
+  }
+  return errors
+}
+
+/** Every combination of the answers to the questions with options. */
+export function answerCombinations(params: Array<{ key: string; options?: Array<{ value: string }> }>): Array<Record<string, string>> {
+  return params.filter((p) => p.options?.length).reduce<Array<Record<string, string>>>(
+    (all, p) => all.flatMap((answers) => p.options!.map((o) => ({ ...answers, [p.key]: o.value }))),
+    [{}],
+  )
+}
+
+/** What is wrong across the answers: an option no element is imported for
+ *  and no decision names, and a fitness function imported with none of the
+ *  ADRs it implements. */
+function variantProblems(doc: HubRadicalDoc): string[] {
+  const errors: string[] = []
+  const params = doc.hub.templateParams ?? []
+  const nodes = doc.nodes
+  const rels = doc.relations ?? []
+  const adrDecisions = nodes.filter((n) => n.type === 'adr').map((n) => String(n.decision ?? ''))
+  for (const p of params) {
+    if (!p.options?.length) continue
+    const named = adrDecisions.some((d) => d.includes(`{{${p.key}}}`))
+    for (const o of p.options) {
+      const imports = nodes.some((n) => ((n[HUB_WHEN_KEY] as Record<string, string[]> | undefined)?.[p.key] ?? []).includes(o.value))
+      if (!imports && !named) errors.push(`question ${p.key}: option "${o.value}" decides nothing: no element is imported for it and no decision names {{${p.key}}}`)
+    }
+  }
+  const byId = Object.fromEntries(nodes.map((n) => [n.id as string, n]))
+  const combinations = answerCombinations(params)
+  for (const f of nodes.filter((n) => n.type === 'fitness-fn')) {
+    const adrs = rels.filter((r) => r.relationType === 'implements' && r.sourceId === f.id).map((r) => byId[r.targetId as string]).filter(Boolean)
+    const orphan = combinations.find((values) => picked(f, values) && !adrs.some((a) => picked(a, values)))
+    if (orphan) errors.push(`fitness function "${f.id}" is imported with none of the decisions it implements for ${JSON.stringify(orphan)}`)
+  }
   return errors
 }

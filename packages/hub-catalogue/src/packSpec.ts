@@ -49,6 +49,11 @@ export type RequirementSpec = {
   when?: When
   rationale: string
   scenario: ScenarioSpec
+  /** Why no fitness function checks it: only for a requirement the team
+   *  keeps by hand (a review, a drill on the calendar). Every other
+   *  requirement is named in the `checks` of a fitness function imported
+   *  with it. */
+  unchecked?: string
 } & (
   | { ears_type: 'ubiquitous'; action: string }
   | { ears_type: 'event-driven'; trigger: string; action: string }
@@ -82,6 +87,10 @@ export interface FitnessSpec {
   language: string
   /** The ADRs of the pack it checks. */
   implements: string[]
+  /** The requirements of the pack it checks: each must be imported only
+   *  with answers that import this function too (or another that checks
+   *  it). Spec-level: not written into the document. */
+  checks?: string[]
 }
 
 export interface PackSpec {
@@ -171,3 +180,39 @@ export const packFileText = (spec: PackSpec): string => `${JSON.stringify(buildP
 
 /** Where a spec's built file goes, relative to the catalogue. */
 export const packFile = (spec: Pick<PackSpec, 'id'>): string => `concern/${spec.id}.radical`
+
+/** Whether an element with `when` comes in for the answers. */
+const importedFor = (when: When | undefined, values: Record<string, string>): boolean =>
+  !when || Object.entries(when).every(([key, wanted]) => wanted.includes(values[key] ?? ''))
+
+/** Every combination of the answers to the questions. */
+const combinationsOf = (spec: PackSpec): Array<Record<string, string>> =>
+  spec.questions.reduce<Array<Record<string, string>>>(
+    (all, q) => all.flatMap((answers) => q.options.map((o) => ({ ...answers, [q.key]: o.value }))),
+    [{}],
+  )
+
+/** What a spec lacks of the standard beyond what its document shows: every
+ *  requirement is checked by a fitness function imported whenever it is, or
+ *  says why the team keeps it by hand; every `checks` and `unchecked` is
+ *  well-formed. */
+export function specProblems(spec: PackSpec): string[] {
+  const errors: string[] = []
+  const reqIds = new Set(spec.requirements.map((r) => r.id))
+  for (const f of spec.fitness) {
+    for (const id of f.checks ?? []) if (!reqIds.has(id)) errors.push(`fitness function "${f.id}" checks "${id}", which is no requirement of the pack`)
+  }
+  const combinations = combinationsOf(spec)
+  for (const r of spec.requirements) {
+    const checkers = spec.fitness.filter((f) => f.checks?.includes(r.id))
+    if (r.unchecked !== undefined) {
+      if (!r.unchecked.trim()) errors.push(`requirement "${r.id}": unchecked must say why no fitness function checks it`)
+      if (checkers.length) errors.push(`requirement "${r.id}" is unchecked yet ${checkers.map((f) => `"${f.id}"`).join(', ')} checks it`)
+      continue
+    }
+    if (!checkers.length) { errors.push(`requirement "${r.id}" is checked by no fitness function (name it in a fitness function's checks, or say in unchecked why the team keeps it by hand)`); continue }
+    const alone = combinations.find((values) => importedFor(r.when, values) && !checkers.some((f) => importedFor(f.when, values)))
+    if (alone) errors.push(`requirement "${r.id}" is imported without any fitness function that checks it for ${JSON.stringify(alone)}`)
+  }
+  return errors
+}
