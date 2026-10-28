@@ -41,6 +41,14 @@
       {
         "title": "Sloth: SLO generator for Prometheus",
         "url": "https://sloth.dev/"
+      },
+      {
+        "title": "Chaos Mesh documentation",
+        "url": "https://chaos-mesh.org/docs/"
+      },
+      {
+        "title": "Toxiproxy",
+        "url": "https://github.com/Shopify/toxiproxy"
       }
     ],
     "templateParams": [
@@ -54,12 +62,12 @@
           {
             "value": "99.0",
             "label": "99.0",
-            "description": "Down at most 7 h 12 min per 30 days. One zone, instances restarted by the platform, a managed database with backups. Pick it for internal tools and back-office work that can wait an hour, with nobody paged at night."
+            "description": "Down at most 7 h 12 min per 30 days. One zone, instances restarted by the platform, a managed database with backups. Pick it for internal tools and back-office work that can wait an hour."
           },
           {
             "value": "99.9",
             "label": "99.9",
-            "description": "Down at most 43 min per 30 days. At least two instances in two availability zones and a database that fails over by itself; someone on call. Pick it for most customer-facing services and partner APIs."
+            "description": "Down at most 43 min per 30 days. At least two instances in two availability zones and a database that fails over by itself. Pick it for most customer-facing services and partner APIs."
           },
           {
             "value": "99.95",
@@ -82,12 +90,12 @@
         "options": [
           {
             "value": "freeze",
-            "label": "releases freeze",
+            "label": "a release freeze",
             "description": "While the 30-day budget is spent, only reliability and security fixes are deployed. Pick it when the target is in a contract or the same outages keep coming back, and product owners have agreed to it in writing."
           },
           {
             "value": "review",
-            "label": "a review sets priorities",
+            "label": "a review that sets priorities",
             "description": "A spent budget starts a blameless postmortem and puts its top action into the next iteration; releases go on. Pick it for a young product where shipping matters more than the last nine, or a team without the authority to freeze."
           }
         ]
@@ -101,12 +109,12 @@
         "options": [
           {
             "value": "stronger",
-            "label": "hard dependencies above our target",
+            "label": "hard dependencies above the target",
             "description": "Every service it must call to answer offers a committed availability higher than its own target, and the product of them still meets it. Pick it when the dependencies are managed services or platforms with published SLAs (databases, queues, identity providers)."
           },
           {
             "value": "degrade",
-            "label": "degraded service without them",
+            "label": "degraded service without weak dependencies",
             "description": "Dependencies that cannot meet the target are made soft: without them it still serves what does not need them (cached prices, orders queued for later). Pick it when a partner system or an older internal service is weaker than the target."
           }
         ]
@@ -126,13 +134,13 @@
           {
             "value": "window",
             "label": "an announced maintenance window",
-            "description": "Work that cannot run online gets a weekly window, announced in advance and left out of the measured availability. Pick it for users in one time zone with a quiet night, and only with a target of 99.9 % or less."
+            "description": "Work that cannot run online gets a weekly window, announced in advance and left out of the measured availability. Pick it for users in one time zone with a quiet night, and only with a target of 99.9 % or less; not with 99.95 or 99.99."
           }
         ]
       },
       {
         "key": "WINDOW",
-        "label": "When is the maintenance window?",
+        "label": "When is the maintenance window? Only with an announced maintenance window",
         "defaultValue": "Sundays 02:00 to 04:00 UTC"
       }
     ]
@@ -155,7 +163,7 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "answer at least {{TIER}} % of valid requests in every 30-day window without a server error, measured where callers reach it (load balancer or API gateway), with requests refused for the caller's own fault (4xx) left out",
+      "action": "answer at least {{TIER}} % of valid requests in every 30-day window without a server error, measured with the indicator decided in the Observability pack (good requests at the edge, or probes from outside), with requests refused for the caller's own fault (4xx) left out",
       "rationale": "A target measured as users see it, over a rolling window, is what the error budget and every other decision here rest on (Google SRE book, chapter 4)."
     },
     {
@@ -167,7 +175,7 @@
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "its only instance, or the host under it, stops",
       "action": "start a replacement automatically and serve again within 15 minutes, without a person",
-      "rationale": "At 99.0 % one zone is enough, but 7 h 12 min a month does not cover a restart that waits for someone to notice (AWS Well-Architected REL 11).",
+      "rationale": "At 99.0 % one zone is enough, but 7 h 12 min a month does not cover a restart that waits for someone to notice (AWS Well-Architected Reliability Pillar, REL 11: design to withstand component failures).",
       "hubWhen": {
         "TIER": [
           "99.0"
@@ -183,7 +191,7 @@
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "one availability zone becomes unreachable",
       "action": "keep answering from the remaining zones within 5 minutes, with at least two instances in two zones (three zones for 99.95 %) and enough capacity left to carry the peak",
-      "rationale": "A zone loss is a routine event at cloud scale; 43 minutes a month (99.9 %) or 21 (99.95 %) is gone in one outage if serving depends on a single zone (AWS Well-Architected REL 10).",
+      "rationale": "A zone loss is a routine event at cloud scale; 43 minutes a month (99.9 %) or 21 (99.95 %) is gone in one outage if serving depends on a single zone (AWS Well-Architected Reliability Pillar, REL 10: use fault isolation).",
       "hubWhen": {
         "TIER": [
           "99.9",
@@ -215,7 +223,7 @@
       "y": 520,
       "ears_type": "state-driven",
       "precondition": "the error budget of the last 30 days is spent",
-      "action": "deploy only changes that fix reliability or security, until the measured availability is back at {{TIER}} % or above",
+      "action": "deploy only changes whose pull request is labelled as a reliability or security fix, until the measured availability is back at {{TIER}} % or above",
       "rationale": "An error budget policy agreed in advance turns a missed target into a decision nobody has to argue about (Google SRE workbook, Example Error Budget Policy).",
       "hubWhen": {
         "BUDGET": [
@@ -231,7 +239,7 @@
       "y": 650,
       "ears_type": "event-driven",
       "trigger": "the error budget of the last 30 days is spent",
-      "action": "hold a blameless postmortem within 5 working days and put its most important reliability action into the next iteration",
+      "action": "open a postmortem ticket within 1 hour, hold a blameless postmortem within 5 working days and put its most important reliability action into the next iteration",
       "rationale": "Without a freeze, the review is what makes a missed target change priorities (Google SRE workbook, Example Error Budget Policy).",
       "hubWhen": {
         "BUDGET": [
@@ -246,8 +254,8 @@
       "x": 260,
       "y": 780,
       "ears_type": "ubiquitous",
-      "action": "call synchronously only services whose committed availability is above {{TIER}} %, and keep the product of those availabilities, its own included, at or above {{TIER}} %",
-      "rationale": "Availability multiplies along hard dependencies: an element cannot promise more than the services it waits for (Google SRE book, chapter 3; AWS Well-Architected REL 1).",
+      "action": "call synchronously only services whose committed availability is above {{TIER}} %, and keep the product of its own infrastructure's availability and theirs at or above {{TIER}} %, from a list of hard dependencies kept in the repository",
+      "rationale": "Availability multiplies along hard dependencies: an element cannot promise more than the services it waits for (Google SRE book, chapter 3; AWS Well-Architected Reliability Pillar, REL 1: manage service quotas and dependencies).",
       "hubWhen": {
         "DEPENDENCIES": [
           "stronger"
@@ -262,8 +270,8 @@
       "y": 910,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "a dependency weaker than its own target does not answer within its timeout",
-      "action": "go on serving every operation that does not need it, and answer those that do within 1 second with a degraded result (cached data, work queued for later) or a clear \"try later\"",
-      "rationale": "A soft dependency does not count against the target; turning hard dependencies soft is how an element beats the availability of what it calls (AWS Well-Architected REL 5).",
+      "action": "go on serving every operation that does not need it, and answer those that do within 1 second with a degraded result (cached data, work queued for later) or a clear \"try later\" (503)",
+      "rationale": "A soft dependency does not count against the target; turning hard dependencies soft is how an element beats the availability of what it calls (AWS Well-Architected Reliability Pillar, REL 5: design interactions to mitigate failures).",
       "hubWhen": {
         "DEPENDENCIES": [
           "degrade"
@@ -273,13 +281,13 @@
     {
       "id": "req-online",
       "type": "requirement",
-      "label": "Planned work runs online",
+      "label": "Planned work counts",
       "x": 260,
       "y": 1040,
       "ears_type": "event-driven",
-      "trigger": "a release, a schema change or a patch is rolled out",
-      "action": "go on answering throughout, and count every request it fails meanwhile against the error budget",
-      "rationale": "Planned work is the most common cause of downtime; designing it out is what high targets need (Google SRE book, chapter 4).",
+      "trigger": "a release, a schema change or a patch rolls out",
+      "action": "count every request it fails meanwhile against the error budget, excluding no time from the measured availability; keeping it answering throughout is required by the Deployment and rollback pack",
+      "rationale": "Planned work is the most common cause of downtime; counting it is what makes designing it out worth the effort (Google SRE book, chapter 4).",
       "hubWhen": {
         "MAINTENANCE": [
           "none"
@@ -294,7 +302,7 @@
       "y": 1170,
       "ears_type": "state-driven",
       "precondition": "planned work needs it stopped",
-      "action": "stop only within the maintenance window ({{WINDOW}}), announce it to users at least 7 days before, show a maintenance page meanwhile, and leave the window out of the measured availability only when it was announced in time",
+      "action": "stop only within the maintenance window ({{WINDOW}}) and only when the window was announced on the status page at least 7 days before, show a maintenance page meanwhile, and leave the window out of the measured availability",
       "rationale": "A window announced in advance is downtime users can plan around; one that is not is an outage (Google SRE book, chapter 4).",
       "hubWhen": {
         "MAINTENANCE": [
@@ -308,7 +316,7 @@
       "label": "Target computed",
       "x": 520,
       "y": 0,
-      "given": "30 days of production traffic at the load balancer",
+      "given": "30 days of the indicator",
       "when": "the share of valid requests answered without a 5xx is computed",
       "then": "it is at least {{TIER}} %"
     },
@@ -381,7 +389,7 @@
       "y": 650,
       "given": "a 30-day availability that falls below {{TIER}} %",
       "when": "5 working days pass",
-      "then": "a postmortem is written and its top action is planned in the next iteration",
+      "then": "a postmortem is written, its ticket closed, and its top action planned in the next iteration",
       "hubWhen": {
         "BUDGET": [
           "review"
@@ -395,7 +403,7 @@
       "x": 520,
       "y": 780,
       "given": "the list of services it calls synchronously, with their committed availability",
-      "when": "the product of their availabilities is computed",
+      "when": "the product of its own infrastructure's availability and theirs is computed",
       "then": "every one is above {{TIER}} % and the product is at least {{TIER}} %",
       "hubWhen": {
         "DEPENDENCIES": [
@@ -411,7 +419,7 @@
       "y": 910,
       "given": "a dependency that stops answering",
       "when": "requests that need it and requests that do not arrive",
-      "then": "the second are served as usual and the first get a degraded answer within 1 second",
+      "then": "the second are served as usual and the first get a degraded answer or a 503 within 1 second",
       "hubWhen": {
         "DEPENDENCIES": [
           "degrade"
@@ -421,12 +429,12 @@
     {
       "id": "sc-online",
       "type": "scenario",
-      "label": "Release under load",
+      "label": "Release counted",
       "x": 520,
       "y": 1040,
-      "given": "steady production-like traffic",
-      "when": "a release with a schema change rolls out",
-      "then": "the error rate stays below 0.1 % throughout",
+      "given": "a release that fails 100 requests while rolling out",
+      "when": "the 30-day availability is computed",
+      "then": "the 100 failures are in it",
       "hubWhen": {
         "MAINTENANCE": [
           "none"
@@ -441,7 +449,7 @@
       "y": 1170,
       "given": "a migration that needs the element stopped",
       "when": "it is scheduled",
-      "then": "it runs within {{WINDOW}}, users were told 7 days before, and they see a maintenance page while it runs",
+      "then": "it runs within {{WINDOW}}, the status page announced it 7 days before, users see a maintenance page while it runs, and the minutes are left out of the availability",
       "hubWhen": {
         "MAINTENANCE": [
           "window"
@@ -457,9 +465,9 @@
       "concern": "availability",
       "status": "accepted",
       "date": "",
-      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features.",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
       "decision": "The element targets {{TIER}} % per 30 days (7 h 12 min of downtime). It runs in one availability zone on a platform that restarts failed instances by itself: a Kubernetes Deployment with liveness probes, or a managed runtime (Azure App Service, Google Cloud Run, AWS App Runner). Its database is a managed single instance with automated backups. Dependencies: {{DEPENDENCIES}}. Planned work: {{MAINTENANCE}}. When the budget is spent: {{BUDGET}}. Choose the runtime by what the team already operates; a managed runtime unless the element needs Kubernetes features.",
-      "consequences": "• The cheapest setup: one copy of everything.\n• A zone outage takes the element down until the zone returns; that is accepted at 99.0 %.\n• Nobody is paged at night; outages wait for working hours as long as the month's budget lasts.\n• Moving to 99.9 % later means a second zone and a database that fails over, which this decision does not prepare.",
+      "consequences": "• The cheapest setup: one copy of everything.\n• A zone outage takes the element down until the zone returns; that is accepted at 99.0 %.\n• An outage can wait as long as the month's budget allows; whether anyone is paged at night is decided in the Observability pack.\n• Moving to 99.9 % later means a second zone and a database that fails over, which this decision does not prepare.",
       "alternatives": "1. Two zones from the start: buys 99.9 % but doubles the cost for users who do not need it.\n2. A single virtual machine restarted by hand: cheaper, but a restart waits for someone to notice.",
       "hubWhen": {
         "TIER": [
@@ -476,8 +484,8 @@
       "concern": "availability",
       "status": "accepted",
       "date": "",
-      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features.",
-      "decision": "The element targets {{TIER}} % per 30 days. It runs at least two instances in two availability zones (for 99.95 %: three zones, with enough instances that two zones carry the peak), spread with Kubernetes topology spread constraints or zone-redundant platform settings, behind a load balancer that health-checks each instance. Its database fails over to a synchronous standby in another zone by itself: Amazon RDS Multi-AZ, Azure SQL zone-redundant, Cloud SQL high availability or a Patroni cluster. Dependencies: {{DEPENDENCIES}}. Planned work: {{MAINTENANCE}}. When the budget is spent: {{BUDGET}}. Someone is on call, since 43 minutes (21 for 99.95 %) do not wait for the morning.",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "The element targets {{TIER}} % per 30 days. It runs at least two instances in two availability zones (for 99.95 %: three zones, with enough instances that two zones carry the peak), spread with Kubernetes topology spread constraints or zone-redundant platform settings, behind a load balancer that health-checks each instance. Its database fails over to a synchronous standby in another zone by itself: Amazon RDS Multi-AZ, Azure SQL zone-redundant, Cloud SQL high availability or a Patroni cluster. Dependencies: {{DEPENDENCIES}}. Planned work: {{MAINTENANCE}}. When the budget is spent: {{BUDGET}}. 43 minutes a month (21 for 99.95 %) do not wait for the morning; who is alerted, and when, is decided in the Observability pack.",
       "consequences": "• A zone loss costs minutes of errors, not hours.\n• Roughly twice the compute of one zone (three zones for 99.95 %), and cross-zone traffic is billed.\n• Every instance must be stateless or share state through the database or a cache: sessions and uploads cannot live on one instance.\n• The database failover is a few dozen seconds of errors, which counts against the budget; it is tested, not assumed.",
       "alternatives": "1. One zone and fast restarts: cheaper, but one zone outage uses the whole month's budget.\n2. Two regions active-active: survives a region, at roughly twice the cost and with the hard problem of data replicated across regions.",
       "hubWhen": {
@@ -496,7 +504,7 @@
       "concern": "availability",
       "status": "accepted",
       "date": "",
-      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features.",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
       "decision": "The element targets {{TIER}} % per 30 days (4 min 19 s). It runs active-active in two regions, each in at least two zones and each able to carry the whole peak. A global load balancer routes by health and moves traffic without a person: Amazon Route 53 with health checks and Application Recovery Controller, Azure Front Door, or Google Cloud global load balancing. Data is replicated across regions by a store built for it: Amazon Aurora Global Database or DynamoDB global tables, Azure Cosmos DB, Google Cloud Spanner, or CockroachDB; choose by the consistency the data needs (strong across regions: Spanner or CockroachDB; per-region writes with replication lag: Aurora Global Database, DynamoDB global tables). Dependencies: {{DEPENDENCIES}}. Planned work: {{MAINTENANCE}}. When the budget is spent: {{BUDGET}}.",
       "consequences": "• A region outage costs a minute, not the month.\n• Roughly double the infrastructure, plus cross-region data transfer.\n• Writes across regions are slower or eventually consistent; the data model has to be designed for it.\n• Failover is exercised regularly, or it will not work when needed.\n• Every hard dependency, the identity provider included, must also be multi-region.",
       "alternatives": "1. Active-passive with a warm standby region: cheaper, but failover takes minutes and is rarely tested.\n2. Three zones in one region (99.95 %): far simpler, and enough unless a contract demands four nines.",
@@ -515,8 +523,8 @@
       "concern": "availability",
       "status": "accepted",
       "date": "",
-      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features.",
-      "decision": "The error budget is the downtime {{TIER}} % allows in a rolling 30-day window. While it is spent, the deployment pipeline lets through only changes labelled as reliability or security fixes; feature work resumes when the measured availability is back at {{TIER}} % or above. The policy is signed by the product owner and the team lead, and an exception needs both. The budget is computed from the SLO's recording rules (Sloth or Pyrra on Prometheus, or the SLO feature of Datadog, Grafana Cloud or Google Cloud Monitoring), and the pipeline reads it before every production deploy.",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "The error budget is the downtime {{TIER}} % allows in a rolling 30-day window. While it is spent, the deployment pipeline lets through only changes whose pull request is labelled reliability-fix or security-fix; feature work resumes when the measured availability is back at {{TIER}} % or above. The policy is signed by the product owner and the team lead, and an exception needs both. The budget is computed from the SLO's recording rules (Sloth or Pyrra on Prometheus, or the SLO feature of Datadog, Grafana Cloud or Google Cloud Monitoring), and the pipeline reads it before every production deploy.",
       "consequences": "• Reliability work wins automatically when users are hurting, with no argument.\n• A bad month can stop feature releases for days; product owners plan for it.\n• The availability measurement must be trusted, since it now gates releases.\n• Fixes have to be labelled honestly; the label is reviewed in the pull request.",
       "alternatives": "1. A review instead of a freeze: keeps shipping, but relies on the review changing priorities.\n2. No policy: the target is reported and nothing follows from it.",
       "hubWhen": {
@@ -534,7 +542,7 @@
       "concern": "availability",
       "status": "accepted",
       "date": "",
-      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features.",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
       "decision": "The error budget is the downtime {{TIER}} % allows in a rolling 30-day window. When it is spent, an alert opens a ticket for a blameless postmortem, held within 5 working days; its most important action goes into the next iteration ahead of feature work. Releases are not stopped. The budget is computed from the SLO's recording rules (Sloth or Pyrra on Prometheus, or the SLO feature of Datadog, Grafana Cloud or Google Cloud Monitoring).",
       "consequences": "• Feature releases keep going in a bad month.\n• The postmortem makes the causes visible and gives reliability work a place in the plan.\n• If the same causes keep spending the budget, this decision should be superseded by a freeze.",
       "alternatives": "1. A release freeze: stronger, but needs product owners' agreement and a trusted measurement.\n2. No policy: the target is reported and nothing follows from it.",
@@ -545,24 +553,135 @@
       }
     },
     {
+      "id": "adr-deps-stronger",
+      "type": "adr",
+      "label": "Hard dependencies above the target",
+      "x": 780,
+      "y": 650,
+      "concern": "availability",
+      "status": "accepted",
+      "date": "",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "Every service the element must call to answer (its hard dependencies) has a committed availability above {{TIER}} %, and the product of the platform's commitment for our own instances and database and the dependencies' commitments is at or above {{TIER}} %. The list of hard dependencies with their committed availability and its source (the SLA page) is kept in the repository and checked by a test; adding a synchronous call to a service not on the list, or a weaker one, fails the build. Managed services with a published SLA (the database, the queue, the identity provider) qualify; a partner system or an older internal service without a commitment does not, and must be made soft before it is called synchronously.",
+      "consequences": "• The target is arithmetic, not hope: the list says whether it can be met.\n• A weak dependency cannot be added quietly; making it soft is a design change with its own cost.\n• SLAs are commitments with credits, not guarantees; the measured availability of a dependency can still fall short, and the budget absorbs it.",
+      "alternatives": "1. Degraded service without weak dependencies: more design work, but the element beats what it calls.\n2. No rule: the target is promised and the dependencies decide whether it is met.",
+      "hubWhen": {
+        "DEPENDENCIES": [
+          "stronger"
+        ]
+      }
+    },
+    {
+      "id": "adr-deps-degrade",
+      "type": "adr",
+      "label": "Degraded service without weak dependencies",
+      "x": 780,
+      "y": 780,
+      "concern": "availability",
+      "status": "accepted",
+      "date": "",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "Dependencies that cannot commit to more than {{TIER}} % are soft: the element times them out quickly (the timeouts and circuit breakers are decided in the Integration resilience pack), keeps serving every operation that does not need them, and answers the operations that do within 1 second with a degraded result (the last cached prices, an order queued for later confirmation) or a clear 503 with Retry-After. Which operations degrade and how is a product decision written next to each one. A drill in staging cuts each weak dependency off with Toxiproxy and checks both behaviours with a load test.",
+      "consequences": "• The element's availability no longer multiplies with the partner's.\n• Every degraded path is code and product work: what to show, what to queue, what to refuse.\n• A degraded answer is still an answer users see; the product must accept it.\n• Queued work needs a drain and a way to tell the user later.",
+      "alternatives": "1. Hard dependencies above the target only: simpler, but rules out partners without SLAs.\n2. Accepting the dependency's availability as our own: honest, and a lower target.",
+      "hubWhen": {
+        "DEPENDENCIES": [
+          "degrade"
+        ]
+      }
+    },
+    {
+      "id": "adr-no-downtime",
+      "type": "adr",
+      "label": "No planned downtime",
+      "x": 780,
+      "y": 910,
+      "concern": "availability",
+      "status": "accepted",
+      "date": "",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "Planned work takes the element down for nobody: releases roll out without dropping requests (as decided in the Deployment and rollback pack), schema changes ship as expand and contract, and patching is a rolling replacement of instances. Nothing is excluded from the measured availability: every request failed during planned work counts against the error budget, which is what keeps the work designed to run online.",
+      "consequences": "• Users in every time zone get the same promise at every hour.\n• Every change has to be designed to run beside the previous version; a change that cannot waits for a design, not a window.\n• A clumsy release spends budget like an outage, which is the point.",
+      "alternatives": "1. An announced maintenance window: one-step changes, at the price of downtime users have to plan around.\n2. Excluding releases from the measurement: the number improves, the users' experience does not.",
+      "hubWhen": {
+        "MAINTENANCE": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "adr-window",
+      "type": "adr",
+      "label": "An announced maintenance window",
+      "x": 780,
+      "y": 1040,
+      "concern": "availability",
+      "status": "accepted",
+      "date": "",
+      "context": "People or other systems reach this element, so when it is down somebody notices: a customer who cannot buy, a partner whose calls fail. The forces: every extra nine costs more (more zones, more replicas, automation instead of people) while users cannot tell 99.99 % from 100 % behind their own network; the allowed downtime per 30 days shrinks from hours (99.0 %) to minutes (99.99 %), and a person paged at night needs 15 to 30 minutes just to start; an element is never more available than the product of the hard dependencies it calls; planned work (releases, migrations, patching) is downtime too unless it is designed out; and without an agreed number and a policy for when it is missed, reliability work loses every argument against features. Who is alerted, and the indicator the objective is measured with, are decided in the Observability pack; how a release rolls out without dropping requests in the Deployment and rollback pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "Work that cannot run online stops the element only in the maintenance window, {{WINDOW}}, announced on the status page at least 7 days before as a scheduled maintenance; the maintenance job refuses to run without that announcement. While the element is stopped the edge serves a maintenance page (503 with Retry-After). The window's minutes are left out of the measured availability by a recording rule that marks them; work outside the window, or in an unannounced one, counts as an outage. Releases that can run online still do, as decided in the Deployment and rollback pack.",
+      "consequences": "• Large one-step changes stay possible without spending the budget.\n• Users in other time zones see a weekly outage; the window has to be short and rarely used.\n• The window must be announced and kept: an overrun is an outage from the first minute past it.\n• Excluding time from the measurement is a promise users may not share; the contract has to say so.",
+      "alternatives": "1. No planned downtime: every change designed to run online, at the cost of that design.\n2. Windows without exclusion from the measurement: honest numbers, and a target that has to leave room for them.",
+      "hubWhen": {
+        "MAINTENANCE": [
+          "window"
+        ]
+      }
+    },
+    {
       "id": "ff-slo",
       "type": "fitness-fn",
       "label": "Availability SLO measured",
       "x": 1040,
       "y": 0,
       "category": "operational",
-      "threshold": "Availability at least {{TIER}} % over every rolling 30 days; a page when the budget burns 14.4 times faster than allowed over 1 hour",
-      "description": "An SLO spec generates the Prometheus recording rules for the availability over 30 days and the multiwindow burn-rate alerts. The SLI is the share of requests answered without a 5xx at the edge. The error budget remaining is what the budget policy reads.\n\nTool: Sloth (Prometheus SLO generator); Pyrra takes the same objective\n\n```yaml\n# sloth generate -i availability.yaml -o availability.rules.yaml\nversion: \"prometheus/v1\"\nservice: \"order-api\"\nlabels:\n  owner: \"orders-team\"\nslos:\n  - name: \"availability\"\n    objective: {{TIER}}\n    description: \"Share of valid requests answered without a server error, over 30 days.\"\n    sli:\n      events:\n        error_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=~\"5..\"}[{{.window}}]))\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\"}[{{.window}}]))\n    alerting:\n      name: OrderApiAvailability\n      page_alert:\n        labels: { severity: page }\n      ticket_alert:\n        labels: { severity: ticket }\n```"
+      "threshold": "Availability at least {{TIER}} % over every rolling 30 days from the indicator, nothing excluded; a page alert at 14.4 times the allowed burn over 1 hour and a ticket at 6 times over 6 hours",
+      "description": "An SLO spec generates the Prometheus recording rules for the availability over 30 days and the multiwindow burn-rate alerts; no minute is excluded, so planned work counts. The indicator is the one decided in the Observability pack: the request rates recorded at the edge (shown here), or the probe series as a raw indicator (the commented alternative). The error budget remaining is what the budget policy reads; where the alerts go is decided in the Observability pack.\n\nTool: Sloth (Prometheus SLO generator); Pyrra takes the same objective\n\n```yaml\n# sloth generate -i availability.yaml -o availability.rules.yaml\nversion: \"prometheus/v1\"\nservice: \"order-api\"\nlabels:\n  owner: \"orders-team\"\nslos:\n  - name: \"availability\"\n    objective: {{TIER}}\n    description: \"Share of valid requests answered without a server error, over 30 days.\"\n    sli:\n      events:\n        error_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=~\"5..\"}[{{.window}}]))\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code!~\"4..\"}[{{.window}}]))\n      # with probes as the indicator (Observability pack, ff-probe) use instead:\n      # raw:\n      #   error_ratio_query: 1 - avg_over_time(order_api:probe_up:minute[{{.window}}])\n    alerting:\n      name: OrderApiAvailability\n      page_alert:\n        labels: { severity: page }\n      ticket_alert:\n        labels: { severity: ticket }\n```",
+      "hubWhen": {
+        "MAINTENANCE": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "ff-slo-window",
+      "type": "fitness-fn",
+      "label": "Availability SLO measured outside the window",
+      "x": 1040,
+      "y": 130,
+      "category": "operational",
+      "threshold": "Availability at least {{TIER}} % over every rolling 30 days from the indicator, with only the minutes inside the maintenance window excluded; a page alert at 14.4 times the allowed burn over 1 hour and a ticket at 6 times over 6 hours",
+      "description": "The same SLO spec as without a window, with the indicator queries dropped while a recording rule marks the maintenance window, so those minutes leave a gap that the 30-day average skips; any other minute counts. The window rule is the only place the window is encoded, next to the time it is announced for. Where the alerts go is decided in the Observability pack.\n\nTool: Sloth (Prometheus SLO generator) with a Prometheus recording rule for the window\n\n```yaml\n# maintenance.rules.yaml: 1 inside the window ({{WINDOW}}); edit the day and hours to match it\ngroups:\n  - name: maintenance-window\n    rules:\n      - record: maintenance_window\n        expr: vector(1) and on() (day_of_week() == 0 and hour() >= 2 and hour() < 4)\n---\n# sloth generate -i availability.yaml -o availability.rules.yaml\nversion: \"prometheus/v1\"\nservice: \"order-api\"\nslos:\n  - name: \"availability\"\n    objective: {{TIER}}\n    description: \"Share of valid requests answered without a server error, over 30 days, outside the maintenance window.\"\n    sli:\n      events:\n        error_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=~\"5..\"}[{{.window}}])) unless on() maintenance_window == 1\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code!~\"4..\"}[{{.window}}])) unless on() maintenance_window == 1\n      # with probes as the indicator (Observability pack, ff-probe) use instead:\n      # raw:\n      #   error_ratio_query: (1 - avg_over_time(order_api:probe_up:minute[{{.window}}])) unless on() maintenance_window == 1\n    alerting:\n      name: OrderApiAvailability\n      page_alert:\n        labels: { severity: page }\n      ticket_alert:\n        labels: { severity: ticket }\n```",
+      "hubWhen": {
+        "MAINTENANCE": [
+          "window"
+        ]
+      }
+    },
+    {
+      "id": "ff-window-announced",
+      "type": "fitness-fn",
+      "label": "Window announced, maintenance page served",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "The maintenance job runs only when a scheduled maintenance covering now was created on the status page at least 7 days before, and the public URL answers 503 with the maintenance page while the element is stopped",
+      "description": "The job that stops the element for maintenance first asks the status page for scheduled maintenances and fails unless one covers the current time and was created at least 7 days earlier; after stopping the element it fetches the public URL and fails unless the maintenance page answers. Shown for Atlassian Statuspage; Instatus and others have the same two fields.\n\nTool: GitHub Actions job with the Statuspage API (curl and jq)\n\n```yaml\njobs:\n  maintenance:\n    runs-on: ubuntu-latest\n    environment: production-maintenance\n    steps:\n      - name: Announced at least 7 days ago?\n        env:\n          STATUSPAGE_KEY: ${{ secrets.STATUSPAGE_KEY }}\n          PAGE_ID: ${{ vars.STATUSPAGE_PAGE_ID }}\n        run: |\n          curl -sf -H \"Authorization: OAuth $STATUSPAGE_KEY\" \"https://api.statuspage.io/v1/pages/$PAGE_ID/incidents/scheduled\" \\\n            | jq -e 'now as $now | [.[] | select((.scheduled_for | fromdateiso8601) <= $now and (.scheduled_until | fromdateiso8601) >= $now\n                                    and (.created_at | fromdateiso8601) <= (.scheduled_for | fromdateiso8601) - 7 * 86400)] | length > 0' \\\n            || { echo \"::error::no scheduled maintenance covering now was announced 7 days ago\"; exit 1; }\n      - name: Stop the element and check the maintenance page\n        run: |\n          kubectl -n shop scale deployment/order-api --replicas=0\n          code=$(curl -s -o body.html -w '%{http_code}' https://shop.example.com/)\n          test \"$code\" = 503 && grep -qi maintenance body.html || { echo \"::error::no maintenance page (HTTP $code)\"; exit 1; }\n      # ... the offline work (Deployment and rollback pack, ff-migration-rehearsal), then scale back up\n```",
+      "hubWhen": {
+        "MAINTENANCE": [
+          "window"
+        ]
+      }
     },
     {
       "id": "ff-instance-loss",
       "type": "fitness-fn",
       "label": "Killed instance comes back",
       "x": 1040,
-      "y": 130,
+      "y": 390,
       "category": "operational",
-      "threshold": "After its instance is killed the element serves again within 15 minutes, with no person acting",
-      "description": "A scheduled chaos experiment kills the element's pod; a probe (the Blackbox exporter or a k6 check) records how long until it answers again, and the experiment fails past 15 minutes.\n\nTool: Chaos Mesh (PodChaos), with the Prometheus Blackbox exporter as probe\n\n```yaml\napiVersion: chaos-mesh.org/v1alpha1\nkind: Schedule\nmetadata: { name: order-api-instance-loss, namespace: shop }\nspec:\n  schedule: \"0 10 * * 2\"          # Tuesdays 10:00, in working hours\n  type: PodChaos\n  historyLimit: 5\n  concurrencyPolicy: Forbid\n  podChaos:\n    action: pod-kill\n    mode: all\n    selector:\n      namespaces: [shop]\n      labelSelectors: { app: order-api }\n# Alert if not back: probe_success{job=\"blackbox\",instance=\"https://shop.example.com/healthz\"} == 0 for 15m\n```",
+      "threshold": "After its instance is killed the element answers the probe again within 15 minutes; a probe that fails for 15 minutes after the drill fires an alert",
+      "description": "A scheduled chaos experiment kills the element's pod in working hours; the Observability pack's probe records whether it answers again, and an alerting rule fires when the probe has failed for 15 minutes. This snippet is Kubernetes-bound; on a managed runtime the same drill restarts the instance with the platform's CLI (az webapp restart, or scaling the service to zero and back) on the same schedule, and the same alert rule applies.\n\nTool: Chaos Mesh (PodChaos) with a Prometheus alerting rule over the Blackbox exporter\n\n```yaml\napiVersion: chaos-mesh.org/v1alpha1\nkind: Schedule\nmetadata: { name: order-api-instance-loss, namespace: shop }\nspec:\n  schedule: \"0 10 * * 2\"          # Tuesdays 10:00, in working hours\n  type: PodChaos\n  historyLimit: 5\n  concurrencyPolicy: Forbid\n  podChaos:\n    action: pod-kill\n    mode: all\n    selector:\n      namespaces: [shop]\n      labelSelectors: { app: order-api }\n---\ngroups:\n  - name: instance-loss-drill\n    rules:\n      - alert: OrderApiNotBackAfterInstanceLoss\n        expr: probe_success{job=~\"blackbox-order-api-.*\"} == 0\n        for: 15m\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Order API has not answered its probe for 15 minutes (instance not replaced by the platform)\"\n```",
       "hubWhen": {
         "TIER": [
           "99.0"
@@ -574,10 +693,10 @@
       "type": "fitness-fn",
       "label": "Zone loss tolerated",
       "x": 1040,
-      "y": 260,
+      "y": 520,
       "category": "operational",
-      "threshold": "With every instance in one zone killed at production-like load, errors above 0.1 % last no longer than 5 minutes",
-      "description": "A chaos experiment kills every pod on the nodes of one zone while a load test runs at the expected peak; the load test fails when errors stay above 0.1 % for more than 5 minutes. Run it every month and after every change to the deployment, and once a quarter fail over the database as well.\n\nTool: Chaos Mesh (PodChaos by node zone) with k6 as load\n\n```yaml\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata: { name: order-api-zone-a-down, namespace: shop }\nspec:\n  action: pod-kill\n  mode: all\n  selector:\n    namespaces: [shop]\n    labelSelectors: { app: order-api }\n    nodeSelectors:\n      topology.kubernetes.io/zone: eu-west-1a\n# Meanwhile: k6 run --env RATE=<peak rps> zone-loss.js\n# with thresholds: { http_req_failed: [{ threshold: 'rate<0.001', abortOnFail: false }] }\n# evaluated over the window from 5 minutes after the kill to its end.\n```",
+      "threshold": "With every instance in one zone killed at production-like load, the failure rate from 5 minutes after the kill to the end of the run is below 0.1 %",
+      "description": "A chaos experiment kills every pod of the element on the nodes of one zone at the start of a load test at the expected peak; the load test tags requests by phase and fails when the failure rate after the first 5 minutes is 0.1 % or more. Run it every month and after every change to the deployment, and once a quarter fail over the database as well. Chaos Mesh is Kubernetes-bound; on a managed platform, stop the zone's instances with the cloud CLI at the same moment.\n\nTool: Grafana k6 with Chaos Mesh (PodChaos by node zone)\n\n```js\n// zone-loss.js   (the job starts it and, at the same moment, applies the PodChaos below)\n// apiVersion: chaos-mesh.org/v1alpha1, kind: PodChaos, action: pod-kill, mode: all,\n// selector: { namespaces: [shop], labelSelectors: { app: order-api }, nodeSelectors: { topology.kubernetes.io/zone: eu-west-1a } }\nimport http from 'k6/http'\nimport exec from 'k6/execution'\n\nexport const options = {\n  scenarios: {\n    peak: { executor: 'constant-arrival-rate', rate: Number(__ENV.RATE), timeUnit: '1s', duration: '20m', preAllocatedVUs: 500, maxVUs: 5000 },\n  },\n  thresholds: {\n    'http_req_failed{phase:after}': ['rate<0.001'],   // from 5 minutes after the kill to the end of the run\n  },\n}\n\nexport default function () {\n  const phase = exec.instance.currentTestRunDuration > 5 * 60 * 1000 ? 'after' : 'during'\n  http.get(`${__ENV.BASE_URL}/orders?page=1`, { tags: { phase } })\n}\n```",
       "hubWhen": {
         "TIER": [
           "99.9",
@@ -590,10 +709,10 @@
       "type": "fitness-fn",
       "label": "Region failover drilled",
       "x": 1040,
-      "y": 390,
+      "y": 650,
       "category": "operational",
       "threshold": "With one region cut off, every request is answered from the other region within 60 seconds; 0 % errors after that",
-      "description": "A quarterly game day cuts the application subnets of one region off the network while a k6 probe calls the global endpoint every second from outside; the probe fails if any request fails more than 60 seconds after the cut. The stop condition ends the experiment when the global error alarm fires.\n\nTool: AWS Fault Injection Service (network disruption), with a k6 probe on the global endpoint\n\n```json\n{\n  \"description\": \"Cut region A's application subnets off; traffic must move to region B within 60 s\",\n  \"targets\": {\n    \"appSubnets\": {\n      \"resourceType\": \"aws:ec2:subnet\",\n      \"resourceTags\": { \"tier\": \"app\", \"service\": \"order-api\" },\n      \"selectionMode\": \"ALL\"\n    }\n  },\n  \"actions\": {\n    \"isolateRegion\": {\n      \"actionId\": \"aws:network:disrupt-connectivity\",\n      \"parameters\": { \"duration\": \"PT15M\", \"scope\": \"all\" },\n      \"targets\": { \"Subnets\": \"appSubnets\" }\n    }\n  },\n  \"stopConditions\": [\n    { \"source\": \"aws:cloudwatch:alarm\", \"value\": \"arn:aws:cloudwatch:us-east-1:123456789012:alarm:global-error-rate\" }\n  ],\n  \"roleArn\": \"arn:aws:iam::123456789012:role/fis-experiments\"\n}\n```",
+      "description": "A quarterly game day cuts the application subnets of one region off the network while a k6 probe calls the global endpoint every second from outside; the probe fails if any request fails more than 60 seconds after the cut. The stop condition ends the experiment when the global error alarm fires. The experiment shown is AWS-bound (Fault Injection Service); on Azure, Chaos Studio's network disconnect fault on the region's virtual network does the same, and on Google Cloud a firewall rule that drops the region's ingress, applied by the game-day script.\n\nTool: AWS Fault Injection Service (network disruption), with a k6 probe on the global endpoint\n\n```json\n{\n  \"description\": \"Cut region A's application subnets off; traffic must move to region B within 60 s\",\n  \"targets\": {\n    \"appSubnets\": {\n      \"resourceType\": \"aws:ec2:subnet\",\n      \"resourceTags\": { \"tier\": \"app\", \"service\": \"order-api\" },\n      \"selectionMode\": \"ALL\"\n    }\n  },\n  \"actions\": {\n    \"isolateRegion\": {\n      \"actionId\": \"aws:network:disrupt-connectivity\",\n      \"parameters\": { \"duration\": \"PT15M\", \"scope\": \"all\" },\n      \"targets\": { \"Subnets\": \"appSubnets\" }\n    }\n  },\n  \"stopConditions\": [\n    { \"source\": \"aws:cloudwatch:alarm\", \"value\": \"arn:aws:cloudwatch:us-east-1:123456789012:alarm:global-error-rate\" }\n  ],\n  \"roleArn\": \"arn:aws:iam::123456789012:role/fis-experiments\"\n}\n```",
       "hubWhen": {
         "TIER": [
           "99.99"
@@ -605,10 +724,10 @@
       "type": "fitness-fn",
       "label": "Spent budget blocks deploys",
       "x": 1040,
-      "y": 520,
+      "y": 780,
       "category": "process",
-      "threshold": "A production deploy without the reliability-fix label is refused whenever the 30-day error budget remaining is 0 or below",
-      "description": "A pipeline step before every production deploy reads the error budget remaining from Prometheus (the Sloth recording rule) and fails when it is spent, unless the change carries the label for reliability or security fixes.\n\nTool: GitHub Actions step querying the Prometheus HTTP API\n\n```yaml\n- name: Error budget gate\n  if: ${{ !contains(github.event.pull_request.labels.*.name, 'reliability-fix') }}\n  run: |\n    remaining=$(curl -sf \"$PROMETHEUS_URL/api/v1/query\" \\\n      --data-urlencode 'query=slo:period_error_budget_remaining:ratio{sloth_service=\"order-api\",sloth_slo=\"availability\"}' \\\n      | jq -r '.data.result[0].value[1]')\n    echo \"Error budget remaining: $remaining\"\n    if awk \"BEGIN { exit !($remaining <= 0) }\"; then\n      echo \"::error::Error budget spent: only reliability or security fixes deploy (ADR Spent budget freezes releases)\"\n      exit 1\n    fi\n```",
+      "threshold": "A production deploy of a commit whose pull request carries neither the reliability-fix nor the security-fix label is refused whenever the 30-day error budget remaining is 0 or below",
+      "description": "A pipeline step before every production deploy looks up the pull request of the commit being deployed (so it works on push and manual deploys, not only pull_request runs), lets labelled fixes through, and otherwise reads the error budget remaining from Prometheus (the Sloth recording rule) and fails when it is spent.\n\nTool: GitHub Actions step with the GitHub CLI and the Prometheus HTTP API\n\n```yaml\n- name: Error budget gate\n  env:\n    GH_TOKEN: ${{ github.token }}\n  run: |\n    labels=$(gh api \"repos/${{ github.repository }}/commits/$GITHUB_SHA/pulls\" --jq '[.[].labels[].name] | join(\",\")')\n    case \",$labels,\" in\n      *,reliability-fix,*|*,security-fix,*) echo \"Labelled fix: not gated by the error budget\"; exit 0;;\n    esac\n    remaining=$(curl -sf \"$PROMETHEUS_URL/api/v1/query\" \\\n      --data-urlencode 'query=slo:period_error_budget_remaining:ratio{sloth_service=\"order-api\",sloth_slo=\"availability\"}' \\\n      | jq -r '.data.result[0].value[1]')\n    echo \"Error budget remaining: $remaining\"\n    if awk \"BEGIN { exit !($remaining <= 0) }\"; then\n      echo \"::error::Error budget spent: only reliability or security fixes deploy (ADR Spent budget freezes releases)\"\n      exit 1\n    fi\n```",
       "hubWhen": {
         "BUDGET": [
           "freeze"
@@ -620,13 +739,43 @@
       "type": "fitness-fn",
       "label": "Spent budget opens a review",
       "x": 1040,
-      "y": 650,
+      "y": 910,
       "category": "process",
-      "threshold": "Every spent 30-day budget opens a postmortem ticket within 1 hour; 100 % of them closed within 5 working days",
-      "description": "An alerting rule fires when the error budget remaining reaches 0 and Alertmanager routes it to the ticket system (Jira or GitHub Issues through a webhook receiver); the team's monthly review counts tickets closed in time.\n\nTool: Prometheus alerting rule routed by Alertmanager\n\n```yaml\ngroups:\n  - name: error-budget\n    rules:\n      - alert: OrderApiErrorBudgetSpent\n        expr: slo:period_error_budget_remaining:ratio{sloth_service=\"order-api\",sloth_slo=\"availability\"} <= 0\n        for: 15m\n        labels:\n          severity: ticket\n          action: postmortem\n        annotations:\n          summary: \"Order API spent its 30-day error budget ({{TIER}} %)\"\n          description: \"Hold a blameless postmortem within 5 working days (ADR Spent budget triggers a review).\"\n```",
+      "threshold": "An alert fires within 15 minutes of the error budget reaching 0 and routes to the ticket system; 0 postmortem tickets open longer than 7 calendar days (5 working days)",
+      "description": "An alerting rule fires when the error budget remaining reaches 0 and Alertmanager routes it to the ticket system (GitHub Issues through a webhook bridge, or Jira), which opens an issue labelled postmortem; a weekly job fails when such an issue has been open longer than 7 days, so the postmortem was not held in time.\n\nTool: Prometheus alerting rule routed by Alertmanager; GitHub CLI in a scheduled job\n\n```yaml\ngroups:\n  - name: error-budget\n    rules:\n      - alert: OrderApiErrorBudgetSpent\n        expr: slo:period_error_budget_remaining:ratio{sloth_service=\"order-api\",sloth_slo=\"availability\"} <= 0\n        for: 15m\n        labels:\n          severity: ticket\n          action: postmortem\n        annotations:\n          summary: \"Order API spent its 30-day error budget ({{TIER}} %)\"\n          description: \"Hold a blameless postmortem within 5 working days (ADR Spent budget triggers a review).\"\n---\n# weekly job: every postmortem ticket closed within 5 working days\n- env:\n    GH_TOKEN: ${{ github.token }}\n  run: |\n    since=$(date -u -d '-7 days' +%FT%TZ)\n    old=$(gh issue list --label postmortem --state open --json number,createdAt --jq \"[.[] | select(.createdAt < \\\"$since\\\")] | length\")\n    test \"$old\" -eq 0 || { echo \"::error::$old postmortem tickets open longer than 5 working days\"; exit 1; }\n```",
       "hubWhen": {
         "BUDGET": [
           "review"
+        ]
+      }
+    },
+    {
+      "id": "ff-dependency-budget",
+      "type": "fitness-fn",
+      "label": "Dependency availability adds up",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "Every hard dependency in the list has a committed availability above {{TIER}} %, and the product of our own infrastructure's commitment and theirs is at least {{TIER}} %",
+      "description": "A test reads the list of hard dependencies kept in the repository, with each one's committed availability and the SLA it comes from, and fails when any is at or below the target or when the product, with the platform's commitment for our own instances and database, falls below it. Adding a synchronous call means adding a line, which the reviewer sees.\n\nTool: Vitest over reliability/dependencies.yaml\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\n\n// reliability/dependencies.yaml:\n// own_infrastructure: 99.95          # the platform's commitment for our instances and database (e.g. EKS + RDS Multi-AZ SLAs)\n// hard:                              # services the element waits for to answer\n//   - { name: Orders database (RDS Multi-AZ), availability: 99.95, source: \"https://aws.amazon.com/rds/sla/\" }\n//   - { name: Identity provider (Entra ID), availability: 99.99, source: \"Microsoft Entra SLA\" }\ntype Dependency = { name: string; availability: number; source: string }\nconst TARGET = {{TIER}}\nconst deps = parse(readFileSync('reliability/dependencies.yaml', 'utf8')) as { own_infrastructure: number; hard: Dependency[] }\n\nit('every hard dependency commits to more than the target', () => {\n  expect(deps.hard.filter((d) => d.availability <= TARGET).map((d) => d.name)).toEqual([])\n})\n\nit('the product of our infrastructure and the hard dependencies meets the target', () => {\n  const product = deps.hard.reduce((p, d) => p * (d.availability / 100), deps.own_infrastructure / 100) * 100\n  expect(product).toBeGreaterThanOrEqual(TARGET)\n})\n```",
+      "hubWhen": {
+        "DEPENDENCIES": [
+          "stronger"
+        ]
+      }
+    },
+    {
+      "id": "ff-degrade",
+      "type": "fitness-fn",
+      "label": "Serves without the weak dependency",
+      "x": 1040,
+      "y": 1170,
+      "category": "operational",
+      "threshold": "With the weak dependency cut off: operations that do not need it fail below 0.1 %, and operations that need it answer 200 or 503 within 1 second at the 95th percentile",
+      "description": "A k6 run in staging cuts the weak dependency off through Toxiproxy (a timeout toxic that drops every byte), keeps sending a mix of operations that need it and operations that do not, and checks the two behaviours separately; it removes the toxic afterwards. Staging reaches the dependency through the Toxiproxy proxy named partner.\n\nTool: Grafana k6 with Toxiproxy\n\n```js\n// k6 run --env BASE_URL=https://staging.shop.example --env TOXIPROXY=http://toxiproxy:8474 degrade.js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nexport const options = {\n  scenarios: {\n    mixed: { executor: 'constant-arrival-rate', rate: 20, timeUnit: '1s', duration: '5m', preAllocatedVUs: 50, maxVUs: 500 },\n  },\n  thresholds: {\n    'http_req_failed{op:independent}': ['rate<0.001'],   // operations that do not need the partner keep serving\n    'http_req_duration{op:dependent}': ['p(95)<1000'],   // operations that need it answer within 1 s ...\n    'checks{op:dependent}': ['rate==1'],                 // ... with a degraded result (200) or a clear \"try later\" (503)\n  },\n}\n\nconst JSON_HEADERS = { headers: { 'Content-Type': 'application/json' } }\n\nexport function setup() {\n  http.post(`${__ENV.TOXIPROXY}/proxies/partner/toxics`,\n    JSON.stringify({ name: 'partner_down', type: 'timeout', stream: 'downstream', toxicity: 1.0, attributes: { timeout: 0 } }), JSON_HEADERS)\n}\n\nexport function teardown() {\n  http.del(`${__ENV.TOXIPROXY}/proxies/partner/toxics/partner_down`)\n}\n\nexport default function () {\n  http.get(`${__ENV.BASE_URL}/orders?page=1`, { tags: { op: 'independent' } })\n  const res = http.get(`${__ENV.BASE_URL}/prices/42`, { tags: { op: 'dependent' } })\n  check(res, { 'degraded or try later': (r) => r.status === 200 || r.status === 503 }, { op: 'dependent' })\n}\n```",
+      "hubWhen": {
+        "DEPENDENCIES": [
+          "degrade"
         ]
       }
     }
@@ -771,6 +920,42 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-slo--implements--adr-no-downtime",
+      "sourceId": "ff-slo",
+      "targetId": "adr-no-downtime",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-slo-window--implements--adr-one-zone",
+      "sourceId": "ff-slo-window",
+      "targetId": "adr-one-zone",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-slo-window--implements--adr-multi-zone",
+      "sourceId": "ff-slo-window",
+      "targetId": "adr-multi-zone",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-slo-window--implements--adr-multi-region",
+      "sourceId": "ff-slo-window",
+      "targetId": "adr-multi-region",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-slo-window--implements--adr-window",
+      "sourceId": "ff-slo-window",
+      "targetId": "adr-window",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-window-announced--implements--adr-window",
+      "sourceId": "ff-window-announced",
+      "targetId": "adr-window",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-instance-loss--implements--adr-one-zone",
       "sourceId": "ff-instance-loss",
       "targetId": "adr-one-zone",
@@ -798,6 +983,18 @@
       "id": "ff-budget-review--implements--adr-budget-review",
       "sourceId": "ff-budget-review",
       "targetId": "adr-budget-review",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-dependency-budget--implements--adr-deps-stronger",
+      "sourceId": "ff-dependency-budget",
+      "targetId": "adr-deps-stronger",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-degrade--implements--adr-deps-degrade",
+      "sourceId": "ff-degrade",
+      "targetId": "adr-deps-degrade",
       "relationType": "implements"
     }
   ]
