@@ -2,7 +2,9 @@
 
 # radical.tools
 
-**Open-source architecture studio: C4 models, ADRs, fitness functions and requirements in one living model, with an AI co-architect.**
+**Open-source architecture studio: one living model of your system, for your team and your coding agents.**
+
+C4, decisions, requirements and fitness functions in one model. Free and MIT licensed, in the browser, no account.
 
 [![CI](https://github.com/radicaltools/radical.tools/actions/workflows/ci.yml/badge.svg)](https://github.com/radicaltools/radical.tools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -14,6 +16,14 @@
 
 </div>
 
+## Try it
+
+**[Open studio.radical.tools](https://studio.radical.tools)**: no sign-up, nothing to install. Start from the sample model or your own; the model stays in your browser or in files you choose.
+
+**Connect your coding agent:** `npx @radicaltools/cli setup` connects Claude Code, Claude Desktop, Codex, Cursor or VS Code to a model folder, step by step, and `radical setup --status` checks the connection ([CLI usage](apps/cli/README.md#radical-setup)). No Node.js yet? In an empty folder, `curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup` (or `radical.cmd` on Windows) downloads it first. Then ask your agent to model the repository it works in, and open the same folder in Studio (*Models → Open folder…*) to see the model.
+
+**Desktop app and VS Code:** installers for macOS, Windows and Linux are on the [latest release](https://github.com/radicaltools/radical.tools/releases/latest); to build them yourself, see [Getting started](#getting-started). An extension that opens `.radical` files right in VS Code lives in [apps/vscode](apps/vscode).
+
 ## Why radical.tools?
 
 Architecture diagrams go stale because they are pictures. In radical.tools they are **views of one model**. Every element lives once, and the structure and flow canvases, hierarchy, dependency matrix, table and wiki all read from it. The decisions, requirements and fitness functions that explain the architecture live in the same model, linked to the elements they govern.
@@ -21,6 +31,7 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 - **No account, nothing to install.** Open it in the browser and start modelling. Your model stays in local storage or plain files you can commit.
 - **C4 without the busywork.** Smart Layout places nodes, minimises crossings and fits groups for you, and keeps the rows, columns and grids you pin.
 - **From a paragraph to a model.** Radical Forge turns a system description into requirements, a domain model, fitness functions, Gherkin scenarios, state machines, processes, UI mockups and a C4 model, one reviewable stage at a time, each filling the gaps it finds in the ones before, and ends with a review of the whole model.
+- **Your coding agents follow it.** The MCP server lets Claude Code, Codex or Cursor read and edit the model, and `radical check` in CI says where the code and the model part ways.
 - **Bring your own AI.** OpenAI, Anthropic, Gemini, or a local model through Ollama.
 - **Decisions you would forget, asked for.** The [Hub](https://hub.radical.tools)'s concern packs, in nine groups from Architecture to Technology, each ask a few questions and bring the requirements, the decision, runnable fitness functions and scenarios that fit your answers; `radical check` and the Inspector point out the concerns your model has not decided yet.
 
@@ -34,16 +45,6 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
     <td width="50%"><img alt="Generated architecture wiki page" src="apps/web/screenshots/wiki-light.png"><br><sub><b>Architecture wiki</b>, documentation generated from the model</sub></td>
   </tr>
 </table>
-
-## Try it
-
-Open [**studio.radical.tools**](https://studio.radical.tools). No sign-up, nothing to install.
-
-**Desktop app:** there are no prebuilt installers yet. To run it as an Electron app, build it from source (see [Getting started](#getting-started)): `npm install && npm run dist` produces an installer for your OS in `apps/studio/dist/`.
-
-**VS Code:** an extension that opens `.radical` files right in the editor lives in [apps/vscode](apps/vscode).
-
-**Your coding agent:** `npx @radicaltools/cli setup` connects Claude Code, Claude Desktop, Codex, Cursor or VS Code to a model folder, step by step, and `radical setup --status` checks the connection ([CLI usage](apps/cli/README.md#radical-setup)). No Node.js yet? In an empty folder, `curl -fsSLO https://radical.tools/radical.sh && sh radical.sh setup` (or `radical.cmd` on Windows) downloads it first.
 
 ## Features
 
