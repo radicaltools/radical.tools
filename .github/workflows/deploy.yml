@@ -81,11 +81,15 @@ jobs:
           aws s3 cp apps/studio/out/renderer/apple-touch-icon.png s3://${{ secrets.S3_BUCKET }}/apple-touch-icon.png \
             --cache-control "public, max-age=3600" --content-type "image/png"
 
+      # One "/*" per distribution: CloudFront bills invalidations per path
+      # (1000 free a month, then per path) and a wildcard counts as one, so a
+      # deploy costs 3 paths instead of 23. Hashed assets are immutable and
+      # come back from S3 once.
       - name: Invalidate CloudFront index.html
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/favicon.svg" "/apple-touch-icon.png"
+            --paths "/*"
 
       # ── Marketing website (radical.tools + www) ─────────────────────────
       - name: Stamp asset URLs with the build id
@@ -129,7 +133,7 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/usecases.html" "/manual.html" "/reference.html" "/blog/*" "/docs.js" "/style.css" "/landing.css" "/theme.js" "/radical.sh" "/radical.cmd" "/favicon.svg" "/apple-touch-icon.png"
+            --paths "/*"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
       # Built from apps/hub (the viewer runs on Studio's canvas and panels,
@@ -182,4 +186,4 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.HUB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/hub-data.json" "/hub/*" "/style.css" "/hub.js" "/favicon.svg" "/apple-touch-icon.png"
+            --paths "/*"
