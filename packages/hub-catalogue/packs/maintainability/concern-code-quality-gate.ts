@@ -259,11 +259,10 @@ jobs:
       id: 'ff-pre-commit', label: 'Formatted on commit', category: 'process', implements: GATES,
       checks: ['req-formatted'],
       threshold: '0 files in a pull request differ from the formatter\'s output (prettier --check exits 0 in CI); the formatter runs on every staged file at commit',
-      description: 'husky installs a pre-commit hook that runs lint-staged, which formats and (where a linter is enforced) lints only the staged files in the versions pinned in package.json; CI runs the same formatter check over the whole tree, so a commit made with --no-verify still fails there. On Python the pre-commit framework with ruff-pre-commit does the same.',
+      description: 'husky installs a pre-commit hook that runs lint-staged, which formats and (where a linter is enforced) lints only the staged files in the versions pinned in package.json; CI runs the same formatter check over the whole tree, so a commit made with --no-verify still fails there. On Python the pre-commit framework with ruff-pre-commit does the same. The file is package.json; .husky/pre-commit holds the one line npx lint-staged.',
       tool: 'husky with lint-staged; pre-commit with ruff-pre-commit for Python',
       language: 'json',
-      snippet: `// package.json
-{
+      snippet: `{
   "scripts": {
     "prepare": "husky",
     "format:check": "prettier --check .",
@@ -273,9 +272,7 @@ jobs:
     "*.{ts,tsx,js,mjs,cjs}": ["prettier --write", "eslint --cache --fix --max-warnings 0"],
     "*.{json,md,yml,yaml,css}": ["prettier --write"]
   }
-}
-// .husky/pre-commit
-// npx lint-staged`,
+}`,
     },
     {
       id: 'ff-eslint-config', label: 'Recommended rules, every one an error', when: { STATIC: ['linter'] }, category: 'structural', implements: ['adr-linter'],
@@ -356,7 +353,7 @@ fi`,
       threshold: '0 type errors with strict on for the whole element; 0 @ts-ignore or @ts-expect-error comments without an issue id (KEY-123)',
       description: 'tsconfig turns on strict and the checks strict leaves out, and the type check runs on every pull request; a grep in the same CI step refuses a suppression comment that does not name an issue (the ban-ts-comment lint rule does the same where a linter is enforced). On Python the equivalent is mypy --strict in pyproject.toml and a grep for "type: ignore" without an issue id; on C#, <Nullable>enable</Nullable> with <TreatWarningsAsErrors>true</TreatWarningsAsErrors>.',
       tool: 'TypeScript compiler (tsc --noEmit) with git grep; mypy --strict for Python',
-      language: 'json',
+      language: 'jsonc',
       snippet: `// tsconfig.json
 {
   "compilerOptions": {
@@ -528,11 +525,10 @@ it('every finding is fixed, none is baselined', () => {
       id: 'ff-duplication', label: 'Duplication under the threshold', when: { DUPLICATION: ['block'] }, category: 'structural', implements: GATES,
       checks: ['req-duplication'],
       threshold: 'Duplicated lines at most {{DUPLICATION_PCT}}% of the source tree jscpd scans, blocks of 10 or more lines; the check fails above it and names both copies',
-      description: 'jscpd runs over the source tree in CI with a minimum block of 10 lines and the threshold, exits 1 above it and prints both locations of every clone; the number is the whole tree\'s, so the threshold is set at the level found when this decision is adopted and lowered as clones are removed. With the platform variant the condition "Duplicated lines on new code" in the Sonar gate measures only the pull request\'s new lines instead. The HTML report is kept as a build artifact for the reviewer.',
+      description: 'jscpd runs over the source tree in CI with a minimum block of 10 lines and the threshold, exits 1 above it and prints both locations of every clone; the number is the whole tree\'s, so the threshold is set at the level found when this decision is adopted and lowered as clones are removed. With the platform variant the condition "Duplicated lines on new code" in the Sonar gate measures only the pull request\'s new lines instead. The HTML report is kept as a build artifact for the reviewer. The file is .jscpd.json; CI runs npx jscpd src, which exits 1 when duplication is above the threshold.',
       tool: 'jscpd; the Sonar duplication condition on new code with the platform',
       language: 'json',
-      snippet: `// .jscpd.json
-{
+      snippet: `{
   "threshold": {{DUPLICATION_PCT}},
   "minLines": 10,
   "minTokens": 70,
@@ -541,8 +537,7 @@ it('every finding is fixed, none is baselined', () => {
   "ignore": ["**/node_modules/**", "**/dist/**", "**/*.test.ts", "**/*.spec.ts"],
   "reporters": ["console", "html"],
   "output": "reports/jscpd"
-}
-// CI: npx jscpd src   (exits 1 when duplication is above "threshold" %)`,
+}`,
     },
     {
       id: 'ff-duplication-report', label: 'Clones posted on the pull request', when: { DUPLICATION: ['report'] }, category: 'process', implements: GATES,

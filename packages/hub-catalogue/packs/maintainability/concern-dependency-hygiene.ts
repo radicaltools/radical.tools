@@ -215,7 +215,7 @@ const pack: PackSpec = {
       id: 'ff-renovate-rules', label: 'Renovate automerges only safe updates', when: { UPDATES: ['automerge-patch'] }, category: 'process', implements: ['adr-automerge'],
       checks: ['req-automerge'],
       threshold: 'renovate.json validates; its rules automerge patch and minor updates of packages at 1.0.0 or above after a 3-day minimum release age and label major and 0.x updates for a person; 0 other automerge rules',
-      description: 'The repository\'s renovate.json is validated in CI with renovate-config-validator, and its package rules are what decide the gate: automerge for patch and minor updates of stable packages, a minimum release age of 3 days, majors and 0.x packages labelled for a person. A test over the file (jq in the same step) fails on an automerge rule outside those.',
+      description: 'The repository\'s renovate.json is validated in CI with renovate-config-validator, and its package rules are what decide the gate: automerge for patch and minor updates of stable packages, a minimum release age of 3 days, majors and 0.x packages labelled for a person. A test over the file (jq in the same step) fails on an automerge rule outside those. The file is renovate.json; CI runs `npx --package renovate renovate-config-validator renovate.json` and then `jq -e \'[.packageRules[] | select(.automerge == true)] | all(.matchUpdateTypes == ["patch", "minor"] and .matchCurrentVersion == "!/^0/")\' renovate.json`, which fails when any automerge rule reaches past patch and minor updates of stable packages.',
       tool: 'Renovate (renovate-config-validator and jq in CI)',
       language: 'json',
       snippet: `{
@@ -230,9 +230,7 @@ const pack: PackSpec = {
     { "matchUpdateTypes": ["major"], "automerge": false, "labels": ["dependencies", "major-update"] },
     { "matchCurrentVersion": "/^0/", "automerge": false, "labels": ["dependencies", "pre-1.0"] }
   ]
-}
-// CI: npx --package renovate renovate-config-validator renovate.json
-//     jq -e '[.packageRules[] | select(.automerge == true)] | all(.matchUpdateTypes == ["patch", "minor"] and .matchCurrentVersion == "!/^0/")' renovate.json`,
+}`,
     },
     {
       id: 'ff-weekly-groups', label: 'Updates grouped weekly', when: { UPDATES: ['weekly-batch'] }, category: 'process', implements: ['adr-weekly-batch'],
@@ -351,7 +349,7 @@ jobs:
       id: 'ff-knip', label: 'Unused and unlisted dependencies fail', when: { UNUSED: ['forbidden'] }, category: 'structural', implements: UPDATES,
       checks: ['req-unused-fails'],
       threshold: '0 unused dependencies, 0 unlisted imports, 0 unresolved imports on every pull request',
-      description: 'knip runs as a required check with dependency findings as errors; files and exports stay warnings until the backlog is clean. Python: deptry . with DEP001 to DEP004 in pyproject [tool.deptry]; Go: go mod tidy -diff fails when go.mod would change; JVM: the dependency:analyze goal of the Maven dependency plugin with failOnWarning.',
+      description: 'knip runs as a required check with dependency findings as errors; files and exports stay warnings until the backlog is clean. Python: deptry . with DEP001 to DEP004 in pyproject [tool.deptry]; Go: go mod tidy -diff fails when go.mod would change; JVM: the dependency:analyze goal of the Maven dependency plugin with failOnWarning. The file is knip.json; CI runs npx knip --reporter compact.',
       tool: 'knip; deptry for Python; go mod tidy -diff for Go; maven-dependency-plugin analyze for the JVM',
       language: 'json',
       snippet: `{
@@ -366,8 +364,7 @@ jobs:
     "files": "warn",
     "exports": "warn"
   }
-}
-// CI: npx knip --reporter compact`,
+}`,
     },
     {
       id: 'ff-unused-review', label: 'Unused report is acted on', when: { UNUSED: ['reviewed'] }, category: 'process', implements: UPDATES,

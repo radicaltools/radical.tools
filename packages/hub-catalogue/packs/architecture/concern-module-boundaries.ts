@@ -175,14 +175,14 @@ const pack: PackSpec = {
       description: 'A dependency rule fails on any cycle that leaves a part\'s folder (a cycle among the files of one part is not counted); it is one of the rules in .dependency-cruiser.cjs that npm run check:deps runs. On the JVM the same is ArchUnit\'s slices().matching("..(*)..").should().beFreeOfCycles(); for Python, import-linter\'s independence contract.',
       tool: 'dependency-cruiser; for the JVM: ArchUnit slices; for Python: import-linter; for .NET: NetArchTest',
       language: 'js',
-      snippet: `// .dependency-cruiser.cjs — in forbidden:
-{
+      snippet: `// .dependency-cruiser.cjs: add the rule to forbidden
+module.exports = { forbidden: [{
   name: 'no-cycles-between-parts',
   comment: 'ADR Module boundaries: parts in a cycle are one part',
   severity: 'error',
   from: { path: '^src/modules/([^/]+)/' },
   to: { circular: true, via: { pathNot: '^src/modules/$1/' } },   // the cycle passes through another part
-}
+}] }
 // package.json: "check:deps": "depcruise src --config .dependency-cruiser.cjs"`,
     },
     {
@@ -191,14 +191,14 @@ const pack: PackSpec = {
       description: 'A dependency rule allows a part to import another only through its index (the published API); a deep import into another part\'s folder fails the build. Spring Modulith\'s verify() (named interfaces such as customer::api are its published packages) and Nx\'s module boundaries do the same in their stacks.',
       tool: 'dependency-cruiser; for Spring Boot: Spring Modulith verify(); for an Nx workspace: @nx/enforce-module-boundaries; for .NET: NetArchTest',
       language: 'js',
-      snippet: `// .dependency-cruiser.cjs — in forbidden:
-{
+      snippet: `// .dependency-cruiser.cjs: add the rule to forbidden
+module.exports = { forbidden: [{
   name: 'only-through-public-api',
   comment: 'ADR Module boundaries: parts meet through their published API',
   severity: 'error',
   from: { path: '^src/modules/([^/]+)/' },
   to: { path: '^src/modules/', pathNot: ['^src/modules/$1/', '^src/modules/[^/]+/index\\\\.ts$'] },
-}`,
+}] }`,
     },
     {
       id: 'ff-allowlist', label: 'Only declared dependencies', when: { RULES: ['allowlist'] }, category: 'structural', implements: ['adr-allowlist'], checks: ['req-allowlist'],
@@ -287,14 +287,14 @@ echo "known violations: $then at $previous_tag, $now now"
       description: 'A dependency rule keeps the kernel free of the parts and of every package in node_modules except the pure ones on its allowlist (so a database driver, HTTP client or framework cannot slip in); a second step in the same job compares the kernel\'s line count with the whole and fails above the limit.',
       tool: 'dependency-cruiser and cloc with jq in a shell step; for the JVM: an ArchUnit rule over the kernel package and JaCoCo\'s line counts',
       language: 'js',
-      snippet: `// .dependency-cruiser.cjs — in forbidden:
-{
+      snippet: `// .dependency-cruiser.cjs: add the rule to forbidden
+module.exports = { forbidden: [{
   name: 'kernel-depends-on-nothing',
   comment: 'ADR A small shared kernel: types and contracts only',
   severity: 'error',
   from: { path: '^src/shared-kernel/' },
   to: { path: ['^src/modules/', '^node_modules/'], pathNot: '^node_modules/(zod|uuid|decimal\\\\.js)/' },   // the pure libraries the kernel may use
-}
+}] }
 // CI, in the same job: fail when the kernel passes the limit
 //   kernel=$(cloc --json src/shared-kernel | jq '.SUM.code'); all=$(cloc --json src | jq '.SUM.code')
 //   [ $((kernel * 100 / all)) -le {{KERNEL_PERCENT}} ]`,
@@ -330,14 +330,14 @@ if (late.length) { console.error('internal libraries a major behind for over 90 
       description: 'A dependency rule forbids any import from one part into another; generated API clients live in each consumer and are generated from the provider\'s published contract.',
       tool: 'dependency-cruiser; for the JVM: ArchUnit slices().should().notDependOnEachOther(); for .NET: NetArchTest',
       language: 'js',
-      snippet: `// .dependency-cruiser.cjs — in forbidden:
-{
+      snippet: `// .dependency-cruiser.cjs: add the rule to forbidden
+module.exports = { forbidden: [{
   name: 'parts-share-nothing',
   comment: 'ADR Parts share no code',
   severity: 'error',
   from: { path: '^src/modules/([^/]+)/' },
   to: { path: '^src/modules/', pathNot: '^src/modules/$1/' },
-}`,
+}] }`,
     },
   ],
 }

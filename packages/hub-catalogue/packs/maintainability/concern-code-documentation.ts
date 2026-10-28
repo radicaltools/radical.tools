@@ -387,11 +387,10 @@ it(\`at least \${MIN_PCT}% of the exported symbols carry a doc comment\`, () => 
       id: 'ff-reference-build', label: 'API reference builds without warnings', when: { API_DOCS: ['reference'] }, category: 'process', implements: DECISIONS,
       checks: ['req-reference-built'],
       threshold: 'The reference builds on every pull request with 0 warnings (an unresolved link or an undocumented export is a warning) and is published with each release under its version',
-      description: 'TypeDoc runs with warnings treated as errors, so a broken {@link} or an export without a comment fails the pull request; Sphinx does the same with `sphinx-build -W --keep-going`. The release job runs the same command and publishes the output under the release version (includeVersion puts it in the site).',
+      description: 'TypeDoc runs with warnings treated as errors, so a broken {@link} or an export without a comment fails the pull request; Sphinx does the same with `sphinx-build -W --keep-going`. The release job runs the same command and publishes the output under the release version (includeVersion puts it in the site). The file is typedoc.json; package.json holds the script "docs:api": "typedoc", which CI runs on every pull request and the release job runs to publish docs/api. Python: sphinx-build -W --keep-going -b html docs docs/_build.',
       tool: 'TypeDoc; Sphinx for Python',
       language: 'json',
-      snippet: `// typedoc.json
-{
+      snippet: `{
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs/api",
@@ -399,9 +398,7 @@ it(\`at least \${MIN_PCT}% of the exported symbols carry a doc comment\`, () => 
   "validation": { "notExported": true, "invalidLink": true, "notDocumented": true },
   "requiredToBeDocumented": ["Function", "Class", "Interface", "TypeAlias", "Method"],
   "includeVersion": true
-}
-// package.json: "docs:api": "typedoc"   (CI: npm run docs:api on every pull request; the release job publishes docs/api)
-// Python: sphinx-build -W --keep-going -b html docs docs/_build`,
+}`,
     },
     {
       id: 'ff-contract-drift', label: 'Contract and code agree', when: { API_DOCS: ['generated'] }, category: 'structural', implements: DECISIONS,
