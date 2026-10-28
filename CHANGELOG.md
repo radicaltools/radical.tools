@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - radical.tools: the home page no longer has *Made for*, and the use cases page no longer ends with *Start anywhere*
 
 ### Fixed
+- radical.tools serves a folder's index: `/blog/` (and `/blog`) opens `blog/index.html` instead of the 404 page. A CloudFront function rewrites the URI before S3, and the blog's pages revalidate on every request like the other HTML entry points (`infra/web.tf`, applied with Terraform)
 - The special key chosen under Settings stays after a reload; it went back to Alt/Option
 
 ## [0.3.0] - 2026-10-27
