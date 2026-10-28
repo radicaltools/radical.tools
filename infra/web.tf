@@ -67,6 +67,32 @@ resource "aws_cloudfront_origin_access_control" "web" {
   signing_protocol                  = "sigv4"
 }
 
+# ── Directory index ──────────────────────────────────────────────────────────
+# S3 behind an origin access control serves no directory index: only the
+# root's default_root_object. A request for /blog/ (or /blog) would reach S3
+# as a missing key and come back as the 404 page. This viewer-request function
+# rewrites a URI that ends in "/" to its index.html, and one without a file
+# extension to "<uri>/index.html", before the request reaches the origin.
+resource "aws_cloudfront_function" "web_directory_index" {
+  count   = local.use_web ? 1 : 0
+  name    = "${local.name_prefix}-web-directory-index"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite /dir/ and /dir to /dir/index.html for the static website"
+  publish = true
+  code    = <<-JS
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+      if (uri.endsWith('/')) {
+        request.uri = uri + 'index.html';
+      } else if (!uri.includes('.')) {
+        request.uri = uri + '/index.html';
+      }
+      return request;
+    }
+  JS
+}
+
 # ── CloudFront distribution ──────────────────────────────────────────────────
 
 resource "aws_cloudfront_distribution" "web" {
@@ -94,6 +120,32 @@ resource "aws_cloudfront_distribution" "web" {
 
     # AWS Managed-CachingOptimized
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+
+    # /blog/ → /blog/index.html: S3 behind OAC knows no directory index
+    # besides the root's default_root_object.
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.web_directory_index[0].arn
+    }
+  }
+
+  # The blog's pages (blog/index.html, blog/<slug>.html): always revalidate,
+  # like the other HTML entry points, so a new post is visible immediately.
+  ordered_cache_behavior {
+    path_pattern           = "/blog/*"
+    target_origin_id       = "s3-${aws_s3_bucket.web[0].id}"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    # AWS Managed-CachingDisabled
+    cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.web_directory_index[0].arn
+    }
   }
 
   # HTML entry points: always revalidate so deploys are visible immediately.
