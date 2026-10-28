@@ -92,7 +92,7 @@ jobs:
         run: |
           # HTML references landing.css / style.css / theme.js as `?v=__BUILD__`.
           # Stamping the commit sha busts browser + CDN caches on every deploy.
-          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" apps/web/*.html
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" apps/web/*.html apps/web/blog/*.html
           # The home page names the released version, the one the CLI carries.
           version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' apps/cli/package.json)
           test -n "$version"
@@ -117,9 +117,10 @@ jobs:
 
       - name: Upload website HTML (no-cache)
         run: |
-          for f in apps/web/*.html; do
+          # Top-level pages and the blog (apps/web/blog/<slug>.html, blog/index.html).
+          for f in apps/web/*.html apps/web/blog/*.html; do
             aws s3 cp "$f" \
-              "s3://${{ secrets.WEB_S3_BUCKET }}/$(basename "$f")" \
+              "s3://${{ secrets.WEB_S3_BUCKET }}/${f#apps/web/}" \
               --cache-control "no-store" \
               --content-type "text/html; charset=utf-8"
           done
@@ -128,7 +129,7 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/index.html" "/usecases.html" "/manual.html" "/reference.html" "/docs.js" "/style.css" "/landing.css" "/theme.js" "/radical.sh" "/radical.cmd" "/favicon.svg" "/apple-touch-icon.png"
+            --paths "/index.html" "/usecases.html" "/manual.html" "/reference.html" "/blog/*" "/docs.js" "/style.css" "/landing.css" "/theme.js" "/radical.sh" "/radical.cmd" "/favicon.svg" "/apple-touch-icon.png"
 
       # ── Architecture Hub (hub.radical.tools) ─────────────────────────
       # Built from apps/hub (the viewer runs on Studio's canvas and panels,

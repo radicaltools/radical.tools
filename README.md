@@ -10,7 +10,7 @@ C4, decisions, requirements and fitness functions in one model. Free and MIT lic
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Try it in the browser](https://img.shields.io/badge/try%20it-studio.radical.tools-387bf3)](https://studio.radical.tools)
 
-[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Use cases](https://radical.tools/usecases.html) · [Guide](https://radical.tools/manual.html) · [Reference](https://radical.tools/reference.html)
+[**Try it in the browser**](https://studio.radical.tools) · [Architecture Hub](https://hub.radical.tools) · [Use cases](https://radical.tools/usecases.html) · [Blog](https://radical.tools/blog/) · [Guide](https://radical.tools/manual.html) · [Reference](https://radical.tools/reference.html)
 
 <img alt="Demo: opening the sample banking model and switching between its views: system context, container view, payment sequence, dependency matrix, governance table and generated wiki" src="apps/web/screenshots/demo.gif" width="880">
 

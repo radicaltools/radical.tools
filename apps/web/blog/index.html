@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog — Radical.Tools</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+  <link rel="canonical" href="https://radical.tools/blog/" />
+  <meta name="description" content="Notes on architecture modelling, the software lifecycle and coding agents, from the people behind radical.tools." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://radical.tools/blog/" />
+  <meta property="og:title" content="Blog — Radical.Tools" />
+  <meta property="og:description" content="Notes on architecture modelling, the software lifecycle and coding agents, from the people behind radical.tools." />
+  <meta property="og:image" content="https://radical.tools/social-preview.png" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="640" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- Before any stylesheet: sets data-theme for the first paint and is not blocked by a slow font CDN. -->
+  <script src="../theme.js?v=__BUILD__"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../landing.css?v=__BUILD__" />
+</head>
+<body class="blog-page">
+
+  <!-- Shared site navigation — Home · Use cases · Blog · Docs | Hub · Studio | GitHub · theme. Same on radical.tools, docs and the Hub (SiteNav.tsx). -->
+  <header class="site-nav" id="top">
+    <a class="site-nav-logo" href="https://radical.tools" aria-label="Radical.Tools"><img class="site-nav-mark" src="../favicon.svg" alt="" /></a>
+    <nav class="site-nav-links">
+      <a class="site-nav-btn" href="https://radical.tools">Home</a>
+      <a class="site-nav-btn" href="https://radical.tools/usecases.html">Use cases</a>
+      <a class="site-nav-btn active" href="https://radical.tools/blog/">Blog</a>
+      <a class="site-nav-btn" href="https://radical.tools/manual.html">Docs</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-btn" href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a class="site-nav-btn primary" href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <span class="site-nav-sep" aria-hidden="true"></span>
+      <a class="site-nav-icon" href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.341-3.369-1.341-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.532 1.031 1.532 1.031.891 1.528 2.341 1.087 2.91.831.091-.645.349-1.087.635-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.547 1.376.203 2.393.1 2.646.641.698 1.029 1.591 1.029 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg></a>
+      <button type="button" class="site-nav-icon" data-theme-toggle aria-label="Toggle theme"></button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="blog-hero">
+      <div class="eyebrow">
+        <span class="eyebrow-tag">Blog</span>
+        <span class="sep">/</span><span>architecture, the lifecycle, and agents</span>
+      </div>
+      <h1>Notes from the architect’s desk</h1>
+      <p class="lead">On architecture models, the software lifecycle, and what changes when coding agents join the team. <em>Opinions, not announcements.</em></p>
+    </section>
+
+    <ul class="blog-list">
+      <li>
+        <a class="blog-card" href="the-context-your-agent-needs-has-a-name.html">
+          <div class="blog-meta">
+            <img src="../authors/tomasz-zajac.jpg" alt="" width="28" height="28" />
+            <span>Tomasz Zajac</span>
+            <span aria-hidden="true">·</span>
+            <time datetime="2026-10-28">28 October 2026</time>
+            <span aria-hidden="true">·</span>
+            <span>6 min read</span>
+          </div>
+          <h2>The context your agent needs has a name. It is the architecture model.</h2>
+          <p>Agents read a folder of Markdown files before they write code and call it context. It is the architecture model, reinvented in part. What forty years of the discipline already settled, what the model has to contain, and how people and agents use it.</p>
+        </a>
+      </li>
+    </ul>
+  </main>
+
+  <footer class="footer">
+    <span>Radical.Tools — MIT licensed. Built on the <a href="https://c4model.com" target="_blank" rel="noopener">C4 model</a>.</span>
+    <span class="footer-links">
+      <a href="https://studio.radical.tools" target="_blank" rel="noopener">Studio</a>
+      <a href="https://hub.radical.tools" target="_blank" rel="noopener">Hub</a>
+      <a href="../usecases.html">Use cases</a>
+      <a href="./">Blog</a>
+      <a href="../manual.html">Guide</a>
+      <a href="../reference.html">Reference</a>
+      <a href="https://github.com/radicaltools/radical.tools" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </footer>
+
+</body>
+</html>
