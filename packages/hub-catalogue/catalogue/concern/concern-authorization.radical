@@ -39,8 +39,20 @@
         "url": "https://csrc.nist.gov/projects/role-based-access-control"
       },
       {
+        "title": "NIST SP 800-162, Guide to Attribute Based Access Control (ABAC) Definition and Considerations",
+        "url": "https://csrc.nist.gov/pubs/sp/800/162/upd2/final"
+      },
+      {
+        "title": "NIST SP 800-53 Rev. 5, Security and Privacy Controls (AC-2, AC-6, AU-9)",
+        "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+      },
+      {
         "title": "Open Policy Agent documentation",
         "url": "https://www.openpolicyagent.org/docs/latest/"
+      },
+      {
+        "title": "Google Zanzibar: Consistent, Global Authorization System (2019)",
+        "url": "https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/"
       }
     ],
     "templateParams": [
@@ -68,8 +80,8 @@
           },
           {
             "value": "flat",
-            "label": "everyone may do everything",
-            "description": "Every signed-in caller may do everything. Pick it only while nothing the element offers is meant for some callers only, such as an internal tool for one small team."
+            "label": "one level of access for every caller",
+            "description": "Every signed-in caller may do everything. Pick it only while nothing the element offers is meant for some callers only, such as an internal tool for one small team; the next two questions are then moot."
           }
         ]
       },
@@ -77,7 +89,7 @@
         "key": "ENFORCE",
         "title": "Decision point",
         "label": "Where are permissions decided?",
-        "hint": "Checks spread through handlers drift apart; a policy decision point keeps them in one place at the price of a dependency on the request path.",
+        "hint": "Checks spread through handlers drift apart; a policy decision point keeps them in one place at the price of a dependency on the request path. Only when permissions are given (not with one level of access for every caller).",
         "defaultValue": "code",
         "options": [
           {
@@ -120,7 +132,7 @@
         "key": "REVIEW",
         "title": "Taking back",
         "label": "How are permissions taken back?",
-        "hint": "People change jobs and keep what they had; without a mechanism to take permissions back, every account ends up with more than it needs.",
+        "hint": "People change jobs and keep what they had; without a mechanism to take permissions back, every account ends up with more than it needs. Only when permissions are given (not with one level of access for every caller).",
         "defaultValue": "periodic",
         "options": [
           {
@@ -137,13 +149,13 @@
       },
       {
         "key": "REVIEW_DAYS",
-        "label": "How often are grants reviewed (days)?",
+        "label": "How often are grants reviewed (days)? (periodic reviews only)",
         "defaultValue": "90",
         "type": "number"
       },
       {
         "key": "ELEVATION_HOURS",
-        "label": "How long may an elevation last (hours)?",
+        "label": "How long may an elevation last (hours)? (just-in-time elevation only)",
         "defaultValue": "4",
         "type": "number"
       }
@@ -158,7 +170,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Authorization",
-      "description": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave."
+      "description": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-deny",
@@ -404,9 +416,8 @@
       "label": "Few named administrators",
       "x": 260,
       "y": 1690,
-      "ears_type": "state-driven",
-      "precondition": "an account holds administrator rights",
-      "action": "require phishing-resistant MFA for it, keep at most 5 such accounts, each tied to a named person, and confirm the list every 30 days",
+      "ears_type": "ubiquitous",
+      "action": "keep at most 5 administrator accounts, each tied to a named person and signing in with phishing-resistant MFA, and confirm the list every 30 days",
       "rationale": "With standing rights the number of holders and the strength of their sign-in are the only controls left (NIST SP 800-63B AAL3, ASVS V4.3.1).",
       "hubWhen": {
         "ADMIN": [
@@ -757,9 +768,9 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "Users get roles and roles get permissions (NIST core RBAC with static separation of duty), kept in one permission matrix: operation × role, versioned with the code. Every operation checks its permission on the server, on the record it touches as well as its type; anything without a rule is refused. Permissions are decided {{ENFORCE}}; they are taken back through {{REVIEW}}. Keep the roles under about 20: when an exception would become a role, it is a sign that relationships or attributes are needed. Use the framework's role mechanism (Spring Security, ASP.NET Core policies, Pundit, CASL) rather than checks of our own.",
+      "decision": "Users get roles and roles get permissions (NIST core RBAC with static separation of duty), kept in one permission matrix: operation × role, versioned with the code. Every operation checks its permission on the server, on the record it touches as well as its type; anything without a rule is refused. Permissions are decided {{ENFORCE}}; they are taken back through {{REVIEW}}. Keep the roles under about 20: when an exception would become a role, it is a sign that relationships or attributes are needed. Production access: {{ADMIN}}.",
       "consequences": "• One matrix to read, review and test: a test can call every operation as every role.\n• Rules that depend on the record (only the owner may edit) do not fit roles and need an explicit check per operation.\n• Role explosion when every exception becomes a role.\n• Separation of duties can be checked when roles are granted.",
-      "alternatives": "1. Relationships (ReBAC): expresses ownership and sharing, harder to review as a whole.\n2. Attribute policies (ABAC): precise, but the attributes have to be kept fresh.\n3. Everyone may do everything: only right while nothing is meant for some users.",
+      "alternatives": "1. Relationships (ReBAC): expresses ownership and sharing, harder to review as a whole.\n2. Attribute policies (ABAC): precise, but the attributes have to be kept fresh.\n3. One level of access for every caller: only right while nothing is meant for some users.",
       "hubWhen": {
         "MODEL": [
           "roles"
@@ -776,7 +787,7 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "Access follows from relationships between callers and records (owner, editor, viewer, member of the team or parent folder), modelled as a Zanzibar-style authorization model: object types, relations and the rules that derive one relation from another. Permissions are decided {{ENFORCE}}: with a policy engine, OpenFGA (CNCF, simple to run) or SpiceDB (stronger consistency options, Postgres or Spanner backends) holds the relationship tuples, chosen by the consistency and scale needed; in code, a relationship table queried by one authorization module. Every check names the record; lists ask for the records the caller may see (ListObjects or a filtered query). Permissions are taken back through {{REVIEW}}.",
+      "decision": "Access follows from relationships between callers and records (owner, editor, viewer, member of the team or parent folder), modelled as a Zanzibar-style authorization model: object types, relations and the rules that derive one relation from another. Permissions are decided {{ENFORCE}}: with a policy engine, OpenFGA (CNCF, simple to run) or SpiceDB (stronger consistency options, Postgres or Spanner backends) holds the relationship tuples, chosen by the consistency and scale needed; in code, a relationship table queried by one authorization module. Every check names the record; lists ask for the records the caller may see (ListObjects or a filtered query). A removed relationship takes effect within 10 seconds, and a caller's own change is never evaluated against an older snapshot (a consistency token from the write is passed to the check). Permissions are taken back through {{REVIEW}}. Production access: {{ADMIN}}.",
       "consequences": "• Sharing, ownership and nested folders or teams are expressed directly, without a role per case.\n• Relationship tuples are a second source of truth beside the domain data and must be written in the same change as it (outbox or transactional write).\n• Lists of what a caller may see are expensive on large graphs and need their own design.\n• A stale read can grant just-removed access: consistency tokens are needed.",
       "alternatives": "1. Roles (RBAC): simpler to review, cannot express \"shared with me\".\n2. Attribute policies (ABAC): good for rules over data, awkward for sharing and nesting.\n3. Access control lists per record: simple, but hard to change for a whole team or folder.",
       "hubWhen": {
@@ -795,9 +806,9 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "Permissions are policies over attributes of the caller (department, region, clearance), the record (owner, classification, region) and the request (time, network, assurance level), written as policy as code. Permissions are decided {{ENFORCE}}: with a policy engine, Open Policy Agent (Rego, general purpose, sidecar or library) or Cedar with Amazon Verified Permissions (typed, analysable policies, managed on AWS), chosen by the platform and whether policies must be provably analysable; in code, Casbin or CASL. Attributes come from named sources with a freshness limit, and a missing or stale attribute denies. Permissions are taken back through {{REVIEW}}.",
+      "decision": "Permissions are policies over attributes of the caller (department, region, clearance), the record (owner, classification, region) and the request (time, network, assurance level), written as policy as code. Permissions are decided {{ENFORCE}}: with a policy engine, Open Policy Agent (Rego, general purpose, sidecar or library) or Cedar with Amazon Verified Permissions (typed, analysable policies, managed on AWS), chosen by the platform and whether policies must be provably analysable; in code, Casbin or CASL. Attributes come from named sources with a freshness limit of 15 minutes, and a missing or stale attribute denies. Permissions are taken back through {{REVIEW}}. Production access: {{ADMIN}}.",
       "consequences": "• Rules such as \"own region, working hours only\" are written once, not as roles per region.\n• Every attribute is an input to keep correct and fresh: a wrong department is a wrong decision.\n• Policies are code: they need tests and review of their own.\n• Who may see what is harder to answer for an auditor than with a role matrix.",
-      "alternatives": "1. Roles (RBAC): easy to review, but a role per region or classification explodes.\n2. Relationships (ReBAC): better for sharing, weaker for rules over data.\n3. Everyone may do everything: only right while nothing is meant for some users.",
+      "alternatives": "1. Roles (RBAC): easy to review, but a role per region or classification explodes.\n2. Relationships (ReBAC): better for sharing, weaker for rules over data.\n3. One level of access for every caller: only right while nothing is meant for some users.",
       "hubWhen": {
         "MODEL": [
           "attributes"
@@ -814,7 +825,7 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had. Here nobody needs more than anyone else: the element offers the same to every signed-in caller.",
-      "decision": "Every signed-in caller may do everything the element offers; there are no roles or permissions in the application. Anything meant for some callers only stays out of it until this decision is superseded. Production access: {{ADMIN}}.",
+      "decision": "Every signed-in caller may do everything the element offers; there are no roles or permissions in the application, so no decision point and no review of grants are needed. Anything meant for some callers only stays out of it until this decision is superseded. Production access: {{ADMIN}}.",
       "consequences": "• Nothing to manage, test or review in the application.\n• The first feature for some callers only needs this decision superseded first.\n• Who signs in is the only boundary: authentication carries all the weight.",
       "alternatives": "1. Roles, added when the first restricted feature comes.\n2. Two roles (user, administrator) from the start: little cost now, but an untested boundary until something needs it.",
       "hubWhen": {
@@ -833,7 +844,7 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "Each service decides permissions in one authorization module, called from one place in the request pipeline (middleware, filter or policy attribute), never from scattered checks in handlers. Use the framework's mechanism: Spring Security method security, ASP.NET Core authorization policies, Pundit or Action Policy (Rails), CASL or Casbin (Node). A static rule fails the build for any route that does not go through the module.",
+      "decision": "Each service decides permissions in one authorization module, called from one place in the request pipeline (middleware, filter or policy attribute), never from scattered checks in handlers. Use the framework's mechanism: Spring Security method security, ASP.NET Core authorization policies, Pundit or Action Policy (Rails), CASL or Casbin (Node). A static rule fails the build for any route that does not go through the module: Semgrep for Express-style routers, ArchUnit for Spring (every request mapping annotated with PreAuthorize), a Roslyn analyzer for ASP.NET Core, a RuboCop cop for Rails.",
       "consequences": "• No extra service on the request path; decisions take microseconds.\n• Rules change and ship with the code that needs them.\n• Each service has its own module: with more services or languages, the rules drift apart.\n• Security cannot change a rule without a release of the service.",
       "alternatives": "1. A central policy engine (OPA, Cedar, OpenFGA): one place for every service, but a dependency on every request.\n2. Checks only at the API gateway: coarse, cannot see the record, and every internal call bypasses them.",
       "hubWhen": {
@@ -857,7 +868,7 @@
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "A policy decision point outside the service code answers every permission check; services only enforce its answer (PEP/PDP). Choose by the model: Open Policy Agent for roles and attribute rules across many services and languages (sidecar or embedded, Rego); Cedar with Amazon Verified Permissions for typed, analysable policies on AWS; OpenFGA or SpiceDB for relationships. The decision point runs next to the services (sidecar or same host) so a check stays under 10 ms at p99; when it does not answer within 50 ms the request is refused. Policies live in their own repository, are tested in CI and released as versioned bundles; every decision is logged with the policy version.",
+      "decision": "A policy decision point outside the service code answers every permission check; services only enforce its answer (PEP/PDP). Choose by the model: Open Policy Agent for roles and attribute rules across many services and languages (sidecar or embedded, Rego); Cedar with Amazon Verified Permissions for typed, analysable policies on AWS; OpenFGA or SpiceDB for relationships. The decision point runs next to the services (sidecar or same host) so a check stays under 10 ms at p99; when it does not answer within 50 ms the request is refused. Policies live in their own repository, are tested in CI and released as versioned bundles that reach every decision point within 5 minutes; every decision is logged with the policy version.",
       "consequences": "• One place for every service's rules, in one language, reviewable by security.\n• The decision point is on every request path: it needs the same availability as the services, and an outage refuses requests.\n• Policies need data (roles, relationships, attributes) pushed to or fetched by the engine.\n• Decision logs answer \"why was this allowed\" after an incident.",
       "alternatives": "1. Authorization in the service code: no extra dependency, but rules drift apart across services.\n2. Checks only at the API gateway: coarse, cannot see the record.\n3. A managed authorization service (Auth0 FGA, Permit.io): less to run, more to pay per check and a vendor on the request path.",
       "hubWhen": {
@@ -872,16 +883,64 @@
       }
     },
     {
-      "id": "adr-jit",
+      "id": "adr-review-periodic",
       "type": "adr",
-      "label": "Just-in-time privileged access",
+      "label": "Grants taken back by periodic reviews",
       "x": 780,
       "y": 780,
       "concern": "authorization",
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "Nobody holds standing administrator rights in production. Operators request elevation with a ticket reference; a second person approves it; it expires after at most {{ELEVATION_HOURS}} hours. Use the platform's mechanism: Microsoft Entra Privileged Identity Management, AWS IAM Identity Center with temporary elevated access, Google Cloud Privileged Access Manager, or Teleport or HashiCorp Boundary for hosts and databases, chosen by where the infrastructure runs. One sealed break-glass account per environment, its credential split or in a safe, alerts on use and is rotated after it.",
+      "decision": "Every grant has an owner who confirms it every {{REVIEW_DAYS}} days; a grant not confirmed within 14 days of the review is removed. Leavers reported by HR lose every grant within 24 hours, movers within 5 working days. The grants table keeps the owner and the last review date, and a daily job lists what is overdue and opens a ticket for the owner.",
+      "consequences": "• Works with grants given by hand in the application and with any identity provider.\n• Owner time every cycle: the number of grants to confirm grows with the number of users and permissions, so the cadence is a cost.\n• Between reviews a leaver keeps access unless HR reports them: the leaver process is the real control.",
+      "alternatives": "1. Directory sync: no reviews to run, but every user must be in a directory that HR keeps right.\n2. No reviews: the cheapest, until the audit asks who may do what and why.",
+      "hubWhen": {
+        "MODEL": [
+          "roles",
+          "relations",
+          "attributes"
+        ],
+        "REVIEW": [
+          "periodic"
+        ]
+      }
+    },
+    {
+      "id": "adr-review-directory",
+      "type": "adr",
+      "label": "Grants follow the directory",
+      "x": 780,
+      "y": 910,
+      "concern": "authorization",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
+      "decision": "Permissions are derived only from groups in the identity provider, delivered by SCIM provisioning or group claims; nothing is granted by hand in the application. A change in the directory reaches the permissions within 60 minutes, and a disabled account loses every permission in the same time. An hourly job compares the grants with the directory and fails on any grant without a group behind it.",
+      "consequences": "• Joiners, movers and leavers follow the HR system without a review cycle.\n• Every user must be in the directory: contractors and partners need an account there too.\n• The group model in the directory becomes the permission model, owned together with IT.",
+      "alternatives": "1. Periodic reviews: no directory needed, owner time every cycle.\n2. Both: directory groups for the standard permissions, reviews for the exceptions granted by hand.",
+      "hubWhen": {
+        "MODEL": [
+          "roles",
+          "relations",
+          "attributes"
+        ],
+        "REVIEW": [
+          "directory"
+        ]
+      }
+    },
+    {
+      "id": "adr-jit",
+      "type": "adr",
+      "label": "Just-in-time privileged access",
+      "x": 780,
+      "y": 1040,
+      "concern": "authorization",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
+      "decision": "Nobody holds standing administrator rights in production. Operators request elevation with a ticket reference; a second person approves it; it expires after at most {{ELEVATION_HOURS}} hours. Use the platform's mechanism: Microsoft Entra Privileged Identity Management, AWS IAM Identity Center with temporary elevated access, Google Cloud Privileged Access Manager, or Teleport or HashiCorp Boundary for hosts and databases, chosen by where the infrastructure runs. One sealed break-glass account per environment, its credential split or in a safe, alerts on use and is rotated after it. Every privileged action goes to an append-only audit log the administrators cannot change (CloudTrail to a bucket with Object Lock, Azure Activity Log to an immutable storage account, or the SIEM), kept 12 months.",
       "consequences": "• A phished operator account gives nothing in production by itself.\n• Emergencies need an approver awake, or the break-glass path.\n• Every elevation leaves a record of who, why and for how long.\n• The elevation tool is itself a critical system to protect.",
       "alternatives": "1. Named standing administrators: simpler, but the rights are there for whoever takes the account.\n2. No direct access at all: the strongest, but every support need must be built into the product first.",
       "hubWhen": {
@@ -895,12 +954,12 @@
       "type": "adr",
       "label": "Named standing administrators",
       "x": 780,
-      "y": 910,
+      "y": 1170,
       "concern": "authorization",
       "status": "accepted",
       "date": "",
       "context": "People and other systems use this element with different rights. The forces: most access-control flaws are not broken sign-ins but a check missing at one operation, or a check on the type of record and not on the record itself (OWASP API1:2023, broken object level authorization); anything the interface hides can still be called; checks scattered through the code drift apart, while a central policy adds a dependency on the request path; administrators and support staff need more than everyone else, and standing privileges are what attackers look for; and permissions accumulate as people change jobs and keep what they had.",
-      "decision": "At most 5 named people hold administrator rights in production all the time; each signs in with phishing-resistant MFA (FIDO2 security key or platform passkey), and the list is confirmed every 30 days. Every privileged action is written to an append-only audit log the administrators cannot change (CloudTrail with S3 Object Lock, Azure Activity Log to an immutable storage account, or the SIEM). Revisit when the team grows past 10 people or the data becomes regulated: just-in-time elevation is then the next step.",
+      "decision": "At most 5 named people hold administrator rights in production all the time; each signs in with phishing-resistant MFA (FIDO2 security key or platform passkey), and the list is confirmed every 30 days. Every privileged action is written to an append-only audit log the administrators cannot change (CloudTrail to a bucket with Object Lock, Azure Activity Log to an immutable storage account, or the SIEM), kept 12 months. Revisit when the team grows past 10 people or the data becomes regulated: just-in-time elevation is then the next step.",
       "consequences": "• No approval waits: administrators can act at once.\n• A stolen administrator session is a full compromise until it is noticed.\n• The audit log is the main control, so someone has to read it.",
       "alternatives": "1. Just-in-time elevation with approval: smaller window, needs an approver available.\n2. No direct access: support only through the product.",
       "hubWhen": {
@@ -914,7 +973,7 @@
       "type": "adr",
       "label": "No direct production access",
       "x": 780,
-      "y": 1040,
+      "y": 1300,
       "concern": "authorization",
       "status": "accepted",
       "date": "",
@@ -935,8 +994,8 @@
       "x": 1040,
       "y": 0,
       "category": "structural",
-      "threshold": "Every operation called as every role or rule case gives the expected answer, and with another user's record ids returns 403 or 404; 0 mismatches",
-      "description": "A test lists the operations from the router (not from a list kept by hand), calls each as a caller of every role or rule case, and compares allowed or refused with the expected matrix; it also calls each operation that takes an id with the id of a record of another user. An operation without an entry fails the test.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\nimport { EXPECTED } from './authz/expected'       // \"METHOD path\" -> roles allowed\nimport { CASES, tokenFor, otherUsersRecord } from './authz/fixtures'\n\ndescribe.each(routes)('$method $path', (route) => {\n  it.each(CASES)('as %s gives the expected answer', async (who) => {\n    const res = await request(app)[route.method.toLowerCase()](route.example)\n      .set('Authorization', `Bearer ${await tokenFor(who)}`)\n    const allowed = EXPECTED[`${route.method} ${route.path}`]?.includes(who) ?? false\n    expect([403, 404].includes(res.status)).toBe(!allowed)\n  })\n  it.runIf(route.path.includes(':id'))('refuses another user\\'s record', async () => {\n    const res = await request(app)[route.method.toLowerCase()](route.path.replace(':id', await otherUsersRecord()))\n      .set('Authorization', `Bearer ${await tokenFor('owner')}`)\n    expect([403, 404]).toContain(res.status)\n  })\n})\n```",
+      "threshold": "Every operation called as every role or rule case gives the expected answer, and with another user's record ids returns 403 or 404; 0 mismatches and 0 operations without an entry in the expected matrix",
+      "description": "A test lists the operations from the router (not from a list kept by hand), fails on any operation the expected matrix does not name, calls each as a caller of every role or rule case, and compares allowed or refused with the matrix; it also calls each operation that takes an id with the id of a record of another user, and checks that a refusal left a log entry with caller, operation and record.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory, RSpec request specs)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\nimport { EXPECTED } from './authz/expected'       // \"METHOD path\" -> roles allowed\nimport { CASES, tokenFor, otherUsersRecord, refusalsLogged } from './authz/fixtures'\n\ndescribe.each(routes)('$method $path', (route) => {\n  const key = `${route.method} ${route.path}`\n  it('is in the expected matrix', () => {\n    expect(EXPECTED).toHaveProperty(key)\n  })\n  it.each(CASES)('as %s gives the expected answer', async (who) => {\n    const res = await request(app)[route.method.toLowerCase()](route.example)\n      .set('Authorization', `Bearer ${await tokenFor(who)}`)\n    const allowed = EXPECTED[key]?.includes(who) ?? false\n    expect([403, 404].includes(res.status)).toBe(!allowed)\n    if (!allowed) expect(await refusalsLogged({ caller: who, operation: key })).toBeGreaterThan(0)\n  })\n  it.runIf(route.path.includes(':id'))('refuses another user\\'s record', async () => {\n    const res = await request(app)[route.method.toLowerCase()](route.path.replace(':id', await otherUsersRecord()))\n      .set('Authorization', `Bearer ${await tokenFor('owner')}`)\n    expect([403, 404]).toContain(res.status)\n  })\n})\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
@@ -953,7 +1012,7 @@
       "y": 130,
       "category": "structural",
       "threshold": "0 routes registered without the authorize middleware",
-      "description": "A static rule runs on every pull request and fails on a route registered without going through the authorization module, so a check cannot be forgotten in a handler.\n\nTool: Semgrep\n\n```yaml\nrules:\n  - id: route-without-authorize\n    languages: [typescript]\n    severity: ERROR\n    message: Every route goes through authorize(); ADR \"Permissions decided in code\"\n    patterns:\n      - pattern: $ROUTER.$METHOD($PATH, ...)\n      - metavariable-regex:\n          metavariable: $METHOD\n          regex: ^(get|post|put|patch|delete)$\n      - pattern-not: $ROUTER.$METHOD($PATH, ..., authorize(...), ...)\n```",
+      "description": "A static rule runs on every pull request and fails on a route registered without going through the authorization module, so a check cannot be forgotten in a handler. The rule below is the Express-style form ($ROUTER limited to app, router and *Router, so map.get or axios.get do not match); routes mounted with router.use are checked where they are defined.\n\nTool: Semgrep (Express-style routers); for Spring: ArchUnit methods().that().areAnnotatedWith(RequestMapping.class).should().beAnnotatedWith(PreAuthorize.class); for ASP.NET Core: a Roslyn analyzer over [Authorize]; for Rails: a RuboCop cop over verify_authorized\n\n```yaml\nrules:\n  - id: route-without-authorize\n    languages: [typescript, javascript]\n    severity: ERROR\n    message: Every route goes through authorize(); ADR \"Permissions decided in code\"\n    patterns:\n      - pattern-either:\n          - pattern: $ROUTER.$METHOD($PATH, ...)\n          - pattern: $ROUTER.route($PATH).$METHOD(...)\n      - metavariable-regex:\n          metavariable: $ROUTER\n          regex: ^(app|router|[A-Za-z]+Router)$\n      - metavariable-regex:\n          metavariable: $METHOD\n          regex: ^(get|post|put|patch|delete|all)$\n      - pattern-not: $ROUTER.$METHOD($PATH, ..., authorize(...), ...)\n      - pattern-not: $ROUTER.route($PATH).$METHOD(..., authorize(...), ...)\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
@@ -973,10 +1032,30 @@
       "y": 260,
       "category": "structural",
       "threshold": "0 failing policy tests and at least 90% policy coverage before a bundle is released",
-      "description": "Every policy has unit tests next to it, including the default deny; CI runs them with coverage and refuses to publish the bundle below the threshold.\n\nTool: Open Policy Agent (opa test --coverage --threshold 90)\n\n```rego\npackage authz_test\n\nimport rego.v1\n\nimport data.authz\n\ntest_clerk_cannot_delete_order if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"clerk\"]}, \"action\": \"order:delete\", \"resource\": {\"type\": \"order\", \"region\": \"eu\"}}\n}\n\ntest_other_region_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"manager\"], \"region\": \"eu\"}, \"action\": \"order:read\", \"resource\": {\"type\": \"order\", \"region\": \"us\"}}\n}\n\ntest_unknown_action_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"admin\"]}, \"action\": \"order:unknown\", \"resource\": {\"type\": \"order\"}}\n}\n```",
+      "description": "Every policy has unit tests next to it, including the default deny and a missing attribute; CI runs them with coverage and refuses to publish the bundle below the threshold.\n\nTool: Open Policy Agent (opa test --coverage --threshold 90); with Cedar: cedar validate and the Cedar test suite of Amazon Verified Permissions in CI\n\n```rego\npackage authz_test\n\nimport rego.v1\n\nimport data.authz\n\ntest_clerk_cannot_delete_order if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"clerk\"]}, \"action\": \"order:delete\", \"resource\": {\"type\": \"order\", \"region\": \"eu\"}}\n}\n\ntest_other_region_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"manager\"], \"region\": \"eu\"}, \"action\": \"order:read\", \"resource\": {\"type\": \"order\", \"region\": \"us\"}}\n}\n\ntest_missing_region_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"manager\"]}, \"action\": \"order:read\", \"resource\": {\"type\": \"order\", \"region\": \"eu\"}}\n}\n\ntest_unknown_action_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"admin\"]}, \"action\": \"order:unknown\", \"resource\": {\"type\": \"order\"}}\n}\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
+          "attributes"
+        ],
+        "ENFORCE": [
+          "engine"
+        ]
+      }
+    },
+    {
+      "id": "ff-policy-rollout",
+      "type": "fitness-fn",
+      "label": "Policy bundle reaches every decision point",
+      "x": 1040,
+      "y": 390,
+      "category": "operational",
+      "threshold": "Every decision point reports the released bundle revision within 5 minutes of the release; 0 decision log entries without a bundle revision",
+      "description": "After the bundle is published, the release pipeline polls the status API of every decision point until each reports the new revision, failing after 5 minutes, then reads a sample of the decision log and fails on an entry without the bundles.<name>.revision field.\n\nTool: bash with curl and jq in the release pipeline (OPA status API; for Cedar or OpenFGA, the equivalent version endpoint of the engine)\n\n```bash\n#!/usr/bin/env bash\n# PDPS: the decision points' base URLs; REVISION: the revision just published; BUNDLE: its name\nset -euo pipefail\ndeadline=$(( $(date +%s) + 300 ))\nfor pdp in $PDPS; do\n  until [ \"$(curl -sf \"$pdp/v1/status\" | jq -r \".result.bundles[\\\"$BUNDLE\\\"].active_revision\")\" = \"$REVISION\" ]; do\n    [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"$pdp did not load $REVISION within 5 minutes\"; exit 1; }\n    sleep 5\n  done\ndone\n# a sample of the decision log, one JSON event per line\nmissing=$(tail -n 100 \"$DECISION_LOG\" | jq -c \"select(.bundles[\\\"$BUNDLE\\\"].revision == null)\" | wc -l)\n[ \"$missing\" -eq 0 ] || { echo \"$missing decision log entries carry no policy version\"; exit 1; }\n```",
+      "hubWhen": {
+        "MODEL": [
+          "roles",
+          "relations",
           "attributes"
         ],
         "ENFORCE": [
@@ -989,10 +1068,10 @@
       "type": "fitness-fn",
       "label": "Relationship model tested",
       "x": 1040,
-      "y": 390,
+      "y": 520,
       "category": "structural",
       "threshold": "0 failing assertions over the authorization model, run on every change of the model",
-      "description": "The authorization model has a test file with tuples and expected checks, owners, team members and strangers included; CI runs it on every change to the model.\n\nTool: OpenFGA CLI (fga model test)\n\n```yaml\nname: Order sharing\nmodel_file: ./model.fga\ntuples:\n  - user: user:anne\n    relation: owner\n    object: order:1\n  - user: team:sales#member\n    relation: viewer\n    object: order:1\n  - user: user:bob\n    relation: member\n    object: team:sales\ntests:\n  - name: owner edits, team views, strangers see nothing\n    check:\n      - user: user:anne\n        object: order:1\n        assertions: { can_edit: true }\n      - user: user:bob\n        object: order:1\n        assertions: { can_view: true, can_edit: false }\n      - user: user:eve\n        object: order:1\n        assertions: { can_view: false }\n```",
+      "description": "The authorization model has a test file with tuples and expected checks, owners, team members and strangers included; CI runs it on every change to the model.\n\nTool: OpenFGA CLI (fga model test); with SpiceDB: zed validate over a validation file\n\n```yaml\nname: Order sharing\nmodel_file: ./model.fga\ntuples:\n  - user: user:anne\n    relation: owner\n    object: order:1\n  - user: team:sales#member\n    relation: viewer\n    object: order:1\n  - user: user:bob\n    relation: member\n    object: team:sales\ntests:\n  - name: owner edits, team views, strangers see nothing\n    check:\n      - user: user:anne\n        object: order:1\n        assertions: { can_edit: true }\n      - user: user:bob\n        object: order:1\n        assertions: { can_view: true, can_edit: false }\n      - user: user:eve\n        object: order:1\n        assertions: { can_view: false }\n```",
       "hubWhen": {
         "MODEL": [
           "relations"
@@ -1003,14 +1082,59 @@
       }
     },
     {
+      "id": "ff-sod",
+      "type": "fitness-fn",
+      "label": "Conflicting roles refused",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "Every pair on the separation-of-duties list is refused when granted to one account, and the attempt is recorded; 0 pairs granted",
+      "description": "A test reads the separation-of-duties pairs from the code, grants the first role of each pair to a fresh account, tries to grant the second, and expects a refusal and a recorded attempt.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { SEPARATION_OF_DUTIES } from '../src/authz/roles'   // [['payee-creator', 'payment-approver'], ...]\nimport { tokenFor, createAccount, grantAttempts } from './authz/fixtures'\n\ndescribe.each(SEPARATION_OF_DUTIES)('%s and %s', (first, second) => {\n  it('cannot both be held by one account', async () => {\n    const account = await createAccount({ roles: [first] })\n    const res = await request(app).post(`/accounts/${account.id}/roles`).send({ role: second })\n      .set('Authorization', `Bearer ${await tokenFor('administrator')}`)\n    expect(res.status).toBe(409)\n    expect(await grantAttempts({ account: account.id, role: second, refused: true })).toHaveLength(1)\n  })\n})\n```",
+      "hubWhen": {
+        "MODEL": [
+          "roles"
+        ]
+      }
+    },
+    {
+      "id": "ff-unshare",
+      "type": "fitness-fn",
+      "label": "Unsharing takes effect in time",
+      "x": 1040,
+      "y": 780,
+      "category": "operational",
+      "threshold": "A record is refused within 10 seconds of the relationship that granted it being removed; a check made with the write's consistency token is refused at once",
+      "description": "An integration test shares a document with a user through a team, removes the user from the team, polls the document until it is refused (failing past 10 seconds), and checks that a request carrying the consistency token of the removal is refused on the first try.\n\nTool: Vitest with supertest against the service and its relationship store (OpenFGA, SpiceDB or the relationship table)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { seedTeamShare, tokenFor, sleep } from './authz/fixtures'\n\nit('closes a document within 10 seconds of the member being removed', async () => {\n  const { doc, member, team, admin } = await seedTeamShare()\n  const removal = await request(app).delete(`/teams/${team.id}/members/${member.id}`).set('Authorization', `Bearer ${await tokenFor(admin)}`)\n  expect(removal.status).toBe(204)\n  const token = removal.headers['x-consistency-token']           // the write's token, from the relationship store\n  const atOnce = await request(app).get(`/documents/${doc.id}`).set('Authorization', `Bearer ${await tokenFor(member)}`).set('X-Consistency-Token', token)\n  expect([403, 404]).toContain(atOnce.status)\n  const started = Date.now()\n  while ((await request(app).get(`/documents/${doc.id}`).set('Authorization', `Bearer ${await tokenFor(member)}`)).status === 200) {\n    expect(Date.now() - started).toBeLessThan(10_000)\n    await sleep(500)\n  }\n})\n```",
+      "hubWhen": {
+        "MODEL": [
+          "relations"
+        ]
+      }
+    },
+    {
+      "id": "ff-missing-attribute",
+      "type": "fitness-fn",
+      "label": "Missing attributes deny",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "A request from a user without an attribute the policy reads, or with one refreshed more than 15 minutes ago, is refused and the log names the attribute; 0 such requests allowed",
+      "description": "An integration test creates a user without a region, and one whose region was last refreshed 16 minutes ago, asks for a record each and expects 403 with a log entry naming the attribute.\n\nTool: Vitest with supertest, the attribute source seeded by the test (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { userWithAttributes, tokenFor, decisionLog } from './authz/fixtures'\n\nit.each([\n  ['no region', {}],\n  ['a stale region', { region: 'eu', refreshedAt: new Date(Date.now() - 16 * 60_000) }],\n])('refuses a user with %s and names the attribute', async (_, attributes) => {\n  const user = await userWithAttributes(attributes)\n  const res = await request(app).get('/orders/1').set('Authorization', `Bearer ${await tokenFor(user)}`)\n  expect(res.status).toBe(403)\n  expect(await decisionLog.last({ user: user.id })).toMatchObject({ decision: 'deny', attribute: 'region' })\n})\n```",
+      "hubWhen": {
+        "MODEL": [
+          "attributes"
+        ]
+      }
+    },
+    {
       "id": "ff-fail-closed",
       "type": "fitness-fn",
       "label": "Engine outage refuses",
       "x": 1040,
-      "y": 520,
+      "y": 1040,
       "category": "operational",
-      "threshold": "100% of protected calls refused while the decision point is down; p99 decision time under 10 ms while it is up",
-      "description": "An integration test starts the service with its decision point, measures decision latency, then stops the decision point and calls protected operations as a caller with every permission, expecting each to be refused.\n\nTool: Testcontainers with Vitest\n\n```ts\nit('refuses every call while the policy engine is down', async () => {\n  const pdp = await new GenericContainer('openpolicyagent/opa:latest').withCommand(['run', '--server']).start()\n  const app = await startService({ pdpUrl: `http://${pdp.getHost()}:${pdp.getMappedPort(8181)}` })\n  await pdp.stop()\n  for (const route of protectedRoutes) {\n    const res = await app.call(route, { as: 'superuser' })\n    expect([403, 503]).toContain(res.status)\n  }\n})\n```",
+      "threshold": "100% of protected calls refused while the decision point is down; p99 decision time under 10 ms over 200 calls while it is up",
+      "description": "An integration test starts the service with its decision point, times 200 allowed calls and checks the p99, then stops the decision point and calls protected operations as a caller with every permission, expecting each to be refused.\n\nTool: Testcontainers with Vitest\n\n```ts\nimport { GenericContainer } from 'testcontainers'\nimport { startService, protectedRoutes } from './authz/service'\n\nit('answers fast while the engine is up and refuses everything while it is down', async () => {\n  const pdp = await new GenericContainer('openpolicyagent/opa:latest') // pin a version in your repository\n    .withExposedPorts(8181).withCommand(['run', '--server', '--addr', ':8181']).start()\n  const app = await startService({ pdpUrl: `http://${pdp.getHost()}:${pdp.getMappedPort(8181)}` })\n  const times: number[] = []\n  for (let i = 0; i < 200; i++) {\n    const started = performance.now()\n    expect((await app.call(protectedRoutes[0], { as: 'superuser' })).status).toBe(200)\n    times.push(performance.now() - started)\n  }\n  times.sort((a, b) => a - b)\n  expect(times[Math.floor(times.length * 0.99)]).toBeLessThan(10)\n  await pdp.stop()\n  for (const route of protectedRoutes) {\n    const res = await app.call(route, { as: 'superuser' })\n    expect([403, 503]).toContain(res.status)\n  }\n})\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
@@ -1027,10 +1151,10 @@
       "type": "fitness-fn",
       "label": "No overdue grants",
       "x": 1040,
-      "y": 650,
+      "y": 1170,
       "category": "process",
       "threshold": "0 grants unreviewed for more than {{REVIEW_DAYS}} + 14 days; 0 grants of leavers older than 24 hours",
-      "description": "A scheduled CI job runs a query over the grants every day and fails, opening a ticket for the owner, when a grant is overdue for review or belongs to a person who has left.\n\nTool: psql in a scheduled CI job\n\n```sql\n-- fails the job when it returns a row\nselect g.account_id, g.permission, g.last_reviewed_at, p.left_at\nfrom grants g\njoin people p on p.account_id = g.account_id\nwhere g.last_reviewed_at < now() - interval '{{REVIEW_DAYS}} days' - interval '14 days'\n   or (p.left_at is not null and p.left_at < now() - interval '24 hours');\n```",
+      "description": "A scheduled CI job runs a query over the grants every day and fails, printing the rows and opening a ticket for the owner, when a grant is overdue for review or belongs to a person who has left.\n\nTool: psql in a scheduled CI job (bash)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\noverdue=$(psql \"$DATABASE_URL\" -Atc \"\n  select g.account_id || ' ' || g.permission || ' reviewed ' || coalesce(g.last_reviewed_at::text, 'never') || ' left ' || coalesce(p.left_at::text, '-')\n  from grants g\n  join people p on p.account_id = g.account_id\n  where g.last_reviewed_at < now() - interval '{{REVIEW_DAYS}} days' - interval '14 days'\n     or (p.left_at is not null and p.left_at < now() - interval '24 hours')\")\n[ -z \"$overdue\" ] || { echo \"$overdue\"; exit 1; }\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
@@ -1047,10 +1171,10 @@
       "type": "fitness-fn",
       "label": "Grants match the directory",
       "x": 1040,
-      "y": 780,
+      "y": 1300,
       "category": "process",
       "threshold": "0 grants without a directory group behind them; 0 grants of disabled accounts older than 60 minutes",
-      "description": "A scheduled job compares the grants with the directory's groups every hour and fails on any grant that no group explains, or that belongs to an account the directory has disabled.\n\nTool: psql in a scheduled CI job\n\n```sql\n-- directory_* tables are filled by the SCIM endpoint; fails when it returns a row\nselect g.account_id, g.permission\nfrom grants g\nleft join directory_group_members m on m.account_id = g.account_id and m.group_name = g.source_group\nleft join directory_accounts a on a.account_id = g.account_id\nwhere m.account_id is null\n   or (a.disabled_at is not null and a.disabled_at < now() - interval '60 minutes');\n```",
+      "description": "A scheduled job compares the grants with the directory's groups every hour and fails, printing the rows, on any grant that no group explains, or that belongs to an account the directory has disabled.\n\nTool: psql in a scheduled CI job (bash); the directory_* tables are filled by the SCIM endpoint\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nstray=$(psql \"$DATABASE_URL\" -Atc \"\n  select g.account_id || ' ' || g.permission\n  from grants g\n  left join directory_group_members m on m.account_id = g.account_id and m.group_name = g.source_group\n  left join directory_accounts a on a.account_id = g.account_id\n  where m.account_id is null\n     or (a.disabled_at is not null and a.disabled_at < now() - interval '60 minutes')\")\n[ -z \"$stray\" ] || { echo \"$stray\"; exit 1; }\n```",
       "hubWhen": {
         "MODEL": [
           "roles",
@@ -1067,10 +1191,25 @@
       "type": "fitness-fn",
       "label": "No standing admins",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "operational",
       "threshold": "0 people holding administrator rights outside an active, approved elevation",
-      "description": "A scheduled query over the cloud account lists the people with administrator policies attached directly; anything returned is a standing right that bypasses elevation. Use the equivalent tables for Azure or Google Cloud.\n\nTool: Steampipe (AWS plugin)\n\n```sql\n-- fails the job when it returns a row\nselect u.name, u.arn\nfrom aws_iam_user u\nwhere u.attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess'\n   or u.attached_policy_arns ? 'arn:aws:iam::aws:policy/PowerUserAccess';\n```",
+      "description": "A scheduled query over the cloud account lists IAM users with an administrator policy attached directly, through a group or inline, and IAM Identity Center assignments of administrator permission sets to a person or group; every row is compared with the elevation tool's active requests, and any without one is a standing right that bypasses elevation. Use the equivalent tables for Azure (azuread_user, azure_role_assignment) or Google Cloud (gcp_iam_policy).\n\nTool: Steampipe (AWS plugin), in a scheduled CI job that fails when the query returns a row not matched by an active elevation\n\n```sql\n-- every row is a standing administrator right unless the elevation tool lists it as active\nwith admin_policies as (\n  select unnest(array['arn:aws:iam::aws:policy/AdministratorAccess', 'arn:aws:iam::aws:policy/PowerUserAccess']) as arn\n),\nadmin_sets as (\n  select mpa.permission_set_arn\n  from aws_ssoadmin_managed_policy_attachment mpa\n  join aws_ssoadmin_permission_set ps on ps.arn = mpa.permission_set_arn\n  where mpa.managed_policy_arn in (select arn from admin_policies)\n)\nselect 'iam user ' || u.name as holder\nfrom aws_iam_user u\nwhere exists (select 1 from admin_policies p where u.attached_policy_arns ? p.arn)\n   or exists (select 1 from jsonb_array_elements(u.inline_policies) ip\n              where ip -> 'PolicyDocument' -> 'Statement' @> '[{\"Effect\": \"Allow\", \"Action\": \"*\"}]')\nunion all\nselect 'iam group ' || g.name || ' member ' || (m ->> 'UserName')\nfrom aws_iam_group g, jsonb_array_elements(g.users) m\nwhere exists (select 1 from admin_policies p where g.attached_policy_arns ? p.arn)\nunion all\nselect 'identity center ' || a.principal_type || ' ' || a.principal_id || ' in account ' || a.target_account_id\nfrom aws_ssoadmin_account_assignment a\nwhere a.permission_set_arn in (select permission_set_arn from admin_sets)\n  and a.target_account_id = '123456789012';   -- the production account\n```",
+      "hubWhen": {
+        "ADMIN": [
+          "jit"
+        ]
+      }
+    },
+    {
+      "id": "ff-break-glass",
+      "type": "fitness-fn",
+      "label": "Break-glass use alerts",
+      "x": 1040,
+      "y": 1560,
+      "category": "operational",
+      "threshold": "A sign-in with the break-glass account raises a page to the security owner within 5 minutes; the credential's last rotation is at most 24 hours after its last use",
+      "description": "An EventBridge rule matches console sign-ins by the break-glass user from CloudTrail and sends them to the paging topic; a quarterly drill signs in with the account in a non-production environment and times the page. The same scheduled job that counts administrators compares the account's password_last_used with its password last changed date.\n\nTool: Terraform (aws_cloudwatch_event_rule on CloudTrail sign-in events, SNS to the pager); on Azure: an Entra ID sign-in log alert rule for the account; on Google Cloud: a log-based alert on the service account\n\n```hcl\nresource \"aws_cloudwatch_event_rule\" \"break_glass_used\" {\n  name        = \"break-glass-used\"\n  description = \"ADR Just-in-time privileged access: page on any use of the sealed account\"\n  event_pattern = jsonencode({\n    source        = [\"aws.signin\"]\n    \"detail-type\" = [\"AWS Console Sign In via CloudTrail\"]\n    detail = {\n      eventName    = [\"ConsoleLogin\"]\n      userIdentity = { userName = [var.break_glass_user_name] }\n    }\n  })\n}\n\nresource \"aws_cloudwatch_event_target\" \"break_glass_page\" {\n  rule = aws_cloudwatch_event_rule.break_glass_used.name\n  arn  = var.security_pager_topic_arn   # SNS topic wired to the on-call tool\n}\n```",
       "hubWhen": {
         "ADMIN": [
           "jit"
@@ -1082,12 +1221,28 @@
       "type": "fitness-fn",
       "label": "Admins few and strong",
       "x": 1040,
-      "y": 1040,
+      "y": 1690,
       "category": "operational",
-      "threshold": "At most 5 administrator accounts, 0 of them without MFA",
-      "description": "A scheduled query counts the people with administrator rights and lists those without MFA; the job fails above 5 accounts or on any without MFA.\n\nTool: Steampipe (AWS plugin)\n\n```sql\nselect\n  count(*) as admins,\n  count(*) filter (where not mfa_enabled) as without_mfa\nfrom aws_iam_user\nwhere attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess';\n-- the job fails when admins > 5 or without_mfa > 0\n```",
+      "threshold": "At most 5 administrator accounts, 0 of them without a FIDO security key registered",
+      "description": "A scheduled query counts the people with administrator rights and lists those without a FIDO security key among their MFA devices (serial numbers of security keys are :u2f/ ARNs); the job fails above 5 accounts or on any without one. A passkey registered as a FIDO key appears the same way; a virtual MFA device does not count.\n\nTool: Steampipe (AWS plugin), in a scheduled CI job; for Azure: azuread_user with authentication methods, for Google Workspace: the users report with isEnforcedIn2Sv and security keys\n\n```sql\nselect\n  count(*) as admins,\n  count(*) filter (where not exists (\n    select 1 from jsonb_array_elements(coalesce(mfa_devices, '[]'::jsonb)) d\n    where d ->> 'SerialNumber' like '%:u2f/%'\n  )) as without_security_key\nfrom aws_iam_user\nwhere attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess';\n-- the job fails when admins > 5 or without_security_key > 0\n```",
       "hubWhen": {
         "ADMIN": [
+          "standing"
+        ]
+      }
+    },
+    {
+      "id": "ff-audit-immutable",
+      "type": "fitness-fn",
+      "label": "Audit log cannot be changed",
+      "x": 1040,
+      "y": 1820,
+      "category": "structural",
+      "threshold": "The audit trail writes to a bucket with Object Lock in compliance mode for at least 365 days and has log file validation on; 0 trails without both",
+      "description": "A policy over the Terraform plan in CI fails when the CloudTrail trail has no log file validation, or its bucket has no Object Lock configuration in compliance mode with a default retention of at least 365 days, so that no administrator can delete or edit an entry within the retention.\n\nTool: Conftest on the Terraform plan (AWS form; on Azure check the storage account's immutability policy, on Google Cloud the bucket's retention policy with locked = true)\n\n```rego\npackage main\n\nimport rego.v1\n\ntrails := [r | some r in input.resource_changes; r.type == \"aws_cloudtrail\"]\nlocks := [r | some r in input.resource_changes; r.type == \"aws_s3_bucket_object_lock_configuration\"]\n\ndeny contains \"no CloudTrail trail in the plan\" if count(trails) == 0\n\ndeny contains msg if {\n\tsome t in trails\n\tnot t.change.after.enable_log_file_validation\n\tmsg := sprintf(\"%s has no log file validation\", [t.address])\n}\n\ndeny contains \"no Object Lock configuration on the audit bucket\" if count(locks) == 0\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tnot retention.mode == \"COMPLIANCE\"\n\tmsg := sprintf(\"%s is not in compliance mode\", [l.address])\n}\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tretention.days < 365\n\tmsg := sprintf(\"%s keeps the audit log for fewer than 365 days\", [l.address])\n}\n```",
+      "hubWhen": {
+        "ADMIN": [
+          "jit",
           "standing"
         ]
       }
@@ -1097,10 +1252,10 @@
       "type": "fitness-fn",
       "label": "No person reaches data",
       "x": 1040,
-      "y": 1170,
+      "y": 1950,
       "category": "structural",
       "threshold": "0 infrastructure changes that give a person access to a production data store",
-      "description": "A policy runs over every Terraform plan in CI and refuses a change that attaches data-store actions to a user or group rather than a service role.\n\nTool: Conftest\n\n```rego\npackage main\n\nimport rego.v1\n\nhuman_policy := {\"aws_iam_user_policy\", \"aws_iam_group_policy\"}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\thuman_policy[r.type]\n\tsome s in json.unmarshal(r.change.after.policy).Statement\n\tsome a in actions(s)\n\tregex.match(\"^(rds-db|dynamodb|s3|secretsmanager):\", a)\n\tmsg := sprintf(\"%s gives a person direct access to production data (%s)\", [r.address, a])\n}\n\nactions(s) := s.Action if is_array(s.Action)\n\nactions(s) := [s.Action] if is_string(s.Action)\n```",
+      "description": "A policy runs over every Terraform plan in CI and refuses a change that gives a user or group data-store actions or a wildcard inline, or attaches an administrator or data-store managed policy to a user or group; service roles are not touched.\n\nTool: Conftest on the Terraform plan (AWS form; for Azure check azurerm_role_assignment with a user principal, for Google Cloud google_project_iam_member with user: or group: members)\n\n```rego\npackage main\n\nimport rego.v1\n\nhuman_inline := {\"aws_iam_user_policy\", \"aws_iam_group_policy\"}\nhuman_attachment := {\"aws_iam_user_policy_attachment\", \"aws_iam_group_policy_attachment\"}\ndata_policies := {\n\t\"arn:aws:iam::aws:policy/AdministratorAccess\", \"arn:aws:iam::aws:policy/PowerUserAccess\",\n\t\"arn:aws:iam::aws:policy/AmazonRDSFullAccess\", \"arn:aws:iam::aws:policy/AmazonS3FullAccess\",\n\t\"arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess\", \"arn:aws:iam::aws:policy/SecretsManagerReadWrite\",\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\thuman_inline[r.type]\n\tsome s in json.unmarshal(r.change.after.policy).Statement\n\tsome a in actions(s)\n\tregex.match(\"^(\\\\*|rds[a-z-]*:|dynamodb:|s3:|secretsmanager:)\", a)\n\tmsg := sprintf(\"%s gives a person direct access to production data (%s)\", [r.address, a])\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\thuman_attachment[r.type]\n\tdata_policies[r.change.after.policy_arn]\n\tmsg := sprintf(\"%s attaches %s to a person or group\", [r.address, r.change.after.policy_arn])\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\tr.type == \"aws_iam_policy_attachment\"\n\tcount(array.concat(object.get(r.change.after, \"users\", []), object.get(r.change.after, \"groups\", []))) > 0\n\tmsg := sprintf(\"%s attaches a policy to users or groups\", [r.address])\n}\n\nactions(s) := s.Action if is_array(s.Action)\n\nactions(s) := [s.Action] if is_string(s.Action)\n```",
       "hubWhen": {
         "ADMIN": [
           "none"
@@ -1112,10 +1267,10 @@
       "type": "fitness-fn",
       "label": "No permission checks creep in",
       "x": 1040,
-      "y": 1300,
+      "y": 2080,
       "category": "structural",
       "threshold": "0 imports of an authorization library or role check in the application code",
-      "description": "A dependency rule fails the build when the code imports an authorization library, which would mean a restricted feature arrived without its decision.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-authorization',\n    comment: 'ADR One level of access: supersede it before adding permissions',\n    severity: 'error',\n    from: {},\n    to: { path: 'node_modules/(@casl/|casbin|accesscontrol|@openfga/|@permitio/|@cerbos/)' },\n  }],\n}\n```",
+      "description": "A dependency rule fails the build when the code imports an authorization library, which would mean a restricted feature arrived without its decision.\n\nTool: dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest, a RuboCop custom cop)\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-authorization',\n    comment: 'ADR One level of access: supersede it before adding permissions',\n    severity: 'error',\n    from: {},\n    to: { path: 'node_modules/(@casl/|casbin|accesscontrol|@openfga/|@permitio/|@cerbos/)' },\n  }],\n}\n```",
       "hubWhen": {
         "MODEL": [
           "flat"
@@ -1383,6 +1538,12 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-policy-rollout--implements--adr-engine",
+      "sourceId": "ff-policy-rollout",
+      "targetId": "adr-engine",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-relation-tests--implements--adr-engine",
       "sourceId": "ff-relation-tests",
       "targetId": "adr-engine",
@@ -1395,45 +1556,39 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-sod--implements--adr-roles",
+      "sourceId": "ff-sod",
+      "targetId": "adr-roles",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-unshare--implements--adr-relations",
+      "sourceId": "ff-unshare",
+      "targetId": "adr-relations",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-missing-attribute--implements--adr-attributes",
+      "sourceId": "ff-missing-attribute",
+      "targetId": "adr-attributes",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-fail-closed--implements--adr-engine",
       "sourceId": "ff-fail-closed",
       "targetId": "adr-engine",
       "relationType": "implements"
     },
     {
-      "id": "ff-stale-grants--implements--adr-roles",
+      "id": "ff-stale-grants--implements--adr-review-periodic",
       "sourceId": "ff-stale-grants",
-      "targetId": "adr-roles",
+      "targetId": "adr-review-periodic",
       "relationType": "implements"
     },
     {
-      "id": "ff-stale-grants--implements--adr-relations",
-      "sourceId": "ff-stale-grants",
-      "targetId": "adr-relations",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-stale-grants--implements--adr-attributes",
-      "sourceId": "ff-stale-grants",
-      "targetId": "adr-attributes",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-directory-sync--implements--adr-roles",
+      "id": "ff-directory-sync--implements--adr-review-directory",
       "sourceId": "ff-directory-sync",
-      "targetId": "adr-roles",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-directory-sync--implements--adr-relations",
-      "sourceId": "ff-directory-sync",
-      "targetId": "adr-relations",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-directory-sync--implements--adr-attributes",
-      "sourceId": "ff-directory-sync",
-      "targetId": "adr-attributes",
+      "targetId": "adr-review-directory",
       "relationType": "implements"
     },
     {
@@ -1443,8 +1598,26 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-break-glass--implements--adr-jit",
+      "sourceId": "ff-break-glass",
+      "targetId": "adr-jit",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-admin-list--implements--adr-standing",
       "sourceId": "ff-admin-list",
+      "targetId": "adr-standing",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-audit-immutable--implements--adr-jit",
+      "sourceId": "ff-audit-immutable",
+      "targetId": "adr-jit",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-audit-immutable--implements--adr-standing",
+      "sourceId": "ff-audit-immutable",
       "targetId": "adr-standing",
       "relationType": "implements"
     },
