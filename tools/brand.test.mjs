@@ -22,12 +22,12 @@ describe('one mark everywhere', () => {
   })
 
   it('links the favicon from every page and shows the mark as the logo', () => {
-    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/studio/src/renderer/index.html', 'apps/hub/index.html']) {
-      expect(read(page), page).toMatch(/<link rel="icon" href="(\.\/)?favicon\.svg" type="image\/svg\+xml" \/>/)
-      expect(read(page), page).toMatch(/<link rel="apple-touch-icon" href="(\.\/)?apple-touch-icon\.png" \/>/)
+    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/studio/src/renderer/index.html', 'apps/hub/index.html']) {
+      expect(read(page), page).toMatch(/<link rel="icon" href="(\.\/|\.\.\/)?favicon\.svg" type="image\/svg\+xml" \/>/)
+      expect(read(page), page).toMatch(/<link rel="apple-touch-icon" href="(\.\/|\.\.\/)?apple-touch-icon\.png" \/>/)
     }
-    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/hub/src/SiteNav.tsx']) {
-      expect(read(page), page).toMatch(/<img class(Name)?="site-nav-mark" src="(\.\/)?favicon\.svg"/)
+    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/hub/src/SiteNav.tsx']) {
+      expect(read(page), page).toMatch(/<img class(Name)?="site-nav-mark" src="(\.\/|\.\.\/)?favicon\.svg"/)
     }
     expect(read('apps/studio/src/renderer/src/components/WelcomeScreen.tsx')).toContain("from '../radical-mark.svg?url'")
     expect(existsSync(join(ROOT, 'tools/generate-icon.js'))).toBe(false)

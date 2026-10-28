@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Blog on radical.tools (`/blog/`, *Blog* in the site navigation and footer, and in the Hub's): a list of posts and a reading page per post with the author's card; the first post, *The context your agent needs has a name. It is the architecture model.*, by Tomasz Zajac. The deploy uploads `apps/web/blog/*.html` and invalidates `/blog/*`
 - Setup wizard on Studio's first start, in the browser and the desktop app: one step each for the theme, the special key, the canvas (Focus, Smart fit, Wizard on create) and an AI provider with its key. Every choice applies at once; *Skip setup* keeps the defaults, and the wizard does not open on its own again. *Settings → Setup…* opens it later. Browsers that used Studio before do not see it
 - The System theme, which follows the operating system's light or dark appearance as it changes. It is the default, where Studio was always dark before
 

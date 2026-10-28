@@ -1,7 +1,7 @@
 // ─── Shared site navigation ──────────────────────────────────────────────────
 //
 // The same bar as radical.tools / docs (apps/web/landing.css `.site-nav`):
-// Home · Use cases · Docs | Hub · Studio | GitHub · theme. Keep markup and class
+// Home · Use cases · Blog · Docs | Hub · Studio | GitHub · theme. Keep markup and class
 // names in sync with apps/web/index.html and apps/web/manual.html.
 
 import React from 'react'
@@ -26,6 +26,7 @@ export function SiteNav({ studioUrl, theme, onToggleTheme, onHub }: SiteNavProps
       <nav className="site-nav-links">
         <a className="site-nav-btn" href="https://radical.tools">Home</a>
         <a className="site-nav-btn" href="https://radical.tools/usecases.html">Use cases</a>
+        <a className="site-nav-btn" href="https://radical.tools/blog/">Blog</a>
         <a className="site-nav-btn" href="https://radical.tools/manual.html">Docs</a>
         <span className="site-nav-sep" aria-hidden="true" />
         <button type="button" className="site-nav-btn active" onClick={onHub}>Hub</button>
