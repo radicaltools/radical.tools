@@ -320,6 +320,15 @@ Found while reviewing and rewriting the 33 packs (PR: Hub packs quality):
    over the snippets extracted from the catalogue would close that.
 7. **Two agents sharing one scratchpad overwrote each other's scripts**; give
    each agent of a round a sub-directory.
+8. **`when` can only AND its answers.** An element that applies to two
+   combinations (orchestration when choreography is picked with a synchronous
+   default; Terraform's checks when the cloud's own tool is picked on Google
+   Cloud or on premises) is built twice from one factory with a `-fallback`
+   or `-onprem` id. A `when` that takes a list of conditions (any of them)
+   would keep one element each.
+9. **Rego snippets (32) have never run**: `opa` could not be installed in the
+   agents' sandbox. `opa check` over the extracted snippets in CI is the
+   first item of point 6.
 
 ### Dogfooding (2026-10-06)
 
