@@ -1,0 +1,1258 @@
+{
+  "hub": {
+    "id": "concern-code-documentation",
+    "category": "concern",
+    "name": "Code documentation",
+    "description": "What about the element is written down, where it lives and how it stays true: the decisions, the API reference, the README of each module, the documentation site, and the diagrams or the architecture model.",
+    "tags": [
+      "maintainability",
+      "documentation",
+      "adr",
+      "docs as code",
+      "api docs",
+      "diagrams",
+      "readme"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "code-documentation",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "code lives in these elements, so what is written down about it, where, and how it is kept true has to be decided.",
+      "group": "maintainability"
+    },
+    "sources": [
+      {
+        "title": "Michael Nygard: Documenting Architecture Decisions",
+        "url": "https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions"
+      },
+      {
+        "title": "MADR: Markdown Any Decision Records",
+        "url": "https://adr.github.io/madr/"
+      },
+      {
+        "title": "Simon Brown: The C4 model for visualising software architecture",
+        "url": "https://c4model.com/"
+      },
+      {
+        "title": "Write the Docs: Docs as Code",
+        "url": "https://www.writethedocs.org/guide/docs-as-code/"
+      },
+      {
+        "title": "Diátaxis: a systematic approach to technical documentation",
+        "url": "https://diataxis.fr/"
+      },
+      {
+        "title": "Google developer documentation style guide",
+        "url": "https://developers.google.com/style"
+      },
+      {
+        "title": "OpenAPI Specification",
+        "url": "https://spec.openapis.org/oas/latest.html"
+      },
+      {
+        "title": "Principles behind the Agile Manifesto (working software, sustainable pace)",
+        "url": "https://agilemanifesto.org/principles.html"
+      },
+      {
+        "title": "ISO/IEC 25010, Maintainability: analysability",
+        "url": "https://iso25000.com/index.php/en/iso-25000-standards/iso-25010"
+      },
+      {
+        "title": "lychee link checker",
+        "url": "https://lychee.cli.rs/"
+      },
+      {
+        "title": "MkDocs: strict builds and configuration",
+        "url": "https://www.mkdocs.org/user-guide/configuration/"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "DECISIONS",
+        "title": "Decisions",
+        "label": "Where are architecture decisions recorded?",
+        "hint": "A decision that is not written down is re-argued at every change. Where the record lives decides who reads it, who reviews it, and whether anything checks that it is still true.",
+        "defaultValue": "adr-repo",
+        "options": [
+          {
+            "value": "adr-repo",
+            "label": "decision records as files in the repository",
+            "description": "One Markdown file per decision in the repository, in the Nygard or MADR format (status, date, context, decision, consequences), reviewed in the pull request with the code that implements it. Pick it when the people who need the decisions are the people who open the repository, and you want the record versioned and reviewed like code."
+          },
+          {
+            "value": "model",
+            "label": "decisions in an architecture model next to the code",
+            "description": "Decisions live in an architecture model kept in the repository (a radical.tools Markdown folder, or Structurizr DSL with its ADR tooling), each linked to the elements it constrains and to the requirements and checks behind it, and a CI job checks the model. Pick it when you already keep a C4 model or want decisions, diagrams and requirements to be one connected thing rather than three folders."
+          },
+          {
+            "value": "wiki",
+            "label": "a decision log in a wiki or document space",
+            "description": "Decisions are pages in Confluence, Notion or a similar space, from one template, with an index page per system and a link from the repository. Pick it when most readers (product, operations, architecture board, auditors) never open a repository and need to find and comment on decisions where they already work."
+          }
+        ]
+      },
+      {
+        "key": "API_DOCS",
+        "title": "API reference",
+        "label": "How is the API documented?",
+        "hint": "Generated reference is always current but says what, never why; a written guide explains, but goes stale unless its examples are run.",
+        "defaultValue": "generated",
+        "options": [
+          {
+            "value": "generated",
+            "label": "generated from the code or the contract on every build",
+            "description": "OpenAPI from annotations or an OpenAPI file as the source of truth; TSDoc, Javadoc or docstrings rendered by TypeDoc, Javadoc or Sphinx; published as a site on every release, with a check that the published contract and the running code agree. Pick it for any API other teams or customers call."
+          },
+          {
+            "value": "written",
+            "label": "a hand-written guide in the repository, with examples run by tests",
+            "description": "A guide written for readers (how to authenticate, the three calls that matter, the error model), kept next to the code, whose code examples are executed in CI (doctests, executed Markdown snippets). Pick it for a library or SDK where a tutorial beats a reference, and someone owns the text."
+          },
+          {
+            "value": "none",
+            "label": "no public API; internal types documented in code only",
+            "description": "Nothing outside the team calls the element; its types and functions carry doc comments and nothing is published. Pick it for a web app or a batch job with no callers, so that no one builds a reference nobody reads."
+          }
+        ]
+      },
+      {
+        "key": "READMES",
+        "title": "READMEs",
+        "label": "Where does a newcomer read how to run and test a module?",
+        "hint": "The README is read more than any other page; what it must say decides whether a new person runs the module on day one or asks.",
+        "defaultValue": "per-module",
+        "options": [
+          {
+            "value": "per-module",
+            "label": "a README in every package, module or service",
+            "description": "Every package, module or service directory holds a README with the same sections (purpose, how to run, how to test, who owns it), and a check fails when one is missing or a section is absent. Pick it for a monorepo or any repository with more than one deployable or publishable unit."
+          },
+          {
+            "value": "root-only",
+            "label": "one README at the repository root",
+            "description": "One README at the root explains the whole repository and holds a table of its modules with a line of purpose and an owner each. Pick it for a single-purpose repository where per-module READMEs would repeat the same text."
+          }
+        ]
+      },
+      {
+        "key": "DOCS_SITE",
+        "title": "Documentation",
+        "label": "Where is the longer documentation kept and published?",
+        "hint": "Documentation that lives in the repository is reviewed and built with the code and can fail the build on a broken link; documentation outside it reaches more readers but nothing checks it.",
+        "defaultValue": "docs-as-code",
+        "options": [
+          {
+            "value": "docs-as-code",
+            "label": "docs as code in the repository, built and published in CI",
+            "description": "Markdown or AsciiDoc in the repository, organised by Diátaxis (tutorials, how-to guides, reference, explanation), built by Docusaurus, MkDocs or Antora on every pull request and published on merge; a broken link or a warning fails the build. Pick it when the writers are the developers and the readers are developers or operators."
+          },
+          {
+            "value": "external",
+            "label": "kept and published outside the repository",
+            "description": "Documentation lives in Confluence, Notion, GitBook or a help-centre product, written by people who do not work in the repository, with a link from the README and the version it describes on each page. Pick it when technical writers or support own the documentation, or the readers are end users."
+          }
+        ]
+      },
+      {
+        "key": "DIAGRAMS",
+        "title": "Diagrams",
+        "label": "How are the architecture diagrams kept?",
+        "hint": "A diagram drawn once is out of date after the next merge; a diagram rendered from a model or from text in the repository changes in the pull request that changes the system.",
+        "defaultValue": "model",
+        "options": [
+          {
+            "value": "model",
+            "label": "rendered from a model or diagram-as-code in the repository",
+            "description": "Diagrams are rendered from a model or text kept in the repository (radical.tools, Structurizr DSL, PlantUML with C4-PlantUML, Mermaid) and reviewed in the pull request with the change they show. Pick it by default: the diagram is a diff, and a check can tell when code changed and the diagram did not."
+          },
+          {
+            "value": "images",
+            "label": "hand-drawn images, dated, in the docs folder",
+            "description": "Diagrams are drawn in draw.io, Excalidraw or on a whiteboard and kept as images in the docs folder, each with its date, author and editable source file next to it. Pick it for a small system with one or two diagrams, or sketches whose value is the conversation, not the record."
+          }
+        ]
+      },
+      {
+        "key": "ADR_DAYS",
+        "label": "Within how many days of being made must a decision be recorded?",
+        "defaultValue": "14",
+        "type": "number"
+      },
+      {
+        "key": "ADR_DIR",
+        "label": "Which directory holds the decision records?",
+        "defaultValue": "docs/adr"
+      },
+      {
+        "key": "MODEL_DIR",
+        "label": "Which folder holds the architecture model?",
+        "defaultValue": "architecture"
+      },
+      {
+        "key": "README_SECTIONS",
+        "label": "Which sections must every README have?",
+        "defaultValue": "Purpose, Run, Test, Owner"
+      },
+      {
+        "key": "DOC_COMMENT_COVERAGE_PCT",
+        "label": "What share of the public API must carry doc comments (%)?",
+        "defaultValue": "90",
+        "type": "number"
+      },
+      {
+        "key": "LINK_CHECK_MINUTES",
+        "label": "Within how many minutes must the documentation build, link check included, finish?",
+        "defaultValue": "5",
+        "type": "number"
+      },
+      {
+        "key": "MAX_DOC_AGE_DAYS",
+        "label": "After how many days without review is a documentation page stale?",
+        "defaultValue": "365",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "The element can be understood without asking",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Code documentation",
+      "description": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
+    },
+    {
+      "id": "req-adr-recorded",
+      "type": "requirement",
+      "label": "Significant decisions are recorded",
+      "x": 260,
+      "y": 0,
+      "ears_type": "event-driven",
+      "trigger": "an architecturally significant decision is made (a new or removed dependency, external service or data store, a protocol or format other systems rely on, a security or data-handling choice, or going against an earlier decision)",
+      "action": "record it within {{ADR_DAYS}} days as one decision record with a title, status, date, context, decision and consequences, in: {{DECISIONS}}",
+      "rationale": "A decision that is not written down is re-argued at every change or reversed without anyone noticing; the fields are the minimum that lets a later reader judge whether the context still holds (Nygard, Documenting Architecture Decisions; MADR)."
+    },
+    {
+      "id": "req-adr-supersede",
+      "type": "requirement",
+      "label": "Superseded decisions link forward",
+      "x": 260,
+      "y": 130,
+      "ears_type": "event-driven",
+      "trigger": "a new decision replaces or amends an earlier one",
+      "action": "mark the earlier record as superseded with a link to the new one, link the new one back, and never delete or rewrite the earlier record",
+      "rationale": "The old record explains code that is still there; a reader who finds it must be sent to the current decision, and a reader of the new one must see what it replaced (Nygard: records are immutable, status superseded)."
+    },
+    {
+      "id": "req-adr-with-code",
+      "type": "requirement",
+      "label": "Decision reviewed with its code",
+      "x": 260,
+      "y": 260,
+      "ears_type": "ubiquitous",
+      "action": "keep the decision record in the repository and change it in the same pull request as the first code that implements the decision, so that the reviewer of the code reviews the decision",
+      "rationale": "A decision reviewed with its code gets the same scrutiny as the code and is versioned with it; one reviewed elsewhere is approved by people who do not see what it costs (Nygard; Write the Docs, Docs as Code).",
+      "hubWhen": {
+        "DECISIONS": [
+          "adr-repo",
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "req-adr-linked",
+      "type": "requirement",
+      "label": "Decisions linked to what they constrain",
+      "x": 260,
+      "y": 390,
+      "ears_type": "ubiquitous",
+      "action": "link every decision in the model to at least one element it constrains and, where one exists, to the automated check that enforces it, and fail the CI check on a decision without status, date or a constrained element",
+      "rationale": "In a model a decision is only useful if a reader of an element can reach it from that element; an unlinked decision is a file in a different folder with extra steps (C4 model; radical check rules on decisions).",
+      "hubWhen": {
+        "DECISIONS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "req-adr-wiki-index",
+      "type": "requirement",
+      "label": "Decision log is findable from the code",
+      "x": 260,
+      "y": 520,
+      "ears_type": "ubiquitous",
+      "action": "keep one decision log index page per system listing every decision with its status and date, make every decision page from the same template, and link the index from the repository README and from the code that implements a decision",
+      "rationale": "Pages outside the repository are found only through links; without an index and a link from the code, the log is what the person who wrote it remembers (Nygard; Google developer documentation style guide on navigation).",
+      "hubWhen": {
+        "DECISIONS": [
+          "wiki"
+        ]
+      }
+    },
+    {
+      "id": "req-api-regenerated",
+      "type": "requirement",
+      "label": "API reference regenerated and in sync",
+      "x": 260,
+      "y": 650,
+      "ears_type": "event-driven",
+      "trigger": "a release is built",
+      "action": "regenerate the API reference from the code or the contract and publish it with the release version, and fail the build when the published contract and the specification generated from the running code differ in any operation, parameter, field or status code",
+      "rationale": "A generated reference is only as current as its last build, and a contract file that drifts from the code documents an API that does not exist (OpenAPI Specification; Fowler, the contract as a source of truth in concern API evolution).",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated"
+        ]
+      }
+    },
+    {
+      "id": "req-doc-comments",
+      "type": "requirement",
+      "label": "Public API carries doc comments",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "carry a doc comment with a one-line summary and every parameter and return value on at least {{DOC_COMMENT_COVERAGE_PCT}}% of exported or public symbols, measured on each pull request",
+      "rationale": "The reference is generated from the comments, and a symbol without one is a blank page; a threshold on the whole keeps the gate from blocking every typo (Google developer documentation style guide on API reference comments; ISO 25010 analysability).",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated",
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "req-examples-run",
+      "type": "requirement",
+      "label": "Examples in the docs are executed",
+      "x": 260,
+      "y": 910,
+      "ears_type": "ubiquitous",
+      "action": "execute every code example in the API guide as a test on each pull request, and fail the build when an example does not compile, raises, or prints something other than what the guide shows",
+      "rationale": "A written guide stays true only if its examples are run; an example that nobody runs is the first thing to break and the last to be noticed (Write the Docs, Docs as Code; Python doctest).",
+      "hubWhen": {
+        "API_DOCS": [
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "req-readme-per-module",
+      "type": "requirement",
+      "label": "Every module has its README",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "ubiquitous",
+      "action": "hold a README.md in every package, module or service directory with the sections {{README_SECTIONS}}, and fail the build when a directory lacks the file or a section",
+      "rationale": "The README is the page read first and most; the same sections everywhere let a newcomer run and test any module without asking who owns it (Google developer documentation style guide; Write the Docs on READMEs).",
+      "hubWhen": {
+        "READMES": [
+          "per-module"
+        ]
+      }
+    },
+    {
+      "id": "req-readme-root",
+      "type": "requirement",
+      "label": "Root README lists every module",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "hold in the root README a table with one row per module naming its purpose, how to run and test it, and its owner, and fail the build when a module directory has no row",
+      "rationale": "With one README, the table is the only place a newcomer learns what a directory is for and who to ask; a module missing from it is invisible (Google developer documentation style guide).",
+      "hubWhen": {
+        "READMES": [
+          "root-only"
+        ]
+      }
+    },
+    {
+      "id": "req-links",
+      "type": "requirement",
+      "label": "Broken links fail the docs build",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a page of the documentation holds a link to a page, anchor or URL that does not resolve, or the site generator reports a warning",
+      "action": "fail the documentation build on the pull request, naming the page and the link, within {{LINK_CHECK_MINUTES}} minutes",
+      "rationale": "A broken link is the reader's first sign that nobody maintains the page; a build that fails on one keeps the whole site trustworthy at the cost of one fix per pull request (Write the Docs, Docs as Code; lychee).",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "docs-as-code"
+        ]
+      }
+    },
+    {
+      "id": "req-external-versioned",
+      "type": "requirement",
+      "label": "External docs name their version",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "link the documentation space from the repository README, state on every page the release it describes, and update the pages for a release before the release is announced",
+      "rationale": "Documentation outside the repository is not built with the code, so the only guard against describing a version that no longer runs is naming the version on the page (Google developer documentation style guide on versioned documentation).",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "external"
+        ]
+      }
+    },
+    {
+      "id": "req-doc-owner",
+      "type": "requirement",
+      "label": "Pages have an owner and a review date",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "state-driven",
+      "precondition": "a documentation page (a guide, a README, a decision log index or a diagram page) has a review date older than {{MAX_DOC_AGE_DAYS}} days or no owner",
+      "action": "list it in the stale-page report, tell its owner (or the team when it has none), and remove or re-date it within 30 days",
+      "rationale": "A page nobody owns is a page nobody updates; a review date makes \"is this still true?\" a question with an answer instead of a guess (Google developer documentation style guide; Write the Docs on documentation maintenance)."
+    },
+    {
+      "id": "req-diagram-same-pr",
+      "type": "requirement",
+      "label": "Diagrams change with the code",
+      "x": 260,
+      "y": 1690,
+      "ears_type": "event-driven",
+      "trigger": "a pull request changes the structure of a diagrammed module (a new or removed container, component, dependency between modules, data store or external call)",
+      "action": "change the model or diagram source in the same pull request, and fail the check when the source under a diagrammed module changes structure and the model folder {{MODEL_DIR}} does not change",
+      "rationale": "A diagram kept as text or a model is a diff; the pull request that changes the system is the one moment the author knows what changed (Simon Brown, C4 model and diagrams as code).",
+      "hubWhen": {
+        "DIAGRAMS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "req-diagram-dated",
+      "type": "requirement",
+      "label": "Image diagrams are dated with their source",
+      "x": 260,
+      "y": 1820,
+      "ears_type": "ubiquitous",
+      "action": "keep every diagram image in the docs folder with its date and author in the caption, its editable source file (.drawio, .excalidraw) next to it, and a diagram older than {{MAX_DOC_AGE_DAYS}} days reviewed or removed",
+      "rationale": "An image cannot be diffed, so the date tells a reader how far to trust it and the source file lets the next person change it instead of redrawing (Simon Brown, C4 model: notation and dating of diagrams).",
+      "hubWhen": {
+        "DIAGRAMS": [
+          "images"
+        ]
+      }
+    },
+    {
+      "id": "sc-adr-recorded",
+      "type": "scenario",
+      "label": "Decision gets a record",
+      "x": 520,
+      "y": 0,
+      "given": "a pull request that adds a dependency on a new external service",
+      "when": "it is reviewed",
+      "then": "a decision record with title, status, date, context, decision and consequences exists for it, dated within {{ADR_DAYS}} days of the decision"
+    },
+    {
+      "id": "sc-adr-supersede",
+      "type": "scenario",
+      "label": "Old decision points to the new",
+      "x": 520,
+      "y": 130,
+      "given": "an accepted decision record",
+      "when": "a new decision replaces it",
+      "then": "the old record reads superseded and links to the new one, the new one links back, and the old text is unchanged"
+    },
+    {
+      "id": "sc-adr-with-code",
+      "type": "scenario",
+      "label": "Decision and code in one pull request",
+      "x": 520,
+      "y": 260,
+      "given": "a change that implements a new decision",
+      "when": "its pull request is opened",
+      "then": "the diff holds both the decision record and the code, and the record is not merged ahead of the code",
+      "hubWhen": {
+        "DECISIONS": [
+          "adr-repo",
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "sc-adr-linked",
+      "type": "scenario",
+      "label": "Unlinked decision fails the check",
+      "x": 520,
+      "y": 390,
+      "given": "the architecture model with a decision linked to no element",
+      "when": "the CI check runs",
+      "then": "it fails naming the decision, and passes once the decision constrains an element",
+      "hubWhen": {
+        "DECISIONS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "sc-adr-wiki-index",
+      "type": "scenario",
+      "label": "Decision reached from the code",
+      "x": 520,
+      "y": 520,
+      "given": "a module that implements a decision",
+      "when": "a developer opens its README and follows the link",
+      "then": "the decision log index lists the decision with status and date, and its page follows the template",
+      "hubWhen": {
+        "DECISIONS": [
+          "wiki"
+        ]
+      }
+    },
+    {
+      "id": "sc-api-regenerated",
+      "type": "scenario",
+      "label": "Drift fails the release",
+      "x": 520,
+      "y": 650,
+      "given": "a contract file and code that adds a response field without updating it",
+      "when": "the release is built",
+      "then": "the drift check fails naming the field, and passes once contract and code agree",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated"
+        ]
+      }
+    },
+    {
+      "id": "sc-doc-comments",
+      "type": "scenario",
+      "label": "Undocumented export refused",
+      "x": 520,
+      "y": 780,
+      "given": "a pull request exporting a new function without a doc comment",
+      "when": "the lint and coverage step runs",
+      "then": "the step fails when coverage falls below {{DOC_COMMENT_COVERAGE_PCT}}%, and names the function",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated",
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "sc-examples-run",
+      "type": "scenario",
+      "label": "Broken example fails the build",
+      "x": 520,
+      "y": 910,
+      "given": "a guide whose example calls a function that was renamed",
+      "when": "the pull request runs its tests",
+      "then": "the example test fails naming the guide and the line",
+      "hubWhen": {
+        "API_DOCS": [
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "sc-readme-per-module",
+      "type": "scenario",
+      "label": "Module without README fails",
+      "x": 520,
+      "y": 1040,
+      "given": "a new package directory added without a README.md",
+      "when": "the build runs",
+      "then": "the README check fails naming the directory, and passes once the file holds {{README_SECTIONS}}",
+      "hubWhen": {
+        "READMES": [
+          "per-module"
+        ]
+      }
+    },
+    {
+      "id": "sc-readme-root",
+      "type": "scenario",
+      "label": "Unlisted module fails",
+      "x": 520,
+      "y": 1170,
+      "given": "a new module directory not in the root README table",
+      "when": "the build runs",
+      "then": "the README check fails naming the directory",
+      "hubWhen": {
+        "READMES": [
+          "root-only"
+        ]
+      }
+    },
+    {
+      "id": "sc-links",
+      "type": "scenario",
+      "label": "Broken link stops the merge",
+      "x": 520,
+      "y": 1300,
+      "given": "a pull request that renames a page other pages link to",
+      "when": "the documentation build runs",
+      "then": "it fails within {{LINK_CHECK_MINUTES}} minutes naming each page with a broken link",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "docs-as-code"
+        ]
+      }
+    },
+    {
+      "id": "sc-external-versioned",
+      "type": "scenario",
+      "label": "Page names its release",
+      "x": 520,
+      "y": 1430,
+      "given": "a release that changes a documented behaviour",
+      "when": "the release is announced",
+      "then": "the page describing it names the new release and the README links to the space",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "external"
+        ]
+      }
+    },
+    {
+      "id": "sc-doc-owner",
+      "type": "scenario",
+      "label": "Stale page reported",
+      "x": 520,
+      "y": 1560,
+      "given": "a page whose review date is {{MAX_DOC_AGE_DAYS}} days old",
+      "when": "the stale-page report runs",
+      "then": "the page and its owner are listed, and the page is re-dated or removed within 30 days"
+    },
+    {
+      "id": "sc-diagram-same-pr",
+      "type": "scenario",
+      "label": "Structural change without diagram fails",
+      "x": 520,
+      "y": 1690,
+      "given": "a pull request adding a call to a new external service without touching {{MODEL_DIR}}",
+      "when": "the diagram check runs",
+      "then": "it fails naming the module, and passes once the model shows the new call",
+      "hubWhen": {
+        "DIAGRAMS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "sc-diagram-dated",
+      "type": "scenario",
+      "label": "Undated diagram fails the check",
+      "x": 520,
+      "y": 1820,
+      "given": "a diagram image added without a date or a source file",
+      "when": "the docs check runs",
+      "then": "it fails naming the image, and passes once a date, author and source file are present",
+      "hubWhen": {
+        "DIAGRAMS": [
+          "images"
+        ]
+      }
+    },
+    {
+      "id": "adr-adr-repo",
+      "type": "adr",
+      "label": "Decision records as files in the repository",
+      "x": 780,
+      "y": 0,
+      "concern": "code-documentation",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and will be read, changed and operated by people who were not there when it was written, and by the same people a year later. The forces: a decision that is not written down is re-argued at every change, or quietly reversed; documentation kept away from the code is not updated when the code is, and a page that was true once reads as if it still were; generated reference is always current but says what, never why; a wiki reaches readers who never open a repository, at the price of living where no review and no build can check it; a diagram drawn once drifts from the system it shows the moment the next pull request merges; and every page costs time to keep, so the set has to be small enough that it is kept.",
+      "decision": "Every architecturally significant decision is one Markdown file in {{ADR_DIR}}, numbered and named NNNN-title.md, in the MADR template (YAML front matter with status, date, deciders; sections Context and Problem Statement, Considered Options, Decision Outcome, Consequences), created with adr-tools or log4brains and recorded within {{ADR_DAYS}} days. The record is changed in the pull request of the first code that implements it, reviewed by the same reviewers; a superseding record sets the old one's status to superseded with a link both ways, and old records are never rewritten. A test over the front matter runs in CI. API reference: {{API_DOCS}}. READMEs: {{READMES}}. Documentation: {{DOCS_SITE}}. Diagrams: {{DIAGRAMS}}.",
+      "consequences": "• Decisions are versioned, reviewed and searched like code, and travel with the repository when it is forked or archived.\n• Readers who do not open the repository (product, operations, auditors) need a published copy: log4brains or the docs site renders the folder.\n• The template guarantees fields, not quality: a record with a one-line context passes the lint and still explains nothing; reviewers have to read it.\n• Decisions spanning several repositories live in one of them or in a shared one, and the others link to it.",
+      "alternatives": "1. Decisions in an architecture model next to the code: links each decision to the elements it constrains and lets CI check them together, but needs the model to exist and be kept.\n2. A decision log in a wiki: reaches readers outside the repository, but no review with the code and nothing checks it.\n3. Decisions in commit messages or pull request descriptions: already written, but unsearchable by topic and lost when the branch is squashed.",
+      "hubWhen": {
+        "DECISIONS": [
+          "adr-repo"
+        ]
+      }
+    },
+    {
+      "id": "adr-model",
+      "type": "adr",
+      "label": "Decisions in the architecture model next to the code",
+      "x": 780,
+      "y": 130,
+      "concern": "code-documentation",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and will be read, changed and operated by people who were not there when it was written, and by the same people a year later. The forces: a decision that is not written down is re-argued at every change, or quietly reversed; documentation kept away from the code is not updated when the code is, and a page that was true once reads as if it still were; generated reference is always current but says what, never why; a wiki reaches readers who never open a repository, at the price of living where no review and no build can check it; a diagram drawn once drifts from the system it shows the moment the next pull request merges; and every page costs time to keep, so the set has to be small enough that it is kept.",
+      "decision": "Decisions are elements of the architecture model kept in {{MODEL_DIR}} in the repository: with radical.tools, ADR nodes in the Markdown folder with status, date, context, decision, consequences and alternatives, linked with constrains to the containers and components they bind, with derives to the requirements behind them and with implements from the fitness functions that enforce them, and `radical check {{MODEL_DIR}}` runs in CI and fails on a decision without status or a constrained element; with Structurizr, ADRs in the workspace's decisions folder shown in its ADR view. A decision is recorded within {{ADR_DAYS}} days and changed in the same pull request as the first code that implements it; a superseding decision links the old one and leaves it in place. API reference: {{API_DOCS}}. READMEs: {{READMES}}. Documentation: {{DOCS_SITE}}. Diagrams: {{DIAGRAMS}}.",
+      "consequences": "• A reader of an element reaches its decisions, requirements and checks from the element, and a decision without a subject is an error, not a forgotten file.\n• The model has to be kept: a team that stops updating it has stale decisions and stale diagrams at once.\n• The model folder is reviewable as text, but the tool is one more thing to install for reading and editing (CLI, Studio or an editor for the DSL).\n• Decisions are published as part of the model, not as a page on their own; readers outside the repository need the rendered site or a viewer.",
+      "alternatives": "1. Decision records as plain files in {{ADR_DIR}}: no tool to learn, but the link from a decision to what it constrains is prose and nothing checks it.\n2. A decision log in a wiki: reaches readers outside the repository, but no review with the code and nothing checks it.\n3. Decisions both in the model and in a wiki: two copies drift; keep one and link to it.",
+      "hubWhen": {
+        "DECISIONS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "adr-wiki",
+      "type": "adr",
+      "label": "A decision log in a wiki or document space",
+      "x": 780,
+      "y": 260,
+      "concern": "code-documentation",
+      "status": "accepted",
+      "date": "",
+      "context": "Code lives in this element and will be read, changed and operated by people who were not there when it was written, and by the same people a year later. The forces: a decision that is not written down is re-argued at every change, or quietly reversed; documentation kept away from the code is not updated when the code is, and a page that was true once reads as if it still were; generated reference is always current but says what, never why; a wiki reaches readers who never open a repository, at the price of living where no review and no build can check it; a diagram drawn once drifts from the system it shows the moment the next pull request merges; and every page costs time to keep, so the set has to be small enough that it is kept. Here most readers never open the repository: decisions have to be found, read and commented on in the space where those readers already work.",
+      "decision": "Decisions are pages in the team's space (Confluence with the Decision template, or a Notion database with the same fields): title, status (proposed, accepted, superseded), date, deciders, context, decision, consequences, options considered. One decision log index page per system lists every decision with status and date; the repository README and the module implementing a decision link to its page. A decision is recorded within {{ADR_DAYS}} days; superseding sets the old page's status and links both ways, and old pages are not edited. A scheduled script over the space's REST API reports pages missing a status or date and decisions not on the index. API reference: {{API_DOCS}}. READMEs: {{READMES}}. Documentation: {{DOCS_SITE}}. Diagrams: {{DIAGRAMS}}.",
+      "consequences": "• Product, operations and an architecture board read and comment where they already are, with the space's search and notifications.\n• The decision is not reviewed with the code: the reviewer of the pull request has to open the page, and a code change that contradicts a decision is caught by people, not by a check.\n• The space is outside version control: history is the page history, and an export is needed when the space is moved or shut.\n• Links from code to pages break when pages move; the script catches missing pages, not moved ones.",
+      "alternatives": "1. Decision records as files in {{ADR_DIR}}: reviewed with the code and versioned, but invisible to readers who do not open repositories unless published.\n2. Decisions in an architecture model next to the code: connected and checked, but the furthest from readers who live in the wiki.\n3. Files in the repository published to the wiki by a job: one source and both audiences, at the cost of a job to keep and comments that land on the copy.",
+      "hubWhen": {
+        "DECISIONS": [
+          "wiki"
+        ]
+      }
+    },
+    {
+      "id": "ff-adr-lint",
+      "type": "fitness-fn",
+      "label": "Decision records are well-formed",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "Every file in {{ADR_DIR}} has status, date and title; every superseded record links to a record that exists; 0 records in status proposed older than {{ADR_DAYS}} days",
+      "description": "A test reads the MADR front matter of every record in {{ADR_DIR}}, checks the required fields and that each superseded-by link points at an existing record, and fails on a record left in proposed past the deadline. log4brains or adr-tools can create the files; this test keeps them honest.\n\nTool: Vitest with gray-matter (a test over the ADR folder)\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst DIR = 'docs/adr'   // ADR_DIR\nconst DAYS = 14          // ADR_DAYS\nconst files = readdirSync(DIR).filter((f) => /^\\d{4}-.+\\.md$/.test(f))\n\nit.each(files)('%s is a well-formed decision record', (file) => {\n  const { data } = matter(readFileSync(`${DIR}/${file}`, 'utf8'))\n  expect(['proposed', 'accepted', 'superseded', 'deprecated']).toContain(data.status)\n  expect(data.date).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)\n  if (data.status === 'superseded') expect(files).toContain(String(data['superseded-by']))\n  if (data.status === 'proposed') expect((Date.now() - Date.parse(data.date)) / 86_400_000).toBeLessThanOrEqual(DAYS)\n})\n```",
+      "hubWhen": {
+        "DECISIONS": [
+          "adr-repo"
+        ]
+      }
+    },
+    {
+      "id": "ff-radical-check",
+      "type": "fitness-fn",
+      "label": "Architecture model checked in CI",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "`radical check {{MODEL_DIR}}` reports 0 errors on every pull request: no decision without status, date or a constrained element, no broken link, no gap above its baseline",
+      "description": "The CI job runs the model check against the test reports of the same run, so a decision without a subject, a fitness function naming a test that did not run, or a link to a deleted element fails the pull request. With Structurizr, `structurizr-cli validate` on the workspace plays the same role for the DSL.\n\nTool: radical CLI in GitHub Actions\n\n```yaml\n# .github/workflows/architecture.yml\nname: architecture model\non: [pull_request, push]\njobs:\n  check:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with: { node-version-file: .nvmrc, cache: npm }\n      - run: npm ci\n      - run: npm test -- --reporter=junit --outputFile=reports/junit.xml\n      - run: npx radical check architecture --reports reports   # MODEL_DIR; rules and baselines in architecture/check.json\n```",
+      "hubWhen": {
+        "DECISIONS": [
+          "model"
+        ]
+      }
+    },
+    {
+      "id": "ff-wiki-log",
+      "type": "fitness-fn",
+      "label": "Decision log complete in the wiki",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "0 decision pages without a status and a date; 0 decisions missing from the index page; 0 pages in status proposed older than {{ADR_DAYS}} days",
+      "description": "A weekly job lists the pages of the decision space through the Confluence REST API, reads the status and date properties, compares the list with the links on the index page, and posts the gaps to the team channel; the job fails when any gap is older than a week.\n\nTool: Confluence REST API with curl and jq (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# weekly: decision pages with their status and date properties\nset -euo pipefail\nSPACE=ARCH; DAYS=14   # ADR_DAYS\ncurl -sf -u \"$CONFLUENCE_USER:$CONFLUENCE_TOKEN\" \\\n  \"$CONFLUENCE_URL/wiki/rest/api/content/search?cql=space=$SPACE+and+label=decision&expand=metadata.properties.status,metadata.properties.date&limit=200\" \\\n  | jq -r '.results[] | [.id, .title, .metadata.properties.status.value // \"MISSING\", .metadata.properties.date.value // \"MISSING\"] | @tsv' > decisions.tsv\nawk -F'\\t' '$3==\"MISSING\" || $4==\"MISSING\" { print \"no status or date: \" $2; bad=1 } END { exit bad }' decisions.tsv\nawk -F'\\t' -v days=$DAYS 'BEGIN { now=systime() } $3==\"proposed\" && (now - mktime(gensub(/-/, \" \", \"g\", $4) \" 0 0 0\")) / 86400 > days { print \"proposed too long: \" $2; bad=1 } END { exit bad }' decisions.tsv\n# every decision page is linked from the index page\nINDEX=$(curl -sf -u \"$CONFLUENCE_USER:$CONFLUENCE_TOKEN\" \"$CONFLUENCE_URL/wiki/rest/api/content/$INDEX_PAGE_ID?expand=body.storage\" | jq -r .body.storage.value)\ncut -f1 decisions.tsv | while read -r id; do grep -q \"pages/$id\" <<< \"$INDEX\" || { echo \"not on the index: $id\"; exit 1; }; done\n```",
+      "hubWhen": {
+        "DECISIONS": [
+          "wiki"
+        ]
+      }
+    },
+    {
+      "id": "ff-readme-sections",
+      "type": "fitness-fn",
+      "label": "Every module has its README sections",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "Every workspace or module directory holds README.md with the headings {{README_SECTIONS}}; 0 directories without",
+      "description": "A test lists the module directories from the workspace configuration (package.json workspaces, or the services folder), not from a list kept by hand, and expects a README.md with every required heading in each; a new module fails the test until it has one.\n\nTool: Vitest (a test over the workspaces)\n\n```ts\nimport { existsSync, globSync, readFileSync } from 'node:fs'\nimport { expect, it } from 'vitest'\n\nconst SECTIONS = ['Purpose', 'Run', 'Test', 'Owner']   // README_SECTIONS\nconst workspaces: string[] = JSON.parse(readFileSync('package.json', 'utf8')).workspaces\nconst dirs = workspaces.flatMap((w) => globSync(w))\n\nit.each(dirs)('%s has a README with the required sections', (dir) => {\n  const file = `${dir}/README.md`\n  expect(existsSync(file), `${file} is missing`).toBe(true)\n  const headings = readFileSync(file, 'utf8').match(/^#{1,3} .+$/gm) ?? []\n  for (const s of SECTIONS) expect(headings.some((h) => h.toLowerCase().includes(s.toLowerCase())), `${file} lacks \"${s}\"`).toBe(true)\n})\n```",
+      "hubWhen": {
+        "READMES": [
+          "per-module"
+        ]
+      }
+    },
+    {
+      "id": "ff-readme-table",
+      "type": "fitness-fn",
+      "label": "Root README lists every module",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "Every module directory has a row in the root README's module table with purpose and owner; 0 rows naming a directory that no longer exists",
+      "description": "A test reads the module table of the root README and compares it with the module directories of the repository both ways: a directory without a row and a row without a directory each fail it.\n\nTool: Vitest (a test over README.md)\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { expect, it } from 'vitest'\n\nconst readme = readFileSync('README.md', 'utf8')\nconst rows = [...readme.matchAll(/^\\| `?(src\\/[\\w-]+)`? \\| (.+?) \\| (.+?) \\|$/gm)]   // | dir | purpose | owner |\nconst listed = new Map(rows.map((r) => [r[1], { purpose: r[2].trim(), owner: r[3].trim() }]))\nconst dirs = readdirSync('src', { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `src/${d.name}`)\n\nit('every module is in the table, with purpose and owner', () => {\n  expect(dirs.filter((d) => !listed.has(d))).toEqual([])\n  for (const [dir, row] of listed) expect(row.purpose && row.owner, `${dir} lacks purpose or owner`).toBeTruthy()\n})\nit('no row names a module that is gone', () => {\n  expect([...listed.keys()].filter((d) => !dirs.includes(d))).toEqual([])\n})\n```",
+      "hubWhen": {
+        "READMES": [
+          "root-only"
+        ]
+      }
+    },
+    {
+      "id": "ff-doc-comments",
+      "type": "fitness-fn",
+      "label": "Doc comments on the public API",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "At least {{DOC_COMMENT_COVERAGE_PCT}}% of exported symbols carry a doc comment with a summary; a missing comment on a new export is a lint error",
+      "description": "eslint-plugin-jsdoc requires a doc comment on every exported function, class and type, as an error on new code; for Python, interrogate measures docstring coverage and fails under the threshold (`interrogate --fail-under {{DOC_COMMENT_COVERAGE_PCT}} src`); for Java, the javadoc doclint `-Xdoclint:all` run in the build.\n\nTool: eslint-plugin-jsdoc (or interrogate for Python)\n\n```js\n// eslint.config.js\nimport jsdoc from 'eslint-plugin-jsdoc'\nexport default [\n  jsdoc.configs['flat/recommended-typescript-error'],\n  {\n    files: ['src/**/*.ts'],\n    rules: {\n      'jsdoc/require-jsdoc': ['error', {\n        publicOnly: true,                       // exported symbols only\n        require: { FunctionDeclaration: true, ClassDeclaration: true, MethodDefinition: true },\n        contexts: ['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'ExportNamedDeclaration > VariableDeclaration'],\n      }],\n      'jsdoc/require-description': 'error',\n      'jsdoc/require-param-description': 'error',\n    },\n  },\n]\n// Python: interrogate --fail-under 90 src   # DOC_COMMENT_COVERAGE_PCT\n```",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated",
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "ff-reference-build",
+      "type": "fitness-fn",
+      "label": "API reference builds without warnings",
+      "x": 1040,
+      "y": 780,
+      "category": "process",
+      "threshold": "The reference builds on every pull request with 0 warnings (an unresolved link or an undocumented export is a warning) and is published with each release",
+      "description": "TypeDoc runs with warnings treated as errors, so a broken `{@link}` or an export without a comment fails the pull request; Sphinx does the same with `sphinx-build -W --keep-going`. The release job publishes the output under the release version.\n\nTool: TypeDoc (or Sphinx)\n\n```json\n// typedoc.json\n{\n  \"$schema\": \"https://typedoc.org/schema.json\",\n  \"entryPoints\": [\"src/index.ts\"],\n  \"out\": \"docs/api\",\n  \"treatWarningsAsErrors\": true,\n  \"validation\": { \"notExported\": true, \"invalidLink\": true, \"notDocumented\": true },\n  \"requiredToBeDocumented\": [\"Function\", \"Class\", \"Interface\", \"TypeAlias\", \"Method\"],\n  \"includeVersion\": true\n}\n// package.json: \"docs:api\": \"typedoc\"   (CI: npm run docs:api on every pull request)\n// Python: sphinx-build -W --keep-going -b html docs docs/_build\n```",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated"
+        ]
+      }
+    },
+    {
+      "id": "ff-contract-drift",
+      "type": "fitness-fn",
+      "label": "Contract and code agree",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "0 differences between the published OpenAPI contract and the specification generated from the running code, on every pull request",
+      "description": "The pipeline starts the element, fetches the specification it generates from its routes and compares it with the contract file in the repository with oasdiff; any difference fails the build, so the contract, the generated reference and the code cannot drift apart. Whether a difference may be released at all is the API evolution concern's decision; this check only keeps the documentation true.\n\nTool: oasdiff\n\n```bash\n#!/usr/bin/env bash\n# CI step: the contract in the repository is what the code serves\nset -euo pipefail\nnpm start & PID=$!\nuntil curl -sf http://localhost:3000/openapi.json > generated.json; do sleep 1; done\nkill $PID\n# any difference in paths, parameters, schemas or responses fails\noasdiff diff openapi.yaml generated.json --fail-on-diff --exclude-elements description,examples,title\n# and a breaking change is reported on its own for the API evolution review\noasdiff breaking openapi.yaml generated.json --fail-on ERR\n```",
+      "hubWhen": {
+        "API_DOCS": [
+          "generated"
+        ]
+      }
+    },
+    {
+      "id": "ff-doctest",
+      "type": "fitness-fn",
+      "label": "Examples in the guide run",
+      "x": 1040,
+      "y": 1040,
+      "category": "process",
+      "threshold": "Every code example in the API guide is executed on each pull request; 0 examples failing or skipped",
+      "description": "markdown-doctest executes every fenced JavaScript and TypeScript block of the guide with the package imported, failing on an exception; for Python, `pytest --doctest-modules --doctest-glob=\"docs/*.md\"` runs the doctests in docstrings and Markdown. Examples that need a server are marked and run against a test instance instead of being skipped.\n\nTool: markdown-doctest (or pytest --doctest-modules)\n\n```js\n// .markdown-doctest-setup.js\nconst sdk = require('./dist')\nmodule.exports = {\n  require: { '@shop/sdk': sdk },                      // what the examples import\n  globals: { client: sdk.createClient({ baseUrl: process.env.API_URL }) },\n  regexRequire: { '^@shop/sdk/(.+)$': (m, sub) => require(`./dist/${sub}`) },\n  ignore: ['**/CHANGELOG.md'],\n}\n// package.json: \"test:docs\": \"markdown-doctest docs/api/*.md README.md\"\n// Python: pytest --doctest-modules --doctest-glob=\"docs/*.md\" src docs\n```",
+      "hubWhen": {
+        "API_DOCS": [
+          "written"
+        ]
+      }
+    },
+    {
+      "id": "ff-docs-build",
+      "type": "fitness-fn",
+      "label": "Docs build strictly with links checked",
+      "x": 1040,
+      "y": 1170,
+      "category": "process",
+      "threshold": "The documentation builds in strict mode with 0 warnings and lychee finds 0 broken links, within {{LINK_CHECK_MINUTES}} minutes, on every pull request",
+      "description": "The docs job builds the site with warnings as errors (`mkdocs build --strict`, or Docusaurus with onBrokenLinks: \"throw\") and runs lychee over the Markdown and the built HTML; the job has a timeout of {{LINK_CHECK_MINUTES}} minutes and is a required check.\n\nTool: MkDocs (--strict) with lychee in GitHub Actions\n\n```yaml\n# .github/workflows/docs.yml\nname: docs\non: [pull_request]\njobs:\n  docs:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5   # LINK_CHECK_MINUTES\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with: { python-version: '3.12' }\n      - run: pip install mkdocs-material && mkdocs build --strict   # Docusaurus: onBrokenLinks: 'throw'\n      - uses: lycheeverse/lychee-action@v2\n        with:\n          args: --no-progress --include-fragments --exclude-path site/assets 'docs/**/*.md' 'site/**/*.html'\n          fail: true\n```",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "docs-as-code"
+        ]
+      }
+    },
+    {
+      "id": "ff-stale-pages",
+      "type": "fitness-fn",
+      "label": "No page without owner or past review",
+      "x": 1040,
+      "y": 1300,
+      "category": "process",
+      "threshold": "Every page has an owner and a review date in its front matter; 0 pages with a review date older than {{MAX_DOC_AGE_DAYS}} days on the main branch",
+      "description": "A test over the docs folder reads each page's front matter and fails on a page without an owner or review date; a weekly job runs the same test with the age limit and opens an issue assigned to the owner for each stale page.\n\nTool: Vitest with gray-matter (a test over the docs folder)\n\n```ts\nimport { globSync, readFileSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst MAX_DAYS = Number(process.env.MAX_DOC_AGE_DAYS ?? 365)   // MAX_DOC_AGE_DAYS\nconst pages = globSync('docs/**/*.md')\n\nit.each(pages)('%s has an owner and a recent review date', (page) => {\n  const { data } = matter(readFileSync(page, 'utf8'))   // --- owner: team-orders\\n reviewed: 2026-10-01 ---\n  expect(data.owner, `${page} has no owner`).toBeTruthy()\n  expect(String(data.reviewed)).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)\n  if (process.env.CHECK_AGE) expect((Date.now() - Date.parse(data.reviewed)) / 86_400_000, `${page} is stale`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
+      "hubWhen": {
+        "DOCS_SITE": [
+          "docs-as-code"
+        ]
+      }
+    },
+    {
+      "id": "ff-diagram-drift",
+      "type": "fitness-fn",
+      "label": "Structural change touches the model",
+      "x": 1040,
+      "y": 1430,
+      "category": "process",
+      "threshold": "0 merged pull requests that add or remove a dependency, service client or data store under a diagrammed module without a change in {{MODEL_DIR}}",
+      "description": "A CI step lists the files a pull request changes; when a dependency manifest, a client of another service or a data-store configuration under a diagrammed module changed and nothing under {{MODEL_DIR}} did, the step fails with the list, and the author either updates the model or explains in the pull request why the structure did not change. With Structurizr or PlantUML the diagram source folder takes the model folder's place.\n\nTool: git diff --name-only (CI script)\n\n```bash\n#!/usr/bin/env bash\n# CI: a change to the structure of a diagrammed module changes the model too\nset -euo pipefail\nMODEL=architecture   # MODEL_DIR\nBASE=$(git merge-base origin/main HEAD)\nchanged=$(git diff --name-only \"$BASE\"...HEAD)\n# files that change the structure: dependency manifests, service clients, data-store config\nstructural=$(grep -E '^(apps|packages|services)/[^/]+/(package\\.json|pom\\.xml|go\\.mod|requirements\\.txt|src/(clients|adapters|infra)/.*|src/.*(Client|Repository|Gateway)\\.[a-z]+)$' <<< \"$changed\" || true)\nif [ -n \"$structural\" ] && ! grep -q \"^$MODEL/\" <<< \"$changed\"; then\n  echo \"These files change the structure of a diagrammed module, but $MODEL/ did not change:\"; echo \"$structural\"\n  echo \"Update the model in this pull request (radical check lists what is missing) or explain why the structure is the same.\"\n  exit 1\nfi\n```",
+      "hubWhen": {
+        "DIAGRAMS": [
+          "model"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-adr-recorded--derives--need",
+      "sourceId": "req-adr-recorded",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-adr-supersede--derives--need",
+      "sourceId": "req-adr-supersede",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-adr-with-code--derives--need",
+      "sourceId": "req-adr-with-code",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-adr-linked--derives--need",
+      "sourceId": "req-adr-linked",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-adr-wiki-index--derives--need",
+      "sourceId": "req-adr-wiki-index",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-api-regenerated--derives--need",
+      "sourceId": "req-api-regenerated",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-doc-comments--derives--need",
+      "sourceId": "req-doc-comments",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-examples-run--derives--need",
+      "sourceId": "req-examples-run",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-readme-per-module--derives--need",
+      "sourceId": "req-readme-per-module",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-readme-root--derives--need",
+      "sourceId": "req-readme-root",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-links--derives--need",
+      "sourceId": "req-links",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-external-versioned--derives--need",
+      "sourceId": "req-external-versioned",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-doc-owner--derives--need",
+      "sourceId": "req-doc-owner",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-diagram-same-pr--derives--need",
+      "sourceId": "req-diagram-same-pr",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-diagram-dated--derives--need",
+      "sourceId": "req-diagram-dated",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-adr-recorded--verifies--req-adr-recorded",
+      "sourceId": "sc-adr-recorded",
+      "targetId": "req-adr-recorded",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-adr-supersede--verifies--req-adr-supersede",
+      "sourceId": "sc-adr-supersede",
+      "targetId": "req-adr-supersede",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-adr-with-code--verifies--req-adr-with-code",
+      "sourceId": "sc-adr-with-code",
+      "targetId": "req-adr-with-code",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-adr-linked--verifies--req-adr-linked",
+      "sourceId": "sc-adr-linked",
+      "targetId": "req-adr-linked",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-adr-wiki-index--verifies--req-adr-wiki-index",
+      "sourceId": "sc-adr-wiki-index",
+      "targetId": "req-adr-wiki-index",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-api-regenerated--verifies--req-api-regenerated",
+      "sourceId": "sc-api-regenerated",
+      "targetId": "req-api-regenerated",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-doc-comments--verifies--req-doc-comments",
+      "sourceId": "sc-doc-comments",
+      "targetId": "req-doc-comments",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-examples-run--verifies--req-examples-run",
+      "sourceId": "sc-examples-run",
+      "targetId": "req-examples-run",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-readme-per-module--verifies--req-readme-per-module",
+      "sourceId": "sc-readme-per-module",
+      "targetId": "req-readme-per-module",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-readme-root--verifies--req-readme-root",
+      "sourceId": "sc-readme-root",
+      "targetId": "req-readme-root",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-links--verifies--req-links",
+      "sourceId": "sc-links",
+      "targetId": "req-links",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-external-versioned--verifies--req-external-versioned",
+      "sourceId": "sc-external-versioned",
+      "targetId": "req-external-versioned",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-doc-owner--verifies--req-doc-owner",
+      "sourceId": "sc-doc-owner",
+      "targetId": "req-doc-owner",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-diagram-same-pr--verifies--req-diagram-same-pr",
+      "sourceId": "sc-diagram-same-pr",
+      "targetId": "req-diagram-same-pr",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-diagram-dated--verifies--req-diagram-dated",
+      "sourceId": "sc-diagram-dated",
+      "targetId": "req-diagram-dated",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-adr-lint--implements--adr-adr-repo",
+      "sourceId": "ff-adr-lint",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-radical-check--implements--adr-model",
+      "sourceId": "ff-radical-check",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-wiki-log--implements--adr-wiki",
+      "sourceId": "ff-wiki-log",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-sections--implements--adr-adr-repo",
+      "sourceId": "ff-readme-sections",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-sections--implements--adr-model",
+      "sourceId": "ff-readme-sections",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-sections--implements--adr-wiki",
+      "sourceId": "ff-readme-sections",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-table--implements--adr-adr-repo",
+      "sourceId": "ff-readme-table",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-table--implements--adr-model",
+      "sourceId": "ff-readme-table",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-readme-table--implements--adr-wiki",
+      "sourceId": "ff-readme-table",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doc-comments--implements--adr-adr-repo",
+      "sourceId": "ff-doc-comments",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doc-comments--implements--adr-model",
+      "sourceId": "ff-doc-comments",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doc-comments--implements--adr-wiki",
+      "sourceId": "ff-doc-comments",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-reference-build--implements--adr-adr-repo",
+      "sourceId": "ff-reference-build",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-reference-build--implements--adr-model",
+      "sourceId": "ff-reference-build",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-reference-build--implements--adr-wiki",
+      "sourceId": "ff-reference-build",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-contract-drift--implements--adr-adr-repo",
+      "sourceId": "ff-contract-drift",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-contract-drift--implements--adr-model",
+      "sourceId": "ff-contract-drift",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-contract-drift--implements--adr-wiki",
+      "sourceId": "ff-contract-drift",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doctest--implements--adr-adr-repo",
+      "sourceId": "ff-doctest",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doctest--implements--adr-model",
+      "sourceId": "ff-doctest",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-doctest--implements--adr-wiki",
+      "sourceId": "ff-doctest",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-build--implements--adr-adr-repo",
+      "sourceId": "ff-docs-build",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-build--implements--adr-model",
+      "sourceId": "ff-docs-build",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-build--implements--adr-wiki",
+      "sourceId": "ff-docs-build",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-stale-pages--implements--adr-adr-repo",
+      "sourceId": "ff-stale-pages",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-stale-pages--implements--adr-model",
+      "sourceId": "ff-stale-pages",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-stale-pages--implements--adr-wiki",
+      "sourceId": "ff-stale-pages",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-diagram-drift--implements--adr-adr-repo",
+      "sourceId": "ff-diagram-drift",
+      "targetId": "adr-adr-repo",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-diagram-drift--implements--adr-model",
+      "sourceId": "ff-diagram-drift",
+      "targetId": "adr-model",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-diagram-drift--implements--adr-wiki",
+      "sourceId": "ff-diagram-drift",
+      "targetId": "adr-wiki",
+      "relationType": "implements"
+    }
+  ]
+}

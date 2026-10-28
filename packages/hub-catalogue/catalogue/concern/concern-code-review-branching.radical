@@ -1,0 +1,1161 @@
+{
+  "hub": {
+    "id": "concern-code-review-branching",
+    "category": "concern",
+    "name": "Code review and branching",
+    "description": "How a change travels from a developer's machine to the main branch: the branching model, who reviews it and how many must approve, who owns which code, how big a change may be and how old a branch, and what a commit message says.",
+    "tags": [
+      "maintainability",
+      "code review",
+      "branching",
+      "trunk-based development",
+      "codeowners",
+      "conventional commits",
+      "pull requests"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "code-review-branching",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "code lives in these elements and several people change it, so how a change is branched, reviewed and merged has to be decided.",
+      "group": "maintainability"
+    },
+    "sources": [
+      {
+        "title": "Google Engineering Practices: Code Review Developer Guide",
+        "url": "https://google.github.io/eng-practices/review/"
+      },
+      {
+        "title": "Paul Hammant: Trunk Based Development",
+        "url": "https://trunkbaseddevelopment.com/"
+      },
+      {
+        "title": "Martin Fowler: Patterns for Managing Source Code Branches",
+        "url": "https://martinfowler.com/articles/branching-patterns.html"
+      },
+      {
+        "title": "DORA: DevOps Research and Assessment (Accelerate, State of DevOps)",
+        "url": "https://dora.dev/"
+      },
+      {
+        "title": "Vincent Driessen: A successful Git branching model (with the 2020 note of reflection)",
+        "url": "https://nvie.com/posts/a-successful-git-branching-model/"
+      },
+      {
+        "title": "Conventional Commits 1.0.0",
+        "url": "https://www.conventionalcommits.org/en/v1.0.0/"
+      },
+      {
+        "title": "SmartBear: Best Practices for Peer Code Review (the Cisco review study)",
+        "url": "https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/"
+      },
+      {
+        "title": "GitHub Docs: About code owners",
+        "url": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners"
+      },
+      {
+        "title": "GitHub Docs: About rulesets",
+        "url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "BRANCHING",
+        "title": "Branching",
+        "label": "How do changes reach the main branch?",
+        "hint": "This decides how long a change lives apart from everyone else's, how unfinished work is hidden, and whether there are branches for versions at all.",
+        "defaultValue": "trunk",
+        "options": [
+          {
+            "value": "trunk",
+            "label": "trunk-based development",
+            "description": "Everyone works on main: a change is a branch of at most a day or two merged through a short pull request, or a pair's commit straight to main; unfinished work ships behind a feature flag. Pick it for a service you deploy continuously (see the Deployment pack) with a test suite the team trusts and a team willing to split work into small steps."
+          },
+          {
+            "value": "feature-pr",
+            "label": "feature branches with a pull request each",
+            "description": "Each change is a branch with a pull request, merged to main when reviewed and green; main is always releasable and nothing lives on it that is not reviewed. Pick it for most teams: it needs no feature flags for unfinished work, as long as branches stay under a week and are rebased daily."
+          },
+          {
+            "value": "gitflow",
+            "label": "GitFlow with release and hotfix branches",
+            "description": "A develop branch collects the next version, a release/x.y branch stabilises it, main holds only tagged releases, and hotfix branches patch a version in support. Pick it only for a product shipped in numbered versions that customers install and keep running (desktop, on-premises, embedded, SDKs); for a deployed service its own author advises against it (Driessen, 2020 note)."
+          }
+        ]
+      },
+      {
+        "key": "REVIEW",
+        "title": "Review",
+        "label": "Who must approve a change?",
+        "hint": "A review catches the mistakes tests do not describe and spreads knowledge of the code; the rule says how many eyes a change gets and whether a pair counts.",
+        "defaultValue": "one-reviewer",
+        "options": [
+          {
+            "value": "one-reviewer",
+            "label": "one approving review from someone other than the author",
+            "description": "Every pull request needs one approval from a person who did not write it; a new commit dismisses stale approvals. Pick it as the baseline for a team of three or more; it is what Google's practice and the DORA data assume."
+          },
+          {
+            "value": "two-critical",
+            "label": "two reviews on critical paths, one elsewhere",
+            "description": "Changes under {{CRITICAL_PATHS}} need two approvals, one from the owning team; everything else needs one. Pick it when some directories move money, decide access or change the schema, so a mistake there costs more than a second review."
+          },
+          {
+            "value": "pairing",
+            "label": "pair or mob programming counts as the review",
+            "description": "A change written by a pair or mob carries Co-authored-by trailers and the partner's approval merges it; a change written alone still needs one review. Pick it for a team that pairs most of the day and wants to merge within the hour instead of waiting for an asynchronous review."
+          }
+        ]
+      },
+      {
+        "key": "OWNERSHIP",
+        "title": "Ownership",
+        "label": "Who owns which code?",
+        "hint": "Ownership decides who is asked to review and who may say no; without it, reviews go to whoever is free and nobody is accountable for a directory.",
+        "defaultValue": "codeowners",
+        "options": [
+          {
+            "value": "codeowners",
+            "label": "CODEOWNERS per directory",
+            "description": "A CODEOWNERS file maps every top-level directory to a team; a change under a directory needs that team's approval and GitHub asks it automatically. Pick it with two or more teams in one repository, or anywhere a directory holds code with a single accountable team."
+          },
+          {
+            "value": "collective",
+            "label": "collective ownership with rotating reviewers",
+            "description": "Anyone may change and review anything; a reviewer is assigned round-robin from the team so that reviews spread and knowledge does too. Pick it for one team of up to about eight on one codebase, where naming owners per directory would create bottlenecks."
+          }
+        ]
+      },
+      {
+        "key": "SIZE",
+        "title": "Size",
+        "label": "Is there a limit on the size of a change?",
+        "hint": "Reviewers find most defects in the first 200 to 400 lines and little after that; a limit forces the split that reviewers would otherwise have to ask for.",
+        "defaultValue": "limit",
+        "options": [
+          {
+            "value": "limit",
+            "label": "a hard limit per pull request",
+            "description": "A pull request may change at most {{MAX_PR_LINES}} lines (generated files and lock files excluded) and is split otherwise; a lead may label an exception. Pick it whenever reviews are slow or shallow today: a limit is the one lever that changes both."
+          },
+          {
+            "value": "none",
+            "label": "no limit, reviewers may ask to split",
+            "description": "Size is reported on every pull request but nothing blocks; a reviewer may send a large change back. Pick it for a small, disciplined team where large changes are rare and already questioned."
+          }
+        ]
+      },
+      {
+        "key": "COMMITS",
+        "title": "Commits",
+        "label": "What must a commit message say?",
+        "hint": "The history of main is what the next incident is debugged from and, with a convention, what the changelog and version number are computed from.",
+        "defaultValue": "conventional",
+        "options": [
+          {
+            "value": "conventional",
+            "label": "Conventional Commits, enforced by commitlint",
+            "description": "Every commit subject is type(scope): description (feat, fix, refactor, …), checked by a commit-msg hook and in CI; the changelog and the next version are derived from the types. Pick it when you publish a changelog or version numbers, or several teams read one history."
+          },
+          {
+            "value": "free",
+            "label": "free-form, squash-merged",
+            "description": "A subject line under 72 characters in the imperative, a body that says why; pull requests are squash-merged so main holds one commit per change with its pull request number. Pick it when nothing is derived from the messages and the pull request, not the commit, is the unit of history."
+          }
+        ]
+      },
+      {
+        "key": "MAX_PR_LINES",
+        "label": "How many changed lines may a pull request have at most?",
+        "defaultValue": "400",
+        "type": "number"
+      },
+      {
+        "key": "MAX_BRANCH_DAYS",
+        "label": "How old may a branch get before it is flagged (days; 2 for trunk-based, 7 otherwise)?",
+        "defaultValue": "2",
+        "type": "number"
+      },
+      {
+        "key": "REVIEW_HOURS",
+        "label": "Within how many working hours must a pull request get its first review?",
+        "defaultValue": "4",
+        "type": "number"
+      },
+      {
+        "key": "CRITICAL_PATHS",
+        "label": "Which directories are critical (need the stricter review)?",
+        "defaultValue": "payments/, auth/, migrations/"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Changes merge small, reviewed and soon",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Code review and branching",
+      "description": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
+    },
+    {
+      "id": "req-protected-main",
+      "type": "requirement",
+      "label": "Main branch protected",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "protect the main branch with a ruleset that refuses direct pushes, force pushes and deletion, requires the pull-request checks named by the Code quality gate and Test strategy decisions to pass, and keeps the history linear (squash or rebase merges only)",
+      "rationale": "A rule that lives in people's memory is skipped under pressure; one in the repository's rulesets is not, and a linear history is what bisect and blame work on (GitHub Docs: About rulesets; Fowler, Patterns for Managing Source Code Branches: mainline)."
+    },
+    {
+      "id": "req-one-review",
+      "type": "requirement",
+      "label": "One review from another person",
+      "x": 260,
+      "y": 130,
+      "ears_type": "state-driven",
+      "precondition": "a pull request has no approving review from a person other than its author, or its last approval predates its latest commit",
+      "action": "refuse to merge it",
+      "rationale": "The author is the one person who cannot see their own blind spots; a stale approval has not seen the code being merged (Google, Code Review Developer Guide: the standard of code review).",
+      "hubWhen": {
+        "REVIEW": [
+          "one-reviewer"
+        ]
+      }
+    },
+    {
+      "id": "req-two-critical",
+      "type": "requirement",
+      "label": "Two reviews on critical paths",
+      "x": 260,
+      "y": 260,
+      "ears_type": "state-driven",
+      "precondition": "a pull request changes a file under {{CRITICAL_PATHS}}",
+      "action": "require two approving reviews from people other than the author, at least one from the owning team, before it merges; one approval elsewhere",
+      "rationale": "Where a mistake moves money, grants access or loses data, a second reviewer is cheaper than the incident; everywhere else a second review only lengthens the queue (SmartBear, review study: inspection rate and defect density).",
+      "hubWhen": {
+        "REVIEW": [
+          "two-critical"
+        ]
+      }
+    },
+    {
+      "id": "req-pairing",
+      "type": "requirement",
+      "label": "Pair counts as review",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "a change written by a pair or mob is opened as a pull request",
+      "action": "carry a Co-authored-by trailer for every partner on each commit, accept the partner's approval as the review, and require one review from someone else for a change whose commits name no partner",
+      "rationale": "Two people at one keyboard have reviewed every line as it was written; the trailer makes that visible and auditable, and a solo change gets the review it did not have (Fowler, Patterns for Managing Source Code Branches: pre-integration review vs. pairing).",
+      "hubWhen": {
+        "REVIEW": [
+          "pairing"
+        ]
+      }
+    },
+    {
+      "id": "req-turnaround",
+      "type": "requirement",
+      "label": "First review within hours",
+      "x": 260,
+      "y": 520,
+      "ears_type": "event-driven",
+      "trigger": "a pull request is marked ready for review",
+      "action": "give it a first review (approval or comments) within {{REVIEW_HOURS}} working hours, with the median over the last 30 days under {{REVIEW_HOURS}} hours and the 90th percentile under one working day",
+      "rationale": "A review that waits a day stalls the change, grows it while it waits, and pushes the author to start another branch; Google asks for a reply within one business day at most and prefers hours (Google, Speed of Code Reviews; DORA, lead time for changes)."
+    },
+    {
+      "id": "req-owner-approval",
+      "type": "requirement",
+      "label": "Owning team approves",
+      "x": 260,
+      "y": 650,
+      "ears_type": "event-driven",
+      "trigger": "a pull request changes a file under a directory listed in CODEOWNERS",
+      "action": "request a review from the owning team automatically and refuse to merge until a member of it approves, with every top-level directory listed in CODEOWNERS and 0 paths without an owner",
+      "rationale": "The team accountable for a directory is the one that knows what a change there breaks; a directory without an owner is reviewed by nobody in particular (GitHub Docs: About code owners).",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "codeowners"
+        ]
+      }
+    },
+    {
+      "id": "req-rotation",
+      "type": "requirement",
+      "label": "Reviewer assigned by rotation",
+      "x": 260,
+      "y": 780,
+      "ears_type": "event-driven",
+      "trigger": "a pull request is marked ready for review",
+      "action": "assign one reviewer from the team round-robin within 15 minutes, skipping the author and anyone out of office, so that over a month no two people review more than 40% of each other's changes",
+      "rationale": "Collective ownership works only when reviews actually spread; left to volunteers they go to the same two people (Fowler, Patterns for Managing Source Code Branches; Google, The Standard of Code Review: knowledge sharing).",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "collective"
+        ]
+      }
+    },
+    {
+      "id": "req-pr-size",
+      "type": "requirement",
+      "label": "Oversized change split",
+      "x": 260,
+      "y": 910,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a pull request changes more than {{MAX_PR_LINES}} lines, generated files and lock files excluded",
+      "action": "fail the size check with the count and the suggestion to split, and allow the merge only with a size-exception label set by a lead and a reason in the description",
+      "rationale": "Reviewers find most defects in the first 200 to 400 lines and little after; past that a review is a formality (SmartBear, review study: 200 to 400 LOC per review; Google, Small CLs).",
+      "hubWhen": {
+        "SIZE": [
+          "limit"
+        ]
+      }
+    },
+    {
+      "id": "req-branch-age",
+      "type": "requirement",
+      "label": "Old branches flagged",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a branch other than main, develop or a release or hotfix branch has not been merged {{MAX_BRANCH_DAYS}} days after its first commit",
+      "action": "flag it in the daily report and tell its author to merge, split or delete it; bot branches (renovate/, dependabot/) are listed apart",
+      "rationale": "The cost of a merge grows with the time apart; a branch older than a few days is already a merge nobody wants to do (Hammant, Trunk Based Development: short-lived feature branches; DORA: lead time)."
+    },
+    {
+      "id": "req-conventional",
+      "type": "requirement",
+      "label": "Conventional commit messages",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "accept only commits whose subject follows Conventional Commits 1.0.0 (type, optional scope, description under 72 characters; a ! or BREAKING CHANGE footer for breaking changes), checked by a commit-msg hook on every machine and by commitlint over the pull request's commits in CI",
+      "rationale": "A typed history is read by people and by tools: the changelog and the next version are computed from it, and a breaking change is marked where it was made (Conventional Commits 1.0.0).",
+      "hubWhen": {
+        "COMMITS": [
+          "conventional"
+        ]
+      }
+    },
+    {
+      "id": "req-free-commits",
+      "type": "requirement",
+      "label": "Short subjects, one commit per change",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "keep every commit subject under 72 characters in the imperative with a body saying why, and squash-merge pull requests so that main holds one commit per change with the pull request number in its subject",
+      "rationale": "Without a convention, the pull request is the unit of history; squashing keeps main as one line per change with a link to the discussion that explains it (Fowler, Patterns for Managing Source Code Branches: mainline integration).",
+      "hubWhen": {
+        "COMMITS": [
+          "free"
+        ]
+      }
+    },
+    {
+      "id": "req-trunk",
+      "type": "requirement",
+      "label": "Branches merge within days",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "merge every branch to main within {{MAX_BRANCH_DAYS}} days of its first commit, hide unfinished work behind a feature flag (as the Deployment decision sets) or a branch by abstraction, and have every developer integrate to main at least once a working day",
+      "rationale": "Daily integration is the practice behind the DORA findings on lead time and change failure rate; a change that waits a week is a week of other people's changes to merge against (Hammant, Trunk Based Development; DORA, Trunk-based development capability).",
+      "hubWhen": {
+        "BRANCHING": [
+          "trunk"
+        ]
+      }
+    },
+    {
+      "id": "req-feature-pr",
+      "type": "requirement",
+      "label": "Main always releasable",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "ubiquitous",
+      "action": "make every change through a branch and a pull request rebased on main before merge, merge only when reviewed and green, keep branches under {{MAX_BRANCH_DAYS}} days, and keep main releasable at every commit",
+      "rationale": "A pull request per change gives every change its review and its checks before it lands; the branch age keeps the model close to continuous integration instead of drifting to long-lived feature branches (Fowler, Patterns for Managing Source Code Branches: feature branching; Hammant: short-lived branches).",
+      "hubWhen": {
+        "BRANCHING": [
+          "feature-pr"
+        ]
+      }
+    },
+    {
+      "id": "req-gitflow",
+      "type": "requirement",
+      "label": "Releases and hotfixes branched",
+      "x": 260,
+      "y": 1690,
+      "ears_type": "event-driven",
+      "trigger": "a version is about to ship, or a shipped version needs a fix",
+      "action": "create release/x.y from develop (fixes only, no features), merge it to main with an annotated tag vX.Y.Z and back into develop, and for a fix branch hotfix/x.y.z from the tag on main and merge it to both main and develop, so that main holds only tagged releases",
+      "rationale": "Customers who installed version 2.3 need a 2.3.1 without the features of 2.4; release and hotfix branches give each supported version a place to be fixed (Driessen, A successful Git branching model).",
+      "hubWhen": {
+        "BRANCHING": [
+          "gitflow"
+        ]
+      }
+    },
+    {
+      "id": "sc-protected-main",
+      "type": "scenario",
+      "label": "Direct push refused",
+      "x": 520,
+      "y": 0,
+      "given": "a developer with write access",
+      "when": "they push a commit straight to main, then force-push a branch that was merged",
+      "then": "both pushes are refused by the ruleset and the only way in is a pull request with green checks"
+    },
+    {
+      "id": "sc-one-review",
+      "type": "scenario",
+      "label": "Stale approval dismissed",
+      "x": 520,
+      "y": 130,
+      "given": "a pull request approved by a reviewer",
+      "when": "the author pushes another commit",
+      "then": "the approval is dismissed and the merge button stays disabled until someone approves again",
+      "hubWhen": {
+        "REVIEW": [
+          "one-reviewer"
+        ]
+      }
+    },
+    {
+      "id": "sc-two-critical",
+      "type": "scenario",
+      "label": "Second approval required",
+      "x": 520,
+      "y": 260,
+      "given": "a pull request changing a file under {{CRITICAL_PATHS}} with one approval",
+      "when": "the merge is attempted",
+      "then": "the required check \"critical-paths-review\" fails naming the files and the missing second approval",
+      "hubWhen": {
+        "REVIEW": [
+          "two-critical"
+        ]
+      }
+    },
+    {
+      "id": "sc-pairing",
+      "type": "scenario",
+      "label": "Solo change still reviewed",
+      "x": 520,
+      "y": 390,
+      "given": "two pull requests, one with Co-authored-by trailers on all commits and one without",
+      "when": "each is approved by a co-author of the first",
+      "then": "the first may merge; the second waits for a review from someone who did not write it",
+      "hubWhen": {
+        "REVIEW": [
+          "pairing"
+        ]
+      }
+    },
+    {
+      "id": "sc-turnaround",
+      "type": "scenario",
+      "label": "Review turnaround measured",
+      "x": 520,
+      "y": 520,
+      "given": "the pull requests merged in the last 30 days",
+      "when": "the time from ready-for-review to the first review is computed from each timeline",
+      "then": "the median is under {{REVIEW_HOURS}} working hours and the 90th percentile under one working day"
+    },
+    {
+      "id": "sc-owner-approval",
+      "type": "scenario",
+      "label": "Owner review requested",
+      "x": 520,
+      "y": 650,
+      "given": "a CODEOWNERS file naming a team for payments/",
+      "when": "a pull request changes payments/refund.ts",
+      "then": "the team is requested automatically and the merge waits for one of its members",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "codeowners"
+        ]
+      }
+    },
+    {
+      "id": "sc-rotation",
+      "type": "scenario",
+      "label": "Reviewer rotated",
+      "x": 520,
+      "y": 780,
+      "given": "a team of six with round-robin assignment",
+      "when": "twelve pull requests are opened in a week",
+      "then": "each member other than the author was assigned at least one, within 15 minutes of ready-for-review",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "collective"
+        ]
+      }
+    },
+    {
+      "id": "sc-pr-size",
+      "type": "scenario",
+      "label": "Large pull request blocked",
+      "x": 520,
+      "y": 910,
+      "given": "a pull request changing {{MAX_PR_LINES}} + 1 lines of source",
+      "when": "the size check runs",
+      "then": "it fails with the line count, and passes only after a split or a size-exception label with a reason",
+      "hubWhen": {
+        "SIZE": [
+          "limit"
+        ]
+      }
+    },
+    {
+      "id": "sc-branch-age",
+      "type": "scenario",
+      "label": "Stale branch reported",
+      "x": 520,
+      "y": 1040,
+      "given": "a branch whose first commit is {{MAX_BRANCH_DAYS}} + 1 days old and unmerged",
+      "when": "the daily branch report runs",
+      "then": "the branch is listed with its author and age, and renovate/ and dependabot/ branches appear in a separate list"
+    },
+    {
+      "id": "sc-conventional",
+      "type": "scenario",
+      "label": "Untyped commit refused",
+      "x": 520,
+      "y": 1170,
+      "given": "a developer committing \"fixed stuff\"",
+      "when": "the commit-msg hook runs, and then the same commit is pushed in a pull request",
+      "then": "the hook refuses it, and the CI commitlint job fails the pull request naming the commit",
+      "hubWhen": {
+        "COMMITS": [
+          "conventional"
+        ]
+      }
+    },
+    {
+      "id": "sc-free-commits",
+      "type": "scenario",
+      "label": "Squash merge only",
+      "x": 520,
+      "y": 1300,
+      "given": "a pull request with five commits",
+      "when": "it is merged",
+      "then": "main gains exactly one commit whose subject is under 72 characters and ends with the pull request number",
+      "hubWhen": {
+        "COMMITS": [
+          "free"
+        ]
+      }
+    },
+    {
+      "id": "sc-trunk",
+      "type": "scenario",
+      "label": "Daily integration",
+      "x": 520,
+      "y": 1430,
+      "given": "the merges to main over the last 10 working days",
+      "when": "they are grouped by author and day",
+      "then": "every active developer merged on at least 8 of the 10 days and no branch was older than {{MAX_BRANCH_DAYS}} days at merge",
+      "hubWhen": {
+        "BRANCHING": [
+          "trunk"
+        ]
+      }
+    },
+    {
+      "id": "sc-feature-pr",
+      "type": "scenario",
+      "label": "Any commit of main releases",
+      "x": 520,
+      "y": 1560,
+      "given": "the last 20 commits on main",
+      "when": "each is checked out and the release pipeline run",
+      "then": "every one builds, passes its checks and deploys to a test environment",
+      "hubWhen": {
+        "BRANCHING": [
+          "feature-pr"
+        ]
+      }
+    },
+    {
+      "id": "sc-gitflow",
+      "type": "scenario",
+      "label": "Hotfix reaches both branches",
+      "x": 520,
+      "y": 1690,
+      "given": "version 2.3.0 tagged on main and develop ahead of it",
+      "when": "a hotfix/2.3.1 is merged",
+      "then": "main holds the tag v2.3.1, develop contains the fix, and main's history holds no commit outside release and hotfix merges",
+      "hubWhen": {
+        "BRANCHING": [
+          "gitflow"
+        ]
+      }
+    },
+    {
+      "id": "adr-trunk",
+      "type": "adr",
+      "label": "Trunk-based development",
+      "x": 780,
+      "y": 0,
+      "concern": "code-review-branching",
+      "status": "accepted",
+      "date": "",
+      "context": "Several people change the code of this element every day, and every change travels from one machine to the main branch through a branch, a review and a merge. The forces: a branch that lives long drifts from main and merges with pain, but one merged within hours needs a way to hide unfinished work; a review catches the mistakes tests do not describe, but a review that waits a day stalls every change behind it and a review of 2,000 lines catches almost nothing (SmartBear: defect density falls off past about 400 lines); the people who know a directory best are not always free to review it; the history of main is what the next incident is debugged from, so what a commit message says and whether history is linear matters a year later; and products shipped in numbered versions to customers who install them need branches for versions in support, which a service deployed continuously never does.",
+      "decision": "The element is developed trunk-based on GitHub: a change is a branch of at most {{MAX_BRANCH_DAYS}} days merged to main through a short pull request, and unfinished work ships behind a feature flag (OpenFeature with the provider the Deployment decision names) or a branch by abstraction. Main is protected by a ruleset: no direct push or force push, required checks (the Code quality gate and Test strategy jobs), linear history by squash merge. Review: {{REVIEW}}. Ownership: {{OWNERSHIP}}. Size: {{SIZE}}, with {{MAX_PR_LINES}} lines as the limit. Commits: {{COMMITS}}. A first review is due within {{REVIEW_HOURS}} working hours; a daily job (gh api) lists branches older than {{MAX_BRANCH_DAYS}} days and pull requests over the limit.",
+      "consequences": "• Merges are small and conflicts rare, because nobody is more than two days away from main; lead time for a change is hours.\n• Unfinished work needs flags or abstraction seams, and flags need clean-up (the Deployment pack's stale-flag check).\n• Every developer must split work into steps that each leave main releasable, which is a skill the team has to build.\n• There is no branch to stabilise a release on: the test suite and the rollout checks are the only safety net.",
+      "alternatives": "1. Feature branches with a pull request each: no flags needed for unfinished work, but branches live longer and merges hurt more.\n2. GitFlow: a branch per release, right for installed products, needless ceremony for a service deployed continuously.\n3. Direct commits to main without pull requests: faster still, but the review and the checks have nowhere to run before the code lands.",
+      "hubWhen": {
+        "BRANCHING": [
+          "trunk"
+        ]
+      }
+    },
+    {
+      "id": "adr-feature-pr",
+      "type": "adr",
+      "label": "Feature branches with pull requests",
+      "x": 780,
+      "y": 130,
+      "concern": "code-review-branching",
+      "status": "accepted",
+      "date": "",
+      "context": "Several people change the code of this element every day, and every change travels from one machine to the main branch through a branch, a review and a merge. The forces: a branch that lives long drifts from main and merges with pain, but one merged within hours needs a way to hide unfinished work; a review catches the mistakes tests do not describe, but a review that waits a day stalls every change behind it and a review of 2,000 lines catches almost nothing (SmartBear: defect density falls off past about 400 lines); the people who know a directory best are not always free to review it; the history of main is what the next incident is debugged from, so what a commit message says and whether history is linear matters a year later; and products shipped in numbered versions to customers who install them need branches for versions in support, which a service deployed continuously never does.",
+      "decision": "Every change to the element is a branch from main and a pull request on GitHub, rebased on main before merge and merged by squash when reviewed and green; main is always releasable and nothing reaches it any other way. Branches stay under {{MAX_BRANCH_DAYS}} days, and a daily job (gh api) flags the ones that do not. Main is protected by a ruleset: no direct push or force push, required checks (the Code quality gate and Test strategy jobs), linear history. Review: {{REVIEW}}. Ownership: {{OWNERSHIP}}. Size: {{SIZE}}, with {{MAX_PR_LINES}} lines as the limit. Commits: {{COMMITS}}. A first review is due within {{REVIEW_HOURS}} working hours.",
+      "consequences": "• Every change gets its review and its checks before it lands; main is releasable at any commit.\n• Unfinished work can stay on its branch, so no feature flags are needed for it, but a branch past a week drifts and merges with pain: the age check is what keeps this model honest.\n• Two branches that touch the same files find out at merge time, later than trunk-based development would.\n• Pull requests are the unit of history and discussion; the merge commit (or squash) links to it.",
+      "alternatives": "1. Trunk-based development: shorter lead time and fewer merge conflicts, at the price of feature flags and smaller steps.\n2. GitFlow: adds develop, release and hotfix branches that a continuously deployed service does not need.\n3. Long-lived feature branches merged when the feature is done: the merges become projects of their own and main stops reflecting the team's work.",
+      "hubWhen": {
+        "BRANCHING": [
+          "feature-pr"
+        ]
+      }
+    },
+    {
+      "id": "adr-gitflow",
+      "type": "adr",
+      "label": "GitFlow with release and hotfix branches",
+      "x": 780,
+      "y": 260,
+      "concern": "code-review-branching",
+      "status": "accepted",
+      "date": "",
+      "context": "Several people change the code of this element every day, and every change travels from one machine to the main branch through a branch, a review and a merge. The forces: a branch that lives long drifts from main and merges with pain, but one merged within hours needs a way to hide unfinished work; a review catches the mistakes tests do not describe, but a review that waits a day stalls every change behind it and a review of 2,000 lines catches almost nothing (SmartBear: defect density falls off past about 400 lines); the people who know a directory best are not always free to review it; the history of main is what the next incident is debugged from, so what a commit message says and whether history is linear matters a year later; and products shipped in numbered versions to customers who install them need branches for versions in support, which a service deployed continuously never does. Here the element ships in numbered versions that customers install and keep running, so a version in support needs a branch of its own to be fixed on.",
+      "decision": "The element follows GitFlow on GitHub: feature branches merge to develop through pull requests; a release/x.y branch is cut from develop for each version, takes fixes only, and is merged to main with an annotated tag vX.Y.Z and back into develop; a hotfix/x.y.z branch is cut from the tag on main and merged to both. Main and develop are protected by rulesets (no direct or force push, required checks from the Code quality gate and Test strategy decisions); main accepts merges from release/* and hotfix/* only. Review: {{REVIEW}}. Ownership: {{OWNERSHIP}}. Size: {{SIZE}}, with {{MAX_PR_LINES}} lines as the limit. Commits: {{COMMITS}}. Feature branches stay under {{MAX_BRANCH_DAYS}} days; a first review is due within {{REVIEW_HOURS}} working hours. The git-flow AVH command-line extension does the branching; a GitHub Actions job checks main's history.",
+      "consequences": "• Each supported version has a branch to fix on; customers on 2.3 get 2.3.1 without 2.4's features.\n• Two long-lived branches (main, develop) and a release branch per version mean double merges and the occasional fix forgotten on one side; the back-merge is checked, not trusted.\n• Integration happens on develop, later than on a trunk; the age limit on feature branches keeps it from drifting further.\n• The model's own author advises against it for software deployed continuously; if the element ever becomes a service, this decision is superseded by trunk-based development.",
+      "alternatives": "1. Trunk-based development with release branches cut from main and fixes cherry-picked back: fewer long-lived branches, enough for most versioned products (Hammant: branch for release).\n2. Feature branches with pull requests and tags on main only: no place to fix a version in support once main has moved on.\n3. One branch per customer version kept forever: unbounded maintenance.",
+      "hubWhen": {
+        "BRANCHING": [
+          "gitflow"
+        ]
+      }
+    },
+    {
+      "id": "adr-codeowners",
+      "type": "adr",
+      "label": "Code owners per directory",
+      "x": 780,
+      "y": 390,
+      "concern": "code-review-branching",
+      "status": "accepted",
+      "date": "",
+      "context": "Several people change the code of this element every day, and every change travels from one machine to the main branch through a branch, a review and a merge. The forces: a branch that lives long drifts from main and merges with pain, but one merged within hours needs a way to hide unfinished work; a review catches the mistakes tests do not describe, but a review that waits a day stalls every change behind it and a review of 2,000 lines catches almost nothing (SmartBear: defect density falls off past about 400 lines); the people who know a directory best are not always free to review it; the history of main is what the next incident is debugged from, so what a commit message says and whether history is linear matters a year later; and products shipped in numbered versions to customers who install them need branches for versions in support, which a service deployed continuously never does.",
+      "decision": "A CODEOWNERS file at .github/CODEOWNERS maps every top-level directory of the element to a GitHub team; a catch-all line at the top names the platform team for anything unlisted. The ruleset requires a code-owner review, so a change under a directory waits for its team, which GitHub requests automatically. Critical directories ({{CRITICAL_PATHS}}) are owned by the team accountable for them. A CI check parses CODEOWNERS and fails when a top-level directory has no owner or an owner is not a team.",
+      "consequences": "• The people who know a directory see every change to it, and a change in payments/ cannot be waved through by a stranger.\n• A team that is slow to review becomes a bottleneck for everyone touching its directory; the turnaround measure shows where.\n• The file must be kept in step with the directory tree; the check fails the build when it is not.\n• Cross-cutting changes collect several owners and several approvals.",
+      "alternatives": "1. Collective ownership with rotating reviewers: no bottleneck per directory, but nobody accountable for one either.\n2. Owners listed in a wiki: not enforced, out of date within a month.\n3. One owner for the whole repository: a single person on every pull request's path.",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "codeowners"
+        ]
+      }
+    },
+    {
+      "id": "ff-branch-protection",
+      "type": "fitness-fn",
+      "label": "Main is protected by a ruleset",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "The rules active on main include pull_request with at least 1 required approval and stale-review dismissal, required_status_checks with strict mode, non_fast_forward (no force push), deletion, and required_linear_history; 0 of them missing",
+      "description": "A scheduled job reads the rules in force on main through the GitHub API (rulesets and classic protection combined) and fails when one of the required rules is missing or weaker than the decision, so a setting changed by hand in the web UI is noticed within a day.\n\nTool: GitHub CLI (gh api) in a scheduled GitHub Actions job\n\n```bash\n#!/usr/bin/env bash\n# fails when a rule required by the branching decision is missing on main\nset -euo pipefail\nrules=$(gh api \"repos/$GITHUB_REPOSITORY/rules/branches/main\")\nneed() { echo \"$rules\" | jq -e \"$1\" > /dev/null || { echo \"missing on main: $2\"; exit 1; }; }\nneed 'map(select(.type==\"pull_request\" and .parameters.required_approving_review_count>=1 and .parameters.dismiss_stale_reviews_on_push)) | length>0' 'pull request with 1 approval, stale reviews dismissed'\nneed 'map(select(.type==\"required_status_checks\" and .parameters.strict_required_status_checks_policy)) | length>0' 'required status checks (strict)'\nneed 'map(select(.type==\"non_fast_forward\")) | length>0' 'no force push'\nneed 'map(select(.type==\"deletion\")) | length>0' 'no deletion'\nneed 'map(select(.type==\"required_linear_history\")) | length>0' 'linear history'\necho \"main is protected as decided\"\n```"
+    },
+    {
+      "id": "ff-codeowners",
+      "type": "fitness-fn",
+      "label": "Every directory has an owner",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "0 top-level directories without a matching CODEOWNERS line; every owner is a team (@org/team); the ruleset requires a code-owner review",
+      "description": "The CODEOWNERS file names a team per top-level directory with a catch-all first; a CI step walks the top-level directories and fails when one has no line of its own, or when an owner is a single person instead of a team.\n\nTool: GitHub CODEOWNERS with a shell check in CI\n\n```bash\n# .github/CODEOWNERS\n# *                 @shop/platform          (catch-all, first so later lines win)\n# payments/         @shop/payments\n# auth/             @shop/identity\n# migrations/       @shop/data @shop/payments\n# web/              @shop/storefront\n\n# CI step: every top-level directory owned by a team\nset -euo pipefail\nfor dir in $(git ls-tree -d --name-only HEAD | grep -v '^\\.'); do\n  grep -Eq \"^$dir/\\s+@[a-z0-9-]+/[a-z0-9-]+\" .github/CODEOWNERS || { echo \"no team owns $dir/\"; exit 1; }\ndone\ngrep -Eq '^\\S+\\s+@[a-z0-9-]+\\s*$' .github/CODEOWNERS && { echo \"an owner is a person, not a team\"; exit 1; }\necho \"every top-level directory has an owning team\"\n```",
+      "hubWhen": {
+        "OWNERSHIP": [
+          "codeowners"
+        ]
+      }
+    },
+    {
+      "id": "ff-pr-size",
+      "type": "fitness-fn",
+      "label": "Pull requests stay small",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "Changed lines per pull request (additions + deletions, generated and lock files excluded) at most {{MAX_PR_LINES}}; the check fails above it unless the size-exception label is set",
+      "description": "A required check on every pull request sums additions and deletions over its files from the GitHub API, skipping lock files, snapshots and generated code, and fails above the limit with the count; a lead may set the size-exception label, which the check honours and which is reported weekly.\n\nTool: GitHub CLI (gh api) as a required GitHub Actions check\n\n```bash\n#!/usr/bin/env bash\n# required check \"pr-size\": fails above MAX_PR_LINES changed lines of source\nset -euo pipefail\nMAX=400   # MAX_PR_LINES\npr=$(jq -r .pull_request.number \"$GITHUB_EVENT_PATH\")\nlines=$(gh api --paginate \"repos/$GITHUB_REPOSITORY/pulls/$pr/files\" \\\n  | jq '[.[] | select(.filename | test(\"(package-lock\\\\.json|yarn\\\\.lock|pnpm-lock\\\\.yaml|\\\\.snap$|/generated/|\\\\.min\\\\.js$)\") | not)\n         | .additions + .deletions] | add // 0')\nlabels=$(gh pr view \"$pr\" --json labels -q '.labels[].name')\necho \"changed lines of source: $lines (limit $MAX)\"\nif [ \"$lines\" -gt \"$MAX\" ] && ! grep -qx size-exception <<< \"$labels\"; then\n  echo \"::error::$lines changed lines; split the pull request or ask a lead for the size-exception label\"; exit 1\nfi\n```",
+      "hubWhen": {
+        "SIZE": [
+          "limit"
+        ]
+      }
+    },
+    {
+      "id": "ff-branch-age",
+      "type": "fitness-fn",
+      "label": "No long-lived branches",
+      "x": 1040,
+      "y": 390,
+      "category": "process",
+      "threshold": "0 branches older than {{MAX_BRANCH_DAYS}} days (first commit not on main) other than main, develop, release/* and hotfix/*; bot branches (renovate/, dependabot/) reported apart and not counted",
+      "description": "A daily job lists every branch, computes the age of its first commit not on main, and fails naming the branches over the limit and their last authors; Renovate and Dependabot branches are listed separately so a stale dependency update does not hide a stale feature branch, and the other way round.\n\nTool: git and GitHub CLI in a scheduled GitHub Actions job\n\n```bash\n#!/usr/bin/env bash\n# daily: flags branches whose first own commit is older than MAX_BRANCH_DAYS\nset -euo pipefail\nMAX=2   # MAX_BRANCH_DAYS: 2 for trunk-based, 7 otherwise\ngit fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'\nnow=$(date +%s); stale=0\nfor b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -Ev '/(main|develop|HEAD)$|/(release|hotfix)/'); do\n  first=$(git log --reverse --format=%ct origin/main..\"$b\" | head -1); [ -z \"$first\" ] && continue\n  age=$(( (now - first) / 86400 )); author=$(git log -1 --format=%an \"$b\")\n  case \"$b\" in origin/renovate/*|origin/dependabot/*) echo \"bot: $b $age d\";; *)\n    [ \"$age\" -gt \"$MAX\" ] && { echo \"::error::$b is $age days old (last: $author); merge, split or delete it\"; stale=$((stale+1)); };;\n  esac\ndone\n[ \"$stale\" -eq 0 ]\n```"
+    },
+    {
+      "id": "ff-commitlint",
+      "type": "fitness-fn",
+      "label": "Commit messages are conventional",
+      "x": 1040,
+      "y": 520,
+      "category": "process",
+      "threshold": "100% of commits in a pull request pass commitlint with the conventional config; subject at most 72 characters; the hook runs on every clone after npm install",
+      "description": "commitlint with the conventional config runs on every commit through a husky commit-msg hook, and again in CI over all commits of the pull request, so a commit made with --no-verify is still caught before the merge. semantic-release or release-please derives the changelog and version from the types.\n\nTool: commitlint with husky\n\n```js\n// commitlint.config.js\nmodule.exports = {\n  extends: ['@commitlint/config-conventional'],\n  rules: {\n    'header-max-length': [2, 'always', 72],\n    'scope-enum': [2, 'always', ['api', 'web', 'payments', 'auth', 'db', 'ci', 'deps']],\n  },\n}\n// package.json: \"scripts\": { \"prepare\": \"husky\" }\n// .husky/commit-msg:   npx --no -- commitlint --edit \"$1\"\n// CI (pull_request):   npx commitlint --from \"$BASE_SHA\" --to \"$HEAD_SHA\" --verbose\n```",
+      "hubWhen": {
+        "COMMITS": [
+          "conventional"
+        ]
+      }
+    },
+    {
+      "id": "ff-squash-subjects",
+      "type": "fitness-fn",
+      "label": "Squash merges with short subjects",
+      "x": 1040,
+      "y": 650,
+      "category": "process",
+      "threshold": "Repository allows squash merge only (merge commits and rebase merges off); 0 commits on main in the last 30 days with a subject over 72 characters or without a pull request number",
+      "description": "A scheduled job reads the repository's merge settings through the API and fails unless squash is the only merge method, then walks the last 30 days of main and fails on a subject over 72 characters or one that does not end with a pull request number.\n\nTool: GitHub CLI (gh api) in a scheduled GitHub Actions job\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\ngh api \"repos/$GITHUB_REPOSITORY\" | jq -e '.allow_squash_merge and (.allow_merge_commit|not) and (.allow_rebase_merge|not)' > /dev/null \\\n  || { echo \"::error::squash must be the only merge method\"; exit 1; }\nbad=0\nwhile IFS= read -r subject; do\n  [ \"${#subject}\" -le 72 ] && grep -Eq '\\(#[0-9]+\\)$' <<< \"$subject\" || { echo \"::error::bad subject on main: $subject\"; bad=$((bad+1)); }\ndone < <(git log --since='30 days ago' --no-merges --format=%s origin/main)\n[ \"$bad\" -eq 0 ]\n```",
+      "hubWhen": {
+        "COMMITS": [
+          "free"
+        ]
+      }
+    },
+    {
+      "id": "ff-review-turnaround",
+      "type": "fitness-fn",
+      "label": "Reviews come within hours",
+      "x": 1040,
+      "y": 780,
+      "category": "holistic",
+      "threshold": "Over the last 30 days, time from ready-for-review to the first review: median under {{REVIEW_HOURS}} working hours, 90th percentile under one working day (8 hours)",
+      "description": "A weekly job reads every merged pull request's timeline through the GraphQL API, takes the later of its creation and its last ready-for-review event as the start and the first review or review comment by someone other than the author as the end, counts working hours (Mon–Fri, 9–17 in the team's zone) between them, and fails on the percentiles; the numbers go to the team's dashboard beside the DORA lead time.\n\nTool: GitHub GraphQL API (gh api graphql) with a Node script\n\n```ts\n// scripts/review-turnaround.ts  (run weekly; REVIEW_HOURS=4)\nimport { execFileSync } from 'node:child_process'\nconst q = `query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){\n  pullRequests(last:100, states:MERGED, orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ number createdAt author{login}\n    timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT,PULL_REQUEST_REVIEW], first:50){ nodes{ __typename\n      ... on ReadyForReviewEvent{ createdAt } ... on PullRequestReview{ createdAt author{login} } } } } } } }`\nconst [owner, name] = process.env.GITHUB_REPOSITORY!.split('/')\nconst data = JSON.parse(execFileSync('gh', ['api', 'graphql', '-f', `query=${q}`, '-F', `owner=${owner}`, '-F', `name=${name}`]).toString())\nconst hours = data.data.repository.pullRequests.nodes.flatMap((pr: any) => {\n  const items = pr.timelineItems.nodes\n  const ready = items.filter((i: any) => i.__typename === 'ReadyForReviewEvent').map((i: any) => i.createdAt).sort().pop() ?? pr.createdAt\n  const first = items.find((i: any) => i.__typename === 'PullRequestReview' && i.author?.login !== pr.author?.login && i.createdAt > ready)\n  return first ? [workingHours(new Date(ready), new Date(first.createdAt))] : []   // workingHours: Mon–Fri 9–17\n}).sort((a: number, b: number) => a - b)\nconst p = (n: number) => hours[Math.floor(hours.length * n)] ?? 0\nconsole.log({ prs: hours.length, p50: p(0.5), p90: p(0.9) })\nif (p(0.5) > Number(process.env.REVIEW_HOURS ?? 4) || p(0.9) > 8) process.exit(1)\n```"
+    },
+    {
+      "id": "ff-critical-two-approvals",
+      "type": "fitness-fn",
+      "label": "Critical paths get two approvals",
+      "x": 1040,
+      "y": 910,
+      "category": "process",
+      "threshold": "A pull request touching {{CRITICAL_PATHS}} merges only with 2 approvals from non-authors, one from the owning team; 0 such merges with fewer",
+      "description": "GitHub rulesets cannot vary the approval count by path, so a required check does it: on every review and push it lists the changed files, and when one is under a critical path it counts current approvals by people other than the author and fails below two; CODEOWNERS supplies the owning team's approval.\n\nTool: GitHub Actions with gh (required check \"critical-paths-review\")\n\n```yaml\n# .github/workflows/critical-paths-review.yml\nname: critical-paths-review\non:\n  pull_request: { types: [opened, synchronize, ready_for_review] }\n  pull_request_review: { types: [submitted, dismissed] }\njobs:\n  check:\n    runs-on: ubuntu-latest\n    env: { GH_TOKEN: ${{ github.token }}, PR: ${{ github.event.pull_request.number }}, CRITICAL: '^(payments|auth|migrations)/' }\n    steps:\n      - run: |\n          files=$(gh api --paginate \"repos/$GITHUB_REPOSITORY/pulls/$PR/files\" -q '.[].filename')\n          grep -Eq \"$CRITICAL\" <<< \"$files\" || { echo \"no critical path touched\"; exit 0; }\n          author=$(gh pr view \"$PR\" --json author -q .author.login)\n          approvals=$(gh pr view \"$PR\" --json reviews -q \"[.reviews[] | select(.state==\\\"APPROVED\\\" and .author.login!=\\\"$author\\\") | .author.login] | unique | length\")\n          [ \"$approvals\" -ge 2 ] || { echo \"::error::critical path changed; $approvals of 2 approvals\"; exit 1; }\n```",
+      "hubWhen": {
+        "REVIEW": [
+          "two-critical"
+        ]
+      }
+    },
+    {
+      "id": "ff-pair-trailer",
+      "type": "fitness-fn",
+      "label": "Pair changes name their partner",
+      "x": 1040,
+      "y": 1040,
+      "category": "process",
+      "threshold": "A pull request merged on a co-author's approval has a Co-authored-by trailer naming that co-author on 100% of its commits; a pull request without trailers has an approval from someone other than the author",
+      "description": "A required check reads the pull request's commits and approvals: when every commit carries a Co-authored-by trailer, an approval from one of the named partners is enough; otherwise it demands an approval from someone who authored none of the commits. Pairs set the trailer once with git-mob or a commit template.\n\nTool: GitHub Actions with gh and git interpret-trailers (required check \"pair-or-review\")\n\n```bash\n#!/usr/bin/env bash\n# required check \"pair-or-review\": a pair's partner may approve; a solo change needs an outsider\nset -euo pipefail\nauthor=$(gh pr view \"$PR\" --json author -q .author.login)\napprovers=$(gh pr view \"$PR\" --json reviews -q '.reviews[] | select(.state==\"APPROVED\") | .author.login' | sort -u | grep -vx \"$author\" || true)\n[ -n \"$approvers\" ] || { echo \"::error::no approval from anyone but the author\"; exit 1; }\ntrailers=\"\"; solo=0\nfor sha in $(gh pr view \"$PR\" --json commits -q '.commits[].oid'); do\n  t=$(git log -1 --format=%B \"$sha\" | git interpret-trailers --parse | grep -i '^Co-authored-by:' || true)\n  [ -n \"$t\" ] || solo=1\n  trailers=\"$trailers $(tr 'A-Z' 'a-z' <<< \"$t\")\"\ndone\n[ \"$solo\" -eq 0 ] && { echo \"pair change: Co-authored-by on every commit, partner's approval counts\"; exit 0; }\nfor a in $approvers; do   # a solo change: the approver must not be one of its writers\n  grep -q \"$(tr 'A-Z' 'a-z' <<< \"$a\")\" <<< \"$trailers\" || exit 0\ndone\necho \"::error::not every commit names a partner, and every approver co-wrote the change; ask someone else to review\"; exit 1\n```",
+      "hubWhen": {
+        "REVIEW": [
+          "pairing"
+        ]
+      }
+    },
+    {
+      "id": "ff-gitflow-history",
+      "type": "fitness-fn",
+      "label": "Main holds only releases",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "100% of merge commits on main come from release/* or hotfix/*; every merge to main carries an annotated tag vX.Y.Z; 0 tags on main absent from develop",
+      "description": "A job on every push to main checks that the merged branch was a release or hotfix branch, that the merge is tagged with a semantic version, and that the tagged commit is reachable from develop (the back-merge happened); it fails otherwise, so a forgotten back-merge is found the same day and not in the next release.\n\nTool: git in a GitHub Actions job on push to main\n\n```bash\n#!/usr/bin/env bash\n# on push to main: release and hotfix merges only, tagged and back-merged\nset -euo pipefail\ngit fetch origin develop --tags\nfor m in $(git log --merges --first-parent --format=%H origin/main~20..origin/main); do\n  src=$(git log -1 --format=%s \"$m\" | grep -oE \"(release|hotfix)/[0-9]+\\.[0-9]+(\\.[0-9]+)?\" || true)\n  [ -n \"$src\" ] || { echo \"::error::$m merged into main from something other than release/* or hotfix/*\"; exit 1; }\n  tag=$(git tag --points-at \"$m\" | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' || true)\n  [ -n \"$tag\" ] || { echo \"::error::merge $m of $src has no vX.Y.Z tag\"; exit 1; }\n  git merge-base --is-ancestor \"$m\" origin/develop || { echo \"::error::$tag not merged back into develop\"; exit 1; }\ndone\necho \"main holds tagged releases, all back-merged\"\n```",
+      "hubWhen": {
+        "BRANCHING": [
+          "gitflow"
+        ]
+      }
+    },
+    {
+      "id": "ff-daily-integration",
+      "type": "fitness-fn",
+      "label": "Everyone integrates daily",
+      "x": 1040,
+      "y": 1300,
+      "category": "holistic",
+      "threshold": "Over the last 10 working days, every developer with a commit in the period merged to main on at least 8 of the days they committed; branches at merge at most {{MAX_BRANCH_DAYS}} days old",
+      "description": "A weekly job groups the merges to main by author and working day and compares them with the days each person committed anywhere; a developer committing for days without merging is working on a hidden branch, which is what trunk-based development is meant to prevent. The result sits beside the DORA lead time on the team's dashboard.\n\nTool: git in a scheduled GitHub Actions job\n\n```bash\n#!/usr/bin/env bash\n# weekly: days committed vs. days merged to main, per author, last 10 working days\nset -euo pipefail\ngit fetch origin '+refs/heads/*:refs/remotes/origin/*'\nsince='14 days ago'\ncommitted=$(git log --all --since=\"$since\" --format='%ae %as' | sort -u)\nmerged=$(git log origin/main --since=\"$since\" --format='%ae %as' | sort -u)\nfail=0\nfor a in $(cut -d' ' -f1 <<< \"$committed\" | sort -u); do\n  c=$(grep -c \"^$a \" <<< \"$committed\"); m=$(grep -c \"^$a \" <<< \"$merged\" || true)\n  echo \"$a: committed on $c days, merged to main on $m\"\n  [ $((m * 10)) -ge $((c * 8)) ] || { echo \"::error::$a merged on fewer than 80% of their active days\"; fail=1; }\ndone\nexit $fail\n```",
+      "hubWhen": {
+        "BRANCHING": [
+          "trunk"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-protected-main--derives--need",
+      "sourceId": "req-protected-main",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-one-review--derives--need",
+      "sourceId": "req-one-review",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-two-critical--derives--need",
+      "sourceId": "req-two-critical",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pairing--derives--need",
+      "sourceId": "req-pairing",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-turnaround--derives--need",
+      "sourceId": "req-turnaround",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-owner-approval--derives--need",
+      "sourceId": "req-owner-approval",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-rotation--derives--need",
+      "sourceId": "req-rotation",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pr-size--derives--need",
+      "sourceId": "req-pr-size",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-branch-age--derives--need",
+      "sourceId": "req-branch-age",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-conventional--derives--need",
+      "sourceId": "req-conventional",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-free-commits--derives--need",
+      "sourceId": "req-free-commits",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-trunk--derives--need",
+      "sourceId": "req-trunk",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-feature-pr--derives--need",
+      "sourceId": "req-feature-pr",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-gitflow--derives--need",
+      "sourceId": "req-gitflow",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-protected-main--verifies--req-protected-main",
+      "sourceId": "sc-protected-main",
+      "targetId": "req-protected-main",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-one-review--verifies--req-one-review",
+      "sourceId": "sc-one-review",
+      "targetId": "req-one-review",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-two-critical--verifies--req-two-critical",
+      "sourceId": "sc-two-critical",
+      "targetId": "req-two-critical",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pairing--verifies--req-pairing",
+      "sourceId": "sc-pairing",
+      "targetId": "req-pairing",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-turnaround--verifies--req-turnaround",
+      "sourceId": "sc-turnaround",
+      "targetId": "req-turnaround",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-owner-approval--verifies--req-owner-approval",
+      "sourceId": "sc-owner-approval",
+      "targetId": "req-owner-approval",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-rotation--verifies--req-rotation",
+      "sourceId": "sc-rotation",
+      "targetId": "req-rotation",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pr-size--verifies--req-pr-size",
+      "sourceId": "sc-pr-size",
+      "targetId": "req-pr-size",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-branch-age--verifies--req-branch-age",
+      "sourceId": "sc-branch-age",
+      "targetId": "req-branch-age",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-conventional--verifies--req-conventional",
+      "sourceId": "sc-conventional",
+      "targetId": "req-conventional",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-free-commits--verifies--req-free-commits",
+      "sourceId": "sc-free-commits",
+      "targetId": "req-free-commits",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-trunk--verifies--req-trunk",
+      "sourceId": "sc-trunk",
+      "targetId": "req-trunk",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-feature-pr--verifies--req-feature-pr",
+      "sourceId": "sc-feature-pr",
+      "targetId": "req-feature-pr",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-gitflow--verifies--req-gitflow",
+      "sourceId": "sc-gitflow",
+      "targetId": "req-gitflow",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-branch-protection--implements--adr-trunk",
+      "sourceId": "ff-branch-protection",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-branch-protection--implements--adr-feature-pr",
+      "sourceId": "ff-branch-protection",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-branch-protection--implements--adr-gitflow",
+      "sourceId": "ff-branch-protection",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-codeowners--implements--adr-codeowners",
+      "sourceId": "ff-codeowners",
+      "targetId": "adr-codeowners",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pr-size--implements--adr-trunk",
+      "sourceId": "ff-pr-size",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pr-size--implements--adr-feature-pr",
+      "sourceId": "ff-pr-size",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pr-size--implements--adr-gitflow",
+      "sourceId": "ff-pr-size",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-branch-age--implements--adr-trunk",
+      "sourceId": "ff-branch-age",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-branch-age--implements--adr-feature-pr",
+      "sourceId": "ff-branch-age",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-branch-age--implements--adr-gitflow",
+      "sourceId": "ff-branch-age",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-commitlint--implements--adr-trunk",
+      "sourceId": "ff-commitlint",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-commitlint--implements--adr-feature-pr",
+      "sourceId": "ff-commitlint",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-commitlint--implements--adr-gitflow",
+      "sourceId": "ff-commitlint",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-squash-subjects--implements--adr-trunk",
+      "sourceId": "ff-squash-subjects",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-squash-subjects--implements--adr-feature-pr",
+      "sourceId": "ff-squash-subjects",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-squash-subjects--implements--adr-gitflow",
+      "sourceId": "ff-squash-subjects",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-review-turnaround--implements--adr-trunk",
+      "sourceId": "ff-review-turnaround",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-review-turnaround--implements--adr-feature-pr",
+      "sourceId": "ff-review-turnaround",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-review-turnaround--implements--adr-gitflow",
+      "sourceId": "ff-review-turnaround",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-critical-two-approvals--implements--adr-trunk",
+      "sourceId": "ff-critical-two-approvals",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-critical-two-approvals--implements--adr-feature-pr",
+      "sourceId": "ff-critical-two-approvals",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-critical-two-approvals--implements--adr-gitflow",
+      "sourceId": "ff-critical-two-approvals",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pair-trailer--implements--adr-trunk",
+      "sourceId": "ff-pair-trailer",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pair-trailer--implements--adr-feature-pr",
+      "sourceId": "ff-pair-trailer",
+      "targetId": "adr-feature-pr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pair-trailer--implements--adr-gitflow",
+      "sourceId": "ff-pair-trailer",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-gitflow-history--implements--adr-gitflow",
+      "sourceId": "ff-gitflow-history",
+      "targetId": "adr-gitflow",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-daily-integration--implements--adr-trunk",
+      "sourceId": "ff-daily-integration",
+      "targetId": "adr-trunk",
+      "relationType": "implements"
+    }
+  ]
+}
