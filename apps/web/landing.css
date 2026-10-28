@@ -415,6 +415,11 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .blog-article header { margin-bottom: 36px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
 .blog-article h1 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; margin: 12px 0 18px; text-wrap: balance; }
 .blog-article h2 { font-size: 1.3rem; font-weight: 700; letter-spacing: -.015em; margin: 40px 0 12px; }
+/* The model's building blocks, one framed card each. */
+.blog-blocks { display: flex; flex-direction: column; gap: 12px; margin: 8px 0 26px; }
+.blog-block { padding: 18px 22px; border-radius: 14px; background: var(--bg-panel); border: 1px solid var(--border); }
+.blog-block h3 { font-size: 1.02rem; font-weight: 650; letter-spacing: -.01em; color: var(--text); margin: 0 0 6px; }
+.blog-article .blog-block p { margin: 0; font-size: .98rem; line-height: 1.7; }
 .blog-article p { font-size: 1.02rem; line-height: 1.75; color: var(--text-2); margin: 0 0 18px; }
 .blog-article p strong { color: var(--text); }
 .blog-article a { color: var(--accent); }

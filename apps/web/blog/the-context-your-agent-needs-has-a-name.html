@@ -55,7 +55,7 @@
           <span aria-hidden="true">·</span>
           <time datetime="2026-10-28">28 October 2026</time>
           <span aria-hidden="true">·</span>
-          <span>6 min read</span>
+          <span>7 min read</span>
         </div>
       </header>
 
@@ -80,10 +80,48 @@
 <h2 id="your-model">Your model, not a standard one</h2>
 <p>Every company should define its own model and adjust it as it learns. The standards are there to be borrowed from, not adopted whole. ArchiMate is a serious piece of work, but for most organisations it is over-engineered: some sixty element types, most of which nobody will use, and a learning curve that kills adoption before it starts. TOGAF’s ADM is a method for an enterprise architecture function with a budget, not for a product team of forty people. UML and SysML have the notation for almost anything and, for that reason, for nothing in particular. A small metamodel your team actually fills in beats a complete one that stays empty.</p>
 <p>My minimal set follows the three layers above. None of its building blocks is new; each has a source older than the current wave of tooling.</p>
-<p>It starts with the needs: the brief, the notes from the workshop, the ticket as the customer wrote it. They are kept as they came, because the raw words are evidence. ISO 29148 has separated stakeholder needs from requirements for this reason.</p>
-<p>The requirements are derived from the needs and written in EARS, so that each one has an unambiguous, testable form. Each requirement gets a scenario in Gherkin that verifies it. Where a scenario involves a screen, there is a mockup.</p>
-<p>Processes are drawn the way BPMN has drawn them since 2004. The domain model holds the entities, their attributes and the relations between them, as domain-driven design describes them. It is the vocabulary everything else uses. An entity whose lifecycle matters gets a state machine, in Harel’s statecharts from 1987.</p>
-<p>Structure is described in C4 elements. Yes, C4: Simon Brown’s answer to how much of UML a team needs for structure. Decisions are recorded the way Michael Nygard described them, and fitness functions come from <em>Building Evolutionary Architectures</em>.</p>
+<div class="blog-blocks">
+  <section class="blog-block">
+    <h3>Needs</h3>
+    <p>It starts with the needs: the brief, the notes from the workshop, the ticket as the customer wrote it. They are kept as they came, because the raw words are evidence. ISO 29148 has separated stakeholder needs from requirements for this reason. When a requirement is disputed months later, the need is where you find out whether anyone asked for it or it was invented on the way.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Requirements</h3>
+    <p>Requirements are derived from the needs and written in EARS, so that each one has an unambiguous, testable form. EARS came out of Rolls-Royce engine control software in 2009 and fits on a page: a requirement says when, while or if something happens, and what the system shall do then. It sounds bureaucratic until you give an agent a requirement that says “fast” and see what it does with it.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Scenarios</h3>
+    <p>Scenarios are written in Gherkin, each one verifying a requirement. Given, when, then: the form comes from behaviour-driven development, and what matters here is the link it keeps. A scenario names the tests that check it, so whether a requirement is verified becomes a question a build can answer.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Mockups</h3>
+    <p>Mockups belong where a scenario involves a screen. A rough one is enough. Without it the agent designs the screen itself, and you see what it chose when the pull request arrives.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Processes</h3>
+    <p>Processes are the kind BPMN has drawn since 2004: the work across people and systems, in order, with the point where the system takes over. Requirements state the system’s obligations one at a time. The process is where you see whether together they get a customer from the first step to the last.</p>
+  </section>
+  <section class="blog-block">
+    <h3>The domain model</h3>
+    <p>The domain model holds the entities, their attributes and the relations between them, as domain-driven design describes them. It is the vocabulary everything else uses. When a requirement says order and a component stores an order, both mean the same entity, with the same attributes. An agent without that vocabulary invents a new one in every file it touches.</p>
+  </section>
+  <section class="blog-block">
+    <h3>State machines</h3>
+    <p>State machines come one per entity whose lifecycle matters, in Harel’s statecharts from 1987. A status column tells you which states exist. It does not say which transitions are allowed or which event triggers each of them, and that is what an agent gets wrong when a new feature touches the status.</p>
+  </section>
+  <section class="blog-block">
+    <h3>The C4 elements</h3>
+    <p>The C4 elements describe the structure. Yes, C4: Simon Brown’s answer to how much of UML a team needs for structure. People, systems, containers and components cover the logical and physical layers, and most teams already draw them.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Decision records</h3>
+    <p>Decision records follow the form Michael Nygard described in 2011: a status, the context, the decision and its consequences. The code records what was chosen and never why. An agent that cannot see the decision will propose the rejected option again, with good arguments.</p>
+  </section>
+  <section class="blog-block">
+    <h3>Fitness functions</h3>
+    <p>Fitness functions, from <em>Building Evolutionary Architectures</em>, are automated checks that an architectural property still holds: a dependency that must not exist, a response time the system has to keep. They are what keeps a decision from turning into a wish once the team, or the agent, is under pressure.</p>
+  </section>
+</div>
 <p>That set is enough to describe most systems I have worked on, and enough for an agent to do real work with.</p>
 <p>What makes it a model rather than a pile of documents is the relations between the blocks. A requirement derives from a need. A scenario verifies the requirement. A component satisfies it. A decision constrains the component, and a fitness function checks that the decision still holds. A state machine is the lifecycle of one entity, and a process moves entities through those states. The model is that graph. Diagrams, tables and documents are views of it: edit the graph and the views stay true, edit the diagram and you are back in draw.io.</p>
 
