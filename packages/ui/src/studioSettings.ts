@@ -19,10 +19,18 @@ export interface StudioSettings {
   /** Focus: a selection on the canvas dims what it is not related to and
    *  the camera frames it (canvasFocus.ts). The switch is on the canvas. */
   selectionFocus: boolean
+  /** The special key held on the canvas to connect, nest, pick several
+   *  elements and drop from the palette without the wizard. */
+  specialKey: SpecialKey
+  /** The Setup wizard was finished or skipped in this browser. */
+  setupDone: boolean
 }
 
+export type SpecialKey = 'alt' | 'shift' | 'ctrl' | 'meta'
+const SPECIAL_KEYS: SpecialKey[] = ['alt', 'shift', 'ctrl', 'meta']
+
 export function defaultStudioSettings(): StudioSettings {
-  return { nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true, selectionFocus: true }
+  return { nodeWizardOnCreate: true, smartFit: true, alignKeepsOrder: true, selectionFocus: true, specialKey: 'alt', setupDone: false }
 }
 
 export function normalizeStudioSettings(raw: unknown): StudioSettings {
@@ -34,6 +42,8 @@ export function normalizeStudioSettings(raw: unknown): StudioSettings {
     smartFit: typeof r.smartFit === 'boolean' ? r.smartFit : base.smartFit,
     alignKeepsOrder: typeof r.alignKeepsOrder === 'boolean' ? r.alignKeepsOrder : base.alignKeepsOrder,
     selectionFocus: typeof r.selectionFocus === 'boolean' ? r.selectionFocus : base.selectionFocus,
+    specialKey: SPECIAL_KEYS.includes(r.specialKey as SpecialKey) ? r.specialKey as SpecialKey : base.specialKey,
+    setupDone: typeof r.setupDone === 'boolean' ? r.setupDone : base.setupDone,
   }
 }
 

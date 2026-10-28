@@ -69,6 +69,7 @@
           <ul>
             <li><a href="#formats">File formats</a></li>
             <li><a href="#links">Deep links</a></li>
+            <li><a href="#settings">Studio settings</a></li>
             <li><a href="#shortcuts">Keyboard shortcuts</a></li>
             <li><a href="#install">Install &amp; build</a></li>
           </ul>
@@ -573,6 +574,25 @@ radical-mcp --version</code></pre>
               <tr><td><code>type:adr</code> · <code>t:container</code></td><td>Elements of a type, by its id or name</td></tr>
               <tr><td><code>status:accepted</code></td><td>Elements whose property (by key or name) holds the value</td></tr>
               <tr><td><code>&gt;</code> first</td><td>Commands, in Quick Search only</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section" id="settings">
+        <h2>Studio settings</h2>
+        <p>Kept in the browser or the desktop app, not in the model. The Setup wizard sets them on the first start (not in VS Code), and <em>Settings → Setup…</em> opens it again.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Setting</th><th>Values</th><th>Default</th><th>Where</th></tr></thead>
+            <tbody>
+              <tr><td>Theme</td><td>System (follows the operating system), Light, Dark; in VS Code the editor's theme</td><td>System</td><td>Setup, <em>Settings → Theme</em></td></tr>
+              <tr><td>Special key</td><td><kbd>Alt</kbd>/<kbd>⌥</kbd>, <kbd>Shift</kbd>, <kbd>Ctrl</kbd>, <kbd>⌘</kbd>/<kbd>Win</kbd></td><td><kbd>Alt</kbd>/<kbd>⌥</kbd></td><td>Setup, <em>Settings → Special key</em></td></tr>
+              <tr><td>Focus</td><td>On, off</td><td>On</td><td>Setup, the canvas controls</td></tr>
+              <tr><td>Smart fit</td><td>On, off</td><td>On</td><td>Setup, <em>Settings</em>, the canvas controls</td></tr>
+              <tr><td>Wizard on create</td><td>On, off</td><td>On</td><td>Setup, <em>Settings</em></td></tr>
+              <tr><td>AI provider</td><td>None, Ollama, OpenAI, Claude, Gemini; key, model, base URL</td><td>None</td><td>Setup (provider and key), <em>Settings → AI providers…</em></td></tr>
+              <tr><td>Lines in this model</td><td>Curved, Orthogonal; saved in the model</td><td>Curved</td><td><em>Settings</em></td></tr>
             </tbody>
           </table>
         </div>

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Studio } from '../support/fixtures'
+import { Studio, skipSetup } from '../support/fixtures'
 import { DOCS_HUB_PORT } from '../playwright.docs.config'
 
 export interface DocsOptions {
@@ -39,6 +39,7 @@ export const test = base.extend<DocsOptions & { studio: Studio; shot: (name: str
     await page.addInitScript((t) => {
       if (!localStorage.getItem('radical-theme')) localStorage.setItem('radical-theme', t)
     }, theme)
+    await skipSetup(page)
     await use(page)
     await context.close()
     await rm(profile, { recursive: true, force: true })

@@ -299,11 +299,32 @@ export async function isolatedStudio(browser: Browser): Promise<{ studio: Studio
   const { viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent } = base.info().project.use
   const context = await browser.newContext({ viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent })
   const page = await context.newPage()
+  await skipSetup(page)
   const problems = await guard(page)
   return { studio: new Studio(page), problems, close: () => context.close() }
 }
 
-export const test = base.extend<{ studio: Studio; guard: void }>({
+/**
+ * Mark Studio set up in this page's browser, so the Setup wizard does not
+ * open over what a test looks at. Studio settings a test stores itself
+ * count as set up too.
+ */
+export async function skipSetup(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('radical-studio-settings')) {
+      localStorage.setItem('radical-studio-settings', JSON.stringify({ setupDone: true }))
+    }
+  })
+}
+
+export const test = base.extend<{ studio: Studio; guard: void; firstStart: boolean; setup: void }>({
+  /** Leave the browser as on Studio's first start: the Setup wizard opens. */
+  firstStart: [false, { option: true }],
+  setup: [async ({ page, firstStart }, use) => {
+    if (!firstStart) await skipSetup(page)
+    await use()
+  }, { auto: true }],
+
   guard: [async ({ page }, use, testInfo) => {
     const problems = await guard(page)
     await use()

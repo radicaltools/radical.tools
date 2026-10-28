@@ -22,6 +22,8 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
+import { saveThemePref, useThemePref, type Theme, type ThemePref } from '../theme'
+import { openSetup } from './SetupWizard'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
 import {
   loadStudioSettings,
@@ -112,16 +114,12 @@ const IconReference = () => (
   </svg>
 )
 
-const IconSun = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <circle cx="8" cy="8" r="3" />
-    <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" />
-  </svg>
-)
-
-const IconMoon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M13.5 8.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" />
+const IconSetup = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+    <path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0" />
+    <circle cx="10.5" cy="4" r="1.5" />
+    <circle cx="5.5" cy="8" r="1.5" />
+    <circle cx="12.5" cy="12" r="1.5" />
   </svg>
 )
 
@@ -316,7 +314,8 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, atTop = false, child
 function AppMenu({
   onManage, activeDocLabel, activeDocSource, branch,
   connectionModifier, setConnectionModifier,
-  theme, onToggleTheme,
+  themePref, onThemePref, showTheme,
+  onOpenSetup,
   smartFitActive, onToggleSmartFit,
   metamodelActive, onToggleMetamodel,
   onOpenAISettings,
@@ -335,8 +334,11 @@ function AppMenu({
   branch: React.ReactNode
   connectionModifier: ConnectionMod
   setConnectionModifier: (m: ConnectionMod) => void
-  theme: 'dark' | 'light'
-  onToggleTheme: () => void
+  themePref: ThemePref
+  onThemePref: (pref: ThemePref) => void
+  /** Outside VS Code, whose editor sets the theme. */
+  showTheme: boolean
+  onOpenSetup: () => void
   smartFitActive: boolean
   onToggleSmartFit: () => void
   metamodelActive: boolean
@@ -416,10 +418,22 @@ function AppMenu({
       {railMenu('settings', 'Settings', <RailIconSettings />, (<>
           <div className="app-menu-section">
             <div className="app-menu-label">View</div>
-            <button className="app-menu-item" role="menuitem" onClick={run(onToggleTheme)}>
-              <span className="app-menu-icon">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
-              <span className="app-menu-text">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </button>
+            {showTheme && (
+              <div className="app-menu-row">
+                <span className="app-menu-row-label">Theme</span>
+                <select
+                  className="app-menu-select"
+                  aria-label="Theme"
+                  value={themePref}
+                  onChange={(e) => onThemePref(e.target.value as ThemePref)}
+                  title="System follows the operating system's appearance"
+                >
+                  <option value="system">System</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+            )}
             <button
               className={`app-menu-item${smartFitActive ? ' active' : ''}`}
               role="menuitemcheckbox"
@@ -451,6 +465,7 @@ function AppMenu({
               <span className="app-menu-row-label">Special key</span>
               <select
                 className="app-menu-select"
+                aria-label="Special key"
                 value={connectionModifier}
                 onChange={(e) => setConnectionModifier(e.target.value as ConnectionMod)}
               >
@@ -548,6 +563,10 @@ function AppMenu({
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">
+            <button className="app-menu-item" role="menuitem" onClick={run(onOpenSetup)} title="The theme, the special key, the canvas and an AI provider, one step each">
+              <span className="app-menu-icon"><IconSetup /></span>
+              <span className="app-menu-text">Setup…</span>
+            </button>
             <button className="app-menu-item" role="menuitem" onClick={run(onOpenAbout)}>
               <span className="app-menu-icon"><IconInfo /></span>
               <span className="app-menu-text">About Radical Studio</span>
@@ -732,31 +751,30 @@ export function Toolbar(): React.ReactElement {
   // the browser keep the user's own choice.
   const isVSCode = host().kind === 'vscode'
 
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (isVSCode) {
-      return document.body.classList.contains('vscode-light') ? 'light' : 'dark'
-    }
-    return (localStorage.getItem('radical-theme') as 'dark' | 'light') || 'dark'
-  })
+  // The theme chosen in this browser (Light, Dark or System), unless VS Code
+  // sets it.
+  const { pref: themePref, theme: chosenTheme } = useThemePref()
+  const [vscodeTheme, setVSCodeTheme] = useState<Theme>(() =>
+    document.body.classList.contains('vscode-light') ? 'light' : 'dark')
+  const theme = isVSCode ? vscodeTheme : chosenTheme
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    if (!isVSCode) localStorage.setItem('radical-theme', theme)
-  }, [theme, isVSCode])
+  }, [theme])
 
   // In VS Code: follow the editor theme automatically
   useEffect(() => {
     if (!isVSCode) return
     const obs = new MutationObserver(() => {
-      setTheme(document.body.classList.contains('vscode-light') ? 'light' : 'dark')
+      setVSCodeTheme(document.body.classList.contains('vscode-light') ? 'light' : 'dark')
     })
     obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-kind'] })
     return () => obs.disconnect()
   }, [isVSCode])
 
   const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-  }, [])
+    saveThemePref(theme === 'dark' ? 'light' : 'dark')
+  }, [theme])
 
   // Keyboard shortcuts: Cmd+Z / Cmd+Shift+Z (Mac), Ctrl+Z / Ctrl+Shift+Z (Win), F5
   useEffect(() => {
@@ -924,6 +942,7 @@ export function Toolbar(): React.ReactElement {
       { id: 'export.svg', title: 'Export as SVG', group: 'Export', run: handleExportSVG },
       { id: 'export.copy', title: 'Copy image to clipboard', group: 'Export', run: () => { void copyToClipboard() } },
       { id: 'settings.theme', title: theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme', group: 'Settings', run: toggleTheme, when: () => !isVSCode },
+      { id: 'settings.setup', title: 'Setup: theme, special key, canvas, AI', group: 'Settings', run: openSetup, when: () => !isVSCode },
       { id: 'settings.smartFit', title: autoFitActive ? 'Smart fit: turn off' : 'Smart fit: turn on', group: 'Settings', run: toggleAutoFit },
       { id: 'about', title: 'About Radical Studio', group: 'Help', run: handleOpenAbout },
     ]
@@ -945,8 +964,10 @@ export function Toolbar(): React.ReactElement {
         branch={appMode !== 'inspector' && <BranchChangesButton />}
         connectionModifier={connectionModifier}
         setConnectionModifier={setConnectionModifier}
-        theme={theme}
-        onToggleTheme={toggleTheme}
+        themePref={themePref}
+        onThemePref={saveThemePref}
+        showTheme={!isVSCode}
+        onOpenSetup={openSetup}
         smartFitActive={autoFitActive}
         onToggleSmartFit={toggleAutoFit}
         metamodelActive={appMode === 'metamodel'}

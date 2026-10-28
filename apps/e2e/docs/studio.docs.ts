@@ -124,6 +124,16 @@ test('welcome', async ({ page, shot }) => {
   await shot('welcome')
 })
 
+// The Setup wizard at its Special key step, as Settings → Setup… opens it.
+test('setup', async ({ page, shot }) => {
+  await open(page, 'view-ctx')
+  await menu(page, /^Setup…/)
+  const wizard = page.getByRole('dialog', { name: 'Set up Radical Studio' })
+  await wizard.getByRole('button', { name: 'Special key' }).click()
+  await expect(wizard.getByRole('radiogroup', { name: 'Special key' })).toBeVisible()
+  await shot('setup')
+})
+
 test('documents', async ({ page, shot }) => {
   await open(page, 'view-ctx')
   await menu(page, /Manage models/)

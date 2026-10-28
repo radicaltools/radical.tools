@@ -1,3 +1,5 @@
+// Before all: whether this is Studio's first start here (firstStart.ts).
+import './firstStart'
 // First: document persistence configures the store before it is created.
 import './persistence/autosave'
 import './persistence/selection'

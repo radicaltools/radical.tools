@@ -4376,7 +4376,7 @@ export const useDiagramStore = create<DiagramStore>()(
       connectSource: null,
       relinking: null,
       relationTypeChoice: null,
-      connectionModifier: 'alt' as const,
+      connectionModifier: loadStudioSettings().specialKey,
       autoFitActive: loadStudioSettings().smartFit,
       selectionFocus: loadStudioSettings().selectionFocus,
       findInView: null,
@@ -7558,6 +7558,7 @@ export const useDiagramStore = create<DiagramStore>()(
 
       setConnectionModifier(mod) {
         set((state) => { state.connectionModifier = mod })
+        updateStudioSettings({ specialKey: mod })
       },
 
       setRelinking(relinking) {
