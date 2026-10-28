@@ -42,8 +42,8 @@
         "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
       },
       {
-        "title": "OWASP Top 10 Proactive Controls",
-        "url": "https://owasp.org/www-project-proactive-controls/"
+        "title": "OWASP Top 10 Proactive Controls 2024",
+        "url": "https://top10proactive.owasp.org/"
       },
       {
         "title": "SEI CERT Coding Standards (C, C++, Java)",
@@ -56,6 +56,10 @@
       {
         "title": "NIST SP 800-218, Secure Software Development Framework (SSDF) 1.1",
         "url": "https://csrc.nist.gov/pubs/sp/800/218/final"
+      },
+      {
+        "title": "Semgrep documentation",
+        "url": "https://semgrep.dev/docs/"
       },
       {
         "title": "GitHub CodeQL documentation",
@@ -118,23 +122,23 @@
         "key": "SAST",
         "title": "Static analysis",
         "label": "How does static application security testing run?",
-        "hint": "A scanner on the pull request finds the flaw while the author still remembers the code; a scheduled one finds it later and hands it to a queue.",
+        "hint": "A scanner on the pull request finds the flaw while the author still remembers the code; a scheduled one finds it later and hands it to a queue. The lint rules for banned constructs and string-built queries run in every case; this is about the scanner suites.",
         "defaultValue": "pr-blocking",
         "options": [
           {
             "value": "pr-blocking",
-            "label": "on every pull request, high findings block the merge",
+            "label": "a scan of every pull request that blocks the merge on high findings",
             "description": "Semgrep (p/owasp-top-ten, p/default), CodeQL security-extended and the language's scanner (Bandit, gosec, SpotBugs find-sec-bugs) run as required checks; a high or critical finding without a reviewed suppression stops the merge. Pick it for anything reached from the internet or holding personal data."
           },
           {
             "value": "scheduled",
-            "label": "nightly or weekly, findings triaged within a deadline",
+            "label": "a nightly scan with findings triaged within a deadline",
             "description": "The same scanners run on a schedule over the default branch, and every new finding gets an owner and a deadline from a triage queue. Pick it for a codebase with a large backlog of findings you are working through, or where the scanners are too slow or noisy for the pull request; move to blocking once the queue is empty."
           },
           {
             "value": "none",
-            "label": "none, code review only",
-            "description": "No scanner; reviewers check against the standard's checklist. Pick it only for small internal tools with no outside callers and no personal data, and record it so that the first external caller supersedes this decision."
+            "label": "no scanner suite, code review only",
+            "description": "No Semgrep or CodeQL suite; the lint rules for banned constructs and string-built queries still run on the pull request, and reviewers check the rest against the standard's checklist. Pick it only for small internal tools with no outside callers and no personal data, and record it so that the first external caller supersedes this decision."
           }
         ]
       },
@@ -147,17 +151,17 @@
         "options": [
           {
             "value": "pipeline",
-            "label": "against each deployed environment in the pipeline",
+            "label": "a ZAP scan of each environment the pipeline deploys to",
             "description": "An OWASP ZAP baseline scan (or API scan from the OpenAPI document) runs against every environment the pipeline deploys to, and a high alert fails the deployment's check. Pick it when the pipeline deploys to an environment it can reach, which is most pipelines."
           },
           {
             "value": "periodic",
-            "label": "on a schedule: a ZAP full scan or a penetration test",
+            "label": "a scheduled ZAP full scan or penetration test",
             "description": "A ZAP full scan runs on a schedule against staging, and a penetration test is commissioned on a longer one; findings enter the same deadlines. Pick it when deployments are rare or the pipeline cannot reach the running system."
           },
           {
             "value": "none",
-            "label": "none",
+            "label": "no dynamic testing",
             "description": "No dynamic testing. Pick it only for an element with no HTTP or network surface of its own (a batch job, a library), where fuzzing or unit tests cover its inputs instead."
           }
         ]
@@ -171,55 +175,55 @@
         "options": [
           {
             "value": "sla",
-            "label": "fixed within a deadline by severity",
+            "label": "a deadline by severity",
             "description": "Every finding (scanner, pentest, review, bug bounty) is fixed within its severity's deadline, and the main branch's build fails on an overdue one. Pick it when the team can fix what the scanners find; it is the simplest rule and the hardest to argue with."
           },
           {
             "value": "risk-accepted",
-            "label": "fixed within a deadline, or accepted in writing until a date",
+            "label": "a deadline by severity, or a written acceptance until a date",
             "description": "The same deadlines, but a finding may be left open with a written risk acceptance in a register, signed by the owner and a second person from security, that expires. Pick it for codebases with findings nobody can fix in time (a vendor library, a legacy module slated for replacement); every acceptance comes up again when it expires."
           }
         ]
       },
       {
         "key": "CRITICAL_DAYS",
-        "label": "Days to fix a critical finding",
+        "label": "Days to fix a critical finding in our code",
         "defaultValue": "2",
         "type": "number"
       },
       {
         "key": "HIGH_DAYS",
-        "label": "Days to fix a high finding",
+        "label": "Days to fix a high finding in our code",
         "defaultValue": "7",
         "type": "number"
       },
       {
         "key": "MEDIUM_DAYS",
-        "label": "Days to fix a medium finding",
+        "label": "Days to fix a medium finding in our code",
         "defaultValue": "30",
         "type": "number"
       },
       {
         "key": "ACCEPTANCE_DAYS",
-        "label": "Most days a risk acceptance stays valid",
+        "label": "Most days a risk acceptance stays valid. Only with written acceptances",
         "defaultValue": "90",
         "type": "number"
       },
       {
         "key": "SAST_MINUTES",
-        "label": "Within how many minutes must the static analysis of a pull request finish?",
+        "label": "Within how many minutes must the static analysis of a pull request finish? Only with a scan of every pull request",
         "defaultValue": "10",
         "type": "number"
       },
       {
         "key": "DAST_DAYS",
-        "label": "Most days between dynamic tests of the production configuration",
+        "label": "Most days between dynamic tests of the production configuration. Only with scheduled dynamic testing",
         "defaultValue": "90",
         "type": "number"
       },
       {
         "key": "THREAT_MODEL_TRIGGER",
-        "label": "Which changes require the threat model to be updated?",
+        "label": "Which changes require the threat model to be updated? Only with ASVS level 2",
         "defaultValue": "a new endpoint, a new data store, a new trust boundary"
       }
     ]
@@ -242,7 +246,7 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "pass every value that reaches a database, directory, OS command or interpreter as a bound parameter of a prepared statement or through the ORM's query builder, and build 0 queries or commands by string concatenation or interpolation",
+      "action": "pass every value that reaches a database, directory, OS command or interpreter as a bound parameter of a prepared statement or through the ORM's query builder, and build 0 queries or commands by string concatenation, interpolation or formatting",
       "rationale": "Injection is OWASP Top 10 A03:2021; a parameterised query keeps data from ever being parsed as code, whatever the input holds, and is the one defence that needs no judgement per call site (OWASP SQL Injection Prevention Cheat Sheet, Option 1; ASVS 4.0.3 V5.3.4, V5.3.8)."
     },
     {
@@ -270,7 +274,7 @@
       "ears_type": "event-driven",
       "trigger": "a request, message or file arrives at the element's boundary",
       "action": "validate it against a declared schema (zod or valibot, Pydantic, Bean Validation or JSON Schema) that refuses unknown fields, before any handler runs; reject an invalid one with status 400 (or the protocol's equivalent) that names every failing field and carries no stack trace; and let code inside the boundary work with the typed, validated values only",
-      "rationale": "Validation in one place with a schema is validation someone can read and test; naming the field makes rejections usable for honest clients and gives attackers nothing they did not send (OWASP Input Validation Cheat Sheet: allow-list validation at the boundary; ASVS 4.0.3 V5.1.3, V5.1.4; Proactive Controls C5).",
+      "rationale": "Validation in one place with a schema is validation someone can read and test; naming the field makes rejections usable for honest clients and gives attackers nothing they did not send (OWASP Input Validation Cheat Sheet: allow-list validation at the boundary; ASVS 4.0.3 V5.1.3, V5.1.4; OWASP Proactive Controls 2024, C3: Validate all Input and Handle Exceptions).",
       "hubWhen": {
         "INPUT": [
           "boundary-schema"
@@ -285,7 +289,7 @@
       "y": 390,
       "ears_type": "ubiquitous",
       "action": "check the arguments of every exported function and every message handler for type, range, length and allowed values before using them, fail with a typed error that names the argument, and never assume a caller in the same process has validated them",
-      "rationale": "A library or shared module has as many boundaries as callers; a check it does not do itself depends on every caller doing it (OWASP Input Validation Cheat Sheet; SEI CERT API00-C, MSC08-J: validate arguments of exported functions).",
+      "rationale": "A library or shared module has as many boundaries as callers; a check it does not do itself depends on every caller doing it (OWASP Input Validation Cheat Sheet; SEI CERT API00-C and MET00-J: validate the arguments of exported functions and methods).",
       "hubWhen": {
         "INPUT": [
           "everywhere"
@@ -301,7 +305,7 @@
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "a change introduces eval or new Function, OS command execution with an interpolated string, deserialisation of untrusted data (pickle, ObjectInputStream, BinaryFormatter), a regular expression or a file path built from input, or a function the standard bans",
       "action": "fail the lint of the pull request naming the file and line, unless a reviewed suppression with the reason is written beside it",
-      "rationale": "Code built from data is injection by another name, and deserialising untrusted objects is remote code execution in most runtimes; a ban enforced by lint costs nothing per review (OWASP Top 10 A03:2021 and A08:2021; ASVS 4.0.3 V5.2.4, V5.5.1, V5.5.3; Proactive Controls C5)."
+      "rationale": "Code built from data is injection by another name, and deserialising untrusted objects is remote code execution in most runtimes; a ban enforced by lint costs nothing per review (OWASP Top 10 A03:2021 and A08:2021; ASVS 4.0.3 V5.2.4, V5.5.1, V5.5.3; OWASP Proactive Controls 2024, C3)."
     },
     {
       "id": "req-framework-defaults",
@@ -311,7 +315,7 @@
       "y": 650,
       "ears_type": "ubiquitous",
       "action": "take CSRF protection, CORS, cookie flags (Secure, HttpOnly, SameSite) and the security headers from the framework's middleware configured once at start (helmet and a CSRF middleware for Express, Spring Security's defaults, Django's SecurityMiddleware and CsrfViewMiddleware, ASP.NET Core antiforgery), with the framework's strict modes on, and write 0 hand-rolled replacements; where a gateway sets the headers, set none in the code that conflict",
-      "rationale": "The framework's security middleware is reviewed by more people than any hand-rolled version and is wrong only where it is turned off (Proactive Controls C2, Leverage Security Frameworks and Libraries; OWASP Top 10 A05:2021; ASVS 4.0.3 V4.2.2, V14.4, V14.5).",
+      "rationale": "The framework's security middleware is reviewed by more people than any hand-rolled version and is wrong only where it is turned off (OWASP Proactive Controls 2024, C5: Secure by Default Configurations; OWASP Top 10 A05:2021; ASVS 4.0.3 V4.2.2, V14.4, V14.5).",
       "hubWhen": {
         "STANDARD": [
           "asvs-l1",
@@ -343,7 +347,7 @@
       "y": 910,
       "ears_type": "event-driven",
       "trigger": "the scheduled static analysis reports a new high or critical finding",
-      "action": "give it an owner from the triage queue within 1 working day, after which the deadline of its severity runs, and show the queue's age on the team's dashboard",
+      "action": "give it an owner from the triage queue within 1 working day, recorded as an assigned issue that names the alert, after which the deadline of its severity runs",
       "rationale": "A scheduled scan without triage produces a list nobody owns; the working-day limit on triage keeps the deadlines meaningful (NIST SSDF RV.1, RV.2).",
       "hubWhen": {
         "SAST": [
@@ -359,7 +363,7 @@
       "y": 1040,
       "ears_type": "event-driven",
       "trigger": "a build is deployed to an environment of the pipeline (ephemeral, staging or production)",
-      "action": "run an OWASP ZAP baseline scan, or the API scan from the OpenAPI document, against it within 30 minutes, fail the deployment's check on a high alert, and keep the report with the build",
+      "action": "run an OWASP ZAP baseline scan, or the API scan from the OpenAPI document, against it within 30 minutes, fail the deployment's check on an alert raised to FAIL, and keep the report with the build",
       "rationale": "What the running system exposes (missing headers, verbose errors, forgotten routes, reflected input) is visible only to a scan of the running system (OWASP ZAP documentation: baseline and API scans; NIST SSDF PW.8).",
       "hubWhen": {
         "DAST": [
@@ -375,7 +379,7 @@
       "y": 1170,
       "ears_type": "state-driven",
       "precondition": "the last dynamic test (a ZAP full scan or a penetration test) of the production configuration is more than {{DAST_DAYS}} days old",
-      "action": "run or commission a new one within 14 days, and put each of its high and critical findings under the deadlines of its severity",
+      "action": "run or commission a new one within 14 days, and put each of its high and critical findings under the deadlines of its severity as code scanning alerts",
       "rationale": "A dynamic test ages with every release; a bound on its age is what keeps \"we had a pentest\" from meaning one from three years ago (NIST SSDF PW.8; OWASP ZAP documentation: full scan).",
       "hubWhen": {
         "DAST": [
@@ -392,7 +396,7 @@
       "ears_type": "state-driven",
       "precondition": "an open security finding (static analysis, dynamic scan, penetration test, review or report) is older than its deadline: {{CRITICAL_DAYS}} days for critical, {{HIGH_DAYS}} for high, {{MEDIUM_DAYS}} for medium",
       "action": "fail the main branch's build and the release, naming the finding, until it is fixed",
-      "rationale": "A deadline the build enforces is the only one that holds under delivery pressure (NIST SSDF RV.2; OWASP Top 10 A06:2021 for the same rule on dependencies, decided in Software supply chain).",
+      "rationale": "A deadline the build enforces is the only one that holds under delivery pressure (NIST SSDF RV.2; the same rule for vulnerable dependencies is decided in Software supply chain).",
       "hubWhen": {
         "FINDINGS": [
           "sla"
@@ -422,7 +426,7 @@
       "x": 260,
       "y": 1560,
       "ears_type": "ubiquitous",
-      "action": "cover every authorization-sensitive operation (reading or changing another user's or tenant's data, admin functions, object ids taken from the request) with negative tests that call it as the wrong user, the wrong tenant and anonymously and expect 403 or 404 and 401, kept in the pull-request suite",
+      "action": "cover every authorization-sensitive operation (reading or changing another user's or tenant's data, admin functions, object ids taken from the request) with negative tests that call it as the wrong user, the wrong tenant and anonymously and expect 403 or 404 and 401, kept in the pull-request suite and tagged with the operation they cover",
       "rationale": "Broken access control is OWASP Top 10 A01:2021 and no scanner finds it, because the code is correct for the right user; only a test that is the wrong user does (ASVS 4.0.3 V4.1.1, V4.1.3; the rules themselves are decided in Authorization)."
     },
     {
@@ -433,7 +437,7 @@
       "y": 1690,
       "ears_type": "event-driven",
       "trigger": "a change adds {{THREAT_MODEL_TRIGGER}}",
-      "action": "update the feature's threat model (a STRIDE table in threat-model.md beside the code: asset, threat, mitigation, status) in the same pull request, with every threat mitigated or carried as a finding under its deadline, and have it reviewed before the merge",
+      "action": "update the feature's threat model (a STRIDE table in threat-model.md beside the code: asset, threat, mitigation, status) in the same pull request, with every threat either mitigated or carried as a numbered finding under its deadline, and have it reviewed before the merge",
       "rationale": "Level 2 asks for design-level controls, which no scanner verifies; a threat model kept beside the code and changed with it is the lightest form that stays true (ASVS 4.0.3 V1.1.2; Threat Modeling Manifesto: continuous, with the people who build the system).",
       "hubWhen": {
         "STANDARD": [
@@ -561,7 +565,7 @@
       "y": 910,
       "given": "a nightly scan that reports a new high finding",
       "when": "1 working day has passed",
-      "then": "the finding has an owner and a due date {{HIGH_DAYS}} days from the report",
+      "then": "an issue naming the alert has an assignee, and the finding's due date is {{HIGH_DAYS}} days from the report",
       "hubWhen": {
         "SAST": [
           "scheduled"
@@ -571,12 +575,12 @@
     {
       "id": "sc-dast-pipeline",
       "type": "scenario",
-      "label": "Reflected input caught",
+      "label": "Missing policy caught",
       "x": 520,
       "y": 1040,
-      "given": "a build that reflects a query parameter into a page unencoded",
+      "given": "a build that drops the Content-Security-Policy header",
       "when": "it is deployed to the ephemeral environment",
-      "then": "the ZAP scan reports a high alert within 30 minutes and the deployment's check fails",
+      "then": "the ZAP scan reports the FAIL alert within 30 minutes and the deployment's check fails",
       "hubWhen": {
         "DAST": [
           "pipeline"
@@ -636,7 +640,7 @@
       "y": 1560,
       "given": "order 42 that belongs to customer A",
       "when": "customer B and an anonymous caller GET /orders/42",
-      "then": "customer B gets 404 or 403, the anonymous caller 401, and the test runs in the pull-request suite"
+      "then": "customer B gets 404 or 403, the anonymous caller 401, and the test runs in the pull-request suite tagged with the route"
     },
     {
       "id": "sc-threat-model",
@@ -646,7 +650,7 @@
       "y": 1690,
       "given": "a pull request that adds a public endpoint to a feature",
       "when": "it is reviewed",
-      "then": "it changes the feature's threat-model.md with rows for the endpoint, the check finds every STRIDE category and 0 unmitigated rows, and a reviewer approved the table",
+      "then": "it changes the feature's threat-model.md with rows for the endpoint, the check finds every STRIDE category and every row mitigated or carried as a numbered finding, and a reviewer approved the table",
       "hubWhen": {
         "STANDARD": [
           "asvs-l2"
@@ -677,8 +681,8 @@
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) is decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself.",
-      "decision": "The code is held to OWASP ASVS Level 1 (4.0.3, moving to 5.0), and every Level 1 control is mapped to a lint rule, a test or a scanner rather than to a document. Data reaches the database only through parameterised queries or the ORM's query builder; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security with no-eval and react/no-danger, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware with secure defaults. Input is {{INPUT}}. Static analysis: {{SAST}} (Semgrep with p/owasp-top-ten and p/default, CodeQL security-extended). Dynamic testing: {{DAST}} (OWASP ZAP). Findings are {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
+      "decision": "The code is held to OWASP ASVS Level 1 (4.0.3, moving to 5.0), and every Level 1 control is mapped to a lint rule, a test or a scanner rather than to a document. Data reaches the database only through parameterised queries or the ORM's query builder, checked by a lint rule on every pull request; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security with no-eval and react/no-danger, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware with secure defaults. Input is validated {{INPUT}}. Static analysis: {{SAST}}. Dynamic testing: {{DAST}}. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
       "consequences": "• Most of the standard is checked on every change by tools; a reviewer checks the rest from a short list.\n• Level 1 verifies code, not design: a feature with a flawed design passes if its code is clean, which is what Level 2's threat model adds.\n• Lint bans are blunt: the reporting query built from an allow-list of column names needs a suppression with a reason, and reviewers must read suppressions.\n• Needs a framework with auto-escaping and security middleware; hand-rolled HTTP handling has to add both.",
       "alternatives": "1. ASVS Level 2: adds a threat model per feature and design-level controls; the right bar for personal, financial or health data.\n2. A language coding standard (SEI CERT, MISRA): for C, C++ and embedded code, where the classes of flaw are different.\n3. The OWASP Top 10 as the only checklist: an awareness document, too coarse to map to checks.",
       "hubWhen": {
@@ -696,8 +700,8 @@
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) is decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself.",
-      "decision": "The code is held to OWASP ASVS Level 2 (4.0.3, moving to 5.0): every Level 1 control is mapped to a lint rule, a test or a scanner, and the design-level controls are carried by a threat model per feature, a STRIDE table in threat-model.md beside the feature's code, updated in the same pull request whenever a change adds {{THREAT_MODEL_TRIGGER}}, and reviewed before the merge; a check fails the build when a feature has no threat model or an unmitigated row. Data reaches the database only through parameterised queries or the ORM's query builder; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware. Input is {{INPUT}}. Static analysis: {{SAST}} (Semgrep with p/owasp-top-ten and p/default, CodeQL security-extended). Dynamic testing: {{DAST}} (OWASP ZAP). Findings are {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
+      "decision": "The code is held to OWASP ASVS Level 2 (4.0.3, moving to 5.0): every Level 1 control is mapped to a lint rule, a test or a scanner, and the design-level controls are carried by a threat model per feature, a STRIDE table in threat-model.md beside the feature's code, updated in the same pull request whenever a change adds {{THREAT_MODEL_TRIGGER}}, and reviewed before the merge; a check fails the build when a feature has no threat model or a row that is neither mitigated nor a numbered finding. Data reaches the database only through parameterised queries or the ORM's query builder, checked by a lint rule on every pull request; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware. Input is validated {{INPUT}}. Static analysis: {{SAST}}. Dynamic testing: {{DAST}}. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
       "consequences": "• Design flaws (a missing check on a new trust boundary, a data store nobody thought about) are found at the pull request, where they are cheap.\n• Every feature carries a threat model that must be kept true; a stale one is worse than none, so the check and the review are not optional.\n• Costs an hour or two per new trust boundary from the people who build the feature, not from a security team.\n• Level 2 also expects a verification by someone other than the author per release; plan a review or a penetration test cycle for it.",
       "alternatives": "1. ASVS Level 1: the same tools without the threat model; enough where a design flaw is not a reportable incident.\n2. ASVS Level 3: adds verification of every control by a reviewer and architecture-level requirements; for systems where a breach endangers life or critical infrastructure.\n3. A threat model for the whole system once a year: cheaper, and stale by the second release.",
       "hubWhen": {
@@ -715,8 +719,8 @@
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) is decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself.",
-      "decision": "The code is held to a language coding standard: SEI CERT C/C++ (or CERT Java) for application and systems code, MISRA C:2023 where a safety standard or a customer asks for it. Compliance is checked by an analyser in CI, not by reading: clang-tidy with the cert-*, bugprone-* and clang-analyzer-* checks as errors, cppcheck with the MISRA add-on, or a certified analyser (PC-lint Plus, Polyspace, Coverity) where the safety case needs one; the compiler runs with -Wall -Wextra -Werror, -fstack-protector-strong and _FORTIFY_SOURCE=2, and the tests under AddressSanitizer and UndefinedBehaviorSanitizer. Every array index and buffer length is checked, only bounded string functions are used, integer arithmetic on sizes is checked for overflow, and gets, strcpy, strcat, sprintf, scanf without widths, system and alloca are banned by the analyser; each deviation is recorded with its justification in a deviation record the analyser reads. Input is {{INPUT}}. Static analysis: {{SAST}} (the analyser above, with Semgrep and CodeQL for C/C++ where available). Dynamic testing: {{DAST}} (OWASP ZAP where there is an HTTP surface; libFuzzer or AFL++ over every parser otherwise). Findings are {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Dependencies and toolchains are decided in Software supply chain, credentials in Secrets.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
+      "decision": "The code is held to a language coding standard: SEI CERT C/C++ (or CERT Java) for application and systems code, MISRA C:2023 where a safety standard or a customer asks for it. Compliance is checked by an analyser in CI, not by reading: clang-tidy with the cert-*, bugprone-* and clang-analyzer-* checks as errors, cppcheck with the MISRA add-on, or a certified analyser (PC-lint Plus, Polyspace, Coverity) where the safety case needs one; the compiler runs with -Wall -Wextra -Werror, -fstack-protector-strong and _FORTIFY_SOURCE=2, and the tests under AddressSanitizer and UndefinedBehaviorSanitizer. Every array index and buffer length is checked, only bounded string functions are used, integer arithmetic on sizes is checked for overflow, and gets, strcpy, strcat, sprintf, scanf without widths, system and alloca are banned by the analyser; each deviation is recorded with its justification in a deviation record the analyser reads. Queries to any database go through bound parameters, checked by a lint rule. Input is validated {{INPUT}}. Security scanner suites beyond the analyser: {{SAST}}. Dynamic testing: {{DAST}}; with no HTTP surface, libFuzzer or AFL++ over every parser instead. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Dependencies and toolchains are decided in Software supply chain, credentials in Secrets.",
       "consequences": "• The flaws that matter in unmanaged code (overruns, overflows, use after free) are caught by the analyser and the sanitizers, not by the customer.\n• The analyser reports many findings on an existing codebase; adopt it with a baseline and fix new code first, or the warnings are ignored.\n• MISRA's rules forbid constructs application developers use daily; deviations need a record and a reviewer, which takes time and a person who owns the standard.\n• A certified analyser costs licences; clang-tidy and cppcheck cover most of CERT and much of MISRA for free.",
       "alternatives": "1. ASVS Level 1 or 2: the web application classes of flaw; wrong for code where the problem is memory.\n2. Rewriting in a memory-safe language (Rust, Go): removes the class rather than checking for it; a project, not a rule.\n3. Sanitizers and fuzzing only, no coding standard: finds what the tests reach, and nothing in the paths they do not.",
       "hubWhen": {
@@ -733,7 +737,7 @@
       "y": 0,
       "category": "structural",
       "threshold": "0 findings of severity ERROR from p/owasp-top-ten and p/default; the run finishes within {{SAST_MINUTES}} minutes",
-      "description": "Semgrep runs the OWASP Top Ten and default rulesets and exits non-zero on an ERROR-severity finding; on the pull request it is a required check with a hard timeout, on a schedule it uploads SARIF to code scanning, where the findings get owners.\n\nTool: Semgrep (semgrep scan with p/owasp-top-ten and p/default)\n\n```yaml\n# .github/workflows/semgrep.yml\nname: semgrep\non:\n  pull_request:                        # blocking variant: a required check\n  schedule: [{ cron: '0 3 * * *' }]    # scheduled variant: findings to the queue\njobs:\n  semgrep:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{SAST_MINUTES}}\n    container: { image: semgrep/semgrep:1.90.0 }\n    steps:\n      - uses: actions/checkout@v4\n      - run: semgrep scan --config p/owasp-top-ten --config p/default --config .semgrep\n          --severity ERROR --error --sarif --output semgrep.sarif\n      - if: always()\n        uses: github/codeql-action/upload-sarif@v3\n        with: { sarif_file: semgrep.sarif }\n```",
+      "description": "Semgrep runs the OWASP Top Ten and default rulesets and exits non-zero on an ERROR-severity finding; on the pull request it is a required check with a hard timeout, on a schedule it uploads SARIF to code scanning, where the findings get owners.\n\nTool: Semgrep (semgrep scan with p/owasp-top-ten and p/default)\n\n```yaml\n# .github/workflows/semgrep.yml\nname: semgrep\non:\n  pull_request:                        # blocking variant: a required check\n  schedule: [{ cron: '0 3 * * *' }]    # scheduled variant: findings to the queue\npermissions: { contents: read, security-events: write }\njobs:\n  semgrep:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{SAST_MINUTES}}\n    container: { image: semgrep/semgrep:1.90.0 }\n    steps:\n      - uses: actions/checkout@v4.2.2                     # pin by commit SHA in your repository\n      - run: semgrep scan --config p/owasp-top-ten --config p/default --config .semgrep\n          --severity ERROR --error --sarif --output semgrep.sarif\n      - if: always()\n        uses: github/codeql-action/upload-sarif@v3.28.0   # pin by commit SHA in your repository\n        with: { sarif_file: semgrep.sarif }\n```",
       "hubWhen": {
         "SAST": [
           "pr-blocking",
@@ -749,7 +753,7 @@
       "y": 130,
       "category": "structural",
       "threshold": "0 open code scanning alerts of severity high or critical on the pull request; the CodeQL check is required for merging",
-      "description": "CodeQL analyses every supported language of the repository with the security-extended query suite; code scanning's pull-request check is set to fail on high or above and is a required status check in branch protection.\n\nTool: GitHub CodeQL (github/codeql-action)\n\n```yaml\n# .github/workflows/codeql.yml\nname: codeql\non:\n  pull_request: { branches: [main] }\n  push: { branches: [main] }\npermissions: { contents: read, security-events: write }\njobs:\n  analyze:\n    runs-on: ubuntu-latest\n    strategy: { matrix: { language: [javascript-typescript, python, cpp] } }\n    steps:\n      - uses: actions/checkout@v4\n      - uses: github/codeql-action/init@v3\n        with: { languages: ${{ matrix.language }}, queries: security-extended }\n      - uses: github/codeql-action/autobuild@v3\n      - uses: github/codeql-action/analyze@v3\n# Settings > Code security > Code scanning: \"Check failure: High or higher\";\n# branch protection requires the \"CodeQL\" check\n```",
+      "description": "CodeQL analyses each language of the repository with the security-extended query suite; code scanning's pull-request check is set to fail on high or above and is a required status check in branch protection. List only the languages the repository holds: autobuild fails for one with no sources.\n\nTool: GitHub CodeQL (github/codeql-action)\n\n```yaml\n# .github/workflows/codeql.yml\nname: codeql\non:\n  pull_request: { branches: [main] }\n  push: { branches: [main] }\npermissions: { contents: read, security-events: write }\njobs:\n  analyze:\n    runs-on: ubuntu-latest\n    strategy: { matrix: { language: [javascript-typescript] } }   # add each language the repository holds\n    steps:\n      - uses: actions/checkout@v4.2.2                 # pin by commit SHA in your repository\n      - uses: github/codeql-action/init@v3.28.0       # pin by commit SHA in your repository\n        with:\n          languages: ${{ matrix.language }}\n          queries: security-extended\n      - uses: github/codeql-action/autobuild@v3.28.0  # pin by commit SHA in your repository\n      - uses: github/codeql-action/analyze@v3.28.0    # pin by commit SHA in your repository\n# Settings > Code security > Code scanning: \"Check failure: High or higher\";\n# branch protection requires the \"CodeQL\" check\n```",
       "hubWhen": {
         "SAST": [
           "pr-blocking",
@@ -796,8 +800,8 @@
       "x": 1040,
       "y": 520,
       "category": "structural",
-      "threshold": "0 queries built by concatenation or interpolation in the code; the rule is ERROR severity and part of the pull-request lint",
-      "description": "A Semgrep rule kept in the repository matches query calls whose SQL is a template literal with an expression, a concatenation or a format call, and fails the pull request. SonarQube rules S2077 (formatted SQL) and S3649 (SQL injection) do the same for Java and C#, Bandit B608 for Python.\n\nTool: Semgrep (a repository rule) and SonarQube S2077 / S3649\n\n```yaml\n# .semgrep/sql-string-built.yml   (run with: semgrep scan --config .semgrep --error)\nrules:\n  - id: sql-string-built\n    message: SQL built from a string; bind the value as a parameter (ADR Secure coding)\n    severity: ERROR\n    languages: [javascript, typescript]\n    metadata: { cwe: \"CWE-89\", owasp: \"A03:2021\" }\n    patterns:\n      - pattern-either:\n          - pattern: $DB.query(`...${$X}...`, ...)\n          - pattern: $DB.query($A + $B, ...)\n          - pattern: $DB.query(`...`.concat(...), ...)\n          - pattern: $DB.raw(`...${$X}...`)\n          - pattern: $KNEX.whereRaw(`...${$X}...`)\n      - metavariable-regex: { metavariable: $DB, regex: (?i)(db|pool|client|conn|sequelize|knex|prisma) }\n```"
+      "threshold": "0 queries built by concatenation, interpolation or formatting in the code; the rules are ERROR severity and part of the pull-request lint",
+      "description": "Semgrep rules kept in the repository match query calls whose SQL is a template literal with an expression, a concatenation or a format call (JavaScript and TypeScript), and a buffer written by sprintf and then passed to a database call (C), and fail the pull request. They run as a lint rule whatever the scanner decision. SonarQube rules S2077 (formatted SQL) and S3649 (SQL injection) do the same for Java and C#, Bandit B608 for Python.\n\nTool: Semgrep (repository rules; run with semgrep scan --config .semgrep --error); SonarQube S2077 / S3649 for Java and C#; Bandit B608 for Python\n\n```yaml\n# .semgrep/sql-string-built.yml\nrules:\n  - id: sql-string-built\n    message: SQL built from a string; bind the value as a parameter (ADR Secure coding)\n    severity: ERROR\n    languages: [javascript, typescript]\n    metadata: { cwe: \"CWE-89\", owasp: \"A03:2021\" }\n    patterns:\n      - pattern-either:\n          - pattern: $DB.query(`...${$X}...`, ...)\n          - pattern: $DB.query($A + $B, ...)\n          - pattern: $DB.query(`...`.concat(...), ...)\n          - pattern: $DB.raw(`...${$X}...`)\n          - pattern: $DB.whereRaw(`...${$X}...`)\n      - metavariable-regex: { metavariable: $DB, regex: (?i)(db|pool|client|conn|sequelize|knex|prisma) }\n  - id: sql-string-built-c\n    message: SQL formatted into a buffer and executed; use a prepared statement with bound parameters (ADR Secure coding)\n    severity: ERROR\n    languages: [c]\n    metadata: { cwe: \"CWE-89\" }\n    patterns:\n      - pattern: |\n          $FMT($BUF, ...);\n          ...\n          $EXEC($DB, $BUF, ...);\n      - metavariable-regex: { metavariable: $FMT, regex: ^(sprintf|snprintf|strcat|strcpy)$ }\n      - metavariable-regex: { metavariable: $EXEC, regex: ^(sqlite3_exec|sqlite3_prepare_v2|PQexec|mysql_query|mysql_real_query)$ }\n```"
     },
     {
       "id": "ff-zap-baseline",
@@ -807,7 +811,7 @@
       "y": 650,
       "category": "operational",
       "threshold": "0 ZAP alerts at level FAIL against every environment the pipeline deploys to; the scan finishes within 30 minutes of the deployment",
-      "description": "A workflow listens for successful deployments and runs the ZAP baseline scan against the environment's URL; the rules file raises the alerts that must block (injection, missing CSP, cookie flags) to FAIL and turns known noise to IGNORE with a comment. APIs use zaproxy/action-api-scan with the OpenAPI document.\n\nTool: OWASP ZAP (zaproxy/action-baseline)\n\n```yaml\n# .github/workflows/dast.yml\nname: dast\non: [deployment_status]\njobs:\n  zap:\n    if: github.event.deployment_status.state == 'success'\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4\n      - uses: zaproxy/action-baseline@v0.14.0\n        with:\n          target: ${{ github.event.deployment_status.environment_url }}\n          rules_file_name: .zap/rules.tsv\n          cmd_options: '-a -j'          # alpha rules, AJAX spider\n          fail_action: true\n          allow_issue_writing: false\n# .zap/rules.tsv (id<TAB>action<TAB>comment):\n# 40018\tFAIL\tSQL Injection\n# 10038\tFAIL\tContent Security Policy header missing\n# 10054\tFAIL\tCookie without SameSite\n```",
+      "description": "A workflow listens for successful deployments and runs the ZAP baseline scan against the environment's URL; the rules file raises the passive alerts that must block (missing CSP, cookie flags, missing anti-clickjacking) to FAIL and turns known noise to IGNORE with a comment. The baseline scan runs passive rules and the spider only; active rules such as SQL injection (40018) need zaproxy/action-api-scan with the OpenAPI document or action-full-scan, run against the ephemeral or staging environment, never production.\n\nTool: OWASP ZAP (zaproxy/action-baseline; zaproxy/action-api-scan for active rules)\n\n```yaml\n# .github/workflows/dast.yml\nname: dast\non: [deployment_status]\njobs:\n  zap:\n    if: github.event.deployment_status.state == 'success'\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4.2.2          # pin by commit SHA in your repository\n      - uses: zaproxy/action-baseline@v0.14.0  # pin by commit SHA in your repository\n        with:\n          target: ${{ github.event.deployment_status.environment_url }}\n          rules_file_name: .zap/rules.tsv\n          cmd_options: '-a -j'          # alpha passive rules, AJAX spider\n          fail_action: true\n          allow_issue_writing: false\n# .zap/rules.tsv (id<TAB>action<TAB>comment), passive rules only:\n# 10038\tFAIL\tContent Security Policy header missing\n# 10054\tFAIL\tCookie without SameSite\n# 10020\tFAIL\tMissing anti-clickjacking header\n# 10096\tIGNORE\tTimestamp disclosure: build ids in a header, reviewed\n```",
       "hubWhen": {
         "DAST": [
           "pipeline"
@@ -821,8 +825,8 @@
       "x": 1040,
       "y": 780,
       "category": "process",
-      "threshold": "The newest ZAP full scan or penetration test report of the production configuration is at most {{DAST_DAYS}} days old and holds 0 open high or critical alerts",
-      "description": "A quarterly workflow runs the ZAP full scan against staging and commits its report to security/dast/; a daily check fails when the newest report (scan or penetration test, named by date) is older than the limit or still holds high alerts.\n\nTool: OWASP ZAP (zaproxy/action-full-scan) and a check over the reports\n\n```bash\n# the scan (workflow on a cron, e.g. '0 3 1 */3 *'):\n#   - uses: zaproxy/action-full-scan@v0.12.0\n#     with: { target: https://staging.shop.example, cmd_options: '-J report.json', fail_action: false }\n#   then: cp report.json \"security/dast/$(date +%F)-zap-staging.json\" and commit\n# the daily check:\nlatest=$(ls security/dast/*.json | sort | tail -1)     # YYYY-MM-DD-<scope>.json\nreport_date=$(basename \"$latest\" | cut -c1-10)\nage=$(( ( $(date +%s) - $(date -d \"$report_date\" +%s) ) / 86400 ))\n[ \"$age\" -le {{DAST_DAYS}} ] || { echo \"newest dynamic test $report_date is $age days old\"; exit 1; }\njq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' \"$latest\" \\\n  || { echo \"$latest still holds high alerts\"; exit 1; }\n```",
+      "threshold": "The newest dynamic test report (ZAP full scan or penetration test) of the production configuration is at most {{DAST_DAYS}} days old, and the newest ZAP report holds 0 high or critical alerts",
+      "description": "A scheduled workflow runs the ZAP full scan against staging and commits its JSON report to security/dast/ as <date>-zap-staging.json; a penetration test is filed beside it as <date>-pentest.pdf with its findings uploaded to code scanning as SARIF, so the deadline job covers them. A daily check fails when the newest report of either kind is older than the limit, or when the newest ZAP report still holds high alerts.\n\nTool: OWASP ZAP (zaproxy/action-full-scan) and a shell check over the reports\n\n```bash\n# the scan: a workflow on a cron that fits {{DAST_DAYS}} days (e.g. '0 3 1 */3 *' for quarterly, with a 90-day limit):\n#   - uses: zaproxy/action-full-scan@v0.12.0   # pin by commit SHA in your repository\n#     with: { target: https://staging.shop.example, cmd_options: '-J report.json', fail_action: false }\n#   then: cp report.json \"security/dast/$(date +%F)-zap-staging.json\" and commit\n# the daily check:\nlatest=$(ls security/dast/ | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-(zap-.*\\.json|pentest\\.pdf)$' | sort | tail -1)\nreport_date=$(echo \"$latest\" | cut -c1-10)\nage=$(( ( $(date +%s) - $(date -d \"$report_date\" +%s) ) / 86400 ))\n[ \"$age\" -le {{DAST_DAYS}} ] || { echo \"newest dynamic test $report_date is $age days old\"; exit 1; }\nlatest_zap=$(ls security/dast/*-zap-*.json | sort | tail -1)\njq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' \"$latest_zap\" \\\n  || { echo \"$latest_zap still holds high alerts\"; exit 1; }\n```",
       "hubWhen": {
         "DAST": [
           "periodic"
@@ -845,17 +849,74 @@
       }
     },
     {
+      "id": "ff-argument-guards",
+      "type": "fitness-fn",
+      "label": "Exported functions refuse bad arguments",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "100 % of the exported functions of the public surface fail with the typed ArgumentError, naming the argument, on a negative number, an out-of-range integer, null, an empty string and a wrong-typed object",
+      "description": "A test enumerates the functions exported from the package's public surface (not a list kept by hand) and calls each with the usual bad arguments; every call must fail with the shared typed error that names the argument, which means the function checked before doing anything. A function that legitimately accepts one of the values declares it in GUARD_EXCEPTIONS beside the test, where a reviewer sees it. For Python, the same test over the module's __all__ with pytest.raises(ArgumentError).\n\nTool: Vitest over the public surface (pytest for Python)\n\n```ts\nimport * as api from '../src/index'            // the package's public surface\nimport { ArgumentError } from '../src/errors'    // the typed error every guard throws, with .argument\n\nconst BAD: unknown[][] = [[-1], [2 ** 31], [null], [''], [{ unexpected: true }]]\nconst GUARD_EXCEPTIONS: Record<string, unknown[]> = {}   // 'parseOptional': [null], reviewed\nconst exported = Object.entries(api).filter(([, v]) => typeof v === 'function') as Array<[string, (...a: unknown[]) => unknown]>\n\ndescribe.each(exported)('%s guards its arguments', (name, fn) => {\n  const cases = BAD.filter((args) => !(GUARD_EXCEPTIONS[name] ?? []).some((v) => JSON.stringify(v) === JSON.stringify(args[0])))\n  it.each(cases)('refuses %j with a typed error naming the argument', async (...args) => {\n    await expect(Promise.resolve().then(() => fn(...args))).rejects.toSatisfy(\n      (e: unknown) => e instanceof ArgumentError && typeof e.argument === 'string' && e.argument.length > 0,\n    )\n  })\n})\n```",
+      "hubWhen": {
+        "INPUT": [
+          "everywhere"
+        ]
+      }
+    },
+    {
+      "id": "ff-framework-defaults",
+      "type": "fitness-fn",
+      "label": "Middleware defenses present in responses",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "A state-changing request without the CSRF token is refused with 403; every response carries Content-Security-Policy, Strict-Transport-Security and X-Content-Type-Options, and every cookie is Secure, HttpOnly and SameSite",
+      "description": "A test starts the element with its production configuration and checks what the framework's middleware must produce: a 403 on a POST without the CSRF token, the security headers on a page, and the flags on every cookie it sets. A hand-rolled replacement that forgets one of them fails here. For Django, the same test with the test client and SECURE_* settings; for Spring, MockMvc against the security filter chain.\n\nTool: Vitest with supertest (helmet and csurf or csrf-csrf on Express)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'   // started with NODE_ENV=production and the production middleware\n\nit('refuses a state-changing request without the CSRF token', async () => {\n  await request(app).post('/orders').send({ quantity: 1 }).expect(403)\n})\n\nit('carries the middleware headers and cookie flags', async () => {\n  const res = await request(app).get('/').expect(200)\n  expect(res.headers['content-security-policy']).toBeDefined()\n  expect(res.headers['strict-transport-security']).toMatch(/max-age=\\d{7,}/)\n  expect(res.headers['x-content-type-options']).toBe('nosniff')\n  const cookies = ([] as string[]).concat(res.headers['set-cookie'] ?? [])\n  for (const cookie of cookies) {\n    expect(cookie).toMatch(/;\\s*Secure/i)\n    expect(cookie).toMatch(/;\\s*HttpOnly/i)\n    expect(cookie).toMatch(/;\\s*SameSite=(Lax|Strict)/i)\n  }\n})\n```",
+      "hubWhen": {
+        "STANDARD": [
+          "asvs-l1",
+          "asvs-l2"
+        ]
+      }
+    },
+    {
+      "id": "ff-authz-coverage",
+      "type": "fitness-fn",
+      "label": "Every sensitive route has negative tests",
+      "x": 1040,
+      "y": 1300,
+      "category": "structural",
+      "threshold": "100 % of routes with an id in the path or under /admin have a test tagged with the route (authz:METHOD /path) in the pull-request suite",
+      "description": "A test lists the element's routes from its router, keeps those that take an object id from the path or live under /admin, and fails for every one without a test file that carries the tag authz:METHOD /path; the tagged test itself calls the route as the wrong user, the wrong tenant and anonymously. A new sensitive route fails the suite until its negative tests exist.\n\nTool: Vitest over the router's table and the test files\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { globSync } from 'glob'\nimport { routes } from '../src/app'   // the router's table: { method, path }\n\nconst tagged = new Set(\n  globSync('tests/**/*.test.ts').flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/authz:([A-Z]+ \\S+)/g)].map((m) => m[1])),\n)\nconst sensitive = routes.filter((r) => /:\\w+/.test(r.path) || r.path.startsWith('/admin'))\n\nit.each(sensitive)('$method $path has negative authorization tests', (r) => {\n  expect(tagged, `write a test tagged \"authz:${r.method} ${r.path}\" that calls it as the wrong user, the wrong tenant and anonymously`)\n    .toContain(`${r.method} ${r.path}`)\n})\n```"
+    },
+    {
+      "id": "ff-triage-queue",
+      "type": "fitness-fn",
+      "label": "Scheduled findings get an owner in time",
+      "x": 1040,
+      "y": 1430,
+      "category": "process",
+      "threshold": "0 open high or critical code scanning alerts older than 1 working day without an assigned issue that names the alert",
+      "description": "The nightly scanners upload SARIF to code scanning; the triage queue is the open high and critical alerts. A daily job fails for every such alert older than one working day (three days on a Monday) that no open issue labelled sast, with an assignee, names by its number; the issue's assignee is the owner and the deadline runs from the alert.\n\nTool: GitHub CLI over code scanning alerts and issues, in a scheduled job\n\n```bash\nlimit_days=$([ \"$(date +%u)\" = 1 ] && echo 3 || echo 1)   # one working day; three over a weekend\nsince=$(date -u -d \"-$limit_days days\" +%FT%TZ)\ngh api --paginate \"/repos/$REPO/code-scanning/alerts?state=open&per_page=100\" \\\n  | jq -r --arg since \"$since\" '.[] | select(.created_at < $since and (.rule.security_severity_level | IN(\"high\", \"critical\"))) | .number' > due.txt\ngh issue list --repo \"$REPO\" --label sast --state open --limit 500 --json title,assignees \\\n  --jq '.[] | select(.assignees | length > 0) | .title' > owned.txt\nstatus=0\nwhile read -r n; do\n  grep -q \"alert #$n\\b\" owned.txt || { echo \"code scanning alert #$n has no owner after $limit_days day(s)\"; status=1; }\ndone < due.txt\nexit $status\n```",
+      "hubWhen": {
+        "SAST": [
+          "scheduled"
+        ]
+      }
+    },
+    {
       "id": "ff-findings-sla",
       "type": "fitness-fn",
       "label": "No finding past its deadline",
       "x": 1040,
-      "y": 1040,
+      "y": 1560,
       "category": "operational",
-      "threshold": "0 open code scanning alerts older than {{CRITICAL_DAYS}} days (critical), {{HIGH_DAYS}} days (high) or {{MEDIUM_DAYS}} days (medium)",
-      "description": "A job on the main branch reads the repository's open code scanning alerts (Semgrep, CodeQL, ZAP and the language scanners all upload SARIF there) and fails on any past its severity's deadline, naming the rule and the file. Penetration test findings are filed as alerts through a SARIF upload so the same check covers them.\n\nTool: GitHub code scanning alerts API through the GitHub CLI\n\n```bash\ngh api --paginate \"/repos/$REPO/code-scanning/alerts?state=open&per_page=100\" | jq -e \\\n  --argjson crit {{CRITICAL_DAYS}} --argjson high {{HIGH_DAYS}} --argjson med {{MEDIUM_DAYS}} '\n  [.[] | {sev: .rule.security_severity_level, age: ((now - (.created_at | fromdateiso8601)) / 86400),\n          rule: .rule.id, file: .most_recent_instance.location.path}\n       | select((.sev == \"critical\" and .age > $crit) or (.sev == \"high\" and .age > $high)\n                or (.sev == \"medium\" and .age > $med))]\n  | if length > 0 then (map(\"\\(.rule) \\(.file) \\(.sev) \\(.age | floor)d\") | join(\"\\n\") | halt_error(1)) else true end'\n```",
+      "threshold": "0 open code scanning alerts older than {{CRITICAL_DAYS}} days (critical), {{HIGH_DAYS}} days (high) or {{MEDIUM_DAYS}} days (medium) that no valid acceptance in the risk register names",
+      "description": "A job on the main branch reads the repository's open code scanning alerts (Semgrep, CodeQL, ZAP and the language scanners all upload SARIF there) and fails on any past its severity's deadline, naming the rule and the file. With a risk register, an alert whose \"<rule id> <path>\" a still-valid acceptance names is skipped; without one, nothing is. Penetration test findings are filed as alerts through a SARIF upload so the same check covers them.\n\nTool: GitHub code scanning alerts API through the GitHub CLI, with jq (and yq for the register)\n\n```bash\n# acceptances still valid today, as JSON (an empty list without a register)\nif [ -f security/risk-acceptances.yaml ]; then yq -o=json '.' security/risk-acceptances.yaml > register.json; else echo '[]' > register.json; fi\ngh api --paginate \"/repos/$REPO/code-scanning/alerts?state=open&per_page=100\" | jq -e \\\n  --argjson crit {{CRITICAL_DAYS}} --argjson high {{HIGH_DAYS}} --argjson med {{MEDIUM_DAYS}} --slurpfile reg register.json '\n  ($reg[0] // [] | map(select((.expires | tostring | . + \"T00:00:00Z\" | fromdateiso8601) > now)) | map(.finding)) as $accepted\n  | [.[] | {sev: .rule.security_severity_level, age: ((now - (.created_at | fromdateiso8601)) / 86400),\n            rule: .rule.id, file: .most_recent_instance.location.path}\n         | select((.sev == \"critical\" and .age > $crit) or (.sev == \"high\" and .age > $high) or (.sev == \"medium\" and .age > $med))\n         | \"\\(.rule) \\(.file)\" as $key | select(($accepted | index($key)) == null)]\n  | if length > 0 then (map(\"\\(.rule) \\(.file) \\(.sev) \\(.age | floor)d\") | join(\"\\n\") | halt_error(1)) else true end'\n```",
       "hubWhen": {
         "FINDINGS": [
-          "sla"
+          "sla",
+          "risk-accepted"
         ]
       }
     },
@@ -864,10 +925,10 @@
       "type": "fitness-fn",
       "label": "Risk acceptances complete and current",
       "x": 1040,
-      "y": 1170,
+      "y": 1690,
       "category": "process",
-      "threshold": "0 overdue findings without a valid acceptance; 0 acceptances without owner, second approver, reason and expiry, expired, or valid longer than {{ACCEPTANCE_DAYS}} days",
-      "description": "A test over the register security/risk-acceptances.yaml fails on an incomplete, self-approved, expired or over-long acceptance; the deadline job over the code scanning alerts skips only the alerts the register names, so an overdue finding without an acceptance still fails the build.\n\nTool: Vitest over the risk register\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\n// security/risk-acceptances.yaml:\n// - { finding: \"CodeQL js/sql-injection src/report.ts:42\", owner: \"ola\", approver: \"sec-team/marek\",\n//     reason: \"allow-listed column names; module replaced in Q1\", controls: \"WAF rule 942100\", accepted: 2026-10-01, expires: 2026-12-30 }\ntype Acceptance = { finding: string; owner: string; approver: string; reason: string; accepted: string; expires: string }\nconst register: Acceptance[] = parse(readFileSync('security/risk-acceptances.yaml', 'utf8')) ?? []\nconst DAY = 86_400_000\n\nit('every risk acceptance is complete, approved by a second person and current', () => {\n  const bad = register.filter((r) =>\n    !r.finding || !r.owner || !r.approver || r.owner === r.approver || !r.reason\n    || Date.parse(r.expires) < Date.now()\n    || (Date.parse(r.expires) - Date.parse(r.accepted)) / DAY > {{ACCEPTANCE_DAYS}})\n  expect(bad.map((r) => r.finding)).toEqual([])\n})\n```",
+      "threshold": "0 acceptances without finding, owner, second approver, reason and expiry, self-approved, expired, or valid longer than {{ACCEPTANCE_DAYS}} days",
+      "description": "A test over the register security/risk-acceptances.yaml fails on an incomplete, self-approved, expired or over-long acceptance; the deadline job skips only the alerts a valid acceptance names (by \"<rule id> <path>\"), so an overdue finding without an acceptance still fails the build.\n\nTool: Vitest over the risk register\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\n// security/risk-acceptances.yaml:\n// - { finding: \"js/sql-injection src/report.ts\", owner: \"ola\", approver: \"sec-team/marek\",\n//     reason: \"allow-listed column names; module replaced in Q1\", controls: \"WAF rule 942100\", accepted: 2026-10-01, expires: 2026-12-30 }\ntype Acceptance = { finding: string; owner: string; approver: string; reason: string; controls: string; accepted: string; expires: string }\nconst register: Acceptance[] = parse(readFileSync('security/risk-acceptances.yaml', 'utf8')) ?? []\nconst DAY = 86_400_000\n\nit('every risk acceptance is complete, approved by a second person and current', () => {\n  const bad = register.filter((r) =>\n    !r.finding || !r.owner || !r.approver || r.owner === r.approver || !r.reason || !r.controls\n    || Date.parse(r.expires) < Date.now()\n    || (Date.parse(r.expires) - Date.parse(r.accepted)) / DAY > {{ACCEPTANCE_DAYS}})\n  expect(bad.map((r) => r.finding)).toEqual([])\n})\n```",
       "hubWhen": {
         "FINDINGS": [
           "risk-accepted"
@@ -879,10 +940,10 @@
       "type": "fitness-fn",
       "label": "CERT and MISRA checks as errors",
       "x": 1040,
-      "y": 1300,
+      "y": 1820,
       "category": "structural",
-      "threshold": "0 warnings from the cert-*, bugprone-* and clang-analyzer-* checks and 0 MISRA violations outside recorded deviations; the build fails on any",
-      "description": "clang-tidy runs over the compilation database with the CERT, bugprone and analyzer checks as errors and the unsafe-functions check naming the banned functions; cppcheck's MISRA add-on runs beside it with the rule texts, and suppressions live in a deviation file reviewed like code. The tests run under the sanitizers in a second configuration.\n\nTool: clang-tidy and cppcheck --addon=misra (PC-lint Plus or Polyspace where the safety case needs a certified analyser)\n\n```yaml\n# .clang-tidy   (CI: run-clang-tidy -p build -quiet; exits non-zero on an error)\nChecks: >\n  -*, cert-*, bugprone-*, clang-analyzer-*, misc-*,\n  cppcoreguidelines-pro-bounds-array-to-pointer-decay,\n  cppcoreguidelines-pro-bounds-constant-array-index\nWarningsAsErrors: 'cert-*,bugprone-*,clang-analyzer-*'\nCheckOptions:\n  - { key: bugprone-unsafe-functions.ReportDefaultFunctions, value: true }\n  - { key: bugprone-unsafe-functions.CustomFunctions,\n      value: '^::gets$,fgets,;^::strcpy$,strlcpy,;^::strcat$,strlcat,;^::sprintf$,snprintf,;^::system$,,;^::alloca$,,' }\n# MISRA C:2023, in the same job:\n#   cppcheck --addon=misra.json --enable=warning,style --error-exitcode=1 \\\n#            --suppressions-list=misra-deviations.txt --project=build/compile_commands.json\n# sanitizers: cmake -DCMAKE_CXX_FLAGS=\"-fsanitize=address,undefined -fno-omit-frame-pointer\" && ctest\n```",
+      "threshold": "0 warnings from the cert-*, bugprone-* and clang-analyzer-* checks, 0 uses of the banned functions, and 0 MISRA violations outside recorded deviations; the build fails on any",
+      "description": "clang-tidy runs over the compilation database with the CERT, bugprone and analyzer checks as errors and the unsafe-functions check naming the banned functions (system among them, so a command built from data cannot run); cppcheck's MISRA add-on runs beside it with the rule texts, and suppressions live in a deviation file reviewed like code. The tests run under the sanitizers in a second configuration.\n\nTool: clang-tidy and cppcheck --addon=misra (PC-lint Plus or Polyspace where the safety case needs a certified analyser)\n\n```yaml\n# .clang-tidy   (CI: run-clang-tidy -p build -quiet; exits non-zero on an error)\nChecks: >\n  -*, cert-*, bugprone-*, clang-analyzer-*, misc-*,\n  cppcoreguidelines-pro-bounds-array-to-pointer-decay,\n  cppcoreguidelines-pro-bounds-constant-array-index\nWarningsAsErrors: 'cert-*,bugprone-*,clang-analyzer-*'\nCheckOptions:\n  - { key: bugprone-unsafe-functions.ReportDefaultFunctions, value: true }\n  - { key: bugprone-unsafe-functions.CustomFunctions,\n      value: '^::gets$,fgets,;^::strcpy$,strlcpy,;^::strcat$,strlcat,;^::sprintf$,snprintf,;^::system$,,;^::alloca$,,' }\n# MISRA C:2023, in the same job:\n#   cppcheck --addon=misra.json --enable=warning,style --error-exitcode=1 \\\n#            --suppressions-list=misra-deviations.txt --project=build/compile_commands.json\n# sanitizers: cmake -DCMAKE_CXX_FLAGS=\"-fsanitize=address,undefined -fno-omit-frame-pointer\" && ctest\n```",
       "hubWhen": {
         "STANDARD": [
           "cert-misra"
@@ -894,10 +955,10 @@
       "type": "fitness-fn",
       "label": "Every feature has a current threat model",
       "x": 1040,
-      "y": 1430,
+      "y": 1950,
       "category": "process",
-      "threshold": "100 % of feature directories hold a threat-model.md with a row for each STRIDE category and 0 rows with status open or unmitigated",
-      "description": "A check in the pull-request pipeline walks the feature directories and fails when one has no threat-model.md, its table lacks a STRIDE category, or a row is still open; a CODEOWNERS entry for threat-model.md makes a security reviewer's approval required when it changes.\n\nTool: A shell check in CI with CODEOWNERS\n\n```bash\n# fails when a feature has no threat model, a STRIDE category is missing, or a threat is unmitigated\nstatus=0\nfor feature in src/features/*/; do\n  tm=\"${feature}threat-model.md\"\n  [ -f \"$tm\" ] || { echo \"$feature: no threat-model.md\"; status=1; continue; }\n  for category in Spoofing Tampering Repudiation \"Information disclosure\" \"Denial of service\" \"Elevation of privilege\"; do\n    grep -qi \"^| *$category\" \"$tm\" || { echo \"$tm: no row for $category\"; status=1; }\n  done\n  if grep -qiE '\\| *(open|unmitigated) *\\|' \"$tm\"; then echo \"$tm: unmitigated threat\"; status=1; fi\ndone\nexit $status\n# CODEOWNERS:  **/threat-model.md  @our-org/security-reviewers\n```",
+      "threshold": "100 % of feature directories hold a threat-model.md with a row for each STRIDE category, and 100 % of rows have the status mitigated or finding #<number>",
+      "description": "A check in the pull-request pipeline walks the feature directories and fails when one has no threat-model.md, its table lacks a STRIDE category, or a row's status (the last column) is anything but mitigated or a numbered finding under its deadline; a CODEOWNERS entry for threat-model.md makes a security reviewer's approval required when it changes.\n\nTool: A shell check in CI with CODEOWNERS\n\n```bash\n# threat-model.md: a table | Category | Asset | Threat | Mitigation | Status |, status = mitigated or finding #123\nstatus=0\nfor feature in src/features/*/; do\n  tm=\"${feature}threat-model.md\"\n  [ -f \"$tm\" ] || { echo \"$feature: no threat-model.md\"; status=1; continue; }\n  for category in Spoofing Tampering Repudiation \"Information disclosure\" \"Denial of service\" \"Elevation of privilege\"; do\n    grep -qi \"^| *$category\" \"$tm\" || { echo \"$tm: no row for $category\"; status=1; }\n  done\n  # every data row's last cell is \"mitigated\" or \"finding #<n>\"\n  grep -E '^\\|' \"$tm\" | grep -viE '^\\| *(category|-)' | awk -F'|' -v tm=\"$tm\" '\n    { s = $(NF-1); gsub(/^ +| +$/, \"\", s); if (s !~ /^(mitigated|finding #[0-9]+)$/) { print tm \": row not mitigated or a numbered finding: \" $0; bad = 1 } }\n    END { exit bad }' || status=1\ndone\nexit $status\n# CODEOWNERS:  **/threat-model.md  @our-org/security-reviewers\n```",
       "hubWhen": {
         "STANDARD": [
           "asvs-l2"
@@ -1221,6 +1282,72 @@
     {
       "id": "ff-input-400--implements--adr-cert-misra",
       "sourceId": "ff-input-400",
+      "targetId": "adr-cert-misra",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-argument-guards--implements--adr-asvs-l1",
+      "sourceId": "ff-argument-guards",
+      "targetId": "adr-asvs-l1",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-argument-guards--implements--adr-asvs-l2",
+      "sourceId": "ff-argument-guards",
+      "targetId": "adr-asvs-l2",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-argument-guards--implements--adr-cert-misra",
+      "sourceId": "ff-argument-guards",
+      "targetId": "adr-cert-misra",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-framework-defaults--implements--adr-asvs-l1",
+      "sourceId": "ff-framework-defaults",
+      "targetId": "adr-asvs-l1",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-framework-defaults--implements--adr-asvs-l2",
+      "sourceId": "ff-framework-defaults",
+      "targetId": "adr-asvs-l2",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-authz-coverage--implements--adr-asvs-l1",
+      "sourceId": "ff-authz-coverage",
+      "targetId": "adr-asvs-l1",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-authz-coverage--implements--adr-asvs-l2",
+      "sourceId": "ff-authz-coverage",
+      "targetId": "adr-asvs-l2",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-authz-coverage--implements--adr-cert-misra",
+      "sourceId": "ff-authz-coverage",
+      "targetId": "adr-cert-misra",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-triage-queue--implements--adr-asvs-l1",
+      "sourceId": "ff-triage-queue",
+      "targetId": "adr-asvs-l1",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-triage-queue--implements--adr-asvs-l2",
+      "sourceId": "ff-triage-queue",
+      "targetId": "adr-asvs-l2",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-triage-queue--implements--adr-cert-misra",
+      "sourceId": "ff-triage-queue",
       "targetId": "adr-cert-misra",
       "relationType": "implements"
     },
