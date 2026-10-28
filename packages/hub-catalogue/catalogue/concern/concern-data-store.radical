@@ -3,7 +3,7 @@
     "id": "concern-data-store",
     "category": "concern",
     "name": "Data store",
-    "description": "Which kind of data store keeps the element's data and which product, how consistent reads are, who runs it, and how its schema changes.",
+    "description": "Which kind of data store keeps the element's data and which product, how consistent reads are, who runs the engine, and how its schema changes.",
     "tags": [
       "technology",
       "database",
@@ -11,6 +11,7 @@
       "postgresql",
       "mongodb",
       "dynamodb",
+      "redis",
       "schema migrations"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
@@ -30,16 +31,20 @@
         "url": "https://martinfowler.com/bliki/PolyglotPersistence.html"
       },
       {
-        "title": "Danilo Sato: ParallelChange (expand and contract)",
-        "url": "https://martinfowler.com/bliki/ParallelChange.html"
-      },
-      {
-        "title": "Thoughtworks Technology Radar",
-        "url": "https://www.thoughtworks.com/radar"
+        "title": "Martin Kleppmann: Designing Data-Intensive Applications",
+        "url": "https://dataintensive.net/"
       },
       {
         "title": "endoflife.date: database support lifecycles",
         "url": "https://endoflife.date/"
+      },
+      {
+        "title": "PostgreSQL versioning policy",
+        "url": "https://www.postgresql.org/support/versioning/"
+      },
+      {
+        "title": "PostgreSQL documentation: constraints",
+        "url": "https://www.postgresql.org/docs/current/ddl-constraints.html"
       },
       {
         "title": "Amazon DynamoDB best practices",
@@ -50,8 +55,12 @@
         "url": "https://www.mongodb.com/docs/manual/core/schema-validation/"
       },
       {
-        "title": "Squawk, a linter for PostgreSQL migrations",
-        "url": "https://github.com/sbdchd/squawk"
+        "title": "MongoDB: the Schema Versioning pattern",
+        "url": "https://www.mongodb.com/blog/post/building-with-patterns-the-schema-versioning-pattern"
+      },
+      {
+        "title": "Regulation (EU) 2022/2554 (DORA), Art. 28: ICT third-party risk and exit strategies",
+        "url": "https://eur-lex.europa.eu/eli/reg/2022/2554/oj"
       }
     ],
     "templateParams": [
@@ -75,7 +84,7 @@
           {
             "value": "keyvalue",
             "label": "a key-value store (DynamoDB or Redis)",
-            "description": "Items read and written by key, with access patterns designed up front. Pick it for very high volume with a few known lookups (sessions, carts, counters, device state) needing single-digit-millisecond latency at any scale."
+            "description": "Items read and written by key, with access patterns designed up front. Pick it for very high volume with a few known lookups (sessions, carts, counters, device state) needing single-digit-millisecond latency at any scale. DynamoDB is only managed; self-hosting means Redis or Valkey."
           }
         ]
       },
@@ -94,26 +103,26 @@
           {
             "value": "eventual",
             "label": "eventual, with a bound on staleness",
-            "description": "Replicas and indexes may lag the primary by a bounded time. Pick it for read-heavy data that may be seconds old (catalogues, feeds, analytics) or replicas in several regions."
+            "description": "Replicas and indexes may lag the primary by a bounded time, asked below. Pick it for read-heavy data that may be seconds old (catalogues, feeds, analytics) or replicas in several regions."
           }
         ]
       },
       {
         "key": "HOSTING",
         "title": "Hosting",
-        "label": "Who runs the store?",
-        "hint": "Running a database well means patching, failover, backups, monitoring and tuning, at any hour.",
+        "label": "Who runs the engine?",
+        "hint": "Running a database well means patching, failover, backups, monitoring and tuning, at any hour. The engine's hosting is decided here, not in the Infrastructure pack.",
         "defaultValue": "managed",
         "options": [
           {
             "value": "managed",
             "label": "a managed cloud service",
-            "description": "Amazon RDS or Aurora, Azure Database for PostgreSQL, Cloud SQL, MongoDB Atlas, DynamoDB or ElastiCache run the engine. Pick it when the team has no database operators, or runs in a public cloud already."
+            "description": "Amazon RDS or Aurora, Azure Database, Cloud SQL, MongoDB Atlas, DynamoDB or ElastiCache run the engine. Pick it when the team has no database operators, or runs in a public cloud already."
           },
           {
             "value": "self",
             "label": "self-hosted by us",
-            "description": "We run the engine on our Kubernetes (CloudNativePG, Percona or MongoDB operators) or virtual machines (Patroni). Pick it when data must stay on premises, a provider is ruled out, or the scale makes a managed service too costly, and people with the skills are on call."
+            "description": "We run the engine on our Kubernetes (CloudNativePG, Percona or MongoDB operators) or virtual machines (Patroni). Pick it when data must stay on premises, a provider is ruled out, or the scale makes a managed service too costly, and people with the skills are on call. With a key-value store this means Redis or Valkey, not DynamoDB."
           }
         ]
       },
@@ -121,35 +130,35 @@
         "key": "MIGRATIONS",
         "title": "Schema changes",
         "label": "How does the schema change?",
-        "hint": "The schema will change many times while the system runs; each change has to be repeatable in every environment and safe for the code still running.",
+        "hint": "The schema will change many times while the system runs; each change has to be repeatable in every environment and safe for the code still running. Only when the store has a schema to migrate: a key-value store's tables and indexes are infrastructure code, and its item shapes carry a version.",
         "defaultValue": "tool",
         "options": [
           {
             "value": "tool",
             "label": "a versioned migration tool (Flyway or Liquibase)",
-            "description": "Numbered SQL (or changelog) migrations kept with the code, applied by the deploy. Pick it for relational stores, especially when several applications or languages share the tooling or DBAs review SQL."
+            "description": "Numbered SQL (or changelog) migrations kept with the code, applied by the deploy. Pick it for relational stores, especially when several applications or languages share the tooling or DBAs review SQL; for MongoDB, Liquibase with its MongoDB extension. Not with a key-value store."
           },
           {
             "value": "orm",
             "label": "the ORM's migrations (Prisma, EF Core, Alembic, Django)",
-            "description": "Migrations generated from the model in code and applied by the deploy. Pick it when one application owns the store and its ORM generates migrations the team reviews."
+            "description": "Migrations generated from the model in code and applied by the deploy. Pick it when one application owns a relational store and its ORM generates migrations the team reviews. Not with a document or key-value store: Prisma and Mongoose generate no migrations for MongoDB."
           },
           {
             "value": "lazy",
             "label": "a schema version per record, upgraded in code",
-            "description": "Each document or item carries its schema version; code upgrades old records when it reads them, and a backfill catches up. Pick it for document and key-value stores with large collections where rewriting everything at once is too costly."
+            "description": "Each document or item carries its schema version; code upgrades old records when it reads them, and a backfill catches up. Pick it for document and key-value stores with large collections where rewriting everything at once is too costly. Not with a relational database."
           }
         ]
       },
       {
         "key": "STALE_SECONDS",
-        "label": "How old may a read be when consistency is eventual (seconds)?",
+        "label": "How old may a read be when consistency is eventual (seconds)? Used only with eventual consistency",
         "defaultValue": "5",
         "type": "number"
       },
       {
         "key": "P99_MS",
-        "label": "What 99th-percentile latency must key lookups meet (ms)?",
+        "label": "What 99th-percentile latency must key lookups meet (ms)? Used only with a key-value store",
         "defaultValue": "20",
         "type": "number"
       }
@@ -164,7 +173,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Data store",
-      "description": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code."
+      "description": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-access-patterns",
@@ -173,18 +182,29 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "list every query the element makes in an access-pattern catalogue with its expected volume, and serve each from a key or index designed for it, with 0 full scans of a table or collection on a request path",
-      "rationale": "A store fits only if its data model serves the queries; a full scan that is fast at launch is a time-out a year later (Fowler, PolyglotPersistence; DynamoDB best practices: design for access patterns)."
+      "action": "list every query the element makes in an access-pattern catalogue with its expected volume, serve each from a key or index designed for it, and make 0 Scan or KEYS calls on a request path",
+      "rationale": "A key-value store fits only when every query is a known lookup; a scan that is fast at launch is a time-out a year later (DynamoDB best practices: design for access patterns; Fowler, PolyglotPersistence).",
+      "hubWhen": {
+        "MODEL": [
+          "keyvalue"
+        ]
+      }
     },
     {
-      "id": "req-expand-contract",
+      "id": "req-indexed-reads",
       "type": "requirement",
-      "label": "Schema changes without downtime",
+      "label": "Request paths read by index",
       "x": 260,
       "y": 130,
       "ears_type": "ubiquitous",
-      "action": "keep each schema change compatible with the previous release of the code (expand, migrate, then contract in a later release), so that a deploy needs 0 minutes of planned downtime",
-      "rationale": "During a rolling deploy the old and the new code run against the same schema; a change only the new code understands breaks the old (Sato, ParallelChange; Sadalage and Fowler, Evolutionary Database Design)."
+      "action": "serve every query on a request path from a key or an index, with 0 whole-table or whole-collection scans over a table or collection above 10,000 rows on a request path",
+      "rationale": "A full scan that is fast at launch is a time-out a year later; small tables are scanned by design and are not the problem (Fowler, PolyglotPersistence; Kleppmann, Designing Data-Intensive Applications, ch. 3).",
+      "hubWhen": {
+        "MODEL": [
+          "relational",
+          "document"
+        ]
+      }
     },
     {
       "id": "req-versioned",
@@ -200,6 +220,28 @@
         "MIGRATIONS": [
           "tool",
           "orm"
+        ],
+        "MODEL": [
+          "relational"
+        ]
+      }
+    },
+    {
+      "id": "req-versioned-doc",
+      "type": "requirement",
+      "label": "Collection changes are versioned",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "a change needs a different validator, index or reference data",
+      "action": "apply it as a versioned changeset committed with the code and run by the deploy pipeline with {{MIGRATIONS}}, with 0 validator or index changes made by hand in any shared environment",
+      "rationale": "A collection changed by hand differs between environments, and the difference shows up in production (Sadalage and Fowler, Evolutionary Database Design: all database artefacts are version controlled).",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "tool"
+        ],
+        "MODEL": [
+          "document"
         ]
       }
     },
@@ -208,14 +250,18 @@
       "type": "requirement",
       "label": "Old records upgraded",
       "x": 260,
-      "y": 390,
+      "y": 520,
       "ears_type": "event-driven",
       "trigger": "a record written under an older schema version is read",
       "action": "upgrade it to the current version in code before use, write it back at the next save, and backfill in the background so that 0 records are more than 2 schema versions behind",
-      "rationale": "Upgrading on read spreads the cost of a change over time; the backfill keeps the code from carrying upgraders for every version ever written (MongoDB Schema Versioning pattern).",
+      "rationale": "Upgrading on read spreads the cost of a change over time; the backfill keeps the code from carrying upgraders for every version ever written (MongoDB, the Schema Versioning pattern).",
       "hubWhen": {
         "MIGRATIONS": [
           "lazy"
+        ],
+        "MODEL": [
+          "document",
+          "keyvalue"
         ]
       }
     },
@@ -224,10 +270,10 @@
       "type": "requirement",
       "label": "Integrity enforced by the database",
       "x": 260,
-      "y": 520,
+      "y": 650,
       "ears_type": "ubiquitous",
       "action": "enforce the invariants between records in the database itself, with a primary key on 100% of tables, a foreign key on every reference column, and unique and check constraints for the rules they can express",
-      "rationale": "Every code path, script and future application obeys a constraint; only some of them obey application code (Evolutionary Database Design; PostgreSQL documentation, constraints).",
+      "rationale": "Every code path, script and future application obeys a constraint; only some of them obey application code (Sadalage and Fowler, Evolutionary Database Design; PostgreSQL documentation, constraints).",
       "hubWhen": {
         "MODEL": [
           "relational"
@@ -239,7 +285,7 @@
       "type": "requirement",
       "label": "Documents validated and bounded",
       "x": 260,
-      "y": 650,
+      "y": 780,
       "ears_type": "ubiquitous",
       "action": "store each aggregate as one document, validate 100% of collections with a JSON Schema validator that rejects invalid writes, and keep every document under 1 MB",
       "rationale": "Schema-flexible does not mean schema-free: a validator stops malformed documents at the door, and the size bound keeps documents well below MongoDB's 16 MB limit and fast to read (MongoDB schema validation).",
@@ -254,9 +300,9 @@
       "type": "requirement",
       "label": "Key lookups are fast",
       "x": 260,
-      "y": 780,
+      "y": 910,
       "ears_type": "ubiquitous",
-      "action": "answer 99% of key reads and writes within {{P99_MS}} ms at peak load, and keep every item under 400 KB",
+      "action": "answer 99% of key reads and writes within {{P99_MS}} ms as measured by the store, and keep every item under 400 KB",
       "rationale": "Predictable low latency at any scale is the reason to give up queries; 400 KB is DynamoDB's item limit, and large values in Redis block other commands (DynamoDB best practices).",
       "hubWhen": {
         "MODEL": [
@@ -269,11 +315,11 @@
       "type": "requirement",
       "label": "Operations commit whole",
       "x": 260,
-      "y": 910,
+      "y": 1040,
       "ears_type": "event-driven",
       "trigger": "a business operation changes several records",
       "action": "commit all its changes in one transaction, so that 0 readers see part of the operation and a failure leaves none of it",
-      "rationale": "A half-applied operation (money taken, order not created) is the hardest kind of bug to find and repair (ACID; Kleppmann, Designing Data-Intensive Applications, ch. 7).",
+      "rationale": "A half-applied operation (money taken, order not created) is the hardest kind of bug to find and repair (Kleppmann, Designing Data-Intensive Applications, ch. 7).",
       "hubWhen": {
         "CONSISTENCY": [
           "strong"
@@ -285,7 +331,7 @@
       "type": "requirement",
       "label": "Staleness is bounded",
       "x": 260,
-      "y": 1040,
+      "y": 1170,
       "ears_type": "state-driven",
       "precondition": "replicas or secondary indexes lag behind the primary",
       "action": "serve reads at most {{STALE_SECONDS}} seconds old, and read from the primary wherever a user must see their own write",
@@ -301,10 +347,10 @@
       "type": "requirement",
       "label": "Data can leave the provider",
       "x": 260,
-      "y": 1170,
+      "y": 1300,
       "ears_type": "ubiquitous",
-      "action": "keep a logical export of all data, no older than 24 hours, in storage the organisation controls and in a format another provider or a self-hosted engine can load",
-      "rationale": "A managed service is a dependency on one provider; an export it does not hold is the exit plan (EBA Guidelines on outsourcing arrangements, exit strategies; DORA Art. 28).",
+      "action": "keep a daily logical export of all data in storage the organisation controls, in a format a self-hosted engine of the same kind loads, with the newest export less than 26 hours old",
+      "rationale": "A managed service is a dependency on one provider; an export it does not hold is the exit plan (DORA Art. 28, exit strategies). Loading it into a self-hosted engine is the restore drill of the Backup and recovery pack.",
       "hubWhen": {
         "HOSTING": [
           "managed"
@@ -316,7 +362,7 @@
       "type": "requirement",
       "label": "Engine patched on time",
       "x": 260,
-      "y": 1300,
+      "y": 1430,
       "ears_type": "event-driven",
       "trigger": "a minor or security release of the database engine is published",
       "action": "apply it within 30 days by a rolling upgrade with automatic failover, keeping writes unavailable for under 30 seconds",
@@ -330,22 +376,33 @@
     {
       "id": "sc-access-patterns",
       "type": "scenario",
-      "label": "No scan on request path",
+      "label": "Scan on request path refused",
       "x": 520,
       "y": 0,
-      "given": "the access-pattern catalogue and the store with production-sized data",
-      "when": "every listed query runs and its plan is read",
-      "then": "each uses a key or an index, and none scans a whole table or collection"
+      "given": "the access-pattern catalogue and the request-handling code",
+      "when": "a change calls Scan or KEYS outside a batch job",
+      "then": "the lint fails naming the call",
+      "hubWhen": {
+        "MODEL": [
+          "keyvalue"
+        ]
+      }
     },
     {
-      "id": "sc-expand-contract",
+      "id": "sc-indexed-reads",
       "type": "scenario",
-      "label": "Old code survives migration",
+      "label": "No scan on request path",
       "x": 520,
       "y": 130,
-      "given": "the previous release running against the store",
-      "when": "the next release's migrations are applied",
-      "then": "the previous release's tests still pass against the migrated schema"
+      "given": "the store loaded with production-sized data and its scan counters reset",
+      "when": "the request-path test suite runs and the counters are read",
+      "then": "no table or collection above 10,000 rows was scanned whole",
+      "hubWhen": {
+        "MODEL": [
+          "relational",
+          "document"
+        ]
+      }
     },
     {
       "id": "sc-versioned",
@@ -360,6 +417,27 @@
         "MIGRATIONS": [
           "tool",
           "orm"
+        ],
+        "MODEL": [
+          "relational"
+        ]
+      }
+    },
+    {
+      "id": "sc-versioned-doc",
+      "type": "scenario",
+      "label": "Changeset applied by pipeline",
+      "x": 520,
+      "y": 390,
+      "given": "a change that adds an index",
+      "when": "it is deployed to each environment in turn",
+      "then": "the same versioned changeset is applied by the pipeline everywhere, and the changelog history matches in every environment",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "tool"
+        ],
+        "MODEL": [
+          "document"
         ]
       }
     },
@@ -368,13 +446,17 @@
       "type": "scenario",
       "label": "Old record read",
       "x": 520,
-      "y": 390,
+      "y": 520,
       "given": "a record at schema version N-1",
       "when": "the element reads it and later saves it",
       "then": "it is used as version N and stored as version N",
       "hubWhen": {
         "MIGRATIONS": [
           "lazy"
+        ],
+        "MODEL": [
+          "document",
+          "keyvalue"
         ]
       }
     },
@@ -383,7 +465,7 @@
       "type": "scenario",
       "label": "Dangling reference refused",
       "x": 520,
-      "y": 520,
+      "y": 650,
       "given": "an order line that references an order",
       "when": "a line is inserted for an order that does not exist",
       "then": "the database refuses the insert",
@@ -398,7 +480,7 @@
       "type": "scenario",
       "label": "Invalid document refused",
       "x": 520,
-      "y": 650,
+      "y": 780,
       "given": "a collection with its JSON Schema validator",
       "when": "a document missing a required field is inserted",
       "then": "the database refuses the write",
@@ -413,10 +495,10 @@
       "type": "scenario",
       "label": "Lookups within target",
       "x": 520,
-      "y": 780,
+      "y": 910,
       "given": "the store at production volume",
-      "when": "a load test reads and writes by key at peak rate for 10 minutes",
-      "then": "the 99th percentile stays within {{P99_MS}} ms",
+      "when": "a day of key reads and writes has been served and the store's latency percentiles are read",
+      "then": "the 99th percentile of reads and of writes is within {{P99_MS}} ms",
       "hubWhen": {
         "MODEL": [
           "keyvalue"
@@ -428,7 +510,7 @@
       "type": "scenario",
       "label": "Failure leaves nothing",
       "x": 520,
-      "y": 910,
+      "y": 1040,
       "given": "an operation that writes three records",
       "when": "it fails after the second write",
       "then": "none of the three records is changed and no reader saw the first two",
@@ -443,7 +525,7 @@
       "type": "scenario",
       "label": "Own write visible",
       "x": 520,
-      "y": 1040,
+      "y": 1170,
       "given": "a user who has just changed a record",
       "when": "the user reads it again while replicas lag",
       "then": "the user sees the change, and other readers see it within {{STALE_SECONDS}} seconds",
@@ -456,12 +538,12 @@
     {
       "id": "sc-exit",
       "type": "scenario",
-      "label": "Export loads elsewhere",
+      "label": "Export is fresh",
       "x": 520,
-      "y": 1170,
-      "given": "the latest export",
-      "when": "it is loaded into a self-hosted engine of the same kind",
-      "then": "it loads without error and is less than 24 hours old",
+      "y": 1300,
+      "given": "the storage the organisation controls",
+      "when": "the freshness check runs",
+      "then": "the newest export there is less than 26 hours old",
       "hubWhen": {
         "HOSTING": [
           "managed"
@@ -473,7 +555,7 @@
       "type": "scenario",
       "label": "Minor release applied",
       "x": 520,
-      "y": 1300,
+      "y": 1430,
       "given": "a new minor release of the engine",
       "when": "30 days have passed",
       "then": "every node runs it, and the failover during the upgrade kept writes unavailable for under 30 seconds",
@@ -492,9 +574,9 @@
       "concern": "data-store",
       "status": "accepted",
       "date": "",
-      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern.",
-      "decision": "The data is kept in a relational database: PostgreSQL by default, MySQL where the team or platform already runs it. Consistency: {{CONSISTENCY}}; hosting: {{HOSTING}} (managed: Amazon RDS or Aurora, Azure Database for PostgreSQL flexible server, Google Cloud SQL; self-hosted: CloudNativePG on Kubernetes or Patroni on virtual machines). Schema changes: {{MIGRATIONS}}, linted with Squawk for PostgreSQL. Constraints, not only code, enforce the invariants; JSONB columns hold the parts whose shape varies. Choosing PostgreSQL or MySQL: PostgreSQL for richer types (JSONB, arrays, ranges), extensions (PostGIS, pgvector) and transactional DDL; MySQL when existing operations know it. Choosing managed or self-hosted: managed unless data residency, cost at scale or an on-premises platform rules it out.",
-      "consequences": "• Any query can be written later, including the reports and back-office searches nobody listed today.\n• Transactions and constraints keep the data consistent across entities without application code.\n• Scaling writes past one primary needs partitioning, sharding (Citus, Vitess) or a different store for the hot path.\n• Schema changes need migrations and expand-and-contract discipline.",
+      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern; whether a change ships as expand and contract or in a window is decided in the Deployment and rollback pack.",
+      "decision": "The data is kept in a relational database: PostgreSQL by default, MySQL where the team or platform already runs it. Consistency: {{CONSISTENCY}}; where it is eventual, reads are at most {{STALE_SECONDS}} seconds old. Hosting: {{HOSTING}} (managed: Amazon RDS or Aurora, Azure Database for PostgreSQL or for MySQL flexible server, Google Cloud SQL; self-hosted: CloudNativePG on Kubernetes or Patroni on virtual machines). Schema changes: {{MIGRATIONS}}; whether a change ships as expand and contract or in a window, and how migrations are linted for it, is decided in the Deployment and rollback pack. Constraints, not only code, enforce the invariants; JSONB columns hold the parts whose shape varies. Choosing PostgreSQL or MySQL: PostgreSQL for richer types (JSONB, arrays, ranges), extensions (PostGIS, pgvector) and transactional DDL; MySQL when existing operations know it. Choosing managed or self-hosted: managed unless data residency, cost at scale or an on-premises platform rules it out.",
+      "consequences": "• Any query can be written later, including the reports and back-office searches nobody listed today.\n• Transactions and constraints keep the data consistent across entities without application code.\n• Scaling writes past one primary needs partitioning, sharding (Citus, Vitess) or a different store for the hot path.\n• Every schema change is a migration, planned with the code version still running.",
       "alternatives": "1. A document database: aggregates read whole and flexible shapes, at the cost of joins and cross-document constraints.\n2. A key-value store: scale and latency for known lookups, no ad hoc queries.\n3. A distributed SQL database (CockroachDB, YugabyteDB, Spanner): relational with horizontal write scale, more cost and latency per write.",
       "hubWhen": {
         "MODEL": [
@@ -511,8 +593,8 @@
       "concern": "data-store",
       "status": "accepted",
       "date": "",
-      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern.",
-      "decision": "The data is kept in a document database, MongoDB, one document per aggregate, with a JSON Schema validator on every collection. Consistency: {{CONSISTENCY}} (majority write concern; reads from the primary or with majority read concern where it must be strong); hosting: {{HOSTING}} (managed: MongoDB Atlas; self-hosted: the MongoDB or Percona operator on Kubernetes). Schema changes: {{MIGRATIONS}}. References between aggregates by id; multi-document transactions only where one operation must change two aggregates. Choosing MongoDB or a PostgreSQL JSONB column: MongoDB when most data is documents and scale-out by sharding is likely; JSONB when only a part of a mostly relational model varies in shape. Amazon DocumentDB or Azure Cosmos DB for MongoDB only after checking the features you need are compatible.",
+      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern; whether a change ships as expand and contract or in a window is decided in the Deployment and rollback pack.",
+      "decision": "The data is kept in a document database, MongoDB, one document per aggregate, with a JSON Schema validator on every collection. Consistency: {{CONSISTENCY}} (majority write concern; reads from the primary or with majority read concern where it must be strong); where it is eventual, secondaries serve reads at most {{STALE_SECONDS}} seconds old. Hosting: {{HOSTING}} (managed: MongoDB Atlas; self-hosted: the MongoDB or Percona operator on Kubernetes). Schema changes: {{MIGRATIONS}}; whether a change ships as expand and contract or in a window is decided in the Deployment and rollback pack. References between aggregates by id; multi-document transactions only where one operation must change two aggregates. Choosing MongoDB or a PostgreSQL JSONB column: MongoDB when most data is documents and scale-out by sharding is likely; JSONB when only a part of a mostly relational model varies in shape. Amazon DocumentDB or Azure Cosmos DB for MongoDB only after checking the features you need are compatible.",
       "consequences": "• An aggregate is read and written in one operation, with no mapping to tables.\n• Shapes can vary between records, and the validator still stops malformed writes.\n• Joins and constraints across documents are the application's job; queries not planned for need new indexes or pipelines.\n• Data duplicated across documents for read speed must be kept in step by code.",
       "alternatives": "1. A relational database with JSONB columns: constraints and joins with flexible parts.\n2. A key-value store: simpler and faster for lookups by key, no queries on content.\n3. A search engine (OpenSearch) as the main store: great for text search, weak as a system of record.",
       "hubWhen": {
@@ -530,8 +612,8 @@
       "concern": "data-store",
       "status": "accepted",
       "date": "",
-      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern.",
-      "decision": "The data is kept in a key-value store designed from its access patterns: Amazon DynamoDB (single-table design, keys and global secondary indexes per listed access pattern, on-demand or provisioned capacity) for durable data on AWS; Redis (or Valkey) with persistence only for small, short-lived or rebuildable data such as sessions, counters and rate limits. Consistency: {{CONSISTENCY}} (DynamoDB strongly consistent reads and TransactWriteItems where it must be strong); hosting: {{HOSTING}} (managed: DynamoDB, ElastiCache or MemoryDB; self-hosted: Redis with Sentinel or Valkey cluster). Schema changes: {{MIGRATIONS}}. No Scan on a request path. Choosing DynamoDB or Redis: DynamoDB when the data must survive and grow without limit; Redis when it fits in memory and losing the last second is acceptable. Outside AWS: Azure Cosmos DB or Google Bigtable play DynamoDB's part.",
+      "context": "This element keeps the system's data, and the store chosen for it outlives most of the code around it: data is far harder to move than code. The forces: the way the data is queried (ad hoc and across entities, whole aggregates by id, or a few known lookups at very high volume) favours different data models; some operations must never be seen half done, while others can accept reading slightly old data in exchange for scale and availability; a managed service takes patching, failover and backups off the team but adds a provider, its limits and its bill, while self-hosting needs people who can run the engine at three in the morning; and the schema will change many times while the system is live, so every change has to be repeatable and safe for the code version still running. Backup and recovery is its own concern; whether a change ships as expand and contract or in a window is decided in the Deployment and rollback pack.",
+      "decision": "The data is kept in a key-value store designed from its access patterns: Amazon DynamoDB (single-table design, keys and global secondary indexes per listed access pattern, on-demand or provisioned capacity) for durable data on AWS; Redis (or Valkey) with persistence only for small, short-lived or rebuildable data such as sessions, counters and rate limits. Key reads and writes answer within {{P99_MS}} ms at the 99th percentile, measured by the store. Consistency: {{CONSISTENCY}} (DynamoDB strongly consistent reads and TransactWriteItems where it must be strong); where it is eventual, replicas and global tables lag at most {{STALE_SECONDS}} seconds. Hosting: {{HOSTING}} (managed: DynamoDB, ElastiCache or MemoryDB; self-hosted: Redis with Sentinel or Valkey cluster). Schema changes: tables and indexes are infrastructure code applied by the pipeline; item shapes carry a schema version and old items are upgraded in code when read. No Scan on a request path. Choosing DynamoDB or Redis: DynamoDB when the data must survive and grow without limit; Redis when it fits in memory and losing the last second is acceptable. Outside AWS: Azure Cosmos DB or Google Bigtable play DynamoDB's part.",
       "consequences": "• Single-digit-millisecond latency at any scale, with capacity that scales without re-architecture.\n• Every query must be designed up front; a new access pattern means a new index or a backfill.\n• No joins and limited transactions; reports and analytics go to an export (DynamoDB to S3, Athena) rather than the store.\n• DynamoDB ties the element to AWS; the item and transaction limits shape the design.",
       "alternatives": "1. A relational database: any query, transactions and constraints, with less headroom for scale.\n2. A document database: richer queries on content, more operational work.\n3. A cache in front of a relational database: keeps queries flexible and lookups fast, adds invalidation.",
       "hubWhen": {
@@ -547,11 +629,32 @@
       "x": 1040,
       "y": 0,
       "category": "process",
-      "threshold": "Every migration applies to an empty database and to the previous release's schema; 0 checksum mismatches against applied migrations",
-      "description": "On every pull request the pipeline starts the production engine and version, applies all migrations from empty, and validates them; the deploy runs migrate and validate against each environment. With Liquibase the same is `liquibase update` followed by `liquibase validate`.\n\nTool: Flyway\n\n```yaml\n# .github/workflows/migrations.yml\njobs:\n  migrations:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:17          # the production major version\n        env: { POSTGRES_PASSWORD: test, POSTGRES_DB: app }\n        ports: ['5432:5432']\n        options: --health-cmd pg_isready --health-interval 5s\n    steps:\n      - uses: actions/checkout@v4\n      - run: |\n          docker run --rm --network host -v \"$PWD/db/migration:/flyway/sql\" flyway/flyway:11 \\\n            -url=jdbc:postgresql://localhost:5432/app -user=postgres -password=test \\\n            -validateMigrationNaming=true migrate validate\n```",
+      "threshold": "Every migration applies to an empty database of the production engine and version; 0 checksum mismatches against applied migrations",
+      "description": "On every pull request the pipeline starts the production engine and version, applies all migrations from empty, and validates them; the deploy runs migrate and validate against each environment, so a schema changed by hand shows up as a validation failure. With Liquibase the same is `liquibase update` followed by `liquibase validate`.\n\nTool: Flyway (PostgreSQL shown; MySQL: the mysql service image and a jdbc:mysql URL)\n\n```yaml\n# .github/workflows/migrations.yml\njobs:\n  migrations:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:17          # the production major version\n        env: { POSTGRES_PASSWORD: test, POSTGRES_DB: app }\n        ports: ['5432:5432']\n        options: --health-cmd pg_isready --health-interval 5s\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: |\n          docker run --rm --network host -v \"$PWD/db/migration:/flyway/sql\" flyway/flyway:11 \\\n            -url=jdbc:postgresql://localhost:5432/app -user=postgres -password=test \\\n            -validateMigrationNaming=true migrate validate\n```",
       "hubWhen": {
         "MIGRATIONS": [
           "tool"
+        ],
+        "MODEL": [
+          "relational"
+        ]
+      }
+    },
+    {
+      "id": "ff-liquibase-mongo",
+      "type": "fitness-fn",
+      "label": "Changesets apply cleanly",
+      "x": 1040,
+      "y": 130,
+      "category": "process",
+      "threshold": "Every changeset applies to an empty MongoDB of the production version; after the update the changelog reports nothing pending",
+      "description": "On every pull request the pipeline starts the production MongoDB version, applies the changelog from empty with Liquibase and its MongoDB extension (the extension and MongoDB driver jars are kept in db/lib and mounted into /liquibase/lib), and checks that status reports the database up to date; the deploy runs the same update against each environment.\n\nTool: Liquibase with the liquibase-mongodb extension\n\n```yaml\n# .github/workflows/migrations.yml\njobs:\n  migrations:\n    runs-on: ubuntu-latest\n    services:\n      mongo:\n        image: mongo:8.0            # the production version\n        ports: ['27017:27017']\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: |\n          lb() { docker run --rm --network host -v \"$PWD/db:/liquibase/changelog\" -v \"$PWD/db/lib:/liquibase/lib\" \\\n                   liquibase/liquibase:4.31 --url=\"mongodb://localhost:27017/app\" --changelog-file=changelog.xml \"$@\"; }\n          lb update\n          lb status --verbose | grep -q 'is up to date'\n```",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "tool"
+        ],
+        "MODEL": [
+          "document"
         ]
       }
     },
@@ -560,43 +663,82 @@
       "type": "fitness-fn",
       "label": "Model and migrations agree",
       "x": 1040,
-      "y": 130,
+      "y": 260,
       "category": "process",
       "threshold": "0 differences between the model in code and the committed migrations",
-      "description": "The build fails when the model in code changed without a migration. Prisma compares the migrations with the schema; the equivalents are `dotnet ef migrations has-pending-model-changes` (EF Core), `alembic check` (Alembic) and `python manage.py makemigrations --check --dry-run` (Django).\n\nTool: Prisma Migrate (prisma migrate diff)\n\n```bash\n# exits 2 when the schema and the migrations differ\nnpx prisma migrate diff \\\n  --from-migrations prisma/migrations \\\n  --to-schema-datamodel prisma/schema.prisma \\\n  --shadow-database-url \"$SHADOW_DATABASE_URL\" \\\n  --exit-code\n```",
+      "description": "The build fails when the model in code changed without a migration, so every schema change is a committed, versioned migration.\n\nTool: Prisma Migrate (prisma migrate diff); EF Core: dotnet ef migrations has-pending-model-changes; Alembic: alembic check; Django: manage.py makemigrations --check --dry-run\n\n```bash\n# exits 2 when the schema and the migrations differ\nnpx prisma migrate diff \\\n  --from-migrations prisma/migrations \\\n  --to-schema-datamodel prisma/schema.prisma \\\n  --shadow-database-url \"$SHADOW_DATABASE_URL\" \\\n  --exit-code\n```",
       "hubWhen": {
         "MIGRATIONS": [
           "orm"
+        ],
+        "MODEL": [
+          "relational"
         ]
       }
     },
     {
       "id": "ff-schema-versions",
       "type": "fitness-fn",
-      "label": "No record far behind",
+      "label": "No document far behind",
       "x": 1040,
-      "y": 260,
+      "y": 390,
       "category": "operational",
-      "threshold": "0 records more than 2 schema versions behind the current one",
-      "description": "A scheduled job counts the records per schema version in each collection and fails when any is more than two versions behind; the backfill job then runs. For DynamoDB, the same count comes from a sparse index on the schema version attribute.\n\nTool: mongosh (scheduled job)\n\n```js\n// check-schema-versions.js — mongosh \"$MONGODB_URI\" --file check-schema-versions.js\nconst CURRENT = { orders: 7, customers: 4 }   // the version the code writes\nlet behind = 0\nfor (const [name, version] of Object.entries(CURRENT)) {\n  const n = db.getCollection(name).countDocuments({ schemaVersion: { $lt: version - 2 } })\n  if (n > 0) print(`${name}: ${n} documents more than 2 versions behind`)\n  behind += n\n}\nif (behind > 0) quit(1)\n```",
+      "threshold": "0 documents more than 2 schema versions behind the current one, documents without a version field included",
+      "description": "A scheduled job counts the documents per collection that are more than two versions behind the version the code writes, or carry no schema version at all (the oldest of all), and fails when any exist; the backfill job then runs.\n\nTool: mongosh (scheduled job)\n\n```js\n// check-schema-versions.js — mongosh \"$MONGODB_URI\" --file check-schema-versions.js\nconst CURRENT = { orders: 7, customers: 4 }   // the version the code writes\nlet behind = 0\nfor (const [name, version] of Object.entries(CURRENT)) {\n  const n = db.getCollection(name).countDocuments({\n    $or: [{ schemaVersion: { $lt: version - 2 } }, { schemaVersion: { $exists: false } }],\n  })\n  if (n > 0) print(`${name}: ${n} documents more than 2 versions behind`)\n  behind += n\n}\nif (behind > 0) quit(1)\n```",
       "hubWhen": {
         "MIGRATIONS": [
           "lazy"
+        ],
+        "MODEL": [
+          "document"
         ]
       }
     },
     {
-      "id": "ff-squawk",
+      "id": "ff-schema-versions-kv",
       "type": "fitness-fn",
-      "label": "Migrations safe to deploy",
+      "label": "No item far behind",
       "x": 1040,
-      "y": 390,
+      "y": 520,
+      "category": "operational",
+      "threshold": "0 items more than 2 schema versions behind the current one, items without a version attribute included",
+      "description": "A scheduled batch job (the one place a Scan is allowed) counts the items more than two versions behind the version the code writes, or without a schema version at all, and fails when any exist; the backfill job then runs. The CLI pages the scan and sums the count.\n\nTool: AWS CLI (DynamoDB); Redis: a SCAN over the key space in a job, reading the version field of each value\n\n```bash\n#!/usr/bin/env bash\n# CURRENT: the schema version the code writes; TABLE from the environment\nset -euo pipefail\nCURRENT=7\nbehind=$(aws dynamodb scan --table-name \"$TABLE\" --select COUNT \\\n  --filter-expression 'attribute_not_exists(schemaVersion) OR schemaVersion < :v' \\\n  --expression-attribute-values \"{\\\":v\\\":{\\\"N\\\":\\\"$((CURRENT - 2))\\\"}}\" --query Count --output text)\n[ \"$behind\" -eq 0 ] || { echo \"$behind items more than 2 schema versions behind\"; exit 1; }\n```",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "lazy"
+        ],
+        "MODEL": [
+          "keyvalue"
+        ]
+      }
+    },
+    {
+      "id": "ff-seq-scan",
+      "type": "fitness-fn",
+      "label": "No sequential scan on request paths",
+      "x": 1040,
+      "y": 650,
       "category": "structural",
-      "threshold": "0 Squawk findings in new migrations (no dropped or renamed column in use, no blocking index build, no NOT NULL column without a default)",
-      "description": "Squawk lints the SQL of each new migration for changes that lock tables or break the code still running; the build fails on any finding.\n\nTool: Squawk\n\n```bash\n# lint only the migrations the pull request adds\ngit diff --name-only --diff-filter=A origin/main -- 'db/migration/*.sql' \\\n  | xargs --no-run-if-empty npx squawk-cli \\\n      --exclude=prefer-big-int,prefer-text-field\n```",
+      "threshold": "0 sequential scans over a table above 10,000 rows during the request-path test suite",
+      "description": "The integration pipeline loads a database with production-sized data, resets the statistics, runs the request-path test suite, then reads pg_stat_user_tables: a table above 10,000 rows with a sequential scan since the reset fails the job.\n\nTool: psql (PostgreSQL); MySQL: sys.schema_tables_with_full_table_scans after the same suite\n\n```sql\n-- before the request-path test suite, on a database loaded with production-sized data:\nSELECT pg_stat_reset();\n\n-- after it: tables above 10,000 rows that were read whole; the job fails on any row\nSELECT relname, seq_scan, n_live_tup\nFROM pg_stat_user_tables\nWHERE n_live_tup > 10000 AND seq_scan > 0\nORDER BY seq_scan DESC;\n```",
       "hubWhen": {
         "MODEL": [
           "relational"
+        ]
+      }
+    },
+    {
+      "id": "ff-collscan",
+      "type": "fitness-fn",
+      "label": "No collection scan on request paths",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "0 COLLSCAN operations over a collection above 10,000 documents during the request-path test suite",
+      "description": "The integration pipeline loads a database with production-sized data, turns the profiler on for every operation, runs the request-path test suite, then reads system.profile: an operation whose plan was a collection scan over a collection above 10,000 documents fails the job.\n\nTool: mongosh\n\n```js\n// before the request-path test suite: db.setProfilingLevel(2)\n// after it — mongosh \"$MONGODB_URI\" --file check-collscan.js\nconst big = db.getCollectionNames()\n  .filter((n) => !n.startsWith('system.') && db.getCollection(n).estimatedDocumentCount() > 10000)\n  .map((n) => `${db.getName()}.${n}`)\nconst scans = db.system.profile.find({ planSummary: 'COLLSCAN', ns: { $in: big } }).toArray()\nif (scans.length) {\n  print(scans.map((s) => `${s.ns}: ${JSON.stringify(s.command)}`).join('\\n'))\n  quit(1)\n}\n```",
+      "hubWhen": {
+        "MODEL": [
+          "document"
         ]
       }
     },
@@ -605,7 +747,7 @@
       "type": "fitness-fn",
       "label": "Keys and foreign keys present",
       "x": 1040,
-      "y": 520,
+      "y": 910,
       "category": "structural",
       "threshold": "100% of tables have a primary key; 0 columns named *_id without a foreign key",
       "description": "A test migrates a fresh database in a container and queries the catalogue for tables without a primary key and reference columns without a foreign key; both lists must be empty.\n\nTool: Testcontainers with a SQL query on information_schema (PostgreSQL)\n\n```sql\n-- tables without a primary key\nSELECT t.table_name FROM information_schema.tables t\nWHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'\n  AND NOT EXISTS (SELECT 1 FROM information_schema.table_constraints c\n                  WHERE c.table_name = t.table_name AND c.constraint_type = 'PRIMARY KEY');\n\n-- reference columns without a foreign key\nSELECT k.table_name, k.column_name FROM information_schema.columns k\nWHERE k.table_schema = 'public' AND k.column_name LIKE '%\\_id'\n  AND NOT EXISTS (SELECT 1 FROM information_schema.key_column_usage u\n                  JOIN information_schema.table_constraints c USING (constraint_name, table_name)\n                  WHERE c.constraint_type = 'FOREIGN KEY'\n                    AND u.table_name = k.table_name AND u.column_name = k.column_name);\n```",
@@ -620,7 +762,7 @@
       "type": "fitness-fn",
       "label": "Collections validate writes",
       "x": 1040,
-      "y": 650,
+      "y": 1040,
       "category": "structural",
       "threshold": "100% of collections have a $jsonSchema validator with validationLevel strict and validationAction error",
       "description": "A check run after each deploy lists the collections and fails when one has no JSON Schema validator, or one that only warns.\n\nTool: mongosh\n\n```js\n// check-validators.js — mongosh \"$MONGODB_URI\" --file check-validators.js\nconst missing = db.getCollectionInfos({ type: 'collection' })\n  .filter((c) => !c.name.startsWith('system.'))\n  .filter((c) => !c.options?.validator?.$jsonSchema\n    || (c.options.validationLevel ?? 'strict') !== 'strict'\n    || (c.options.validationAction ?? 'error') !== 'error')\n  .map((c) => c.name)\nif (missing.length) { print('Collections without a strict validator: ' + missing.join(', ')); quit(1) }\n```",
@@ -635,13 +777,43 @@
       "type": "fitness-fn",
       "label": "No Scan in request code",
       "x": 1040,
-      "y": 780,
+      "y": 1170,
       "category": "structural",
-      "threshold": "0 uses of Scan outside batch jobs",
-      "description": "A lint rule forbids the DynamoDB Scan command in request-handling code; batch jobs under src/jobs are exempt. For Redis, the same rule forbids KEYS.\n\nTool: ESLint (no-restricted-imports)\n\n```js\n// eslint.config.mjs\nexport default [\n  {\n    files: ['src/**/*.ts'],\n    ignores: ['src/jobs/**'],\n    rules: {\n      'no-restricted-imports': ['error', {\n        paths: [\n          { name: '@aws-sdk/client-dynamodb', importNames: ['ScanCommand'], message: 'ADR Key-value store: serve requests from a key or index, never Scan.' },\n          { name: '@aws-sdk/lib-dynamodb', importNames: ['ScanCommand'], message: 'ADR Key-value store: serve requests from a key or index, never Scan.' },\n        ],\n      }],\n    },\n  },\n]\n```",
+      "threshold": "0 uses of the DynamoDB Scan command or the Redis KEYS command outside src/jobs",
+      "description": "A lint rule forbids importing the DynamoDB Scan command and calling keys() on a client in request-handling code; batch jobs under src/jobs are exempt.\n\nTool: ESLint (Node.js); other runtimes: a Semgrep rule on the same call names\n\n```js\n// eslint.config.mjs\nexport default [\n  {\n    files: ['src/**/*.ts'],\n    ignores: ['src/jobs/**'],\n    rules: {\n      'no-restricted-imports': ['error', {\n        paths: [\n          { name: '@aws-sdk/client-dynamodb', importNames: ['ScanCommand'], message: 'ADR Key-value store: serve requests from a key or index, never Scan.' },\n          { name: '@aws-sdk/lib-dynamodb', importNames: ['ScanCommand'], message: 'ADR Key-value store: serve requests from a key or index, never Scan.' },\n        ],\n      }],\n      'no-restricted-syntax': ['error', {\n        selector: 'CallExpression[callee.property.name=\"keys\"][callee.object.name!=\"Object\"]',\n        message: 'ADR Key-value store: KEYS blocks Redis; use SCAN in a job under src/jobs, never in a request.',\n      }],\n    },\n  },\n]\n```",
       "hubWhen": {
         "MODEL": [
           "keyvalue"
+        ]
+      }
+    },
+    {
+      "id": "ff-kv-latency",
+      "type": "fitness-fn",
+      "label": "Key lookups within target",
+      "x": 1040,
+      "y": 1300,
+      "category": "operational",
+      "threshold": "99th percentile of the store's request latency for GetItem and PutItem at most {{P99_MS}} ms in every hour of the last 24 hours",
+      "description": "A daily job reads the store's own latency percentile per operation from CloudWatch (SuccessfulRequestLatency, p99, hourly) and fails when any hour exceeds the budget. Runs on Linux (GNU date).\n\nTool: AWS CLI with CloudWatch SuccessfulRequestLatency (DynamoDB); Redis: redis-benchmark -t get,set against the production-sized store, reading its p99 line\n\n```bash\n#!/usr/bin/env bash\n# daily: the store's p99 for key reads and writes over the last 24 hours, per hour\nset -euo pipefail\nfail=0\nfor op in GetItem PutItem; do\n  p99=$(aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB --metric-name SuccessfulRequestLatency \\\n    --dimensions Name=TableName,Value=\"$TABLE\" Name=Operation,Value=\"$op\" \\\n    --start-time \"$(date -u -d '24 hours ago' +%FT%TZ)\" --end-time \"$(date -u +%FT%TZ)\" --period 3600 \\\n    --extended-statistics p99 --query 'max(Datapoints[].ExtendedStatistics.p99)' --output text)\n  [ \"$p99\" = None ] || [ \"$(jq -n \"$p99 <= {{P99_MS}}\")\" = true ] || { echo \"$op p99 $p99 ms, budget {{P99_MS}} ms\"; fail=1; }\ndone\nexit $fail\n```",
+      "hubWhen": {
+        "MODEL": [
+          "keyvalue"
+        ]
+      }
+    },
+    {
+      "id": "ff-atomic",
+      "type": "fitness-fn",
+      "label": "Failed operation leaves nothing",
+      "x": 1040,
+      "y": 1430,
+      "category": "structural",
+      "threshold": "For every business operation that writes several records: a fault after its second write leaves 0 records changed",
+      "description": "An integration test against the real engine (Testcontainers) injects a fault after the second write of an operation through the repository's test hook and asserts that none of its records exists afterwards; one such test per multi-record operation.\n\nTool: Vitest (or your stack's test runner) with Testcontainers\n\n```ts\nimport { afterEach, expect, it } from 'vitest'\nimport { failAfterWrites, reset } from '../src/data/testHooks'   // the repository's fault injection, test builds only\nimport { orderLines, orders, placeOrder } from '../src/orders'\n\nafterEach(reset)\n\nit('a failure after the second write leaves nothing of the operation', async () => {\n  failAfterWrites(2)                                           // the third write throws\n  await expect(placeOrder(sampleOrderWithThreeLines())).rejects.toThrow()\n  expect(await orders.find(sampleOrderId)).toBeNull()\n  expect(await orderLines.countFor(sampleOrderId)).toBe(0)\n})\n```",
+      "hubWhen": {
+        "CONSISTENCY": [
+          "strong"
         ]
       }
     },
@@ -650,13 +822,52 @@
       "type": "fitness-fn",
       "label": "Replica lag within bound",
       "x": 1040,
-      "y": 910,
+      "y": 1560,
       "category": "operational",
       "threshold": "Replica lag at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it",
-      "description": "An alert on the exporter's replication-lag metric pages when replicas fall further behind than the bound. For MongoDB use the replica set member lag from the MongoDB exporter; for DynamoDB global tables, the ReplicationLatency metric in CloudWatch.\n\nTool: Prometheus with postgres_exporter\n\n```yaml\ngroups:\n  - name: data-store\n    rules:\n      - alert: ReplicaLagAboveBound\n        expr: max by (instance) (pg_replication_lag_seconds) > 5   # STALE_SECONDS\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          summary: \"Replica {{ $labels.instance }} lags {{ $value }}s behind the primary\"\n```",
+      "description": "An alert on postgres_exporter's replication-lag metric pages when a replica falls further behind than the bound.\n\nTool: Prometheus with postgres_exporter (PostgreSQL); MySQL: mysqld_exporter's mysql_slave_status_seconds_behind_master\n\n```yaml\ngroups:\n  - name: data-store\n    rules:\n      - alert: ReplicaLagAboveBound\n        expr: max by (instance) (pg_replication_lag_seconds) > {{STALE_SECONDS}}\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          summary: \"Replica {{ $labels.instance }} lags {{ $value }}s behind the primary\"\n```",
       "hubWhen": {
         "CONSISTENCY": [
           "eventual"
+        ],
+        "MODEL": [
+          "relational"
+        ]
+      }
+    },
+    {
+      "id": "ff-replica-lag-document",
+      "type": "fitness-fn",
+      "label": "Secondary lag within bound",
+      "x": 1040,
+      "y": 1690,
+      "category": "operational",
+      "threshold": "Replica set member lag at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it",
+      "description": "An alert on the MongoDB exporter's member replication lag (compatible-mode metric from replSetGetStatus) pages when a secondary falls further behind than the bound.\n\nTool: Prometheus with the Percona mongodb_exporter (--compatible-mode)\n\n```yaml\ngroups:\n  - name: data-store\n    rules:\n      - alert: SecondaryLagAboveBound\n        expr: max by (set, name) (mongodb_mongod_replset_member_replication_lag{state=\"SECONDARY\"}) > {{STALE_SECONDS}}\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          summary: \"{{ $labels.name }} in {{ $labels.set }} lags {{ $value }}s behind the primary\"\n```",
+      "hubWhen": {
+        "CONSISTENCY": [
+          "eventual"
+        ],
+        "MODEL": [
+          "document"
+        ]
+      }
+    },
+    {
+      "id": "ff-replica-lag-kv",
+      "type": "fitness-fn",
+      "label": "Replication lag within bound",
+      "x": 1040,
+      "y": 1820,
+      "category": "operational",
+      "threshold": "Redis replica lag, or DynamoDB global table replication latency, at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it",
+      "description": "Two alert rules: the Redis exporter's replica lag, and DynamoDB's ReplicationLatency (milliseconds, per receiving region) brought into Prometheus by the CloudWatch exporter; either pages when a replica falls further behind than the bound.\n\nTool: Prometheus with redis_exporter and the CloudWatch exporter (aws_dynamodb_replication_latency_maximum)\n\n```yaml\ngroups:\n  - name: data-store\n    rules:\n      - alert: RedisReplicaLagAboveBound\n        expr: max by (instance) (redis_connected_slave_lag_seconds) > {{STALE_SECONDS}}\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          summary: \"Redis {{ $labels.instance }}: a replica lags {{ $value }}s\"\n      - alert: DynamoDBReplicationLagAboveBound\n        expr: max by (table_name, receiving_region) (aws_dynamodb_replication_latency_maximum) / 1000 > {{STALE_SECONDS}}\n        for: 2m\n        labels: { severity: page }\n        annotations:\n          summary: \"{{ $labels.table_name }} replicates to {{ $labels.receiving_region }} with {{ $value }}s latency\"\n```",
+      "hubWhen": {
+        "CONSISTENCY": [
+          "eventual"
+        ],
+        "MODEL": [
+          "keyvalue"
         ]
       }
     },
@@ -665,10 +876,10 @@
       "type": "fitness-fn",
       "label": "Export is fresh",
       "x": 1040,
-      "y": 1040,
+      "y": 1950,
       "category": "operational",
-      "threshold": "The newest export in our own storage is less than 26 hours old; a monthly job loads it into a self-hosted engine without error",
-      "description": "A scheduled check finds the newest export object in the bucket the organisation controls and fails when it is older than 26 hours (a daily export with two hours of slack).\n\nTool: AWS CLI (scheduled check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nnewest=$(aws s3api list-objects-v2 --bucket \"$EXPORT_BUCKET\" --prefix exports/ \\\n  --query 'sort_by(Contents, &LastModified)[-1].LastModified' --output text)\nage=$(( $(date +%s) - $(date -d \"$newest\" +%s) ))\n[ \"$age\" -lt $((26 * 3600)) ] || { echo \"newest export is $((age / 3600)) h old\"; exit 1; }\n```",
+      "threshold": "The newest export in storage the organisation controls is less than 26 hours old",
+      "description": "A scheduled check lists the export location through rclone (S3, Azure Blob Storage, Google Cloud Storage and others alike), takes the newest object's modification time and fails when it is older than 26 hours (a daily export with two hours of slack). Runs on Linux (GNU date).\n\nTool: rclone with jq (scheduled check)\n\n```bash\n#!/usr/bin/env bash\n# EXPORT_REMOTE: an rclone remote in storage we control, e.g. s3:exports/orders, azblob:exports/orders, gcs:exports/orders\nset -euo pipefail\nnewest=$(rclone lsjson \"$EXPORT_REMOTE\" --files-only --recursive | jq -r 'max_by(.ModTime).ModTime')\n[ \"$newest\" != null ] || { echo \"no export found in $EXPORT_REMOTE\"; exit 1; }\nage=$(( $(date +%s) - $(date -d \"$newest\" +%s) ))\n[ \"$age\" -lt $((26 * 3600)) ] || { echo \"newest export is $((age / 3600)) h old\"; exit 1; }\n```",
       "hubWhen": {
         "HOSTING": [
           "managed"
@@ -676,17 +887,56 @@
       }
     },
     {
-      "id": "ff-engine-current",
+      "id": "ff-engine-current-relational",
       "type": "fitness-fn",
-      "label": "Engine on latest minor",
+      "label": "PostgreSQL on latest minor",
       "x": 1040,
-      "y": 1170,
+      "y": 2080,
       "category": "operational",
-      "threshold": "Every node runs the latest minor release of its major, or one published less than 30 days ago; 0 majors past end of support",
-      "description": "A scheduled job compares the version each node reports with the latest release of its major on endoflife.date, and fails when the latest has been out for more than 30 days or the major has reached end of support. Products: postgresql, mysql, mongodb, redis.\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nrunning=$(psql \"$DATABASE_URL\" -tAc 'SHOW server_version' | cut -d' ' -f1)   # e.g. 17.4\nmajor=${running%%.*}\ninfo=$(curl -fsS \"https://endoflife.date/api/postgresql/${major}.json\")\nlatest=$(jq -r '.latest' <<<\"$info\"); released=$(jq -r '.latestReleaseDate' <<<\"$info\"); eol=$(jq -r '.eol' <<<\"$info\")\n[ \"$eol\" != \"true\" ] && { [ \"$eol\" = \"false\" ] || [ \"$(date -d \"$eol\" +%s)\" -gt \"$(date +%s)\" ]; } \\\n  || { echo \"PostgreSQL $major is past end of support\"; exit 1; }\nif [ \"$running\" != \"$latest\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '30 days ago' +%s)\" ]; then\n  echo \"running $running, $latest released on $released\"; exit 1\nfi\n```",
+      "threshold": "Every PostgreSQL node runs the latest release of its postgresql cycle on endoflife.date, or one published less than 30 days ago; 0 cycles past end of support",
+      "description": "A scheduled job asks each node its version, looks its cycle up on endoflife.date (postgresql) and fails when the newest release of the cycle has been out for more than 30 days without being applied, or the cycle has reached end of support. Runs on Linux (GNU date).\n\nTool: endoflife.date API with psql (PostgreSQL); MySQL: SELECT VERSION() and the mysql product, cycle of two numbers\n\n```bash\n#!/usr/bin/env bash\n# run once per node; the node's connection string comes from the environment\nset -euo pipefail\nrunning=$(psql \"$DATABASE_URL\" -tAc 'SHOW server_version' | cut -d' ' -f1)\ncycle=$(cut -d. -f1-1 <<<\"$running\")\ninfo=$(curl -fsS \"https://endoflife.date/api/postgresql/${cycle}.json\")\nlatest=$(jq -r '.latest' <<<\"$info\"); released=$(jq -r '.latestReleaseDate' <<<\"$info\"); eol=$(jq -r '.eol' <<<\"$info\")\nif [ \"$eol\" = true ] || { [ \"$eol\" != false ] && [ \"$(date -d \"$eol\" +%s)\" -lt \"$(date +%s)\" ]; }; then\n  echo \"PostgreSQL $cycle is past end of support ($eol)\"; exit 1\nfi\nif [ \"$running\" != \"$latest\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '30 days ago' +%s)\" ]; then\n  echo \"running $running, $latest released on $released (30 days allowed)\"; exit 1\nfi\n```",
       "hubWhen": {
         "HOSTING": [
           "self"
+        ],
+        "MODEL": [
+          "relational"
+        ]
+      }
+    },
+    {
+      "id": "ff-engine-current-document",
+      "type": "fitness-fn",
+      "label": "MongoDB on latest minor",
+      "x": 1040,
+      "y": 2210,
+      "category": "operational",
+      "threshold": "Every MongoDB node runs the latest release of its mongodb cycle on endoflife.date, or one published less than 30 days ago; 0 cycles past end of support",
+      "description": "A scheduled job asks each node its version, looks its cycle up on endoflife.date (mongodb) and fails when the newest release of the cycle has been out for more than 30 days without being applied, or the cycle has reached end of support. Runs on Linux (GNU date).\n\nTool: endoflife.date API with mongosh\n\n```bash\n#!/usr/bin/env bash\n# run once per node; the node's connection string comes from the environment\nset -euo pipefail\nrunning=$(mongosh \"$MONGODB_URI\" --quiet --eval 'db.version()')\ncycle=$(cut -d. -f1-2 <<<\"$running\")\ninfo=$(curl -fsS \"https://endoflife.date/api/mongodb/${cycle}.json\")\nlatest=$(jq -r '.latest' <<<\"$info\"); released=$(jq -r '.latestReleaseDate' <<<\"$info\"); eol=$(jq -r '.eol' <<<\"$info\")\nif [ \"$eol\" = true ] || { [ \"$eol\" != false ] && [ \"$(date -d \"$eol\" +%s)\" -lt \"$(date +%s)\" ]; }; then\n  echo \"MongoDB $cycle is past end of support ($eol)\"; exit 1\nfi\nif [ \"$running\" != \"$latest\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '30 days ago' +%s)\" ]; then\n  echo \"running $running, $latest released on $released (30 days allowed)\"; exit 1\nfi\n```",
+      "hubWhen": {
+        "HOSTING": [
+          "self"
+        ],
+        "MODEL": [
+          "document"
+        ]
+      }
+    },
+    {
+      "id": "ff-engine-current-keyvalue",
+      "type": "fitness-fn",
+      "label": "Redis on latest minor",
+      "x": 1040,
+      "y": 2340,
+      "category": "operational",
+      "threshold": "Every Redis node runs the latest release of its redis cycle on endoflife.date, or one published less than 30 days ago; 0 cycles past end of support",
+      "description": "A scheduled job asks each node its version, looks its cycle up on endoflife.date (redis) and fails when the newest release of the cycle has been out for more than 30 days without being applied, or the cycle has reached end of support. Runs on Linux (GNU date).\n\nTool: endoflife.date API with redis-cli (Redis; Valkey: the valkey product)\n\n```bash\n#!/usr/bin/env bash\n# run once per node; the node's connection string comes from the environment\nset -euo pipefail\nrunning=$(redis-cli -u \"$REDIS_URL\" INFO server | tr -d '\\r' | awk -F: '/^redis_version:/ { print $2 }')\ncycle=$(cut -d. -f1-2 <<<\"$running\")\ninfo=$(curl -fsS \"https://endoflife.date/api/redis/${cycle}.json\")\nlatest=$(jq -r '.latest' <<<\"$info\"); released=$(jq -r '.latestReleaseDate' <<<\"$info\"); eol=$(jq -r '.eol' <<<\"$info\")\nif [ \"$eol\" = true ] || { [ \"$eol\" != false ] && [ \"$(date -d \"$eol\" +%s)\" -lt \"$(date +%s)\" ]; }; then\n  echo \"Redis $cycle is past end of support ($eol)\"; exit 1\nfi\nif [ \"$running\" != \"$latest\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '30 days ago' +%s)\" ]; then\n  echo \"running $running, $latest released on $released (30 days allowed)\"; exit 1\nfi\n```",
+      "hubWhen": {
+        "HOSTING": [
+          "self"
+        ],
+        "MODEL": [
+          "keyvalue"
         ]
       }
     }
@@ -699,14 +949,20 @@
       "relationType": "derives"
     },
     {
-      "id": "req-expand-contract--derives--need",
-      "sourceId": "req-expand-contract",
+      "id": "req-indexed-reads--derives--need",
+      "sourceId": "req-indexed-reads",
       "targetId": "need",
       "relationType": "derives"
     },
     {
       "id": "req-versioned--derives--need",
       "sourceId": "req-versioned",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-versioned-doc--derives--need",
+      "sourceId": "req-versioned-doc",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -765,15 +1021,21 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-expand-contract--verifies--req-expand-contract",
-      "sourceId": "sc-expand-contract",
-      "targetId": "req-expand-contract",
+      "id": "sc-indexed-reads--verifies--req-indexed-reads",
+      "sourceId": "sc-indexed-reads",
+      "targetId": "req-indexed-reads",
       "relationType": "verifies"
     },
     {
       "id": "sc-versioned--verifies--req-versioned",
       "sourceId": "sc-versioned",
       "targetId": "req-versioned",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-versioned-doc--verifies--req-versioned-doc",
+      "sourceId": "sc-versioned-doc",
+      "targetId": "req-versioned-doc",
       "relationType": "verifies"
     },
     {
@@ -831,38 +1093,14 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-flyway--implements--adr-document",
-      "sourceId": "ff-flyway",
+      "id": "ff-liquibase-mongo--implements--adr-document",
+      "sourceId": "ff-liquibase-mongo",
       "targetId": "adr-document",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-flyway--implements--adr-keyvalue",
-      "sourceId": "ff-flyway",
-      "targetId": "adr-keyvalue",
       "relationType": "implements"
     },
     {
       "id": "ff-orm-drift--implements--adr-relational",
       "sourceId": "ff-orm-drift",
-      "targetId": "adr-relational",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-orm-drift--implements--adr-document",
-      "sourceId": "ff-orm-drift",
-      "targetId": "adr-document",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-orm-drift--implements--adr-keyvalue",
-      "sourceId": "ff-orm-drift",
-      "targetId": "adr-keyvalue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-schema-versions--implements--adr-relational",
-      "sourceId": "ff-schema-versions",
       "targetId": "adr-relational",
       "relationType": "implements"
     },
@@ -873,15 +1111,21 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-schema-versions--implements--adr-keyvalue",
-      "sourceId": "ff-schema-versions",
+      "id": "ff-schema-versions-kv--implements--adr-keyvalue",
+      "sourceId": "ff-schema-versions-kv",
       "targetId": "adr-keyvalue",
       "relationType": "implements"
     },
     {
-      "id": "ff-squawk--implements--adr-relational",
-      "sourceId": "ff-squawk",
+      "id": "ff-seq-scan--implements--adr-relational",
+      "sourceId": "ff-seq-scan",
       "targetId": "adr-relational",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-collscan--implements--adr-document",
+      "sourceId": "ff-collscan",
+      "targetId": "adr-document",
       "relationType": "implements"
     },
     {
@@ -903,20 +1147,44 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-kv-latency--implements--adr-keyvalue",
+      "sourceId": "ff-kv-latency",
+      "targetId": "adr-keyvalue",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-atomic--implements--adr-relational",
+      "sourceId": "ff-atomic",
+      "targetId": "adr-relational",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-atomic--implements--adr-document",
+      "sourceId": "ff-atomic",
+      "targetId": "adr-document",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-atomic--implements--adr-keyvalue",
+      "sourceId": "ff-atomic",
+      "targetId": "adr-keyvalue",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-replica-lag--implements--adr-relational",
       "sourceId": "ff-replica-lag",
       "targetId": "adr-relational",
       "relationType": "implements"
     },
     {
-      "id": "ff-replica-lag--implements--adr-document",
-      "sourceId": "ff-replica-lag",
+      "id": "ff-replica-lag-document--implements--adr-document",
+      "sourceId": "ff-replica-lag-document",
       "targetId": "adr-document",
       "relationType": "implements"
     },
     {
-      "id": "ff-replica-lag--implements--adr-keyvalue",
-      "sourceId": "ff-replica-lag",
+      "id": "ff-replica-lag-kv--implements--adr-keyvalue",
+      "sourceId": "ff-replica-lag-kv",
       "targetId": "adr-keyvalue",
       "relationType": "implements"
     },
@@ -939,20 +1207,20 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-engine-current--implements--adr-relational",
-      "sourceId": "ff-engine-current",
+      "id": "ff-engine-current-relational--implements--adr-relational",
+      "sourceId": "ff-engine-current-relational",
       "targetId": "adr-relational",
       "relationType": "implements"
     },
     {
-      "id": "ff-engine-current--implements--adr-document",
-      "sourceId": "ff-engine-current",
+      "id": "ff-engine-current-document--implements--adr-document",
+      "sourceId": "ff-engine-current-document",
       "targetId": "adr-document",
       "relationType": "implements"
     },
     {
-      "id": "ff-engine-current--implements--adr-keyvalue",
-      "sourceId": "ff-engine-current",
+      "id": "ff-engine-current-keyvalue--implements--adr-keyvalue",
+      "sourceId": "ff-engine-current-keyvalue",
       "targetId": "adr-keyvalue",
       "relationType": "implements"
     }
