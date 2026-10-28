@@ -3,7 +3,7 @@
     "id": "concern-rate-limiting",
     "category": "concern",
     "name": "Rate limiting and abuse",
-    "description": "Entry points from outside: how much one caller may ask, how it is counted and where, how oversized and automated requests are stopped, and who can reach it at all.",
+    "description": "Entry points from outside: how much one caller may ask, how it is counted and where, and how oversized and automated requests are stopped. Whether an element is reachable from outside at all is not decided here (network segmentation is a pack of its own).",
     "tags": [
       "security",
       "rate-limiting",
@@ -24,6 +24,10 @@
       {
         "title": "OWASP API Security Top 10 2023, API4:2023 Unrestricted Resource Consumption",
         "url": "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/"
+      },
+      {
+        "title": "OWASP API Security Top 10 2023, API6:2023 Unrestricted Access to Sensitive Business Flows",
+        "url": "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/"
       },
       {
         "title": "RFC 6585, Additional HTTP Status Codes (4. 429 Too Many Requests)",
@@ -51,7 +55,7 @@
         "key": "EXPOSURE",
         "title": "Exposure",
         "label": "Who can reach it?",
-        "hint": "Anything on the internet is probed and scraped within hours of going live; what is not reachable cannot be flooded.",
+        "hint": "Anything on the internet is probed and scraped within hours of going live; a partner API has known callers and agreed limits.",
         "defaultValue": "internet",
         "options": [
           {
@@ -62,12 +66,7 @@
           {
             "value": "partners",
             "label": "known partners and our signed-in users",
-            "description": "Every request carries a partner key or a user's credential, checked at the edge. Pick it for B2B APIs and back offices; limits can be agreed per partner."
-          },
-          {
-            "value": "internal",
-            "label": "only our own network",
-            "description": "No public address; only our own systems call it. Pick it when the model shows callers only from inside; limits still stop a runaway internal caller."
+            "description": "Every request carries a partner key or a user's credential, checked at the edge, so callers are counted by account or API key, not by address. Pick it for B2B APIs and back offices; limits can be agreed per partner."
           }
         ]
       },
@@ -91,7 +90,7 @@
           {
             "value": "ip",
             "label": "its source address",
-            "description": "IPv4 per address, IPv6 per /64. Pick it only when callers are anonymous; offices and mobile carriers share addresses, so allow-list the known ones."
+            "description": "IPv4 per address, IPv6 per /64. Pick it only when callers are anonymous; offices and mobile carriers share addresses, so allow-list the known ones. Not with known partners, whose every request carries a key to count by."
           }
         ]
       },
@@ -163,7 +162,7 @@
           {
             "value": "none",
             "label": "costly operations only for identified callers",
-            "description": "No bot product; costly operations sit behind sign-in or a partner key. Pick it for partner and internal APIs, where every caller is known."
+            "description": "No bot product; costly operations sit behind sign-in or a partner key. Pick it for partner APIs and back offices, where every caller is known."
           }
         ]
       },
@@ -347,7 +346,7 @@
       "y": 1170,
       "ears_type": "state-driven",
       "precondition": "the element runs on more than one instance",
-      "action": "keep the counters in one shared store, so that the element as a whole accepts no more than {{LIMIT_PER_MIN}} requests a minute from one caller, within 10 %, and fall back to a per-instance limit rather than none when the store is unreachable",
+      "action": "keep the counters in one shared store, so that the element as a whole accepts no more from one caller than one instance would, within 10 %, and fall back to a per-instance limit rather than none when the store is unreachable",
       "rationale": "A limit counted per instance multiplies with every instance added; failing open would turn a store outage into an open door (OWASP Denial of Service Cheat Sheet).",
       "hubWhen": {
         "WHERE": [
@@ -395,7 +394,7 @@
       "y": 1560,
       "ears_type": "ubiquitous",
       "action": "offer {{COSTLY_OPS}} only to callers with a valid account or partner key, so that each can be counted and blocked by who it is",
-      "rationale": "Without bot protection, the only defence for a costly operation is that nobody anonymous can reach it (OWASP API6:2023 Unrestricted Access to Sensitive Business Flows).",
+      "rationale": "Without bot protection, the only defence for a costly operation is that nobody anonymous can reach it (OWASP API6:2023).",
       "hubWhen": {
         "BOTS": [
           "none"
@@ -434,29 +433,14 @@
       }
     },
     {
-      "id": "req-internal",
-      "type": "requirement",
-      "label": "Reachable only inside",
-      "x": 260,
-      "y": 1950,
-      "ears_type": "ubiquitous",
-      "action": "accept connections only from our own network, with no public address and no route from the internet",
-      "rationale": "Not reachable is the strongest limit; the decision records it so that exposing the element later is a decision too.",
-      "hubWhen": {
-        "EXPOSURE": [
-          "internal"
-        ]
-      }
-    },
-    {
       "id": "sc-limit",
       "type": "scenario",
       "label": "Excess refused",
       "x": 520,
       "y": 0,
       "given": "one caller and ten others at normal load",
-      "when": "the one sends {{LIMIT_PER_MIN}} requests and then 100 more within a minute",
-      "then": "the extra requests get 429 with Retry-After, and the others' 95th percentile stays within 10 % of normal"
+      "when": "the one sends ten times {{LIMIT_PER_MIN}} requests a minute for three minutes",
+      "then": "at least 99 % of its excess gets 429 with Retry-After, and the others' 95th percentile stays within 10 % of normal"
     },
     {
       "id": "sc-size",
@@ -464,9 +448,9 @@
       "label": "Large body refused",
       "x": 520,
       "y": 130,
-      "given": "an operation that accepts {{MAX_BODY_KB}} KB at most",
-      "when": "a 100 MB body is sent",
-      "then": "it is refused with 413 and the element's memory does not grow by more than the limit"
+      "given": "every write operation of the router",
+      "when": "a body of 100 times {{MAX_BODY_KB}} KB is sent to each",
+      "then": "each is refused with 413"
     },
     {
       "id": "sc-pages",
@@ -474,9 +458,9 @@
       "label": "Page size capped",
       "x": 520,
       "y": 260,
-      "given": "a list of 10 000 items",
-      "when": "a caller asks for a page of 10 000",
-      "then": "the request is refused with 400, and a request without a page size gets at most {{MAX_PAGE_ITEMS}} items"
+      "given": "every paginated operation of the router",
+      "when": "a caller asks each for a page of 10 000, and then for a page without a size",
+      "then": "the first is refused with 400, and the second holds at most {{MAX_PAGE_ITEMS}} items"
     },
     {
       "id": "sc-token-bucket",
@@ -485,8 +469,8 @@
       "x": 520,
       "y": 390,
       "given": "a caller that has sent nothing for a minute",
-      "when": "it sends {{BURST}} requests at once and then keeps sending at twice its rate",
-      "then": "the burst is accepted, and afterwards requests above {{LIMIT_PER_MIN}} a minute get 429",
+      "when": "it sends {{BURST}} requests at once and then twice its rate for a minute",
+      "then": "the burst is accepted, and of the minute's requests no more than {{LIMIT_PER_MIN}} plus 10 % are, the rest getting 429",
       "hubWhen": {
         "ALGORITHM": [
           "token-bucket"
@@ -516,7 +500,7 @@
       "y": 650,
       "given": "a caller that has made 10 requests this minute",
       "when": "it makes another",
-      "then": "the response says the limit is {{LIMIT_PER_MIN}}, how many remain and when the window resets",
+      "then": "the response says the limit is {{LIMIT_PER_MIN}}, that {{LIMIT_PER_MIN}} minus 11 remain, and when the window resets",
       "hubWhen": {
         "ALGORITHM": [
           "fixed-window"
@@ -544,9 +528,9 @@
       "label": "Invalid key ignored",
       "x": 520,
       "y": 910,
-      "given": "a partner's key with its limit almost used",
-      "when": "another source sends 1 000 requests naming that key with a wrong secret",
-      "then": "they are refused with 401, the partner's remaining limit does not change, and the source is limited after {{ANON_LIMIT_PER_MIN}}",
+      "given": "a partner's key with one request of its limit left",
+      "when": "another source sends {{ANON_LIMIT_PER_MIN}} and 10 more requests naming that key with a wrong secret, and then the partner sends its request",
+      "then": "the forged requests are refused with 401, then 429 after {{ANON_LIMIT_PER_MIN}}, and the partner's request is accepted",
       "hubWhen": {
         "KEY": [
           "apikey"
@@ -560,8 +544,8 @@
       "x": 520,
       "y": 1040,
       "given": "a caller over its limit",
-      "when": "it sends requests with a different X-Forwarded-For value each time, and then from other addresses in its /64",
-      "then": "they are all counted against the same caller and refused",
+      "when": "it sends a request with a forged X-Forwarded-For value, and then from another address in its /64",
+      "then": "both are counted against the same caller and refused",
       "hubWhen": {
         "KEY": [
           "ip"
@@ -571,12 +555,12 @@
     {
       "id": "sc-shared-counters",
       "type": "scenario",
-      "label": "Limit holds on four instances",
+      "label": "Limit holds on two instances",
       "x": 520,
       "y": 1170,
-      "given": "four instances behind a load balancer",
-      "when": "one caller sends twice {{LIMIT_PER_MIN}} requests in a minute spread over all four",
-      "then": "no more than {{LIMIT_PER_MIN}} plus 10 % are accepted in total",
+      "given": "two instances sharing a store",
+      "when": "one caller sends twice {{LIMIT_PER_MIN}} requests in a minute spread over both, and again with the store stopped",
+      "then": "no more than one instance alone accepts plus 10 % are accepted, and with the store stopped the caller is still refused past one instance's limit",
       "hubWhen": {
         "WHERE": [
           "app"
@@ -590,8 +574,8 @@
       "x": 520,
       "y": 1300,
       "given": "one source",
-      "when": "it calls the first of {{COSTLY_OPS}} 11 times in 10 minutes",
-      "then": "the 11th attempt is answered with a challenge, and a new source's first attempt is not",
+      "when": "its first attempt at one of {{COSTLY_OPS}} is made, and then 10 more in 10 minutes",
+      "then": "the first attempt sees no challenge and the 11th is answered with one",
       "hubWhen": {
         "BOTS": [
           "challenge"
@@ -619,9 +603,9 @@
       "label": "Anonymous costly call refused",
       "x": 520,
       "y": 1560,
-      "given": "a caller without a credential",
-      "when": "it calls the first of {{COSTLY_OPS}}",
-      "then": "it is refused with 401",
+      "given": "every route the router marks costly",
+      "when": "each is called without a credential",
+      "then": "each is refused with 401",
       "hubWhen": {
         "BOTS": [
           "none"
@@ -635,8 +619,8 @@
       "x": 520,
       "y": 1690,
       "given": "the element behind its edge",
-      "when": "its origin address is called directly from the internet",
-      "then": "the connection is refused",
+      "when": "each of its origin addresses is called directly from the internet",
+      "then": "every connection is refused",
       "hubWhen": {
         "EXPOSURE": [
           "internet"
@@ -659,21 +643,6 @@
       }
     },
     {
-      "id": "sc-internal",
-      "type": "scenario",
-      "label": "Closed from outside",
-      "x": 520,
-      "y": 1950,
-      "given": "the element deployed",
-      "when": "its addresses and ports are scanned from outside the network",
-      "then": "none answers",
-      "hubWhen": {
-        "EXPOSURE": [
-          "internal"
-        ]
-      }
-    },
-    {
       "id": "adr-gateway",
       "type": "adr",
       "label": "Limits at the API gateway",
@@ -682,7 +651,7 @@
       "concern": "rate-limiting",
       "status": "accepted",
       "date": "",
-      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all.",
+      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all. Snippets assume the router's table in src/app (routes with method, path, an example and the flags paginated and costly), black-box tests against $BASE_URL of a staging deployment with credentials in TOKEN_* variables, the gateway's decK file under gateway/, and Terraform plans read with terraform show -json.",
       "decision": "Requests pass an API gateway that limits each caller, counted by {{KEY}}, to {{LIMIT_PER_MIN}} requests a minute using {{ALGORITHM}}, refuses bodies over {{MAX_BODY_KB}} KB, and answers the excess with 429 and Retry-After; counters are shared by all gateway nodes. The element is reachable by {{EXPOSURE}}; bots on costly operations: {{BOTS}}. Choosing the gateway: the one already in the path. Match the algorithm: AWS API Gateway (usage plans) and Envoy's local rate limit are token buckets, NGINX limit_req a leaky bucket with a burst, Kong's open-source rate-limiting plugin fixed windows (sliding windows in Kong Enterprise and Azure API Management's rate-limit-by-key). Judge by whether it can key on the validated token's subject or the API key, share counters across nodes (Redis, a global rate limit service) and set limits per caller.",
       "consequences": "• One place for every route's limits, applied before the element spends anything.\n• The gateway must see the caller's identity: it validates tokens or keys itself.\n• Limits that depend on business data (plan, tenant) need the gateway to read it, or a second limit in the element.\n• Limits need tuning from real traffic; start in log-only mode for a week.",
       "alternatives": "1. At the edge WAF: earlier and cheaper, but approximate and keyed mostly on addresses.\n2. In the application: knows the business, but a request has already reached the element.\n3. Rely on autoscaling: pays for abuse instead of stopping it.",
@@ -701,7 +670,7 @@
       "concern": "rate-limiting",
       "status": "accepted",
       "date": "",
-      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all.",
+      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all. Snippets assume the router's table in src/app (routes with method, path, an example and the flags paginated and costly), black-box tests against $BASE_URL of a staging deployment with credentials in TOKEN_* variables, the gateway's decK file under gateway/, and Terraform plans read with terraform show -json.",
       "decision": "Rate rules at the edge WAF or CDN limit each caller, counted by {{KEY}}, to {{LIMIT_PER_MIN}} requests a minute using {{ALGORITHM}} as closely as the product allows, refuse bodies over {{MAX_BODY_KB}} KB, and answer the excess with 429 and Retry-After; the origin accepts traffic only from the edge. The element is reachable by {{EXPOSURE}}; bots on costly operations: {{BOTS}}. Choosing the product: Cloudflare WAF rate limiting rules, AWS WAF rate-based rules (with CloudFront or an ALB), Azure Front Door WAF rate limit rules or Akamai; judge by the keys it can count on (address, header, cookie, JWT claim), the shortest window it supports, how fast it starts blocking, and its price per million requests.",
       "consequences": "• Floods are refused before they reach our network or our bill.\n• Counts are approximate and lag by seconds: the limit is a ceiling, not an exact figure.\n• Keys are mostly addresses and headers; per-account limits need the edge to read a token claim or a second limit further in.\n• The edge provider is on every request's path.",
       "alternatives": "1. At the API gateway: exact, keyed on the validated caller, but after traffic entered our network.\n2. In the application: knows the business, latest of all.",
@@ -720,32 +689,13 @@
       "concern": "rate-limiting",
       "status": "accepted",
       "date": "",
-      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all.",
-      "decision": "The element limits each caller, counted by {{KEY}}, to {{LIMIT_PER_MIN}} requests a minute using {{ALGORITHM}}, in middleware that runs before any handler, with counters in a shared Redis; bodies over {{MAX_BODY_KB}} KB are refused by the server's own limit. The excess gets 429 and Retry-After. The element is reachable by {{EXPOSURE}}; bots on costly operations: {{BOTS}}. Choosing the library: the framework's own (ASP.NET Core rate limiting, Spring Cloud Gateway RequestRateLimiter) or a maintained one with a Redis store (Bucket4j for Java, express-rate-limit with rate-limit-redis for Node, django-ratelimit for Python); judge by its algorithms, atomic shared counters and per-route configuration.",
+      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all. Snippets assume the router's table in src/app (routes with method, path, an example and the flags paginated and costly), black-box tests against $BASE_URL of a staging deployment with credentials in TOKEN_* variables, the gateway's decK file under gateway/, and Terraform plans read with terraform show -json.",
+      "decision": "The element limits each caller, counted by {{KEY}}, to {{LIMIT_PER_MIN}} requests a minute using {{ALGORITHM}}, in middleware that runs before any handler, with counters in a shared Redis; bodies over {{MAX_BODY_KB}} KB are refused by the server's own limit. The excess gets 429 and Retry-After. The element is reachable by {{EXPOSURE}}; bots on costly operations: {{BOTS}}. Choosing the library: the framework's own (ASP.NET Core rate limiting) or a maintained one with a Redis store (Bucket4j with its Spring Boot starter for Java, express-rate-limit with rate-limit-redis for Node, django-ratelimit for Python); judge by its algorithms, atomic shared counters and per-route configuration.",
       "consequences": "• Limits can follow business data: plan, tenant, operation cost.\n• A request has already reached the element when it is refused: floods still need protection in front.\n• Redis is on the request path; when it is unreachable, the per-instance fallback limits less exactly.",
       "alternatives": "1. At the API gateway: before the element, but blind to business data.\n2. At the edge WAF: earliest and cheapest, approximate.",
       "hubWhen": {
         "WHERE": [
           "app"
-        ]
-      }
-    },
-    {
-      "id": "adr-internal",
-      "type": "adr",
-      "label": "Not reachable from outside",
-      "x": 780,
-      "y": 390,
-      "concern": "rate-limiting",
-      "status": "accepted",
-      "date": "",
-      "context": "This element takes requests from people or other systems outside it. The forces: one caller, by mistake (a retry loop, a bad deploy) or on purpose, can use up capacity meant for all; bots guess passwords, create accounts, scrape data and run up the bill of costly operations (messages sent, searches, third-party calls); a request or a page can be large enough to exhaust memory before it is refused; limits that are too tight, or keyed on an address shared by an office or a mobile carrier, lock out real users; and a limit counted on one instance of many is no limit at all.",
-      "decision": "The element accepts connections only from our own network: no public address, security groups or network policies admit only the internal callers listed in the model. Exposing it later supersedes this decision and brings the edge protection the internet needs.",
-      "consequences": "• Nothing outside can flood or scrape it.\n• Internal callers are still limited, against retry storms and runaway jobs.\n• Every new caller needs a network rule, which shows up in review.",
-      "alternatives": "1. Public with limits: needed only if outside callers appear.\n2. Reachable through a VPN for partners: closer to the partners option than to this one.",
-      "hubWhen": {
-        "EXPOSURE": [
-          "internal"
         ]
       }
     },
@@ -757,7 +707,7 @@
       "y": 0,
       "category": "operational",
       "threshold": "With one caller at 10 times {{LIMIT_PER_MIN}} requests a minute, other callers' 95th percentile stays within 10 % of the baseline and at least 99 % of the flood's excess gets 429 with Retry-After",
-      "description": "A load test in the staging environment runs normal traffic from several callers and a flood from one, and compares the others' response times with a baseline run without the flood.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst BASELINE_P95 = Number(__ENV.BASELINE_P95_MS)\n\nexport const options = {\n  scenarios: {\n    normal: { executor: 'constant-arrival-rate', rate: 20, timeUnit: '1s', duration: '3m', preAllocatedVUs: 50, env: { KEY: 'normal' } },\n    flood:  { executor: 'constant-arrival-rate', rate: LIMIT * 10, timeUnit: '1m', duration: '3m', preAllocatedVUs: 200, env: { KEY: 'flood' } },\n  },\n  thresholds: {\n    'http_req_duration{scenario:normal}': [`p(95)<${BASELINE_P95 * 1.1}`],\n    'checks{scenario:flood}': ['rate>0.89'], // 90 % of the flood is excess\n  },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders`, { headers: { Authorization: `Bearer ${__ENV['TOKEN_' + __ENV.KEY]}` } })\n  if (__ENV.KEY === 'flood') check(res, { 'limited with Retry-After': (r) => r.status === 429 && !!r.headers['Retry-After'] })\n}\n```"
+      "description": "A load test in the staging environment runs normal traffic from several callers and a flood from one, and compares the others' response times with a baseline run without the flood; 90 % of the flood is excess, so 99 % of the excess is 89 % of the flood.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst BASELINE_P95 = Number(__ENV.BASELINE_P95_MS)\n\nexport const options = {\n  scenarios: {\n    normal: { executor: 'constant-arrival-rate', rate: 20, timeUnit: '1s', duration: '3m', preAllocatedVUs: 50, env: { KEY: 'normal' } },\n    flood:  { executor: 'constant-arrival-rate', rate: LIMIT * 10, timeUnit: '1m', duration: '3m', preAllocatedVUs: 200, env: { KEY: 'flood' } },\n  },\n  thresholds: {\n    'http_req_duration{scenario:normal}': [`p(95)<${BASELINE_P95 * 1.1}`],\n    'checks{scenario:flood}': ['rate>0.89'],\n  },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders`, { headers: { Authorization: `Bearer ${__ENV['TOKEN_' + __ENV.KEY]}` } })\n  if (__ENV.KEY === 'flood') check(res, { 'limited with Retry-After': (r) => r.status === 429 && !!r.headers['Retry-After'] })\n}\n```"
     },
     {
       "id": "ff-body",
@@ -766,18 +716,118 @@
       "x": 1040,
       "y": 130,
       "category": "structural",
-      "threshold": "A body of 100 times {{MAX_BODY_KB}} KB is answered with 413 on 100 % of the element's write operations",
-      "description": "A smoke test after each deployment sends an oversized body to each write operation and expects 413, which fails when a new route or a proxy change drops the size limit.\n\nTool: curl in the deployment pipeline\n\n```bash\nsize_kb=$(( {{MAX_BODY_KB}} * 100 ))\nfor route in $(cat write-routes.txt); do\n  code=$(head -c \"${size_kb}K\" /dev/zero | curl -s -o /dev/null -w '%{http_code}' \\\n    -X POST -H 'Content-Type: application/json' --data-binary @- \"$BASE_URL$route\")\n  [ \"$code\" = 413 ] || { echo \"$route answered $code to an oversized body\"; exit 1; }\ndone\n```"
+      "threshold": "A body of 100 times {{MAX_BODY_KB}} KB is answered with 413 on 100 % of the router's write operations",
+      "description": "A test lists the write operations from the router (not from a list kept by hand), sends an oversized body to each and expects 413, which fails when a new route or a proxy change drops the size limit.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\n\nconst oversized = Buffer.alloc({{MAX_BODY_KB}} * 100 * 1024, 'a')\n\ndescribe.each(routes.filter((r) => ['POST', 'PUT', 'PATCH'].includes(r.method)))('%s %s', (route) => {\n  it('refuses an oversized body with 413', async () => {\n    const res = await request(app)[route.method.toLowerCase()](route.example)\n      .set('Content-Type', 'application/octet-stream').send(oversized)\n    expect(res.status).toBe(413)\n  })\n})\n```"
+    },
+    {
+      "id": "ff-pages",
+      "type": "fitness-fn",
+      "label": "Pages capped",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "Every paginated operation refuses a page size of 10 000 with 400 and returns at most {{MAX_PAGE_ITEMS}} items without a size; 0 exceptions",
+      "description": "A test lists the paginated operations from the router (routes flagged paginated), asks each for an oversized page and for a default one, and checks the refusal and the count.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes flagged paginated name their page-size parameter\n\ndescribe.each(routes.filter((r) => r.paginated))('GET %s', (route) => {\n  it('caps the page', async () => {\n    await request(app).get(route.example).query({ [route.pageSizeParam]: 10_000 }).set(auth(user)).expect(400)\n    const res = await request(app).get(route.example).set(auth(user)).expect(200)\n    expect(res.body.items.length).toBeLessThanOrEqual({{MAX_PAGE_ITEMS}})\n  })\n})\n```"
+    },
+    {
+      "id": "ff-bucket",
+      "type": "fitness-fn",
+      "label": "Bucket admits a burst, keeps the rate",
+      "x": 1040,
+      "y": 390,
+      "category": "operational",
+      "threshold": "After a minute idle, {{BURST}} requests at once are all accepted; of twice {{LIMIT_PER_MIN}} requests spread over the next minute, at most {{LIMIT_PER_MIN}} plus 10 % are accepted and the rest get 429",
+      "description": "A black-box test against the staging deployment lets the bucket fill, sends the burst in parallel, then sends at twice the rate for a minute and counts what was accepted.\n\nTool: Vitest with fetch against $BASE_URL (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst BURST = {{BURST}}\nconst call = () => fetch(`${process.env.BASE_URL}/orders`, { headers: { Authorization: `Bearer ${process.env.TOKEN_BUCKET}` } })\nconst sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))\n\nit('admits a burst, then holds the rate', async () => {\n  await sleep(60_000)                                                   // a minute idle: the bucket is full\n  const burst = await Promise.all(Array.from({ length: BURST }, call))\n  expect(burst.map((r) => r.status)).toEqual(Array(BURST).fill(200))\n  let accepted = 0\n  for (let i = 0; i < LIMIT * 2; i++) {                                 // twice the rate for one minute\n    const res = await call()\n    if (res.status === 200) accepted++\n    else expect(res.status).toBe(429)\n    await sleep(30_000 / LIMIT)\n  }\n  expect(accepted).toBeLessThanOrEqual(LIMIT * 1.1)\n}, 200_000)\n```",
+      "hubWhen": {
+        "ALGORITHM": [
+          "token-bucket"
+        ]
+      }
+    },
+    {
+      "id": "ff-sliding",
+      "type": "fitness-fn",
+      "label": "Window edges hold",
+      "x": 1040,
+      "y": 520,
+      "category": "operational",
+      "threshold": "{{LIMIT_PER_MIN}} requests in the last second of a minute are accepted and {{LIMIT_PER_MIN}} in the first second of the next all get 429",
+      "description": "A black-box test against the staging deployment waits for second 59, sends the limit at once, waits two seconds past the minute boundary and sends the limit again.\n\nTool: Vitest with fetch against $BASE_URL (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst call = () => fetch(`${process.env.BASE_URL}/orders`, { headers: { Authorization: `Bearer ${process.env.TOKEN_WINDOW}` } })\nconst sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))\nconst untilSecond = async (s: number) => { while (new Date().getSeconds() !== s) await sleep(100) }\n\nit('refuses a burst that straddles the minute boundary', async () => {\n  await untilSecond(59)\n  const first = await Promise.all(Array.from({ length: LIMIT }, call))\n  await sleep(2_000)\n  const second = await Promise.all(Array.from({ length: LIMIT }, call))\n  expect(first.filter((r) => r.status === 200)).toHaveLength(LIMIT)\n  expect(second.filter((r) => r.status === 429)).toHaveLength(LIMIT)\n}, 120_000)\n```",
+      "hubWhen": {
+        "ALGORITHM": [
+          "sliding-window"
+        ]
+      }
+    },
+    {
+      "id": "ff-fixed",
+      "type": "fitness-fn",
+      "label": "Quota headers present",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "After 10 requests in a minute, the 11th answer carries the limit {{LIMIT_PER_MIN}}, {{LIMIT_PER_MIN}} minus 11 remaining and a reset of at most 60 seconds",
+      "description": "A black-box test against the staging deployment makes eleven requests at the start of a minute and reads the RateLimit header fields of the last answer.\n\nTool: Vitest with fetch against $BASE_URL (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst call = () => fetch(`${process.env.BASE_URL}/orders`, { headers: { Authorization: `Bearer ${process.env.TOKEN_QUOTA}` } })\nconst sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))\n\nit('shows the quota with every answer', async () => {\n  while (new Date().getSeconds() !== 0) await sleep(100)             // the start of a calendar minute\n  for (let i = 0; i < 10; i++) await call()\n  const res = await call()\n  // IETF draft-ietf-httpapi-ratelimit-headers up to -07; newer drafts fold the three into one RateLimit field\n  expect(Number(res.headers.get('ratelimit-limit'))).toBe(LIMIT)\n  expect(Number(res.headers.get('ratelimit-remaining'))).toBe(LIMIT - 11)\n  expect(Number(res.headers.get('ratelimit-reset'))).toBeLessThanOrEqual(60)\n}, 120_000)\n```",
+      "hubWhen": {
+        "ALGORITHM": [
+          "fixed-window"
+        ]
+      }
+    },
+    {
+      "id": "ff-key-account",
+      "type": "fitness-fn",
+      "label": "Anonymous limit apart",
+      "x": 1040,
+      "y": 780,
+      "category": "operational",
+      "threshold": "From one address without a credential, {{ANON_LIMIT_PER_MIN}} requests are accepted and the next 10 get 429; a signed-in user's request from the same address is accepted",
+      "description": "A black-box test against the staging deployment floods a public route from one address without a credential, then calls with a user's token from the same address.\n\nTool: Vitest with fetch against $BASE_URL (or the test runner of your stack)\n\n```ts\nconst ANON = {{ANON_LIMIT_PER_MIN}}\nconst anon = () => fetch(`${process.env.BASE_URL}/products`)\nconst user = () => fetch(`${process.env.BASE_URL}/products`, { headers: { Authorization: `Bearer ${process.env.TOKEN_USER}` } })\n\nit('limits anonymous addresses lower and apart from signed-in callers', async () => {\n  const statuses: number[] = []\n  for (let i = 0; i < ANON + 10; i++) statuses.push((await anon()).status)\n  expect(statuses.slice(0, ANON)).toEqual(Array(ANON).fill(200))\n  expect(statuses.slice(ANON)).toEqual(Array(10).fill(429))\n  expect((await user()).status).toBe(200)\n}, 120_000)\n```",
+      "hubWhen": {
+        "KEY": [
+          "account"
+        ]
+      }
+    },
+    {
+      "id": "ff-key-apikey",
+      "type": "fitness-fn",
+      "label": "Invalid keys do not count",
+      "x": 1040,
+      "y": 910,
+      "category": "operational",
+      "threshold": "With one request of a partner's limit left, {{ANON_LIMIT_PER_MIN}} requests naming its key with a wrong secret get 401 and the next 10 get 429; the partner's request is then accepted",
+      "description": "A black-box test against the staging deployment uses up a partner's limit but one, floods with a forged key from another address, and checks that the partner's last request still passes.\n\nTool: Vitest with fetch against $BASE_URL (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst ANON = {{ANON_LIMIT_PER_MIN}}\nconst url = `${process.env.BASE_URL}/orders`\nconst partner = () => fetch(url, { headers: { 'X-Api-Key': process.env.PARTNER_KEY! } })\nconst forged = () => fetch(url, { headers: { 'X-Api-Key': `${process.env.PARTNER_KEY_ID}.wrong-secret` } })\n\nit('refuses invalid keys before counting, and limits them per address', async () => {\n  for (let i = 0; i < LIMIT - 1; i++) expect((await partner()).status).toBe(200)   // one request left\n  const statuses: number[] = []\n  for (let i = 0; i < ANON + 10; i++) statuses.push((await forged()).status)\n  expect(statuses.slice(0, ANON)).toEqual(Array(ANON).fill(401))\n  expect(statuses.slice(ANON)).toEqual(Array(10).fill(429))\n  expect((await partner()).status).toBe(200)                                       // the forged calls did not count\n}, 300_000)\n```",
+      "hubWhen": {
+        "KEY": [
+          "apikey"
+        ]
+      }
+    },
+    {
+      "id": "ff-key-ip",
+      "type": "fitness-fn",
+      "label": "Addresses counted fairly",
+      "x": 1040,
+      "y": 1040,
+      "category": "operational",
+      "threshold": "A forged X-Forwarded-For from outside does not reset a caller's count; two addresses in one IPv6 /64 share one count; an address in another /64 has its own",
+      "description": "A black-box test against the staging deployment floods from the runner's address and then forges the header; a second test, from a runner on the trusted-proxy list, presents addresses as the proxy would and checks the /64 grouping.\n\nTool: Vitest with fetch against $BASE_URL and, for the proxy path, from a runner on the trusted-proxy list (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst direct = (headers = {}) => fetch(`${process.env.BASE_URL}/products`, { headers })\nconst viaProxy = (ip: string) => fetch(`${process.env.INTERNAL_URL}/products`, { headers: { 'X-Forwarded-For': ip } })  // this runner is a trusted proxy in staging\n\nit('ignores a forged X-Forwarded-For from outside', async () => {\n  for (let i = 0; i < LIMIT; i++) await direct()\n  expect((await direct({ 'X-Forwarded-For': '203.0.113.9' })).status).toBe(429)\n}, 120_000)\n\nit('counts an IPv6 /64 as one caller', async () => {\n  for (let i = 0; i < LIMIT; i++) await viaProxy('2001:db8:1:2::1')\n  expect((await viaProxy('2001:db8:1:2::ffff')).status).toBe(429)\n  expect((await viaProxy('2001:db8:1:3::1')).status).toBe(200)\n}, 120_000)\n```",
+      "hubWhen": {
+        "KEY": [
+          "ip"
+        ]
+      }
     },
     {
       "id": "ff-gateway",
       "type": "fitness-fn",
       "label": "Every route limited",
       "x": 1040,
-      "y": 260,
+      "y": 1170,
       "category": "structural",
-      "threshold": "0 gateway services without a rate-limiting plugin; 0 limits above {{LIMIT_PER_MIN}} a minute without an exception recorded",
-      "description": "A Conftest policy over the gateway's declarative configuration (Kong decK file) fails the pull request when a service has no rate limit, or one higher than agreed.\n\nTool: Conftest (Open Policy Agent) over the Kong decK configuration\n\n```rego\npackage main\n\nimport rego.v1\n\nlimited(s) if { some p in s.plugins; p.name in {\"rate-limiting\", \"rate-limiting-advanced\"} }\nglobal if { some p in input.plugins; p.name in {\"rate-limiting\", \"rate-limiting-advanced\"} }\n\ndeny contains msg if {\n  not global\n  some s in input.services\n  not limited(s)\n  msg := sprintf(\"service %s has no rate limit\", [s.name])\n}\n\ndeny contains msg if {\n  some s in input.services\n  some p in s.plugins\n  p.name == \"rate-limiting\"\n  p.config.minute > {{LIMIT_PER_MIN}}\n  msg := sprintf(\"service %s allows %d a minute\", [s.name, p.config.minute])\n}\n```",
+      "threshold": "0 gateway services without a rate-limiting plugin on the service, one of its routes, or globally; 0 per-minute limits above {{LIMIT_PER_MIN}} without an exception tag naming its ticket",
+      "description": "A Conftest policy over the gateway's declarative configuration (Kong decK file) fails the pull request when a service has no rate limit at any level, or one higher than agreed that carries no limit-exception tag; both rate-limiting (config.minute) and rate-limiting-advanced (the limit for the 60-second window) are read.\n\nTool: Conftest (Open Policy Agent) over the Kong decK configuration\n\n```rego\npackage main\n\nimport rego.v1\n\nlimit_plugins := {\"rate-limiting\", \"rate-limiting-advanced\"}\n\nplugins_of(s) := array.concat(object.get(s, \"plugins\", []), [p | some r in object.get(s, \"routes\", []); some p in object.get(r, \"plugins\", [])])\n\nlimited(s) if { some p in plugins_of(s); p.name in limit_plugins }\nglobal if { some p in object.get(input, \"plugins\", []); p.name in limit_plugins }\n\n# an agreed exception carries a tag with its ticket: limit-exception:ARCH-123\nexcepted(p) if { some t in object.get(p, \"tags\", []); startswith(t, \"limit-exception:\") }\n\nper_minute(p) := p.config.minute if p.name == \"rate-limiting\"\nper_minute(p) := p.config.limit[i] if { p.name == \"rate-limiting-advanced\"; some i; p.config.window_size[i] == 60 }\n\ndeny contains msg if {\n  not global\n  some s in input.services\n  not limited(s)\n  msg := sprintf(\"service %s has no rate limit on it or its routes\", [s.name])\n}\n\ndeny contains msg if {\n  some s in input.services\n  some p in plugins_of(s)\n  p.name in limit_plugins\n  not excepted(p)\n  per_minute(p) > {{LIMIT_PER_MIN}}\n  msg := sprintf(\"service %s allows %v a minute without an exception tag\", [s.name, per_minute(p)])\n}\n```",
       "hubWhen": {
         "WHERE": [
           "gateway"
@@ -789,10 +839,10 @@
       "type": "fitness-fn",
       "label": "Edge rate rule present",
       "x": 1040,
-      "y": 390,
+      "y": 1300,
       "category": "structural",
       "threshold": "Every web ACL in front of the element holds a rate-based rule in blocking mode; 0 plan changes that remove it",
-      "description": "A Conftest policy over the Terraform plan fails when a WAF web ACL has no rate-based rule that blocks, so the edge limit cannot disappear in a refactoring.\n\nTool: Conftest (Open Policy Agent) over terraform show -json\n\n```rego\npackage main\n\nimport rego.v1\n\nrate_rule(acl) if {\n  some r in acl.rule\n  some s in r.statement\n  count(s.rate_based_statement) > 0\n  some a in r.action\n  count(a.block) > 0\n}\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_wafv2_web_acl\"\n  not rate_rule(rc.change.after)\n  msg := sprintf(\"%s has no blocking rate-based rule\", [rc.address])\n}\n```",
+      "description": "A Conftest policy over the Terraform plan fails when a WAF web ACL has no rate-based rule that blocks, so the edge limit cannot disappear in a refactoring.\n\nTool: Conftest (Open Policy Agent) over terraform show -json (AWS WAF; for Cloudflare: the cloudflare_ruleset resource with phase http_ratelimit, checked the same way)\n\n```rego\npackage main\n\nimport rego.v1\n\nrate_rule(acl) if {\n  some r in acl.rule\n  some s in r.statement\n  count(s.rate_based_statement) > 0\n  some a in r.action\n  count(a.block) > 0\n}\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_wafv2_web_acl\"\n  not rate_rule(rc.change.after)\n  msg := sprintf(\"%s has no blocking rate-based rule\", [rc.address])\n}\n```",
       "hubWhen": {
         "WHERE": [
           "waf"
@@ -804,10 +854,10 @@
       "type": "fitness-fn",
       "label": "Limit holds across instances",
       "x": 1040,
-      "y": 520,
+      "y": 1430,
       "category": "structural",
-      "threshold": "Against two instances sharing Redis, request {{LIMIT_PER_MIN}} + 1 within a minute gets 429 with Retry-After; another caller's request still succeeds",
-      "description": "An integration test starts two instances of the element with a Redis container, spreads one caller's requests over both, and expects the limit to hold for the pair.\n\nTool: Vitest with supertest and Testcontainers (Redis)\n\n```ts\nit('limits one caller across instances', async () => {\n  const [a, b] = await startInstances(2, { redisUrl: redis.getConnectionUrl() })\n  for (let i = 0; i < {{LIMIT_PER_MIN}}; i++) await request(i % 2 ? a : b).get('/orders').set(auth(caller)).expect(200)\n  const res = await request(a).get('/orders').set(auth(caller))\n  expect(res.status).toBe(429)\n  expect(Number(res.headers['retry-after'])).toBeGreaterThan(0)\n  await request(b).get('/orders').set(auth(otherCaller)).expect(200)\n})\n```",
+      "threshold": "Two instances sharing Redis accept no more from one caller in a minute than one instance alone plus 10 %, and no more than {{LIMIT_PER_MIN}} + {{BURST}}; another caller is still accepted; with Redis stopped, one instance still refuses past its own limit",
+      "description": "An integration test starts two instances of the element with a Redis container, measures what one instance alone accepts from a flood (the single-instance allowance, whatever the algorithm), then spreads the same flood over both and compares; a last run stops Redis and expects the per-instance fallback to refuse.\n\nTool: Vitest with supertest and Testcontainers (Redis) (or the test runner of your stack)\n\n```ts\nconst LIMIT = {{LIMIT_PER_MIN}}\nconst BURST = {{BURST}}\nconst sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))\nconst flood = async (targets: Instance[], n: number) => {\n  let accepted = 0\n  for (let i = 0; i < n; i++) if ((await request(targets[i % targets.length]).get('/orders').set(auth(caller))).status === 200) accepted++\n  return accepted\n}\n\nit('accepts no more across two instances than one instance does', async () => {\n  const [a, b] = await startInstances(2, { redisUrl: redis.getConnectionUrl() })\n  const alone = await flood([a], LIMIT * 2)                 // the single-instance allowance\n  await sleep(60_000)\n  const pair = await flood([a, b], LIMIT * 2)\n  expect(pair).toBeLessThanOrEqual(alone * 1.1)\n  expect(pair).toBeLessThanOrEqual(LIMIT + BURST)\n  await request(b).get('/orders').set(auth(otherCaller)).expect(200)\n}, 300_000)\n\nit('still limits per instance when Redis is unreachable', async () => {\n  const [a] = await startInstances(1, { redisUrl: redis.getConnectionUrl() })\n  await redis.stop()\n  expect(await flood([a], LIMIT * 2)).toBeLessThan(LIMIT * 2)\n}, 300_000)\n```",
       "hubWhen": {
         "WHERE": [
           "app"
@@ -817,12 +867,12 @@
     {
       "id": "ff-bots-challenge",
       "type": "fitness-fn",
-      "label": "Repeated sign-in challenged",
+      "label": "Repeated costly calls challenged",
       "x": 1040,
-      "y": 650,
+      "y": 1560,
       "category": "structural",
-      "threshold": "The 11th attempt at a costly operation from one source within 10 minutes shows a challenge; the 1st attempt from a new source never does",
-      "description": "An end-to-end test repeats the first costly operation from one browser context and expects the challenge widget on the 11th attempt, and none in a fresh context.\n\nTool: Playwright\n\n```ts\ntest('repeated sign-in is challenged', async ({ page, browser }) => {\n  for (let i = 0; i < 11; i++) {\n    await page.goto('/sign-in')\n    await page.getByLabel('Email').fill('someone@example.com')\n    await page.getByLabel('Password').fill(`wrong-${i}`)\n    await page.getByRole('button', { name: 'Sign in' }).click()\n  }\n  await expect(page.locator('iframe[src*=\"challenges.cloudflare.com\"]')).toBeVisible()\n  const fresh = await (await browser.newContext()).newPage()\n  await fresh.goto('/sign-in')\n  await expect(fresh.locator('iframe[src*=\"challenges.cloudflare.com\"]')).toHaveCount(0)\n})\n```",
+      "threshold": "The 1st attempt at a costly operation from a fresh source shows no challenge; the 11th within 10 minutes shows one",
+      "description": "An end-to-end test uses the password reset (one of the costly operations, with no lockout of its own) from one browser context: the first attempt must show no challenge widget, the eleventh must; the locator covers Turnstile, hCaptcha and reCAPTCHA.\n\nTool: Playwright\n\n```ts\nconst CHALLENGE = 'iframe[src*=\"challenges.cloudflare.com\"], iframe[src*=\"hcaptcha.com\"], iframe[src*=\"google.com/recaptcha\"]'\n\nconst resetOnce = async (page: Page) => {\n  await page.goto('/password-reset')\n  await page.getByLabel('Email').fill('someone@example.com')\n  await page.getByRole('button', { name: 'Send reset link' }).click()\n}\n\ntest('a repeated costly operation is challenged, a first attempt never', async ({ page }) => {\n  await resetOnce(page)\n  await expect(page.locator(CHALLENGE)).toHaveCount(0)\n  for (let i = 0; i < 10; i++) await resetOnce(page)\n  await expect(page.locator(CHALLENGE)).toBeVisible()\n})\n```",
       "hubWhen": {
         "BOTS": [
           "challenge"
@@ -834,10 +884,10 @@
       "type": "fitness-fn",
       "label": "Bot control enabled",
       "x": 1040,
-      "y": 780,
+      "y": 1690,
       "category": "structural",
       "threshold": "The web ACL in front of the element holds the managed bot rule group, not in count-only mode",
-      "description": "A Conftest policy over the Terraform plan fails when the edge's managed bot rule group is missing or overridden to count, which would let bots through silently.\n\nTool: Conftest (Open Policy Agent) over terraform show -json, for AWS WAF Bot Control\n\n```rego\npackage main\n\nimport rego.v1\n\nbot_control(acl) if {\n  some r in acl.rule\n  some s in r.statement\n  some m in s.managed_rule_group_statement\n  m.name == \"AWSManagedRulesBotControlRuleSet\"\n  some o in r.override_action\n  count(o.none) > 0\n}\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_wafv2_web_acl\"\n  not bot_control(rc.change.after)\n  msg := sprintf(\"%s does not enforce AWS WAF Bot Control\", [rc.address])\n}\n```",
+      "description": "A Conftest policy over the Terraform plan fails when the edge's managed bot rule group is missing or overridden to count, which would let bots through silently.\n\nTool: Conftest (Open Policy Agent) over terraform show -json, for AWS WAF Bot Control (for Cloudflare: the cloudflare_bot_management resource; for Akamai: the akamai_botman_* resources; each checked the same way for presence and a blocking action)\n\n```rego\npackage main\n\nimport rego.v1\n\nbot_control(acl) if {\n  some r in acl.rule\n  some s in r.statement\n  some m in s.managed_rule_group_statement\n  m.name == \"AWSManagedRulesBotControlRuleSet\"\n  some o in r.override_action\n  count(o.none) > 0\n}\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_wafv2_web_acl\"\n  not bot_control(rc.change.after)\n  msg := sprintf(\"%s does not enforce AWS WAF Bot Control\", [rc.address])\n}\n```",
       "hubWhen": {
         "BOTS": [
           "managed"
@@ -845,17 +895,47 @@
       }
     },
     {
-      "id": "ff-closed",
+      "id": "ff-bots-none",
       "type": "fitness-fn",
-      "label": "Closed from outside",
+      "label": "Costly operations behind identity",
       "x": 1040,
-      "y": 910,
+      "y": 1820,
+      "category": "structural",
+      "threshold": "Every route the router marks costly answers 401 without a credential; 0 exceptions",
+      "description": "A test lists the routes flagged costly from the router (not from a list kept by hand) and calls each without a credential, expecting 401; a new costly route fails the test until it is protected or flagged.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes flagged costly: the operations listed in the decision\n\ndescribe.each(routes.filter((r) => r.costly))('%s %s', (route) => {\n  it('refuses a call without a credential', async () => {\n    await request(app)[route.method.toLowerCase()](route.example).expect(401)\n  })\n})\n```",
+      "hubWhen": {
+        "BOTS": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "ff-origin",
+      "type": "fitness-fn",
+      "label": "Origin closed to the internet",
+      "x": 1040,
+      "y": 1950,
       "category": "operational",
-      "threshold": "0 ports of the element answer from outside the network",
-      "description": "A scheduled scan from a runner outside the network tries every port of the element's addresses and fails on any that answers.\n\nTool: Nmap\n\n```bash\nnmap -Pn -p- --open -oG scan.txt $ELEMENT_ADDRESSES\nif grep -q '/open/' scan.txt; then\n  echo \"reachable from outside:\"; grep '/open/' scan.txt; exit 1\nfi\n```",
+      "threshold": "0 of the origin addresses answer a connection from the internet; every one is refused or times out",
+      "description": "A scheduled job on a runner outside the provider's network tries each origin address directly over HTTPS and fails when any answers, which would mean the edge and its limits can be bypassed.\n\nTool: curl in a scheduled job on a runner outside the edge\n\n```bash\n#!/usr/bin/env bash\n# ORIGIN_ADDRESSES: the origin's addresses or host names as the edge sees them, space separated\nset -uo pipefail\nfail=0\nfor origin in $ORIGIN_ADDRESSES; do\n  if curl -sk --max-time 10 -o /dev/null \"https://$origin/\"; then echo \"$origin answers directly, bypassing the edge\"; fail=1; fi\ndone\nexit $fail\n```",
       "hubWhen": {
         "EXPOSURE": [
-          "internal"
+          "internet"
+        ]
+      }
+    },
+    {
+      "id": "ff-partner-alert",
+      "type": "fitness-fn",
+      "label": "Partner near its limit",
+      "x": 1040,
+      "y": 2080,
+      "category": "operational",
+      "threshold": "An alert names every partner whose request rate has been above 80 % of its limit for 15 minutes",
+      "description": "A Prometheus rule over the gateway's per-consumer request counter alerts the partner's owner; a partner whose limit was raised by agreement gets a rule of its own with its figure.\n\nTool: Prometheus alerting rules over Kong's prometheus plugin (per_consumer and status_code_metrics on; for the application: its own http_requests_total by caller)\n\n```yaml\ngroups:\n- name: partner-limits\n  rules:\n  - alert: PartnerNearLimit\n    expr: sum by (consumer) (rate(kong_http_requests_total[15m])) * 60 > 0.8 * {{LIMIT_PER_MIN}}\n    for: 15m\n    labels: { severity: ticket }\n    annotations: { summary: \"{{ $labels.consumer }} has run above 80 % of its limit for 15 minutes\" }\n  # a partner with a raised limit, agreed and recorded: its own rule with its figure\n  - alert: PartnerNearLimitAcme\n    expr: sum(rate(kong_http_requests_total{consumer=\"acme\"}[15m])) * 60 > 0.8 * 3000\n    for: 15m\n    labels: { severity: ticket }\n```",
+      "hubWhen": {
+        "EXPOSURE": [
+          "partners"
         ]
       }
     }
@@ -952,12 +1032,6 @@
       "relationType": "derives"
     },
     {
-      "id": "req-internal--derives--need",
-      "sourceId": "req-internal",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
       "id": "sc-limit--verifies--req-limit",
       "sourceId": "sc-limit",
       "targetId": "req-limit",
@@ -1048,12 +1122,6 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-internal--verifies--req-internal",
-      "sourceId": "sc-internal",
-      "targetId": "req-internal",
-      "relationType": "verifies"
-    },
-    {
       "id": "ff-noisy--implements--adr-gateway",
       "sourceId": "ff-noisy",
       "targetId": "adr-gateway",
@@ -1086,6 +1154,132 @@
     {
       "id": "ff-body--implements--adr-app",
       "sourceId": "ff-body",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pages--implements--adr-gateway",
+      "sourceId": "ff-pages",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pages--implements--adr-waf",
+      "sourceId": "ff-pages",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pages--implements--adr-app",
+      "sourceId": "ff-pages",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bucket--implements--adr-gateway",
+      "sourceId": "ff-bucket",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bucket--implements--adr-waf",
+      "sourceId": "ff-bucket",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bucket--implements--adr-app",
+      "sourceId": "ff-bucket",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sliding--implements--adr-gateway",
+      "sourceId": "ff-sliding",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sliding--implements--adr-waf",
+      "sourceId": "ff-sliding",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sliding--implements--adr-app",
+      "sourceId": "ff-sliding",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fixed--implements--adr-gateway",
+      "sourceId": "ff-fixed",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fixed--implements--adr-waf",
+      "sourceId": "ff-fixed",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fixed--implements--adr-app",
+      "sourceId": "ff-fixed",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-account--implements--adr-gateway",
+      "sourceId": "ff-key-account",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-account--implements--adr-waf",
+      "sourceId": "ff-key-account",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-account--implements--adr-app",
+      "sourceId": "ff-key-account",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-apikey--implements--adr-gateway",
+      "sourceId": "ff-key-apikey",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-apikey--implements--adr-waf",
+      "sourceId": "ff-key-apikey",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-apikey--implements--adr-app",
+      "sourceId": "ff-key-apikey",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-ip--implements--adr-gateway",
+      "sourceId": "ff-key-ip",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-ip--implements--adr-waf",
+      "sourceId": "ff-key-ip",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-ip--implements--adr-app",
+      "sourceId": "ff-key-ip",
       "targetId": "adr-app",
       "relationType": "implements"
     },
@@ -1144,9 +1338,57 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-closed--implements--adr-internal",
-      "sourceId": "ff-closed",
-      "targetId": "adr-internal",
+      "id": "ff-bots-none--implements--adr-gateway",
+      "sourceId": "ff-bots-none",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bots-none--implements--adr-waf",
+      "sourceId": "ff-bots-none",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bots-none--implements--adr-app",
+      "sourceId": "ff-bots-none",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-origin--implements--adr-gateway",
+      "sourceId": "ff-origin",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-origin--implements--adr-waf",
+      "sourceId": "ff-origin",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-origin--implements--adr-app",
+      "sourceId": "ff-origin",
+      "targetId": "adr-app",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-partner-alert--implements--adr-gateway",
+      "sourceId": "ff-partner-alert",
+      "targetId": "adr-gateway",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-partner-alert--implements--adr-waf",
+      "sourceId": "ff-partner-alert",
+      "targetId": "adr-waf",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-partner-alert--implements--adr-app",
+      "sourceId": "ff-partner-alert",
+      "targetId": "adr-app",
       "relationType": "implements"
     }
   ]

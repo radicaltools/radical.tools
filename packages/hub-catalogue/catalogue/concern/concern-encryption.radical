@@ -49,6 +49,10 @@
       {
         "title": "RFC 8446, The Transport Layer Security (TLS) Protocol Version 1.3",
         "url": "https://www.rfc-editor.org/rfc/rfc8446"
+      },
+      {
+        "title": "PCI DSS v4.0.1, Requirement 3 (protect stored account data)",
+        "url": "https://www.pcisecuritystandards.org/document_library/"
       }
     ],
     "templateParams": [
@@ -61,8 +65,8 @@
         "options": [
           {
             "value": "modern",
-            "label": "TLS 1.3 only",
-            "description": "Mozilla's \"modern\" profile: no legacy suites to misconfigure, forward secrecy always. Pick it when every client is a current browser, mobile app or SDK (Android 10+, iOS 12.2+, Java 11+, OpenSSL 1.1.1+)."
+            "label": "TLS 1.3",
+            "description": "Mozilla's \"modern\" profile, nothing older offered: no legacy suites to misconfigure, forward secrecy always. Pick it when every client is a current browser, mobile app or SDK (Android 10+, iOS 12.2+, Java 11+, OpenSSL 1.1.1+)."
           },
           {
             "value": "intermediate",
@@ -105,7 +109,7 @@
           {
             "value": "provider",
             "label": "provider-managed keys",
-            "description": "The default encryption of the managed database, object store and disks, with keys the provider creates and rotates. Pick it when no regulation or contract asks you to control the keys and the data is not highly sensitive."
+            "description": "The default encryption of the managed database, object store and disks, with keys the provider creates and rotates. Pick it when no regulation or contract asks you to control the keys and the data is not highly sensitive; the rotation question is then the provider's."
           },
           {
             "value": "cmk",
@@ -123,7 +127,7 @@
         "key": "ROTATION",
         "title": "Key rotation",
         "label": "How are our encryption keys rotated?",
-        "hint": "NIST bounds how long a key may protect new data; rotating only the key material is cheap, re-encrypting everything is not. With provider-managed keys the provider decides.",
+        "hint": "Only when the keys at rest are customer-managed; with provider-managed keys the provider decides and this answer is not used. NIST bounds how long a key may protect new data; rotating only the key material is cheap, re-encrypting everything is not.",
         "defaultValue": "automatic",
         "options": [
           {
@@ -215,7 +219,7 @@
       "y": 260,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "a client offers TLS 1.1 or older, or TLS 1.2 without an ECDHE key exchange and an AEAD cipher (AES-GCM or ChaCha20-Poly1305)",
-      "action": "refuse the handshake, and review once a year whether TLS 1.2 can be dropped",
+      "action": "refuse the handshake",
       "rationale": "TLS 1.2 is safe only with forward-secret AEAD suites; CBC and static RSA suites are the ones attacks keep finding (NIST SP 800-52 Rev. 2, 3.3.1; Mozilla \"intermediate\" profile).",
       "hubWhen": {
         "TLS": [
@@ -278,7 +282,7 @@
       "y": 780,
       "ears_type": "ubiquitous",
       "action": "encrypt stored data in databases, queues, object stores, disks, snapshots and backups with AES-256 under {{AT_REST}}",
-      "rationale": "Disks, snapshots and backups leave the system in ways nobody tracks; encryption at rest makes a lost copy unreadable (ASVS 6.2.1; OWASP Cryptographic Storage Cheat Sheet)."
+      "rationale": "Disks, snapshots and backups leave the system in ways nobody tracks; encryption at rest makes a lost copy unreadable (ASVS 6.1.1 to 6.1.3; OWASP Cryptographic Storage Cheat Sheet)."
     },
     {
       "id": "req-key-access",
@@ -287,7 +291,7 @@
       "x": 260,
       "y": 910,
       "ears_type": "ubiquitous",
-      "action": "allow only the element's own identity and the key administrators to use its keys, keep administration and use apart, and log every use of a key for at least 12 months",
+      "action": "allow only the element's own identity to use its keys and only key administrators to manage them, with nobody in both roles, and log every use of a key in the provider's audit trail",
       "rationale": "Holding the keys means nothing if anyone can use them; separation of duties and a log of every decryption are what customer-managed keys buy (NIST SP 800-57 Pt 1, 5.3 and 6; OWASP Cryptographic Storage Cheat Sheet, key management).",
       "hubWhen": {
         "AT_REST": [
@@ -338,9 +342,30 @@
       "x": 260,
       "y": 1300,
       "ears_type": "event-driven",
-      "trigger": "an encryption key is {{KEY_ROTATE_DAYS}} days old, or is suspected to be compromised",
-      "action": "create a new key, re-encrypt the data or its data keys under it within 30 days (within 72 hours after a suspected compromise), and then disable the old key",
-      "rationale": "Where a cryptoperiod applies to the data, the old key must stop protecting anything (NIST SP 800-57 Pt 1, 5.3; PCI DSS v4.0 3.6 and 3.7).",
+      "trigger": "an encryption key is {{KEY_ROTATE_DAYS}} days old",
+      "action": "create a new key, re-encrypt the data or its data keys under it within 30 days, and then disable the old key",
+      "rationale": "Where a cryptoperiod applies to the data, the old key must stop protecting anything (NIST SP 800-57 Pt 1, 5.3; PCI DSS v4.0.1 3.6 and 3.7).",
+      "hubWhen": {
+        "AT_REST": [
+          "cmk",
+          "field"
+        ],
+        "ROTATION": [
+          "reencrypt"
+        ]
+      }
+    },
+    {
+      "id": "req-key-compromise",
+      "type": "requirement",
+      "label": "Compromised key replaced fast",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "event-driven",
+      "trigger": "an encryption key is suspected to be compromised",
+      "action": "create a new key, re-encrypt the data or its data keys under it within 72 hours, and disable the old key",
+      "rationale": "A key that may be known to someone else protects nothing; the drill is what makes 72 hours real (NIST SP 800-57 Pt 1, 5.3; PCI DSS v4.0.1 3.7.5).",
+      "unchecked": "a key-compromise drill the security owner runs twice a year on a copy of production data, timed against the 72 hours; no tool can run it.",
       "hubWhen": {
         "AT_REST": [
           "cmk",
@@ -356,7 +381,7 @@
       "type": "requirement",
       "label": "Certificates renewed automatically",
       "x": 260,
-      "y": 1430,
+      "y": 1560,
       "ears_type": "event-driven",
       "trigger": "a certificate has 30 days of validity left",
       "action": "renew it automatically and install it without downtime, and alert the owner if it still has fewer than 14 days left",
@@ -372,7 +397,7 @@
       "type": "requirement",
       "label": "Expiry alerted ahead",
       "x": 260,
-      "y": 1560,
+      "y": 1690,
       "ears_type": "state-driven",
       "precondition": "a certificate on the inventory has fewer than 30 days of validity left",
       "action": "alert its named owner every working day until it is replaced, and keep every certificate the element uses on the inventory with its owner and expiry",
@@ -444,9 +469,9 @@
       "label": "Unverified backend refused",
       "x": 520,
       "y": 520,
-      "given": "the element configured for its database",
-      "when": "the database presents a certificate for another host name, and then plain text is offered",
-      "then": "the element refuses both connections",
+      "given": "the element configured for its database and for another element",
+      "when": "the database presents a certificate for another host name, and then plain text is offered to both",
+      "then": "the element refuses all three connections",
       "hubWhen": {
         "INTERNAL": [
           "tls"
@@ -486,7 +511,7 @@
       "y": 910,
       "given": "the element's data key in the KMS",
       "when": "another service's identity asks the KMS to decrypt with it, and a key administrator tries to decrypt",
-      "then": "both are refused and both attempts are in the KMS log",
+      "then": "both are refused and both attempts are in the audit trail",
       "hubWhen": {
         "AT_REST": [
           "cmk",
@@ -548,14 +573,33 @@
       }
     },
     {
+      "id": "sc-key-compromise",
+      "type": "scenario",
+      "label": "Compromise drill",
+      "x": 520,
+      "y": 1430,
+      "given": "a key declared compromised in a drill",
+      "when": "the re-encryption runbook is followed",
+      "then": "within 72 hours every record decrypts under the new key and the old key is disabled, and the time taken is recorded",
+      "hubWhen": {
+        "AT_REST": [
+          "cmk",
+          "field"
+        ],
+        "ROTATION": [
+          "reencrypt"
+        ]
+      }
+    },
+    {
       "id": "sc-certs-acme",
       "type": "scenario",
       "label": "Renewal without anyone",
       "x": 520,
-      "y": 1430,
+      "y": 1560,
       "given": "a certificate with 30 days left",
-      "when": "the certificate manager runs",
-      "then": "a new certificate is in use the same day with no failed request",
+      "when": "the certificate manager runs, and once a renewal is made to fail",
+      "then": "a new certificate is in use the same day with no failed request; the failed one raises an alert at 14 days",
       "hubWhen": {
         "CERTS": [
           "acme"
@@ -567,7 +611,7 @@
       "type": "scenario",
       "label": "Expiring certificate alerted",
       "x": 520,
-      "y": 1560,
+      "y": 1690,
       "given": "a partner-facing certificate expiring in 29 days",
       "when": "the daily check runs",
       "then": "its owner is alerted, and the alerts stop when the new certificate is installed",
@@ -586,9 +630,9 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
       "decision": "Outside callers get {{TLS}} at the edge (Mozilla profile, HSTS); certificates are issued {{CERTS}}. Between our own elements, a service mesh in strict mode encrypts and authenticates every hop with mutual TLS and certificates that expire within 24 hours; databases and managed queues outside the mesh are reached with TLS and certificate verification. Choosing the mesh: Linkerd for the least to run and automatic mTLS by default; Istio when you also need fine-grained traffic and authorisation policies; Cilium when it already runs as the network plugin. Judge by the operational load, the sidecar or sidecar-less model and the certificate authority it can chain to.",
-      "consequences": "• Every hop is encrypted and authenticated without changes to the code.\n• Callers inside get identities that authorisation policies can use.\n• The mesh is on every request's path: its upgrades and its CA are now critical.\n• Traffic to managed services outside the mesh still needs its own TLS settings.",
+      "consequences": "• Every hop is encrypted and authenticated without changes to the code.\n• Callers inside get identities that authorisation policies can use.\n• The mesh is on every request's path: its upgrades and its CA are now critical.\n• Traffic to managed services outside the mesh still needs its own TLS settings.\n• Where TLS 1.2 is still offered to outside callers, whether it can be dropped is reviewed once a year.",
       "alternatives": "1. TLS on every connection, configured per element: no mesh to run, but no caller identity and more places to get wrong.\n2. Clear text inside a private network: simplest, and safe only while the network is ours alone.",
       "hubWhen": {
         "INTERNAL": [
@@ -605,9 +649,9 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
       "decision": "Outside callers get {{TLS}} at the edge (Mozilla profile, HSTS); certificates are issued {{CERTS}}. The load balancer re-encrypts to the element, and the element connects to databases, queues and other elements over TLS 1.2 or newer, verifying the certificate and host name against our internal CA or the provider's (for example Amazon RDS CA bundles, Azure Database certificates). Turning verification off is not allowed in any environment; tests run against real certificates from a local CA (mkcert or a test step-ca).",
-      "consequences": "• No clear text on any network, without a mesh to operate.\n• Every element and driver must be configured and kept configured; a default that skips verification is a finding.\n• The connection proves the server, not the caller: who is calling is decided by authentication.",
+      "consequences": "• No clear text on any network, without a mesh to operate.\n• Every element and driver must be configured and kept configured; a default that skips verification is a finding.\n• The connection proves the server, not the caller: who is calling is decided by authentication.\n• Where TLS 1.2 is still offered to outside callers, whether it can be dropped is reviewed once a year.",
       "alternatives": "1. Mutual TLS in a service mesh: identity on every hop, a mesh to run.\n2. Clear text inside a private network: simplest, weakest.",
       "hubWhen": {
         "INTERNAL": [
@@ -624,9 +668,9 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
       "decision": "Outside callers get {{TLS}} at the edge (Mozilla profile, HSTS); certificates are issued {{CERTS}}. TLS ends at the load balancer; traffic between our elements stays in clear text inside one private network (VPC or VNet) with no peering, no public addresses and no shared tenants, relying on the provider's physical-layer encryption between its data centres. Any connection that leaves that network, or carries card or health data, uses TLS; peering or a shared tenant supersedes this decision.",
-      "consequences": "• Nothing to configure or rotate inside; the cheapest option.\n• A foothold on the network reads every internal call: one compromised host sees everything.\n• Audits (PCI DSS, HIPAA, ISO 27001) may not accept it; the conditions must stay true and be checked.",
+      "consequences": "• Nothing to configure or rotate inside; the cheapest option.\n• A foothold on the network reads every internal call: one compromised host sees everything.\n• Audits (PCI DSS, HIPAA, ISO 27001) may not accept it; the conditions must stay true and be checked.\n• Where TLS 1.2 is still offered to outside callers, whether it can be dropped is reviewed once a year.",
       "alternatives": "1. TLS on every connection: modest effort, removes the clear text.\n2. Mutual TLS in a service mesh: encryption and identity on every hop.",
       "hubWhen": {
         "INTERNAL": [
@@ -643,7 +687,7 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
       "decision": "Databases, queues, object stores, disks, snapshots and backups use the provider's default AES-256 encryption with provider-managed keys (Amazon RDS and S3 default encryption, Azure Storage Service Encryption, Google default encryption at rest); the provider creates, stores and rotates the keys. No resource may be created unencrypted, which the provider's policy service checks. Moving to customer-managed keys is a later decision, needed when a customer, auditor or regulation asks who can decrypt.",
       "consequences": "• No keys to manage, no cost and no risk of locking ourselves out.\n• Protects lost disks and media, not data read through the database or the storage API.\n• We cannot prove, disable or audit the use of the keys ourselves.",
       "alternatives": "1. Customer-managed keys in a KMS: our key policy and audit log, a little cost and care.\n2. Application-level field encryption: protects against administrators and backups too, at the cost of search and indexing on those fields.",
@@ -662,8 +706,8 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
-      "decision": "Stored data is encrypted with AES-256 under customer-managed keys in the cloud's KMS (AWS KMS, Azure Key Vault or Managed HSM, Google Cloud KMS), one key per element and environment, with a key policy that lets only the element's identity use it and only key administrators manage it; every use is logged. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Choose an HSM-backed tier (CloudHSM, Managed HSM, Cloud HSM) when a standard requires FIPS 140-3 level 3, and an external key store only when a contract requires the keys outside the provider.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
+      "decision": "Stored data is encrypted with AES-256 under customer-managed keys in the cloud's KMS (AWS KMS, Azure Key Vault or Managed HSM, Google Cloud KMS), one key per element and environment, with a key policy that lets only the element's identity use it and only key administrators manage it, the two sets of principals disjoint and the administrators' actions listed rather than kms:*; every use is logged by the provider's audit trail. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Choose an HSM-backed tier (CloudHSM, Managed HSM, Cloud HSM) when a standard requires FIPS 140-3 level 3, and an external key store only when a contract requires the keys outside the provider.",
       "consequences": "• We decide and can prove who may decrypt, and can disable a key to make data unreadable.\n• A deleted or disabled key makes data unrecoverable: deletion has a waiting period and needs two people.\n• KMS calls cost money and add latency on every data key fetch; caching data keys keeps it small.",
       "alternatives": "1. Provider-managed keys: no work, no control.\n2. Application-level field encryption on top: protects the most sensitive fields from anyone who can query the database.",
       "hubWhen": {
@@ -681,8 +725,8 @@
       "concern": "encryption",
       "status": "accepted",
       "date": "",
-      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years.",
-      "decision": "The application encrypts {{SENSITIVE_FIELDS}} before writing them, with envelope encryption: AES-256-GCM data keys per record or tenant, wrapped by a customer-managed key in the KMS. Everything else is encrypted at rest under customer-managed keys. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Library: Google Tink or the AWS Encryption SDK in the element, or HashiCorp Vault Transit when several languages must share the keys; never cryptography written by hand. Fields that must be searched get a separate keyed hash (HMAC-SHA-256) for exact matches.",
+      "context": "Data reaches this element from people or other systems, or is kept in it. The forces: traffic is read or changed wherever it crosses a network someone else controls, and \"inside our network\" stops being true with the first misconfigured peering, mirror port or compromised host; old protocol versions and cipher suites stay enabled for years after they are broken; disks, snapshots and backups leave the system in ways nobody tracks; whoever holds the keys can read the data, so who controls them (the provider, us, or only the application) decides who can be compelled or tricked into reading it; certificates and keys that expire or are never rotated cause outages or stay useful to an attacker for years. Snippets assume Terraform under infra/ (plans read with terraform show -json), Kubernetes and mesh manifests rendered under manifests/, the public endpoints listed one host per line in endpoints.txt, internal ones as host:port in internal-endpoints.txt, and certificates issued by hand in cert-inventory.txt.",
+      "decision": "The application encrypts {{SENSITIVE_FIELDS}} before writing them, with envelope encryption: AES-256-GCM data keys per record or tenant, wrapped by a customer-managed key in the KMS. Everything else is encrypted at rest under customer-managed keys, one key per element and environment, with a key policy that lets only the element's identity use it and only key administrators manage it, the two sets disjoint; every use is logged by the provider's audit trail. Key rotation: {{ROTATION}}, every {{KEY_ROTATE_DAYS}} days. Library: Google Tink or the AWS Encryption SDK in the element, or HashiCorp Vault Transit when several languages must share the keys; never cryptography written by hand. Fields that must be searched get a separate keyed hash (HMAC-SHA-256) for exact matches.",
       "consequences": "• Database administrators, backups, replicas and SQL injection see only ciphertext for those fields.\n• Those fields cannot be sorted, range-queried or full-text searched in the database.\n• Migrations and analytics must go through the application or the KMS to read them.\n• Losing the KMS key loses those fields, even in backups.",
       "alternatives": "1. Customer-managed keys at rest only: transparent to the application, but visible to anyone who can query.\n2. Tokenisation by a vault service (for cards, a PCI provider): takes the data out of scope entirely, adds a dependency.\n3. Database column encryption (Always Encrypted, pgcrypto): less code, but keys or plaintext pass through the database.",
       "hubWhen": {
@@ -694,22 +738,42 @@
     {
       "id": "ff-tls-scan",
       "type": "fitness-fn",
-      "label": "Public TLS configuration",
+      "label": "Public TLS: 1.3 only",
       "x": 1040,
       "y": 0,
       "category": "operational",
-      "threshold": "0 findings of severity HIGH or CRITICAL; only {{TLS}} offered; certificates valid for at least 14 more days",
-      "description": "A scheduled job scans each public endpoint of the element with testssl.sh and fails on a protocol or cipher suite outside the chosen profile, a weak finding or a certificate close to expiry.\n\nTool: testssl.sh\n\n```bash\ntestssl.sh --quiet --warnings off --severity HIGH --jsonfile tls.json \"$ENDPOINT\"\n# fails on HIGH/CRITICAL findings, e.g. TLS 1.0/1.1, CBC suites, weak keys\njq -e '[.[] | select(.severity == \"HIGH\" or .severity == \"CRITICAL\")] | length == 0' tls.json\n# certificate must stay valid for at least 14 more days\necho | openssl s_client -connect \"$ENDPOINT:443\" -servername \"$ENDPOINT\" 2>/dev/null \\\n  | openssl x509 -noout -checkend $(( 14 * 86400 ))\n```"
+      "threshold": "On every public endpoint: TLS 1.3 offered and SSLv2, SSLv3, TLS 1.0, 1.1 and 1.2 not offered; 0 findings of severity HIGH or CRITICAL; plain HTTP redirected; HSTS max-age at least 31536000; the certificate valid for at least 14 more days",
+      "description": "A scheduled job scans each public endpoint with testssl.sh and reads the protocol findings from its JSON (ids SSLv2, SSLv3, TLS1, TLS1_1, TLS1_2, TLS1_3), then checks the redirect, the HSTS header and the certificate's expiry with curl and openssl.\n\nTool: testssl.sh 3.2 (docker), jq, curl and openssl\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nwhile read -r endpoint; do\n  docker run --rm -v \"$PWD\":/out drwetter/testssl.sh:3.2 --quiet --warnings off --jsonfile \"/out/$endpoint.json\" \"$endpoint\"\n  jq -e '\n    ([.[] | select(.severity == \"HIGH\" or .severity == \"CRITICAL\")] | length == 0)\n    and ([.[] | select(.id == \"TLS1_3\")] | length == 1 and all(.finding | startswith(\"offered\")))\n    and ([.[] | select(.id | IN(\"SSLv2\", \"SSLv3\", \"TLS1\", \"TLS1_1\", \"TLS1_2\"))] | length == 5 and all(.finding | startswith(\"not offered\")))\n  ' \"$endpoint.json\" > /dev/null || { echo \"$endpoint: not TLS 1.3 only, or a HIGH/CRITICAL finding\"; exit 1; }\n  curl -sI \"http://$endpoint/\" | grep -Eq '^HTTP/[0-9.]+ 30[1278]' || { echo \"$endpoint: plain HTTP not redirected\"; exit 1; }\n  max_age=$(curl -sI \"https://$endpoint/\" | grep -i '^strict-transport-security:' | grep -Eo 'max-age=[0-9]+' | cut -d= -f2 || true)\n  [ \"${max_age:-0}\" -ge 31536000 ] || { echo \"$endpoint: HSTS max-age under a year\"; exit 1; }\n  echo | openssl s_client -connect \"$endpoint:443\" -servername \"$endpoint\" 2>/dev/null \\\n    | openssl x509 -noout -checkend $(( 14 * 86400 )) || { echo \"$endpoint: certificate expires within 14 days\"; exit 1; }\ndone < endpoints.txt\n```",
+      "hubWhen": {
+        "TLS": [
+          "modern"
+        ]
+      }
+    },
+    {
+      "id": "ff-tls-scan-12",
+      "type": "fitness-fn",
+      "label": "Public TLS: 1.2 and 1.3, strong suites",
+      "x": 1040,
+      "y": 130,
+      "category": "operational",
+      "threshold": "On every public endpoint: TLS 1.2 and 1.3 offered; SSLv2, SSLv3, TLS 1.0 and 1.1 not offered; the 3DES/IDEA, obsoleted (CBC, static RSA) and non-forward-secret cipher lists not offered; 0 findings of severity HIGH or CRITICAL; plain HTTP redirected; HSTS max-age at least 31536000; the certificate valid for at least 14 more days",
+      "description": "A scheduled job scans each public endpoint with testssl.sh and reads the protocol and cipher-list findings from its JSON (ids TLS1_2, TLS1_3, SSLv2, SSLv3, TLS1, TLS1_1, cipherlist_3DES_IDEA, cipherlist_OBSOLETED, cipherlist_STRONG_NOFS), then checks the redirect, the HSTS header and the certificate's expiry with curl and openssl.\n\nTool: testssl.sh 3.2 (docker), jq, curl and openssl\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nwhile read -r endpoint; do\n  docker run --rm -v \"$PWD\":/out drwetter/testssl.sh:3.2 --quiet --warnings off --jsonfile \"/out/$endpoint.json\" \"$endpoint\"\n  jq -e '\n    ([.[] | select(.severity == \"HIGH\" or .severity == \"CRITICAL\")] | length == 0)\n    and ([.[] | select(.id | IN(\"TLS1_2\", \"TLS1_3\"))] | length == 2 and all(.finding | startswith(\"offered\")))\n    and ([.[] | select(.id | IN(\"SSLv2\", \"SSLv3\", \"TLS1\", \"TLS1_1\"))] | length == 4 and all(.finding | startswith(\"not offered\")))\n    and ([.[] | select(.id | IN(\"cipherlist_3DES_IDEA\", \"cipherlist_OBSOLETED\", \"cipherlist_STRONG_NOFS\"))] | length == 3 and all(.finding | startswith(\"not offered\")))\n  ' \"$endpoint.json\" > /dev/null || { echo \"$endpoint: outside the intermediate profile, or a HIGH/CRITICAL finding\"; exit 1; }\n  curl -sI \"http://$endpoint/\" | grep -Eq '^HTTP/[0-9.]+ 30[1278]' || { echo \"$endpoint: plain HTTP not redirected\"; exit 1; }\n  max_age=$(curl -sI \"https://$endpoint/\" | grep -i '^strict-transport-security:' | grep -Eo 'max-age=[0-9]+' | cut -d= -f2 || true)\n  [ \"${max_age:-0}\" -ge 31536000 ] || { echo \"$endpoint: HSTS max-age under a year\"; exit 1; }\n  echo | openssl s_client -connect \"$endpoint:443\" -servername \"$endpoint\" 2>/dev/null \\\n    | openssl x509 -noout -checkend $(( 14 * 86400 )) || { echo \"$endpoint: certificate expires within 14 days\"; exit 1; }\ndone < endpoints.txt\n```",
+      "hubWhen": {
+        "TLS": [
+          "intermediate"
+        ]
+      }
     },
     {
       "id": "ff-mesh-strict",
       "type": "fitness-fn",
       "label": "Mesh in strict mode",
       "x": 1040,
-      "y": 130,
+      "y": 260,
       "category": "structural",
-      "threshold": "A mesh-wide PeerAuthentication in STRICT mode exists, and 0 workloads or namespaces override it to PERMISSIVE or DISABLE",
-      "description": "A Conftest policy over the rendered manifests fails when the mesh-wide mutual TLS policy is missing or anything weakens it.\n\nTool: Conftest (Open Policy Agent) over Istio manifests\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"PeerAuthentication\"\n  input.spec.mtls.mode != \"STRICT\"\n  msg := sprintf(\"%s/%s weakens mutual TLS to %s\", [input.metadata.namespace, input.metadata.name, input.spec.mtls.mode])\n}\n\ndeny contains msg if {\n  input.kind == \"PeerAuthentication\"\n  some port, setting in input.spec.portLevelMtls\n  setting.mode != \"STRICT\"\n  msg := sprintf(\"%s/%s turns off mutual TLS on port %v\", [input.metadata.namespace, input.metadata.name, port])\n}\n```",
+      "threshold": "A mesh-wide PeerAuthentication (istio-system, no selector) with mtls.mode STRICT exists, and 0 PeerAuthentications or port-level settings with any other mode or none",
+      "description": "A Conftest policy over all rendered manifests at once fails when the mesh-wide mutual TLS policy is missing, or when any PeerAuthentication leaves the mode unset (which inherits PERMISSIVE) or sets another one, on the workload or on a port.\n\nTool: Conftest (Open Policy Agent) over Istio manifests\n\n```rego\n# conftest test --combine manifests/\npackage main\n\nimport rego.v1\n\ndocs contains d if { some f in input; is_array(f.contents); some d in f.contents }\ndocs contains d if { some f in input; not is_array(f.contents); d := f.contents }\n\nmesh_wide_strict if {\n  some p in docs\n  p.kind == \"PeerAuthentication\"\n  p.metadata.namespace == \"istio-system\"\n  not p.spec.selector\n  p.spec.mtls.mode == \"STRICT\"\n}\n\ndeny contains msg if {\n  not mesh_wide_strict\n  msg := \"no mesh-wide PeerAuthentication in istio-system with mtls.mode STRICT\"\n}\n\ndeny contains msg if {\n  some p in docs\n  p.kind == \"PeerAuthentication\"\n  not p.spec.mtls.mode == \"STRICT\"            # unset inherits PERMISSIVE\n  msg := sprintf(\"%s/%s weakens mutual TLS (mode %v)\", [p.metadata.namespace, p.metadata.name, object.get(p, [\"spec\", \"mtls\", \"mode\"], \"unset\")])\n}\n\ndeny contains msg if {\n  some p in docs\n  p.kind == \"PeerAuthentication\"\n  some port, setting in p.spec.portLevelMtls\n  not setting.mode == \"STRICT\"\n  msg := sprintf(\"%s/%s turns off mutual TLS on port %v\", [p.metadata.namespace, p.metadata.name, port])\n}\n```",
       "hubWhen": {
         "INTERNAL": [
           "mtls"
@@ -721,10 +785,10 @@
       "type": "fitness-fn",
       "label": "Backends refuse clear text",
       "x": 1040,
-      "y": 260,
+      "y": 390,
       "category": "structural",
-      "threshold": "0 backends (databases, queues) that accept a connection without TLS; 0 client configurations with certificate verification turned off",
-      "description": "A smoke test after each deployment tries to connect to each database without TLS and expects a refusal; a code search fails the build on settings that skip verification.\n\nTool: psql and Semgrep\n\n```bash\n# the database must refuse clear text (rds.force_ssl=1, hostssl-only pg_hba.conf)\nif psql \"host=$DB_HOST dbname=$DB_NAME user=$DB_USER sslmode=disable\" -c 'select 1' 2>/dev/null; then\n  echo \"database accepts connections without TLS\"; exit 1\nfi\n# no client may skip verification\nsemgrep --error --lang generic -e 'sslmode=require' -e 'rejectUnauthorized: false' -e 'InsecureSkipVerify: true' -e 'verify=False' src/\n```",
+      "threshold": "0 databases that accept a connection without TLS; every internal endpoint (queues, other elements) answers verifiable TLS and 0 answer plain HTTP; 0 client settings that skip or downgrade verification",
+      "description": "A smoke test after each deployment tries each database without TLS and expects a refusal, checks every internal endpoint for a certificate that verifies against our CA and for a refusal of plain HTTP; a Semgrep rule set fails the build on settings that skip or downgrade verification.\n\nTool: psql, openssl, curl and Semgrep\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n# the database must refuse clear text (rds.force_ssl=1, hostssl-only pg_hba.conf)\nif psql \"host=$DB_HOST dbname=$DB_NAME user=$DB_USER sslmode=disable\" -c 'select 1' 2>/dev/null; then\n  echo \"database $DB_HOST accepts connections without TLS\"; exit 1\nfi\n# queues and other elements: TLS that verifies against our CA, and no plain HTTP (host:port per line)\nwhile read -r ep; do\n  echo | openssl s_client -connect \"$ep\" -servername \"${ep%%:*}\" -CAfile \"$INTERNAL_CA\" 2>/dev/null | grep -q 'Verify return code: 0' \\\n    || { echo \"$ep: no TLS that verifies against our CA\"; exit 1; }\n  if curl -sf --max-time 5 -o /dev/null \"http://$ep/\"; then echo \"$ep answers plain HTTP\"; exit 1; fi\ndone < internal-endpoints.txt\n# no client may skip or downgrade verification\ncat > /tmp/tls-verify.yml <<'RULES'\nrules:\n- id: tls-verification-off\n  message: TLS verification turned off or downgraded (ADR TLS on every connection)\n  severity: ERROR\n  languages: [generic]\n  pattern-either:\n    - pattern: sslmode=require\n    - pattern: sslmode=prefer\n    - pattern: 'rejectUnauthorized: false'\n    - pattern: 'InsecureSkipVerify: true'\n    - pattern: verify=False\nRULES\nsemgrep --config /tmp/tls-verify.yml --error src/\n```",
       "hubWhen": {
         "INTERNAL": [
           "tls"
@@ -736,10 +800,10 @@
       "type": "fitness-fn",
       "label": "Private network stays private",
       "x": 1040,
-      "y": 390,
+      "y": 520,
       "category": "structural",
-      "threshold": "0 VPC peerings, public addresses or 0.0.0.0/0 ingress rules on the element's network in the Terraform plan",
-      "description": "A Conftest policy over the Terraform plan fails when the private network gains a peering, a public address or an open ingress rule, any of which breaks the conditions of the decision.\n\nTool: Conftest (Open Policy Agent) over terraform show -json\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_vpc_peering_connection\"\n  msg := sprintf(\"%s: peering breaks the clear-text-inside decision\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in input.resource_changes\n  rc.type == \"aws_security_group_rule\"\n  rc.change.after.type == \"ingress\"\n  \"0.0.0.0/0\" in rc.change.after.cidr_blocks\n  msg := sprintf(\"%s opens the private network to the internet\", [rc.address])\n}\n```",
+      "threshold": "0 VPC peerings, 0 public addresses (elastic IPs, instances with a public address, subnets that assign one) and 0 0.0.0.0/0 or ::/0 ingress rules on the element's network in the Terraform plan",
+      "description": "A Conftest policy over the Terraform plan fails when the private network gains a peering, a public address or an open ingress rule, any of which breaks the conditions of the decision. The rules are for the AWS provider; the Azure and Google providers' peering, public IP and security rule resources are checked the same way.\n\nTool: Conftest (Open Policy Agent) over terraform show -json (AWS provider; for Azure: azurerm_virtual_network_peering, azurerm_public_ip, azurerm_network_security_rule; for Google: google_compute_network_peering, google_compute_address, google_compute_firewall)\n\n```rego\npackage main\n\nimport rego.v1\n\nchanges contains rc if { some rc in input.resource_changes; rc.change.actions[_] != \"delete\" }\n\ndeny contains msg if {\n  some rc in changes\n  rc.type == \"aws_vpc_peering_connection\"\n  msg := sprintf(\"%s: peering breaks the clear-text-inside decision\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in changes\n  rc.type in {\"aws_eip\", \"aws_eip_association\"}\n  msg := sprintf(\"%s: a public address on the private network\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in changes\n  rc.type == \"aws_instance\"\n  rc.change.after.associate_public_ip_address == true\n  msg := sprintf(\"%s gets a public address\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in changes\n  rc.type == \"aws_subnet\"\n  rc.change.after.map_public_ip_on_launch == true\n  msg := sprintf(\"%s assigns public addresses\", [rc.address])\n}\n\nopen_cidr(c) if c in {\"0.0.0.0/0\", \"::/0\"}\n\ndeny contains msg if {\n  some rc in changes\n  rc.type == \"aws_security_group_rule\"\n  rc.change.after.type == \"ingress\"\n  some c in array.concat(object.get(rc.change.after, \"cidr_blocks\", []), object.get(rc.change.after, \"ipv6_cidr_blocks\", []))\n  open_cidr(c)\n  msg := sprintf(\"%s opens the private network to the internet\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in changes\n  rc.type == \"aws_vpc_security_group_ingress_rule\"\n  some c in [rc.change.after.cidr_ipv4, rc.change.after.cidr_ipv6]\n  open_cidr(c)\n  msg := sprintf(\"%s opens the private network to the internet\", [rc.address])\n}\n```",
       "hubWhen": {
         "INTERNAL": [
           "private"
@@ -751,20 +815,57 @@
       "type": "fitness-fn",
       "label": "Nothing stored unencrypted",
       "x": 1040,
-      "y": 520,
+      "y": 650,
       "category": "operational",
       "threshold": "0 non-compliant database instances, snapshots, volumes or buckets",
-      "description": "AWS Config managed rules evaluate every database, snapshot, volume and bucket continuously and report one that is not encrypted at rest. Azure Policy and Google Organization Policy have equivalent built-in rules.\n\nTool: AWS Config managed rules\n\n```hcl\nlocals {\n  encryption_rules = [\n    \"RDS_STORAGE_ENCRYPTED\",\n    \"RDS_SNAPSHOT_ENCRYPTED\",\n    \"ENCRYPTED_VOLUMES\",\n    \"S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED\",\n  ]\n}\n\nresource \"aws_config_config_rule\" \"encrypted_at_rest\" {\n  for_each = toset(local.encryption_rules)\n  name     = lower(replace(each.value, \"_\", \"-\"))\n  source {\n    owner             = \"AWS\"\n    source_identifier = each.value\n  }\n}\n```"
+      "description": "AWS Config managed rules evaluate every database, snapshot, volume and bucket continuously and report one that is not encrypted at rest.\n\nTool: AWS Config managed rules (for Azure: the built-in Azure Policy definitions for storage and SQL encryption; for Google: encryption at rest is always on, the Organization Policy only matters for customer-managed keys)\n\n```hcl\nlocals {\n  encryption_rules = [\n    \"RDS_STORAGE_ENCRYPTED\",\n    \"RDS_SNAPSHOT_ENCRYPTED\",\n    \"ENCRYPTED_VOLUMES\",\n    \"S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED\",\n  ]\n}\n\nresource \"aws_config_config_rule\" \"encrypted_at_rest\" {\n  for_each = toset(local.encryption_rules)\n  name     = lower(replace(each.value, \"_\", \"-\"))\n  source {\n    owner             = \"AWS\"\n    source_identifier = each.value\n  }\n}\n```",
+      "hubWhen": {
+        "AT_REST": [
+          "provider"
+        ]
+      }
+    },
+    {
+      "id": "ff-rest-cmk",
+      "type": "fitness-fn",
+      "label": "Stored under our key only",
+      "x": 1040,
+      "y": 780,
+      "category": "operational",
+      "threshold": "0 database instances, volumes or buckets encrypted with any key but the element's customer-managed key; 0 unencrypted snapshots",
+      "description": "AWS Config managed rules evaluate every database, volume and bucket continuously with the element's key passed as the only allowed key, so a resource encrypted with a provider-managed key is reported too; snapshots are checked for encryption.\n\nTool: AWS Config managed rules with key parameters (for Azure: Azure Policy \"should use customer-managed keys\" definitions; for Google: the Organization Policy constraint gcp.restrictNonCmekServices)\n\n```hcl\nlocals {\n  key_arn = aws_kms_key.data.arn   # one key per element and environment\n}\n\nresource \"aws_config_config_rule\" \"rds_our_key\" {\n  name = \"rds-storage-encrypted-with-our-key\"\n  source {\n    owner             = \"AWS\"\n    source_identifier = \"RDS_STORAGE_ENCRYPTED\"\n  }\n  input_parameters = jsonencode({ kmsKeyId = local.key_arn })\n}\n\nresource \"aws_config_config_rule\" \"rds_snapshots\" {\n  name = \"rds-snapshot-encrypted\"\n  source {\n    owner             = \"AWS\"\n    source_identifier = \"RDS_SNAPSHOT_ENCRYPTED\"\n  }\n}\n\nresource \"aws_config_config_rule\" \"volumes_our_key\" {\n  name = \"encrypted-volumes-with-our-key\"\n  source {\n    owner             = \"AWS\"\n    source_identifier = \"ENCRYPTED_VOLUMES\"\n  }\n  input_parameters = jsonencode({ kmsId = local.key_arn })\n}\n\nresource \"aws_config_config_rule\" \"buckets_our_key\" {\n  name = \"s3-default-encryption-with-our-key\"\n  source {\n    owner             = \"AWS\"\n    source_identifier = \"S3_DEFAULT_ENCRYPTION_KMS\"\n  }\n  input_parameters = jsonencode({ kmsKeyArns = local.key_arn })\n}\n```",
+      "hubWhen": {
+        "AT_REST": [
+          "cmk",
+          "field"
+        ]
+      }
+    },
+    {
+      "id": "ff-key-policy",
+      "type": "fitness-fn",
+      "label": "Key use and administration apart",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "In every aws_kms_key policy of the plan: the principals allowed to use the key are a subset of the element's roles, 0 principals may both use and administer it, and 0 statements grant use to *",
+      "description": "A Conftest policy over the Terraform plan parses each KMS key policy and fails when a principal outside the element's roles may encrypt or decrypt, when one principal appears in both a use and an administration statement (kms:* counts as both), or when use is open to everyone. Every KMS call is logged by CloudTrail by default.\n\nTool: Conftest (Open Policy Agent) over terraform show -json (AWS; for Azure: Key Vault RBAC assignments, for Google: IAM bindings on the key ring, checked the same way)\n\n```rego\npackage main\n\nimport rego.v1\n\nelement_roles := {\"arn:aws:iam::123456789012:role/order-api\"}   # the element's own identities\n\nuse_actions := {\"kms:Encrypt\", \"kms:Decrypt\", \"kms:GenerateDataKey\", \"kms:GenerateDataKey*\", \"kms:GenerateDataKeyWithoutPlaintext\", \"kms:ReEncrypt*\", \"kms:ReEncryptFrom\", \"kms:ReEncryptTo\", \"kms:*\"}\nadmin_actions := {\"kms:Create*\", \"kms:Put*\", \"kms:Update*\", \"kms:Enable*\", \"kms:Disable*\", \"kms:Revoke*\", \"kms:ScheduleKeyDeletion\", \"kms:CancelKeyDeletion\", \"kms:TagResource\", \"kms:UntagResource\", \"kms:*\"}\n\nas_set(x) := {x} if is_string(x)\nas_set(x) := {v | some v in x} if is_array(x)\n\nkeys contains rc if {\n  some rc in input.resource_changes\n  rc.type == \"aws_kms_key\"\n  is_string(rc.change.after.policy)\n}\n\nallows(rc, actions) := {p |\n  some s in json.unmarshal(rc.change.after.policy).Statement\n  s.Effect == \"Allow\"\n  count(as_set(s.Action) & actions) > 0\n  some p in as_set(s.Principal.AWS)\n}\n\ndeny contains msg if {\n  some rc in keys\n  some p in allows(rc, use_actions) - element_roles\n  msg := sprintf(\"%s: %s may use the key but is not the element's identity\", [rc.address, p])\n}\n\ndeny contains msg if {\n  some rc in keys\n  some p in allows(rc, use_actions) & allows(rc, admin_actions)\n  msg := sprintf(\"%s: %s may both use and administer the key\", [rc.address, p])\n}\n\ndeny contains msg if {\n  some rc in keys\n  \"*\" in allows(rc, use_actions)\n  msg := sprintf(\"%s: anyone may use the key\", [rc.address])\n}\n```",
+      "hubWhen": {
+        "AT_REST": [
+          "cmk",
+          "field"
+        ]
+      }
     },
     {
       "id": "ff-key-rotation",
       "type": "fitness-fn",
       "label": "Key rotation on",
       "x": 1040,
-      "y": 650,
+      "y": 1040,
       "category": "operational",
-      "threshold": "0 customer-managed keys without automatic rotation; rotation period at most {{KEY_ROTATE_DAYS}} days",
-      "description": "AWS Config reports every customer-managed KMS key whose automatic rotation is off; a scheduled job checks the rotation period of each.\n\nTool: AWS Config managed rule CMK_BACKING_KEY_ROTATION_ENABLED and the AWS CLI\n\n```bash\nfor key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do\n  [ \"$(aws kms describe-key --key-id \"$key\" --query 'KeyMetadata.KeyManager' --output text)\" = CUSTOMER ] || continue\n  status=$(aws kms get-key-rotation-status --key-id \"$key\" --output json)\n  echo \"$status\" | jq -e --argjson max {{KEY_ROTATE_DAYS}} \\\n    '.KeyRotationEnabled and (.RotationPeriodInDays <= $max)' >/dev/null \\\n    || { echo \"key $key: rotation off or longer than {{KEY_ROTATE_DAYS}} days\"; exit 1; }\ndone\n```",
+      "threshold": "0 customer-managed symmetric keys without automatic rotation; every rotation period at most {{KEY_ROTATE_DAYS}} days",
+      "description": "A scheduled job lists the customer-managed keys, skips the asymmetric and HMAC ones (which the KMS cannot rotate) and fails on a symmetric key whose rotation is off or whose period is longer than {{KEY_ROTATE_DAYS}} days.\n\nTool: AWS CLI and jq (for Azure: az keyvault key rotation-policy show; for Google: gcloud kms keys describe, field rotationPeriod)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfor key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do\n  meta=$(aws kms describe-key --key-id \"$key\" --query 'KeyMetadata' --output json)\n  echo \"$meta\" | jq -e '.KeyManager == \"CUSTOMER\" and .KeySpec == \"SYMMETRIC_DEFAULT\" and .KeyState == \"Enabled\"' > /dev/null || continue\n  aws kms get-key-rotation-status --key-id \"$key\" --output json \\\n    | jq -e --argjson max {{KEY_ROTATE_DAYS}} '.KeyRotationEnabled and (.RotationPeriodInDays <= $max)' > /dev/null \\\n    || { echo \"key $key: rotation off or longer than {{KEY_ROTATE_DAYS}} days\"; exit 1; }\ndone\n```",
       "hubWhen": {
         "AT_REST": [
           "cmk",
@@ -780,10 +881,10 @@
       "type": "fitness-fn",
       "label": "No key past its period",
       "x": 1040,
-      "y": 780,
+      "y": 1170,
       "category": "operational",
       "threshold": "0 enabled customer-managed keys older than {{KEY_ROTATE_DAYS}} + 30 days",
-      "description": "A scheduled job lists the customer-managed keys and fails on an enabled key past its cryptoperiod and the 30 days allowed for re-encryption, which means the old key still protects data.\n\nTool: AWS CLI and jq\n\n```bash\nmax=$(( ({{KEY_ROTATE_DAYS}} + 30) * 86400 ))\nfor key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do\n  aws kms describe-key --key-id \"$key\" --output json | jq -e --argjson max \"$max\" '\n    .KeyMetadata | select(.KeyManager == \"CUSTOMER\" and .KeyState == \"Enabled\")\n    | (now - .CreationDate) > $max' >/dev/null && { echo \"key $key is past its cryptoperiod\"; exit 1; }\ndone\nexit 0\n```",
+      "description": "A scheduled job lists the customer-managed keys and fails on an enabled key past its cryptoperiod and the 30 days allowed for re-encryption, which means the old key still protects data. The creation date is an ISO 8601 string in the CLI's JSON and is converted before comparing.\n\nTool: AWS CLI and jq (for Azure: az keyvault key list, attributes.created; for Google: gcloud kms keys versions list, createTime)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nmax=$(( ({{KEY_ROTATE_DAYS}} + 30) * 86400 ))\nfor key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do\n  if aws kms describe-key --key-id \"$key\" --output json | jq -e --argjson max \"$max\" '\n      .KeyMetadata | select(.KeyManager == \"CUSTOMER\" and .KeyState == \"Enabled\")\n      | (now - (.CreationDate | sub(\"\\\\.[0-9]+\"; \"\") | sub(\"\\\\+00:00$\"; \"Z\") | fromdateiso8601)) > $max' > /dev/null; then\n    echo \"key $key is past its cryptoperiod\"; exit 1\n  fi\ndone\n```",
       "hubWhen": {
         "AT_REST": [
           "cmk",
@@ -799,13 +900,43 @@
       "type": "fitness-fn",
       "label": "Fields stored as ciphertext",
       "x": 1040,
-      "y": 910,
+      "y": 1300,
       "category": "structural",
       "threshold": "0 of the listed sensitive fields readable as plaintext in the database",
-      "description": "An integration test saves a record through the element, reads the row directly from the database and fails if any of the sensitive fields holds the original value.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nit('stores sensitive fields as ciphertext', async () => {\n  const card = '4111111111111111'\n  const { id } = await customers.create({ name: 'Ada', cardNumber: card })\n  const { rows } = await pg.query('select card_number from customers where id = $1', [id])\n  expect(rows[0].card_number).not.toContain(card)\n  expect((await customers.get(id)).cardNumber).toBe(card)\n})\n```",
+      "description": "An integration test saves a record through the element, reads the row directly from the database and fails if any of the sensitive fields holds the original value.\n\nTool: Vitest with Testcontainers (PostgreSQL) (or the test runner of your stack)\n\n```ts\nit('stores sensitive fields as ciphertext', async () => {\n  const card = '4111111111111111'\n  const { id } = await customers.create({ name: 'Ada', cardNumber: card })\n  const { rows } = await pg.query('select card_number from customers where id = $1', [id])\n  expect(rows[0].card_number).not.toContain(card)\n  expect((await customers.get(id)).cardNumber).toBe(card)\n})\n```",
       "hubWhen": {
         "AT_REST": [
           "field"
+        ]
+      }
+    },
+    {
+      "id": "ff-cert-renewal",
+      "type": "fitness-fn",
+      "label": "Renewal watched",
+      "x": 1040,
+      "y": 1430,
+      "category": "operational",
+      "threshold": "An alert fires for every certificate with fewer than 14 days left or not Ready for an hour; 0 certificates expire",
+      "description": "Prometheus rules over cert-manager's metrics page the owner when a certificate the manager should have renewed at 30 days is still within 14 days of expiry, or has not been Ready for an hour; the public endpoints' expiry is also checked by the TLS scan.\n\nTool: Prometheus alerting rules over cert-manager metrics (for AWS Certificate Manager: a CloudWatch alarm on AWS/CertificateManager DaysToExpiry below 14)\n\n```yaml\ngroups:\n- name: certificates\n  rules:\n  - alert: CertificateNotRenewed\n    expr: certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 86400\n    for: 1h\n    labels: { severity: page }\n    annotations: { summary: \"{{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days: automatic renewal failed\" }\n  - alert: CertificateNotReady\n    expr: certmanager_certificate_ready_status{condition=\"False\"} == 1\n    for: 1h\n    labels: { severity: page }\n    annotations: { summary: \"{{ $labels.namespace }}/{{ $labels.name }} is not Ready\" }\n```",
+      "hubWhen": {
+        "CERTS": [
+          "acme"
+        ]
+      }
+    },
+    {
+      "id": "ff-cert-inventory",
+      "type": "fitness-fn",
+      "label": "Inventory expiry check",
+      "x": 1040,
+      "y": 1560,
+      "category": "process",
+      "threshold": "Every working day, every certificate on the inventory with fewer than 30 days left raises an alert to its named owner; the job fails while one is on the list",
+      "description": "A scheduled job reads the inventory (endpoint and owner per line), checks each certificate's expiry with openssl and alerts the owner of each one within 30 days of expiry; the job keeps failing, and alerting, until the certificate is replaced.\n\nTool: openssl in a scheduled job (cron, a scheduled CI workflow) with your alerting hook\n\n```bash\n#!/usr/bin/env bash\n# cert-inventory.txt: \"<host:port> <owner>\" per line; notify: your paging or chat hook\nset -uo pipefail\nfail=0\nwhile read -r endpoint owner; do\n  [ -n \"$endpoint\" ] || continue\n  if ! echo | openssl s_client -connect \"$endpoint\" -servername \"${endpoint%%:*}\" 2>/dev/null | openssl x509 -noout -checkend $(( 30 * 86400 )); then\n    echo \"$endpoint expires within 30 days (owner: $owner)\"\n    notify \"$owner\" \"certificate $endpoint expires within 30 days; replace it\"\n    fail=1\n  fi\ndone < cert-inventory.txt\nexit $fail\n```",
+      "hubWhen": {
+        "CERTS": [
+          "managed-ca"
         ]
       }
     }
@@ -874,6 +1005,12 @@
     {
       "id": "req-rotate-reencrypt--derives--need",
       "sourceId": "req-rotate-reencrypt",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-key-compromise--derives--need",
+      "sourceId": "req-key-compromise",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -956,6 +1093,12 @@
       "relationType": "verifies"
     },
     {
+      "id": "sc-key-compromise--verifies--req-key-compromise",
+      "sourceId": "sc-key-compromise",
+      "targetId": "req-key-compromise",
+      "relationType": "verifies"
+    },
+    {
       "id": "sc-certs-acme--verifies--req-certs-acme",
       "sourceId": "sc-certs-acme",
       "targetId": "req-certs-acme",
@@ -986,6 +1129,24 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-tls-scan-12--implements--adr-mtls",
+      "sourceId": "ff-tls-scan-12",
+      "targetId": "adr-mtls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-tls-scan-12--implements--adr-internal-tls",
+      "sourceId": "ff-tls-scan-12",
+      "targetId": "adr-internal-tls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-tls-scan-12--implements--adr-private",
+      "sourceId": "ff-tls-scan-12",
+      "targetId": "adr-private",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-mesh-strict--implements--adr-mtls",
       "sourceId": "ff-mesh-strict",
       "targetId": "adr-mtls",
@@ -1010,14 +1171,26 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-rest--implements--adr-cmk",
-      "sourceId": "ff-rest",
+      "id": "ff-rest-cmk--implements--adr-cmk",
+      "sourceId": "ff-rest-cmk",
       "targetId": "adr-cmk",
       "relationType": "implements"
     },
     {
-      "id": "ff-rest--implements--adr-field",
-      "sourceId": "ff-rest",
+      "id": "ff-rest-cmk--implements--adr-field",
+      "sourceId": "ff-rest-cmk",
+      "targetId": "adr-field",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-policy--implements--adr-cmk",
+      "sourceId": "ff-key-policy",
+      "targetId": "adr-cmk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-policy--implements--adr-field",
+      "sourceId": "ff-key-policy",
       "targetId": "adr-field",
       "relationType": "implements"
     },
@@ -1049,6 +1222,42 @@
       "id": "ff-field--implements--adr-field",
       "sourceId": "ff-field",
       "targetId": "adr-field",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-renewal--implements--adr-mtls",
+      "sourceId": "ff-cert-renewal",
+      "targetId": "adr-mtls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-renewal--implements--adr-internal-tls",
+      "sourceId": "ff-cert-renewal",
+      "targetId": "adr-internal-tls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-renewal--implements--adr-private",
+      "sourceId": "ff-cert-renewal",
+      "targetId": "adr-private",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-inventory--implements--adr-mtls",
+      "sourceId": "ff-cert-inventory",
+      "targetId": "adr-mtls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-inventory--implements--adr-internal-tls",
+      "sourceId": "ff-cert-inventory",
+      "targetId": "adr-internal-tls",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cert-inventory--implements--adr-private",
+      "sourceId": "ff-cert-inventory",
+      "targetId": "adr-private",
       "relationType": "implements"
     }
   ]
