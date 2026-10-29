@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { readCatalogue, validateCatalogue, concernPacksOf } from '../src/catalogue'
 import { concernPackProblems, CONCERN_GROUPS } from '@radical/common/concerns'
-import { buildPackDoc, packFile, packFileText, type PackSpec } from '../src/packSpec'
+import { buildPackDoc, packFile, packFileText, specProblems, type PackSpec } from '../src/packSpec'
 import { boundImportProblems } from '../src/packCheck'
 
 const entries = readCatalogue()
@@ -28,8 +28,30 @@ describe('concern packs', () => {
 
   it('every pack meets the standard, and every group has packs', () => {
     for (const { file, doc } of packs) expect(concernPackProblems(doc), file).toEqual([])
+    for (const spec of specs) expect(specProblems(spec), spec.id).toEqual([])
     const groups = new Set(packs.map(({ doc }) => doc.hub.concern?.group))
     for (const g of CONCERN_GROUPS) expect(groups.has(g.id), `group ${g.id} has no pack`).toBe(true)
+  })
+
+  it('specProblems: every requirement is checked by a fitness function imported with it, or says why not', () => {
+    const spec = {
+      ...specs[0],
+      questions: [{ key: 'Q', title: 'Q', label: 'Q?', hint: '', default: 'a', options: [{ value: 'a', label: 'a', description: 'a' }, { value: 'b', label: 'b', description: 'b' }] }],
+      requirements: [
+        { ...specs[0].requirements[0], id: 'r1', when: undefined, unchecked: undefined },
+        { ...specs[0].requirements[0], id: 'r2', when: { Q: ['a', 'b'] }, unchecked: undefined },
+        { ...specs[0].requirements[0], id: 'r3', when: undefined, unchecked: 'A review on the calendar.' },
+        { ...specs[0].requirements[0], id: 'r4', when: undefined, unchecked: ' ' },
+      ],
+      fitness: [{ ...specs[0].fitness[0], id: 'f1', when: { Q: ['a'] }, checks: ['r2', 'r4', 'nope'] }],
+    } as PackSpec
+    expect(specProblems(spec)).toEqual([
+      'fitness function "f1" checks "nope", which is no requirement of the pack',
+      'requirement "r1" is checked by no fitness function (name it in a fitness function\'s checks, or say in unchecked why the team keeps it by hand)',
+      'requirement "r2" is imported without any fitness function that checks it for {"Q":"b"}',
+      'requirement "r4": unchecked must say why no fitness function checks it',
+      'requirement "r4" is unchecked yet "f1" checks it',
+    ])
   })
 
   it('every pack imported and bound passes radical check', () => {

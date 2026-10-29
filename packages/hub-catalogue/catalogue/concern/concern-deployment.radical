@@ -3,7 +3,7 @@
     "id": "concern-deployment",
     "category": "concern",
     "name": "Deployment and rollback",
-    "description": "How a change reaches production and how it is undone: the rollout strategy and its automatic checks, database migrations that keep rollback possible, feature flags, the time to roll back, and the release cadence measured with the DORA metrics.",
+    "description": "How a change reaches production and how it is undone: the rollout strategy and its automatic checks, database migrations that keep rollback possible, feature flags and their removal, the time to roll back, and the release cadence measured with the DORA metrics.",
     "tags": [
       "operations",
       "deployment",
@@ -49,6 +49,22 @@
       {
         "title": "Argo Rollouts documentation",
         "url": "https://argo-rollouts.readthedocs.io/en/stable/"
+      },
+      {
+        "title": "Kubernetes documentation: Deployments",
+        "url": "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+      },
+      {
+        "title": "Kubernetes documentation: Pod Lifecycle (termination of pods)",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"
+      },
+      {
+        "title": "AWS Well-Architected Framework, Reliability Pillar",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html"
+      },
+      {
+        "title": "flagd: flag definitions",
+        "url": "https://flagd.dev/reference/flag-definitions/"
       }
     ],
     "templateParams": [
@@ -72,7 +88,7 @@
           {
             "value": "canary",
             "label": "a canary with automatic analysis",
-            "description": "The new version gets 5 %, then 25 %, then 50 % of traffic; at each step its error rate and latency are compared with the stable one and a worse canary is rolled back by itself. Pick it with enough traffic to judge a step (about 100 requests per step or more) and metrics per version."
+            "description": "The new version gets 5 %, then 25 %, then 50 % of traffic; at each step its success rate and latency are compared with the stable version and a worse canary is rolled back by itself. Pick it with enough traffic to judge a step (about 100 requests per step or more) and metrics per version."
           }
         ]
       },
@@ -80,7 +96,7 @@
         "key": "MIGRATIONS",
         "title": "Schema changes",
         "label": "How do database schema changes ship?",
-        "hint": "During a rollout and after a rollback, the previous version runs against the new schema. A change it cannot read makes rollback impossible.",
+        "hint": "During a rollout and after a rollback, the previous version runs against the new schema. A change it cannot read makes rollback impossible. The migration tool itself is decided in the Data store pack.",
         "defaultValue": "expand",
         "options": [
           {
@@ -90,7 +106,7 @@
           },
           {
             "value": "window",
-            "label": "in a maintenance window",
+            "label": "a maintenance window",
             "description": "Changes that cannot be made online run with the element stopped, in an announced window, after a rehearsal on a copy of production. Pick it only for a large one-off change (a type change on a huge table, a database upgrade) and when downtime is acceptable."
           },
           {
@@ -104,17 +120,17 @@
         "key": "FLAGS",
         "title": "Feature flags",
         "label": "Is deploying separate from releasing?",
-        "hint": "With feature flags, code reaches production switched off and is turned on for some users, then all, without a deploy; turning it off is the fastest rollback.",
+        "hint": "With feature flags, code reaches production switched off and is turned on for some users, then all, without a deploy; turning it off is the fastest rollback. A flag left behind after its rollout is a debt item, removed by a deadline.",
         "defaultValue": "yes",
         "options": [
           {
             "value": "yes",
-            "label": "yes, behind feature flags",
+            "label": "feature flags",
             "description": "Unfinished or risky features ship switched off and are turned on per environment or share of users through OpenFeature with a provider (LaunchDarkly, Unleash, flagd, ConfigCat). Pick it with trunk-based development, several changes in flight, or features released at a business date."
           },
           {
             "value": "no",
-            "label": "no, a deploy is a release",
+            "label": "no flags: a deploy is a release",
             "description": "What is merged and deployed is live for everyone. Pick it for small teams with fast rollback and features small enough to finish in one change; it avoids the cost of flags and their clean-up."
           }
         ]
@@ -123,12 +139,12 @@
         "key": "CADENCE",
         "title": "Cadence",
         "label": "How often does it release?",
-        "hint": "Smaller, more frequent releases fail less often and are easier to undo (DORA). The cadence sets the targets for the four DORA metrics.",
+        "hint": "Smaller, more frequent releases fail less often and are easier to undo (DORA). The cadence sets the targets for the DORA metrics.",
         "defaultValue": "continuous",
         "options": [
           {
             "value": "continuous",
-            "label": "continuously, every merge",
+            "label": "continuous deployment of every merge",
             "description": "Every change merged to the main branch goes to production through the pipeline, the same day. Pick it with a test suite and rollout checks the team trusts, and a product where small changes can reach users at any time."
           },
           {
@@ -143,6 +159,24 @@
         "label": "How fast must a bad release be undone (minutes)?",
         "defaultValue": "15",
         "type": "number"
+      },
+      {
+        "key": "CANARY_SUCCESS_PERCENT",
+        "label": "Lowest success rate a canary step may show (%); at or above the availability objective decided in the Availability pack",
+        "defaultValue": "99",
+        "type": "number"
+      },
+      {
+        "key": "WINDOW_MINUTES",
+        "label": "How long is a maintenance window for an offline migration (minutes)? Only with migrations in a maintenance window",
+        "defaultValue": "120",
+        "type": "number"
+      },
+      {
+        "key": "FLAG_AGE_DAYS",
+        "label": "Most days a flag may stay after its feature reached all users. Only with feature flags",
+        "defaultValue": "90",
+        "type": "number"
       }
     ]
   },
@@ -155,7 +189,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Deployment and rollback",
-      "description": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, and the team must know how often it ships and how often shipping goes wrong."
+      "description": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-rollback",
@@ -175,8 +209,8 @@
       "x": 260,
       "y": 130,
       "ears_type": "ubiquitous",
-      "action": "take an instance out of the load balancer and let its requests in flight finish, for up to 30 seconds, before stopping it, and send traffic to a new instance only once its readiness check passes",
-      "rationale": "Requests cut off at shutdown and traffic sent to instances still starting are the errors every deployment causes unless they are designed out (Kubernetes documentation, pod termination)."
+      "action": "leave the load balancer and let its requests in flight finish, for up to 30 seconds, before an instance stops, and receive traffic on a new instance only once its readiness check (decided in the Observability pack) passes, so that a deployment under steady load fails 0 requests",
+      "rationale": "Requests cut off at shutdown and traffic sent to instances still starting are the errors every deployment causes unless they are designed out (Kubernetes documentation, Pod Lifecycle: termination of pods)."
     },
     {
       "id": "req-rolling",
@@ -186,8 +220,8 @@
       "y": 260,
       "ears_type": "event-driven",
       "trigger": "a new version rolls out",
-      "action": "replace instances one at a time, starting each new one before an old one stops, and halt the rollout when new instances fail readiness for 5 minutes or the error rate rises above its service level",
-      "rationale": "A rolling update that removes capacity first, or carries on past failing instances, turns a bad version into an outage (Kubernetes documentation, Deployments).",
+      "action": "replace instances one at a time, starting each new one before an old one stops, and halt the rollout when new instances fail to become ready for 5 minutes or the error rate rises above its service level",
+      "rationale": "A rolling update that removes capacity first, or carries on past failing instances, turns a bad version into an outage (Kubernetes documentation, Deployments: rolling update strategy and progress deadline).",
       "hubWhen": {
         "STRATEGY": [
           "rolling"
@@ -218,7 +252,7 @@
       "y": 520,
       "ears_type": "event-driven",
       "trigger": "a new version rolls out",
-      "action": "send it 5 %, 25 % and 50 % of traffic in turn for 10 minutes each, compare its success rate and 95th percentile latency with the stable version at every step, and roll back automatically when the success rate drops below 99 % or the latency is 20 % worse",
+      "action": "send it 5 %, 25 % and 50 % of traffic in turn for 10 minutes each, measure its success rate and 95th percentile latency at every step, and roll back automatically when the success rate drops below {{CANARY_SUCCESS_PERCENT}} % or the 95th percentile is more than 20 % above the stable version's",
       "rationale": "A canary limits a bad version to a small share of users, and an automatic judgement stops it faster than a person watching dashboards (Google SRE workbook, Canarying Releases).",
       "hubWhen": {
         "STRATEGY": [
@@ -249,8 +283,8 @@
       "y": 780,
       "ears_type": "state-driven",
       "precondition": "a schema change cannot run while the element serves",
-      "action": "run it only in an announced maintenance window, after a rehearsal on a restored copy of production that finished within half the window, and with a backup taken just before it and a tested way back",
-      "rationale": "An offline migration that overruns its window, or cannot be undone, is an outage without an end; the rehearsal tells how long it takes (AWS Well-Architected REL 8).",
+      "action": "run it only in the announced maintenance window of {{WINDOW_MINUTES}} minutes, after a rehearsal on a restored copy of production in which the migration and the way back (the restore) each finished within half the window, and with a backup taken just before it",
+      "rationale": "An offline migration that overruns its window, or cannot be undone, is an outage without an end; the rehearsal tells how long each takes (AWS Well-Architected Reliability Pillar, REL 8: implement change).",
       "hubWhen": {
         "MIGRATIONS": [
           "window"
@@ -264,7 +298,7 @@
       "x": 260,
       "y": 910,
       "ears_type": "ubiquitous",
-      "action": "keep no database schema of its own, leaving every stored state to services that own their migrations",
+      "action": "keep no database schema of its own and depend on no database client or migration tool, leaving every stored state to services that own their migrations",
       "rationale": "An element without a schema can always be rolled back; this keeps it that way until the decision changes.",
       "hubWhen": {
         "MIGRATIONS": [
@@ -279,7 +313,7 @@
       "x": 260,
       "y": 1040,
       "ears_type": "ubiquitous",
-      "action": "ship unfinished or risky features switched off behind a flag that can be turned on and off per environment and per share of users without a deploy, take effect within 60 seconds, and remove each flag within 30 days of the feature reaching all users",
+      "action": "ship unfinished or risky features switched off behind a flag that can be turned on and off per environment and per share of users without a deploy, apply a changed flag within 60 seconds, and remove each flag within {{FLAG_AGE_DAYS}} days of its feature reaching all users",
       "rationale": "Flags separate deploying from releasing and make switching a feature off the fastest rollback; flags left behind become untested branches (Pete Hodgson, Feature Toggles).",
       "hubWhen": {
         "FLAGS": [
@@ -288,13 +322,28 @@
       }
     },
     {
+      "id": "req-no-flags",
+      "type": "requirement",
+      "label": "No flags: deploys are releases",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "make every deployed change live for everyone at once, depend on no feature flag SDK or provider, and keep work too large to finish in one change on its branch until it is",
+      "rationale": "Without flags, a flag SDK that arrives unnoticed is a release process nobody decided; this keeps the decision true until it is superseded.",
+      "hubWhen": {
+        "FLAGS": [
+          "no"
+        ]
+      }
+    },
+    {
       "id": "req-continuous",
       "type": "requirement",
       "label": "Every merge deployed",
       "x": 260,
-      "y": 1170,
+      "y": 1300,
       "ears_type": "ubiquitous",
-      "action": "deploy every change merged to the main branch to production through the automated pipeline within 1 day, keeping the change failure rate under 15 % and recovering from a failed deployment within 1 hour",
+      "action": "deploy every change merged to the main branch to production through the automated pipeline within 1 day, and recover from a failed deployment within {{ROLLBACK_MINUTES}} minutes by rolling back",
       "rationale": "DORA's research ties on-demand deployment and lead times under a day to fewer failed changes and faster recovery (DORA, the four key metrics).",
       "hubWhen": {
         "CADENCE": [
@@ -307,10 +356,10 @@
       "type": "requirement",
       "label": "Weekly release train",
       "x": 260,
-      "y": 1300,
+      "y": 1430,
       "ears_type": "event-driven",
       "trigger": "the weekly cut-off passes",
-      "action": "release every change merged before it to production within 2 working days, keeping the lead time from merge to production under 7 days and the change failure rate under 15 %",
+      "action": "release every change merged before it to production within 2 working days, keeping the lead time from merge to production under 7 days, and recover from a failed deployment within {{ROLLBACK_MINUTES}} minutes by rolling back",
       "rationale": "A fixed weekly train keeps batches small enough to undo; DORA's metrics show whether it is getting slower or failing more (DORA, the four key metrics).",
       "hubWhen": {
         "CADENCE": [
@@ -334,7 +383,7 @@
       "label": "Release under load",
       "x": 520,
       "y": 130,
-      "given": "steady traffic at the usual rate",
+      "given": "steady traffic at the usual rate against staging",
       "when": "a new version is deployed",
       "then": "no request fails because of the deployment"
     },
@@ -374,7 +423,7 @@
       "label": "Bad canary rolled back",
       "x": 520,
       "y": 520,
-      "given": "a version that fails 3 % of requests",
+      "given": "a version that fails more than 100 minus {{CANARY_SUCCESS_PERCENT}} % of requests",
       "when": "it reaches the 5 % step",
       "then": "the analysis fails and all traffic returns to the stable version within {{ROLLBACK_MINUTES}} minutes",
       "hubWhen": {
@@ -404,8 +453,8 @@
       "label": "Rehearsal decides",
       "x": 520,
       "y": 780,
-      "given": "an offline migration planned for a two-hour window",
-      "when": "its rehearsal on a copy of production takes 90 minutes",
+      "given": "an offline migration planned for the {{WINDOW_MINUTES}}-minute window",
+      "when": "its rehearsal on a copy of production takes longer than half the window",
       "then": "it is not run in that window until it is made faster or the window longer",
       "hubWhen": {
         "MIGRATIONS": [
@@ -420,7 +469,7 @@
       "x": 520,
       "y": 910,
       "given": "the element's repository",
-      "when": "it is searched for migrations and database clients",
+      "when": "its dependencies are searched for database clients and migration tools, and its tree for a migrations directory",
       "then": "there are none",
       "hubWhen": {
         "MIGRATIONS": [
@@ -444,11 +493,26 @@
       }
     },
     {
+      "id": "sc-no-flags",
+      "type": "scenario",
+      "label": "No flag SDK",
+      "x": 520,
+      "y": 1170,
+      "given": "the element's repository",
+      "when": "its dependencies are searched for feature flag SDKs and providers",
+      "then": "there are none",
+      "hubWhen": {
+        "FLAGS": [
+          "no"
+        ]
+      }
+    },
+    {
       "id": "sc-continuous",
       "type": "scenario",
       "label": "Merge reaches production",
       "x": 520,
-      "y": 1170,
+      "y": 1300,
       "given": "a change merged to the main branch in the morning",
       "when": "the day ends",
       "then": "it is in production, deployed by the pipeline",
@@ -463,7 +527,7 @@
       "type": "scenario",
       "label": "Train leaves on time",
       "x": 520,
-      "y": 1300,
+      "y": 1430,
       "given": "changes merged before Tuesday's cut-off",
       "when": "the release train runs",
       "then": "they are in production by Thursday",
@@ -482,8 +546,8 @@
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "New versions roll out as a rolling update: on Kubernetes a Deployment with maxUnavailable 0 and maxSurge 1, readiness probes, a preStop delay and a progress deadline of 5 minutes; on other platforms the equivalent (ECS rolling deployments with the deployment circuit breaker, Azure App Service or Cloud Run revisions). The pipeline watches the error rate during the rollout and runs kubectl rollout undo (or the platform's rollback) when it rises. The previous version's image stays in the registry, so rollback takes {{ROLLBACK_MINUTES}} minutes at most. Schema changes: {{MIGRATIONS}}. Feature flags: {{FLAGS}}. Cadence: {{CADENCE}}.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "New versions roll out as a rolling update: on Kubernetes a Deployment with maxUnavailable 0 and maxSurge 1, a preStop delay, a progress deadline of 5 minutes and the readiness probes decided in the Observability pack; on other platforms the equivalent (ECS rolling deployments with the deployment circuit breaker, Azure App Service or Cloud Run revisions). The pipeline watches the error rate during the rollout and runs kubectl rollout undo (or the platform's rollback) when it rises. The previous version's image stays in the registry, so rollback takes {{ROLLBACK_MINUTES}} minutes at most. Schema changes: {{MIGRATIONS}}. Feature flags: {{FLAGS}}. Cadence: {{CADENCE}}.",
       "consequences": "• Nothing to install beyond the platform; the cheapest strategy.\n• Old and new versions serve together for minutes: both must work with the same schema and messages.\n• A bad version reaches a growing share of users until someone or something notices.\n• Rollback is another rolling update, minutes rather than seconds.",
       "alternatives": "1. Canary with automatic analysis: limits a bad version to 5 % of traffic, but needs Argo Rollouts or Flagger and metrics per version.\n2. Blue-green: instant switch back, at double capacity during each release.",
       "hubWhen": {
@@ -501,7 +565,7 @@
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
       "decision": "New versions deploy beside the live one and take traffic all at once after their smoke tests pass: on Kubernetes with Argo Rollouts (blueGreen strategy with pre-promotion analysis), elsewhere with AWS CodeDeploy blue/green, Azure App Service deployment slots or two target groups behind the load balancer. The previous version keeps running for 60 minutes after the switch, so switching back takes seconds and always within {{ROLLBACK_MINUTES}} minutes. Schema changes: {{MIGRATIONS}}. Feature flags: {{FLAGS}}. Cadence: {{CADENCE}}. Choose the tool by the platform the element runs on.",
       "consequences": "• Rollback is a switch: seconds, not a redeploy.\n• Users never see two versions at once, but the database does: the schema must still suit both.\n• Double the capacity during each release, and a full environment to warm up.\n• All users get the new version at once; smoke tests are the only gate before them.",
       "alternatives": "1. Canary: exposes a bad version to a few users first, with gradual traffic shifting.\n2. Rolling update: no extra capacity, but rollback is slower and versions mix.",
@@ -520,8 +584,8 @@
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "New versions roll out as a canary: 5 %, 25 %, 50 %, then 100 % of traffic, 10 minutes per step, with an automatic analysis at every step that compares the canary's success rate and 95th percentile latency (from Prometheus or the metrics backend) with the stable version and aborts on a worse result. Tooling: Argo Rollouts or Flagger on Kubernetes, with traffic split by the ingress or service mesh (NGINX, Istio, Linkerd, Gateway API); AWS CodeDeploy or App Mesh canaries on ECS and Lambda. Choose Argo Rollouts when the team already uses Argo CD, Flagger when it uses Flux. An abort returns all traffic to the stable version within {{ROLLBACK_MINUTES}} minutes. Schema changes: {{MIGRATIONS}}. Feature flags: {{FLAGS}}. Cadence: {{CADENCE}}.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "New versions roll out as a canary: 5 %, 25 %, 50 %, then 100 % of traffic, 10 minutes per step, with an automatic analysis at every step from Prometheus (or the metrics backend): the canary's success rate must stay at or above {{CANARY_SUCCESS_PERCENT}} % and its 95th percentile latency within 20 % of the stable version's, or the rollout aborts. Tooling: Argo Rollouts or Flagger on Kubernetes, with traffic split by the ingress or service mesh (NGINX, Istio, Linkerd, Gateway API); AWS CodeDeploy or App Mesh canaries on ECS and Lambda. Choose Argo Rollouts when the team already uses Argo CD, Flagger when it uses Flux. An abort returns all traffic to the stable version within {{ROLLBACK_MINUTES}} minutes. Schema changes: {{MIGRATIONS}}. Feature flags: {{FLAGS}}. Cadence: {{CADENCE}}.",
       "consequences": "• A bad version reaches 5 % of users for minutes, not everyone.\n• Rollback is automatic and does not wait for a person.\n• Needs metrics per version and enough traffic for the analysis to be meaningful; at low traffic the steps judge noise.\n• A rollout takes 30 minutes or more; urgent fixes need a documented fast path.",
       "alternatives": "1. Rolling update with a person watching: simpler, but slower to notice and a bad version reaches everyone.\n2. Blue-green: instant switch back, but everyone gets the new version at once.",
       "hubWhen": {
@@ -539,8 +603,8 @@
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "Schema changes ship as expand and contract: a migration only adds (columns, tables, indexes built concurrently), data is backfilled in batches, the code switches over in a later release, and removals come at least one release after nothing reads the old shape. Migrations run as a separate pipeline step before the new version rolls out, with a migration tool that records what ran: Flyway, Liquibase, Atlas, or the framework's own (Entity Framework, Alembic, Prisma Migrate). A linter in CI refuses destructive or backward-incompatible changes (Atlas migrate lint, or Squawk for PostgreSQL).",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "Schema changes ship as expand and contract: a migration only adds (columns, tables, indexes built concurrently), data is backfilled in batches, the code switches over in a later release, and removals come at least one release after nothing reads the old shape. Migrations run as a separate pipeline step before the new version rolls out, with the migration tool decided in the Data store pack (Flyway, Liquibase, Atlas, or the framework's own), which records what ran. A linter in CI refuses destructive or backward-incompatible changes (Atlas migrate lint, or Squawk for PostgreSQL).",
       "consequences": "• The previous version always runs against the current schema, so rollback never waits on the database.\n• A rename or type change takes two or three releases instead of one.\n• Old columns linger until the contract step; someone has to schedule it.\n• Backfills on large tables run in batches, outside the deployment.",
       "alternatives": "1. Migrations in a maintenance window: one step, but downtime and no quick rollback.\n2. Migrations that run on application start: simple, but every instance races to migrate and a failure blocks the rollout.",
       "hubWhen": {
@@ -558,8 +622,8 @@
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "Schema changes that cannot run online are made in an announced maintenance window with the element stopped. Before the window, the migration is rehearsed on a copy of production restored from the latest backup, and it runs only if the rehearsal finished within half the window. Just before it, a fresh backup is taken; the way back (a down-migration or the restore) is part of the rehearsal. Changes that can run online still ship as expand and contract. Migrations run with Flyway, Liquibase, Atlas or the framework's own tool, from the pipeline, never by hand.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "Schema changes that cannot run online are made in an announced maintenance window of {{WINDOW_MINUTES}} minutes with the element stopped. Before the window, the migration is rehearsed on a copy of production restored from the latest backup, and it runs only if the migration and the way back (restoring that backup) each finished within half the window in the rehearsal. Just before the window a fresh backup is taken. Changes that can run online still ship as expand and contract. Migrations run with the tool decided in the Data store pack (Flyway, Liquibase, Atlas or the framework's own), from the pipeline, never by hand.",
       "consequences": "• Large or awkward changes can be done in one step.\n• Each window is downtime, announced in advance and counted by users if not by the target.\n• Rollback after the window means restoring the backup and losing what was written since.\n• A copy of production for the rehearsal must be kept safe like production.",
       "alternatives": "1. Expand and contract only: no downtime, but some changes take several releases.\n2. Online schema change tools (gh-ost, pt-online-schema-change, pg_repack): big changes without downtime, with tooling to learn.",
       "hubWhen": {
@@ -569,17 +633,74 @@
       }
     },
     {
-      "id": "adr-continuous",
+      "id": "adr-no-schema",
       "type": "adr",
-      "label": "Continuous deployment",
+      "label": "No schema of its own",
       "x": 780,
       "y": 650,
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "Every change merged to the main branch goes to production through the pipeline without a manual step, the same day: trunk-based development with short-lived branches, the rollout strategy above as the safety net, and feature flags ({{FLAGS}}) for what is not ready. The four DORA metrics are measured from the pipeline and the incident tracker (Apache DevLake, Sleuth, LinearB or the CI system's own reports) and reviewed every month: deployment frequency daily or more, lead time for changes under 1 day, change failure rate under 15 %, failed deployment recovery under 1 hour.",
-      "consequences": "• Small batches: each release is easy to understand and to undo.\n• The pipeline's tests and rollout checks are the only gate; their quality is the release process.\n• Users see changes continuously; announcements are tied to flags, not deploys.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours. Here the element stores nothing of its own: every state it touches lives in a service that owns its migrations.",
+      "decision": "The element keeps no database schema and depends on no database client or migration tool; a dependency rule in CI fails the build when one arrives. State it needs lives in services that own their migrations and are reached through their APIs. Adding a store of its own supersedes this decision and brings the schema change question back.",
+      "consequences": "• Rollback never waits on a database: the previous version always runs.\n• A feature that needs state of its own has to supersede this decision first, or put the state in a service that owns it.\n• Nothing to migrate, back up or rehearse for this element.",
+      "alternatives": "1. Expand and contract migrations: for when the element gets a store of its own.\n2. A cache or local file as hidden state: works until a second instance or a rollback shows it was a schema after all.",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "adr-flags",
+      "type": "adr",
+      "label": "Features released behind flags",
+      "x": 780,
+      "y": 780,
+      "concern": "deployment",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "Deploying is separate from releasing: unfinished or risky features ship switched off behind a feature flag and are turned on per environment and per share of users without a deploy. Flags are read through the OpenFeature SDK with one provider for the organisation (LaunchDarkly, Unleash, ConfigCat, or flagd with the flag definitions in the repository); choose by whether a hosted provider is allowed to hold the targeting data, and by cost per seat. A changed flag takes effect within 60 seconds on every instance. A flag whose feature has reached all users is a debt item: it is removed, with the code path behind it, within {{FLAG_AGE_DAYS}} days, and a test fails the build on an older one. Turning a flag off is the first rollback for a released feature; the deployment rollback is the second.",
+      "consequences": "• Code reaches production continuously; releases are business decisions, made in the flag tool.\n• Every flag doubles the paths to test until it is removed; the {{FLAG_AGE_DAYS}}-day removal is what keeps the count down.\n• The provider is on the request path or in the SDK's cache: its outage must leave the element on the last known flags.\n• Who may flip a flag in production is an access decision, written down next to the flags.",
+      "alternatives": "1. No flags, a deploy is a release: simpler, but every merge is visible to everyone at once.\n2. Flags in configuration files or environment variables: no provider, but changing one is a deploy.",
+      "hubWhen": {
+        "FLAGS": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "id": "adr-no-flags",
+      "type": "adr",
+      "label": "A deploy is a release",
+      "x": 780,
+      "y": 910,
+      "concern": "deployment",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours. Here the team keeps changes small enough to finish in one change and trusts the rollback, so it does without flags.",
+      "decision": "There are no feature flags: what is merged and deployed is live for everyone. Unfinished work stays on a branch until it is small enough to ship whole, or ships dark behind a route nobody links to. Rolling back a release is the only way to take a feature back, within {{ROLLBACK_MINUTES}} minutes. This decision is superseded when a feature has to reach some users before others, or be released at a business date apart from its deploy.",
+      "consequences": "• No flag provider, no flag clean-up, one path to test.\n• A feature cannot be switched off without rolling back everything deployed with it.\n• Features that take weeks need long-lived branches or dark routes, both of which hide integration problems.",
+      "alternatives": "1. Feature flags through OpenFeature with a provider: releases apart from deploys, at the cost of flags and their removal.\n2. Flags in configuration: a half-way that still needs a deploy to flip.",
+      "hubWhen": {
+        "FLAGS": [
+          "no"
+        ]
+      }
+    },
+    {
+      "id": "adr-continuous",
+      "type": "adr",
+      "label": "Continuous deployment",
+      "x": 780,
+      "y": 1040,
+      "concern": "deployment",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "Every change merged to the main branch goes to production through the pipeline without a manual step, the same day: trunk-based development with short-lived branches and the rollout strategy above as the safety net. Feature flags: {{FLAGS}}; what is not ready for users either ships switched off behind a flag or stays small enough to finish in one change. The DORA metrics: a weekly job checks deployment frequency (a production deployment on at least 5 days a week) and lead time (every merge in production within 1 day); the change failure rate and the recovery time ({{ROLLBACK_MINUTES}} minutes by rollback) come from the incident tracker and the rollback drill, and all four are reviewed every month (Apache DevLake, Sleuth, LinearB or the CI system's own reports).",
+      "consequences": "• Small batches: each release is easy to understand and to undo.\n• The pipeline's tests and rollout checks are the only gate; their quality is the release process.\n• Users see changes continuously; announcements are tied to flags or to dark routes, not to deploys.",
       "alternatives": "1. A weekly release train: more coordination, larger batches.\n2. Manual approval of each production deploy: a person as the gate, slower without being safer.",
       "hubWhen": {
         "CADENCE": [
@@ -592,12 +713,12 @@
       "type": "adr",
       "label": "Weekly release train",
       "x": 780,
-      "y": 780,
+      "y": 1170,
       "concern": "deployment",
       "status": "accepted",
       "date": "",
-      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it.",
-      "decision": "Changes merged before a weekly cut-off are released together within 2 working days, through the same automated pipeline and rollout strategy; urgent fixes can leave outside the train. The four DORA metrics are measured from the pipeline and the incident tracker (Apache DevLake, Sleuth, LinearB or the CI system's own reports) and reviewed every month: at least one production release every 7 days, lead time for changes under 7 days, change failure rate under 15 %, failed deployment recovery under 1 day. Feature flags: {{FLAGS}}.",
+      "context": "This element is changed and deployed while people use it. The forces: most outages start with a change, so how a change reaches production decides much of the availability; a release that cannot be undone quickly turns a small mistake into a long outage; old and new versions run side by side during most deployments and both must work against the same database; a schema change that the previous version cannot read makes rollback impossible; small, frequent changes fail less often and are easier to undo than large, rare ones (DORA); and deploying is not the same as releasing: code can be in production without users seeing it. The snippets of this pack assume the element is deployed to the shop namespace as order-api; rename them for yours.",
+      "decision": "Changes merged before a weekly cut-off are released together within 2 working days, through the same automated pipeline and rollout strategy; urgent fixes can leave outside the train. Feature flags: {{FLAGS}}. The DORA metrics: a weekly job checks deployment frequency (at least one production release every 7 days) and lead time (every merge in production within 7 days); the change failure rate and the recovery time ({{ROLLBACK_MINUTES}} minutes by rollback) come from the incident tracker and the rollback drill, and all four are reviewed every month (Apache DevLake, Sleuth, LinearB or the CI system's own reports).",
       "consequences": "• Releases are predictable for customers, support and app stores.\n• Batches are a week of changes: a failure is harder to pin on one change.\n• Lead time is up to a week by design; moving to continuous deployment later is a change of policy, not of tooling.",
       "alternatives": "1. Continuous deployment: smaller batches and shorter lead time, with full trust in the pipeline.\n2. Monthly or quarterly releases: big batches that fail more often and are hard to undo (DORA).",
       "hubWhen": {
@@ -614,17 +735,27 @@
       "y": 0,
       "category": "operational",
       "threshold": "Rollback of the staging deployment to the previous version completes within {{ROLLBACK_MINUTES}} minutes, every week",
-      "description": "A scheduled pipeline rolls the staging deployment back to the previous version and forward again, timing each, and fails past {{ROLLBACK_MINUTES}} minutes. With Argo Rollouts use kubectl argo rollouts undo and status instead.\n\nTool: GitHub Actions scheduled workflow with kubectl\n\n```yaml\nname: rollback-drill\non:\n  schedule: [{ cron: '0 9 * * 1' }]   # Mondays 09:00\njobs:\n  drill:\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - name: Roll back and time it\n        run: |\n          start=$(date +%s)\n          kubectl -n shop-staging rollout undo deployment/order-api\n          kubectl -n shop-staging rollout status deployment/order-api --timeout={{ROLLBACK_MINUTES}}m\n          echo \"Rolled back in $(( $(date +%s) - start )) s\"\n      - name: Roll forward again\n        if: always()\n        run: |\n          kubectl -n shop-staging rollout undo deployment/order-api\n          kubectl -n shop-staging rollout status deployment/order-api --timeout={{ROLLBACK_MINUTES}}m\n```"
+      "description": "A scheduled pipeline rolls the staging deployment back to the previous version and forward again, timing each, and fails past {{ROLLBACK_MINUTES}} minutes. With Argo Rollouts use kubectl argo rollouts undo and status instead; on a managed runtime, the platform's rollback command (az webapp deployment slot swap, gcloud run services update-traffic).\n\nTool: GitHub Actions scheduled workflow with kubectl\n\n```yaml\nname: rollback-drill\non:\n  schedule: [{ cron: '0 9 * * 1' }]   # Mondays 09:00\njobs:\n  drill:\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - name: Roll back and time it\n        run: |\n          start=$(date +%s)\n          kubectl -n shop-staging rollout undo deployment/order-api\n          kubectl -n shop-staging rollout status deployment/order-api --timeout={{ROLLBACK_MINUTES}}m\n          echo \"Rolled back in $(( $(date +%s) - start )) s\"\n      - name: Roll forward again\n        if: always()\n        run: |\n          kubectl -n shop-staging rollout undo deployment/order-api\n          kubectl -n shop-staging rollout status deployment/order-api --timeout={{ROLLBACK_MINUTES}}m\n```"
+    },
+    {
+      "id": "ff-graceful",
+      "type": "fitness-fn",
+      "label": "Deploy under load drops nothing",
+      "x": 1040,
+      "y": 130,
+      "category": "operational",
+      "threshold": "0 failed requests (connection errors, 502, 503, 504) in a k6 run that spans a staging deployment at a steady rate",
+      "description": "The staging pipeline starts a k6 run at a steady rate, deploys the new version while it runs, and lets the run end two minutes after the rollout finished; the threshold fails the run, and the pipeline, on any failed request. It catches instances stopped with requests in flight and traffic routed before readiness.\n\nTool: Grafana k6, started by the staging deploy job\n\n```js\n// k6 run --env BASE_URL=https://staging.shop.example deploy-under-load.js &\n// then, in the same job: kubectl -n shop-staging set image deployment/order-api order-api=$IMAGE\n//   && kubectl -n shop-staging rollout status deployment/order-api --timeout=4m; wait  (the k6 exit code fails the job)\nimport http from 'k6/http'\n\nexport const options = {\n  scenarios: {\n    steady: { executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '6m', preAllocatedVUs: 100, maxVUs: 500 },\n  },\n  thresholds: {\n    http_req_failed: ['rate==0'],   // one connection reset or 5xx during the rollout fails the run\n  },\n}\n\nexport default function () {\n  http.get(`${__ENV.BASE_URL}/orders?page=1`)\n}\n```"
     },
     {
       "id": "ff-rolling",
       "type": "fitness-fn",
       "label": "Rolling update keeps capacity",
       "x": 1040,
-      "y": 130,
+      "y": 260,
       "category": "structural",
-      "threshold": "0 Deployments with maxUnavailable above 0, without a readiness probe, or without a progress deadline of at most 300 s",
-      "description": "A policy over the Kubernetes manifests fails the pipeline when a Deployment could remove capacity during a rollout, route traffic to instances that are not ready, or carry on forever past failing instances.\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  object.get(input.spec, [\"strategy\", \"rollingUpdate\", \"maxUnavailable\"], \"25%\") != 0\n  msg := sprintf(\"%s: set strategy.rollingUpdate.maxUnavailable to 0\", [input.metadata.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  object.get(input.spec, \"progressDeadlineSeconds\", 600) > 300\n  msg := sprintf(\"%s: set progressDeadlineSeconds to 300 or less\", [input.metadata.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.readinessProbe\n  msg := sprintf(\"%s: container %s has no readinessProbe\", [input.metadata.name, c.name])\n}\n```",
+      "threshold": "0 Deployments with a Recreate strategy, maxUnavailable above 0, maxSurge of 0, a progress deadline above 300 s, or a container without a preStop hook",
+      "description": "A policy over the Kubernetes manifests fails the pipeline when a Deployment could remove capacity during a rollout, stop an instance without a preStop delay, or carry on forever past failing instances. Liveness and readiness probes are checked by the Observability pack's policy.\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  input.spec.strategy.type == \"Recreate\"\n  msg := sprintf(\"%s: strategy Recreate stops every instance first; use RollingUpdate\", [input.metadata.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  unavailable := object.get(input.spec, [\"strategy\", \"rollingUpdate\", \"maxUnavailable\"], \"25%\")\n  not unavailable in {0, \"0\", \"0%\"}\n  msg := sprintf(\"%s: set strategy.rollingUpdate.maxUnavailable to 0 (is %v)\", [input.metadata.name, unavailable])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  surge := object.get(input.spec, [\"strategy\", \"rollingUpdate\", \"maxSurge\"], \"25%\")\n  surge in {0, \"0\", \"0%\"}\n  msg := sprintf(\"%s: set strategy.rollingUpdate.maxSurge to 1 or more\", [input.metadata.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  object.get(input.spec, \"progressDeadlineSeconds\", 600) > 300\n  msg := sprintf(\"%s: set progressDeadlineSeconds to 300 or less\", [input.metadata.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.lifecycle.preStop\n  msg := sprintf(\"%s: container %s has no lifecycle.preStop (a sleep that lets the load balancer drain it)\", [input.metadata.name, c.name])\n}\n```",
       "hubWhen": {
         "STRATEGY": [
           "rolling"
@@ -636,10 +767,10 @@
       "type": "fitness-fn",
       "label": "Switch gated by smoke tests",
       "x": 1040,
-      "y": 260,
+      "y": 390,
       "category": "operational",
-      "threshold": "Traffic switches only after the smoke tests pass on the preview; the previous version kept for 3600 s",
-      "description": "The Rollout runs a smoke-test job against the preview service before promotion; a failed job aborts the release with the live version untouched. The previous version is scaled down only an hour after the switch.\n\nTool: Argo Rollouts (blueGreen strategy, pre-promotion analysis)\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata: { name: order-api, namespace: shop }\nspec:\n  strategy:\n    blueGreen:\n      activeService: order-api\n      previewService: order-api-preview\n      autoPromotionEnabled: true\n      scaleDownDelaySeconds: 3600\n      prePromotionAnalysis:\n        templates: [{ templateName: smoke-tests }]\n---\napiVersion: argoproj.io/v1alpha1\nkind: AnalysisTemplate\nmetadata: { name: smoke-tests, namespace: shop }\nspec:\n  metrics:\n    - name: smoke\n      provider:\n        job:\n          spec:\n            backoffLimit: 0\n            template:\n              spec:\n                restartPolicy: Never\n                containers:\n                  - name: k6\n                    image: grafana/k6:0.54.0\n                    args: [run, --env, BASE_URL=http://order-api-preview, /tests/smoke.js]\n```",
+      "threshold": "Traffic switches only after the smoke-test job passes against the preview service; the previous version is kept for 3600 s after the switch",
+      "description": "The Rollout runs a k6 smoke-test job against the preview service before promotion; a failed job aborts the release with the live version untouched. The script comes from a ConfigMap mounted into the job. The previous version is scaled down only an hour after the switch.\n\nTool: Argo Rollouts (blueGreen strategy, pre-promotion analysis)\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata: { name: order-api, namespace: shop }\nspec:\n  strategy:\n    blueGreen:\n      activeService: order-api\n      previewService: order-api-preview\n      autoPromotionEnabled: true\n      scaleDownDelaySeconds: 3600\n      prePromotionAnalysis:\n        templates: [{ templateName: smoke-tests }]\n---\napiVersion: v1\nkind: ConfigMap\nmetadata: { name: smoke-tests, namespace: shop }\ndata:\n  smoke.js: |\n    import http from 'k6/http'\n    import { check } from 'k6'\n    export const options = { vus: 1, iterations: 10, thresholds: { checks: ['rate==1'] } }\n    export default function () {\n      const res = http.get(`${__ENV.BASE_URL}/orders?page=1`)\n      check(res, { 'orders answer 200': (r) => r.status === 200 })\n    }\n---\napiVersion: argoproj.io/v1alpha1\nkind: AnalysisTemplate\nmetadata: { name: smoke-tests, namespace: shop }\nspec:\n  metrics:\n    - name: smoke\n      provider:\n        job:\n          spec:\n            backoffLimit: 0\n            template:\n              spec:\n                restartPolicy: Never\n                volumes: [{ name: tests, configMap: { name: smoke-tests } }]\n                containers:\n                  - name: k6\n                    image: grafana/k6:0.54.0\n                    args: [run, --env, BASE_URL=http://order-api-preview, /tests/smoke.js]\n                    volumeMounts: [{ name: tests, mountPath: /tests }]\n```",
       "hubWhen": {
         "STRATEGY": [
           "bluegreen"
@@ -651,10 +782,10 @@
       "type": "fitness-fn",
       "label": "Canary analysis aborts bad versions",
       "x": 1040,
-      "y": 390,
+      "y": 520,
       "category": "operational",
-      "threshold": "A canary step fails at a success rate below 99 % or a 95th percentile above 0.5 s; 0 bad versions promoted past 5 %",
-      "description": "The Rollout shifts traffic in steps and runs an analysis from the first step on; two failed measurements abort the rollout and return all traffic to the stable version. Flagger's Canary resource with metric templates does the same.\n\nTool: Argo Rollouts (canary strategy with a Prometheus AnalysisTemplate)\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata: { name: order-api, namespace: shop }\nspec:\n  strategy:\n    canary:\n      canaryService: order-api-canary\n      stableService: order-api\n      trafficRouting: { nginx: { stableIngress: order-api } }\n      analysis:\n        templates: [{ templateName: canary-health }]\n        startingStep: 1\n        args: [{ name: service, value: order-api-canary }]\n      steps:\n        - setWeight: 5\n        - pause: { duration: 10m }\n        - setWeight: 25\n        - pause: { duration: 10m }\n        - setWeight: 50\n        - pause: { duration: 10m }\n---\napiVersion: argoproj.io/v1alpha1\nkind: AnalysisTemplate\nmetadata: { name: canary-health, namespace: shop }\nspec:\n  args: [{ name: service }]\n  metrics:\n    - name: success-rate\n      interval: 1m\n      failureLimit: 2\n      successCondition: result[0] >= 0.99\n      provider:\n        prometheus:\n          address: http://prometheus.monitoring:9090\n          query: |\n            sum(rate(http_server_request_duration_seconds_count{service=\"{{args.service}}\",http_response_status_code!~\"5..\"}[2m]))\n            / sum(rate(http_server_request_duration_seconds_count{service=\"{{args.service}}\"}[2m]))\n    - name: p95-latency\n      interval: 1m\n      failureLimit: 2\n      successCondition: result[0] <= 0.5\n      provider:\n        prometheus:\n          address: http://prometheus.monitoring:9090\n          query: |\n            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service=\"{{args.service}}\"}[2m])))\n```",
+      "threshold": "A canary step fails at a success rate below {{CANARY_SUCCESS_PERCENT}} % or a 95th percentile more than 20 % above the stable version's; a second failed measurement aborts the rollout",
+      "description": "The Rollout shifts traffic in steps and runs an analysis from the first step on, measured every minute: the canary's success rate against {{CANARY_SUCCESS_PERCENT}} %, and the ratio of the canary's 95th percentile to the stable version's against 1.2. A second failed measurement of either aborts the rollout and returns all traffic to the stable version. Flagger's Canary resource with metric templates does the same.\n\nTool: Argo Rollouts (canary strategy with a Prometheus AnalysisTemplate)\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata: { name: order-api, namespace: shop }\nspec:\n  strategy:\n    canary:\n      canaryService: order-api-canary\n      stableService: order-api\n      trafficRouting: { nginx: { stableIngress: order-api } }\n      analysis:\n        templates: [{ templateName: canary-health }]\n        startingStep: 1\n        args:\n          - { name: canary, value: order-api-canary }\n          - { name: stable, value: order-api }\n      steps:\n        - setWeight: 5\n        - pause: { duration: 10m }\n        - setWeight: 25\n        - pause: { duration: 10m }\n        - setWeight: 50\n        - pause: { duration: 10m }\n---\napiVersion: argoproj.io/v1alpha1\nkind: AnalysisTemplate\nmetadata: { name: canary-health, namespace: shop }\nspec:\n  args: [{ name: canary }, { name: stable }]\n  metrics:\n    - name: success-rate\n      interval: 1m\n      failureLimit: 1                       # a second failed measurement fails the analysis\n      successCondition: result[0] * 100 >= {{CANARY_SUCCESS_PERCENT}}\n      provider:\n        prometheus:\n          address: http://prometheus.monitoring:9090\n          query: |\n            sum(rate(http_server_request_duration_seconds_count{service=\"{{args.canary}}\",http_response_status_code!~\"5..\"}[2m]))\n            / sum(rate(http_server_request_duration_seconds_count{service=\"{{args.canary}}\"}[2m]))\n    - name: p95-vs-stable\n      interval: 1m\n      failureLimit: 1\n      successCondition: result[0] <= 1.2    # canary p95 at most 20 % above the stable p95\n      provider:\n        prometheus:\n          address: http://prometheus.monitoring:9090\n          query: |\n            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service=\"{{args.canary}}\"}[2m])))\n            / histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service=\"{{args.stable}}\"}[2m])))\n```",
       "hubWhen": {
         "STRATEGY": [
           "canary"
@@ -666,7 +797,7 @@
       "type": "fitness-fn",
       "label": "Migrations stay compatible",
       "x": 1040,
-      "y": 520,
+      "y": 650,
       "category": "structural",
       "threshold": "0 destructive or backward-incompatible statements (drop, rename, type change) in a migration that is not a marked contract step",
       "description": "Every pull request that adds a migration is linted against the main branch; dropping or renaming a column or table fails the build unless the migration is the contract step of an earlier expand, marked with a lint directive and reviewed.\n\nTool: Atlas (atlas migrate lint); Squawk does the same for PostgreSQL\n\n```hcl\n# atlas.hcl\nlint {\n  destructive {\n    error = true\n  }\n  incompatible {\n    error = true\n  }\n}\n\nenv \"ci\" {\n  dev = \"docker://postgres/16/dev\"\n  migration {\n    dir = \"file://migrations\"\n  }\n}\n\n# CI step:\n#   atlas migrate lint --env ci --git-base origin/main\n# A reviewed contract step opts out per statement with:\n#   -- atlas:nolint destructive\n```",
@@ -681,13 +812,28 @@
       "type": "fitness-fn",
       "label": "Offline migration rehearsed",
       "x": 1040,
-      "y": 650,
+      "y": 780,
       "category": "process",
-      "threshold": "Rehearsal on a restored copy of production finishes within half the window (60 minutes for a 2-hour window); the production run needs an approved environment",
-      "description": "A pipeline job restores the latest backup into a rehearsal database, runs the pending migrations against it and times them; the production job runs only after an approval in a protected environment and fails if the rehearsal took longer than half the window.\n\nTool: GitHub Actions (protected environment) with pg_restore and Flyway\n\n```yaml\njobs:\n  rehearse:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          pg_restore --clean --no-owner -d \"$REHEARSAL_DB_URL\" backups/latest.dump\n          start=$(date +%s)\n          flyway -url=\"$REHEARSAL_JDBC_URL\" -locations=filesystem:migrations migrate\n          took=$(( $(date +%s) - start ))\n          echo \"Rehearsal took $took s\"\n          test \"$took\" -le 3600 || { echo \"::error::Longer than half the window\"; exit 1; }\n  migrate:\n    needs: rehearse\n    runs-on: ubuntu-latest\n    environment: production-maintenance   # required reviewers, window announced\n    steps:\n      - run: |\n          ./scripts/backup-now.sh\n          flyway -url=\"$PROD_JDBC_URL\" -locations=filesystem:migrations migrate\n```",
+      "threshold": "In the rehearsal on a restored copy of production, the migration and the restore each finish within half of {{WINDOW_MINUTES}} minutes; the production run needs an approved environment",
+      "description": "A pipeline job restores the latest backup into a rehearsal database, runs the pending migrations against it and times them, then restores the backup again (the way back) and times that; it fails when either took longer than half the window. The production job runs only after an approval in a protected environment, takes a backup first, and only follows a passed rehearsal.\n\nTool: GitHub Actions (protected environment) with pg_restore and Flyway\n\n```yaml\njobs:\n  rehearse:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          half=$(( {{WINDOW_MINUTES}} * 30 ))   # seconds: half of {{WINDOW_MINUTES}} minutes\n          pg_restore --clean --no-owner -d \"$REHEARSAL_DB_URL\" backups/latest.dump\n          start=$(date +%s)\n          flyway -url=\"$REHEARSAL_JDBC_URL\" -locations=filesystem:migrations migrate\n          took=$(( $(date +%s) - start ))\n          echo \"Migration took $took s\"\n          test \"$took\" -le \"$half\" || { echo \"::error::Migration longer than half the window\"; exit 1; }\n          start=$(date +%s)\n          pg_restore --clean --no-owner -d \"$REHEARSAL_DB_URL\" backups/latest.dump\n          took=$(( $(date +%s) - start ))\n          echo \"The way back (restore) took $took s\"\n          test \"$took\" -le \"$half\" || { echo \"::error::Restore longer than half the window\"; exit 1; }\n  migrate:\n    needs: rehearse\n    runs-on: ubuntu-latest\n    environment: production-maintenance   # required reviewers; the window is announced\n    steps:\n      - run: |\n          ./scripts/backup-now.sh\n          flyway -url=\"$PROD_JDBC_URL\" -locations=filesystem:migrations migrate\n```",
       "hubWhen": {
         "MIGRATIONS": [
           "window"
+        ]
+      }
+    },
+    {
+      "id": "ff-no-schema",
+      "type": "fitness-fn",
+      "label": "No database client arrives",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "0 dependencies on a database client or migration tool, and no migrations directory in the repository",
+      "description": "A dependency rule fails the build when a database driver, ORM or migration tool is added, which would mean a schema arrived without its decision; a pipeline step fails on a migrations directory. For Python, Go or the JVM, the same rule goes in the dependency allow-list of the build (pip-audit --require-hashes with a constraints file, go.mod review, a Gradle dependency verification).\n\nTool: dependency-cruiser; for Python: a constraints file reviewed in CI; for Go: go.mod reviewed in CI\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-schema-of-its-own',\n    comment: 'ADR No schema of its own: supersede it before adding a database client or a migration tool',\n    severity: 'error',\n    from: {},\n    to: { path: 'node_modules/(pg|mysql2|mongodb|mongoose|@prisma/client|prisma|knex|typeorm|sequelize|drizzle-orm|node-pg-migrate|umzug)(/|$)' },\n  }],\n}\n// CI, after depcruise:  test ! -e migrations -a ! -e prisma/migrations -a ! -e db/migrate\n```",
+      "hubWhen": {
+        "MIGRATIONS": [
+          "none"
         ]
       }
     },
@@ -696,10 +842,10 @@
       "type": "fitness-fn",
       "label": "Stale flags removed",
       "x": 1040,
-      "y": 780,
+      "y": 1040,
       "category": "structural",
-      "threshold": "0 flags fully released for more than 30 days",
-      "description": "A test reads the flag definitions kept in the repository and fails for every flag that has been on for all users for more than 30 days, so that it is removed with the code path behind it.\n\nTool: Vitest over flagd (OpenFeature) flag definitions\n\n```ts\nimport { readFileSync } from 'node:fs'\n\nconst { flags } = JSON.parse(readFileSync('flags/flags.flagd.json', 'utf8')) as {\n  flags: Record<string, { metadata?: { fullyReleasedAt?: string } }>\n}\nconst MAX_DAYS = 30\n\nit.each(Object.entries(flags))('flag %s is removed within 30 days of full release', (key, flag) => {\n  const released = flag.metadata?.fullyReleasedAt\n  if (!released) return\n  const days = (Date.now() - Date.parse(released)) / 86_400_000\n  expect(days, `remove flag ${key}: fully released ${Math.floor(days)} days ago`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
+      "threshold": "0 flags on for everyone for more than {{FLAG_AGE_DAYS}} days",
+      "description": "A test reads the flagd flag definitions kept in the repository, treats a flag as fully released when it is enabled with defaultVariant on and no targeting, takes the date its defaultVariant line last changed from git blame, and fails for every flag released longer than {{FLAG_AGE_DAYS}} days ago, so that it is removed with the code path behind it. The checkout needs the history (fetch-depth: 0). With a hosted provider, read the flags and their last change from its API instead.\n\nTool: Vitest over flagd (OpenFeature) flag definitions, with git blame\n\n```ts\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\n\nconst FILE = 'flags/flags.flagd.json'\nconst text = readFileSync(FILE, 'utf8')\nconst lines = text.split('\\n')\nconst { flags } = JSON.parse(text) as {\n  flags: Record<string, { state: 'ENABLED' | 'DISABLED'; defaultVariant?: string; targeting?: unknown }>\n}\nconst MAX_DAYS = {{FLAG_AGE_DAYS}}\n\n/** When the given line of the file last changed, from git blame. */\nconst changedAt = (line: number): number => {\n  const blame = execFileSync('git', ['blame', '--porcelain', `-L${line},${line}`, '--', FILE], { encoding: 'utf8' })\n  return Number(/^committer-time (\\d+)$/m.exec(blame)![1]) * 1000\n}\n\nit.each(Object.entries(flags))('flag %s is removed in time after its full release', (key, flag) => {\n  const released = flag.state === 'ENABLED' && flag.defaultVariant === 'on' && !flag.targeting\n  if (!released) return\n  const start = lines.findIndex((l) => l.includes(`\"${key}\"`))\n  const line = lines.findIndex((l, i) => i > start && l.includes('\"defaultVariant\"')) + 1\n  const days = (Date.now() - changedAt(line)) / 86_400_000\n  expect(days, `remove flag ${key}: on for everyone for ${Math.floor(days)} days`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
       "hubWhen": {
         "FLAGS": [
           "yes"
@@ -707,14 +853,44 @@
       }
     },
     {
+      "id": "ff-flag-propagation",
+      "type": "fitness-fn",
+      "label": "Flag changes take effect in time",
+      "x": 1040,
+      "y": 1170,
+      "category": "operational",
+      "threshold": "A flag turned off reaches the element within 60 seconds, with no deployment",
+      "description": "An integration test against the staging element turns a flag on and then off at its source (the flag definitions file flagd watches, or the provider's API with a hosted provider) and polls the element until its answer changes, failing past 60 seconds.\n\nTool: Vitest against staging, writing the flagd flag definitions (or the provider's API)\n\n```ts\nimport { readFileSync, writeFileSync } from 'node:fs'\n\nconst FLAGS = process.env.FLAGS_FILE ?? 'flags/flags.flagd.json'   // the file flagd syncs from\nconst BASE_URL = process.env.BASE_URL!\nconst FLAG = 'new-checkout'\n\nconst setDefault = (variant: 'on' | 'off'): void => {\n  const doc = JSON.parse(readFileSync(FLAGS, 'utf8'))\n  doc.flags[FLAG].defaultVariant = variant\n  writeFileSync(FLAGS, JSON.stringify(doc, null, 2))\n}\nconst until = async (ok: () => Promise<boolean>, ms: number): Promise<void> => {\n  const end = Date.now() + ms\n  while (!(await ok())) {\n    if (Date.now() > end) throw new Error(`not applied within ${ms} ms`)\n    await new Promise((r) => setTimeout(r, 1000))\n  }\n}\nconst seen = async (): Promise<string | null> => (await fetch(`${BASE_URL}/checkout`)).headers.get('x-feature-new-checkout')\n\nit('a flag turned off reaches the element within 60 seconds', async () => {\n  setDefault('on')\n  await until(async () => (await seen()) === 'on', 60_000)\n  const started = Date.now()\n  setDefault('off')\n  await until(async () => (await seen()) === 'off', 60_000)\n  expect(Date.now() - started).toBeLessThanOrEqual(60_000)\n})\n```",
+      "hubWhen": {
+        "FLAGS": [
+          "yes"
+        ]
+      }
+    },
+    {
+      "id": "ff-no-flags",
+      "type": "fitness-fn",
+      "label": "No flag SDK arrives",
+      "x": 1040,
+      "y": 1300,
+      "category": "structural",
+      "threshold": "0 dependencies on a feature flag SDK or provider client",
+      "description": "A dependency rule fails the build when a feature flag SDK or a provider's client is added, which would mean releases became separate from deploys without the decision being superseded. For Python, Go or the JVM, the same rule goes in the dependency review of the build.\n\nTool: dependency-cruiser; for Python: a constraints file reviewed in CI; for Go: go.mod reviewed in CI\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-feature-flags',\n    comment: 'ADR A deploy is a release: supersede it before adding feature flags',\n    severity: 'error',\n    from: {},\n    to: { path: 'node_modules/(@openfeature/|launchdarkly-node-server-sdk|@launchdarkly/|unleash-client|configcat-node|flagsmith-nodejs|@growthbook/)' },\n  }],\n}\n```",
+      "hubWhen": {
+        "FLAGS": [
+          "no"
+        ]
+      }
+    },
+    {
       "id": "ff-dora-continuous",
       "type": "fitness-fn",
-      "label": "Deploys daily",
+      "label": "Deploys daily, merges live within a day",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "process",
-      "threshold": "Production deployments on at least 5 days of every week; lead time under 1 day and change failure rate under 15 % in the monthly DORA review",
-      "description": "A weekly job counts the days with a production deployment in the last 7 days from the repository's deployments and fails below 5; lead time and change failure rate come from the DORA dashboard (Apache DevLake) in the monthly review.\n\nTool: GitHub CLI in a scheduled GitHub Actions job; Apache DevLake for the DORA dashboard\n\n```yaml\nname: dora-deployment-frequency\non:\n  schedule: [{ cron: '0 7 * * 1' }]\njobs:\n  frequency:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          GH_TOKEN: ${{ github.token }}\n        run: |\n          since=$(date -u -d '-7 days' +%FT%TZ)\n          days=$(gh api \"repos/${{ github.repository }}/deployments?environment=production&per_page=100\" \\\n            --jq \"[.[] | select(.created_at > \\\"$since\\\") | .created_at[0:10]] | unique | length\")\n          echo \"Days with a production deployment in the last 7: $days\"\n          test \"$days\" -ge 5\n```",
+      "threshold": "Production deployments on at least 5 days of every week; the longest lead time from merge to production in the last 7 days at most 24 hours",
+      "description": "A weekly job reads the repository's production deployments and merged pull requests of the last 7 days: it fails below 5 deployment days, and when any merge waited more than 24 hours for the first production deployment after it. Change failure rate and recovery come from the incident tracker and the rollback drill, reviewed monthly.\n\nTool: GitHub CLI and jq in a scheduled GitHub Actions job\n\n```yaml\nname: dora-weekly\non:\n  schedule: [{ cron: '0 7 * * 1' }]\njobs:\n  frequency-and-lead-time:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          GH_TOKEN: ${{ github.token }}\n        run: |\n          since=$(date -u -d '-7 days' +%FT%TZ)\n          gh api \"repos/${{ github.repository }}/deployments?environment=production&per_page=100\" \\\n            --jq \"[.[] | select(.created_at > \\\"$since\\\") | .created_at]\" > deploys.json\n          days=$(jq 'map(.[0:10]) | unique | length' deploys.json)\n          echo \"Days with a production deployment in the last 7: $days\"\n          test \"$days\" -ge 5\n          # lead time: from each merge of the last 7 days to the first production deployment after it\n          gh pr list --state merged --search \"merged:>=$(date -u -d '-7 days' +%F)\" --limit 200 --json mergedAt \\\n            | jq -e --slurpfile deploys deploys.json '\n                [.[] | .mergedAt as $m | ($deploys[0] | map(select(. >= $m)) | min) as $d\n                     | select($d != null) | (($d | fromdateiso8601) - ($m | fromdateiso8601)) / 3600]\n                | (max // 0) as $worst | \"Longest lead time: \\($worst | floor) h\" | stderr | $worst <= 24'\n```",
       "hubWhen": {
         "CADENCE": [
           "continuous"
@@ -724,12 +900,12 @@
     {
       "id": "ff-dora-train",
       "type": "fitness-fn",
-      "label": "Train leaves weekly",
+      "label": "Train leaves weekly, merges live within a week",
       "x": 1040,
-      "y": 1040,
+      "y": 1560,
       "category": "process",
-      "threshold": "At least 1 production deployment in every 7 days; lead time under 7 days and change failure rate under 15 % in the monthly DORA review",
-      "description": "A weekly job fails when no production deployment happened in the last 7 days; lead time and change failure rate come from the DORA dashboard (Apache DevLake) in the monthly review.\n\nTool: GitHub CLI in a scheduled GitHub Actions job; Apache DevLake for the DORA dashboard\n\n```yaml\nname: dora-release-train\non:\n  schedule: [{ cron: '0 7 * * 1' }]\njobs:\n  train:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          GH_TOKEN: ${{ github.token }}\n        run: |\n          since=$(date -u -d '-7 days' +%FT%TZ)\n          n=$(gh api \"repos/${{ github.repository }}/deployments?environment=production&per_page=100\" \\\n            --jq \"[.[] | select(.created_at > \\\"$since\\\")] | length\")\n          echo \"Production deployments in the last 7 days: $n\"\n          test \"$n\" -ge 1\n```",
+      "threshold": "At least 1 production deployment in every 7 days; the longest lead time from merge to production in the last 14 days at most 7 days",
+      "description": "A weekly job reads the repository's production deployments and merged pull requests: it fails when no production deployment happened in the last 7 days, and when any merge of the last 14 days waited more than 7 days for the first production deployment after it. Change failure rate and recovery come from the incident tracker and the rollback drill, reviewed monthly.\n\nTool: GitHub CLI and jq in a scheduled GitHub Actions job\n\n```yaml\nname: dora-weekly\non:\n  schedule: [{ cron: '0 7 * * 1' }]\njobs:\n  train:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          GH_TOKEN: ${{ github.token }}\n        run: |\n          since=$(date -u -d '-14 days' +%FT%TZ)\n          gh api \"repos/${{ github.repository }}/deployments?environment=production&per_page=100\" \\\n            --jq \"[.[] | select(.created_at > \\\"$since\\\") | .created_at]\" > deploys.json\n          week=$(date -u -d '-7 days' +%FT%TZ)\n          n=$(jq --arg week \"$week\" 'map(select(. > $week)) | length' deploys.json)\n          echo \"Production deployments in the last 7 days: $n\"\n          test \"$n\" -ge 1\n          gh pr list --state merged --search \"merged:>=$(date -u -d '-14 days' +%F)\" --limit 300 --json mergedAt \\\n            | jq -e --slurpfile deploys deploys.json '\n                [.[] | .mergedAt as $m | ($deploys[0] | map(select(. >= $m)) | min) as $d\n                     | select($d != null) | (($d | fromdateiso8601) - ($m | fromdateiso8601)) / 86400]\n                | (max // 0) as $worst | \"Longest lead time: \\($worst | floor) days\" | stderr | $worst <= 7'\n```",
       "hubWhen": {
         "CADENCE": [
           "train"
@@ -789,6 +965,12 @@
     {
       "id": "req-flags--derives--need",
       "sourceId": "req-flags",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-no-flags--derives--need",
+      "sourceId": "req-no-flags",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -859,6 +1041,12 @@
       "relationType": "verifies"
     },
     {
+      "id": "sc-no-flags--verifies--req-no-flags",
+      "sourceId": "sc-no-flags",
+      "targetId": "req-no-flags",
+      "relationType": "verifies"
+    },
+    {
       "id": "sc-continuous--verifies--req-continuous",
       "sourceId": "sc-continuous",
       "targetId": "req-continuous",
@@ -885,6 +1073,24 @@
     {
       "id": "ff-rollback-drill--implements--adr-canary",
       "sourceId": "ff-rollback-drill",
+      "targetId": "adr-canary",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-graceful--implements--adr-rolling",
+      "sourceId": "ff-graceful",
+      "targetId": "adr-rolling",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-graceful--implements--adr-bluegreen",
+      "sourceId": "ff-graceful",
+      "targetId": "adr-bluegreen",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-graceful--implements--adr-canary",
+      "sourceId": "ff-graceful",
       "targetId": "adr-canary",
       "relationType": "implements"
     },
@@ -919,21 +1125,27 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-flag-age--implements--adr-rolling",
-      "sourceId": "ff-flag-age",
-      "targetId": "adr-rolling",
+      "id": "ff-no-schema--implements--adr-no-schema",
+      "sourceId": "ff-no-schema",
+      "targetId": "adr-no-schema",
       "relationType": "implements"
     },
     {
-      "id": "ff-flag-age--implements--adr-bluegreen",
+      "id": "ff-flag-age--implements--adr-flags",
       "sourceId": "ff-flag-age",
-      "targetId": "adr-bluegreen",
+      "targetId": "adr-flags",
       "relationType": "implements"
     },
     {
-      "id": "ff-flag-age--implements--adr-canary",
-      "sourceId": "ff-flag-age",
-      "targetId": "adr-canary",
+      "id": "ff-flag-propagation--implements--adr-flags",
+      "sourceId": "ff-flag-propagation",
+      "targetId": "adr-flags",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-flags--implements--adr-no-flags",
+      "sourceId": "ff-no-flags",
+      "targetId": "adr-no-flags",
       "relationType": "implements"
     },
     {

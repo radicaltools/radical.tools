@@ -37,13 +37,13 @@ test('a concept added from a Hub link in Viewer reaches the model', async ({ pag
   const before = (await studio.storedDoc()).nodes.length
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   // The link's pack opens in its wizard by itself; at its default answers:
-  // the decision for an identity provider.
+  // the decisions for an identity provider and for the second factor.
   await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 16)
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 20)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   expect(await studio.storedJson()).toContain('Users sign in through an identity provider')
   await studio.settle()
-  expect((await studio.storedDoc()).nodes.length).toBe(before + 16)
+  expect((await studio.storedDoc()).nodes.length).toBe(before + 20)
 })
 
 test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {
@@ -105,7 +105,7 @@ test('a concern pack is imported with its answers and bound to the element in on
   await step('Sign-in').click()
   await wizard.getByRole('radio', { name: /^An external identity provider/ }).click()
   await step('Second factor').click()
-  await wizard.getByRole('radio', { name: /^No\b/ }).click()
+  await wizard.getByRole('radio', { name: /^The session alone/ }).click()
   // Which operations need it is no longer asked.
   await step('Details').click()
   await expect(wizard.getByLabel('How long may a session stay idle (minutes)?')).toBeVisible()
@@ -117,8 +117,8 @@ test('a concern pack is imported with its answers and bound to the element in on
   await expect(wizard).toBeHidden()
   await expect(dialog).toBeHidden()
 
-  // need + 5 requirements + 5 scenarios + ADR + 2 fitness functions.
-  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 14)
+  // need + 5 requirements + 5 scenarios + 2 ADRs (sign-in, no step-up) + 4 fitness functions.
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 17)
   const doc = await studio.storedDoc() as unknown as {
     nodes: Array<{ id: string; type: string; status?: string; concern?: string }>
     relations: Array<{ sourceId: string; targetId: string; relationType?: string }>
@@ -172,7 +172,7 @@ test('several concern packs from a Hub link open their wizards one after another
   await expect(page.locator('[aria-label="Import from Hub"]')).toBeHidden()
   await expect.poll(async () => {
     const stored = await studio.storedDoc() as unknown as { nodes: Array<{ type: string; concern?: string }>; views: Array<{ name: string; folder?: string }> }
-    return [stored.nodes.filter((n) => n.type === 'adr').map((n) => n.concern).sort(), stored.views.filter((v) => v.folder === 'Concerns').map((v) => v.name).sort()]
+    return [[...new Set(stored.nodes.filter((n) => n.type === 'adr').map((n) => n.concern))].sort(), stored.views.filter((v) => v.folder === 'Concerns').map((v) => v.name).sort()]
   }).toEqual([['authentication', 'secrets'], ['Authentication', 'Secrets']])
 })
 

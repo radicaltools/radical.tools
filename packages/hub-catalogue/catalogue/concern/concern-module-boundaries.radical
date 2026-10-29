@@ -3,15 +3,14 @@
     "id": "concern-module-boundaries",
     "category": "concern",
     "name": "Module boundaries",
-    "description": "Keeping the parts of the code apart: which part may depend on which, through what, with no cycles; what they may share; who owns each; and how the build enforces it on the code there is today.",
+    "description": "Keeping the parts of the code apart: which part may depend on which, through what, with no cycles; what they may share; and how the build enforces it on the code there is today. The snippets are TypeScript with dependency-cruiser; each tool line names the JVM, .NET and Python equivalent.",
     "tags": [
       "maintainability",
       "modularity",
       "dependencies",
       "architecture rules",
       "cycles",
-      "shared kernel",
-      "codeowners"
+      "shared kernel"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "concern": {
@@ -30,8 +29,20 @@
         "url": "https://www.oreilly.com/library/view/building-evolutionary-architectures/9781492097532/"
       },
       {
+        "title": "Robert C. Martin: Clean Architecture (component principles: the Acyclic Dependencies Principle)",
+        "url": "https://www.oreilly.com/library/view/clean-architecture-a/9780134494272/"
+      },
+      {
+        "title": "Eric Evans: Domain-Driven Design (reference and summary; Shared Kernel)",
+        "url": "https://www.domainlanguage.com/ddd/"
+      },
+      {
         "title": "Martin Fowler: BoundedContext",
         "url": "https://martinfowler.com/bliki/BoundedContext.html"
+      },
+      {
+        "title": "Semantic Versioning 2.0.0",
+        "url": "https://semver.org/spec/v2.0.0.html"
       },
       {
         "title": "Spring Modulith reference documentation",
@@ -61,12 +72,12 @@
           {
             "value": "allowlist",
             "label": "each part lists what it may use",
-            "description": "Every part declares the parts it may depend on (Spring Modulith allowedDependencies, import-linter contracts, an explicit map in dependency-cruiser); everything else is forbidden. Pick it for up to about fifteen parts that are peers, such as the modules of a modular monolith, where each dependency deserves a decision."
+            "description": "Every part declares the parts it may depend on (a module.json per part read by dependency-cruiser; Spring Modulith allowedDependencies, import-linter contracts elsewhere); everything else is forbidden. Pick it for up to about fifteen parts that are peers, such as the modules of a modular monolith, where each dependency deserves a decision."
           },
           {
             "value": "levels",
             "label": "parts ranked in levels",
-            "description": "Each part is tagged with a level (for example app, feature, domain, util) and may depend only on parts of lower levels, never on its own level's peers or higher. Pick it for a monorepo with dozens of libraries, where a list per part would be unmaintainable."
+            "description": "Each part is tagged with a level (app, feature, data-access, domain, util) and may depend only on parts of lower levels, never on its own level's peers or higher. Pick it for a codebase with dozens of parts, where a list per part would be unmaintainable."
           }
         ]
       },
@@ -99,7 +110,7 @@
           {
             "value": "kernel",
             "label": "a small shared kernel",
-            "description": "A few value types and contracts (money, identifiers, event schemas) live in one shared part that every user of it must approve changes to. Pick it when parts genuinely speak the same language about a few concepts."
+            "description": "A few value types and contracts (money, identifiers, event schemas) live in one shared part, src/shared-kernel, that every user of it must approve changes to. Pick it when parts genuinely speak the same language about a few concepts."
           },
           {
             "value": "library",
@@ -110,25 +121,6 @@
             "value": "none",
             "label": "nothing but third-party libraries",
             "description": "Parts share no code of their own; small helpers are duplicated and data crosses only through APIs or events. Pick it when teams must never wait for each other, accepting some duplication."
-          }
-        ]
-      },
-      {
-        "key": "OWNERS",
-        "title": "Ownership",
-        "label": "Does each part have a team that owns it?",
-        "hint": "Boundaries hold better when someone is responsible for each side: a change to a part asks its owners.",
-        "defaultValue": "team",
-        "options": [
-          {
-            "value": "team",
-            "label": "yes, one owning team per part",
-            "description": "Each part has an owning team in CODEOWNERS whose approval a change to it needs. Pick it when more than one team works in the code."
-          },
-          {
-            "value": "collective",
-            "label": "no, one team owns the whole codebase",
-            "description": "One team owns everything and any member may change any part. Pick it for a single team of up to about eight people."
           }
         ]
       },
@@ -155,7 +147,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Module boundaries",
-      "description": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them."
+      "description": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-allowlist",
@@ -164,7 +156,7 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "let each part depend only on the parts it declares as allowed, with 0 undeclared dependencies between parts on the main branch outside the recorded baseline",
+      "action": "let each part depend only on the parts it declares in its module.json as allowed, with 0 undeclared dependencies between parts on the main branch outside the recorded baseline",
       "rationale": "Declaring each dependency makes it a decision visible in review; rules that are not checked erode with every shortcut (Building Evolutionary Architectures, ch. 2; Spring Modulith, allowed dependencies).",
       "hubWhen": {
         "RULES": [
@@ -179,7 +171,7 @@
       "x": 260,
       "y": 130,
       "ears_type": "ubiquitous",
-      "action": "let each part depend only on parts of a lower level, with 0 dependencies on a part of the same or a higher level on the main branch outside the recorded baseline",
+      "action": "let each part depend only on parts of a lower level than the one declared in its module.json, with 0 dependencies on a part of the same or a higher level on the main branch outside the recorded baseline",
       "rationale": "Levels give a large number of parts one direction without a list per part (Nx, enforce module boundaries; ISO/IEC 25010 modularity).",
       "hubWhen": {
         "RULES": [
@@ -194,7 +186,7 @@
       "x": 260,
       "y": 260,
       "ears_type": "ubiquitous",
-      "action": "let a part use another only through that part's published API (its public package or index), with 0 imports of another part's internal files and 0 queries on another part's tables",
+      "action": "let a part use another only through that part's published API (its index.ts), with 0 imports of another part's internal files",
       "rationale": "A part whose internals others reach into cannot change them alone, and cannot later be extracted (Fowler, BoundedContext; Spring Modulith, application modules)."
     },
     {
@@ -204,8 +196,8 @@
       "x": 260,
       "y": 390,
       "ears_type": "ubiquitous",
-      "action": "keep the dependency graph between parts free of cycles, with 0 cycles between modules, packages or libraries",
-      "rationale": "Parts in a cycle can only be understood, tested and released together, which makes them one part (Acyclic Dependencies Principle, R. C. Martin; ISO/IEC 25010 modularity)."
+      "action": "keep the dependency graph between parts free of cycles, with 0 cycles that run through more than one part (a cycle inside one part is that part's own business)",
+      "rationale": "Parts in a cycle can only be understood, tested and released together, which makes them one part (Martin, Clean Architecture: the Acyclic Dependencies Principle; ISO/IEC 25010 modularity)."
     },
     {
       "id": "req-fail",
@@ -232,7 +224,7 @@
       "ears_type": "state-driven",
       "precondition": "known violations remain in the recorded baseline",
       "action": "fail any change that adds a violation outside the baseline, and shrink the baseline by at least {{RATCHET_PERCENT}}% each quarter",
-      "rationale": "An old codebase cannot be fixed at once; freezing what is there stops it getting worse while the baseline records the debt to pay down (ArchUnit FreezingArchRule, dependency-cruiser known violations).",
+      "rationale": "An old codebase cannot be fixed at once; freezing what is there stops it getting worse while the baseline records the debt to pay down (dependency-cruiser known violations; ArchUnit FreezingArchRule).",
       "hubWhen": {
         "ENFORCE": [
           "ratchet"
@@ -246,7 +238,7 @@
       "x": 260,
       "y": 780,
       "ears_type": "ubiquitous",
-      "action": "keep in the shared kernel only types and contracts used by at least two parts, with no I/O, framework or rule of a single part, at most {{KERNEL_PERCENT}}% of the code, and changes approved by an owner of every part that uses it",
+      "action": "keep in the shared kernel only types and contracts used by at least two parts, with no dependency on a part and no third-party library beyond the allowed pure ones, at most {{KERNEL_PERCENT}}% of the source lines, and changes approved by the owners of every part that uses it as the Code review and branching pack decides ownership",
       "rationale": "A shared kernel is shared on purpose and kept small; a growing \"common\" folder couples everything to everything (Evans, Domain-Driven Design, Shared Kernel).",
       "hubWhen": {
         "SHARED": [
@@ -262,7 +254,7 @@
       "y": 910,
       "ears_type": "event-driven",
       "trigger": "shared code changes",
-      "action": "publish it as a new semantic version of its library, and keep every consumer at most one major version behind the latest for no longer than 90 days",
+      "action": "publish it as a new semantic version of its library, and move every consumer to the latest major version within 90 days of its release",
       "rationale": "Versioned libraries let each part upgrade on its own schedule; bounding the lag keeps old versions from piling up (Semantic Versioning 2.0.0).",
       "hubWhen": {
         "SHARED": [
@@ -286,28 +278,13 @@
       }
     },
     {
-      "id": "req-owners",
-      "type": "requirement",
-      "label": "Every part has an owner",
-      "x": 260,
-      "y": 1170,
-      "ears_type": "ubiquitous",
-      "action": "name an owning team in CODEOWNERS for 100% of the parts, and require that team's approval to merge a change to its part",
-      "rationale": "A boundary nobody owns is crossed by whoever is in a hurry; owners review what crosses theirs (Conway's law; GitHub CODEOWNERS).",
-      "hubWhen": {
-        "OWNERS": [
-          "team"
-        ]
-      }
-    },
-    {
       "id": "sc-allowlist",
       "type": "scenario",
       "label": "Undeclared dependency found",
       "x": 520,
       "y": 0,
       "given": "the ordering module, allowed to use catalog only",
-      "when": "a change makes it import a class of billing",
+      "when": "a change makes it import from billing",
       "then": "the rule check reports the undeclared dependency naming both modules",
       "hubWhen": {
         "RULES": [
@@ -321,8 +298,8 @@
       "label": "Upward dependency found",
       "x": 520,
       "y": 130,
-      "given": "a domain library and a feature library",
-      "when": "the domain library imports the feature library",
+      "given": "a domain part and a feature part",
+      "when": "the domain part imports the feature part",
       "then": "the rule check reports the dependency on a higher level",
       "hubWhen": {
         "RULES": [
@@ -337,7 +314,7 @@
       "x": 520,
       "y": 260,
       "given": "two parts, each with a published API",
-      "when": "one imports the other's internal class",
+      "when": "one imports a file of the other that is not its index",
       "then": "the rule check reports it and the build fails"
     },
     {
@@ -358,7 +335,7 @@
       "y": 520,
       "given": "a pull request that adds a forbidden dependency",
       "when": "the build runs",
-      "then": "the build fails naming the rule and both parts, and the pull request cannot be merged",
+      "then": "the dependency check fails naming the rule and both parts, and the pull request cannot be merged",
       "hubWhen": {
         "ENFORCE": [
           "fail"
@@ -373,7 +350,7 @@
       "y": 650,
       "given": "a baseline of known violations",
       "when": "a change adds a new violation, and a quarter ends",
-      "then": "the change fails the build, and the baseline holds at least {{RATCHET_PERCENT}}% fewer violations than a quarter earlier",
+      "then": "the change fails the build, and the baseline holds at least {{RATCHET_PERCENT}}% fewer violations than at the previous quarter's tag",
       "hubWhen": {
         "ENFORCE": [
           "ratchet"
@@ -387,7 +364,7 @@
       "x": 520,
       "y": 780,
       "given": "the shared kernel",
-      "when": "a change adds code used by one part only, or the kernel passes {{KERNEL_PERCENT}}% of the lines",
+      "when": "a change makes it import a part or a database driver, or the kernel passes {{KERNEL_PERCENT}}% of the lines",
       "then": "the check fails and the change is moved into the part that uses it",
       "hubWhen": {
         "SHARED": [
@@ -403,7 +380,7 @@
       "y": 910,
       "given": "a shared library and its consumers",
       "when": "a new major version is published",
-      "then": "within 90 days every consumer is on it or the previous major",
+      "then": "within 90 days every consumer is on it, and the lag check fails for any that is not",
       "hubWhen": {
         "SHARED": [
           "library"
@@ -426,21 +403,6 @@
       }
     },
     {
-      "id": "sc-owners",
-      "type": "scenario",
-      "label": "Owner approves change",
-      "x": 520,
-      "y": 1170,
-      "given": "a part owned by a team",
-      "when": "someone outside the team opens a pull request changing it",
-      "then": "the pull request cannot be merged until the owning team approves it",
-      "hubWhen": {
-        "OWNERS": [
-          "team"
-        ]
-      }
-    },
-    {
       "id": "adr-allowlist",
       "type": "adr",
       "label": "Declared dependencies only",
@@ -449,9 +411,9 @@
       "concern": "module-boundaries",
       "status": "accepted",
       "date": "",
-      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; this pack keeps the boundaries between them.",
-      "decision": "Each part (module, package or library) declares the parts it may depend on and exposes a published API; any other dependency, any access to another part's internals and any cycle fails the rule check, which runs as a test in every build ({{ENFORCE}}). Shared code: {{SHARED}}. Ownership: {{OWNERS}}. The checker by stack: Spring Modulith (@ApplicationModule(allowedDependencies = …) with ApplicationModules.verify()) for Spring Boot, ArchUnit slices for other JVM code, import-linter contracts for Python, NetArchTest for .NET, dependency-cruiser with an explicit map for TypeScript. Pick the one that runs as a unit test in the existing test runner, so a violation shows up like any failing test.",
-      "consequences": "• Every dependency between parts is a visible decision, reviewed when it is added.\n• The declarations are code to maintain: adding a dependency means changing two lines and convincing a reviewer.\n• Boundaries hold only while the check runs in every build.\n• With many parts the lists become noise; levels scale better.",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "Each part (src/modules/<name>) declares in its module.json the parts it may depend on (\"uses\") and exposes a published API in its index.ts; any other dependency, any import of another part's file but its index, and any cycle through more than one part fails the dependency check, which runs in every build ({{ENFORCE}}). Shared code: {{SHARED}}. The checker is dependency-cruiser with rules generated from the module.json files; on Spring Boot the same is Spring Modulith (@ApplicationModule(allowedDependencies = …) with ApplicationModules.verify()), on other JVM code ArchUnit slices, in Python import-linter contracts, on .NET NetArchTest. Pick the one that runs in the existing build, so a violation shows up like any failing test.",
+      "consequences": "• Every dependency between parts is a visible decision, reviewed when it is added.\n• The declarations are code to maintain: adding a dependency means changing one line in module.json and convincing a reviewer.\n• Boundaries hold only while the check runs in every build.\n• With many parts the lists become noise; levels scale better.",
       "alternatives": "1. Levels: one rule for many parts, but less precise between peers.\n2. Only forbidding known-bad dependencies: easy to start, but anything not foreseen is allowed.\n3. No checked rules: fastest to start, and boundaries erode within months.",
       "hubWhen": {
         "RULES": [
@@ -468,9 +430,9 @@
       "concern": "module-boundaries",
       "status": "accepted",
       "date": "",
-      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; this pack keeps the boundaries between them.",
-      "decision": "Each part is tagged with a level (app, feature, data-access, domain, util; or the levels the codebase needs) and may depend only on parts of lower levels and only through their public entry point; cycles are forbidden. The rules run in every build ({{ENFORCE}}). Shared code: {{SHARED}}. Ownership: {{OWNERS}}. The checker by stack: Nx's @nx/enforce-module-boundaries with type tags (plus scope tags per domain) in a TypeScript monorepo, eslint-plugin-boundaries without Nx, ArchUnit layeredArchitecture() over module packages on the JVM, import-linter's layers contract for Python.",
-      "consequences": "• One rule covers dozens of parts; a new library only needs its tags.\n• Peers at the same level cannot use each other, which pushes shared code down a level.\n• Says nothing about which domain may use which; add scope tags when that matters.\n• Boundaries hold only while the lint runs in every build.",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "Each part (src/modules/<name>) declares its level in its module.json (util, domain, data-access, feature, app; or the levels the codebase needs) and may depend only on parts of lower levels and only through their index.ts; cycles through more than one part are forbidden. The dependency check runs in every build ({{ENFORCE}}). Shared code: {{SHARED}}. The checker is dependency-cruiser with rules generated from the levels; in an Nx workspace the same is @nx/enforce-module-boundaries with type tags, on the JVM ArchUnit's layeredArchitecture() over module packages, in Python import-linter's layers contract.",
+      "consequences": "• One rule covers dozens of parts; a new part only needs its level.\n• Peers at the same level cannot use each other, which pushes shared code down a level.\n• Says nothing about which domain may use which; add scope tags or an allowlist when that matters.\n• Boundaries hold only while the check runs in every build.",
       "alternatives": "1. Per-part lists: precise, but unmaintainable for dozens of parts.\n2. Separate repositories per part: strong boundaries, slow cross-part changes.\n3. No checked rules: boundaries erode within months.",
       "hubWhen": {
         "RULES": [
@@ -479,16 +441,54 @@
       }
     },
     {
-      "id": "adr-shared-kernel",
+      "id": "adr-fail",
       "type": "adr",
-      "label": "A small shared kernel",
+      "label": "Every violation fails the build",
       "x": 780,
       "y": 260,
       "concern": "module-boundaries",
       "status": "accepted",
       "date": "",
-      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; this pack keeps the boundaries between them.",
-      "decision": "Code shared between parts lives in one shared kernel: value types and contracts (money, identifiers, event schemas) used by at least two parts, with no I/O, no framework and no rule of a single part, at most {{KERNEL_PERCENT}}% of the source lines. Every part that uses the kernel has an owner among its CODEOWNERS, so a change to it is approved by them all.",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "The dependency check runs on every pull request as a job the main branch requires (the ruleset that protects main is the Code review and branching pack's), and any violation fails it: there is no baseline and no exception list. Existing violations, if any, are fixed before the check is switched on.",
+      "consequences": "• A violation never reaches main, so nobody comes to depend on one.\n• Switching the check on needs a clean codebase first; on an old one that is a project of its own.\n• A rule that turns out wrong blocks everyone until it is changed, which keeps the rules honest.",
+      "alternatives": "1. A frozen baseline with a ratchet: adoptable today on an old codebase, at the cost of carrying known violations.\n2. Warnings only: visible, and ignored within weeks.",
+      "hubWhen": {
+        "ENFORCE": [
+          "fail"
+        ]
+      }
+    },
+    {
+      "id": "adr-ratchet",
+      "type": "adr",
+      "label": "Known violations frozen, new ones fail",
+      "x": 780,
+      "y": 390,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "The dependency check runs on every pull request with today's violations frozen in .dependency-cruiser-known-violations.json (written once with the --baseline option, committed, never edited by hand): a new violation fails the build, a fixed one is removed from the baseline. The baseline shrinks by at least {{RATCHET_PERCENT}}% each quarter against the previous quarter's tag (quarter-<year>Q<n>), checked in the build. On the JVM the same is ArchUnit's FreezingArchRule with its store committed.",
+      "consequences": "• Adoptable today on an old codebase; the code stops getting worse at once.\n• The baseline is debt on record: paying it down is planned work, and the quarterly check makes skipping it visible.\n• A fixed violation that is not removed from the baseline hides nothing, since the check only ignores what is listed.",
+      "alternatives": "1. Every violation fails the build: cleaner, after fixing everything first.\n2. A deadline instead of a ratchet: all violations fixed by a date, usually missed.",
+      "hubWhen": {
+        "ENFORCE": [
+          "ratchet"
+        ]
+      }
+    },
+    {
+      "id": "adr-shared-kernel",
+      "type": "adr",
+      "label": "A small shared kernel",
+      "x": 780,
+      "y": 520,
+      "concern": "module-boundaries",
+      "status": "accepted",
+      "date": "",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "Code shared between parts lives in one shared kernel, src/shared-kernel: value types and contracts (money, identifiers, event schemas) used by at least two parts, with no dependency on a part, no I/O or framework library (only the pure libraries on the kernel's allowlist), at most {{KERNEL_PERCENT}}% of the source lines. A change to the kernel is approved by the owners of every part that uses it, as the Code review and branching pack decides ownership.",
       "consequences": "• Parts speak the same language about the few concepts they share.\n• Every kernel change is a change to every part that uses it, hence the approvals and the size limit.\n• Helpers that are convenient but not shared concepts stay in the parts and are sometimes duplicated.",
       "alternatives": "1. Versioned internal libraries: each part upgrades on its own schedule.\n2. Nothing shared: no coupling through code, at the cost of duplication.\n3. A free-for-all \"common\" folder: easy, and it couples everything to everything.",
       "hubWhen": {
@@ -502,12 +502,12 @@
       "type": "adr",
       "label": "Versioned internal libraries",
       "x": 780,
-      "y": 390,
+      "y": 650,
       "concern": "module-boundaries",
       "status": "accepted",
       "date": "",
-      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; this pack keeps the boundaries between them.",
-      "decision": "Code shared between parts is published as internal libraries with semantic versions to the internal registry (npm, Maven, NuGet or PyPI on Artifactory, GitHub Packages or a cloud artifact registry). Each part upgrades on its own schedule; Renovate opens the upgrade pull requests, minor and patch versions merge automatically on green builds, and no consumer stays more than one major version behind for over 90 days.",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
+      "decision": "Code shared between parts is published as internal libraries under the @shop scope with semantic versions to the internal registry (npm, Maven, NuGet or PyPI on Artifactory, GitHub Packages or a cloud artifact registry). Each part upgrades on its own schedule; how the update pull requests arrive is decided in the Dependency hygiene pack. No consumer stays on an older major version for more than 90 days after a new major is released; a weekly check in every consumer fails past that.",
       "consequences": "• Parts released apart are not forced to upgrade together.\n• Several versions of a library live at once; fixes have to be released and picked up.\n• Library owners must keep compatibility within a major version and announce majors.",
       "alternatives": "1. A shared kernel in the same repository: always one version, but every change hits every user at once.\n2. Nothing shared: no versions to manage, some duplication.",
       "hubWhen": {
@@ -521,11 +521,11 @@
       "type": "adr",
       "label": "Parts share no code",
       "x": 780,
-      "y": 520,
+      "y": 780,
       "concern": "module-boundaries",
       "status": "accepted",
       "date": "",
-      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; this pack keeps the boundaries between them.",
+      "context": "The code in this element is cut into parts (modules, packages, libraries) and keeps changing. Without written and checked rules, every shortcut adds a dependency nobody decided on: one module reads another's internals, two packages import each other, and a \"common\" folder grows until every change touches everything. The forces: rules kept only in a wiki erode within months; a cycle makes two parts one, so neither can be tested, owned or released alone; sharing code saves typing but couples the teams that share it; a boundary nobody owns is crossed by whoever is in a hurry; and an old codebase cannot fix every violation at once. What the parts are (layers, rings, slices) is the Architecture style pack; who owns each part is the Code review and branching pack; this pack keeps the boundaries between the parts.",
       "decision": "Parts share no source code of their own: small helpers are duplicated, and data crosses only through published APIs or events, with clients generated in each consumer from the provider's contract. Third-party libraries are allowed.",
       "consequences": "• No team ever waits for another to change shared code.\n• Some duplication, and a bug in a copied helper is fixed in each copy.\n• Contracts carry the whole weight of the coupling, so they must be versioned and checked.",
       "alternatives": "1. A small shared kernel: less duplication for genuinely shared concepts.\n2. Versioned internal libraries: sharing without lock-step upgrades.",
@@ -542,8 +542,8 @@
       "x": 1040,
       "y": 0,
       "category": "structural",
-      "threshold": "0 cycles between modules, packages or libraries on the main branch",
-      "description": "A dependency rule in the build fails on any cycle between the folders that make up the parts. On the JVM the same check is ArchUnit's slices().matching(\"..(*)..\").should().beFreeOfCycles(); for Python, import-linter's independence contract.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-circular',\n    comment: 'ADR Module boundaries: parts in a cycle are one part',\n    severity: 'error',\n    from: { path: '^src/' },\n    to: { circular: true },\n  }],\n  options: { tsConfig: { fileName: 'tsconfig.json' }, doNotFollow: { path: 'node_modules' } },\n}\n// package.json: \"check:deps\": \"depcruise src --config .dependency-cruiser.cjs\"\n```"
+      "threshold": "0 cycles that run through more than one part on the main branch",
+      "description": "A dependency rule fails on any cycle that leaves a part's folder (a cycle among the files of one part is not counted); it is one of the rules in .dependency-cruiser.cjs that npm run check:deps runs. On the JVM the same is ArchUnit's slices().matching(\"..(*)..\").should().beFreeOfCycles(); for Python, import-linter's independence contract.\n\nTool: dependency-cruiser; for the JVM: ArchUnit slices; for Python: import-linter; for .NET: NetArchTest\n\n```js\n// .dependency-cruiser.cjs: add the rule to forbidden\nmodule.exports = { forbidden: [{\n  name: 'no-cycles-between-parts',\n  comment: 'ADR Module boundaries: parts in a cycle are one part',\n  severity: 'error',\n  from: { path: '^src/modules/([^/]+)/' },\n  to: { circular: true, via: { pathNot: '^src/modules/$1/' } },   // the cycle passes through another part\n}] }\n// package.json: \"check:deps\": \"depcruise src --config .dependency-cruiser.cjs\"\n```"
     },
     {
       "id": "ff-public-api",
@@ -552,8 +552,8 @@
       "x": 1040,
       "y": 130,
       "category": "structural",
-      "threshold": "0 imports from one part into another part's internal files",
-      "description": "A dependency rule allows a part to import another only through its index (the published API); a deep import into another part's folder fails the build. Spring Modulith's verify() and Nx's module boundaries do the same in their stacks.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'only-through-public-api',\n    comment: 'ADR Module boundaries: parts meet through their published API',\n    severity: 'error',\n    from: { path: '^src/modules/([^/]+)/' },\n    to: { path: '^src/modules/', pathNot: ['^src/modules/$1/', '^src/modules/[^/]+/index\\\\.ts$'] },\n  }],\n}\n```"
+      "threshold": "0 imports from one part into another part's files other than its index.ts",
+      "description": "A dependency rule allows a part to import another only through its index (the published API); a deep import into another part's folder fails the build. Spring Modulith's verify() (named interfaces such as customer::api are its published packages) and Nx's module boundaries do the same in their stacks.\n\nTool: dependency-cruiser; for Spring Boot: Spring Modulith verify(); for an Nx workspace: @nx/enforce-module-boundaries; for .NET: NetArchTest\n\n```js\n// .dependency-cruiser.cjs: add the rule to forbidden\nmodule.exports = { forbidden: [{\n  name: 'only-through-public-api',\n  comment: 'ADR Module boundaries: parts meet through their published API',\n  severity: 'error',\n  from: { path: '^src/modules/([^/]+)/' },\n  to: { path: '^src/modules/', pathNot: ['^src/modules/$1/', '^src/modules/[^/]+/index\\\\.ts$'] },\n}] }\n```"
     },
     {
       "id": "ff-allowlist",
@@ -562,8 +562,8 @@
       "x": 1040,
       "y": 260,
       "category": "structural",
-      "threshold": "0 dependencies on modules a module does not declare, 0 accesses to internals and 0 cycles between modules",
-      "description": "Each module declares its allowed dependencies in package-info.java; a test lets Spring Modulith find the modules and verify every dependency against those lists, and writes the module diagram. In Python, import-linter contracts per module do the same.\n\nTool: Spring Modulith (ArchUnit underneath)\n\n```java\n// ordering/package-info.java\n@ApplicationModule(allowedDependencies = { \"catalog\", \"customer::api\" })\npackage com.example.shop.ordering;\n\nclass ModuleStructureTest {\n  static final ApplicationModules modules = ApplicationModules.of(ShopApplication.class);\n\n  @Test\n  void modulesUseOnlyDeclaredDependencies() {\n    modules.verify(); // fails on undeclared dependencies, internals and cycles\n  }\n\n  @Test\n  void writeDocumentation() {\n    new Documenter(modules).writeModulesAsPlantUml();\n  }\n}\n```",
+      "threshold": "0 dependencies from a part on a part its module.json does not list",
+      "description": "Each part declares what it may use in src/modules/<name>/module.json; the configuration reads the files and generates one forbidden rule per part that allows imports only of the declared parts' index files. A new dependency means a one-line change to module.json, visible in review.\n\nTool: dependency-cruiser; for Spring Boot: Spring Modulith @ApplicationModule(allowedDependencies) with ApplicationModules.verify(); for Python: import-linter forbidden contracts\n\n```js\n// .dependency-cruiser.cjs — each part declares what it may use in src/modules/<name>/module.json: { \"uses\": [\"catalog\", \"customer\"] }\nconst { readdirSync, readFileSync } = require('node:fs')\nconst parts = readdirSync('src/modules')\nconst uses = Object.fromEntries(parts.map((p) => [p, JSON.parse(readFileSync(`src/modules/${p}/module.json`, 'utf8')).uses ?? []]))\n\nmodule.exports = {\n  forbidden: parts.map((p) => ({\n    name: `${p}-uses-only-declared-parts`,\n    comment: 'ADR Declared dependencies only: add the part to module.json to use it',\n    severity: 'error',\n    from: { path: `^src/modules/${p}/` },\n    to: { path: '^src/modules/', pathNot: [`^src/modules/${p}/`, ...uses[p].map((u) => `^src/modules/${u}/index\\\\.ts$`)] },\n  })),\n  options: { tsConfig: { fileName: 'tsconfig.json' } },\n}\n```",
       "hubWhen": {
         "RULES": [
           "allowlist"
@@ -577,8 +577,8 @@
       "x": 1040,
       "y": 390,
       "category": "structural",
-      "threshold": "0 dependencies on a library of the same or a higher level",
-      "description": "Each Nx project is tagged with its level; the lint rule fails when a project depends on a project of a level it may not use, or imports past a library's public entry point.\n\nTool: Nx module boundaries (@nx/enforce-module-boundaries)\n\n```js\n// eslint.config.mjs\nimport nx from '@nx/eslint-plugin'\nexport default [\n  ...nx.configs['flat/base'],\n  {\n    files: ['**/*.ts'],\n    rules: {\n      '@nx/enforce-module-boundaries': ['error', {\n        enforceBuildableLibDependency: true,\n        depConstraints: [\n          { sourceTag: 'type:app', onlyDependOnLibsWithTags: ['type:feature', 'type:data-access', 'type:domain', 'type:util'] },\n          { sourceTag: 'type:feature', onlyDependOnLibsWithTags: ['type:data-access', 'type:domain', 'type:util'] },\n          { sourceTag: 'type:data-access', onlyDependOnLibsWithTags: ['type:domain', 'type:util'] },\n          { sourceTag: 'type:domain', onlyDependOnLibsWithTags: ['type:util'] },\n          { sourceTag: 'type:util', onlyDependOnLibsWithTags: [] },\n        ],\n      }],\n    },\n  },\n]\n```",
+      "threshold": "0 dependencies from a part on a part of the same or a higher level",
+      "description": "Each part declares its level in src/modules/<name>/module.json; the configuration generates one forbidden rule per part that refuses imports from parts of the same or a higher level. In an Nx workspace the same is the type tags of @nx/enforce-module-boundaries.\n\nTool: dependency-cruiser; for an Nx workspace: @nx/enforce-module-boundaries with depConstraints on type tags; for the JVM: ArchUnit layeredArchitecture(); for Python: import-linter layers contract\n\n```js\n// .dependency-cruiser.cjs — each part declares its level in src/modules/<name>/module.json: { \"level\": \"feature\" }\nconst { readdirSync, readFileSync } = require('node:fs')\nconst LEVELS = ['util', 'domain', 'data-access', 'feature', 'app']   // lowest first: a part may use lower levels only\nconst parts = readdirSync('src/modules')\nconst level = Object.fromEntries(parts.map((p) => [p, LEVELS.indexOf(JSON.parse(readFileSync(`src/modules/${p}/module.json`, 'utf8')).level)]))\n\nmodule.exports = {\n  forbidden: parts.map((p) => ({\n    name: `${p}-depends-down-levels-only`,\n    comment: 'ADR Parts ranked in levels: a part uses parts of lower levels only',\n    severity: 'error',\n    from: { path: `^src/modules/${p}/` },\n    to: { path: parts.filter((o) => o !== p && level[o] >= level[p]).map((o) => `^src/modules/${o}/`) },\n  })).filter((rule) => rule.to.path.length > 0),\n  options: { tsConfig: { fileName: 'tsconfig.json' } },\n}\n```",
       "hubWhen": {
         "RULES": [
           "levels"
@@ -586,14 +586,29 @@
       }
     },
     {
-      "id": "ff-ratchet",
+      "id": "ff-fail",
       "type": "fitness-fn",
-      "label": "Known violations frozen",
+      "label": "Violations fail the pull request",
       "x": 1040,
       "y": 520,
+      "category": "process",
+      "threshold": "The dependency check runs on every pull request and its job fails on any violation, naming the rule and both files",
+      "description": "A workflow runs npm run check:deps on every pull request; dependency-cruiser's default err reporter exits non-zero on an error-severity violation and prints the rule with the from and to files. The job is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.\n\nTool: dependency-cruiser in GitHub Actions; for the JVM: the ArchUnit tests in the build's test job\n\n```yaml\n# .github/workflows/boundaries.yml\nname: module boundaries\non: [pull_request]\njobs:\n  check-deps:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - uses: actions/setup-node@v4.1.0   # pin by commit SHA in your repository\n        with: { node-version-file: .nvmrc, cache: npm }\n      - run: npm ci\n      - run: npm run check:deps   # depcruise src --config .dependency-cruiser.cjs; exits non-zero on a violation\n```",
+      "hubWhen": {
+        "ENFORCE": [
+          "fail"
+        ]
+      }
+    },
+    {
+      "id": "ff-ratchet",
+      "type": "fitness-fn",
+      "label": "Known violations frozen and shrinking",
+      "x": 1040,
+      "y": 650,
       "category": "structural",
-      "threshold": "0 new violations outside the baseline; the baseline shrinks by at least {{RATCHET_PERCENT}}% each quarter",
-      "description": "The rules run with today's violations frozen in a baseline committed to the repository: a new violation fails, a fixed one is removed from the store automatically. A quarterly review compares the size of the baseline with the quarter before. With dependency-cruiser the same is `depcruise-baseline` and `--ignore-known`.\n\nTool: ArchUnit FreezingArchRule\n\n```java\n@AnalyzeClasses(packages = \"com.example.shop\")\nclass FrozenRulesTest {\n  // archunit.properties:\n  //   freeze.store.default.path=src/test/resources/archunit_store\n  //   freeze.store.default.allowStoreCreation=true   (first run only)\n  //   freeze.refreeze=false\n  @ArchTest\n  static final ArchRule noCycles =\n      freeze(slices().matching(\"com.example.shop.(*)..\").should().beFreeOfCycles());\n\n  @ArchTest\n  static final ArchRule noInternals =\n      freeze(noClasses().that().resideInAPackage(\"com.example.shop.ordering..\")\n          .should().dependOnClassesThat().resideInAPackage(\"com.example.shop.billing.internal..\"));\n}\n```",
+      "threshold": "0 violations outside the baseline on every pull request; the baseline holds at least {{RATCHET_PERCENT}}% fewer entries than at the previous quarter's tag",
+      "description": "The dependency check runs with --ignore-known, so only violations not in the committed baseline fail; the baseline was written once with --baseline. A second step counts the baseline's entries against the file at the previous quarter's tag and fails when it has not shrunk enough. With ArchUnit the same is FreezingArchRule with its store committed and counted the same way.\n\nTool: dependency-cruiser (--baseline, --ignore-known) with jq and git in a shell step; for the JVM: ArchUnit FreezingArchRule with the archunit_store directory\n\n```bash\nset -euo pipefail\n# once, to freeze today's violations:  npx depcruise src --config .dependency-cruiser.cjs --baseline   (then commit the file)\nnpx depcruise src --config .dependency-cruiser.cjs --ignore-known   # fails on violations outside .dependency-cruiser-known-violations.json\n\n# the baseline shrinks: compare with the previous quarter's tag (quarter-<year>Q<n>, set by the team)\nnow=$(jq length .dependency-cruiser-known-violations.json)\nprevious_tag=$(git describe --tags --match 'quarter-*' --abbrev=0 HEAD~1)\nthen=$(git show \"$previous_tag:.dependency-cruiser-known-violations.json\" | jq length)\necho \"known violations: $then at $previous_tag, $now now\"\n[ \"$((now * 100))\" -le \"$((then * (100 - {{RATCHET_PERCENT}})))\" ] || { echo \"the baseline has not shrunk by {{RATCHET_PERCENT}}% since $previous_tag\"; exit 1; }\n```",
       "hubWhen": {
         "ENFORCE": [
           "ratchet"
@@ -605,10 +620,10 @@
       "type": "fitness-fn",
       "label": "Shared kernel stays small",
       "x": 1040,
-      "y": 650,
+      "y": 780,
       "category": "structural",
-      "threshold": "The shared kernel imports no part and no I/O library, and holds at most {{KERNEL_PERCENT}}% of the source lines",
-      "description": "A dependency rule keeps the kernel free of the parts and of I/O; a second step in the same job compares the kernel's line count with the whole and fails above the limit.\n\nTool: dependency-cruiser and cloc\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'kernel-depends-on-nothing',\n    comment: 'ADR A small shared kernel: types and contracts only',\n    severity: 'error',\n    from: { path: '^src/shared-kernel/' },\n    to: { path: ['^src/modules/', 'node_modules/(pg|mongodb|axios|express|fastify|kafkajs)'] },\n  }],\n}\n// CI: fail when the kernel passes the limit\n// kernel=$(cloc --json src/shared-kernel | jq '.SUM.code'); all=$(cloc --json src | jq '.SUM.code')\n// [ $((kernel * 100 / all)) -le {{KERNEL_PERCENT}} ]\n```",
+      "threshold": "The shared kernel imports no part and no third-party package outside its allowlist, and holds at most {{KERNEL_PERCENT}}% of the source lines",
+      "description": "A dependency rule keeps the kernel free of the parts and of every package in node_modules except the pure ones on its allowlist (so a database driver, HTTP client or framework cannot slip in); a second step in the same job compares the kernel's line count with the whole and fails above the limit.\n\nTool: dependency-cruiser and cloc with jq in a shell step; for the JVM: an ArchUnit rule over the kernel package and JaCoCo's line counts\n\n```js\n// .dependency-cruiser.cjs: add the rule to forbidden\nmodule.exports = { forbidden: [{\n  name: 'kernel-depends-on-nothing',\n  comment: 'ADR A small shared kernel: types and contracts only',\n  severity: 'error',\n  from: { path: '^src/shared-kernel/' },\n  to: { path: ['^src/modules/', '^node_modules/'], pathNot: '^node_modules/(zod|uuid|decimal\\\\.js)/' },   // the pure libraries the kernel may use\n}] }\n// CI, in the same job: fail when the kernel passes the limit\n//   kernel=$(cloc --json src/shared-kernel | jq '.SUM.code'); all=$(cloc --json src | jq '.SUM.code')\n//   [ $((kernel * 100 / all)) -le {{KERNEL_PERCENT}} ]\n```",
       "hubWhen": {
         "SHARED": [
           "kernel"
@@ -618,12 +633,12 @@
     {
       "id": "ff-library",
       "type": "fitness-fn",
-      "label": "Library versions not left behind",
+      "label": "No consumer left behind",
       "x": 1040,
-      "y": 780,
+      "y": 910,
       "category": "process",
-      "threshold": "An update pull request for a new internal library version is opened within 1 day; no consumer stays more than one major version behind for over 90 days",
-      "description": "Renovate watches the internal registry and opens a pull request in every consumer when a shared library is released; patch and minor versions merge automatically on green tests, majors go to the owning team, and the dependency dashboard shows who lags.\n\nTool: Renovate\n\n```json\n{\n  \"$schema\": \"https://docs.renovatebot.com/renovate-schema.json\",\n  \"extends\": [\"config:recommended\", \":dependencyDashboard\"],\n  \"packageRules\": [\n    {\n      \"matchPackageNames\": [\"@shop/**\"],\n      \"groupName\": \"internal libraries\",\n      \"schedule\": [\"at any time\"],\n      \"automerge\": true,\n      \"matchUpdateTypes\": [\"minor\", \"patch\"]\n    },\n    {\n      \"matchPackageNames\": [\"@shop/**\"],\n      \"matchUpdateTypes\": [\"major\"],\n      \"labels\": [\"internal-major\"],\n      \"prPriority\": 5\n    }\n  ]\n}\n```",
+      "threshold": "0 internal libraries on which a consumer is a major version behind for more than 90 days after the newer major's release",
+      "description": "A weekly job in every consumer lists its outdated packages, and for each internal library whose latest major is newer than the installed one reads the release date of that version from the registry; a lag over 90 days fails the job naming the library.\n\nTool: npm (outdated, view) in a TypeScript script run with tsx from a scheduled GitHub Actions job; for Maven: versions:display-dependency-updates with the release dates from the repository index\n\n```ts\n// scripts/library-lag.ts — scheduled weekly in every consumer: npx tsx scripts/library-lag.ts\nimport { execFileSync } from 'node:child_process'\n\nconst SCOPE = '@shop/'\nconst MAX_DAYS = 90\n// npm outdated exits 1 when something is outdated; its JSON is still on stdout\nconst npm = (args: string[]): string => { try { return execFileSync('npm', args, { encoding: 'utf8' }) } catch (e: any) { return e.stdout } }\nconst major = (version: string) => Number(version.split('.')[0])\n\nconst outdated: Record<string, { current: string; latest: string }> = JSON.parse(npm(['outdated', '--json']) || '{}')\nconst late: string[] = []\nfor (const [name, info] of Object.entries(outdated)) {\n  if (!name.startsWith(SCOPE) || major(info.latest) <= major(info.current)) continue\n  const published: Record<string, string> = JSON.parse(npm(['view', name, 'time', '--json']))\n  const days = Math.floor((Date.now() - Date.parse(published[info.latest])) / 86_400_000)\n  if (days > MAX_DAYS) late.push(`${name}: on ${info.current}, ${info.latest} was released ${days} days ago`)\n}\nif (late.length) { console.error('internal libraries a major behind for over 90 days:\\n' + late.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "SHARED": [
           "library"
@@ -635,28 +650,13 @@
       "type": "fitness-fn",
       "label": "No code shared between parts",
       "x": 1040,
-      "y": 910,
+      "y": 1040,
       "category": "structural",
       "threshold": "0 imports from one part's folder into another's",
-      "description": "A dependency rule forbids any import from one part into another; generated API clients live in each consumer and are generated from the provider's published contract.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'parts-share-nothing',\n    comment: 'ADR Parts share no code',\n    severity: 'error',\n    from: { path: '^src/modules/([^/]+)/' },\n    to: { path: '^src/modules/', pathNot: '^src/modules/$1/' },\n  }],\n}\n```",
+      "description": "A dependency rule forbids any import from one part into another; generated API clients live in each consumer and are generated from the provider's published contract.\n\nTool: dependency-cruiser; for the JVM: ArchUnit slices().should().notDependOnEachOther(); for .NET: NetArchTest\n\n```js\n// .dependency-cruiser.cjs: add the rule to forbidden\nmodule.exports = { forbidden: [{\n  name: 'parts-share-nothing',\n  comment: 'ADR Parts share no code',\n  severity: 'error',\n  from: { path: '^src/modules/([^/]+)/' },\n  to: { path: '^src/modules/', pathNot: '^src/modules/$1/' },\n}] }\n```",
       "hubWhen": {
         "SHARED": [
           "none"
-        ]
-      }
-    },
-    {
-      "id": "ff-owners",
-      "type": "fitness-fn",
-      "label": "Every part has owners",
-      "x": 1040,
-      "y": 1040,
-      "category": "process",
-      "threshold": "100% of the part folders are matched by a CODEOWNERS entry naming an existing team; branch protection requires code owner review",
-      "description": "A workflow validates CODEOWNERS on every pull request: every file is owned, and each owner exists and has write access. Branch protection on main requires a review from code owners.\n\nTool: codeowners-validator (GitHub Action) with GitHub branch protection\n\n```yaml\n# .github/workflows/codeowners.yml\nname: CODEOWNERS\non: [pull_request]\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: mszostok/codeowners-validator@v0.7.4\n        with:\n          checks: \"files,owners,duppatterns,syntax\"\n          experimental_checks: \"notowned\"\n          github_access_token: \"${{ secrets.OWNERS_VALIDATOR_TOKEN }}\"\n```",
-      "hubWhen": {
-        "OWNERS": [
-          "team"
         ]
       }
     }
@@ -717,12 +717,6 @@
       "relationType": "derives"
     },
     {
-      "id": "req-owners--derives--need",
-      "sourceId": "req-owners",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
       "id": "sc-allowlist--verifies--req-allowlist",
       "sourceId": "sc-allowlist",
       "targetId": "req-allowlist",
@@ -777,12 +771,6 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-owners--verifies--req-owners",
-      "sourceId": "sc-owners",
-      "targetId": "req-owners",
-      "relationType": "verifies"
-    },
-    {
       "id": "ff-cycles--implements--adr-allowlist",
       "sourceId": "ff-cycles",
       "targetId": "adr-allowlist",
@@ -819,15 +807,15 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-ratchet--implements--adr-allowlist",
-      "sourceId": "ff-ratchet",
-      "targetId": "adr-allowlist",
+      "id": "ff-fail--implements--adr-fail",
+      "sourceId": "ff-fail",
+      "targetId": "adr-fail",
       "relationType": "implements"
     },
     {
-      "id": "ff-ratchet--implements--adr-levels",
+      "id": "ff-ratchet--implements--adr-ratchet",
       "sourceId": "ff-ratchet",
-      "targetId": "adr-levels",
+      "targetId": "adr-ratchet",
       "relationType": "implements"
     },
     {
@@ -846,18 +834,6 @@
       "id": "ff-no-shared--implements--adr-share-nothing",
       "sourceId": "ff-no-shared",
       "targetId": "adr-share-nothing",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-owners--implements--adr-allowlist",
-      "sourceId": "ff-owners",
-      "targetId": "adr-allowlist",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-owners--implements--adr-levels",
-      "sourceId": "ff-owners",
-      "targetId": "adr-levels",
       "relationType": "implements"
     }
   ]

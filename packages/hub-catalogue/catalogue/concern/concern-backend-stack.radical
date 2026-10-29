@@ -3,7 +3,7 @@
     "id": "concern-backend-stack",
     "category": "concern",
     "name": "Backend stack",
-    "description": "The language, runtime and framework a server-side service is built on, why, the performance budget it is held to, and how it is kept on supported versions with its dependencies up to date.",
+    "description": "The language, runtime and framework a server-side service is built on, why, the version policy that keeps it on supported releases, and the footprint it is held to when performance decides.",
     "tags": [
       "technology",
       "backend",
@@ -11,14 +11,14 @@
       "language",
       "framework",
       "end of life",
-      "dependency updates",
-      "performance budget"
+      "version policy",
+      "footprint"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "concern": {
       "id": "backend-stack",
-      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"component\") AND external != true",
-      "why": "these are server-side services, so what they are built on, how fast they must be, and how they are kept supported and up to date has to be decided.",
+      "trigger": "LIST NODES WHERE type = \"container\" AND external != true",
+      "why": "these are server-side services, so what they are built on and how they are kept on supported versions has to be decided.",
       "group": "technology"
     },
     "sources": [
@@ -35,12 +35,16 @@
         "url": "https://iso25000.com/index.php/en/iso-25000-standards/iso-25010"
       },
       {
-        "title": "Renovate documentation",
-        "url": "https://docs.renovatebot.com/"
-      },
-      {
         "title": "OpenSSF Scorecard",
         "url": "https://github.com/ossf/scorecard"
+      },
+      {
+        "title": "deps.dev API v3 (Open Source Insights)",
+        "url": "https://docs.deps.dev/api/v3/"
+      },
+      {
+        "title": "OWASP Top 10 2021, A06 Vulnerable and Outdated Components",
+        "url": "https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/"
       },
       {
         "title": "Ford, Parsons, Kua, Sadalage: Building Evolutionary Architectures, 2nd ed.",
@@ -73,12 +77,12 @@
           {
             "value": "go",
             "label": "Go",
-            "description": "Small static binaries, fast start-up, low memory, simple concurrency. Pick it for infrastructure-like services, high-throughput network services and CLIs, when a small standard library is enough."
+            "description": "Small static binaries, fast start-up, low memory, simple concurrency. Pick it for infrastructure-like services, high-throughput network services and CLIs, when a small standard library is enough. Go has no LTS releases: not with the LTS-only version policy."
           },
           {
             "value": "python",
             "label": "Python (FastAPI or Django)",
-            "description": "The data and machine-learning ecosystem, quick to write. Pick it when the service serves models or data pipelines, or the team are data people; CPU-heavy request handling is not its strength."
+            "description": "The data and machine-learning ecosystem, quick to write. Pick it when the service serves models or data pipelines, or the team are data people; CPU-heavy request handling is not its strength. Python has no LTS releases: not with the LTS-only version policy."
           }
         ]
       },
@@ -102,7 +106,7 @@
           {
             "value": "performance",
             "label": "performance",
-            "description": "Latency, memory or start-up time drive cost or user experience. Pick it only when load or cost figures show it matters, and hold the stack to the numbers."
+            "description": "Memory and start-up time drive cost or scaling. Pick it only when load or cost figures show it matters, and hold the stack to the footprint numbers asked below."
           }
         ]
       },
@@ -110,47 +114,23 @@
         "key": "UPGRADE",
         "title": "Version policy",
         "label": "Which versions of the runtime and framework may run?",
-        "hint": "Unsupported versions get no security fixes; versions far behind make each upgrade a project.",
+        "hint": "Unsupported versions get no security fixes; versions far behind make each upgrade a project. Go and Python have no LTS releases: with them, pick the latest or the previous major.",
         "defaultValue": "lts",
         "options": [
           {
             "value": "lts",
             "label": "supported LTS releases only",
-            "description": "Only long-term-support releases, each new LTS adopted within 6 months. Pick it for business systems that value stability and upgrade a few times a year."
+            "description": "Only long-term-support releases, each new LTS adopted within 6 months. Pick it for business systems that value stability and upgrade a few times a year. Not with Go or Python, which have no LTS releases."
           },
           {
             "value": "n1",
             "label": "the latest or the previous major",
-            "description": "Never more than one major version behind the latest release, LTS or not. Pick it when the stack has no LTS for what you use (Go, most frameworks) or you want new features sooner."
+            "description": "Never more than one release cycle behind the latest, LTS or not. Pick it when the stack has no LTS for what you use (Go, Python, most frameworks) or you want new features sooner."
           },
           {
             "value": "latest",
             "label": "the latest release within 30 days",
-            "description": "Each new release of the runtime and framework is adopted within 30 days. Pick it for small services with a strong test suite and automated updates."
-          }
-        ]
-      },
-      {
-        "key": "UPDATES",
-        "title": "Dependency updates",
-        "label": "How are dependencies kept up to date?",
-        "hint": "Small, frequent updates are cheap; a year of updates at once is a migration.",
-        "defaultValue": "renovate",
-        "options": [
-          {
-            "value": "renovate",
-            "label": "Renovate pull requests",
-            "description": "A bot opens update pull requests for libraries, the runtime version and base images, merging patches automatically on green tests. Pick it for any hosting (GitHub, GitLab, Bitbucket, Azure DevOps) and when you want grouping, schedules and runtime files covered."
-          },
-          {
-            "value": "dependabot",
-            "label": "Dependabot pull requests",
-            "description": "GitHub's built-in updates for libraries, Docker images and Actions. Pick it when the code is on GitHub and its simpler configuration is enough."
-          },
-          {
-            "value": "manual",
-            "label": "a scheduled upgrade each quarter",
-            "description": "A planned upgrade of everything once a quarter, checked by a drift report. Pick it only where bots are not allowed (air-gapped or regulated build environments)."
+            "description": "Each new release cycle of the runtime and framework is adopted within 30 days. Pick it for small services with a strong test suite and automated updates."
           }
         ]
       },
@@ -161,32 +141,14 @@
         "type": "number"
       },
       {
-        "key": "PATCH_DAYS",
-        "label": "Within how many days must a high or critical vulnerability be patched?",
-        "defaultValue": "14",
-        "type": "number"
-      },
-      {
-        "key": "P95_MS",
-        "label": "What 95th-percentile response time must the service meet (ms)?",
-        "defaultValue": "200",
-        "type": "number"
-      },
-      {
-        "key": "PEAK_RPS",
-        "label": "What is the expected peak load (requests per second)?",
-        "defaultValue": "200",
-        "type": "number"
-      },
-      {
         "key": "MEMORY_MB",
-        "label": "How much memory may one instance use at peak (MB)?",
+        "label": "How much memory may one instance use at peak (MB)? Held to when performance is the deciding factor",
         "defaultValue": "512",
         "type": "number"
       },
       {
         "key": "STARTUP_SECONDS",
-        "label": "Within how many seconds must a new instance be ready for traffic?",
+        "label": "Within how many seconds must a new instance be ready for traffic? Held to when performance is the deciding factor",
         "defaultValue": "10",
         "type": "number"
       }
@@ -201,7 +163,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Backend stack",
-      "description": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that meet a stated performance budget, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years."
+      "description": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-one-stack",
@@ -221,25 +183,14 @@
       "y": 130,
       "ears_type": "ubiquitous",
       "action": "run only runtime, framework and base image versions under vendor support, replacing each at least {{EOL_DAYS}} days before its end of support",
-      "rationale": "After end of support no security fixes come; the lead time leaves room to upgrade without a rush (endoflife.date; PCI DSS v4.0 6.3.3, OWASP Top 10 A06 Vulnerable and Outdated Components)."
-    },
-    {
-      "id": "req-patch",
-      "type": "requirement",
-      "label": "Vulnerabilities patched in time",
-      "x": 260,
-      "y": 260,
-      "ears_type": "event-driven",
-      "trigger": "a vulnerability rated high or critical (CVSS 7.0 or more) is published for the runtime, the framework or a dependency in use",
-      "action": "deploy a fixed version to production within {{PATCH_DAYS}} days, or record a dated exception with the mitigation",
-      "rationale": "Known vulnerabilities are exploited within days of publication; a deadline turns patching into routine (PCI DSS v4.0 6.3.3; CISA Known Exploited Vulnerabilities catalogue)."
+      "rationale": "After end of support no security fixes come; the lead time leaves room to upgrade without a rush (endoflife.date; OWASP Top 10 A06 Vulnerable and Outdated Components)."
     },
     {
       "id": "req-lts",
       "type": "requirement",
       "label": "New LTS adopted",
       "x": 260,
-      "y": 390,
+      "y": 260,
       "ears_type": "event-driven",
       "trigger": "a new long-term-support release of the runtime or main framework is published",
       "action": "move the service to it within 6 months, and run no non-LTS release in production",
@@ -253,12 +204,12 @@
     {
       "id": "req-n1",
       "type": "requirement",
-      "label": "At most one major behind",
+      "label": "At most one release behind",
       "x": 260,
-      "y": 520,
+      "y": 390,
       "ears_type": "ubiquitous",
-      "action": "run the latest or the previous major version of the runtime and the main framework, never older",
-      "rationale": "Most projects support only the last one or two major versions (Go: the two latest releases); staying within them keeps fixes coming and upgrades short (endoflife.date).",
+      "action": "run the latest or the previous release cycle of the runtime and the main framework, never older",
+      "rationale": "Most projects support only the last one or two release cycles (Go: the two latest releases); staying within them keeps fixes coming and upgrades short (endoflife.date).",
       "hubWhen": {
         "UPGRADE": [
           "n1"
@@ -270,9 +221,9 @@
       "type": "requirement",
       "label": "Latest release adopted",
       "x": 260,
-      "y": 650,
+      "y": 520,
       "ears_type": "event-driven",
-      "trigger": "a new release of the runtime or main framework is published",
+      "trigger": "a new release cycle of the runtime or main framework is published",
       "action": "move the service to it within 30 days",
       "rationale": "Small, frequent upgrades are cheaper than large rare ones, and new security hardening arrives sooner (Building Evolutionary Architectures, incremental change).",
       "hubWhen": {
@@ -282,46 +233,13 @@
       }
     },
     {
-      "id": "req-update-prs",
-      "type": "requirement",
-      "label": "Updates arrive as pull requests",
-      "x": 260,
-      "y": 780,
-      "ears_type": "event-driven",
-      "trigger": "a new version of a dependency, the runtime or a base image is published",
-      "action": "open a pull request updating it within 7 days, merge patch updates automatically when the tests pass, and leave no update pull request open longer than 30 days",
-      "rationale": "Updates that arrive one at a time with tests are cheap to take; automation keeps them from waiting for someone to remember (Renovate, Dependabot documentation).",
-      "hubWhen": {
-        "UPDATES": [
-          "renovate",
-          "dependabot"
-        ]
-      }
-    },
-    {
-      "id": "req-quarterly",
-      "type": "requirement",
-      "label": "Quarterly upgrade",
-      "x": 260,
-      "y": 910,
-      "ears_type": "event-driven",
-      "trigger": "a quarter ends",
-      "action": "upgrade every dependency to its latest version, leaving 0 direct dependencies more than one major version behind",
-      "rationale": "Without a bot, only a fixed rhythm keeps drift from growing into a migration (Building Evolutionary Architectures, dependency fitness functions).",
-      "hubWhen": {
-        "UPDATES": [
-          "manual"
-        ]
-      }
-    },
-    {
       "id": "req-skills",
       "type": "requirement",
       "label": "Enough people know it",
       "x": 260,
-      "y": 1040,
+      "y": 650,
       "ears_type": "ubiquitous",
-      "action": "keep at least two engineers in the owning team who have shipped production code on {{RUNTIME}} in the last 12 months",
+      "action": "keep at least two engineers in the owning team who have merged production changes to the service on {{RUNTIME}} in the last 12 months",
       "rationale": "A stack chosen for the team's skills is only as safe as the number of people who have them (bus factor).",
       "hubWhen": {
         "CRITERION": [
@@ -334,11 +252,11 @@
       "type": "requirement",
       "label": "Dependencies are maintained",
       "x": 260,
-      "y": 1170,
+      "y": 780,
       "ears_type": "event-driven",
       "trigger": "a change adds a direct dependency",
       "action": "accept it only when it had a release in the last 12 months and an OpenSSF Scorecard score of at least 5, or a reviewer records why it is still acceptable",
-      "rationale": "An ecosystem is worth what its maintained libraries are worth; an abandoned dependency becomes your code to maintain (OpenSSF Scorecard: Maintained check).",
+      "rationale": "An ecosystem is worth what its maintained libraries are worth; an abandoned dependency becomes your code to maintain (OpenSSF Scorecard: Maintained check; deps.dev).",
       "hubWhen": {
         "CRITERION": [
           "ecosystem"
@@ -346,24 +264,13 @@
       }
     },
     {
-      "id": "req-latency",
-      "type": "requirement",
-      "label": "Meets the latency budget",
-      "x": 260,
-      "y": 1300,
-      "ears_type": "state-driven",
-      "precondition": "the service runs at the expected peak of {{PEAK_RPS}} requests per second",
-      "action": "answer 95% of requests within {{P95_MS}} ms with under 1% errors",
-      "rationale": "A budget stated as a number is checked on every release candidate; one left implicit is noticed only by users (ISO 25010 performance efficiency: time behaviour)."
-    },
-    {
       "id": "req-footprint",
       "type": "requirement",
       "label": "Small and quick to start",
       "x": 260,
-      "y": 1430,
+      "y": 910,
       "ears_type": "state-driven",
-      "precondition": "the service runs at the expected peak load",
+      "precondition": "the service runs under the load test decided in the Capacity and scaling pack",
       "action": "use at most {{MEMORY_MB}} MB of memory per instance, and have a new instance ready for traffic within {{STARTUP_SECONDS}} seconds of its start",
       "rationale": "A stack chosen for performance has to be held to the numbers that justified it: memory sets the cost per instance, start-up time how fast it scales out (ISO 25010 performance efficiency: resource utilisation).",
       "hubWhen": {
@@ -379,8 +286,8 @@
       "x": 520,
       "y": 0,
       "given": "the service's build files and container images",
-      "when": "a change brings a base image or build of another runtime",
-      "then": "the policy check fails until a decision record allows it"
+      "when": "a change brings a base image or a build manifest of another runtime",
+      "then": "the stack check fails until the manifest is listed in .stack-exceptions with the decision record that allows it"
     },
     {
       "id": "sc-eol",
@@ -393,24 +300,14 @@
       "then": "it fails naming the version and its end-of-support date"
     },
     {
-      "id": "sc-patch",
-      "type": "scenario",
-      "label": "Fix deployed in time",
-      "x": 520,
-      "y": 260,
-      "given": "a dependency in use with a newly published critical vulnerability",
-      "when": "{{PATCH_DAYS}} days have passed",
-      "then": "production runs a fixed version, or a dated exception with its mitigation is recorded"
-    },
-    {
       "id": "sc-lts",
       "type": "scenario",
       "label": "LTS upgrade on time",
       "x": 520,
-      "y": 390,
+      "y": 260,
       "given": "a new LTS release of the runtime",
       "when": "6 months have passed since its release",
-      "then": "the service runs on it in production",
+      "then": "the service runs on it in production, and the version check fails otherwise",
       "hubWhen": {
         "UPGRADE": [
           "lts"
@@ -420,10 +317,10 @@
     {
       "id": "sc-n1",
       "type": "scenario",
-      "label": "Two majors behind refused",
+      "label": "Two releases behind refused",
       "x": 520,
-      "y": 520,
-      "given": "a framework whose latest major is N",
+      "y": 390,
+      "given": "a framework whose latest release cycle is N",
       "when": "the service still runs on N-2",
       "then": "the version check fails",
       "hubWhen": {
@@ -437,44 +334,13 @@
       "type": "scenario",
       "label": "Release adopted in 30 days",
       "x": 520,
-      "y": 650,
-      "given": "a new release of the main framework",
+      "y": 520,
+      "given": "a new release cycle of the main framework",
       "when": "30 days have passed",
-      "then": "the service runs on it in production",
+      "then": "the service runs on it in production, and the version check fails otherwise",
       "hubWhen": {
         "UPGRADE": [
           "latest"
-        ]
-      }
-    },
-    {
-      "id": "sc-update-prs",
-      "type": "scenario",
-      "label": "Update proposed and merged",
-      "x": 520,
-      "y": 780,
-      "given": "a new patch version of a dependency",
-      "when": "it is published",
-      "then": "within 7 days a pull request updates it and merges itself once the tests pass",
-      "hubWhen": {
-        "UPDATES": [
-          "renovate",
-          "dependabot"
-        ]
-      }
-    },
-    {
-      "id": "sc-quarterly",
-      "type": "scenario",
-      "label": "Drift cleared each quarter",
-      "x": 520,
-      "y": 910,
-      "given": "the service's dependencies at the end of a quarter",
-      "when": "the drift report runs",
-      "then": "no direct dependency is more than one major version behind",
-      "hubWhen": {
-        "UPDATES": [
-          "manual"
         ]
       }
     },
@@ -483,10 +349,10 @@
       "type": "scenario",
       "label": "Two people can ship",
       "x": 520,
-      "y": 1040,
-      "given": "the owning team",
-      "when": "its members are reviewed each quarter",
-      "then": "at least two have merged production changes to the service in the last 12 months",
+      "y": 650,
+      "given": "the owning team's members and the service's history",
+      "when": "the authors of the last 12 months are counted",
+      "then": "at least two members of the team merged production changes to the service",
       "hubWhen": {
         "CRITERION": [
           "skills"
@@ -498,10 +364,10 @@
       "type": "scenario",
       "label": "Abandoned library flagged",
       "x": 520,
-      "y": 1170,
+      "y": 780,
       "given": "a pull request adding a library without a release for two years",
-      "when": "the dependency review runs",
-      "then": "it is flagged and cannot merge without a recorded reason",
+      "when": "the dependency check runs",
+      "then": "it fails and the pull request cannot merge without the dependency-exception label and the reviewer's reason",
       "hubWhen": {
         "CRITERION": [
           "ecosystem"
@@ -509,24 +375,14 @@
       }
     },
     {
-      "id": "sc-latency",
-      "type": "scenario",
-      "label": "Peak load within budget",
-      "x": 520,
-      "y": 1300,
-      "given": "the service deployed in a production-like environment",
-      "when": "a load test runs at {{PEAK_RPS}} requests per second for 10 minutes",
-      "then": "the 95th percentile stays within {{P95_MS}} ms and errors stay under 1%"
-    },
-    {
       "id": "sc-footprint",
       "type": "scenario",
       "label": "Instance stays within footprint",
       "x": 520,
-      "y": 1430,
-      "given": "the service under the peak-load test",
-      "when": "a new instance is started and the test runs for 10 minutes",
-      "then": "it is ready within {{STARTUP_SECONDS}} seconds and stays under {{MEMORY_MB}} MB",
+      "y": 910,
+      "given": "a release candidate's image",
+      "when": "one instance is started under a {{MEMORY_MB}} MB limit and the load test runs against it",
+      "then": "it is ready within {{STARTUP_SECONDS}} seconds, is not killed for memory, and its peak memory stays under {{MEMORY_MB}} MB",
       "hubWhen": {
         "CRITERION": [
           "performance"
@@ -542,9 +398,9 @@
       "concern": "backend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
-      "decision": "The service runs on the JVM: Java (or Kotlin where the team prefers it) on the newest LTS JDK from a supported distribution (Eclipse Temurin, Amazon Corretto or Microsoft Build of OpenJDK), with Spring Boot as the framework, built with Gradle or Maven. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (eclipse-temurin, spring-boot). Dependency updates: {{UPDATES}}. Choosing Java or Kotlin: Kotlin for null safety and concise domain code when the team knows it; Java when more people need to read it. Choosing Spring Boot or Quarkus: Spring Boot for the widest ecosystem; Quarkus (or Spring with GraalVM native image) when start-up time and memory matter, e.g. scale-to-zero.",
-      "consequences": "• The widest choice of enterprise libraries, drivers and SDKs, and many people who know it.\n• Higher memory use and slower start than Go or .NET native AOT, unless native images are used.\n• Spring Boot's major versions follow the JDK baseline; framework and JDK upgrades are planned together.\n• Long-lived LTS releases make the version policy easy to keep.",
+      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
+      "decision": "The service runs on the JVM: Java (or Kotlin where the team prefers it) on a JDK release the version policy allows, from a supported distribution (Eclipse Temurin, Amazon Corretto or Microsoft Build of OpenJDK), with Spring Boot as the framework, built with Gradle or Maven. Deciding factor: {{CRITERION}}. Version policy: {{UPGRADE}}; each version replaced at least {{EOL_DAYS}} days before its end of support, tracked through endoflife.date (eclipse-temurin, spring-boot). Footprint budget, held to when performance decides: at most {{MEMORY_MB}} MB per instance at peak, ready within {{STARTUP_SECONDS}} seconds. Dependency updates: as decided in the Dependency hygiene pack. Vulnerable dependencies: as decided in the Software supply chain pack. Latency and load: as decided in the Capacity and scaling pack. Choosing Java or Kotlin: Kotlin for null safety and concise domain code when the team knows it; Java when more people need to read it. Choosing Spring Boot or Quarkus: Spring Boot for the widest ecosystem; Quarkus (or Spring with GraalVM native image) when start-up time and memory matter, e.g. scale-to-zero.",
+      "consequences": "• The widest choice of enterprise libraries, drivers and SDKs, and many people who know it.\n• Higher memory use and slower start than Go or .NET native AOT, unless native images are used.\n• Spring Boot's major versions follow the JDK baseline; framework and JDK upgrades are planned together.\n• A new JDK every six months and an LTS every two years: the version policy sets whether that is one upgrade a year or one every two.",
       "alternatives": "1. .NET: similar maturity and performance, a single vendor stack.\n2. Go: smaller and faster to start, fewer enterprise libraries.\n3. Node.js (TypeScript): one language with the front end, weaker for CPU-heavy work.",
       "hubWhen": {
         "RUNTIME": [
@@ -561,9 +417,9 @@
       "concern": "backend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
-      "decision": "The service runs on .NET with C#, on the newest LTS release, with ASP.NET Core (minimal APIs or controllers) and Entity Framework Core or Dapper for data access. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; end of support tracked through endoflife.date (dotnet). Dependency updates: {{UPDATES}}. Choosing EF Core or Dapper: EF Core for domain models and migrations; Dapper where queries are hand-tuned. Native AOT only when start-up time matters and every library used supports trimming.",
-      "consequences": "• One coherent stack (language, web framework, ORM, test tooling) maintained by one vendor, with good performance.\n• LTS releases are supported for three years and come every two years, so the version policy needs an upgrade at least every two to three years.\n• Fewer open-source libraries than the JVM or Node.js for some niches.\n• Strong fit with Azure and Microsoft identity; runs equally on Linux containers.",
+      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
+      "decision": "The service runs on .NET with C#, on a release the version policy allows (an LTS every two years, supported three years; an STS in between, supported two), with ASP.NET Core (minimal APIs or controllers) and Entity Framework Core or Dapper for data access. Deciding factor: {{CRITERION}}. Version policy: {{UPGRADE}}; each version replaced at least {{EOL_DAYS}} days before its end of support, tracked through endoflife.date (dotnet). Footprint budget, held to when performance decides: at most {{MEMORY_MB}} MB per instance at peak, ready within {{STARTUP_SECONDS}} seconds. Dependency updates: as decided in the Dependency hygiene pack. Vulnerable dependencies: as decided in the Software supply chain pack. Latency and load: as decided in the Capacity and scaling pack. Choosing EF Core or Dapper: EF Core for domain models and migrations; Dapper where queries are hand-tuned. Native AOT only when start-up time matters and every library used supports trimming.",
+      "consequences": "• One coherent stack (language, web framework, ORM, test tooling) maintained by one vendor, with good performance.\n• A release every November: the version policy decides whether every one is adopted or only the LTS ones, every two years.\n• Fewer open-source libraries than the JVM or Node.js for some niches.\n• Strong fit with Azure and Microsoft identity; runs equally on Linux containers.",
       "alternatives": "1. The JVM with Spring Boot: the widest ecosystem.\n2. Go: smaller and simpler, fewer abstractions.\n3. Node.js (TypeScript): shares the language with the front end.",
       "hubWhen": {
         "RUNTIME": [
@@ -580,9 +436,9 @@
       "concern": "backend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
-      "decision": "The service runs on Node.js, on an Active or Maintenance LTS release line (even-numbered majors), written in TypeScript in strict mode, with Fastify or NestJS as the framework (Express only for small services). Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in .nvmrc and the base image, end of support tracked through endoflife.date (nodejs). Dependency updates: {{UPDATES}}; lockfile committed, installs with npm ci. Choosing Fastify or NestJS: Fastify for lean APIs and speed; NestJS when the team wants modules and dependency injection in a larger codebase.",
-      "consequences": "• One language across the front end and back end; types can be shared through generated contracts.\n• Very large package ecosystem, of very uneven quality: dependencies need review and updates more often than elsewhere.\n• Single-threaded event loop: excellent for I/O-bound APIs, poor for CPU-heavy work, which goes to worker threads or another service.\n• Each LTS line is supported for about 30 months, so expect a runtime upgrade at least every year or two.",
+      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
+      "decision": "The service runs on Node.js, on a release line the version policy allows (the even-numbered majors become LTS lines), written in TypeScript in strict mode, with Fastify or NestJS as the framework (Express only for small services). Deciding factor: {{CRITERION}}. Version policy: {{UPGRADE}}; the version is pinned in .nvmrc and the base image, replaced at least {{EOL_DAYS}} days before its end of support, tracked through endoflife.date (nodejs). Footprint budget, held to when performance decides: at most {{MEMORY_MB}} MB per instance at peak, ready within {{STARTUP_SECONDS}} seconds. Dependency updates: as decided in the Dependency hygiene pack. Vulnerable dependencies: as decided in the Software supply chain pack. Latency and load: as decided in the Capacity and scaling pack. Choosing Fastify or NestJS: Fastify for lean APIs and speed; NestJS when the team wants modules and dependency injection in a larger codebase.",
+      "consequences": "• One language across the front end and back end; types can be shared through generated contracts.\n• Very large package ecosystem, of very uneven quality: dependencies need review and updates more often than elsewhere.\n• Single-threaded event loop: excellent for I/O-bound APIs, poor for CPU-heavy work, which goes to worker threads or another service.\n• A new major every six months and an LTS line every year, each supported about 30 months: the version policy sets the upgrade rhythm.",
       "alternatives": "1. Go: better for CPU-bound and high-throughput services, a separate language from the front end.\n2. The JVM or .NET: more structure and performance for large business domains.\n3. Deno or Bun: modern runtimes with built-in tooling, younger ecosystems and support policies.",
       "hubWhen": {
         "RUNTIME": [
@@ -599,8 +455,8 @@
       "concern": "backend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
-      "decision": "The service is written in Go, on one of the two latest Go releases (the ones the Go team supports), using the standard library's net/http with a thin router (chi or the standard ServeMux) rather than a large framework, sqlc or pgx for data access, and distroless or scratch base images. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the toolchain is pinned in go.mod, end of support tracked through endoflife.date (go). Dependency updates: {{UPDATES}}; govulncheck runs in every build.",
+      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
+      "decision": "The service is written in Go, on a release the version policy allows (the Go team supports the two latest releases), using the standard library's net/http with a thin router (chi or the standard ServeMux) rather than a large framework, sqlc or pgx for data access, and distroless or scratch base images. Deciding factor: {{CRITERION}}. Version policy: {{UPGRADE}}; the toolchain is pinned in go.mod, replaced at least {{EOL_DAYS}} days before its end of support, tracked through endoflife.date (go). Footprint budget, held to when performance decides: at most {{MEMORY_MB}} MB per instance at peak, ready within {{STARTUP_SECONDS}} seconds. Dependency updates: as decided in the Dependency hygiene pack. Vulnerable dependencies: as decided in the Software supply chain pack. Latency and load: as decided in the Capacity and scaling pack.",
       "consequences": "• Small static binaries, start-up in milliseconds, low memory: cheap to run and to scale.\n• Each Go release is supported for about a year, so the toolchain is upgraded every six to twelve months; the Go 1 compatibility promise makes that routine.\n• Fewer high-level libraries (ORMs, enterprise SDKs); more code written by hand.\n• Simple language, fast to learn; less expressive for rich domain models.",
       "alternatives": "1. The JVM or .NET: richer frameworks for large business domains, heavier to run.\n2. Rust: more control and safety, slower to write and to learn.\n3. Node.js (TypeScript): one language with the front end, weaker under CPU load.",
       "hubWhen": {
@@ -618,10 +474,85 @@
       "concern": "backend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (latency, memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
-      "decision": "The service is written in Python on a supported 3.x release (bugfix or security phase), with FastAPI (async APIs, Pydantic models) or Django (data-heavy apps with an admin), type-checked with mypy or pyright and linted with Ruff, dependencies locked with uv or Poetry. Deciding factor: {{CRITERION}}. Versions: {{RUNTIME}} at {{UPGRADE}}; the version is pinned in pyproject.toml and the base image, end of support tracked through endoflife.date (python, django). Dependency updates: {{UPDATES}}. Choosing FastAPI or Django: FastAPI for APIs and model serving; Django when the service owns a relational data model and needs an admin and its migrations.",
-      "consequences": "• Direct access to the data and machine-learning ecosystem (NumPy, pandas, PyTorch, scikit-learn).\n• Slower and more memory-hungry per request than the JVM, .NET or Go; CPU-heavy work goes to native libraries or worker processes.\n• Dynamic typing needs type checking in the build to keep a large codebase safe to change.\n• Each Python release is supported for five years; a new one every October.",
+      "context": "This element is a server-side service, and the runtime, language and main framework it is written in will outlive most of the people who chose them. The forces: the team's skills decide how fast and how safely it can work, and hiring follows the choice; the ecosystem decides which libraries, drivers and SDKs exist and are maintained; runtimes and frameworks reach end of support on published dates, after which security fixes stop; performance (memory, start-up time) matters where load or cost is high and rarely elsewhere; every dependency added is code someone else maintains, at their pace; and upgrades put off for years turn into rewrites.",
+      "decision": "The service is written in Python on a 3.x release the version policy allows (each supported five years, a new one every October), with FastAPI (async APIs, Pydantic models) or Django (data-heavy apps with an admin), type-checked with mypy or pyright and linted with Ruff, dependencies locked with uv or Poetry. Deciding factor: {{CRITERION}}. Version policy: {{UPGRADE}}; the version is pinned in pyproject.toml and the base image, replaced at least {{EOL_DAYS}} days before its end of support, tracked through endoflife.date (python, django). Footprint budget, held to when performance decides: at most {{MEMORY_MB}} MB per instance at peak, ready within {{STARTUP_SECONDS}} seconds. Dependency updates: as decided in the Dependency hygiene pack. Vulnerable dependencies: as decided in the Software supply chain pack. Latency and load: as decided in the Capacity and scaling pack. Choosing FastAPI or Django: FastAPI for APIs and model serving; Django when the service owns a relational data model and needs an admin and its migrations.",
+      "consequences": "• Direct access to the data and machine-learning ecosystem (NumPy, pandas, PyTorch, scikit-learn).\n• Slower and more memory-hungry per request than the JVM, .NET or Go; CPU-heavy work goes to native libraries or worker processes.\n• Dynamic typing needs type checking in the build to keep a large codebase safe to change.\n• A new release every October, each supported five years: the version policy sets how many are skipped.",
       "alternatives": "1. Go or the JVM for the request-handling service, with Python only where models run.\n2. Node.js (TypeScript): faster for I/O-bound APIs, weaker data ecosystem.\n3. Notebooks deployed as services: quick, but neither testable nor maintainable.",
+      "hubWhen": {
+        "RUNTIME": [
+          "python"
+        ]
+      }
+    },
+    {
+      "id": "ff-only-jvm",
+      "type": "fitness-fn",
+      "label": "Only the JVM",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "100% of Dockerfiles end in a stage FROM a JVM image; 0 build manifests of another runtime outside .stack-exceptions",
+      "description": "A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a JVM image or on a manifest of another runtime (*.csproj, *package.json, *go.mod, *pyproject.toml, *requirements.txt). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).\n\nTool: git with awk and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# Only the JVM: the final-stage base images and the build manifests of the repository\nset -euo pipefail\nAPPROVED='^(eclipse-temurin|amazoncorretto|mcr\\.microsoft\\.com/openjdk/jdk|gcr\\.io/distroless/java[0-9]*(-debian[0-9]+)?)(:|@|$)'\nFOREIGN=('*.csproj' '*package.json' '*go.mod' '*pyproject.toml' '*requirements.txt')\nfail=0\nfor df in $(git ls-files -- '*Dockerfile*'); do\n  final=$(awk 'toupper($1)==\"FROM\" { img=\"\"; for (i=2;i<=NF;i++) if ($i !~ /^--/) { img=$i; break }\n                                    if (img in alias) img=alias[img]\n                                    for (i=2;i<=NF;i++) if (toupper($i)==\"AS\") alias[$(i+1)]=img\n                                    final=img } END { print final }' \"$df\")\n  [[ \"$final\" =~ $APPROVED ]] || { echo \"::error file=$df::final stage FROM $final is not a JVM image (ADR Built on the JVM)\"; fail=1; }\ndone\nforeign=$(git ls-files -- \"${FOREIGN[@]}\" | grep -vxFf <(cat .stack-exceptions 2>/dev/null) || true)\n[ -z \"$foreign\" ] || { echo \"::error::build manifests of another runtime: $(tr '\\n' ' ' <<<\"$foreign\")\"; fail=1; }\nexit $fail\n```",
+      "hubWhen": {
+        "RUNTIME": [
+          "jvm"
+        ]
+      }
+    },
+    {
+      "id": "ff-only-dotnet",
+      "type": "fitness-fn",
+      "label": "Only .NET",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "100% of Dockerfiles end in a stage FROM a .NET image; 0 build manifests of another runtime outside .stack-exceptions",
+      "description": "A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a .NET image or on a manifest of another runtime (*pom.xml, *build.gradle*, *package.json, *go.mod, *pyproject.toml, *requirements.txt). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).\n\nTool: git with awk and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# Only .NET: the final-stage base images and the build manifests of the repository\nset -euo pipefail\nAPPROVED='^(mcr\\.microsoft\\.com/dotnet/(aspnet|runtime|runtime-deps))(:|@|$)'\nFOREIGN=('*pom.xml' '*build.gradle*' '*package.json' '*go.mod' '*pyproject.toml' '*requirements.txt')\nfail=0\nfor df in $(git ls-files -- '*Dockerfile*'); do\n  final=$(awk 'toupper($1)==\"FROM\" { img=\"\"; for (i=2;i<=NF;i++) if ($i !~ /^--/) { img=$i; break }\n                                    if (img in alias) img=alias[img]\n                                    for (i=2;i<=NF;i++) if (toupper($i)==\"AS\") alias[$(i+1)]=img\n                                    final=img } END { print final }' \"$df\")\n  [[ \"$final\" =~ $APPROVED ]] || { echo \"::error file=$df::final stage FROM $final is not a .NET image (ADR Built on .NET)\"; fail=1; }\ndone\nforeign=$(git ls-files -- \"${FOREIGN[@]}\" | grep -vxFf <(cat .stack-exceptions 2>/dev/null) || true)\n[ -z \"$foreign\" ] || { echo \"::error::build manifests of another runtime: $(tr '\\n' ' ' <<<\"$foreign\")\"; fail=1; }\nexit $fail\n```",
+      "hubWhen": {
+        "RUNTIME": [
+          "dotnet"
+        ]
+      }
+    },
+    {
+      "id": "ff-only-node",
+      "type": "fitness-fn",
+      "label": "Only Node.js",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "100% of Dockerfiles end in a stage FROM a Node.js image; 0 build manifests of another runtime outside .stack-exceptions",
+      "description": "A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a Node.js image or on a manifest of another runtime (*pom.xml, *build.gradle*, *.csproj, *go.mod, *pyproject.toml, *requirements.txt). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).\n\nTool: git with awk and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# Only Node.js: the final-stage base images and the build manifests of the repository\nset -euo pipefail\nAPPROVED='^(node|cgr\\.dev/chainguard/node|gcr\\.io/distroless/nodejs[0-9]*(-debian[0-9]+)?)(:|@|$)'\nFOREIGN=('*pom.xml' '*build.gradle*' '*.csproj' '*go.mod' '*pyproject.toml' '*requirements.txt')\nfail=0\nfor df in $(git ls-files -- '*Dockerfile*'); do\n  final=$(awk 'toupper($1)==\"FROM\" { img=\"\"; for (i=2;i<=NF;i++) if ($i !~ /^--/) { img=$i; break }\n                                    if (img in alias) img=alias[img]\n                                    for (i=2;i<=NF;i++) if (toupper($i)==\"AS\") alias[$(i+1)]=img\n                                    final=img } END { print final }' \"$df\")\n  [[ \"$final\" =~ $APPROVED ]] || { echo \"::error file=$df::final stage FROM $final is not a Node.js image (ADR Built on Node.js)\"; fail=1; }\ndone\nforeign=$(git ls-files -- \"${FOREIGN[@]}\" | grep -vxFf <(cat .stack-exceptions 2>/dev/null) || true)\n[ -z \"$foreign\" ] || { echo \"::error::build manifests of another runtime: $(tr '\\n' ' ' <<<\"$foreign\")\"; fail=1; }\nexit $fail\n```",
+      "hubWhen": {
+        "RUNTIME": [
+          "node"
+        ]
+      }
+    },
+    {
+      "id": "ff-only-go",
+      "type": "fitness-fn",
+      "label": "Only Go",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "100% of Dockerfiles end in a stage FROM a Go image; 0 build manifests of another runtime outside .stack-exceptions",
+      "description": "A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a Go image or on a manifest of another runtime (*pom.xml, *build.gradle*, *.csproj, *package.json, *pyproject.toml, *requirements.txt). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).\n\nTool: git with awk and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# Only Go: the final-stage base images and the build manifests of the repository\nset -euo pipefail\nAPPROVED='^(scratch|gcr\\.io/distroless/(static|base)(-debian[0-9]+)?|cgr\\.dev/chainguard/static|alpine)(:|@|$)'\nFOREIGN=('*pom.xml' '*build.gradle*' '*.csproj' '*package.json' '*pyproject.toml' '*requirements.txt')\nfail=0\nfor df in $(git ls-files -- '*Dockerfile*'); do\n  final=$(awk 'toupper($1)==\"FROM\" { img=\"\"; for (i=2;i<=NF;i++) if ($i !~ /^--/) { img=$i; break }\n                                    if (img in alias) img=alias[img]\n                                    for (i=2;i<=NF;i++) if (toupper($i)==\"AS\") alias[$(i+1)]=img\n                                    final=img } END { print final }' \"$df\")\n  [[ \"$final\" =~ $APPROVED ]] || { echo \"::error file=$df::final stage FROM $final is not a Go image (ADR Built on Go)\"; fail=1; }\ndone\nforeign=$(git ls-files -- \"${FOREIGN[@]}\" | grep -vxFf <(cat .stack-exceptions 2>/dev/null) || true)\n[ -z \"$foreign\" ] || { echo \"::error::build manifests of another runtime: $(tr '\\n' ' ' <<<\"$foreign\")\"; fail=1; }\nexit $fail\n```",
+      "hubWhen": {
+        "RUNTIME": [
+          "go"
+        ]
+      }
+    },
+    {
+      "id": "ff-only-python",
+      "type": "fitness-fn",
+      "label": "Only Python",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "100% of Dockerfiles end in a stage FROM a Python image; 0 build manifests of another runtime outside .stack-exceptions",
+      "description": "A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a Python image or on a manifest of another runtime (*pom.xml, *build.gradle*, *.csproj, *package.json, *go.mod). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).\n\nTool: git with awk and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# Only Python: the final-stage base images and the build manifests of the repository\nset -euo pipefail\nAPPROVED='^(python|cgr\\.dev/chainguard/python|gcr\\.io/distroless/python3(-debian[0-9]+)?)(:|@|$)'\nFOREIGN=('*pom.xml' '*build.gradle*' '*.csproj' '*package.json' '*go.mod')\nfail=0\nfor df in $(git ls-files -- '*Dockerfile*'); do\n  final=$(awk 'toupper($1)==\"FROM\" { img=\"\"; for (i=2;i<=NF;i++) if ($i !~ /^--/) { img=$i; break }\n                                    if (img in alias) img=alias[img]\n                                    for (i=2;i<=NF;i++) if (toupper($i)==\"AS\") alias[$(i+1)]=img\n                                    final=img } END { print final }' \"$df\")\n  [[ \"$final\" =~ $APPROVED ]] || { echo \"::error file=$df::final stage FROM $final is not a Python image (ADR Built on Python)\"; fail=1; }\ndone\nforeign=$(git ls-files -- \"${FOREIGN[@]}\" | grep -vxFf <(cat .stack-exceptions 2>/dev/null) || true)\n[ -z \"$foreign\" ] || { echo \"::error::build manifests of another runtime: $(tr '\\n' ' ' <<<\"$foreign\")\"; fail=1; }\nexit $fail\n```",
       "hubWhen": {
         "RUNTIME": [
           "python"
@@ -633,85 +564,80 @@
       "type": "fitness-fn",
       "label": "No version near end of support",
       "x": 1040,
-      "y": 0,
+      "y": 650,
       "category": "operational",
       "threshold": "0 runtime, framework or base image versions within {{EOL_DAYS}} days of their end of support",
-      "description": "A scheduled job and every build look up each version in use on endoflife.date and fail when its end of support is less than {{EOL_DAYS}} days away. The list of products and cycles is read from the build files (.nvmrc, go.mod, pom.xml, global.json, pyproject.toml) or kept next to them.\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\", e.g. \"nodejs 22\", \"spring-boot 3.5\", \"python 3.13\"\nset -euo pipefail\nLIMIT=$(( $(date +%s) + {{EOL_DAYS}} * 86400 ))\nfail=0\nwhile read -r product cycle; do\n  eol=$(curl -fsS \"https://endoflife.date/api/${product}/${cycle}.json\" | jq -r '.eol')\n  [ \"$eol\" = \"false\" ] && continue\n  if [ \"$eol\" = \"true\" ] || [ \"$(date -d \"$eol\" +%s)\" -lt \"$LIMIT\" ]; then\n    echo \"::error::$product $cycle reaches end of support on $eol\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```"
+      "description": "A scheduled job and every build look up each product and cycle listed in versions.txt on endoflife.date and fail when its end of support is less than {{EOL_DAYS}} days away. versions.txt is kept next to the build files and changed in the same pull request as .nvmrc, go.mod, pom.xml, global.json or pyproject.toml. Runs on Linux (GNU date).\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\" per line, e.g. \"nodejs 24\", \"spring-boot 3.5\", \"python 3.13\"\n# runs on Linux (GNU date); curl and jq\nset -euo pipefail\nfail=0\nwhile read -r product cycle; do\n  eol=$(curl -fsS \"https://endoflife.date/api/${product}/${cycle}.json\" | jq -r '.eol')\n  [ \"$eol\" = \"false\" ] && continue\n  if [ \"$eol\" = \"true\" ] || [ \"$(date -d \"$eol\" +%s)\" -lt $(( $(date +%s) + {{EOL_DAYS}} * 86400 )) ]; then\n    echo \"::error::$product $cycle reaches end of support on $eol\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```"
     },
     {
-      "id": "ff-vulns",
+      "id": "ff-upgrade-lts",
       "type": "fitness-fn",
-      "label": "No unpatched high vulnerabilities",
+      "label": "On a current LTS",
       "x": 1040,
-      "y": 130,
+      "y": 780,
       "category": "operational",
-      "threshold": "0 high or critical vulnerabilities in the image or dependencies, except entries in .trivyignore whose expiry is at most {{PATCH_DAYS}} days after they were added",
-      "description": "Trivy scans the built image (runtime, base image and application dependencies) in every build and nightly; a high or critical finding fails it. An exception is a .trivyignore line with an expiry date, so it fails again when the deadline passes.\n\nTool: Trivy\n\n```yaml\n# .github/workflows/scan.yml (job step)\n- uses: aquasecurity/trivy-action@0.28.0\n  with:\n    image-ref: ${{ env.IMAGE }}\n    severity: HIGH,CRITICAL\n    ignore-unfixed: true\n    exit-code: '1'\n    trivyignores: .trivyignore\n# .trivyignore — every exception expires:\n# CVE-2026-12345 exp:2026-11-05   # mitigated by WAF rule 42, fix pending upstream\n```"
-    },
-    {
-      "id": "ff-base-image",
-      "type": "fitness-fn",
-      "label": "Only the chosen runtime",
-      "x": 1040,
-      "y": 260,
-      "category": "structural",
-      "threshold": "100% of Dockerfile stages start FROM an approved image of the chosen runtime",
-      "description": "A policy over every Dockerfile fails the build when a stage starts from an image that is not on the approved list; keep only the images of the chosen runtime on it.\n\nTool: Conftest (Open Policy Agent)\n\n```rego\n# policy/dockerfile.rego — conftest test Dockerfile\npackage main\nimport rego.v1\n\napproved := {\n  \"eclipse-temurin\", \"mcr.microsoft.com/dotnet/aspnet\", \"node\",\n  \"gcr.io/distroless/static-debian12\", \"python\",\n}\n\ndeny contains msg if {\n  some instr in input\n  instr.Cmd == \"from\"\n  image := split(instr.Value[0], \":\")[0]\n  not approved[image]\n  msg := sprintf(\"%s is not an approved base image (ADR Backend stack)\", [image])\n}\n```"
-    },
-    {
-      "id": "ff-renovate",
-      "type": "fitness-fn",
-      "label": "Renovate keeps versions current",
-      "x": 1040,
-      "y": 390,
-      "category": "process",
-      "threshold": "Update pull requests opened within 7 days of a release; patches merged automatically on green tests; 0 update pull requests open over 30 days",
-      "description": "Renovate updates libraries, the runtime version files and base images; patch and minor updates merge automatically when the tests pass, majors wait for review, and the dependency dashboard lists what is pending.\n\nTool: Renovate\n\n```json\n{\n  \"$schema\": \"https://docs.renovatebot.com/renovate-schema.json\",\n  \"extends\": [\"config:recommended\", \":dependencyDashboard\", \"docker:pinDigests\"],\n  \"schedule\": [\"before 6am on monday\"],\n  \"minimumReleaseAge\": \"3 days\",\n  \"vulnerabilityAlerts\": { \"schedule\": [\"at any time\"], \"labels\": [\"security\"] },\n  \"packageRules\": [\n    { \"matchUpdateTypes\": [\"patch\", \"minor\"], \"matchCurrentVersion\": \"!/^0/\", \"automerge\": true },\n    { \"matchUpdateTypes\": [\"major\"], \"labels\": [\"major-update\"] }\n  ]\n}\n```",
+      "threshold": "Every cycle in versions.txt is an LTS cycle, and is the newest LTS cycle unless that one was released less than 180 days ago",
+      "description": "A scheduled job reads every product's cycles from endoflife.date: the cycle in use must be marked LTS (already, not from a future date), and the newest LTS cycle must be the one in use or younger than six months. Go and Python have no LTS cycles, so the check fails for them: pick another version policy. Runs on Linux (GNU date).\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\" per line, e.g. \"nodejs 24\", \"spring-boot 3.5\", \"python 3.13\"\n# runs on Linux (GNU date); curl and jq\nset -euo pipefail\nfail=0\nwhile read -r product cycle; do\n  all=$(curl -fsS \"https://endoflife.date/api/${product}.json\")\n  today=$(date +%F)\n  jq -e --arg c \"$cycle\" --arg today \"$today\" \\\n    '.[] | select((.cycle|tostring) == $c) | .lts == true or ((.lts|type) == \"string\" and .lts <= $today)' <<<\"$all\" >/dev/null \\\n    || { echo \"::error::$product $cycle is not an LTS cycle\"; fail=1; continue; }\n  read -r newest released < <(jq -r --arg today \"$today\" \\\n    '[.[] | select(.lts == true or ((.lts|type) == \"string\" and .lts <= $today))][0] | \"\\(.cycle) \\(.releaseDate)\"' <<<\"$all\")\n  if [ \"$newest\" != \"$cycle\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '180 days ago' +%s)\" ]; then\n    echo \"::error::$product $cycle: LTS $newest has been out since $released (6 months allowed)\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```",
       "hubWhen": {
-        "UPDATES": [
-          "renovate"
+        "UPGRADE": [
+          "lts"
         ]
       }
     },
     {
-      "id": "ff-dependabot",
+      "id": "ff-upgrade-n1",
       "type": "fitness-fn",
-      "label": "Dependabot keeps versions current",
+      "label": "At most one cycle behind",
       "x": 1040,
-      "y": 520,
-      "category": "process",
-      "threshold": "Update pull requests opened weekly; patches merged automatically on green tests; 0 update pull requests open over 30 days",
-      "description": "Dependabot opens weekly update pull requests for the application dependencies, the base image and the workflow actions; a workflow enables auto-merge for patch updates, which merge once the required checks pass.\n\nTool: Dependabot\n\n```yaml\n# .github/dependabot.yml\nversion: 2\nupdates:\n  - package-ecosystem: npm          # maven, gradle, nuget, gomod, pip, uv...\n    directory: /\n    schedule: { interval: weekly }\n    groups:\n      minor-and-patch: { update-types: [minor, patch] }\n  - package-ecosystem: docker\n    directory: /\n    schedule: { interval: weekly }\n  - package-ecosystem: github-actions\n    directory: /\n    schedule: { interval: weekly }\n# auto-merge: a workflow with dependabot/fetch-metadata@v2 runs\n#   gh pr merge --auto --squash \"$PR_URL\"  when update-type is semver-patch\n```",
+      "y": 910,
+      "category": "operational",
+      "threshold": "Every cycle in versions.txt is the newest or the second-newest cycle endoflife.date lists for its product",
+      "description": "A scheduled job reads every product's cycles from endoflife.date (newest first) and fails when the cycle in use is not among the first two.\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\" per line, e.g. \"nodejs 24\", \"spring-boot 3.5\", \"python 3.13\"\n# runs on Linux (GNU date); curl and jq\nset -euo pipefail\nfail=0\nwhile read -r product cycle; do\n  idx=$(curl -fsS \"https://endoflife.date/api/${product}.json\" | jq --arg c \"$cycle\" 'map(.cycle|tostring) | index($c)')\n  if [ \"$idx\" = null ] || [ \"$idx\" -gt 1 ]; then\n    echo \"::error::$product $cycle is more than one release cycle behind the latest\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```",
       "hubWhen": {
-        "UPDATES": [
-          "dependabot"
+        "UPGRADE": [
+          "n1"
         ]
       }
     },
     {
-      "id": "ff-drift",
+      "id": "ff-upgrade-latest",
       "type": "fitness-fn",
-      "label": "Dependency drift report",
+      "label": "On the latest cycle",
       "x": 1040,
-      "y": 650,
-      "category": "process",
-      "threshold": "0 direct dependencies more than one major version behind at the end of each quarter",
-      "description": "A scheduled job lists outdated direct dependencies and fails when any is more than one major version behind its latest release. On the JVM, the versions-maven-plugin (display-dependency-updates) or the Gradle versions plugin gives the same list.\n\nTool: npm outdated with jq\n\n```bash\n#!/usr/bin/env bash\n# fails when a direct dependency is two or more majors behind\nbehind=$(npm outdated --json | jq -r '\n  to_entries[]\n  | select(.value.current != null)\n  | select((.value.latest | split(\".\")[0] | tonumber) - (.value.current | split(\".\")[0] | tonumber) >= 2)\n  | \"\\(.key) \\(.value.current) -> \\(.value.latest)\"')\n[ -z \"$behind\" ] || { echo \"More than one major behind:\"; echo \"$behind\"; exit 1; }\n```",
+      "y": 1040,
+      "category": "operational",
+      "threshold": "Every cycle in versions.txt is the newest cycle endoflife.date lists for its product, unless that one was released less than 30 days ago",
+      "description": "A scheduled job reads every product's newest cycle and its release date from endoflife.date and fails when the cycle in use is older and the newest has been out for 30 days or more. Runs on Linux (GNU date).\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\" per line, e.g. \"nodejs 24\", \"spring-boot 3.5\", \"python 3.13\"\n# runs on Linux (GNU date); curl and jq\nset -euo pipefail\nfail=0\nwhile read -r product cycle; do\n  read -r newest released < <(curl -fsS \"https://endoflife.date/api/${product}.json\" | jq -r '.[0] | \"\\(.cycle) \\(.releaseDate)\"')\n  if [ \"$newest\" != \"$cycle\" ] && [ \"$(date -d \"$released\" +%s)\" -lt \"$(date -d '30 days ago' +%s)\" ]; then\n    echo \"::error::$product $cycle: $newest released on $released (30 days allowed)\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```",
       "hubWhen": {
-        "UPDATES": [
-          "manual"
+        "UPGRADE": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "ff-skills",
+      "type": "fitness-fn",
+      "label": "Two of the team ship",
+      "x": 1040,
+      "y": 1170,
+      "category": "process",
+      "threshold": "At least 2 members of the owning team (team.txt) authored non-merge commits to the service in the last 12 months",
+      "description": "A scheduled job counts the distinct authors of the last 12 months of commits on the service's path and keeps those whose e-mail address is in team.txt, the owning team's list kept next to CODEOWNERS; fewer than two fails. Needs the full history (fetch-depth 0).\n\nTool: git log (scheduled job)\n\n```bash\n#!/usr/bin/env bash\n# team.txt: one e-mail address of the owning team per line, kept next to CODEOWNERS\nset -euo pipefail\nn=$(git log --since='12 months ago' --no-merges --format=%ae -- . | sort -u | grep -cxFf team.txt || true)\n[ \"$n\" -ge 2 ] || { echo \"::error::only $n of the owning team merged a change to the service in 12 months (2 needed)\"; exit 1; }\n```",
+      "hubWhen": {
+        "CRITERION": [
+          "skills"
         ]
       }
     },
     {
       "id": "ff-dep-review",
       "type": "fitness-fn",
-      "label": "New dependencies reviewed",
+      "label": "New dependencies maintained",
       "x": 1040,
-      "y": 780,
+      "y": 1300,
       "category": "process",
-      "threshold": "Every new direct dependency shows its OpenSSF Scorecard in the pull request; scores below 5 and high-severity advisories fail the check",
-      "description": "GitHub's dependency review action runs on every pull request that changes a manifest: it fails on known vulnerable versions and shows each new dependency's OpenSSF Scorecard, warning below the level set.\n\nTool: GitHub dependency-review-action with OpenSSF Scorecard\n\n```yaml\n# .github/workflows/dependency-review.yml\nname: dependency review\non: [pull_request]\njobs:\n  review:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/dependency-review-action@v4\n        with:\n          fail-on-severity: high\n          show-openssf-scorecard: true\n          warn-on-openssf-scorecard-level: 5\n```",
+      "threshold": "Every direct dependency a pull request adds had a release within 365 days and has an OpenSSF Scorecard of at least 5, or the pull request carries the label dependency-exception",
+      "description": "The pipeline runs the script for each direct dependency the pull request adds to the manifest (name from the manifest diff): deps.dev gives the package's newest publication date and its source repository's Scorecard, for npm, PyPI, Maven, Go and NuGet alike. A failing dependency passes only with the label dependency-exception, which the reviewer adds with the reason in the review. Runs on Linux (GNU date).\n\nTool: deps.dev API (curl and jq) with the GitHub CLI\n\n```bash\n#!/usr/bin/env bash\n# check-dependency.sh <system> <package>: system is npm, pypi, maven (group:artifact), go or nuget\nset -euo pipefail\nsystem=$1; name=$(jq -rn --arg n \"$2\" '$n | @uri')\npkg=$(curl -fsS \"https://api.deps.dev/v3/systems/${system}/packages/${name}\")\nnewest=$(jq -r '[.versions[].publishedAt] | max' <<<\"$pkg\")\nversion=$(jq -r '.versions[] | select(.isDefault) | .versionKey.version' <<<\"$pkg\")\nproject=$(curl -fsS \"https://api.deps.dev/v3/systems/${system}/packages/${name}/versions/${version}\" \\\n  | jq -r '[.relatedProjects[] | select(.relationType == \"SOURCE_REPO\")][0].projectKey.id // empty')\nscore=0\n[ -z \"$project\" ] || score=$(curl -fsS \"https://api.deps.dev/v3/projects/$(jq -rn --arg p \"$project\" '$p | @uri')\" | jq -r '.scorecard.overallScore // 0')\nfail=0\n[ \"$(date -d \"$newest\" +%s)\" -ge \"$(date -d '365 days ago' +%s)\" ] || { echo \"::error::$2: newest release $newest, more than 12 months ago\"; fail=1; }\n[ \"$(jq -n \"$score >= 5\")\" = true ] || { echo \"::error::$2: OpenSSF Scorecard $score (5 needed; project: ${project:-unknown})\"; fail=1; }\nif [ \"$fail\" = 1 ] && gh pr view \"$PR_NUMBER\" --json labels -q '.labels[].name' | grep -qx dependency-exception; then\n  echo \"accepted: the pull request carries dependency-exception with the reviewer's reason\"; fail=0\nfi\nexit $fail\n```",
       "hubWhen": {
         "CRITERION": [
           "ecosystem"
@@ -719,14 +645,19 @@
       }
     },
     {
-      "id": "ff-load",
+      "id": "ff-footprint",
       "type": "fitness-fn",
-      "label": "Latency budget holds",
+      "label": "Footprint within budget",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "operational",
-      "threshold": "95th percentile below {{P95_MS}} ms and under 1% errors at {{PEAK_RPS}} requests per second, on every release candidate",
-      "description": "A k6 load test runs against a production-like environment for each release candidate; its thresholds fail the run when the 95th percentile or the error rate exceeds the target.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nexport const options = {\n  scenarios: {\n    peak: { executor: 'constant-arrival-rate', rate: {{PEAK_RPS}}, timeUnit: '1s', duration: '10m', preAllocatedVUs: 100 },\n  },\n  thresholds: {\n    http_req_duration: ['p(95)<{{P95_MS}}'],\n    http_req_failed: ['rate<0.01'],\n  },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders?page=1`)\n  check(res, { 'status is 200': (r) => r.status === 200 })\n}\n```"
+      "threshold": "A new instance answers its readiness probe within {{STARTUP_SECONDS}} seconds; under the load test its peak memory stays at or under {{MEMORY_MB}} MB and it is not killed for memory",
+      "description": "For each release candidate the job starts one instance of the image under a hard memory limit of {{MEMORY_MB}} MB, polls its readiness endpoint until it answers (failing past {{STARTUP_SECONDS}} seconds), runs the load test the Capacity and scaling pack decided against it, then reads the container's peak memory from cgroup v2 (memory.peak) and whether it was killed for memory. Runs on a Linux host with cgroup v2 (kernel 5.19 or newer).\n\nTool: Docker with curl and jq (release pipeline)\n\n```bash\n#!/usr/bin/env bash\n# IMAGE: the release candidate; LOAD_TEST: the k6 command of the Capacity and scaling pack, run against localhost:8080\nset -euo pipefail\nc=$(docker run -d --memory={{MEMORY_MB}}m -p 8080:8080 \"$IMAGE\")\ntrap 'docker rm -f \"$c\" >/dev/null' EXIT\nstart=$(date +%s)\nuntil curl -fsS localhost:8080/health/ready >/dev/null 2>&1; do\n  sleep 1\n  [ $(( $(date +%s) - start )) -lt {{STARTUP_SECONDS}} ] || { echo \"not ready within {{STARTUP_SECONDS}} s\"; exit 1; }\ndone\necho \"ready after $(( $(date +%s) - start )) s\"\nbash -c \"$LOAD_TEST\"\npeak=$(docker exec \"$c\" cat /sys/fs/cgroup/memory.peak)\noom=$(docker inspect \"$c\" | jq -r '.[0].State.OOMKilled')\n[ \"$oom\" = false ] && [ \"$peak\" -le $(( {{MEMORY_MB}} * 1024 * 1024 )) ] \\\n  || { echo \"peak $(( peak / 1024 / 1024 )) MB of {{MEMORY_MB}} MB, killed for memory: $oom\"; exit 1; }\n```",
+      "hubWhen": {
+        "CRITERION": [
+          "performance"
+        ]
+      }
     }
   ],
   "relations": [
@@ -739,12 +670,6 @@
     {
       "id": "req-eol--derives--need",
       "sourceId": "req-eol",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-patch--derives--need",
-      "sourceId": "req-patch",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -767,18 +692,6 @@
       "relationType": "derives"
     },
     {
-      "id": "req-update-prs--derives--need",
-      "sourceId": "req-update-prs",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-quarterly--derives--need",
-      "sourceId": "req-quarterly",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
       "id": "req-skills--derives--need",
       "sourceId": "req-skills",
       "targetId": "need",
@@ -787,12 +700,6 @@
     {
       "id": "req-maintained--derives--need",
       "sourceId": "req-maintained",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-latency--derives--need",
-      "sourceId": "req-latency",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -815,12 +722,6 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-patch--verifies--req-patch",
-      "sourceId": "sc-patch",
-      "targetId": "req-patch",
-      "relationType": "verifies"
-    },
-    {
       "id": "sc-lts--verifies--req-lts",
       "sourceId": "sc-lts",
       "targetId": "req-lts",
@@ -839,18 +740,6 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-update-prs--verifies--req-update-prs",
-      "sourceId": "sc-update-prs",
-      "targetId": "req-update-prs",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-quarterly--verifies--req-quarterly",
-      "sourceId": "sc-quarterly",
-      "targetId": "req-quarterly",
-      "relationType": "verifies"
-    },
-    {
       "id": "sc-skills--verifies--req-skills",
       "sourceId": "sc-skills",
       "targetId": "req-skills",
@@ -863,16 +752,40 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-latency--verifies--req-latency",
-      "sourceId": "sc-latency",
-      "targetId": "req-latency",
-      "relationType": "verifies"
-    },
-    {
       "id": "sc-footprint--verifies--req-footprint",
       "sourceId": "sc-footprint",
       "targetId": "req-footprint",
       "relationType": "verifies"
+    },
+    {
+      "id": "ff-only-jvm--implements--adr-jvm",
+      "sourceId": "ff-only-jvm",
+      "targetId": "adr-jvm",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-only-dotnet--implements--adr-dotnet",
+      "sourceId": "ff-only-dotnet",
+      "targetId": "adr-dotnet",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-only-node--implements--adr-node",
+      "sourceId": "ff-only-node",
+      "targetId": "adr-node",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-only-go--implements--adr-go",
+      "sourceId": "ff-only-go",
+      "targetId": "adr-go",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-only-python--implements--adr-python",
+      "sourceId": "ff-only-python",
+      "targetId": "adr-python",
+      "relationType": "implements"
     },
     {
       "id": "ff-eol--implements--adr-jvm",
@@ -905,152 +818,122 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-vulns--implements--adr-jvm",
-      "sourceId": "ff-vulns",
+      "id": "ff-upgrade-lts--implements--adr-jvm",
+      "sourceId": "ff-upgrade-lts",
       "targetId": "adr-jvm",
       "relationType": "implements"
     },
     {
-      "id": "ff-vulns--implements--adr-dotnet",
-      "sourceId": "ff-vulns",
+      "id": "ff-upgrade-lts--implements--adr-dotnet",
+      "sourceId": "ff-upgrade-lts",
       "targetId": "adr-dotnet",
       "relationType": "implements"
     },
     {
-      "id": "ff-vulns--implements--adr-node",
-      "sourceId": "ff-vulns",
+      "id": "ff-upgrade-lts--implements--adr-node",
+      "sourceId": "ff-upgrade-lts",
       "targetId": "adr-node",
       "relationType": "implements"
     },
     {
-      "id": "ff-vulns--implements--adr-go",
-      "sourceId": "ff-vulns",
+      "id": "ff-upgrade-lts--implements--adr-go",
+      "sourceId": "ff-upgrade-lts",
       "targetId": "adr-go",
       "relationType": "implements"
     },
     {
-      "id": "ff-vulns--implements--adr-python",
-      "sourceId": "ff-vulns",
+      "id": "ff-upgrade-lts--implements--adr-python",
+      "sourceId": "ff-upgrade-lts",
       "targetId": "adr-python",
       "relationType": "implements"
     },
     {
-      "id": "ff-base-image--implements--adr-jvm",
-      "sourceId": "ff-base-image",
+      "id": "ff-upgrade-n1--implements--adr-jvm",
+      "sourceId": "ff-upgrade-n1",
       "targetId": "adr-jvm",
       "relationType": "implements"
     },
     {
-      "id": "ff-base-image--implements--adr-dotnet",
-      "sourceId": "ff-base-image",
+      "id": "ff-upgrade-n1--implements--adr-dotnet",
+      "sourceId": "ff-upgrade-n1",
       "targetId": "adr-dotnet",
       "relationType": "implements"
     },
     {
-      "id": "ff-base-image--implements--adr-node",
-      "sourceId": "ff-base-image",
+      "id": "ff-upgrade-n1--implements--adr-node",
+      "sourceId": "ff-upgrade-n1",
       "targetId": "adr-node",
       "relationType": "implements"
     },
     {
-      "id": "ff-base-image--implements--adr-go",
-      "sourceId": "ff-base-image",
+      "id": "ff-upgrade-n1--implements--adr-go",
+      "sourceId": "ff-upgrade-n1",
       "targetId": "adr-go",
       "relationType": "implements"
     },
     {
-      "id": "ff-base-image--implements--adr-python",
-      "sourceId": "ff-base-image",
+      "id": "ff-upgrade-n1--implements--adr-python",
+      "sourceId": "ff-upgrade-n1",
       "targetId": "adr-python",
       "relationType": "implements"
     },
     {
-      "id": "ff-renovate--implements--adr-jvm",
-      "sourceId": "ff-renovate",
+      "id": "ff-upgrade-latest--implements--adr-jvm",
+      "sourceId": "ff-upgrade-latest",
       "targetId": "adr-jvm",
       "relationType": "implements"
     },
     {
-      "id": "ff-renovate--implements--adr-dotnet",
-      "sourceId": "ff-renovate",
+      "id": "ff-upgrade-latest--implements--adr-dotnet",
+      "sourceId": "ff-upgrade-latest",
       "targetId": "adr-dotnet",
       "relationType": "implements"
     },
     {
-      "id": "ff-renovate--implements--adr-node",
-      "sourceId": "ff-renovate",
+      "id": "ff-upgrade-latest--implements--adr-node",
+      "sourceId": "ff-upgrade-latest",
       "targetId": "adr-node",
       "relationType": "implements"
     },
     {
-      "id": "ff-renovate--implements--adr-go",
-      "sourceId": "ff-renovate",
+      "id": "ff-upgrade-latest--implements--adr-go",
+      "sourceId": "ff-upgrade-latest",
       "targetId": "adr-go",
       "relationType": "implements"
     },
     {
-      "id": "ff-renovate--implements--adr-python",
-      "sourceId": "ff-renovate",
+      "id": "ff-upgrade-latest--implements--adr-python",
+      "sourceId": "ff-upgrade-latest",
       "targetId": "adr-python",
       "relationType": "implements"
     },
     {
-      "id": "ff-dependabot--implements--adr-jvm",
-      "sourceId": "ff-dependabot",
+      "id": "ff-skills--implements--adr-jvm",
+      "sourceId": "ff-skills",
       "targetId": "adr-jvm",
       "relationType": "implements"
     },
     {
-      "id": "ff-dependabot--implements--adr-dotnet",
-      "sourceId": "ff-dependabot",
+      "id": "ff-skills--implements--adr-dotnet",
+      "sourceId": "ff-skills",
       "targetId": "adr-dotnet",
       "relationType": "implements"
     },
     {
-      "id": "ff-dependabot--implements--adr-node",
-      "sourceId": "ff-dependabot",
+      "id": "ff-skills--implements--adr-node",
+      "sourceId": "ff-skills",
       "targetId": "adr-node",
       "relationType": "implements"
     },
     {
-      "id": "ff-dependabot--implements--adr-go",
-      "sourceId": "ff-dependabot",
+      "id": "ff-skills--implements--adr-go",
+      "sourceId": "ff-skills",
       "targetId": "adr-go",
       "relationType": "implements"
     },
     {
-      "id": "ff-dependabot--implements--adr-python",
-      "sourceId": "ff-dependabot",
-      "targetId": "adr-python",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift--implements--adr-jvm",
-      "sourceId": "ff-drift",
-      "targetId": "adr-jvm",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift--implements--adr-dotnet",
-      "sourceId": "ff-drift",
-      "targetId": "adr-dotnet",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift--implements--adr-node",
-      "sourceId": "ff-drift",
-      "targetId": "adr-node",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift--implements--adr-go",
-      "sourceId": "ff-drift",
-      "targetId": "adr-go",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-drift--implements--adr-python",
-      "sourceId": "ff-drift",
+      "id": "ff-skills--implements--adr-python",
+      "sourceId": "ff-skills",
       "targetId": "adr-python",
       "relationType": "implements"
     },
@@ -1085,32 +968,32 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-load--implements--adr-jvm",
-      "sourceId": "ff-load",
+      "id": "ff-footprint--implements--adr-jvm",
+      "sourceId": "ff-footprint",
       "targetId": "adr-jvm",
       "relationType": "implements"
     },
     {
-      "id": "ff-load--implements--adr-dotnet",
-      "sourceId": "ff-load",
+      "id": "ff-footprint--implements--adr-dotnet",
+      "sourceId": "ff-footprint",
       "targetId": "adr-dotnet",
       "relationType": "implements"
     },
     {
-      "id": "ff-load--implements--adr-node",
-      "sourceId": "ff-load",
+      "id": "ff-footprint--implements--adr-node",
+      "sourceId": "ff-footprint",
       "targetId": "adr-node",
       "relationType": "implements"
     },
     {
-      "id": "ff-load--implements--adr-go",
-      "sourceId": "ff-load",
+      "id": "ff-footprint--implements--adr-go",
+      "sourceId": "ff-footprint",
       "targetId": "adr-go",
       "relationType": "implements"
     },
     {
-      "id": "ff-load--implements--adr-python",
-      "sourceId": "ff-load",
+      "id": "ff-footprint--implements--adr-python",
+      "sourceId": "ff-footprint",
       "targetId": "adr-python",
       "relationType": "implements"
     }

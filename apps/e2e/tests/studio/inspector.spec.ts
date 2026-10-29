@@ -305,7 +305,7 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   // Nobody signs in: no second factor to ask about.
   await expect(step('Second factor')).toHaveCount(0)
   await step('Other systems').click()
-  await wizard.getByRole('radio', { name: /^None, no other system/ }).click()
+  await wizard.getByRole('radio', { name: /^None\b/ }).click()
   await step('Review').click()
   await expect(wizard.getByTestId('concern-brings')).toContainText('1 requirement')
   await expect(wizard.getByTestId('concern-brings')).toContainText('Public by design')

@@ -3,7 +3,7 @@
     "id": "concern-communication-style",
     "category": "concern",
     "name": "Communication style",
-    "description": "How the system's own parts talk to each other: synchronous calls, commands over queues, published events or streams; when to deviate from the default, how deep a chain of calls may go, how contracts are written and checked, and who coordinates a flow across parts.",
+    "description": "How the system's own parts talk to each other: synchronous calls, commands over queues, published events or streams; when to deviate from the default, how deep a chain of calls may go, how contracts between the parts are written and checked, and who coordinates a flow across parts. The snippets are TypeScript (Vitest, pact-js, Temporal's TypeScript SDK) with Spectral, Buf, oasdiff, Conftest and Prometheus; each tool line names the JVM equivalent.",
     "tags": [
       "architecture",
       "communication",
@@ -43,6 +43,10 @@
         "url": "https://microservices.io/patterns/data/saga.html"
       },
       {
+        "title": "microservices.io, Service Integration Contract Test",
+        "url": "https://microservices.io/patterns/testing/service-integration-contract-test.html"
+      },
+      {
         "title": "Enterprise Integration Patterns",
         "url": "https://www.enterpriseintegrationpatterns.com/"
       },
@@ -61,6 +65,10 @@
       {
         "title": "Sam Newman: Building Microservices, 2nd ed. (O'Reilly)",
         "url": "https://www.oreilly.com/library/view/building-microservices-2nd/9781492034018/"
+      },
+      {
+        "title": "Ford, Parsons, Kua, Sadalage: Building Evolutionary Architectures, 2nd ed. (fitness functions)",
+        "url": "https://www.oreilly.com/library/view/building-evolutionary-architectures/9781492097532/"
       }
     ],
     "templateParams": [
@@ -74,12 +82,12 @@
           {
             "value": "sync",
             "label": "synchronous request and response",
-            "description": "A part calls another and waits for the answer. Pick it for a modular monolith or a few services, when most interactions are queries that need an answer now, and every part on a chain has the availability the caller needs."
+            "description": "A part calls another and waits for the answer. Pick it for a modular monolith or a few services, when most interactions are queries that need an answer now, and every part on a chain has the availability the caller needs. Flows across parts are then orchestrated or kept local; choreography needs published events."
           },
           {
             "value": "commands",
             "label": "commands over queues",
-            "description": "A part asks another to do something by sending a command to the receiver's queue and learns the outcome from a reply later; queries stay synchronous. Pick it when work takes longer than a user should wait (documents, payments, provisioning), the receiver may be down for a while, or load comes in bursts."
+            "description": "A part asks another to do something by sending a command to the receiver's queue and learns the outcome from a reply later; queries stay synchronous. Pick it when work takes longer than a user should wait (documents, payments, provisioning), the receiver may be down for a while, or load comes in bursts. Flows across parts are then orchestrated or kept local; choreography needs published events."
           },
           {
             "value": "events",
@@ -116,7 +124,7 @@
         "key": "FLOWS",
         "title": "Multi-step flows",
         "label": "Who coordinates a business flow that spans several parts?",
-        "hint": "Placing an order may reserve stock, take payment and book shipping in three parts. Someone has to know the steps, and what to undo when one fails (all-or-nothing semantics are the Data consistency pack).",
+        "hint": "Placing an order may reserve stock, take payment and book shipping in three parts. Someone has to know the steps, and what to undo when one fails (all-or-nothing semantics are the Data consistency pack). Choreography is available only with published events or streams as the default; with synchronous calls or commands it falls back to an orchestrator.",
         "defaultValue": "orchestration",
         "options": [
           {
@@ -127,7 +135,7 @@
           {
             "value": "choreography",
             "label": "parts react to each other's events",
-            "description": "No coordinator: each part reacts to events of others and publishes its own. Pick it for short flows (up to three steps) where each reaction belongs to a different team, with events as the default; longer flows become hard to follow."
+            "description": "No coordinator: each part reacts to events of others and publishes its own. Pick it for short flows (up to three steps) where each reaction belongs to a different team; longer flows become hard to follow. Only with published events or event streams as the default: with synchronous calls or commands nothing is published to react to, and flows are orchestrated instead."
           },
           {
             "value": "local",
@@ -140,7 +148,7 @@
         "key": "CONTRACTS",
         "title": "Contracts",
         "label": "How is it checked that a change does not break another part?",
-        "hint": "Parts are released apart, so every call and message is a contract. A diff of the contract finds a break in the document; consumer-driven tests find a break in what consumers really use.",
+        "hint": "Parts are released apart, so every call and message between them is a contract. A diff of the contract finds a break in the document; consumer-driven tests find a break in what consumers really use. Contracts with callers outside the system are decided in the API evolution pack.",
         "defaultValue": "pact",
         "options": [
           {
@@ -196,7 +204,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Communication style",
-      "description": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check."
+      "description": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-default",
@@ -206,7 +214,8 @@
       "y": 0,
       "ears_type": "ubiquitous",
       "action": "use {{DEFAULT}} for every interaction between the system's own parts and record each exception in an ADR with its reason, with 0 interactions in the model that are neither the default nor a recorded exception",
-      "rationale": "Mixing styles case by case makes failure behaviour unpredictable; a default with recorded exceptions keeps it decidable (Newman, Building Microservices, ch. 4)."
+      "rationale": "Mixing styles case by case makes failure behaviour unpredictable; a default with recorded exceptions keeps it decidable (Newman, Building Microservices, ch. 4).",
+      "unchecked": "The architects compare the interactions in the model with the default and the recorded exceptions at the quarterly architecture review; whether a reason holds is judged by people, not read by a tool."
     },
     {
       "id": "req-depth",
@@ -237,12 +246,7 @@
       "ears_type": "event-driven",
       "trigger": "a part calls another part synchronously",
       "action": "pass the remaining deadline of the user's request with the call and give up when it has passed, so that a user request spends at most {{CALL_BUDGET_MS}} ms in calls between parts at the 99th percentile",
-      "rationale": "With synchronous calls as the default, deadline propagation stops a slow part from holding every caller above it (gRPC, Deadlines; Google SRE book, Addressing Cascading Failures).",
-      "hubWhen": {
-        "DEFAULT": [
-          "sync"
-        ]
-      }
+      "rationale": "Deadline propagation stops a slow part from holding every caller above it, whatever the default style leaves synchronous (gRPC, Deadlines; Google SRE book, Addressing Cascading Failures)."
     },
     {
       "id": "req-commands",
@@ -267,7 +271,7 @@
       "x": 260,
       "y": 650,
       "ears_type": "ubiquitous",
-      "action": "publish an event after every committed change other parts depend on, carrying the state they need, and answer user requests from the part's own data, with 0 synchronous calls to another part on a user's request path outside the recorded exceptions",
+      "action": "publish an event after every committed change other parts depend on, carrying the state they need, and answer user requests from the part's own data, with 0 synchronous calls from one back-end part to another on a user's request path outside the recorded exceptions (the front end calling its back end is not one)",
       "rationale": "Event-carried state transfer removes the temporal coupling: a part keeps answering while the publisher is down (Fowler, What do you mean by \"Event-Driven\"?).",
       "hubWhen": {
         "DEFAULT": [
@@ -324,11 +328,30 @@
       }
     },
     {
+      "id": "req-orchestrated-fallback",
+      "type": "requirement",
+      "label": "Flows run in an orchestrator for want of events",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "run every business flow that spans more than one part as a workflow in the orchestrator, with each instance's current step and history visible, a compensation declared for every step that changes data, and the flow finished or compensated within {{FLOW_MINUTES}} minutes",
+      "rationale": "Choreography needs published events and this default publishes none, so the orchestrator takes the flows. An orchestrator keeps the steps of a flow in one place and its state visible per instance (microservices.io, Saga: orchestration).",
+      "hubWhen": {
+        "FLOWS": [
+          "choreography"
+        ],
+        "DEFAULT": [
+          "sync",
+          "commands"
+        ]
+      }
+    },
+    {
       "id": "req-choreographed",
       "type": "requirement",
       "label": "Choreographed flows are traced",
       "x": 260,
-      "y": 1170,
+      "y": 1300,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "a flow that spans parts has started and not reached its end event within {{FLOW_MINUTES}} minutes",
       "action": "report it as stuck with its correlation id and the last event seen, and alert the team that owns the part that should have reacted",
@@ -336,6 +359,10 @@
       "hubWhen": {
         "FLOWS": [
           "choreography"
+        ],
+        "DEFAULT": [
+          "events",
+          "streams"
         ]
       }
     },
@@ -344,9 +371,9 @@
       "type": "requirement",
       "label": "Operations stay in one part",
       "x": 260,
-      "y": 1300,
+      "y": 1430,
       "ears_type": "ubiquitous",
-      "action": "complete every business operation inside one part and one local transaction, with 0 operations that change data in two parts",
+      "action": "complete every business operation inside one part and one local transaction, with 0 operations in which one part asks another to change data",
       "rationale": "A flow that stays inside one part needs neither a coordinator nor compensation; boundaries are drawn to keep it so (Newman, Building Microservices, ch. 6).",
       "hubWhen": {
         "FLOWS": [
@@ -359,7 +386,7 @@
       "type": "requirement",
       "label": "Breaking changes refused",
       "x": 260,
-      "y": 1430,
+      "y": 1560,
       "ears_type": "event-driven",
       "trigger": "a change to a contract between parts is proposed",
       "action": "lint it against the house rules and compare it with the contract on the main branch, and refuse to merge a change that would break an existing consumer",
@@ -375,7 +402,7 @@
       "type": "requirement",
       "label": "Consumers' pacts verified",
       "x": 260,
-      "y": 1560,
+      "y": 1690,
       "ears_type": "event-driven",
       "trigger": "a part is about to be deployed",
       "action": "verify it against every pact its consumers have published, for calls and for messages, and deploy it only when every pact of the consumer versions in production passes",
@@ -424,12 +451,7 @@
       "y": 390,
       "given": "a request whose deadline has 50 ms left",
       "when": "the first part calls a second that takes 500 ms",
-      "then": "the call is cancelled after 50 ms, the second part stops working on it, and the user gets a timely error",
-      "hubWhen": {
-        "DEFAULT": [
-          "sync"
-        ]
-      }
+      "then": "the call is cancelled after 50 ms, the second part is not called again, and the user gets a timely error"
     },
     {
       "id": "sc-commands",
@@ -509,17 +531,40 @@
       }
     },
     {
+      "id": "sc-orchestrated-fallback",
+      "type": "scenario",
+      "label": "Failed step compensated",
+      "x": 520,
+      "y": 1170,
+      "given": "the place-order workflow with reserve stock, take payment and book shipping",
+      "when": "the payment is declined",
+      "then": "the workflow releases the stock, ends as failed, and its history shows each step",
+      "hubWhen": {
+        "FLOWS": [
+          "choreography"
+        ],
+        "DEFAULT": [
+          "sync",
+          "commands"
+        ]
+      }
+    },
+    {
       "id": "sc-choreographed",
       "type": "scenario",
       "label": "Stuck flow reported",
       "x": 520,
-      "y": 1170,
+      "y": 1300,
       "given": "an order placed and its stock reserved",
       "when": "no payment event follows within {{FLOW_MINUTES}} minutes",
       "then": "the flow is reported stuck with its correlation id and the payment team is alerted",
       "hubWhen": {
         "FLOWS": [
           "choreography"
+        ],
+        "DEFAULT": [
+          "events",
+          "streams"
         ]
       }
     },
@@ -528,10 +573,10 @@
       "type": "scenario",
       "label": "Operation stays local",
       "x": 520,
-      "y": 1300,
-      "given": "the operations that change data",
-      "when": "each is traced",
-      "then": "each changes the data of one part only, in one transaction",
+      "y": 1430,
+      "given": "the traces of the journeys that change data",
+      "when": "the calls between parts in each are listed",
+      "then": "none asks another part to create, change or delete anything",
       "hubWhen": {
         "FLOWS": [
           "local"
@@ -543,7 +588,7 @@
       "type": "scenario",
       "label": "Removed field refused",
       "x": 520,
-      "y": 1430,
+      "y": 1560,
       "given": "an event contract with a field consumers read",
       "when": "a change removes that field",
       "then": "the build fails naming the breaking change",
@@ -558,7 +603,7 @@
       "type": "scenario",
       "label": "Breaking deploy blocked",
       "x": 520,
-      "y": 1560,
+      "y": 1690,
       "given": "a consumer in production whose pact reads a field",
       "when": "the provider removes the field and tries to deploy",
       "then": "verification fails and can-i-deploy blocks the release",
@@ -577,8 +622,8 @@
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
-      "decision": "Parts talk by synchronous request and response by default: {{SYNC_API}} (Spring's RestClient or grpc-java, .NET's typed HttpClient or Grpc.Net.Client, fetch or @connectrpc in TypeScript), with clients generated from the contracts. Every call carries the remaining deadline of the user's request (gRPC deadlines, or a request-timeout header the server honours); a user request spends at most {{CALL_BUDGET_MS}} ms in calls between parts and a chain is at most {{MAX_DEPTH}} calls deep. A command over a queue or an event is used instead, recorded as an exception, when the caller does not need the result to answer, the work takes longer than the budget, several parts react, or the callee may be down longer than the caller can wait. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Parts talk by synchronous request and response by default: {{SYNC_API}}, with clients generated from the contracts. Every call carries the remaining deadline of the user's request (gRPC deadlines, or the X-Request-Deadline header the server honours, as an absolute Unix epoch in milliseconds); a user request spends at most {{CALL_BUDGET_MS}} ms in calls between parts and a chain is at most {{MAX_DEPTH}} calls deep. A command over a queue or an event is used instead, recorded as an exception, when the caller does not need the result to answer, the work takes longer than the budget, several parts react, or the callee may be down longer than the caller can wait. Flows across parts are orchestrated or stay local, as the flows decision records; choreography needs published events, so with this default it falls back to the orchestrator. Contract checks: {{CONTRACTS}}.",
       "consequences": "• Simplest to write, follow and debug: one request, one trace, an answer or an error.\n• The caller is only as available as everything it calls: availabilities multiply along a chain, hence the depth limit.\n• Overload spreads upstream unless deadlines and load shedding stop it.\n• Work that takes long or must survive a callee being down needs the recorded exceptions.",
       "alternatives": "1. Commands over queues: callers do not wait, at the cost of answering later.\n2. Published events: no temporal coupling, at the cost of copies and eventual consistency.\n3. A service mesh to add retries and timeouts: helps, but does not remove the coupling of waiting.",
       "hubWhen": {
@@ -596,8 +641,8 @@
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
-      "decision": "A part that needs another to do something sends a command to that part's own queue (RabbitMQ or Azure Service Bus queues, Amazon SQS; one owning part per queue) and answers its own caller with the command's id; the receiver replies with an outcome event the sender correlates by id, within {{PROPAGATION_SECONDS}} seconds at the 99th percentile while it is up. Queries that need an answer now stay synchronous ({{SYNC_API}}), at most {{MAX_DEPTH}} calls deep. Messages are described in AsyncAPI; delivery guarantees, deduplication and dead-lettering follow the Messaging pack. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "A part that needs another to do something sends a command to that part's own queue (RabbitMQ or Azure Service Bus queues, Amazon SQS; one owning part per queue) and answers its own caller with the command's id; the receiver replies with an outcome message the sender correlates by id, within {{PROPAGATION_SECONDS}} seconds at the 99th percentile while it is up. Queries that need an answer now stay synchronous ({{SYNC_API}}), at most {{MAX_DEPTH}} calls deep, each carrying the remaining deadline and spending at most {{CALL_BUDGET_MS}} ms per user request. Messages are described in AsyncAPI; delivery guarantees, deduplication and dead-lettering follow the Messaging pack. Flows across parts are orchestrated or stay local, as the flows decision records; choreography needs published events, so with this default it falls back to the orchestrator. Contract checks: {{CONTRACTS}}.",
       "consequences": "• Senders keep working while a receiver is busy or down; bursts wait in the queue.\n• Users see an accepted state and the outcome later, so screens and APIs must show pending work.\n• Each queue has one owner, so who executes a command is never in doubt.\n• Following a request means following a correlation id across messages.",
       "alternatives": "1. Synchronous calls: immediate answers, coupled availability.\n2. Published events: receivers decide what to do, no one is told to do anything.\n3. A shared job table polled by workers: no broker, but a database used as a queue.",
       "hubWhen": {
@@ -615,8 +660,8 @@
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
-      "decision": "Each part publishes events about its own committed changes (through an outbox, as CloudEvents described in AsyncAPI) carrying the state its subscribers need; subscribers keep their own copies and answer user requests from them. Events go through a publish-subscribe broker: Apache Kafka for many subscribers and replay, Amazon SNS with SQS or Google Pub/Sub on those clouds, Azure Service Bus topics on Azure. Copies are updated within {{PROPAGATION_SECONDS}} seconds at the 99th percentile. A command to one specific part goes to that part's queue; a synchronous call ({{SYNC_API}}, at most {{MAX_DEPTH}} deep) is a recorded exception for an answer only its owner can give now, such as a payment authorisation. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Each part publishes events about its own committed changes (through an outbox, as the Data consistency pack decides; as CloudEvents described in AsyncAPI) carrying the state its subscribers need; subscribers keep their own copies and answer user requests from them. Events go through a publish-subscribe broker: Apache Kafka for many subscribers and replay, Amazon SNS with SQS or Google Pub/Sub on those clouds, Azure Service Bus topics on Azure. Copies are updated within {{PROPAGATION_SECONDS}} seconds at the 99th percentile. A command to one specific part goes to that part's queue; a synchronous call between back-end parts ({{SYNC_API}}, at most {{MAX_DEPTH}} deep, carrying the remaining deadline, at most {{CALL_BUDGET_MS}} ms per user request) is a recorded exception for an answer only its owner can give now, such as a payment authorisation; the front end calling its back end is no exception. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
       "consequences": "• A part keeps answering while the parts it depends on are down: no temporal coupling on the user path.\n• Data is copied and eventually consistent; screens and rules must tolerate {{PROPAGATION_SECONDS}} seconds of lag.\n• Publishers do not know their subscribers; what happens after an event is visible only in the contracts and traces.\n• Event schemas become long-lived contracts that need versioning.",
       "alternatives": "1. Synchronous calls: simpler, coupled availability.\n2. Commands over queues: the sender decides what happens, coupling it to the receivers.\n3. Event notification without state (subscribers call back for data): smaller events, but the temporal coupling returns.",
       "hubWhen": {
@@ -634,8 +679,8 @@
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
-      "decision": "Parts write their events to a durable, partitioned log (Apache Kafka, Confluent Cloud, Amazon MSK, Redpanda; Amazon Kinesis or Azure Event Hubs where a managed cloud log is preferred), keyed by entity so that order holds per entity, retained for at least {{RETENTION_DAYS}} days, with topics holding current state compacted. Consumers read at their own pace, keep their own views (Kafka Streams, Apache Flink or plain consumers) and can rebuild them by replaying from the start; events reach every consumer within {{PROPAGATION_SECONDS}} seconds at the 99th percentile. Synchronous calls ({{SYNC_API}}, at most {{MAX_DEPTH}} deep) are recorded exceptions. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Parts write their events to a durable, partitioned log: Apache Kafka on Kubernetes with Strimzi, whose topics are KafkaTopic manifests (a managed Kafka such as Confluent Cloud, Amazon MSK or Redpanda Cloud declares its topics in Terraform and checks the same retention there). Topics are keyed by entity so that order holds per entity, retained for at least {{RETENTION_DAYS}} days, with topics holding current state compacted. Consumers read at their own pace, keep their own views (Kafka Streams, Apache Flink or plain consumers) and can rebuild them by replaying from the start; events reach every consumer within {{PROPAGATION_SECONDS}} seconds at the 99th percentile. Synchronous calls between back-end parts ({{SYNC_API}}, at most {{MAX_DEPTH}} deep, carrying the remaining deadline, at most {{CALL_BUDGET_MS}} ms per user request) are recorded exceptions; the front end calling its back end is no exception. Flows across parts: {{FLOWS}}. Contract checks: {{CONTRACTS}}.",
       "consequences": "• New consumers and new views are added without asking producers, by replaying history.\n• High throughput, with order per key and parallelism per partition.\n• A cluster to run (or pay for) and partitions to size; consumer lag becomes a key metric.\n• Events in the log live for days or forever, so their schemas must stay readable for that long.",
       "alternatives": "1. Published events through a pub/sub broker without replay: simpler, but views cannot be rebuilt from history.\n2. Commands over queues: work distribution, not a history.\n3. Change data capture from each database: no code to publish, but internal tables become the contract.",
       "hubWhen": {
@@ -645,15 +690,53 @@
       }
     },
     {
-      "id": "adr-orchestration",
+      "id": "adr-rest",
       "type": "adr",
-      "label": "Flows run by an orchestrator",
+      "label": "Synchronous calls over HTTP and JSON",
       "x": 780,
       "y": 520,
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Synchronous calls between parts are resource-style HTTP with JSON bodies, described in OpenAPI 3.1 documents owned by the providing part (services/<name>/openapi.yaml), linted with Spectral against the house ruleset in every build; errors are application/problem+json. Clients are generated from the documents (openapi-typescript or OpenAPI Generator) and never written by hand. The remaining deadline travels in the X-Request-Deadline header.",
+      "consequences": "• Any language and any browser can call; people can read and try the API.\n• JSON over HTTP/1.1 costs more per call than a binary protocol; high-volume paths may need the gRPC exception.\n• Deadlines are a house convention the servers must honour, not a protocol feature.",
+      "alternatives": "1. gRPC: generated clients, deadlines and streaming built in, but browsers need a gateway.\n2. GraphQL between parts: flexible queries, and a contract that is hard to diff for breaking changes.",
+      "hubWhen": {
+        "SYNC_API": [
+          "rest"
+        ]
+      }
+    },
+    {
+      "id": "adr-grpc",
+      "type": "adr",
+      "label": "Synchronous calls over gRPC",
+      "x": 780,
+      "y": 650,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Synchronous calls between parts are gRPC over HTTP/2, described in .proto files owned by the providing part under proto/, linted with Buf's STANDARD rules and compared with the main branch in every build. Clients are generated with Buf (Connect for TypeScript, grpc-java, Grpc.Net.Client) and never written by hand. The remaining deadline travels as the gRPC deadline, which every client wrapper sets from the incoming one.",
+      "consequences": "• Binary, fast, with deadlines and streaming built into the protocol.\n• Browsers and scripts need gRPC-Web, Connect or a gateway; people cannot try the API with curl.\n• Field numbers are forever: a removed or retyped field is a break Buf refuses.",
+      "alternatives": "1. HTTP and JSON with OpenAPI: readable by people and browsers, slower per call.\n2. gRPC only where volume demands it, HTTP elsewhere: two client stacks to keep.",
+      "hubWhen": {
+        "SYNC_API": [
+          "grpc"
+        ]
+      }
+    },
+    {
+      "id": "adr-orchestration",
+      "type": "adr",
+      "label": "Flows run by an orchestrator",
+      "x": 780,
+      "y": 780,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
       "decision": "Every business flow across parts runs as a workflow in an orchestrator: Temporal for flows written as code, Camunda 8 where the flow is modelled in BPMN with business people, AWS Step Functions on AWS. The workflow calls each part's commands, keeps the state and history of each instance, retries steps with backoff, waits on timers and human tasks, and runs a declared compensation for every completed step that changed data when a later one fails (saga semantics as in the Data consistency pack). A flow finishes or is compensated within {{FLOW_MINUTES}} minutes. The workflow belongs to the part that owns the business outcome.",
       "consequences": "• Each flow is written in one place and each instance's state is visible and searchable.\n• Timeouts, retries and compensation come from the engine instead of hand-written state machines.\n• The orchestrator is a component to run (or pay for) and must be highly available.\n• The owning part knows every step: a change to a step means changing the workflow too.",
       "alternatives": "1. Choreography: no central component, but flows are visible only through tracing.\n2. Hand-written state machines in a database table: no engine, but timers, retries and history to build.\n3. Distributed transactions (two-phase commit): unsupported by most brokers and services, and blocking.",
@@ -664,21 +747,105 @@
       }
     },
     {
+      "id": "adr-orchestration-fallback",
+      "type": "adr",
+      "label": "Flows run by an orchestrator, as nothing is published",
+      "x": 780,
+      "y": 910,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Choreography was chosen, but it needs published events and the default ({{DEFAULT}}) publishes none, so flows across parts are orchestrated. Every business flow across parts runs as a workflow in an orchestrator: Temporal for flows written as code, Camunda 8 where the flow is modelled in BPMN with business people, AWS Step Functions on AWS. The workflow calls each part's commands, keeps the state and history of each instance, retries steps with backoff, waits on timers and human tasks, and runs a declared compensation for every completed step that changed data when a later one fails (saga semantics as in the Data consistency pack). A flow finishes or is compensated within {{FLOW_MINUTES}} minutes. The workflow belongs to the part that owns the business outcome.",
+      "consequences": "• Each flow is written in one place and each instance's state is visible and searchable.\n• Timeouts, retries and compensation come from the engine instead of hand-written state machines.\n• The orchestrator is a component to run (or pay for) and must be highly available.\n• The owning part knows every step: a change to a step means changing the workflow too.",
+      "alternatives": "1. Choreography: no central component, but flows are visible only through tracing.\n2. Hand-written state machines in a database table: no engine, but timers, retries and history to build.\n3. Distributed transactions (two-phase commit): unsupported by most brokers and services, and blocking.",
+      "hubWhen": {
+        "FLOWS": [
+          "choreography"
+        ],
+        "DEFAULT": [
+          "sync",
+          "commands"
+        ]
+      }
+    },
+    {
       "id": "adr-choreography",
       "type": "adr",
       "label": "Flows by choreography",
       "x": 780,
-      "y": 650,
+      "y": 1040,
       "concern": "communication-style",
       "status": "accepted",
       "date": "",
-      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, and calls to systems outside are Integration resilience.",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
       "decision": "Flows across parts are choreographed: each part reacts to the events of others and publishes its own, and no part coordinates the flow. Every flow is documented as an event chain (which part reacts to which event and what it publishes) in the AsyncAPI documents and a flow diagram in the model; every event carries the flow's correlation id. A process monitor subscribes to the start and end events of each flow and reports an instance not finished within {{FLOW_MINUTES}} minutes. A flow that grows past three steps or needs timeouts is moved to an orchestrator by a new ADR.",
       "consequences": "• No central component; each team owns its reaction and changes it alone.\n• The flow exists only as the sum of reactions; without the documented chain and the monitor nobody can tell where an instance is.\n• Compensation is spread across parts, each undoing its own step on a failure event.\n• Cyclic reactions are possible and must be caught in review.",
       "alternatives": "1. An orchestrator: one place for the flow and its state, at the cost of a central component.\n2. Keeping the flow in one part: no coordination at all, if the boundaries allow it.",
       "hubWhen": {
         "FLOWS": [
           "choreography"
+        ],
+        "DEFAULT": [
+          "events",
+          "streams"
+        ]
+      }
+    },
+    {
+      "id": "adr-local-flows",
+      "type": "adr",
+      "label": "No flow spans parts",
+      "x": 780,
+      "y": 1170,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "No business flow spans parts: every operation that changes data completes inside one part and one local transaction, and the boundaries between parts are drawn (and redrawn, through the Decomposition pack) so that this holds. A part may ask another for data on the way, never to change anything; an operation that would need two parts to change data is a reason to move the boundary, not to add a coordinator. The end-to-end traces prove it on every run.",
+      "consequences": "• No orchestrator, no compensation, no stuck flows: each operation is one transaction.\n• The boundaries carry the constraint: a feature that spans two parts cannot be built until they are re-cut or merged.\n• Reads across parts stay synchronous or come from copies; writes never cross.",
+      "alternatives": "1. An orchestrator for the few flows that must span parts: a central component for the exceptions.\n2. Choreography: reactions across parts, visible only through tracing.",
+      "hubWhen": {
+        "FLOWS": [
+          "local"
+        ]
+      }
+    },
+    {
+      "id": "adr-contract-diffs",
+      "type": "adr",
+      "label": "Contracts diffed on every change",
+      "x": 780,
+      "y": 1300,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "A change to a contract between parts is checked against the version on the main branch in the pull request: oasdiff for OpenAPI, the AsyncAPI CLI's diff for AsyncAPI, Buf for .proto files. A breaking change (a field or operation removed, a type narrowed, a required field added to a request) fails the build; it ships only as a new version of the contract with the old one kept until every consumer has moved, as the API evolution pack decides for callers outside.",
+      "consequences": "• Works for consumers the provider does not know, with no test code on the consumer side.\n• A diff knows the document, not what consumers use: a change that breaks nobody still fails, and a semantic change the schema cannot express passes.\n• Versioning and deprecation become routine work for every provider.",
+      "alternatives": "1. Consumer-driven contract tests: precise about what consumers use, but every consumer must run Pact.\n2. End-to-end tests across parts in a shared environment: slow, flaky and late.",
+      "hubWhen": {
+        "CONTRACTS": [
+          "spec"
+        ]
+      }
+    },
+    {
+      "id": "adr-consumer-contracts",
+      "type": "adr",
+      "label": "Consumer-driven contract tests",
+      "x": 780,
+      "y": 1430,
+      "concern": "communication-style",
+      "status": "accepted",
+      "date": "",
+      "context": "The system's own parts (services, modules, front ends and back ends) have to ask each other for data and to get things done. How they do it decides how they fail together. The forces: a synchronous call ties the caller to the callee being up and fast at that moment (temporal coupling), and a chain of them multiplies latency and the odds that one link is down; asynchronous messages decouple in time but make the result arrive later and the flow harder to follow; events let parts react without the publisher knowing them, until nobody can tell what happens after an order is placed; a flow across parts needs either a coordinator that knows every step or a chain of reactions nobody owns; and parts are released apart, so every interaction is a contract that must not break. Delivery guarantees of a queue are the Messaging pack, calls to systems outside are Integration resilience, and contracts with callers outside the system are the API evolution pack.",
+      "decision": "Every consuming part records the calls and messages it relies on as pacts with Pact and publishes them to the Pact Broker (or PactFlow); every provider build fetches and verifies the pacts of the consumer versions on main and deployed, publishes the results, and the deploy job asks can-i-deploy before deploying and records the deployment after. Messages are verified with message pacts; gRPC calls with the pact-protobuf-plugin. A provider may change anything no pact relies on.",
+      "consequences": "• A breaking change is found in the provider's build, in minutes, without an environment that holds every part.\n• Only what consumers use is protected: a consumer without a pact is on its own.\n• The broker is one more component to run (or a subscription), and every team has to learn the workflow.",
+      "alternatives": "1. Contract diffs on every change: no consumer tests to write, but no knowledge of what consumers really use.\n2. Provider-written schema tests: the provider against its own document, not against its consumers.",
+      "hubWhen": {
+        "CONTRACTS": [
+          "pact"
         ]
       }
     },
@@ -689,8 +856,8 @@
       "x": 1040,
       "y": 0,
       "category": "holistic",
-      "threshold": "0 traces of the user journeys with more than {{MAX_DEPTH}} nested synchronous calls between parts",
-      "description": "The end-to-end journeys run with OpenTelemetry tracing into an in-memory exporter; the test follows each span's parents and counts nested HTTP and gRPC client spans (database calls are not counted). A new call that deepens a chain fails the test.\n\nTool: Vitest with the OpenTelemetry SDK (InMemorySpanExporter)\n\n```ts\nimport { SpanKind } from '@opentelemetry/api'\nimport { InMemorySpanExporter, SimpleSpanProcessor, type ReadableSpan } from '@opentelemetry/sdk-trace-base'\nimport { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'\n\nconst exporter = new InMemorySpanExporter()\nnew NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] }).register()\n\nit('no request goes more than {{MAX_DEPTH}} calls deep', async () => {\n  await runUserJourneys() // the journeys of the end-to-end suite, against the parts started for the test\n  const spans = exporter.getFinishedSpans()\n  const byId = new Map(spans.map((s) => [s.spanContext().spanId, s]))\n  const isCall = (s: ReadableSpan) =>\n    s.kind === SpanKind.CLIENT && ('http.request.method' in s.attributes || 'rpc.system' in s.attributes)\n  const depth = (s: ReadableSpan) => {\n    let d = 0\n    for (let p: ReadableSpan | undefined = s; p; p = byId.get(p.parentSpanContext?.spanId ?? '')) if (isCall(p)) d++\n    return d\n  }\n  expect(Math.max(0, ...spans.map(depth))).toBeLessThanOrEqual({{MAX_DEPTH}})\n})\n```"
+      "threshold": "0 traces of the end-to-end journeys with more than {{MAX_DEPTH}} nested synchronous calls between parts, and 0 in which a part is reached again through its own calls",
+      "description": "The parts started for the end-to-end suite export their spans over OTLP to a Jaeger container; each journey is run with a traceparent header the test generates, the trace is fetched from Jaeger's query API by that id, and the test follows each span's parents counting nested HTTP and gRPC client spans that another part continues with a server span (database calls and calls to systems outside are not counted), and fails when one part serves twice in a line of nested calls (a cycle). The HTTP method is read under the stable name http.request.method and the old http.method, so SDKs on either semantic convention are counted. A new call that deepens a chain fails the test. The helper test/e2e/traces.ts is shared with the other trace-based checks of this pack.\n\nTool: Vitest with Jaeger (jaegertracing/jaeger, OTLP in on 4318, query API on 16686; the /api/traces endpoint is Jaeger's internal JSON API); for the JVM: the same test with JUnit 5 and RestClient\n\n```ts\n// test/e2e/traces.ts — the parts export spans over OTLP to the Jaeger container started for the suite\nimport { randomBytes, randomUUID } from 'node:crypto'\n\nexport interface Span { id: string; parent?: string; service: string; kind?: string; method?: string; durationMs: number; rpc: boolean }\n\nexport const newTraceId = () => randomUUID().replace(/-/g, '')\nexport const traceparent = (traceId: string) => `00-${traceId}-${randomBytes(8).toString('hex')}-01`\n\n/** The spans of one trace, once Jaeger has them all (two reads in a row agree). */\nexport async function trace(traceId: string): Promise<Span[]> {\n  let last = -1\n  for (let i = 0; i < 20; i++) {\n    const res = await fetch(`${process.env.JAEGER_URL}/api/traces/${traceId}`)\n    const spans = res.ok ? toSpans((await res.json()).data[0]) : []\n    if (spans.length > 0 && spans.length === last) return spans\n    last = spans.length\n    await new Promise((r) => setTimeout(r, 500))\n  }\n  throw new Error(`trace ${traceId} did not settle`)\n}\n\n// A call between parts is an HTTP or gRPC client span that a server span of another part continues;\n// a call to a system outside has no server span in the trace and is not counted. The HTTP method is\n// read under the stable semantic-convention name and the old one (SDKs still emitting http.method).\nconst toSpans = (trace: any): Span[] => {\n  const spans = trace.spans.map((s: any) => {\n    const tag = (key: string) => s.tags.find((t: any) => t.key === key)?.value\n    const method = tag('http.request.method') ?? tag('http.method')\n    return {\n      id: s.spanID,\n      parent: s.references.find((r: any) => r.refType === 'CHILD_OF')?.spanID,\n      service: trace.processes[s.processID].serviceName,\n      kind: tag('span.kind'),\n      method,\n      durationMs: s.duration / 1000,\n      rpc: tag('span.kind') === 'client' && (method !== undefined || tag('rpc.system') !== undefined),\n    }\n  })\n  return spans.map((s: Span) => ({ ...s, rpc: s.rpc && spans.some((x: Span) => x.kind === 'server' && x.parent === s.id) }))\n}\n\n// test/e2e/depth.test.ts\nimport { expect, it } from 'vitest'\nimport { journeys } from './journeys'   // the journeys of the suite; each takes the headers to send with its first request\nimport { newTraceId, trace, traceparent, type Span } from './traces'\n\nconst ancestry = (spans: Span[], s: Span): Span[] => {\n  const line: Span[] = []\n  for (let p: Span | undefined = s; p; p = spans.find((x) => x.id === p!.parent)) line.push(p)\n  return line\n}\nconst depth = (spans: Span[], s: Span) => ancestry(spans, s).filter((p) => p.rpc).length\n// a part reached again through its own calls: its service serves twice in one line of server spans\nconst cycle = (spans: Span[], s: Span) => {\n  const served = ancestry(spans, s).filter((p) => p.kind === 'server').map((p) => p.service)\n  return new Set(served).size < served.length\n}\n\nit.each(journeys)('$name goes at most {{MAX_DEPTH}} calls deep, without cycles', async (journey) => {\n  const traceId = newTraceId()\n  await journey.run({ traceparent: traceparent(traceId) })   // the parts continue the trace\n  const spans = await trace(traceId)\n  expect(Math.max(0, ...spans.map((s) => depth(spans, s)))).toBeLessThanOrEqual({{MAX_DEPTH}})\n  expect(spans.filter((s) => cycle(spans, s)).map((s) => s.service)).toEqual([])\n})\n```"
     },
     {
       "id": "ff-budget",
@@ -698,12 +865,37 @@
       "label": "Calls within budget",
       "x": 1040,
       "y": 130,
-      "category": "operational",
-      "threshold": "99th percentile of the time a user request spends in calls between parts at most {{CALL_BUDGET_MS}} ms under the expected load",
-      "description": "A k6 test drives the user journeys at the expected rate against a production-like environment; the parts tag their outgoing calls, and the threshold fails the run when the 99th percentile passes the budget.\n\nTool: k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nexport const options = {\n  scenarios: {\n    journeys: { executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '10m', preAllocatedVUs: 100 },\n  },\n  thresholds: { 'http_req_duration{journey:order-status}': ['p(99)<{{CALL_BUDGET_MS}}'] },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders/${__VU}/status`, { tags: { journey: 'order-status' } })\n  check(res, { answered: (r) => r.status === 200 })\n}\n```",
+      "category": "holistic",
+      "threshold": "99th percentile over the traces of the end-to-end journeys of the time a request spends in calls between parts at most {{CALL_BUDGET_MS}} ms",
+      "description": "The same traces as the depth check: for each journey run, the test finds the server span the request entered and sums the durations of its outgoing client spans (nested calls run inside them); the 99th percentile over all runs must stay within the budget. Under production load the same number is read from the traces in Jaeger or Tempo with the same arithmetic.\n\nTool: Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5\n\n```ts\nimport { expect, it } from 'vitest'\nimport { journeys } from './journeys'\nimport { newTraceId, trace, traceparent } from './traces'\n\nit('a request spends at most {{CALL_BUDGET_MS}} ms in calls between parts (p99 over the journeys)', async () => {\n  const spent: number[] = []\n  for (const journey of journeys) for (let i = 0; i < 20; i++) {\n    const traceId = newTraceId()\n    await journey.run({ traceparent: traceparent(traceId) })\n    const spans = await trace(traceId)\n    const ids = new Set(spans.map((s) => s.id))\n    const entry = spans.find((s) => s.kind === 'server' && !(s.parent && ids.has(s.parent)))   // where the request entered\n    const outgoing = spans.filter((s) => s.rpc && s.parent === entry?.id)                       // nested calls run inside these\n    spent.push(outgoing.reduce((sum, s) => sum + s.durationMs, 0))\n  }\n  spent.sort((a, b) => a - b)\n  expect(spent[Math.floor((spent.length - 1) * 0.99)]).toBeLessThanOrEqual({{CALL_BUDGET_MS}})\n}, 600_000)\n```"
+    },
+    {
+      "id": "ff-deadline",
+      "type": "fitness-fn",
+      "label": "Expired deadline stops the call",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "A request whose deadline passes during a call to another part is answered with 504 within {{CALL_BUDGET_MS}} ms and the called part is not called again",
+      "description": "A test starts a stand-in for the called part that answers after 500 ms, points the part under test at it, sends a request whose X-Request-Deadline is 50 ms away and expects a 504 well within the budget and a single downstream call.\n\nTool: Vitest with a Node http server as the slow part; for the JVM: the same test with JUnit 5 and WireMock's fixed delay\n\n```ts\nimport http from 'node:http'\nimport { afterAll, beforeAll, expect, it } from 'vitest'\n\n// a stand-in for the part called downstream, answering after 500 ms;\n// the part under test is started with DOWNSTREAM_URL=http://localhost:18081\nlet calls = 0\nconst slow = http.createServer((_req, res) => { calls++; setTimeout(() => res.end('{}'), 500) })\nbeforeAll(() => new Promise<void>((resolve) => slow.listen(18081, resolve)))\nafterAll(() => slow.close())\n\nit('gives up when the deadline has passed', async () => {\n  const started = Date.now()\n  const res = await fetch(`${process.env.PART_URL}/orders/1/status`, {\n    headers: { 'X-Request-Deadline': String(Date.now() + 50) },   // absolute deadline, Unix epoch milliseconds\n  })\n  expect(res.status).toBe(504)\n  expect(Date.now() - started).toBeLessThan({{CALL_BUDGET_MS}})\n  expect(calls).toBe(1)   // no retry past the deadline\n})\n```",
       "hubWhen": {
-        "DEFAULT": [
-          "sync"
+        "SYNC_API": [
+          "rest"
+        ]
+      }
+    },
+    {
+      "id": "ff-deadline-grpc",
+      "type": "fitness-fn",
+      "label": "Expired gRPC deadline stops the call",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "A call whose deadline is 50 ms away ends with DEADLINE_EXCEEDED within {{CALL_BUDGET_MS}} ms, the called part receives the same deadline, and it is called once",
+      "description": "A test starts a stand-in for the called part as a gRPC server that answers after 500 ms, points the part under test at it, calls the part under test with a deadline 50 ms away and expects DEADLINE_EXCEEDED within the budget. The stand-in records the deadline it was given: it must be set and no later than the caller's (the part passed it on rather than starting a fresh one), and it is called once (no retry past the deadline). Both sides use pass-through serializers with empty messages, so no generated code is needed; an empty message is a valid Protocol Buffers message whose fields all hold their defaults.\n\nTool: Vitest with @grpc/grpc-js; for the JVM: the same test with JUnit 5, grpc-java's in-process server and Context.current().getDeadline()\n\n```ts\nimport * as grpc from '@grpc/grpc-js'\nimport { afterAll, beforeAll, expect, it } from 'vitest'\n\n// a stand-in for the part called downstream, answering after 500 ms;\n// the part under test is started with DOWNSTREAM_GRPC=localhost:18082 and served at PART_GRPC\nconst raw = { serialize: (b: Buffer) => b, deserialize: (b: Buffer) => b }\nconst method = (path: string) => ({ path, requestStream: false, responseStream: false, requestSerialize: raw.serialize, requestDeserialize: raw.deserialize, responseSerialize: raw.serialize, responseDeserialize: raw.deserialize })\n\nconst seen: Array<number> = []   // the deadline of each downstream call, in epoch milliseconds\nconst slow = new grpc.Server()\nslow.addService({ GetStock: method('/inventory.v1.InventoryService/GetStock') }, {\n  GetStock: (call: grpc.ServerUnaryCall<Buffer, Buffer>, done: grpc.sendUnaryData<Buffer>) => {\n    const d = call.getDeadline()\n    seen.push(d instanceof Date ? d.getTime() : d)   // Infinity when the caller set none\n    setTimeout(() => done(null, Buffer.alloc(0)), 500)\n  },\n})\nbeforeAll(() => new Promise<void>((resolve, reject) =>\n  slow.bindAsync('localhost:18082', grpc.ServerCredentials.createInsecure(), (err) => (err ? reject(err) : resolve())),\n))\nafterAll(() => slow.forceShutdown())\n\nit('gives up when the deadline has passed and passes the deadline on', async () => {\n  const client = new grpc.Client(process.env.PART_GRPC!, grpc.credentials.createInsecure())\n  const started = Date.now()\n  const deadline = started + 50\n  const code = await new Promise<grpc.status>((resolve) => client.makeUnaryRequest(\n    '/ordering.v1.OrderingService/GetOrderStatus', raw.serialize, raw.deserialize, Buffer.alloc(0),\n    new grpc.Metadata(), { deadline }, (err) => resolve(err ? err.code : grpc.status.OK),\n  ))\n  expect(code).toBe(grpc.status.DEADLINE_EXCEEDED)\n  expect(Date.now() - started).toBeLessThan({{CALL_BUDGET_MS}})\n  await new Promise((r) => setTimeout(r, 600))   // room for a retry, which must not come\n  expect(seen).toHaveLength(1)\n  expect(seen[0]).toBeLessThanOrEqual(deadline + 20)   // the caller's deadline, give or take the clock's rounding\n  client.close()\n})\n```",
+      "hubWhen": {
+        "SYNC_API": [
+          "grpc"
         ]
       }
     },
@@ -712,10 +904,10 @@
       "type": "fitness-fn",
       "label": "Commands accepted and answered",
       "x": 1040,
-      "y": 260,
+      "y": 520,
       "category": "structural",
-      "threshold": "A command is acknowledged at once and its outcome arrives within {{PROPAGATION_SECONDS}} seconds; a command sent while the receiver is down is answered after it is back",
-      "description": "An integration test starts the broker in a container, sends a command to the receiver's queue and waits for the correlated reply; a second test stops the receiver first and expects the reply once it restarts.\n\nTool: Testcontainers (RabbitMQ) with Awaitility\n\n```java\n@SpringBootTest\n@Testcontainers\nclass ReserveStockCommandTest {\n  @Container @ServiceConnection\n  static RabbitMQContainer rabbit = new RabbitMQContainer(\"rabbitmq:4-management\");\n\n  @Autowired RabbitTemplate rabbitTemplate;\n  @Autowired ReplyCollector replies; // listens on the sender's reply queue\n\n  @Test\n  void commandIsAnswered() {\n    var id = UUID.randomUUID().toString();\n    rabbitTemplate.convertAndSend(\"inventory.commands\", \"reserve-stock\", new ReserveStock(id, \"SKU-1\", 2));\n    await().atMost(Duration.ofSeconds({{PROPAGATION_SECONDS}}))\n        .until(() -> replies.outcomeOf(id).isPresent());\n  }\n}\n```",
+      "threshold": "A command's outcome reply arrives within {{PROPAGATION_SECONDS}} seconds while the receiver is up; a command sent while the receiver is down is answered within {{PROPAGATION_SECONDS}} seconds of its restart",
+      "description": "An integration test starts RabbitMQ in a container and the receiving part against it, sends a command to the receiver's queue and waits for the correlated reply on the sender's reply queue; a second test stops the receiver, sends, restarts it and expects the reply.\n\nTool: Vitest with Testcontainers (@testcontainers/rabbitmq) and amqplib; for the JVM: Testcontainers with Spring AMQP and Awaitility\n\n```ts\nimport { randomUUID } from 'node:crypto'\nimport amqp from 'amqplib'\nimport { RabbitMQContainer, type StartedRabbitMQContainer } from '@testcontainers/rabbitmq'\nimport { afterAll, beforeAll, it } from 'vitest'\nimport { startInventory, type RunningPart } from './parts'   // starts the receiving part against the broker\n\nlet rabbit: StartedRabbitMQContainer\nlet inventory: RunningPart\nbeforeAll(async () => {\n  rabbit = await new RabbitMQContainer('rabbitmq:4-management').start()\n  inventory = await startInventory({ AMQP_URL: rabbit.getAmqpUrl() })\n}, 120_000)\nafterAll(async () => { await inventory.stop(); await rabbit.stop() })\n\nconst send = async (id: string) => {\n  const channel = await (await amqp.connect(rabbit.getAmqpUrl())).createChannel()\n  await channel.assertQueue('inventory.commands', { durable: true })\n  channel.sendToQueue('inventory.commands', Buffer.from(JSON.stringify({ type: 'reserve-stock', id, sku: 'SKU-1', quantity: 2 })))\n}\nconst replyTo = async (id: string, withinMs: number) => {\n  const channel = await (await amqp.connect(rabbit.getAmqpUrl())).createChannel()\n  await channel.assertQueue('ordering.replies', { durable: true })\n  await new Promise<void>((resolve, reject) => {\n    const timer = setTimeout(() => reject(new Error(`no reply for ${id} within ${withinMs} ms`)), withinMs)\n    channel.consume('ordering.replies', (m) => {\n      if (m && JSON.parse(m.content.toString()).commandId === id) { clearTimeout(timer); channel.ack(m); resolve() }\n    })\n  })\n}\n\nit('answers a command within {{PROPAGATION_SECONDS}} s while the receiver is up', async () => {\n  const id = randomUUID()\n  await send(id)\n  await replyTo(id, {{PROPAGATION_SECONDS}} * 1000)\n})\n\nit('answers a command sent while the receiver was down, once it is back', async () => {\n  await inventory.stop()\n  const id = randomUUID()\n  await send(id)\n  inventory = await startInventory({ AMQP_URL: rabbit.getAmqpUrl() })\n  await replyTo(id, {{PROPAGATION_SECONDS}} * 1000)   // rejects when no reply comes in time\n})\n```",
       "hubWhen": {
         "DEFAULT": [
           "commands"
@@ -727,13 +919,43 @@
       "type": "fitness-fn",
       "label": "Message contracts valid",
       "x": 1040,
-      "y": 390,
+      "y": 650,
       "category": "structural",
-      "threshold": "0 AsyncAPI validation errors, and every queue or topic the parts use described in an AsyncAPI document",
-      "description": "CI validates every part's AsyncAPI document and checks that each channel the code uses (read from the broker configuration) is described in one of them.\n\nTool: AsyncAPI CLI\n\n```yaml\n# .github/workflows/contracts.yml\njobs:\n  asyncapi:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: |\n          for doc in services/*/asyncapi.yaml; do npx -y @asyncapi/cli validate \"$doc\"; done\n      - run: |\n          # every channel in the broker config is described in some AsyncAPI document\n          yq -r '.channels[].address' services/*/asyncapi.yaml | sort -u > described.txt\n          yq -r '.topics[].name' platform/broker/topics.yaml | sort -u > used.txt\n          comm -23 used.txt described.txt | tee undescribed.txt\n          [ ! -s undescribed.txt ]\n```",
+      "threshold": "0 AsyncAPI validation errors, 0 Spectral warnings, and every topic declared for the broker described in an AsyncAPI document",
+      "description": "CI validates and lints every part's AsyncAPI document and compares the channel addresses in the documents with the topics declared for the broker: Strimzi KafkaTopic manifests under platform/kafka/topics, and the topics of a managed broker (aws_sns_topic, google_pubsub_topic, azurerm_servicebus_topic, confluent_kafka_topic) read from the Terraform state under infra/ with the job's read access to it. A topic no document describes fails the job, and so does finding no topic at all.\n\nTool: AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions\n\n```yaml\n# .github/workflows/contracts.yml   (.spectral-asyncapi.yaml holds: extends: [\"spectral:asyncapi\"])\njobs:\n  asyncapi:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: |\n          for doc in services/*/asyncapi.yaml; do npx -y @asyncapi/cli validate \"$doc\"; done\n      - run: npx -y @stoplight/spectral-cli lint \"services/*/asyncapi.yaml\" --ruleset .spectral-asyncapi.yaml --fail-severity warn\n      - uses: hashicorp/setup-terraform@v3.1.2   # pin by commit SHA in your repository\n      - run: |\n          # every topic declared for the broker is described in some AsyncAPI document\n          shopt -s nullglob\n          yq '.channels[].address' services/*/asyncapi.yaml | sort -u > described.txt\n          manifests=(platform/kafka/topics/*.yaml)   # Strimzi KafkaTopic manifests\n          if [ ${#manifests[@]} -gt 0 ]; then yq '.spec.topicName // .metadata.name' \"${manifests[@]}\"; fi > used.txt\n          if [ -d infra ]; then                       # topics of a managed broker, from the Terraform state\n            terraform -chdir=infra init -input=false > /dev/null\n            terraform -chdir=infra show -json | jq -r '\n              def modules: ., (.child_modules[]? | modules);\n              .values.root_module | modules | .resources[]?\n              | select(.type | IN(\"aws_sns_topic\", \"google_pubsub_topic\", \"azurerm_servicebus_topic\", \"confluent_kafka_topic\"))\n              | .values.name // .values.topic_name' >> used.txt\n          fi\n          sort -u -o used.txt used.txt\n          [ -s used.txt ] || { echo \"no topics found in platform/kafka/topics or infra/\"; exit 1; }\n          comm -23 used.txt described.txt | tee undescribed.txt\n          [ ! -s undescribed.txt ]\n```",
       "hubWhen": {
         "DEFAULT": [
-          "commands",
+          "events",
+          "streams"
+        ]
+      }
+    },
+    {
+      "id": "ff-asyncapi-queues",
+      "type": "fitness-fn",
+      "label": "Command contracts valid",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "0 AsyncAPI validation errors, 0 Spectral warnings, and every queue declared for the broker described in an AsyncAPI document",
+      "description": "CI validates and lints every part's AsyncAPI document and compares the channel addresses in the documents with the queues declared for the broker: the RabbitMQ definitions file the broker is loaded with, and the queues of a managed broker (aws_sqs_queue, azurerm_servicebus_queue) read from the Terraform state under infra/. A queue no document describes fails the job, and so does finding no queue at all.\n\nTool: AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions\n\n```yaml\n# .github/workflows/contracts.yml   (.spectral-asyncapi.yaml holds: extends: [\"spectral:asyncapi\"])\njobs:\n  asyncapi:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: |\n          for doc in services/*/asyncapi.yaml; do npx -y @asyncapi/cli validate \"$doc\"; done\n      - run: npx -y @stoplight/spectral-cli lint \"services/*/asyncapi.yaml\" --ruleset .spectral-asyncapi.yaml --fail-severity warn\n      - uses: hashicorp/setup-terraform@v3.1.2   # pin by commit SHA in your repository\n      - run: |\n          # every queue declared for the broker is described in some AsyncAPI document\n          yq '.channels[].address' services/*/asyncapi.yaml | sort -u > described.txt\n          defs=platform/rabbitmq/definitions.json\n          if [ -f \"$defs\" ]; then jq -r '.queues[].name' \"$defs\"; fi > used.txt\n          if [ -d infra ]; then                       # queues of a managed broker, from the Terraform state\n            terraform -chdir=infra init -input=false > /dev/null\n            terraform -chdir=infra show -json | jq -r '\n              def modules: ., (.child_modules[]? | modules);\n              .values.root_module | modules | .resources[]?\n              | select(.type | IN(\"aws_sqs_queue\", \"azurerm_servicebus_queue\")) | .values.name' >> used.txt\n          fi\n          sort -u -o used.txt used.txt\n          [ -s used.txt ] || { echo \"no queues found in $defs or infra/\"; exit 1; }\n          comm -23 used.txt described.txt | tee undescribed.txt\n          [ ! -s undescribed.txt ]\n```",
+      "hubWhen": {
+        "DEFAULT": [
+          "commands"
+        ]
+      }
+    },
+    {
+      "id": "ff-no-sync-calls",
+      "type": "fitness-fn",
+      "label": "No undecided synchronous call",
+      "x": 1040,
+      "y": 910,
+      "category": "holistic",
+      "threshold": "0 synchronous calls between back-end parts in the traces of the end-to-end journeys outside the recorded exceptions",
+      "description": "From the same traces as the depth check, the test pairs each client span with the server span it produced in another part and checks the pair against the list of recorded exceptions (caller, callee, ADR); a call to a system outside has no server span and is not counted, and the suite's own requests to the back end are not spans.\n\nTool: Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5\n\n```ts\nimport { expect, it } from 'vitest'\nimport exceptions from './sync-call-exceptions.json'   // [{ \"from\": \"ordering\", \"to\": \"payment\", \"adr\": \"ADR-023 Payment authorisation is synchronous\" }]\nimport { journeys } from './journeys'\nimport { newTraceId, trace, traceparent } from './traces'\n\nit.each(journeys)('$name makes no synchronous call between back-end parts outside the recorded exceptions', async (journey) => {\n  const traceId = newTraceId()\n  await journey.run({ traceparent: traceparent(traceId) })\n  const spans = await trace(traceId)\n  const calls = spans.filter((s) => s.rpc).map((client) => ({\n    from: client.service,\n    to: spans.find((s) => s.kind === 'server' && s.parent === client.id)?.service,   // undefined: a system outside\n  }))\n  const undecided = calls.filter((c) => c.to && !exceptions.some((e) => e.from === c.from && e.to === c.to))\n  expect(undecided).toEqual([])\n})\n```",
+      "hubWhen": {
+        "DEFAULT": [
           "events",
           "streams"
         ]
@@ -744,10 +966,10 @@
       "type": "fitness-fn",
       "label": "Events applied in time",
       "x": 1040,
-      "y": 520,
+      "y": 1040,
       "category": "operational",
       "threshold": "99th percentile of the time from publishing an event to its being applied by each subscriber at most {{PROPAGATION_SECONDS}} seconds over 10 minutes",
-      "description": "Each subscriber records, for every event it applies, the seconds since the event's time attribute as a histogram labelled with the subscriber; an alert fires when the 99th percentile passes the limit.\n\nTool: Prometheus alerting rule\n\n```yaml\ngroups:\n  - name: event-propagation\n    rules:\n      - alert: EventsAppliedLate\n        expr: |\n          histogram_quantile(0.99, sum by (le, subscriber) (rate(event_applied_delay_seconds_bucket[10m]))) > {{PROPAGATION_SECONDS}}\n        for: 10m\n        labels: { severity: page }\n        annotations:\n          summary: \"{{ $labels.subscriber }} applies events later than {{PROPAGATION_SECONDS}} s\"\n```",
+      "description": "Each subscriber records, for every event it applies, the seconds since the event's time attribute as a histogram event_applied_delay_seconds labelled with the subscriber; an alert fires when the 99th percentile passes the limit.\n\nTool: Prometheus alerting rule (the histogram is exported by the subscribers with the OpenTelemetry metrics SDK or Micrometer)\n\n```yaml\ngroups:\n  - name: event-propagation\n    rules:\n      - alert: EventsAppliedLate\n        expr: |\n          histogram_quantile(0.99, sum by (le, subscriber) (rate(event_applied_delay_seconds_bucket[10m]))) > {{PROPAGATION_SECONDS}}\n        for: 10m\n        labels: { severity: page }\n        annotations:\n          summary: \"{{ $labels.subscriber }} applies events later than {{PROPAGATION_SECONDS}} s\"\n```",
       "hubWhen": {
         "DEFAULT": [
           "events",
@@ -760,10 +982,10 @@
       "type": "fitness-fn",
       "label": "Log keeps events",
       "x": 1040,
-      "y": 650,
+      "y": 1170,
       "category": "structural",
-      "threshold": "0 deleting topics retaining events for less than {{RETENTION_DAYS}} days",
-      "description": "Topics are declared as Strimzi KafkaTopic resources; a policy run in CI over the manifests refuses a deleting topic whose retention is shorter than the limit (compacted topics keep the latest state per key and pass).\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\nimport rego.v1\n\nmin_ms := {{RETENTION_DAYS}} * 24 * 60 * 60 * 1000\n\ndeny contains msg if {\n  input.kind == \"KafkaTopic\"\n  cfg := object.get(input.spec, \"config\", {})\n  object.get(cfg, \"cleanup.policy\", \"delete\") == \"delete\"\n  retention := to_number(object.get(cfg, \"retention.ms\", 604800000))\n  retention >= 0\n  retention < min_ms\n  msg := sprintf(\"topic %s keeps events less than {{RETENTION_DAYS}} days\", [input.metadata.name])\n}\n```",
+      "threshold": "0 deleting topics (cleanup.policy delete or compact,delete) retaining events for less than {{RETENTION_DAYS}} days",
+      "description": "Topics are declared as Strimzi KafkaTopic manifests under platform/kafka/topics; a policy run in CI over the manifests refuses a topic whose cleanup policy deletes and whose retention is shorter than the limit (a purely compacted topic keeps the latest state per key and passes).\n\nTool: Conftest (Open Policy Agent, rego.v1) over the KafkaTopic manifests; for a managed Kafka declared in Terraform: the same rule over the config of confluent_kafka_topic resources in terraform show -json\n\n```rego\npackage main\nimport rego.v1\n\nmin_ms := {{RETENTION_DAYS}} * 24 * 60 * 60 * 1000\n\ndeny contains msg if {\n  input.kind == \"KafkaTopic\"\n  cfg := object.get(input.spec, \"config\", {})\n  contains(object.get(cfg, \"cleanup.policy\", \"delete\"), \"delete\")   # \"delete\" and \"compact,delete\" both delete\n  retention := to_number(object.get(cfg, \"retention.ms\", 604800000))\n  retention >= 0\n  retention < min_ms\n  msg := sprintf(\"topic %s keeps events less than {{RETENTION_DAYS}} days\", [input.metadata.name])\n}\n```",
       "hubWhen": {
         "DEFAULT": [
           "streams"
@@ -775,10 +997,10 @@
       "type": "fitness-fn",
       "label": "Call contracts linted",
       "x": 1040,
-      "y": 780,
+      "y": 1300,
       "category": "structural",
-      "threshold": "0 errors or warnings from the house ruleset on every OpenAPI and AsyncAPI document",
-      "description": "Spectral lints every contract with the built-in OpenAPI and AsyncAPI rulesets plus house rules (operation ids, error schema, deadline header) and fails the build on a warning.\n\nTool: Spectral\n\n```yaml\n# .spectral.yaml   —   npx @stoplight/spectral-cli lint \"services/*/{openapi,asyncapi}.yaml\" --fail-severity warn\nextends: [\"spectral:oas\", \"spectral:asyncapi\"]\nrules:\n  operation-operationId: error\n  errors-use-problem-json:\n    description: Every error response is application/problem+json\n    given: \"$.paths.*.*.responses[?(@property >= '400')].content\"\n    then: { field: \"application/problem+json\", function: truthy }\n    severity: error\n```",
+      "threshold": "0 errors or warnings from the house ruleset on every OpenAPI document",
+      "description": "Spectral lints every part's OpenAPI document with the built-in OpenAPI ruleset plus the house rules (operation ids, problem+json errors) and fails the build on a warning.\n\nTool: Spectral (spectral:oas); for Buf-generated OpenAPI from .proto files the same ruleset applies\n\n```yaml\n# .spectral.yaml   —   npx -y @stoplight/spectral-cli lint \"services/*/openapi.yaml\" --fail-severity warn\nextends: [\"spectral:oas\"]\nrules:\n  operation-operationId: error\n  errors-use-problem-json:\n    description: Every error response is application/problem+json\n    given: \"$.paths.*.*.responses[?(@property >= '400')].content\"\n    then: { field: \"application/problem+json\", function: truthy }\n    severity: error\n```",
       "hubWhen": {
         "SYNC_API": [
           "rest"
@@ -790,10 +1012,10 @@
       "type": "fitness-fn",
       "label": "Proto contracts checked",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "structural",
       "threshold": "0 buf lint errors and 0 breaking changes against the main branch in the .proto files",
-      "description": "Buf lints every .proto file with its standard rules and compares them with the main branch, failing on a field number reused, a field removed or a type changed. Deadlines are required by the house client wrapper, not by the contract.\n\nTool: Buf\n\n```yaml\n# buf.yaml\nversion: v2\nmodules:\n  - path: proto\nlint:\n  use: [STANDARD]\nbreaking:\n  use: [FILE]\n# CI:\n#   buf lint\n#   buf breaking --against '.git#branch=main'\n```",
+      "description": "Buf lints every .proto file with its STANDARD rules and compares them with the main branch, failing on a field number reused, a field removed or a type changed. Deadlines are set by the house client wrapper, not by the contract.\n\nTool: Buf (buf lint, buf breaking)\n\n```yaml\n# buf.yaml\nversion: v2\nmodules:\n  - path: proto\nlint:\n  use: [STANDARD]\nbreaking:\n  use: [FILE]\n# CI:\n#   buf lint\n#   buf breaking --against '.git#branch=main'\n```",
       "hubWhen": {
         "SYNC_API": [
           "grpc"
@@ -805,10 +1027,10 @@
       "type": "fitness-fn",
       "label": "No breaking contract change",
       "x": 1040,
-      "y": 1040,
+      "y": 1560,
       "category": "structural",
       "threshold": "0 breaking changes against the main branch in OpenAPI and AsyncAPI documents",
-      "description": "For each changed contract, CI compares the new version with the one on main: oasdiff for OpenAPI, the AsyncAPI CLI's diff for AsyncAPI (Buf covers .proto files). A breaking change fails the build.\n\nTool: oasdiff and AsyncAPI CLI (diff)\n\n```bash\nset -euo pipefail\nfor doc in services/*/openapi.yaml; do\n  git show \"origin/main:$doc\" > base.yaml 2>/dev/null || continue   # new contract\n  oasdiff breaking base.yaml \"$doc\" --fail-on ERR\ndone\nfor doc in services/*/asyncapi.yaml; do\n  git show \"origin/main:$doc\" > base.yaml 2>/dev/null || continue\n  npx -y @asyncapi/cli diff base.yaml \"$doc\" --type breaking --format json > breaking.json\n  [ \"$(jq length breaking.json)\" -eq 0 ] || { cat breaking.json; exit 1; }\ndone\n```",
+      "description": "For each changed contract, CI compares the new version with the one on main: oasdiff for OpenAPI, the AsyncAPI CLI's diff for AsyncAPI (Buf covers .proto files, see Proto contracts checked). A breaking change fails the build.\n\nTool: oasdiff (breaking --fail-on ERR) and AsyncAPI CLI (diff, which exits with an error on a breaking change)\n\n```bash\nset -euo pipefail\nfor doc in services/*/openapi.yaml; do\n  git show \"origin/main:$doc\" > base.yaml 2>/dev/null || continue   # new contract\n  oasdiff breaking --fail-on ERR base.yaml \"$doc\"\ndone\nfor doc in services/*/asyncapi.yaml; do\n  git show \"origin/main:$doc\" > base.yaml 2>/dev/null || continue\n  npx -y @asyncapi/cli diff base.yaml \"$doc\" --type breaking --format json   # exits non-zero on a breaking change\ndone\n```",
       "hubWhen": {
         "CONTRACTS": [
           "spec"
@@ -820,10 +1042,10 @@
       "type": "fitness-fn",
       "label": "Consumers' pacts pass",
       "x": 1040,
-      "y": 1170,
+      "y": 1690,
       "category": "process",
-      "threshold": "100% of the pacts of consumer versions on main or in production verified before each deploy; 0 deploys refused by can-i-deploy that went ahead",
-      "description": "Every provider build verifies the pacts of its consumers (HTTP interactions with the Verifier, messages with MessageProviderPact) and publishes the result to the Pact Broker; the deploy job runs can-i-deploy first.\n\nTool: Pact (pact-js) and Pact Broker\n\n```ts\nimport { Verifier } from '@pact-foundation/pact'\n\nit('honours every consumer\\'s pact', () =>\n  new Verifier({\n    provider: 'ordering',\n    providerBaseUrl: 'http://localhost:8080',\n    pactBrokerUrl: process.env.PACT_BROKER_URL,\n    consumerVersionSelectors: [{ mainBranch: true }, { deployedOrReleased: true }],\n    publishVerificationResult: true,\n    providerVersion: process.env.GIT_SHA,\n    providerVersionBranch: process.env.GIT_BRANCH,\n  }).verifyProvider())\n\n// deploy job, before deploying:\n//   npx pact-broker can-i-deploy --pacticipant ordering --version $GIT_SHA --to-environment production\n```",
+      "threshold": "100% of the pacts of consumer versions on main or deployed verified in every provider build; 0 deploys without a passing can-i-deploy answer",
+      "description": "Every provider build verifies the pacts of its consumers (HTTP interactions with the Verifier, messages with MessageProviderPact) and publishes the result to the Pact Broker; the deploy job runs can-i-deploy first and records the deployment after.\n\nTool: Pact (pact-js Verifier and MessageProviderPact; for gRPC the pact-protobuf-plugin through pact-js's plugin API, PactV4) and the Pact Broker CLI from @pact-foundation/pact-cli; for the JVM: pact-jvm's @PactBroker provider tests with the same CLI\n\n```ts\nimport { Verifier } from '@pact-foundation/pact'\nimport { it } from 'vitest'\n\nit('honours every consumer\\'s pact', () =>\n  new Verifier({\n    provider: 'ordering',\n    providerBaseUrl: 'http://localhost:8080',\n    pactBrokerUrl: process.env.PACT_BROKER_URL,\n    pactBrokerToken: process.env.PACT_BROKER_TOKEN,\n    consumerVersionSelectors: [{ mainBranch: true }, { deployedOrReleased: true }],\n    publishVerificationResult: true,\n    providerVersion: process.env.GIT_SHA,\n    providerVersionBranch: process.env.GIT_BRANCH,\n  }).verifyProvider())\n\n// deploy job, before and after deploying (the one CLI; `npx pact-broker` alone does not exist):\n//   npx --package=@pact-foundation/pact-cli pact-broker can-i-deploy --pacticipant ordering --version \"$GIT_SHA\" \\\n//     --to-environment production --broker-base-url \"$PACT_BROKER_URL\" --broker-token \"$PACT_BROKER_TOKEN\" \\\n//     --retry-while-unknown 6 --retry-interval 10\n//   ./deploy.sh services/ordering\n//   npx --package=@pact-foundation/pact-cli pact-broker record-deployment --pacticipant ordering --version \"$GIT_SHA\" \\\n//     --environment production --broker-base-url \"$PACT_BROKER_URL\" --broker-token \"$PACT_BROKER_TOKEN\"\n```",
       "hubWhen": {
         "CONTRACTS": [
           "pact"
@@ -835,13 +1057,32 @@
       "type": "fitness-fn",
       "label": "Workflows compensate",
       "x": 1040,
-      "y": 1300,
+      "y": 1820,
       "category": "structural",
       "threshold": "Every workflow has a test in which each step that changes data fails once and the earlier steps are compensated",
-      "description": "Workflow tests run in Temporal's test environment with time skipping and mocked activities; for each step the test makes it fail and verifies the compensations of the earlier steps ran.\n\nTool: Temporal Java SDK testing (TestWorkflowExtension)\n\n```java\nclass PlaceOrderWorkflowTest {\n  @RegisterExtension\n  static final TestWorkflowExtension temporal = TestWorkflowExtension.newBuilder()\n      .setWorkflowTypes(PlaceOrderWorkflowImpl.class)\n      .setDoNotStart(true)\n      .build();\n\n  @Test\n  void releasesStockWhenPaymentFails(TestWorkflowEnvironment env, Worker worker, PlaceOrderWorkflow workflow) {\n    var inventory = mock(InventoryActivities.class, withSettings().withoutAnnotations());\n    var payment = mock(PaymentActivities.class, withSettings().withoutAnnotations());\n    when(payment.charge(any())).thenThrow(ApplicationFailure.newNonRetryableFailure(\"declined\", \"PaymentDeclined\"));\n    worker.registerActivitiesImplementations(inventory, payment);\n    env.start();\n\n    assertThrows(WorkflowFailedException.class, () -> workflow.place(ORDER));\n    verify(inventory).release(ORDER.id());\n  }\n}\n```",
+      "description": "Workflow tests run in Temporal's time-skipping test environment with the activities mocked; for each step the test makes it fail with a non-retryable failure and verifies the compensations of the earlier steps ran.\n\nTool: Temporal TypeScript SDK (@temporalio/testing) with Vitest; for the JVM: Temporal's TestWorkflowExtension with JUnit 5\n\n```ts\nimport { WorkflowFailedError } from '@temporalio/client'\nimport { ApplicationFailure } from '@temporalio/common'\nimport { TestWorkflowEnvironment } from '@temporalio/testing'\nimport { Worker } from '@temporalio/worker'\nimport { afterAll, beforeAll, expect, it, vi } from 'vitest'\nimport type * as activities from '../src/activities'\nimport { placeOrder } from '../src/workflows'\n\nconst ORDER = { id: 'order-1', sku: 'SKU-1', quantity: 2, amountCents: 4200 }   // the workflow's input, as src/workflows declares it\n\nlet env: TestWorkflowEnvironment\nbeforeAll(async () => { env = await TestWorkflowEnvironment.createTimeSkipping() })\nafterAll(async () => { await env?.teardown() })\n\nit('releases the stock when the payment is declined', async () => {\n  const mocks = {\n    reserveStock: vi.fn(async () => 'reservation-1'),\n    releaseStock: vi.fn(async () => {}),\n    charge: vi.fn(async () => { throw ApplicationFailure.nonRetryable('declined', 'PaymentDeclined') }),\n    bookShipping: vi.fn(async () => 'shipment-1'),\n  } satisfies typeof activities\n  const worker = await Worker.create({\n    connection: env.nativeConnection,\n    taskQueue: 'test',\n    workflowsPath: new URL('../src/workflows.ts', import.meta.url).pathname,\n    activities: mocks,\n  })\n  await expect(worker.runUntil(\n    env.client.workflow.execute(placeOrder, { args: [ORDER], workflowId: 'order-1', taskQueue: 'test' }),\n  )).rejects.toBeInstanceOf(WorkflowFailedError)\n  expect(mocks.releaseStock).toHaveBeenCalledWith('reservation-1')\n  expect(mocks.bookShipping).not.toHaveBeenCalled()\n})\n```",
       "hubWhen": {
         "FLOWS": [
           "orchestration"
+        ]
+      }
+    },
+    {
+      "id": "ff-workflow-fallback",
+      "type": "fitness-fn",
+      "label": "Workflows compensate",
+      "x": 1040,
+      "y": 1950,
+      "category": "structural",
+      "threshold": "Every workflow has a test in which each step that changes data fails once and the earlier steps are compensated",
+      "description": "Workflow tests run in Temporal's time-skipping test environment with the activities mocked; for each step the test makes it fail with a non-retryable failure and verifies the compensations of the earlier steps ran.\n\nTool: Temporal TypeScript SDK (@temporalio/testing) with Vitest; for the JVM: Temporal's TestWorkflowExtension with JUnit 5\n\n```ts\nimport { WorkflowFailedError } from '@temporalio/client'\nimport { ApplicationFailure } from '@temporalio/common'\nimport { TestWorkflowEnvironment } from '@temporalio/testing'\nimport { Worker } from '@temporalio/worker'\nimport { afterAll, beforeAll, expect, it, vi } from 'vitest'\nimport type * as activities from '../src/activities'\nimport { placeOrder } from '../src/workflows'\n\nconst ORDER = { id: 'order-1', sku: 'SKU-1', quantity: 2, amountCents: 4200 }   // the workflow's input, as src/workflows declares it\n\nlet env: TestWorkflowEnvironment\nbeforeAll(async () => { env = await TestWorkflowEnvironment.createTimeSkipping() })\nafterAll(async () => { await env?.teardown() })\n\nit('releases the stock when the payment is declined', async () => {\n  const mocks = {\n    reserveStock: vi.fn(async () => 'reservation-1'),\n    releaseStock: vi.fn(async () => {}),\n    charge: vi.fn(async () => { throw ApplicationFailure.nonRetryable('declined', 'PaymentDeclined') }),\n    bookShipping: vi.fn(async () => 'shipment-1'),\n  } satisfies typeof activities\n  const worker = await Worker.create({\n    connection: env.nativeConnection,\n    taskQueue: 'test',\n    workflowsPath: new URL('../src/workflows.ts', import.meta.url).pathname,\n    activities: mocks,\n  })\n  await expect(worker.runUntil(\n    env.client.workflow.execute(placeOrder, { args: [ORDER], workflowId: 'order-1', taskQueue: 'test' }),\n  )).rejects.toBeInstanceOf(WorkflowFailedError)\n  expect(mocks.releaseStock).toHaveBeenCalledWith('reservation-1')\n  expect(mocks.bookShipping).not.toHaveBeenCalled()\n})\n```",
+      "hubWhen": {
+        "FLOWS": [
+          "choreography"
+        ],
+        "DEFAULT": [
+          "sync",
+          "commands"
         ]
       }
     },
@@ -850,13 +1091,32 @@
       "type": "fitness-fn",
       "label": "Stuck flows alerted",
       "x": 1040,
-      "y": 1430,
+      "y": 2080,
       "category": "operational",
       "threshold": "0 flow instances open longer than {{FLOW_MINUTES}} minutes without an alert",
-      "description": "A process monitor subscribes to the start and end events of each documented flow, correlated by id, and exports the age of the oldest open instance per flow; the alert names the flow and goes to the owner of the step expected next.\n\nTool: Prometheus alerting rule\n\n```yaml\ngroups:\n  - name: choreographed-flows\n    rules:\n      - alert: FlowStuck\n        expr: max by (flow, next_step_owner) (flow_oldest_open_instance_seconds) > {{FLOW_MINUTES}} * 60\n        labels: { severity: ticket }\n        annotations:\n          summary: \"A {{ $labels.flow }} flow has been open for more than {{FLOW_MINUTES}} minutes\"\n```",
+      "description": "A process monitor subscribes to the start and end events of each documented flow, correlated by id, and exports the age of the oldest open instance per flow as flow_oldest_open_instance_seconds; the alert names the flow and goes to the owner of the step expected next.\n\nTool: Prometheus alerting rule (the gauge is exported by the process monitor)\n\n```yaml\ngroups:\n  - name: choreographed-flows\n    rules:\n      - alert: FlowStuck\n        expr: max by (flow, next_step_owner) (flow_oldest_open_instance_seconds) > {{FLOW_MINUTES}} * 60\n        labels: { severity: ticket }\n        annotations:\n          summary: \"A {{ $labels.flow }} flow has been open for more than {{FLOW_MINUTES}} minutes\"\n```",
       "hubWhen": {
         "FLOWS": [
           "choreography"
+        ],
+        "DEFAULT": [
+          "events",
+          "streams"
+        ]
+      }
+    },
+    {
+      "id": "ff-local-flows",
+      "type": "fitness-fn",
+      "label": "No write crosses a part",
+      "x": 1040,
+      "y": 2210,
+      "category": "holistic",
+      "threshold": "0 client spans with a mutating method (POST, PUT, PATCH, DELETE) between parts in the traces of the journeys that change data",
+      "description": "From the same traces as the depth check, the test lists the HTTP client spans of each data-changing journey and fails on one whose method changes data in another part; reads between parts pass. For gRPC the mutating methods are named in a list instead of taken from the HTTP method.\n\nTool: Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5\n\n```ts\nimport { expect, it } from 'vitest'\nimport { journeys } from './journeys'\nimport { newTraceId, trace, traceparent } from './traces'\n\nconst MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])\n\nit.each(journeys.filter((j) => j.changesData))('$name changes data in one part only', async (journey) => {\n  const traceId = newTraceId()\n  await journey.run({ traceparent: traceparent(traceId) })\n  const spans = await trace(traceId)\n  const writesElsewhere = spans\n    .filter((s) => s.rpc && MUTATING.has(s.method ?? ''))\n    .map((client) => ({ from: client.service, to: spans.find((s) => s.kind === 'server' && s.parent === client.id)?.service, method: client.method }))\n    .filter((c) => c.to !== undefined)   // a system outside is not a part\n  expect(writesElsewhere).toEqual([])\n})\n```",
+      "hubWhen": {
+        "FLOWS": [
+          "local"
         ]
       }
     }
@@ -913,6 +1173,12 @@
     {
       "id": "req-orchestrated--derives--need",
       "sourceId": "req-orchestrated",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-orchestrated-fallback--derives--need",
+      "sourceId": "req-orchestrated-fallback",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -995,6 +1261,12 @@
       "relationType": "verifies"
     },
     {
+      "id": "sc-orchestrated-fallback--verifies--req-orchestrated-fallback",
+      "sourceId": "sc-orchestrated-fallback",
+      "targetId": "req-orchestrated-fallback",
+      "relationType": "verifies"
+    },
+    {
       "id": "sc-choreographed--verifies--req-choreographed",
       "sourceId": "sc-choreographed",
       "targetId": "req-choreographed",
@@ -1049,14 +1321,38 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-command-reply--implements--adr-commands",
-      "sourceId": "ff-command-reply",
+      "id": "ff-budget--implements--adr-commands",
+      "sourceId": "ff-budget",
       "targetId": "adr-commands",
       "relationType": "implements"
     },
     {
-      "id": "ff-asyncapi--implements--adr-commands",
-      "sourceId": "ff-asyncapi",
+      "id": "ff-budget--implements--adr-events",
+      "sourceId": "ff-budget",
+      "targetId": "adr-events",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-budget--implements--adr-streams",
+      "sourceId": "ff-budget",
+      "targetId": "adr-streams",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-deadline--implements--adr-rest",
+      "sourceId": "ff-deadline",
+      "targetId": "adr-rest",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-deadline-grpc--implements--adr-grpc",
+      "sourceId": "ff-deadline-grpc",
+      "targetId": "adr-grpc",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-command-reply--implements--adr-commands",
+      "sourceId": "ff-command-reply",
       "targetId": "adr-commands",
       "relationType": "implements"
     },
@@ -1069,6 +1365,24 @@
     {
       "id": "ff-asyncapi--implements--adr-streams",
       "sourceId": "ff-asyncapi",
+      "targetId": "adr-streams",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-asyncapi-queues--implements--adr-commands",
+      "sourceId": "ff-asyncapi-queues",
+      "targetId": "adr-commands",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-sync-calls--implements--adr-events",
+      "sourceId": "ff-no-sync-calls",
+      "targetId": "adr-events",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-sync-calls--implements--adr-streams",
+      "sourceId": "ff-no-sync-calls",
       "targetId": "adr-streams",
       "relationType": "implements"
     },
@@ -1091,99 +1405,27 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-openapi--implements--adr-sync",
+      "id": "ff-openapi--implements--adr-rest",
       "sourceId": "ff-openapi",
-      "targetId": "adr-sync",
+      "targetId": "adr-rest",
       "relationType": "implements"
     },
     {
-      "id": "ff-openapi--implements--adr-commands",
-      "sourceId": "ff-openapi",
-      "targetId": "adr-commands",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-openapi--implements--adr-events",
-      "sourceId": "ff-openapi",
-      "targetId": "adr-events",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-openapi--implements--adr-streams",
-      "sourceId": "ff-openapi",
-      "targetId": "adr-streams",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-buf--implements--adr-sync",
+      "id": "ff-buf--implements--adr-grpc",
       "sourceId": "ff-buf",
-      "targetId": "adr-sync",
+      "targetId": "adr-grpc",
       "relationType": "implements"
     },
     {
-      "id": "ff-buf--implements--adr-commands",
-      "sourceId": "ff-buf",
-      "targetId": "adr-commands",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-buf--implements--adr-events",
-      "sourceId": "ff-buf",
-      "targetId": "adr-events",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-buf--implements--adr-streams",
-      "sourceId": "ff-buf",
-      "targetId": "adr-streams",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-breaking--implements--adr-sync",
+      "id": "ff-breaking--implements--adr-contract-diffs",
       "sourceId": "ff-breaking",
-      "targetId": "adr-sync",
+      "targetId": "adr-contract-diffs",
       "relationType": "implements"
     },
     {
-      "id": "ff-breaking--implements--adr-commands",
-      "sourceId": "ff-breaking",
-      "targetId": "adr-commands",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-breaking--implements--adr-events",
-      "sourceId": "ff-breaking",
-      "targetId": "adr-events",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-breaking--implements--adr-streams",
-      "sourceId": "ff-breaking",
-      "targetId": "adr-streams",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-pact--implements--adr-sync",
+      "id": "ff-pact--implements--adr-consumer-contracts",
       "sourceId": "ff-pact",
-      "targetId": "adr-sync",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-pact--implements--adr-commands",
-      "sourceId": "ff-pact",
-      "targetId": "adr-commands",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-pact--implements--adr-events",
-      "sourceId": "ff-pact",
-      "targetId": "adr-events",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-pact--implements--adr-streams",
-      "sourceId": "ff-pact",
-      "targetId": "adr-streams",
+      "targetId": "adr-consumer-contracts",
       "relationType": "implements"
     },
     {
@@ -1193,9 +1435,21 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-workflow-fallback--implements--adr-orchestration-fallback",
+      "sourceId": "ff-workflow-fallback",
+      "targetId": "adr-orchestration-fallback",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-stuck-flows--implements--adr-choreography",
       "sourceId": "ff-stuck-flows",
       "targetId": "adr-choreography",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-local-flows--implements--adr-local-flows",
+      "sourceId": "ff-local-flows",
+      "targetId": "adr-local-flows",
       "relationType": "implements"
     }
   ]

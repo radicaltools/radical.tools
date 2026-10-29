@@ -27,8 +27,36 @@
         "url": "https://web.dev/articles/vitals"
       },
       {
+        "title": "web.dev: Performance budgets 101",
+        "url": "https://web.dev/articles/performance-budgets-101"
+      },
+      {
+        "title": "web.dev: Rendering on the web",
+        "url": "https://web.dev/articles/rendering-on-the-web"
+      },
+      {
+        "title": "web.dev: Time to First Byte (TTFB)",
+        "url": "https://web.dev/articles/ttfb"
+      },
+      {
+        "title": "web.dev: Prevent unnecessary network requests with the HTTP Cache",
+        "url": "https://web.dev/articles/http-cache"
+      },
+      {
         "title": "W3C: Web Content Accessibility Guidelines (WCAG) 2.2",
         "url": "https://www.w3.org/TR/WCAG22/"
+      },
+      {
+        "title": "ETSI EN 301 549: Accessibility requirements for ICT products and services",
+        "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
+      },
+      {
+        "title": "W3C Design Tokens Community Group: Design Tokens Format Module",
+        "url": "https://tr.designtokens.org/format/"
+      },
+      {
+        "title": "Tailwind CSS documentation: theme variables",
+        "url": "https://tailwindcss.com/docs/theme"
       },
       {
         "title": "Browserslist",
@@ -82,7 +110,7 @@
           {
             "value": "htmx",
             "label": "server-rendered HTML with htmx",
-            "description": "The back end renders HTML from templates; htmx swaps parts of the page, and Alpine.js holds small client state. Pick it for forms-and-tables applications when the team is back-end heavy and rich client-side interaction is rare."
+            "description": "The back end renders HTML from templates; htmx swaps parts of the page, and Alpine.js holds small client state. Pick it for forms-and-tables applications when the team is back-end heavy and rich client-side interaction is rare. The rendering question does not apply: every page is rendered on the server (answer SSR)."
           }
         ]
       },
@@ -90,23 +118,23 @@
         "key": "RENDERING",
         "title": "Rendering",
         "label": "Where are pages rendered?",
-        "hint": "Rendering decides what the first response holds: an empty shell, the content, or a file built in advance. It sets first-load speed, search visibility and what the server must do.",
+        "hint": "Rendering decides what the first response holds: an empty shell, the content, or a file built in advance. It sets first-load speed, search visibility and what the server must do. Only when the framework is not htmx, which renders every page on the server: answer SSR there.",
         "defaultValue": "ssr",
         "options": [
           {
             "value": "spa",
             "label": "in the browser (single-page app)",
-            "description": "The server sends a shell and the browser renders everything. Pick it for applications behind sign-in, used for long sessions, where search engines do not matter and later navigation must be instant."
+            "description": "The server sends a shell and the browser renders everything. Pick it for applications behind sign-in, used for long sessions, where search engines do not matter and later navigation must be instant. Not with htmx."
           },
           {
             "value": "ssr",
             "label": "on the server for each request (SSR)",
-            "description": "Each request gets HTML with its content, then the page becomes interactive. Pick it for public pages with personalised or fast-changing content where search and first load matter."
+            "description": "Each request gets HTML with its content, then the page becomes interactive. Pick it for public pages with personalised or fast-changing content where search and first load matter, and always with htmx."
           },
           {
             "value": "static",
             "label": "at build time (static generation)",
-            "description": "Pages are built in advance and served from a CDN, rebuilt when content changes. Pick it for content that is the same for everyone and changes at most a few times an hour (marketing, documentation, catalogues)."
+            "description": "Pages are built in advance and served from a CDN, rebuilt when content changes. Pick it for content that is the same for everyone and changes at most a few times an hour (marketing, documentation, catalogues). Not with htmx."
           }
         ]
       },
@@ -120,12 +148,12 @@
           {
             "value": "own",
             "label": "our own design system",
-            "description": "Our components and design tokens, built on accessible headless primitives (Radix, React Aria, Angular CDK), documented in Storybook. Pick it when the brand must be distinct and several applications share it, and a team can own it."
+            "description": "Our components and design tokens, built on accessible headless primitives (Radix or React Aria for React, Angular CDK, Reka UI for Vue, Bits UI for Svelte; template partials with htmx), documented in Storybook. Pick it when the brand must be distinct and several applications share it, and a team can own it."
           },
           {
             "value": "library",
             "label": "an established component library",
-            "description": "An off-the-shelf library themed to the brand: MUI, Angular Material, Vuetify, PrimeNG, Fluent UI, Skeleton. Pick it for business applications where speed matters more than a distinct look."
+            "description": "An off-the-shelf library themed to the brand: MUI, Angular Material, Vuetify, PrimeNG, Fluent UI, Skeleton; with htmx a CSS library such as Bootstrap or Pico. Pick it for business applications where speed matters more than a distinct look."
           },
           {
             "value": "utility",
@@ -144,7 +172,7 @@
           {
             "value": "modern",
             "label": "the last two versions of Chrome, Edge, Firefox and Safari",
-            "description": "Only current evergreen browsers. Pick it for internal tools and applications whose users have managed, up-to-date devices."
+            "description": "Only current evergreen browsers; older ones get a notice naming the supported browsers. Pick it for internal tools and applications whose users have managed, up-to-date devices."
           },
           {
             "value": "defaults",
@@ -154,7 +182,7 @@
           {
             "value": "extended",
             "label": "an extended list, including older phones (iOS 15 and later)",
-            "description": "Over 0.2% use, last 3 versions, Firefox ESR, iOS Safari 15 and later. Pick it when analytics show many users on older phones (emerging markets, public services that must reach everyone)."
+            "description": "Over 0.2% use, last 3 versions, Firefox ESR, iOS Safari 15 and later, with release candidates tried on real old phones. Pick it when analytics show many users on older phones (emerging markets, public services that must reach everyone)."
           }
         ]
       },
@@ -199,7 +227,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Frontend stack",
-      "description": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain."
+      "description": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-one-framework",
@@ -218,8 +246,8 @@
       "x": 260,
       "y": 130,
       "ears_type": "ubiquitous",
-      "action": "meet, at the 75th percentile of real page loads on mobile and desktop, a Largest Contentful Paint within {{LCP_MS}} ms, an Interaction to Next Paint within {{INP_MS}} ms and a Cumulative Layout Shift of at most {{CLS}}",
-      "rationale": "These are the thresholds for a \"good\" experience, measured at the 75th percentile of field data (web.dev, Web Vitals: LCP 2.5 s, INP 200 ms, CLS 0.1); they also feed search ranking."
+      "action": "meet, at the 75th percentile of real page loads over 28 days per page group, a Largest Contentful Paint within {{LCP_MS}} ms, an Interaction to Next Paint within {{INP_MS}} ms and a Cumulative Layout Shift of at most {{CLS}}",
+      "rationale": "These are the thresholds for a \"good\" experience, measured at the 75th percentile of field data over 28 days (web.dev, Web Vitals: LCP 2.5 s, INP 200 ms, CLS 0.1); they also feed search ranking."
     },
     {
       "id": "req-bundle",
@@ -229,7 +257,7 @@
       "y": 260,
       "ears_type": "ubiquitous",
       "action": "keep the JavaScript a route loads before it is interactive within {{JS_KB}} KB compressed, loading the rest on demand",
-      "rationale": "JavaScript is the costliest byte on a phone: it is downloaded, parsed and run on the main thread, which is what INP measures (web.dev, performance budgets)."
+      "rationale": "JavaScript is the costliest byte on a phone: it is downloaded, parsed and run on the main thread, which is what INP measures (web.dev, Performance budgets 101)."
     },
     {
       "id": "req-a11y",
@@ -239,7 +267,7 @@
       "y": 390,
       "ears_type": "ubiquitous",
       "action": "conform to WCAG 2.2 level AA on every page, with 0 serious or critical automated accessibility violations, every function operable by keyboard alone, and a manual audit with a screen reader before each major release",
-      "rationale": "WCAG 2.2 AA is the level EN 301 549, the European Accessibility Act and most public-sector rules require; automated checks find only part of the failures, hence the manual audit (W3C WCAG 2.2)."
+      "rationale": "WCAG 2.2 AA is the level EN 301 549, the European Accessibility Act and most public-sector rules require; automated checks find only part of the failures, hence the keyboard journey and the manual audit (W3C WCAG 2.2; EN 301 549)."
     },
     {
       "id": "req-supported",
@@ -248,8 +276,16 @@
       "x": 260,
       "y": 520,
       "ears_type": "ubiquitous",
-      "action": "run only framework and build-tool majors under support, moving off each at least {{EOL_DAYS}} days before its end of support, with dependency updates proposed automatically every week",
-      "rationale": "Front-end frameworks support a major for a limited time (Angular 18 months, Node.js-based tooling with its runtime); after that, security fixes stop (endoflife.date; OWASP Top 10 A06)."
+      "action": "run only framework and build-tool majors under support, moving off each at least {{EOL_DAYS}} days before its end of support",
+      "rationale": "Front-end frameworks support a major for a limited time (Angular 18 months, Node.js-based tooling with its runtime); after that, security fixes stop (endoflife.date).",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
+        ]
+      }
     },
     {
       "id": "req-spa-cache",
@@ -260,10 +296,16 @@
       "ears_type": "event-driven",
       "trigger": "a new version of the single-page app is deployed",
       "action": "serve its content-hashed assets with a one-year immutable cache and its HTML with no-cache, so that every user gets the new version on their next navigation and 0 users load a mix of versions",
-      "rationale": "A single-page app is a shell plus assets; wrong caching either serves stale code for days or downloads everything on every visit (web.dev, HTTP caching).",
+      "rationale": "A single-page app is a shell plus assets; wrong caching either serves stale code for days or downloads everything on every visit (web.dev, HTTP Cache).",
       "hubWhen": {
         "RENDERING": [
           "spa"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -275,8 +317,8 @@
       "y": 780,
       "ears_type": "event-driven",
       "trigger": "a page is requested",
-      "action": "answer with HTML that already holds the page's main content, with a Time to First Byte within 800 ms at the 75th percentile",
-      "rationale": "Server rendering pays off only if the server answers quickly; 800 ms is web.dev's \"good\" Time to First Byte, which leaves room for LCP within budget.",
+      "action": "answer with HTML that already holds the page's main content, with a Time to First Byte within 800 ms at the 75th percentile at the peak load decided in the Capacity and scaling pack",
+      "rationale": "Server rendering pays off only if the server answers quickly; 800 ms is web.dev's \"good\" Time to First Byte, which leaves room for LCP within budget (web.dev, TTFB).",
       "hubWhen": {
         "RENDERING": [
           "ssr"
@@ -291,11 +333,17 @@
       "y": 910,
       "ears_type": "event-driven",
       "trigger": "content is published or changed",
-      "action": "rebuild the affected pages and serve them from the CDN within 15 minutes, with 100% of pages served as pre-built files",
-      "rationale": "Static pages are the fastest and cheapest to serve; the publishing delay is the price, and it must be bounded (web.dev, rendering on the web).",
+      "action": "rebuild the affected pages and serve them from the CDN within 15 minutes, with 100% of pages served as pre-built files from the CDN cache",
+      "rationale": "Static pages are the fastest and cheapest to serve; the publishing delay is the price, and it must be bounded (web.dev, Rendering on the web).",
       "hubWhen": {
         "RENDERING": [
           "static"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -307,7 +355,7 @@
       "y": 1040,
       "ears_type": "ubiquitous",
       "action": "build every screen from the design system's components and tokens, document each component with its states in Storybook, and use 0 hard-coded colours, font sizes or spacing outside the tokens",
-      "rationale": "A design system pays off only when used everywhere; tokens make a brand or contrast change one edit instead of a search (W3C Design Tokens Community Group).",
+      "rationale": "A design system pays off only when used everywhere; tokens make a brand or contrast change one edit instead of a search (W3C Design Tokens Format Module).",
       "hubWhen": {
         "DESIGN": [
           "own"
@@ -337,7 +385,7 @@
       "y": 1300,
       "ears_type": "ubiquitous",
       "action": "take colours, spacing and type sizes only from the tokens in the Tailwind theme, with 0 arbitrary values in class names",
-      "rationale": "Arbitrary values bypass the theme and turn the design system back into one-off styles (Tailwind CSS documentation, theme).",
+      "rationale": "Arbitrary values bypass the theme and turn the design system back into one-off styles (Tailwind CSS documentation, theme variables).",
       "hubWhen": {
         "DESIGN": [
           "utility"
@@ -380,6 +428,7 @@
       "trigger": "a release candidate is built",
       "action": "run the main journeys on real devices with the oldest supported iOS Safari and a low-end Android phone, and meet the Core Web Vitals budget on the Android phone",
       "rationale": "Emulated browsers miss the CPU and memory limits of old phones, where an extended audience feels the budget most (web.dev, Web Vitals).",
+      "unchecked": "It runs on real phones, which no pipeline tool here drives: the release engineer runs the main journeys on the device bench (the oldest supported iPhone and a low-end Android phone) before each release candidate is promoted, and records LCP from the phone's DevTools in the release notes.",
       "hubWhen": {
         "BROWSERS": [
           "extended"
@@ -392,9 +441,9 @@
       "label": "Second framework refused",
       "x": 520,
       "y": 0,
-      "given": "the front end's dependencies",
-      "when": "a change adds another UI framework",
-      "then": "the dependency check fails until a decision record allows it"
+      "given": "the front end's package.json files",
+      "when": "a change adds another UI framework's package",
+      "then": "the framework check fails until a decision record allows it"
     },
     {
       "id": "sc-vitals",
@@ -402,7 +451,7 @@
       "label": "Field vitals within budget",
       "x": 520,
       "y": 130,
-      "given": "a month of real-user measurements per page group",
+      "given": "28 days of real-user measurements per page group",
       "when": "the 75th percentiles are computed",
       "then": "LCP is within {{LCP_MS}} ms, INP within {{INP_MS}} ms and CLS at most {{CLS}} for every page group"
     },
@@ -413,8 +462,8 @@
       "x": 520,
       "y": 260,
       "given": "a pull request that adds a large library to a route",
-      "when": "the size check runs",
-      "then": "it fails when the route's JavaScript passes {{JS_KB}} KB compressed"
+      "when": "Lighthouse CI runs against the preview",
+      "then": "it fails when the route's script transfer size passes {{JS_KB}} KB"
     },
     {
       "id": "sc-a11y",
@@ -423,8 +472,8 @@
       "x": 520,
       "y": 390,
       "given": "each page of the main journeys",
-      "when": "the automated checks run and the page is used with keyboard only",
-      "then": "0 serious or critical violations are reported and every function can be reached and used"
+      "when": "the automated checks run and the main journey is completed with the keyboard only",
+      "then": "0 serious or critical violations are reported and the journey completes"
     },
     {
       "id": "sc-supported",
@@ -434,7 +483,15 @@
       "y": 520,
       "given": "a framework major whose end of support is less than {{EOL_DAYS}} days away",
       "when": "the version check runs",
-      "then": "it fails naming the version and its end-of-support date"
+      "then": "it fails naming the version and its end-of-support date",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
+        ]
+      }
     },
     {
       "id": "sc-spa-cache",
@@ -448,6 +505,12 @@
       "hubWhen": {
         "RENDERING": [
           "spa"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -458,7 +521,7 @@
       "x": 520,
       "y": 780,
       "given": "a public page",
-      "when": "it is requested with JavaScript disabled",
+      "when": "it is requested at the peak rate with JavaScript disabled",
       "then": "its main content is in the HTML, and the 75th-percentile TTFB is within 800 ms",
       "hubWhen": {
         "RENDERING": [
@@ -474,10 +537,16 @@
       "y": 910,
       "given": "a published page",
       "when": "its content is changed",
-      "then": "the CDN serves the rebuilt page within 15 minutes",
+      "then": "the publish run completes within 15 minutes and the CDN serves the rebuilt page from its cache",
       "hubWhen": {
         "RENDERING": [
           "static"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -517,7 +586,7 @@
       "label": "Arbitrary value refused",
       "x": 520,
       "y": 1300,
-      "given": "a component change",
+      "given": "a component or template change",
       "when": "it uses a class with an arbitrary value such as a hex colour in brackets",
       "then": "the lint fails",
       "hubWhen": {
@@ -542,7 +611,7 @@
       "label": "Notice in old browser",
       "x": 520,
       "y": 1560,
-      "given": "a browser two years older than the list",
+      "given": "a browser lacking a feature every supported browser has",
       "when": "the front end is opened",
       "then": "the notice names the supported browsers",
       "hubWhen": {
@@ -576,7 +645,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with React in TypeScript (strict). Rendering: {{RENDERING}}: Next.js (App Router, server components) for server rendering and static generation, Vite with React Router for a single-page app. Data fetching with TanStack Query; forms with React Hook Form. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Choosing Next.js or React Router (framework mode): Next.js for the widest ecosystem and hosting on Vercel or Node; React Router when you want web-standard loaders and fewer conventions. Versions tracked through endoflife.date (react, nextjs).",
+      "decision": "The front end is built with React in TypeScript (strict). Rendering: {{RENDERING}}: Next.js (App Router, server components) for server rendering and static generation, Vite with React Router for a single-page app. Data fetching with TanStack Query; forms with React Hook Form. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Choosing Next.js or React Router (framework mode): Next.js for the widest ecosystem and hosting on Vercel or Node; React Router when you want web-standard loaders and fewer conventions. Versions tracked through endoflife.date (react, nextjs), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• The largest ecosystem of components and libraries, and the largest hiring pool.\n• React itself is only the view: routing, data, forms and state are choices to make and keep current.\n• Server components cut the JavaScript sent, but add a server and a new mental model.\n• Next.js majors arrive roughly yearly and change conventions; upgrades are planned work.",
       "alternatives": "1. Angular: everything included and one way of doing it, heavier.\n2. Vue with Nuxt: similar capabilities, gentler learning curve, smaller ecosystem.\n3. Svelte with SvelteKit: smaller bundles, smaller ecosystem.",
       "hubWhen": {
@@ -595,7 +664,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Angular in TypeScript (strict), with standalone components, signals and the Angular CLI (esbuild). Rendering: {{RENDERING}}: Angular SSR with hydration for server rendering, prerendering for static pages, the default build for a single-page app. Design system: {{DESIGN}} (Angular Material and the CDK when adopting a library). Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile, {{JS_KB}} KB of JavaScript per route, also set in angular.json budgets; WCAG 2.2 AA. Each major is supported for 18 months (6 active, 12 LTS), so the front end moves one major at a time with ng update, at least once a year.",
+      "decision": "The front end is built with Angular in TypeScript (strict), with standalone components, signals and the Angular CLI (esbuild). Rendering: {{RENDERING}}: Angular SSR with hydration for server rendering, prerendering for static pages, the default build for a single-page app. Design system: {{DESIGN}} (Angular Material and the CDK when adopting a library). Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. The JavaScript budget is also set in angular.json budgets. Each major is supported for 18 months (6 active, 12 LTS), so the front end moves one major at a time with ng update, at least {{EOL_DAYS}} days before the end of support tracked on endoflife.date (angular).",
       "consequences": "• Routing, forms, HTTP, testing and i18n come with the framework: one way of doing things across teams.\n• Larger initial bundles than Svelte or Vue unless routes are lazy-loaded and deferrable views used.\n• A predictable release and support schedule makes the version policy easy to plan.\n• A steeper learning curve (dependency injection, RxJS) for people new to it.",
       "alternatives": "1. React with Next.js: larger ecosystem, more choices to make.\n2. Vue with Nuxt: lighter, less prescriptive.\n3. Server-rendered HTML with htmx: far less JavaScript for forms-and-tables applications.",
       "hubWhen": {
@@ -614,7 +683,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Vue 3 in TypeScript, using the Composition API and single-file components. Rendering: {{RENDERING}}: Nuxt for server rendering and static generation, Vite with Vue Router for a single-page app. State in Pinia. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Versions tracked through endoflife.date (vue, nuxt).",
+      "decision": "The front end is built with Vue 3 in TypeScript, using the Composition API and single-file components. Rendering: {{RENDERING}}: Nuxt for server rendering and static generation, Vite with Vue Router for a single-page app. State in Pinia. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (vue, nuxt), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• Gentle learning curve and good performance out of the box.\n• Can be adopted gradually inside existing server-rendered pages.\n• A smaller ecosystem and hiring pool than React.\n• Nuxt majors bring migration work; plan them like framework upgrades.",
       "alternatives": "1. React with Next.js: the largest ecosystem.\n2. Svelte with SvelteKit: smaller bundles.\n3. Angular: more included, more prescriptive.",
       "hubWhen": {
@@ -633,7 +702,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Svelte 5 (runes) in TypeScript and SvelteKit, whose adapters cover every rendering mode. Rendering: {{RENDERING}}: adapter-node or a platform adapter for server rendering, adapter-static for static pages and single-page apps. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Versions tracked through endoflife.date (svelte).",
+      "decision": "The front end is built with Svelte 5 (runes) in TypeScript and SvelteKit, whose adapters cover every rendering mode. Rendering: {{RENDERING}}: adapter-node or a platform adapter for server rendering, adapter-static for static pages and single-page apps. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (svelte), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• Compiled components ship little JavaScript, which makes the budget easy to keep.\n• Simple syntax, quick to learn.\n• A smaller ecosystem: fewer ready-made components and integrations, more built in-house.\n• A smaller hiring pool than React, Angular or Vue.",
       "alternatives": "1. React with Next.js: the largest ecosystem, more JavaScript.\n2. Vue with Nuxt: similar simplicity, larger ecosystem.\n3. Server-rendered HTML with htmx: even less JavaScript, less interactivity.",
       "hubWhen": {
@@ -652,9 +721,84 @@
       "status": "accepted",
       "date": "",
       "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is HTML rendered by the back end from templates (Thymeleaf, Razor, Jinja, templ or the back end's own), with htmx swapping parts of the page and Alpine.js for small client-side state; no client-side framework or build step beyond CSS. Rendering: {{RENDERING}}, with every page server rendered and partial updates over HTTP. Design system: {{DESIGN}}, delivered as template partials. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile, {{JS_KB}} KB of JavaScript per page; WCAG 2.2 AA. Choose it while interactions are forms, tables, filters and dialogs; supersede it when screens need rich client state (offline, drag-and-drop editors, real-time collaboration).",
+      "decision": "The front end is HTML rendered by the back end from templates (Thymeleaf, Razor, Jinja, templ or the back end's own), with htmx swapping parts of the page and Alpine.js for small client-side state; no client-side framework or build step beyond CSS. Rendering: every page on the server, with partial updates over HTTP; the rendering question does not apply. Design system: {{DESIGN}}, delivered as template partials. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. htmx and Alpine.js are pinned dependencies updated like any other; the runtime and framework that render the pages, and their support lifecycle, are decided in the Backend stack pack. Choose it while interactions are forms, tables, filters and dialogs; supersede it when screens need rich client state (offline, drag-and-drop editors, real-time collaboration).",
       "consequences": "• Very little JavaScript, no client-side state to keep in sync, one codebase and one team for front and back end.\n• Fast first loads; every interaction is a request, so latency to the server sets how responsive it feels.\n• Rich client-side interaction is awkward and grows into hand-written JavaScript.\n• Fewer ready-made components; the design system is built as template partials.",
       "alternatives": "1. A single-page app framework (React, Angular, Vue, Svelte): rich interaction, much more JavaScript and a second codebase.\n2. Hotwire (Turbo and Stimulus) or Phoenix LiveView: the same idea tied to Rails or Elixir.\n3. Plain server-rendered pages without htmx: simplest, full reloads.",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "htmx"
+        ]
+      }
+    },
+    {
+      "id": "ff-one-framework-react",
+      "type": "fitness-fn",
+      "label": "Only React",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "0 package.json files in the repository declare @angular/core, vue, nuxt, svelte, @sveltejs/kit",
+      "description": "A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).\n\nTool: git with jq and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails when a package.json anywhere in the repository declares another UI framework\nset -euo pipefail\nother=$(git ls-files -- '*package.json' | xargs -r jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' \\\n  | grep -xE '@angular\\/core|vue|nuxt|svelte|@sveltejs\\/kit' || true)\n[ -z \"$other\" ] || { echo \"::error::another UI framework is declared: $(tr '\\n' ' ' <<<\"$other\")(ADR Built with React)\"; exit 1; }\n```",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "react"
+        ]
+      }
+    },
+    {
+      "id": "ff-one-framework-angular",
+      "type": "fitness-fn",
+      "label": "Only Angular",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "0 package.json files in the repository declare react, react-dom, next, vue, nuxt, svelte, @sveltejs/kit",
+      "description": "A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).\n\nTool: git with jq and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails when a package.json anywhere in the repository declares another UI framework\nset -euo pipefail\nother=$(git ls-files -- '*package.json' | xargs -r jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' \\\n  | grep -xE 'react|react-dom|next|vue|nuxt|svelte|@sveltejs\\/kit' || true)\n[ -z \"$other\" ] || { echo \"::error::another UI framework is declared: $(tr '\\n' ' ' <<<\"$other\")(ADR Built with Angular)\"; exit 1; }\n```",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "angular"
+        ]
+      }
+    },
+    {
+      "id": "ff-one-framework-vue",
+      "type": "fitness-fn",
+      "label": "Only Vue",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "0 package.json files in the repository declare react, react-dom, next, @angular/core, svelte, @sveltejs/kit",
+      "description": "A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).\n\nTool: git with jq and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails when a package.json anywhere in the repository declares another UI framework\nset -euo pipefail\nother=$(git ls-files -- '*package.json' | xargs -r jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' \\\n  | grep -xE 'react|react-dom|next|@angular\\/core|svelte|@sveltejs\\/kit' || true)\n[ -z \"$other\" ] || { echo \"::error::another UI framework is declared: $(tr '\\n' ' ' <<<\"$other\")(ADR Built with Vue)\"; exit 1; }\n```",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "vue"
+        ]
+      }
+    },
+    {
+      "id": "ff-one-framework-svelte",
+      "type": "fitness-fn",
+      "label": "Only Svelte",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "0 package.json files in the repository declare react, react-dom, next, @angular/core, vue, nuxt",
+      "description": "A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).\n\nTool: git with jq and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails when a package.json anywhere in the repository declares another UI framework\nset -euo pipefail\nother=$(git ls-files -- '*package.json' | xargs -r jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' \\\n  | grep -xE 'react|react-dom|next|@angular\\/core|vue|nuxt' || true)\n[ -z \"$other\" ] || { echo \"::error::another UI framework is declared: $(tr '\\n' ' ' <<<\"$other\")(ADR Built with Svelte)\"; exit 1; }\n```",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "svelte"
+        ]
+      }
+    },
+    {
+      "id": "ff-one-framework-htmx",
+      "type": "fitness-fn",
+      "label": "Only htmx",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "0 package.json files in the repository declare react, react-dom, next, @angular/core, vue, nuxt, svelte, @sveltejs/kit",
+      "description": "A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).\n\nTool: git with jq and grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails when a package.json anywhere in the repository declares another UI framework\nset -euo pipefail\nother=$(git ls-files -- '*package.json' | xargs -r jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' \\\n  | grep -xE 'react|react-dom|next|@angular\\/core|vue|nuxt|svelte|@sveltejs\\/kit' || true)\n[ -z \"$other\" ] || { echo \"::error::another UI framework is declared: $(tr '\\n' ' ' <<<\"$other\")(ADR Built with htmx)\"; exit 1; }\n```",
       "hubWhen": {
         "FRAMEWORK": [
           "htmx"
@@ -666,47 +810,47 @@
       "type": "fitness-fn",
       "label": "Lab budget holds",
       "x": 1040,
-      "y": 0,
+      "y": 650,
       "category": "operational",
-      "threshold": "On every pull request, for each main page: LCP within {{LCP_MS}} ms, CLS at most {{CLS}}, Total Blocking Time within 200 ms (the lab stand-in for INP), accessibility score at least 0.95",
-      "description": "Lighthouse CI runs three times per main page on a mobile profile against the preview build and asserts the budget; the median run counts. INP needs real interactions, so it is checked in the field (see Field vitals).\n\nTool: Lighthouse CI\n\n```js\n// lighthouserc.cjs\nmodule.exports = {\n  ci: {\n    collect: { url: ['http://localhost:4173/', 'http://localhost:4173/search'], numberOfRuns: 3 },\n    assert: {\n      assertions: {\n        'largest-contentful-paint': ['error', { maxNumericValue: {{LCP_MS}}, aggregationMethod: 'median' }],\n        'cumulative-layout-shift': ['error', { maxNumericValue: {{CLS}}, aggregationMethod: 'median' }],\n        'total-blocking-time': ['error', { maxNumericValue: 200, aggregationMethod: 'median' }],\n        'categories:accessibility': ['error', { minScore: 0.95 }],\n      },\n    },\n    upload: { target: 'temporary-public-storage' },\n  },\n}\n```"
+      "threshold": "On every pull request, for each main page: script transfer size at most {{JS_KB}} KB, LCP within {{LCP_MS}} ms, CLS at most {{CLS}}, Total Blocking Time within 200 ms (the lab stand-in for INP), accessibility score at least 0.95",
+      "description": "Lighthouse CI starts the preview build, runs three times per main page on its mobile profile and asserts the budget; the median run counts. The script size is the transfer size of every script the page loads, whatever the framework's output paths. INP needs real interactions, so it is checked in the field (see Field vitals). Pages behind sign-in need a puppeteerScript that signs in before the runs.\n\nTool: Lighthouse CI\n\n```js\n// lighthouserc.cjs\nmodule.exports = {\n  ci: {\n    collect: {\n      startServerCommand: 'npm run preview',\n      url: ['http://localhost:4173/', 'http://localhost:4173/search'],\n      numberOfRuns: 3,\n      // puppeteerScript: './lighthouse-login.cjs',   // signs in first, for pages behind sign-in\n    },\n    assert: {\n      assertions: {\n        'resource-summary:script:size': ['error', { maxNumericValue: {{JS_KB}} * 1024, aggregationMethod: 'median' }],\n        'largest-contentful-paint': ['error', { maxNumericValue: {{LCP_MS}}, aggregationMethod: 'median' }],\n        'cumulative-layout-shift': ['error', { maxNumericValue: {{CLS}}, aggregationMethod: 'median' }],\n        'total-blocking-time': ['error', { maxNumericValue: 200, aggregationMethod: 'median' }],\n        'categories:accessibility': ['error', { minScore: 0.95 }],\n      },\n    },\n    upload: { target: 'temporary-public-storage' },\n  },\n}\n```"
     },
     {
       "id": "ff-field-vitals",
       "type": "fitness-fn",
       "label": "Field vitals within budget",
       "x": 1040,
-      "y": 130,
+      "y": 780,
       "category": "operational",
-      "threshold": "75th percentile over 28 days per page group: LCP within {{LCP_MS}} ms, INP within {{INP_MS}} ms, CLS at most {{CLS}}; an alert when one is exceeded",
-      "description": "The web-vitals library reports LCP, INP and CLS from real users to the analytics endpoint; a dashboard computes the 75th percentile per page group and alerts when one passes the budget. The Chrome UX Report gives the same figures for public pages.\n\nTool: web-vitals (Google Chrome) real-user monitoring\n\n```ts\nimport { onCLS, onINP, onLCP, type Metric } from 'web-vitals'\n\nconst BUDGET = { LCP: {{LCP_MS}}, INP: {{INP_MS}}, CLS: {{CLS}} }\n\nfunction report(metric: Metric) {\n  const body = JSON.stringify({\n    name: metric.name, value: metric.value, rating: metric.rating,\n    page: location.pathname.replace(/\\/\\d+/g, '/:id'), overBudget: metric.value > BUDGET[metric.name as keyof typeof BUDGET],\n  })\n  navigator.sendBeacon('/rum', body)\n}\nonLCP(report); onINP(report); onCLS(report)\n```"
-    },
-    {
-      "id": "ff-size",
-      "type": "fitness-fn",
-      "label": "JavaScript size budget",
-      "x": 1040,
-      "y": 260,
-      "category": "structural",
-      "threshold": "Each route's initial JavaScript within {{JS_KB}} KB compressed; the pull request fails above it",
-      "description": "size-limit measures the compressed JavaScript of each route's entry chunks after the production build and fails the pull request above the limit, with a comment showing the change.\n\nTool: size-limit\n\n```json\n[\n  { \"name\": \"home\", \"path\": \"dist/assets/index-*.js\", \"limit\": \"{{JS_KB}} KB\", \"gzip\": true },\n  { \"name\": \"search\", \"path\": \"dist/assets/search-*.js\", \"limit\": \"{{JS_KB}} KB\", \"gzip\": true }\n]\n```"
+      "threshold": "75th percentile over 28 days per page group: LCP within {{LCP_MS}} ms, INP within {{INP_MS}} ms, CLS at most {{CLS}}; the daily query returns 0 rows",
+      "description": "The page reports LCP, INP and CLS from real users with the web-vitals library (navigator.sendBeacon to /rum, which stores name, value and page group in rum_events). A daily job runs the query below, which computes the 75th percentile per metric and page group over the last 28 days and returns every row over budget; any row fails the job and alerts the team.\n\nTool: web-vitals (Google Chrome) in the page; a scheduled SQL query over the RUM table (PostgreSQL syntax)\n\n```sql\n-- rum_events(name text, value numeric, page_group text, received_at timestamptz); run daily, alert on any row\nWITH p75 AS (\n  SELECT name, page_group, percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75\n  FROM rum_events\n  WHERE received_at > now() - interval '28 days'\n  GROUP BY name, page_group\n)\nSELECT name, page_group, p75\nFROM p75\nWHERE (name = 'LCP' AND p75 > {{LCP_MS}})\n   OR (name = 'INP' AND p75 > {{INP_MS}})\n   OR (name = 'CLS' AND p75 > {{CLS}})\nORDER BY name, page_group;\n```"
     },
     {
       "id": "ff-axe",
       "type": "fitness-fn",
       "label": "No accessibility violations",
       "x": 1040,
-      "y": 390,
+      "y": 910,
       "category": "structural",
-      "threshold": "0 serious or critical axe violations against WCAG 2.0, 2.1 and 2.2 A and AA rules on every page of the main journeys",
+      "threshold": "0 serious or critical axe violations against the WCAG 2.0 and 2.1 A and AA rules and the 2.2 AA rules on every page of the main journeys",
       "description": "A Playwright test opens each page of the main journeys, including open dialogs and error states, and runs axe-core with the WCAG A and AA tags; any serious or critical violation fails it.\n\nTool: axe-core with Playwright (@axe-core/playwright)\n\n```ts\nimport AxeBuilder from '@axe-core/playwright'\nimport { expect, test } from '@playwright/test'\n\nfor (const path of ['/', '/search', '/checkout']) {\n  test(`${path} meets WCAG 2.2 AA`, async ({ page }) => {\n    await page.goto(path)\n    const { violations } = await new AxeBuilder({ page })\n      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])\n      .analyze()\n    expect(violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([])\n  })\n}\n```"
+    },
+    {
+      "id": "ff-keyboard",
+      "type": "fitness-fn",
+      "label": "Main journey by keyboard",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "The main journey completes with Tab, Shift+Tab, Enter, Space and the arrow keys only, and focus is visible at every step",
+      "description": "A Playwright test walks the main journey without the mouse: it tabs to each control by its accessible name, activates it with Enter or Space, and asserts the focused element is visible after every move; a control that cannot be reached within 200 tabs fails the test.\n\nTool: Playwright\n\n```ts\nimport { expect, test, type Page } from '@playwright/test'\n\nasync function tabTo(page: Page, name: string): Promise<void> {\n  for (let i = 0; i < 200; i++) {\n    const focused = page.locator(':focus')\n    if ((await focused.count()) && (await focused.textContent())?.includes(name)) { await expect(focused).toBeVisible(); return }\n    await page.keyboard.press('Tab')\n  }\n  throw new Error(`${name} cannot be reached with Tab`)\n}\n\ntest('checkout completes with the keyboard alone', async ({ page }) => {\n  await page.goto('/')\n  for (const step of ['Search', 'Add to basket', 'Checkout', 'Place order']) {\n    await tabTo(page, step)\n    await page.keyboard.press('Enter')\n  }\n  await expect(page.getByRole('heading', { name: 'Order placed' })).toBeVisible()\n})\n```"
     },
     {
       "id": "ff-compat",
       "type": "fitness-fn",
       "label": "Features match browser list",
       "x": 1040,
-      "y": 520,
+      "y": 1170,
       "category": "structural",
       "threshold": "0 uses of web features missing from a browser on the list without a configured polyfill",
       "description": "The browser list lives in package.json and drives the build's transpilation; eslint-plugin-compat fails on a web API one of the listed browsers lacks. Playwright runs the journeys in Chromium, Firefox and WebKit.\n\nTool: browserslist with eslint-plugin-compat\n\n```js\n// package.json: \"browserslist\" holds the query of the policy, e.g.\n//   modern:   [\"last 2 Chrome versions\", \"last 2 Edge versions\", \"last 2 Firefox versions\", \"last 2 Safari major versions\"]\n//   defaults: [\"defaults\"]\n//   extended: [\"> 0.2%\", \"last 3 versions\", \"Firefox ESR\", \"iOS >= 15\", \"not dead\"]\n// eslint.config.mjs\nimport compat from 'eslint-plugin-compat'\nexport default [\n  compat.configs['flat/recommended'],\n  { settings: { polyfills: ['fetch', 'Promise'] } },   // what the build polyfills\n]\n```"
@@ -716,33 +860,37 @@
       "type": "fitness-fn",
       "label": "Framework still supported",
       "x": 1040,
-      "y": 650,
+      "y": 1300,
       "category": "operational",
       "threshold": "0 framework or build-tool majors within {{EOL_DAYS}} days of their end of support",
-      "description": "A scheduled job and every build look up the framework majors in use on endoflife.date (angular, nextjs, nuxt, vue, svelte, nodejs for the build) and fail when end of support is less than {{EOL_DAYS}} days away.\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\", e.g. \"angular 20\", \"nodejs 22\"\nset -euo pipefail\nLIMIT=$(( $(date +%s) + {{EOL_DAYS}} * 86400 ))\nfail=0\nwhile read -r product cycle; do\n  eol=$(curl -fsS \"https://endoflife.date/api/${product}/${cycle}.json\" | jq -r '.eol')\n  [ \"$eol\" = \"false\" ] && continue\n  if [ \"$eol\" = \"true\" ] || [ \"$(date -d \"$eol\" +%s)\" -lt \"$LIMIT\" ]; then\n    echo \"::error::$product $cycle reaches end of support on $eol\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```"
-    },
-    {
-      "id": "ff-renovate",
-      "type": "fitness-fn",
-      "label": "Dependencies kept current",
-      "x": 1040,
-      "y": 780,
-      "category": "process",
-      "threshold": "Update pull requests opened weekly; framework packages updated together; 0 update pull requests open over 30 days",
-      "description": "Renovate opens weekly update pull requests, grouping the packages of one framework or monorepo so they move together; patches merge automatically when the tests, the size limit and Lighthouse CI pass.\n\nTool: Renovate\n\n```json\n{\n  \"$schema\": \"https://docs.renovatebot.com/renovate-schema.json\",\n  \"extends\": [\"config:recommended\", \"group:monorepos\", \":dependencyDashboard\"],\n  \"schedule\": [\"before 6am on monday\"],\n  \"minimumReleaseAge\": \"3 days\",\n  \"packageRules\": [\n    { \"matchUpdateTypes\": [\"patch\"], \"automerge\": true },\n    { \"matchUpdateTypes\": [\"major\"], \"labels\": [\"major-update\"] }\n  ]\n}\n```"
+      "description": "A scheduled job and every build look up each product and cycle listed in versions.txt on endoflife.date (angular, nextjs, nuxt, vue, svelte, nodejs for the build) and fail when end of support is less than {{EOL_DAYS}} days away; versions.txt changes in the same pull request as package.json. The same script serves the Backend stack pack. Runs on Linux (GNU date).\n\nTool: endoflife.date API (curl and jq)\n\n```bash\n#!/usr/bin/env bash\n# versions.txt: \"<endoflife.date product> <cycle>\", e.g. \"angular 20\", \"nodejs 24\"\nset -euo pipefail\nLIMIT=$(( $(date +%s) + {{EOL_DAYS}} * 86400 ))\nfail=0\nwhile read -r product cycle; do\n  eol=$(curl -fsS \"https://endoflife.date/api/${product}/${cycle}.json\" | jq -r '.eol')\n  [ \"$eol\" = \"false\" ] && continue\n  if [ \"$eol\" = \"true\" ] || [ \"$(date -d \"$eol\" +%s)\" -lt \"$LIMIT\" ]; then\n    echo \"::error::$product $cycle reaches end of support on $eol\"; fail=1\n  fi\ndone < versions.txt\nexit $fail\n```",
+      "hubWhen": {
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
+        ]
+      }
     },
     {
       "id": "ff-cache-headers",
       "type": "fitness-fn",
       "label": "Cache headers right",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "operational",
-      "threshold": "100% of hashed assets served with max-age=31536000, immutable; index.html with no-cache",
-      "description": "After each deploy a check fetches the HTML and the assets it references and verifies their Cache-Control headers.\n\nTool: curl (post-deploy check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nhtml=$(curl -fsSI \"$BASE_URL/\" | tr -d '\\r' | grep -i '^cache-control')\ngrep -qi 'no-cache' <<<\"$html\" || { echo \"index.html: $html\"; exit 1; }\nfor asset in $(curl -fsS \"$BASE_URL/\" | grep -oE '/assets/[^\"]+\\.(js|css)'); do\n  cc=$(curl -fsSI \"$BASE_URL$asset\" | tr -d '\\r' | grep -i '^cache-control')\n  grep -qi 'max-age=31536000' <<<\"$cc\" && grep -qi 'immutable' <<<\"$cc\" || { echo \"$asset: $cc\"; exit 1; }\ndone\n```",
+      "threshold": "100% of the scripts and stylesheets the HTML references are served with max-age=31536000, immutable; the HTML with no-cache",
+      "description": "After each deploy a check fetches the HTML, takes every script src and stylesheet href from it (absolute, root-relative or relative, whatever the framework emits) and verifies the Cache-Control header of each; a page that references no script or stylesheet fails too, so an empty loop cannot pass.\n\nTool: curl (post-deploy check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nhtml=$(curl -fsSI \"$BASE_URL/\" | tr -d '\\r' | grep -i '^cache-control' || true)\ngrep -qi 'no-cache' <<<\"$html\" || { echo \"index.html: ${html:-no cache-control}\"; exit 1; }\nassets=$(curl -fsS \"$BASE_URL/\" | grep -oE '(src|href)=\"[^\"]+\\.(js|css)(\\?[^\"]*)?\"' | sed -E 's/^[a-z]+=\"//; s/\"$//')\n[ -n \"$assets\" ] || { echo \"no script or stylesheet referenced by $BASE_URL/\"; exit 1; }\nfor asset in $assets; do\n  case \"$asset\" in http*) url=$asset ;; /*) url=\"$BASE_URL$asset\" ;; *) url=\"$BASE_URL/$asset\" ;; esac\n  cc=$(curl -fsSI \"$url\" | tr -d '\\r' | grep -i '^cache-control' || true)\n  grep -qi 'max-age=31536000' <<<\"$cc\" && grep -qi 'immutable' <<<\"$cc\" || { echo \"$url: ${cc:-no cache-control}\"; exit 1; }\ndone\n```",
       "hubWhen": {
         "RENDERING": [
           "spa"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -751,13 +899,34 @@
       "type": "fitness-fn",
       "label": "Server answers quickly",
       "x": 1040,
-      "y": 1040,
+      "y": 1560,
       "category": "operational",
-      "threshold": "Time to First Byte within 800 ms at the 75th percentile under the expected load",
-      "description": "A k6 test requests the main server-rendered pages at the expected load and checks the time to first byte (http_req_waiting) and that the HTML holds the main content.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nexport const options = {\n  vus: 50, duration: '5m',\n  thresholds: { http_req_waiting: ['p(75)<800'], http_req_failed: ['rate<0.01'] },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/products`)\n  check(res, { 'content rendered on the server': (r) => r.body.includes('data-testid=\"product-list\"') })\n}\n```",
+      "threshold": "Time to First Byte within 800 ms at the 75th percentile at the peak rate decided in the Capacity and scaling pack, with the main content in the HTML",
+      "description": "A k6 test requests the main server-rendered pages at the peak rate (PEAK_RPS from the Capacity and scaling pack's decision, passed in the environment) and checks the time to first byte (http_req_waiting) and that the HTML holds the main content.\n\nTool: Grafana k6\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nexport const options = {\n  scenarios: {\n    peak: { executor: 'constant-arrival-rate', rate: Number(__ENV.PEAK_RPS), timeUnit: '1s', duration: '5m', preAllocatedVUs: 50, maxVUs: Number(__ENV.PEAK_RPS) },\n  },\n  thresholds: { http_req_waiting: ['p(75)<800'], http_req_failed: ['rate<0.01'] },\n}\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/products`)\n  check(res, { 'content rendered on the server': (r) => r.body.includes('data-testid=\"product-list\"') })\n}\n```",
       "hubWhen": {
         "RENDERING": [
           "ssr"
+        ]
+      }
+    },
+    {
+      "id": "ff-static-served",
+      "type": "fitness-fn",
+      "label": "Pages served from the edge",
+      "x": 1040,
+      "y": 1690,
+      "category": "operational",
+      "threshold": "100% of the pages in the sitemap answer from the CDN cache on the second request; the last publish run took at most 15 minutes from trigger to completion",
+      "description": "After each publish a check requests every page in the sitemap twice and reads the CDN's cache header of the second response (x-cache for CloudFront, cf-cache-status for Cloudflare, x-vercel-cache for Vercel, cache-status for others); a page not served from the cache fails. It then reads the duration of the last successful publish workflow run. Runs on Linux (GNU date).\n\nTool: curl with the GitHub CLI (post-deploy check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfail=0\nfor url in $(curl -fsS \"$BASE_URL/sitemap.xml\" | grep -oE '<loc>[^<]+</loc>' | sed -E 's#</?loc>##g'); do\n  curl -fsS -o /dev/null \"$url\"                                                     # warms the edge\n  hit=$(curl -fsSI \"$url\" | tr -d '\\r' | grep -iE '^(x-cache|cf-cache-status|x-vercel-cache|cache-status):' || true)\n  grep -qi 'hit' <<<\"$hit\" || { echo \"$url: not served from the CDN cache (${hit:-no cache header})\"; fail=1; }\ndone\nrun=$(gh run list --workflow publish.yml --status success --limit 1 --json createdAt,updatedAt -q '.[0]')\ntook=$(( $(date -d \"$(jq -r .updatedAt <<<\"$run\")\" +%s) - $(date -d \"$(jq -r .createdAt <<<\"$run\")\" +%s) ))\n[ \"$took\" -le 900 ] || { echo \"last publish took $((took / 60)) min (15 allowed)\"; fail=1; }\nexit $fail\n```",
+      "hubWhen": {
+        "RENDERING": [
+          "static"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
         ]
       }
     },
@@ -766,7 +935,7 @@
       "type": "fitness-fn",
       "label": "Only design tokens",
       "x": 1040,
-      "y": 1170,
+      "y": 1820,
       "category": "structural",
       "threshold": "0 hard-coded colours, font sizes or spacing in stylesheets outside the token files",
       "description": "Stylelint requires design-token variables for colour, font size and spacing properties; the token files themselves are exempt.\n\nTool: Stylelint (stylelint-declaration-strict-value)\n\n```json\n{\n  \"plugins\": [\"stylelint-declaration-strict-value\"],\n  \"rules\": {\n    \"color-no-hex\": true,\n    \"scale-unlimited/declaration-strict-value\": [\n      [\"/color$/\", \"font-size\", \"/^(margin|padding|gap)/\"],\n      { \"ignoreValues\": [\"inherit\", \"transparent\", \"currentColor\", \"0\", \"auto\"] }\n    ]\n  },\n  \"ignoreFiles\": [\"src/tokens/**\"]\n}\n```",
@@ -781,10 +950,10 @@
       "type": "fitness-fn",
       "label": "No library internals styled",
       "x": 1040,
-      "y": 1300,
+      "y": 1950,
       "category": "structural",
       "threshold": "0 selectors targeting the component library's internal class names",
-      "description": "Stylelint refuses selectors with the library's internal class prefixes, so styling goes through the theme. Adjust the patterns to the library used (MUI: .Mui, Angular Material: .mat-mdc / .mdc-, PrimeNG: .p-).\n\nTool: Stylelint (selector-disallowed-list)\n\n```json\n{\n  \"rules\": {\n    \"selector-disallowed-list\": [\n      [\"/\\\\.Mui[A-Z]/\", \"/\\\\.mat-mdc-/\", \"/\\\\.mdc-/\", \"/::ng-deep/\"],\n      { \"message\": \"Style the component library through its theme (ADR Frontend stack)\" }\n    ]\n  }\n}\n```",
+      "description": "Stylelint refuses selectors with the library's internal class prefixes, so styling goes through the theme. Adjust the patterns to the library used (MUI: .Mui, Angular Material: .mat-mdc / .mdc-, PrimeNG: .p-, Bootstrap with htmx: its component classes stay, only its internal state classes are listed).\n\nTool: Stylelint (selector-disallowed-list)\n\n```json\n{\n  \"rules\": {\n    \"selector-disallowed-list\": [\n      [\"/\\\\.Mui[A-Z]/\", \"/\\\\.mat-mdc-/\", \"/\\\\.mdc-/\", \"/::ng-deep/\"],\n      { \"message\": \"Style the component library through its theme (ADR Frontend stack)\" }\n    ]\n  }\n}\n```",
       "hubWhen": {
         "DESIGN": [
           "library"
@@ -796,13 +965,52 @@
       "type": "fitness-fn",
       "label": "No arbitrary utility values",
       "x": 1040,
-      "y": 1430,
+      "y": 2080,
       "category": "structural",
-      "threshold": "0 arbitrary values (such as bg-[#1da1f2]) in class names",
-      "description": "The Tailwind ESLint plugin refuses arbitrary values in class names, so colours, spacing and type sizes come from the theme's tokens.\n\nTool: ESLint (eslint-plugin-tailwindcss)\n\n```js\n// eslint.config.mjs\nimport tailwind from 'eslint-plugin-tailwindcss'\nexport default [\n  ...tailwind.configs['flat/recommended'],\n  { rules: { 'tailwindcss/no-arbitrary-value': 'error', 'tailwindcss/no-custom-classname': 'warn' } },\n]\n```",
+      "threshold": "0 arbitrary values (such as bg-[#1da1f2]) in class names of components",
+      "description": "The Tailwind ESLint plugin refuses arbitrary values in class names of JS, TS, JSX, Vue and Svelte files, so colours, spacing and type sizes come from the theme's tokens. Pin the plugin to the Tailwind major: eslint-plugin-tailwindcss 4.x for Tailwind CSS 4 (what shadcn/ui targets), 3.x for Tailwind CSS 3.\n\nTool: ESLint (eslint-plugin-tailwindcss)\n\n```js\n// eslint.config.mjs\nimport tailwind from 'eslint-plugin-tailwindcss'\nexport default [\n  ...tailwind.configs['flat/recommended'],\n  { rules: { 'tailwindcss/no-arbitrary-value': 'error', 'tailwindcss/no-custom-classname': 'warn' } },\n]\n```",
       "hubWhen": {
         "DESIGN": [
           "utility"
+        ],
+        "FRAMEWORK": [
+          "react",
+          "angular",
+          "vue",
+          "svelte"
+        ]
+      }
+    },
+    {
+      "id": "ff-tailwind-templates",
+      "type": "fitness-fn",
+      "label": "No arbitrary utility values in templates",
+      "x": 1040,
+      "y": 2210,
+      "category": "structural",
+      "threshold": "0 arbitrary values (such as bg-[#1da1f2]) in class attributes of server templates",
+      "description": "ESLint never sees server templates, so a grep over the template files fails the build on a utility class with a bracketed arbitrary value; colours, spacing and type sizes come from the theme's tokens. Runs on Linux (GNU grep).\n\nTool: grep (CI job)\n\n```bash\n#!/usr/bin/env bash\n# fails on an arbitrary value (bg-[#1da1f2], w-[13px]) in a class attribute of a server template\nset -euo pipefail\nhits=$(grep -rnE 'class=\"[^\"]*[a-z0-9:-]+-\\[[^]]+\\]' \\\n  --include='*.html' --include='*.jinja' --include='*.j2' --include='*.cshtml' --include='*.templ' templates/ src/ 2>/dev/null || true)\n[ -z \"$hits\" ] || { echo \"$hits\"; echo \"arbitrary utility values: take colours, spacing and sizes from the theme (ADR Frontend stack)\"; exit 1; }\n```",
+      "hubWhen": {
+        "DESIGN": [
+          "utility"
+        ],
+        "FRAMEWORK": [
+          "htmx"
+        ]
+      }
+    },
+    {
+      "id": "ff-browser-notice",
+      "type": "fitness-fn",
+      "label": "Old browsers get the notice",
+      "x": 1040,
+      "y": 2340,
+      "category": "structural",
+      "threshold": "The support detection returns false for a browser lacking a feature every listed browser has and true for a current one; the notice renders on false",
+      "description": "The page runs a small feature detection before the application (a plain script, so it runs in old browsers too) and renders the notice with the supported browsers when a feature every browser on the list has is missing. A unit test checks the detection both ways, so a change to the browser list is paired with a change to the detection.\n\nTool: Vitest\n\n```ts\nimport { describe, expect, it } from 'vitest'\nimport { isSupported, SUPPORTED } from '../src/browserSupport'\n// src/browserSupport.ts, loaded before the application as a plain script:\n//   export const SUPPORTED = 'the last two versions of Chrome, Edge, Firefox and Safari'\n//   export const isSupported = (w: Window) => typeof w.structuredClone === 'function' && typeof Array.prototype.at === 'function'\n\ndescribe('outdated browser notice', () => {\n  it('a browser without a baseline feature is unsupported', () => {\n    expect(isSupported({ structuredClone: undefined } as unknown as Window)).toBe(false)\n  })\n  it('a current browser is supported', () => {\n    expect(isSupported(globalThis as unknown as Window)).toBe(true)\n  })\n  it('the notice names the supported browsers', () => {\n    expect(SUPPORTED).toMatch(/Chrome, Edge, Firefox and Safari/)\n  })\n})\n```",
+      "hubWhen": {
+        "BROWSERS": [
+          "modern"
         ]
       }
     }
@@ -977,6 +1185,36 @@
       "relationType": "verifies"
     },
     {
+      "id": "ff-one-framework-react--implements--adr-react",
+      "sourceId": "ff-one-framework-react",
+      "targetId": "adr-react",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-one-framework-angular--implements--adr-angular",
+      "sourceId": "ff-one-framework-angular",
+      "targetId": "adr-angular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-one-framework-vue--implements--adr-vue",
+      "sourceId": "ff-one-framework-vue",
+      "targetId": "adr-vue",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-one-framework-svelte--implements--adr-svelte",
+      "sourceId": "ff-one-framework-svelte",
+      "targetId": "adr-svelte",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-one-framework-htmx--implements--adr-htmx",
+      "sourceId": "ff-one-framework-htmx",
+      "targetId": "adr-htmx",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-lighthouse--implements--adr-react",
       "sourceId": "ff-lighthouse",
       "targetId": "adr-react",
@@ -1037,36 +1275,6 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-size--implements--adr-react",
-      "sourceId": "ff-size",
-      "targetId": "adr-react",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-size--implements--adr-angular",
-      "sourceId": "ff-size",
-      "targetId": "adr-angular",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-size--implements--adr-vue",
-      "sourceId": "ff-size",
-      "targetId": "adr-vue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-size--implements--adr-svelte",
-      "sourceId": "ff-size",
-      "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-size--implements--adr-htmx",
-      "sourceId": "ff-size",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
       "id": "ff-axe--implements--adr-react",
       "sourceId": "ff-axe",
       "targetId": "adr-react",
@@ -1093,6 +1301,36 @@
     {
       "id": "ff-axe--implements--adr-htmx",
       "sourceId": "ff-axe",
+      "targetId": "adr-htmx",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keyboard--implements--adr-react",
+      "sourceId": "ff-keyboard",
+      "targetId": "adr-react",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keyboard--implements--adr-angular",
+      "sourceId": "ff-keyboard",
+      "targetId": "adr-angular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keyboard--implements--adr-vue",
+      "sourceId": "ff-keyboard",
+      "targetId": "adr-vue",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keyboard--implements--adr-svelte",
+      "sourceId": "ff-keyboard",
+      "targetId": "adr-svelte",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keyboard--implements--adr-htmx",
+      "sourceId": "ff-keyboard",
       "targetId": "adr-htmx",
       "relationType": "implements"
     },
@@ -1151,42 +1389,6 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-eol--implements--adr-htmx",
-      "sourceId": "ff-eol",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-renovate--implements--adr-react",
-      "sourceId": "ff-renovate",
-      "targetId": "adr-react",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-renovate--implements--adr-angular",
-      "sourceId": "ff-renovate",
-      "targetId": "adr-angular",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-renovate--implements--adr-vue",
-      "sourceId": "ff-renovate",
-      "targetId": "adr-vue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-renovate--implements--adr-svelte",
-      "sourceId": "ff-renovate",
-      "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-renovate--implements--adr-htmx",
-      "sourceId": "ff-renovate",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
       "id": "ff-cache-headers--implements--adr-react",
       "sourceId": "ff-cache-headers",
       "targetId": "adr-react",
@@ -1208,12 +1410,6 @@
       "id": "ff-cache-headers--implements--adr-svelte",
       "sourceId": "ff-cache-headers",
       "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-cache-headers--implements--adr-htmx",
-      "sourceId": "ff-cache-headers",
-      "targetId": "adr-htmx",
       "relationType": "implements"
     },
     {
@@ -1244,6 +1440,30 @@
       "id": "ff-ttfb--implements--adr-htmx",
       "sourceId": "ff-ttfb",
       "targetId": "adr-htmx",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-static-served--implements--adr-react",
+      "sourceId": "ff-static-served",
+      "targetId": "adr-react",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-static-served--implements--adr-angular",
+      "sourceId": "ff-static-served",
+      "targetId": "adr-angular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-static-served--implements--adr-vue",
+      "sourceId": "ff-static-served",
+      "targetId": "adr-vue",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-static-served--implements--adr-svelte",
+      "sourceId": "ff-static-served",
+      "targetId": "adr-svelte",
       "relationType": "implements"
     },
     {
@@ -1331,8 +1551,38 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-tailwind--implements--adr-htmx",
-      "sourceId": "ff-tailwind",
+      "id": "ff-tailwind-templates--implements--adr-htmx",
+      "sourceId": "ff-tailwind-templates",
+      "targetId": "adr-htmx",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-browser-notice--implements--adr-react",
+      "sourceId": "ff-browser-notice",
+      "targetId": "adr-react",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-browser-notice--implements--adr-angular",
+      "sourceId": "ff-browser-notice",
+      "targetId": "adr-angular",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-browser-notice--implements--adr-vue",
+      "sourceId": "ff-browser-notice",
+      "targetId": "adr-vue",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-browser-notice--implements--adr-svelte",
+      "sourceId": "ff-browser-notice",
+      "targetId": "adr-svelte",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-browser-notice--implements--adr-htmx",
+      "sourceId": "ff-browser-notice",
       "targetId": "adr-htmx",
       "relationType": "implements"
     }

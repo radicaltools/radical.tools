@@ -13,7 +13,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { concernPackProblems } from '@radical/common/concerns'
-import { buildPackDoc, packFile, packFileText, type PackSpec } from '../src/packSpec'
+import { buildPackDoc, packFile, packFileText, specProblems, type PackSpec } from '../src/packSpec'
 import { CATALOGUE_DIR } from '../src/catalogue'
 import { boundImportProblems } from '../src/packCheck'
 
@@ -41,7 +41,7 @@ for (const file of only.length ? only : specFiles(join(root, 'packs'))) {
     continue
   }
   const doc = buildPackDoc(spec)
-  const problems = concernPackProblems(doc)
+  const problems = [...concernPackProblems(doc), ...specProblems(spec)]
   if (!problems.length) problems.push(...boundImportProblems(doc))
   if (problems.length) {
     console.error(`✖ ${name} (${spec.id}):\n${problems.map((p) => `    - ${p}`).join('\n')}`)

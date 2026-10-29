@@ -3,11 +3,10 @@
     "id": "concern-observability",
     "category": "concern",
     "name": "Observability",
-    "description": "Running in production: the service levels promised and how they are measured, who is alerted and when, what the logs may hold and for how long, and how a failure is traced to its cause.",
+    "description": "Running in production: which signals are collected, how the service level indicator is measured, who is alerted and when, how long logs are kept, and how a failure is traced to its cause.",
     "tags": [
       "operations",
       "observability",
-      "slo",
       "sli",
       "logging",
       "tracing",
@@ -27,6 +26,10 @@
         "url": "https://sre.google/sre-book/monitoring-distributed-systems/"
       },
       {
+        "title": "Google SRE workbook: Implementing SLOs",
+        "url": "https://sre.google/workbook/implementing-slos/"
+      },
+      {
         "title": "Google SRE workbook: Alerting on SLOs",
         "url": "https://sre.google/workbook/alerting-on-slos/"
       },
@@ -41,6 +44,14 @@
       {
         "title": "W3C Trace Context",
         "url": "https://www.w3.org/TR/trace-context/"
+      },
+      {
+        "title": "Kubernetes documentation: Liveness, Readiness and Startup Probes",
+        "url": "https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"
+      },
+      {
+        "title": "Prometheus Alertmanager documentation",
+        "url": "https://prometheus.io/docs/alerting/latest/alertmanager/"
       },
       {
         "title": "OWASP Logging Cheat Sheet",
@@ -66,7 +77,7 @@
           },
           {
             "value": "logs",
-            "label": "structured logs and metrics only",
+            "label": "structured logs and metrics",
             "description": "Less to run and pay for; a request across elements is followed by its correlation id, by hand. Pick it for a single element with few dependencies, or a team not yet ready to run a tracing backend."
           }
         ]
@@ -74,8 +85,8 @@
       {
         "key": "SLI",
         "title": "Measured by",
-        "label": "How are the service levels measured?",
-        "hint": "A service level indicator measured where users meet the service is the number every alert and every argument rests on.",
+        "label": "How is the availability objective measured?",
+        "hint": "The objective and its burn-rate alerts are decided in the Availability pack; this decides the indicator they are computed from, measured where users meet the service.",
         "defaultValue": "request",
         "options": [
           {
@@ -110,29 +121,10 @@
         ]
       },
       {
-        "key": "LOGS",
-        "title": "Personal data",
-        "label": "May logs hold personal data?",
-        "hint": "Logs are read by many people and tools and kept in places with weaker access than the database; personal data in them is a leak waiting to happen and falls under GDPR all the same.",
-        "defaultValue": "redact",
-        "options": [
-          {
-            "value": "redact",
-            "label": "no, pseudonymous ids only",
-            "description": "Names, e-mail and postal addresses, phone numbers and payment data never reach a log; a user id that means nothing outside the system stands in. Pick it by default, and always when logs go to a SaaS backend or many people can read them."
-          },
-          {
-            "value": "restricted",
-            "label": "only in a restricted log store",
-            "description": "Support needs to find a customer's requests by what the customer says; personal data goes only to a separate store with role-based access, every read recorded and a short retention. Pick it only with a lawful basis for it and a named owner."
-          }
-        ]
-      },
-      {
         "key": "SAMPLING",
         "title": "Trace sampling",
         "label": "Which traces are kept?",
-        "hint": "Every trace kept costs storage; the ones that explain failures are a small share of them. Applies only with OpenTelemetry traces.",
+        "hint": "Every trace kept costs storage; the ones that explain failures are a small share of them. Only when the signals are logs, metrics and traces (OpenTelemetry).",
         "defaultValue": "tail",
         "options": [
           {
@@ -143,7 +135,7 @@
           {
             "value": "tail",
             "label": "tail sampling",
-            "description": "The Collector waits for a whole trace and keeps every one with an error or slower than the target, plus a share of the rest. Pick it when errors are rare and each one must be explainable."
+            "description": "The Collector waits for a whole trace and keeps every one with an error or slower than the limit, plus a share of the rest. Pick it when errors are rare and each one must be explainable."
           },
           {
             "value": "all",
@@ -153,18 +145,6 @@
         ]
       },
       {
-        "key": "AVAILABILITY",
-        "label": "Availability promised (%, per 30 days)",
-        "defaultValue": "99.9",
-        "type": "number"
-      },
-      {
-        "key": "P95_MS",
-        "label": "Response time at the 95th percentile (ms)",
-        "defaultValue": "500",
-        "type": "number"
-      },
-      {
         "key": "LOG_DAYS",
         "label": "How long are logs kept (days)?",
         "defaultValue": "30",
@@ -172,8 +152,14 @@
       },
       {
         "key": "SAMPLE_PERCENT",
-        "label": "Share of ordinary traces kept (%)",
+        "label": "Share of ordinary traces kept (%). Only with OpenTelemetry and head or tail sampling",
         "defaultValue": "10",
+        "type": "number"
+      },
+      {
+        "key": "SLOW_TRACE_MS",
+        "label": "A trace slower than this is always kept (ms); set it at the latency objective decided in the Capacity and scaling pack. Only with OpenTelemetry and tail sampling",
+        "defaultValue": "500",
         "type": "number"
       }
     ]
@@ -187,26 +173,16 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Observability",
-      "description": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly; everyone must agree what healthy means. What is collected to do that must not leak secrets or personal data, and must not cost more than it explains."
-    },
-    {
-      "id": "req-slo",
-      "type": "requirement",
-      "label": "Service levels met",
-      "x": 260,
-      "y": 0,
-      "ears_type": "ubiquitous",
-      "action": "meet {{AVAILABILITY}} % availability and a 95th percentile response time of {{P95_MS}} ms in every 30-day window, measured by {{SLI}}",
-      "rationale": "A number everyone agrees on, measured as users see it, decides when to alert and when to slow down changes (Google SRE book, chapter 4; SRE workbook, Implementing SLOs)."
+      "description": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-sli-request",
       "type": "requirement",
       "label": "Good requests counted",
       "x": 260,
-      "y": 130,
+      "y": 0,
       "ears_type": "ubiquitous",
-      "action": "count a request as good when it is valid and answered without a 5xx within {{P95_MS}} ms, at the load balancer or the server's edge, and publish the good and total counts as metrics",
+      "action": "count a request as good when it is valid and answered without a 5xx, at the load balancer or the server's edge, leave 4xx answers out as invalid, and record the good and total rates as the indicator the Availability pack's objective is measured with",
       "rationale": "Measured at the edge, the indicator sees what users see, including failures the element never logs (Google SRE workbook, Implementing SLOs).",
       "hubWhen": {
         "SLI": [
@@ -219,9 +195,9 @@
       "type": "requirement",
       "label": "Probed from outside",
       "x": 260,
-      "y": 260,
+      "y": 130,
       "ears_type": "ubiquitous",
-      "action": "be probed every minute from at least 2 locations outside its own network by a check that exercises a real read path, and count a minute as down when the probes from 2 locations fail",
+      "action": "be probed every minute from at least 2 locations outside its own network by a check that exercises a real read path, and count a minute as down, in the indicator the Availability pack's objective is measured with, when the probes from 2 locations fail",
       "rationale": "With little traffic a ratio of requests is noise; probes measure availability whether or not users are there (Google SRE book, chapter 6, black-box monitoring).",
       "hubWhen": {
         "SLI": [
@@ -232,20 +208,20 @@
     {
       "id": "req-alert",
       "type": "requirement",
-      "label": "Alert on budget burn",
+      "label": "Burn-rate alerts reach people",
       "x": 260,
-      "y": 390,
+      "y": 260,
       "ears_type": "event-driven",
-      "trigger": "errors or slow responses burn the 30-day error budget 14.4 times faster than allowed over 1 hour, or 6 times faster over 6 hours",
-      "action": "alert {{ONCALL}} with the service level, the burn rate and a link to the runbook, and send nothing for causes users do not feel",
-      "rationale": "Multiwindow burn-rate alerts catch fast outages within minutes and slow leaks within hours, without paging on noise (Google SRE workbook, Alerting on SLOs)."
+      "trigger": "a burn-rate alert generated for the objective decided in the Availability pack fires",
+      "action": "deliver it to {{ONCALL}} with the service level, the burn rate and a link to the runbook, and route an alert on a cause users do not feel to a ticket, never to a person",
+      "rationale": "Multiwindow burn-rate alerts catch fast outages within minutes and slow leaks within hours; routing decides whether anyone acts on them (Google SRE workbook, Alerting on SLOs)."
     },
     {
       "id": "req-escalate",
       "type": "requirement",
       "label": "Pages escalate",
       "x": 260,
-      "y": 520,
+      "y": 390,
       "ears_type": "event-driven",
       "trigger": "a page is not acknowledged within 5 minutes",
       "action": "escalate it to the secondary on-call, and after another 10 minutes to the team lead, at any hour",
@@ -261,10 +237,10 @@
       "type": "requirement",
       "label": "Out-of-hours alerts wait",
       "x": 260,
-      "y": 650,
+      "y": 520,
       "ears_type": "state-driven",
       "precondition": "outside working hours",
-      "action": "turn alerts into tickets for the next working day instead of calling anyone, and show the outage on the status page within 5 minutes",
+      "action": "turn alerts into tickets for the next working day instead of calling anyone, and show the outage on the status page within 1 minute of the alert",
       "rationale": "Without on-call, users still need to know the service is down and that it is known; the ticket makes sure the morning starts with it.",
       "hubWhen": {
         "ONCALL": [
@@ -273,53 +249,23 @@
       }
     },
     {
-      "id": "req-logs",
+      "id": "req-retention",
       "type": "requirement",
-      "label": "Logs structured and clean",
+      "label": "Logs deleted after retention",
       "x": 260,
-      "y": 780,
+      "y": 650,
       "ears_type": "ubiquitous",
-      "action": "write structured (JSON) log lines to standard output, each with the trace or correlation id of its request, never with a secret, token or password, and delete them after {{LOG_DAYS}} days",
-      "rationale": "Logs are searched across elements and copied to places with weaker access; a bounded retention limits both cost and what a leak exposes (OWASP Logging Cheat Sheet; The Twelve-Factor App, XI)."
-    },
-    {
-      "id": "req-pii-redact",
-      "type": "requirement",
-      "label": "No personal data logged",
-      "x": 260,
-      "y": 910,
-      "ears_type": "ubiquitous",
-      "action": "keep names, e-mail and postal addresses, phone numbers and payment data out of logs, traces and metric labels, writing a pseudonymous user id instead",
-      "rationale": "Personal data in logs is processed under GDPR like anywhere else, and logs are the copy nobody remembers to delete (OWASP Logging Cheat Sheet, data to exclude).",
-      "hubWhen": {
-        "LOGS": [
-          "redact"
-        ]
-      }
-    },
-    {
-      "id": "req-pii-restricted",
-      "type": "requirement",
-      "label": "Personal data logs restricted",
-      "x": 260,
-      "y": 1040,
-      "ears_type": "ubiquitous",
-      "action": "write personal data only to a separate log store that only the support role can read, record every read with who and when, keep it out of the general logs, traces and metric labels, and delete it after {{LOG_DAYS}} days at most",
-      "rationale": "When support must find a customer by what they say, the data is kept where access is controlled and audited, not in every log (GDPR Article 32; OWASP Logging Cheat Sheet).",
-      "hubWhen": {
-        "LOGS": [
-          "restricted"
-        ]
-      }
+      "action": "keep its log lines for {{LOG_DAYS}} days and no longer, deleted by the log store, not by hand",
+      "rationale": "A bounded retention limits both cost and what a leak exposes; logs are the copy nobody remembers to delete (OWASP Logging Cheat Sheet; The Twelve-Factor App, XI)."
     },
     {
       "id": "req-trace",
       "type": "requirement",
       "label": "Requests traced",
       "x": 260,
-      "y": 1170,
+      "y": 780,
       "ears_type": "ubiquitous",
-      "action": "propagate the W3C Trace Context (traceparent) through every call it makes, to other elements, outside systems and messages on queues",
+      "action": "propagate the W3C Trace Context (traceparent) through every call it makes, to other elements, outside systems and messages on queues, with a client span for each",
       "rationale": "A slow request is explained by where its time went; one broken link in the propagation splits the trace (W3C Trace Context).",
       "hubWhen": {
         "SIGNALS": [
@@ -332,9 +278,9 @@
       "type": "requirement",
       "label": "Traces sampled at the start",
       "x": 260,
-      "y": 1300,
+      "y": 910,
       "ears_type": "ubiquitous",
-      "action": "keep {{SAMPLE_PERCENT}} % of traces, decided once at the first element and followed by every element after it (parent-based sampling)",
+      "action": "keep {{SAMPLE_PERCENT}} % of traces, decided once by the SDK at the first element (parent-based sampling with a trace-id ratio) and followed by every element after it",
       "rationale": "A decision made once keeps traces whole; each element choosing on its own leaves fragments (OpenTelemetry, Sampling).",
       "hubWhen": {
         "SIGNALS": [
@@ -350,10 +296,10 @@
       "type": "requirement",
       "label": "Failing traces kept",
       "x": 260,
-      "y": 1430,
+      "y": 1040,
       "ears_type": "event-driven",
       "trigger": "a trace completes",
-      "action": "keep it when any span has an error or the trace took longer than {{P95_MS}} ms, and keep {{SAMPLE_PERCENT}} % of the rest",
+      "action": "keep it when any span has an error or the trace took longer than {{SLOW_TRACE_MS}} ms, and keep {{SAMPLE_PERCENT}} % of the rest",
       "rationale": "The traces that explain failures are rare; deciding after the trace is complete keeps every one of them at a fraction of the cost (OpenTelemetry, Sampling).",
       "hubWhen": {
         "SIGNALS": [
@@ -369,9 +315,9 @@
       "type": "requirement",
       "label": "Every trace kept",
       "x": 260,
-      "y": 1560,
+      "y": 1170,
       "ears_type": "ubiquitous",
-      "action": "keep every trace for at least 7 days",
+      "action": "keep every trace for at least 7 days, with no sampling in the SDK or the Collector",
       "rationale": "At low traffic the cost is small and any request, not only failing ones, may need explaining.",
       "hubWhen": {
         "SIGNALS": [
@@ -387,30 +333,20 @@
       "type": "requirement",
       "label": "Health reported",
       "x": 260,
-      "y": 1690,
+      "y": 1300,
       "ears_type": "ubiquitous",
       "action": "answer a liveness check that fails only when it must be restarted, and a readiness check that fails while it cannot serve, which the platform uses to restart it and route traffic",
-      "rationale": "The platform restarts what hangs and routes around what is not ready; a liveness check that follows a dependency restarts everything when that dependency fails (Kubernetes documentation, probes)."
-    },
-    {
-      "id": "sc-slo",
-      "type": "scenario",
-      "label": "Levels measured",
-      "x": 520,
-      "y": 0,
-      "given": "30 days of production traffic",
-      "when": "availability and the 95th percentile are computed",
-      "then": "they are at least {{AVAILABILITY}} % and at most {{P95_MS}} ms"
+      "rationale": "The platform restarts what hangs and routes around what is not ready; a liveness check that follows a dependency restarts everything when that dependency fails (Kubernetes documentation, Liveness, Readiness and Startup Probes)."
     },
     {
       "id": "sc-sli-request",
       "type": "scenario",
       "label": "Good and bad counted",
       "x": 520,
-      "y": 130,
-      "given": "requests answered with 200 in 100 ms, 200 after {{P95_MS}} ms, 500 and 404",
+      "y": 0,
+      "given": "requests answered with 200, 500 and 404",
       "when": "the indicator is computed",
-      "then": "only the first is good, and the 404 is left out as invalid",
+      "then": "the 200 is good, the 500 is bad, and the 404 is left out as invalid",
       "hubWhen": {
         "SLI": [
           "request"
@@ -422,10 +358,10 @@
       "type": "scenario",
       "label": "Outage seen by probes",
       "x": 520,
-      "y": 260,
+      "y": 130,
       "given": "probes in two locations",
       "when": "the element stops answering at night with no users",
-      "then": "the minutes are counted as down and the alert follows",
+      "then": "the minutes are counted as down in the indicator",
       "hubWhen": {
         "SLI": [
           "probes"
@@ -435,19 +371,19 @@
     {
       "id": "sc-alert",
       "type": "scenario",
-      "label": "Budget burn alerts",
+      "label": "Outage alerts",
       "x": 520,
-      "y": 390,
-      "given": "an error rate that would use the month's budget in about 2 days",
-      "when": "it lasts 5 minutes",
-      "then": "the people alerted get an alert with the runbook"
+      "y": 260,
+      "given": "every request failing",
+      "when": "the fast burn-rate alert fires",
+      "then": "the people alerted get it with the runbook link, and a cause alert from the same minute became a ticket"
     },
     {
       "id": "sc-escalate",
       "type": "scenario",
       "label": "Missed page escalates",
       "x": 520,
-      "y": 520,
+      "y": 390,
       "given": "a page sent at night",
       "when": "the primary does not acknowledge it within 5 minutes",
       "then": "the secondary is paged, and the team lead 10 minutes later",
@@ -462,10 +398,10 @@
       "type": "scenario",
       "label": "Night outage",
       "x": 520,
-      "y": 650,
+      "y": 520,
       "given": "an outage at 23:00",
       "when": "the burn-rate alert fires",
-      "then": "nobody is called, a ticket waits for the morning, and the status page shows the outage within 5 minutes",
+      "then": "nobody is called, a ticket waits for the morning, and the status page shows the outage within 1 minute of the alert",
       "hubWhen": {
         "ONCALL": [
           "hours"
@@ -473,51 +409,21 @@
       }
     },
     {
-      "id": "sc-logs",
+      "id": "sc-retention",
       "type": "scenario",
-      "label": "Request found in logs",
+      "label": "Old lines gone",
       "x": 520,
-      "y": 780,
-      "given": "a request that fails",
-      "when": "its trace or correlation id is searched",
-      "then": "every log line of it is found, none with a secret, and none older than {{LOG_DAYS}} days is kept"
-    },
-    {
-      "id": "sc-pii-redact",
-      "type": "scenario",
-      "label": "Sign-up logged clean",
-      "x": 520,
-      "y": 910,
-      "given": "a customer signing up with name, e-mail and phone",
-      "when": "the request's log lines and spans are read",
-      "then": "none holds the name, e-mail or phone; the user id is there",
-      "hubWhen": {
-        "LOGS": [
-          "redact"
-        ]
-      }
-    },
-    {
-      "id": "sc-pii-restricted",
-      "type": "scenario",
-      "label": "Support search audited",
-      "x": 520,
-      "y": 1040,
-      "given": "a support engineer and a developer",
-      "when": "both search the restricted store by a customer's e-mail",
-      "then": "only the support engineer sees results, and the read is recorded",
-      "hubWhen": {
-        "LOGS": [
-          "restricted"
-        ]
-      }
+      "y": 650,
+      "given": "the log store",
+      "when": "lines older than {{LOG_DAYS}} days are queried",
+      "then": "none is returned"
     },
     {
       "id": "sc-trace",
       "type": "scenario",
       "label": "Slow request explained",
       "x": 520,
-      "y": 1170,
+      "y": 780,
       "given": "a request slowed by one downstream call",
       "when": "its trace is opened",
       "then": "the slow call is visible with its timing, in the same trace as the request",
@@ -532,7 +438,7 @@
       "type": "scenario",
       "label": "Traces whole",
       "x": 520,
-      "y": 1300,
+      "y": 910,
       "given": "10 000 requests across three elements",
       "when": "the kept traces are counted",
       "then": "about {{SAMPLE_PERCENT}} % are kept and each kept trace has the spans of all three elements",
@@ -550,7 +456,7 @@
       "type": "scenario",
       "label": "Error trace kept",
       "x": 520,
-      "y": 1430,
+      "y": 1040,
       "given": "a thousand traces of which three have an error",
       "when": "they pass the Collector",
       "then": "all three are kept, and about {{SAMPLE_PERCENT}} % of the others",
@@ -568,7 +474,7 @@
       "type": "scenario",
       "label": "Any request traced",
       "x": 520,
-      "y": 1560,
+      "y": 1170,
       "given": "a request a customer complains about 5 days later",
       "when": "its trace is looked up by its id",
       "then": "it is there",
@@ -586,7 +492,7 @@
       "type": "scenario",
       "label": "Hung instance replaced",
       "x": 520,
-      "y": 1690,
+      "y": 1300,
       "given": "an instance that stops answering",
       "when": "its liveness check fails",
       "then": "the platform restarts it, and no traffic reached it once its readiness check failed"
@@ -600,9 +506,9 @@
       "concern": "observability",
       "status": "accepted",
       "date": "",
-      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; logs are searched widely and copied to places with weaker access, so secrets and personal data in them leak; and keeping every log line and every trace forever costs more than the failures they explain.",
-      "decision": "The element emits logs, metrics and traces with the OpenTelemetry SDK of its language (auto-instrumentation for the HTTP server, clients, database and queue libraries), propagating the W3C Trace Context on every call and message. Signals go to an OpenTelemetry Collector, which samples ({{SAMPLING}}), removes attributes that must not leave, and exports to the backend. Choose the backend by what the team already runs, cost per GB ingested and where the data may be kept: the Grafana stack (Tempo, Loki, Mimir or Prometheus) self-hosted or in Grafana Cloud, Elastic, Honeycomb, Datadog or New Relic; the Collector keeps that choice reversible. Service levels: {{AVAILABILITY}} % and {{P95_MS}} ms at the 95th percentile per 30 days, measured by {{SLI}}. Personal data in logs: {{LOGS}}; logs kept {{LOG_DAYS}} days.",
-      "consequences": "• One standard for all three signals, and any backend that speaks OTLP.\n• Every element and library on a request's path must pass the trace context on, queues included, or traces break.\n• Trace volume needs a sampling policy and a Collector to run it.\n• The Collector is one more component to run, scale and upgrade.",
+      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; and keeping every log line and every trace forever costs more than the failures they explain. The availability objective itself, and the burn-rate alerts generated for it, are decided in the Availability pack; what a log line holds and never holds in the Error handling and logging conventions pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "The element emits logs, metrics and traces with the OpenTelemetry SDK of its language (auto-instrumentation for the HTTP server, clients, database and queue libraries), propagating the W3C Trace Context on every call and message. Signals go to an OpenTelemetry Collector, which removes attributes that must not leave and exports to the backend. Trace sampling: {{SAMPLING}}; a head decision is made by the SDK at the first element and followed by the rest, while tail sampling and keeping every trace are the Collector's to do. Choose the backend by what the team already runs, cost per GB ingested and where the data may be kept: the Grafana stack (Tempo, Loki, Mimir or Prometheus) self-hosted or in Grafana Cloud, Elastic, Honeycomb, Datadog or New Relic; the Collector keeps that choice reversible. The availability objective and its burn-rate alerts are decided in the Availability pack and measured with {{SLI}}; alerts reach {{ONCALL}}. Log lines: shaped and redacted as decided in the Error handling and logging conventions pack; logs kept {{LOG_DAYS}} days.",
+      "consequences": "• One standard for all three signals, and any backend that speaks OTLP.\n• Every element and library on a request's path must pass the trace context on, queues included, or traces break.\n• Trace volume needs a sampling policy; tail sampling needs a Collector that buffers whole traces.\n• The Collector is one more component to run, scale and upgrade.",
       "alternatives": "1. Structured logs and metrics only: less to run, but slower to explain failures across elements.\n2. A vendor's own agent (Datadog, Dynatrace): more automatic, but every signal is tied to that vendor and its pricing.",
       "hubWhen": {
         "SIGNALS": [
@@ -619,8 +525,8 @@
       "concern": "observability",
       "status": "accepted",
       "date": "",
-      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; logs are searched widely and copied to places with weaker access, so secrets and personal data in them leak; and keeping every log line and every trace forever costs more than the failures they explain.",
-      "decision": "The element writes structured JSON log lines to standard output, each with a correlation id taken from the incoming X-Request-ID or traceparent header or created at the edge, and passes that id on in every call it makes. It exposes request rate, errors and duration as Prometheus metrics (or OpenTelemetry metrics) on its own endpoint. A shipper (Fluent Bit, Vector or Grafana Alloy) sends the logs to the log store: Loki, Elasticsearch or OpenSearch, or the cloud's own (CloudWatch Logs, Azure Monitor Logs). No tracing. Service levels: {{AVAILABILITY}} % and {{P95_MS}} ms at the 95th percentile per 30 days, measured by {{SLI}}. Personal data in logs: {{LOGS}}; logs kept {{LOG_DAYS}} days.",
+      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; and keeping every log line and every trace forever costs more than the failures they explain. The availability objective itself, and the burn-rate alerts generated for it, are decided in the Availability pack; what a log line holds and never holds in the Error handling and logging conventions pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "The element writes structured JSON log lines to standard output, each with a correlation id taken from the incoming X-Request-ID or traceparent header or created at the edge, and passes that id on in every call it makes. It exposes request rate, errors and duration as the OpenTelemetry HTTP server metric (http.server.request.duration, which Prometheus scrapes as http_server_request_duration_seconds with the label http_response_status_code) on its own endpoint, through the OpenTelemetry metrics SDK with its Prometheus exporter; the indicator queries read that name. A framework's own metrics (Micrometer's http_server_requests_seconds with the label status) are fine too, with the indicator queries rewritten for them. A shipper (Fluent Bit, Vector or Grafana Alloy) sends the logs to the log store: Loki, Elasticsearch or OpenSearch, or the cloud's own (CloudWatch Logs, Azure Monitor Logs). No tracing. The availability objective and its burn-rate alerts are decided in the Availability pack and measured with {{SLI}}; alerts reach {{ONCALL}}. Log lines: shaped and redacted as decided in the Error handling and logging conventions pack; logs kept {{LOG_DAYS}} days.",
       "consequences": "• Less to run and to pay for than three signals.\n• A request across elements is followed by its correlation id, by hand, and where its time went is guessed from timestamps.\n• Adding tracing later is easier if the correlation id is already the traceparent.",
       "alternatives": "1. OpenTelemetry with traces: more to run, but a slow request explains itself.\n2. Unstructured text logs: nothing to set up, but they cannot be searched or counted reliably.",
       "hubWhen": {
@@ -638,8 +544,8 @@
       "concern": "observability",
       "status": "accepted",
       "date": "",
-      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; logs are searched widely and copied to places with weaker access, so secrets and personal data in them leak; and keeping every log line and every trace forever costs more than the failures they explain.",
-      "decision": "An on-call rotation is paged at any hour when the error budget burns fast, and acknowledges within 5 minutes; unacknowledged pages escalate to the secondary and then the team lead. The rotation runs in PagerDuty, Opsgenie, Grafana OnCall or incident.io, fed by Alertmanager (or the backend's alerting). Only symptoms page (multiwindow burn-rate alerts on the service levels); causes such as a full disk or a restarting pod become tickets. Every alert links its runbook. The rotation is large enough that each engineer is on call at most one week in four, and time on call is paid or given back.",
+      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; and keeping every log line and every trace forever costs more than the failures they explain. The availability objective itself, and the burn-rate alerts generated for it, are decided in the Availability pack; what a log line holds and never holds in the Error handling and logging conventions pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "An on-call rotation is paged at any hour when the error budget burns fast, and acknowledges within 5 minutes; unacknowledged pages escalate to the secondary after 5 minutes and to the team lead 10 minutes later. The rotation runs in PagerDuty, Opsgenie, Grafana OnCall or incident.io, fed by Alertmanager (or the backend's alerting); the escalation policy is kept in Terraform. Only symptoms page (the multiwindow burn-rate alerts generated for the objective decided in the Availability pack); causes such as a full disk or a restarting pod become tickets. Every alert links its runbook. The rotation is large enough that each engineer is on call at most one week in four, and time on call is paid or given back.",
       "consequences": "• Outages at night are handled at night; a target of 99.9 % or more becomes reachable.\n• On-call costs money and people's evenings; noisy alerts burn the rotation out, so every page that needed no action is fixed or removed.\n• Runbooks have to exist and be kept current.",
       "alternatives": "1. Alerts in working hours only: cheaper, but a night outage lasts until the morning.\n2. A follow-the-sun rotation across time zones: nobody is woken, but it needs teams in several regions.",
       "hubWhen": {
@@ -657,9 +563,9 @@
       "concern": "observability",
       "status": "accepted",
       "date": "",
-      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; logs are searched widely and copied to places with weaker access, so secrets and personal data in them leak; and keeping every log line and every trace forever costs more than the failures they explain.",
-      "decision": "Burn-rate alerts reach the team in working hours through the team channel (Slack or Microsoft Teams) and a mobile notification; outside working hours, Alertmanager's time intervals route them to tickets for the next working day instead. A status page (Atlassian Statuspage, Instatus or the cloud's own) shows an outage automatically from the same alerts, so users know it is known. Only symptoms alert; every alert links its runbook.",
-      "consequences": "• Nobody is woken; no on-call cost.\n• An outage at night lasts until the morning: one such night can use a month's budget at {{AVAILABILITY}} %, which the target must allow.\n• The status page carries the communication outside hours.",
+      "context": "This element runs in production. The forces: users notice an outage before a team without signals does; healthy needs a number agreed in advance, measured as users see it; alerts on every cause wake people for nothing until they are ignored, while alerts on symptoms that burn the error budget are worth acting on; a request crosses several elements, and its trail is lost without a shared id; and keeping every log line and every trace forever costs more than the failures they explain. The availability objective itself, and the burn-rate alerts generated for it, are decided in the Availability pack; what a log line holds and never holds in the Error handling and logging conventions pack. The snippets of this pack assume the element is order-api, scraped by Prometheus as job order-api and deployed to the shop namespace; rename them for yours.",
+      "decision": "Burn-rate alerts reach the team in working hours through the team channel (Slack or Microsoft Teams) and a mobile notification; outside working hours, Alertmanager's time intervals route them to tickets for the next working day instead. The same alerts reach the status page's incoming webhook (Instatus, Grafana OnCall's status page, or a small bridge to Atlassian Statuspage's incidents API) within 1 minute of firing, so users know the outage is known. Only symptoms alert; every alert links its runbook.",
+      "consequences": "• Nobody is woken; no on-call cost.\n• An outage at night lasts until the morning: one such night can use a month's budget at 99.9 %, which the objective decided in the Availability pack must allow.\n• The status page carries the communication outside hours.",
       "alternatives": "1. An on-call rotation around the clock: night outages are fixed at night, at the cost of a paid rotation.\n2. Best effort by whoever sees the alert: no cost, no promise, and burnout of the conscientious few.",
       "hubWhen": {
         "ONCALL": [
@@ -668,14 +574,14 @@
       }
     },
     {
-      "id": "ff-slo",
+      "id": "ff-sli-request",
       "type": "fitness-fn",
-      "label": "Service levels watched",
+      "label": "Request indicator recorded",
       "x": 1040,
       "y": 0,
       "category": "operational",
-      "threshold": "Availability at least {{AVAILABILITY}} % and 95 % of requests under {{P95_MS}} ms over every 30 days; burn-rate alerts at 14.4 times (1 h) and 6 times (6 h)",
-      "description": "An SLO spec generates the Prometheus recording rules for both service levels and the multiwindow burn-rate alerts from the request metrics; the alerts go to Alertmanager, which routes them as the alerting decision says.\n\nTool: Sloth (Prometheus SLO generator); Pyrra takes the same objectives\n\n```yaml\n# sloth generate -i slos.yaml -o slos.rules.yaml\nversion: \"prometheus/v1\"\nservice: \"order-api\"\nslos:\n  - name: \"availability\"\n    objective: {{AVAILABILITY}}\n    sli:\n      events:\n        error_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=~\"5..\"}[{{.window}}]))\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\"}[{{.window}}]))\n    alerting:\n      name: OrderApiAvailability\n      page_alert: { labels: { severity: page } }\n      ticket_alert: { labels: { severity: ticket } }\n  - name: \"latency\"\n    objective: 95\n    description: \"95 % of requests under {{P95_MS}} ms\"\n    sli:\n      events:\n        # le: the histogram bucket at {{P95_MS}} ms, in seconds\n        error_query: |\n          sum(rate(http_server_request_duration_seconds_count{job=\"order-api\"}[{{.window}}]))\n          - sum(rate(http_server_request_duration_seconds_bucket{job=\"order-api\",le=\"0.5\"}[{{.window}}]))\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\"}[{{.window}}]))\n    alerting:\n      name: OrderApiLatency\n      page_alert: { labels: { severity: page } }\n      ticket_alert: { labels: { severity: ticket } }\n```",
+      "threshold": "The good and total request rates are recorded from the edge metrics; a unit test over the rules counts a 200 as good, a 500 as bad and a 404 as invalid",
+      "description": "Recording rules in the repository compute the good and total request rates from the server's request histogram, leaving 4xx answers out; promtool runs a unit test over them in the pipeline with synthetic series, so a change that counts a 500 as good or a 404 as a request fails the build. The Availability pack's SLO spec uses the same queries. The metric is the OpenTelemetry HTTP server metric as Prometheus names it; for Micrometer, read http_server_requests_seconds_count with the label status instead, in the rules and the test alike.\n\nTool: promtool test rules (Prometheus)\n\n```yaml\n# sli.rules.yaml\ngroups:\n  - name: order-api-sli\n    rules:\n      - record: order_api:requests_total:rate5m\n        labels: { service: order-api }\n        expr: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code!~\"4..\"}[5m]))\n      - record: order_api:requests_good:rate5m\n        labels: { service: order-api }\n        expr: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code!~\"4..|5..\"}[5m]))\n---\n# sli.test.yaml   (CI: promtool test rules sli.test.yaml)\nrule_files: [sli.rules.yaml]\nevaluation_interval: 1m\ntests:\n  - interval: 1m\n    input_series:\n      - series: 'http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=\"200\"}'\n        values: '0+90x10'    # 1.5 good requests per second\n      - series: 'http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=\"500\"}'\n        values: '0+30x10'    # 0.5 failed requests per second\n      - series: 'http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=\"404\"}'\n        values: '0+60x10'    # invalid: left out of both rates\n    promql_expr_test:\n      - expr: order_api:requests_good:rate5m / order_api:requests_total:rate5m\n        eval_time: 10m\n        exp_samples:\n          - labels: '{service=\"order-api\"}'\n            value: 0.75\n```",
       "hubWhen": {
         "SLI": [
           "request"
@@ -689,8 +595,8 @@
       "x": 1040,
       "y": 130,
       "category": "operational",
-      "threshold": "A probe every 60 s from at least 2 locations; probe success at least {{AVAILABILITY}} % over 30 days",
-      "description": "The Blackbox exporter, run in at least two locations outside the element's network, probes a real read path every minute; a recording rule turns the minutes failed in two locations into the availability, and an alert fires when it falls below the target.\n\nTool: Prometheus Blackbox exporter\n\n```yaml\n# blackbox.yml\nmodules:\n  orders_read:\n    prober: http\n    timeout: 5s\n    http:\n      valid_status_codes: [200]\n      fail_if_body_not_matches_regexp: ['\"orders\":']\n---\n# prometheus.yml (in each probe location, with external label location=<name>)\nscrape_configs:\n  - job_name: blackbox-order-api\n    scrape_interval: 60s\n    metrics_path: /probe\n    params: { module: [orders_read] }\n    static_configs: [{ targets: [\"https://shop.example.com/api/orders?probe=1\"] }]\n    relabel_configs:\n      - { source_labels: [__address__], target_label: __param_target }\n      - { source_labels: [__param_target], target_label: instance }\n      - { target_label: __address__, replacement: \"blackbox-exporter:9115\" }\n---\n# rules: a minute is down when 2 or more locations fail it\ngroups:\n  - name: probe-slo\n    rules:\n      - record: order_api:probe_up:minute\n        expr: (count(probe_success{job=\"blackbox-order-api\"} == 0) or vector(0)) < bool 2\n      - alert: OrderApiProbeAvailabilityLow\n        expr: avg_over_time(order_api:probe_up:minute[30d]) < {{AVAILABILITY}} / 100\n        labels: { severity: page }\n```",
+      "threshold": "A probe every 60 s from at least 2 locations outside the network, scraped by one Prometheus; a minute is recorded as down when 2 or more locations fail it",
+      "description": "A Blackbox exporter runs in each of at least two locations outside the element's network and probes a real read path every minute; one central Prometheus scrapes both exporters with a location label per target, so the recording rule sees every location in one evaluation and marks a minute down when two or more fail. The recorded series is the raw indicator the Availability pack's SLO spec reads.\n\nTool: Prometheus Blackbox exporter, scraped by one central Prometheus\n\n```yaml\n# blackbox.yml (in each probe location)\nmodules:\n  orders_read:\n    prober: http\n    timeout: 5s\n    http:\n      valid_status_codes: [200]\n      fail_if_body_not_matches_regexp: ['\"orders\":']\n---\n# prometheus.yml of the central Prometheus: one job per exporter location, same target\nscrape_configs:\n  - job_name: blackbox-order-api-eu-west\n    scrape_interval: 60s\n    metrics_path: /probe\n    params: { module: [orders_read] }\n    static_configs: [{ targets: [\"https://shop.example.com/api/orders?probe=1\"], labels: { location: eu-west } }]\n    relabel_configs:\n      - { source_labels: [__address__], target_label: __param_target }\n      - { source_labels: [__param_target], target_label: instance }\n      - { target_label: __address__, replacement: \"blackbox-eu-west.probes.example.net:9115\" }\n  - job_name: blackbox-order-api-us-east\n    scrape_interval: 60s\n    metrics_path: /probe\n    params: { module: [orders_read] }\n    static_configs: [{ targets: [\"https://shop.example.com/api/orders?probe=1\"], labels: { location: us-east } }]\n    relabel_configs:\n      - { source_labels: [__address__], target_label: __param_target }\n      - { source_labels: [__param_target], target_label: instance }\n      - { target_label: __address__, replacement: \"blackbox-us-east.probes.example.net:9115\" }\n---\n# rules: a minute is down when 2 or more locations fail it\ngroups:\n  - name: probe-sli\n    rules:\n      - record: order_api:probe_up:minute\n        expr: (count(probe_success{job=~\"blackbox-order-api-.*\"} == 0) or vector(0)) < bool 2\n# The Availability pack's SLO spec reads it as a raw indicator:\n#   sli: { raw: { error_ratio_query: 1 - avg_over_time(order_api:probe_up:minute[{{.window}}]) } }\n```",
       "hubWhen": {
         "SLI": [
           "probes"
@@ -704,8 +610,23 @@
       "x": 1040,
       "y": 260,
       "category": "process",
-      "threshold": "Every alert with severity page routes to the on-call receiver; 0 cause alerts (severity ticket) do",
-      "description": "A pipeline step tests the Alertmanager routing tree whenever its configuration changes: page alerts must reach the on-call receiver (PagerDuty), ticket alerts must not.\n\nTool: amtool (Prometheus Alertmanager)\n\n```yaml\n# alertmanager.yml (excerpt)\nroute:\n  receiver: tickets\n  routes:\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: pagerduty-oncall\nreceivers:\n  - name: pagerduty-oncall\n    pagerduty_configs: [{ routing_key_file: /etc/alertmanager/pagerduty-key }]\n  - name: tickets\n    webhook_configs: [{ url: \"https://tickets.example.com/alertmanager\" }]\n---\n# CI step\n- run: |\n    amtool check-config alertmanager.yml\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=pagerduty-oncall severity=page service=order-api\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=tickets severity=ticket service=order-api\n```",
+      "threshold": "Every alert with severity page routes to the on-call receiver; 0 cause alerts (severity ticket) do; the configuration is valid",
+      "description": "A pipeline step tests the Alertmanager routing tree whenever its configuration changes: page alerts must reach the on-call receiver (PagerDuty), ticket alerts must not.\n\nTool: amtool (Prometheus Alertmanager)\n\n```yaml\n# alertmanager.yml (excerpt)\nroute:\n  receiver: tickets\n  routes:\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: pagerduty-oncall\nreceivers:\n  - name: pagerduty-oncall\n    pagerduty_configs: [{ routing_key_file: /etc/alertmanager/pagerduty-key }]\n  - name: tickets\n    webhook_configs: [{ url: \"https://tickets.example.com/alertmanager\" }]\n---\n# CI step\n- run: |\n    amtool check-config alertmanager.yml\n    # --verify.receivers compares the matched receivers comma-joined in route order\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=pagerduty-oncall severity=page service=order-api\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=tickets severity=ticket service=order-api\n```",
+      "hubWhen": {
+        "ONCALL": [
+          "oncall"
+        ]
+      }
+    },
+    {
+      "id": "ff-escalation",
+      "type": "fitness-fn",
+      "label": "Escalation policy as code",
+      "x": 1040,
+      "y": 390,
+      "category": "process",
+      "threshold": "The escalation policy in Terraform escalates after 5 minutes to the secondary and after 10 more to the team lead; terraform plan reports no drift from it",
+      "description": "The PagerDuty escalation policy is kept in Terraform with the delays the decision names; the pipeline validates it on every change and a nightly plan fails on drift, so a delay changed by hand in the console is caught. Opsgenie and Grafana OnCall have Terraform providers with the same shape.\n\nTool: Terraform with the PagerDuty provider (terraform plan -detailed-exitcode)\n\n```hcl\nresource \"pagerduty_escalation_policy\" \"order_api\" {\n  name      = \"Order API\"\n  num_loops = 2\n\n  rule {                                  # primary on-call; after 5 minutes unacknowledged, the next rule\n    escalation_delay_in_minutes = 5\n    target {\n      type = \"schedule_reference\"\n      id   = pagerduty_schedule.primary.id\n    }\n  }\n  rule {                                  # secondary; after 10 more minutes, the team lead\n    escalation_delay_in_minutes = 10\n    target {\n      type = \"schedule_reference\"\n      id   = pagerduty_schedule.secondary.id\n    }\n  }\n  rule {\n    escalation_delay_in_minutes = 10\n    target {\n      type = \"user_reference\"\n      id   = pagerduty_user.team_lead.id\n    }\n  }\n}\n# CI: terraform validate; nightly: terraform plan -detailed-exitcode (2 = drift, fails the job)\n```",
       "hubWhen": {
         "ONCALL": [
           "oncall"
@@ -715,27 +636,17 @@
     {
       "id": "ff-hours-routing",
       "type": "fitness-fn",
-      "label": "Night alerts become tickets",
+      "label": "Night alerts become tickets, the status page knows",
       "x": 1040,
-      "y": 390,
+      "y": 520,
       "category": "process",
-      "threshold": "Page alerts reach the team channel only within working hours; outside them 100 % become tickets",
-      "description": "The Alertmanager routing sends page alerts to the team channel only during the working-hours time interval and to tickets otherwise; a pipeline step validates the configuration and the receivers with amtool whenever it changes.\n\nTool: amtool (Prometheus Alertmanager time intervals)\n\n```yaml\n# alertmanager.yml (excerpt)\ntime_intervals:\n  - name: working-hours\n    time_intervals:\n      - weekdays: ['monday:friday']\n        times: [{ start_time: '08:00', end_time: '18:00' }]\n        location: 'Europe/Warsaw'\nroute:\n  receiver: tickets\n  routes:\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: team-channel\n      active_time_intervals: [working-hours]\n      continue: true\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: tickets\n      mute_time_intervals: [working-hours]\n---\n# CI step\n- run: |\n    amtool check-config alertmanager.yml\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=team-channel,tickets severity=page\n```",
+      "threshold": "Page alerts match the status-page, team-channel and tickets receivers in the routing tree, in that order; the status-page route sets group_wait to at most 1 minute; the configuration is valid",
+      "description": "The Alertmanager routing sends page alerts to the status page's webhook within a minute, to the team channel during the working-hours time interval and to tickets outside it; a pipeline step validates the configuration and the receivers with amtool whenever it changes, and reads the status-page route's group_wait with yq. --verify.receivers compares the receivers comma-joined in route order, so the list follows the order of the routes. amtool does not evaluate time intervals, so the channel-or-ticket split is confirmed once after a change by adding a test alert (amtool alert add severity=page) outside hours and seeing the ticket.\n\nTool: amtool (Prometheus Alertmanager time intervals) and yq\n\n```yaml\n# alertmanager.yml (excerpt)\ntime_intervals:\n  - name: working-hours\n    time_intervals:\n      - weekdays: ['monday:friday']\n        times: [{ start_time: '08:00', end_time: '18:00' }]\n        location: 'Europe/Warsaw'\nroute:\n  receiver: tickets\n  routes:\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: status-page\n      group_wait: 1m\n      continue: true\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: team-channel\n      active_time_intervals: [working-hours]\n      continue: true\n    - matchers: [ 'severity=\"page\"' ]\n      receiver: tickets\n      mute_time_intervals: [working-hours]\nreceivers:\n  - name: status-page\n    webhook_configs: [{ url: \"https://status.example.com/incoming/alertmanager\" }]\n  - name: team-channel\n    slack_configs: [{ channel: \"#shop-alerts\", api_url_file: /etc/alertmanager/slack-url }]\n  - name: tickets\n    webhook_configs: [{ url: \"https://tickets.example.com/alertmanager\" }]\n---\n# CI step\n- run: |\n    amtool check-config alertmanager.yml\n    # the receivers in route order, comma-joined: the check is order-sensitive\n    amtool config routes test --config.file=alertmanager.yml --verify.receivers=status-page,team-channel,tickets severity=page\n    wait=$(yq '.route.routes[] | select(.receiver == \"status-page\") | .group_wait' alertmanager.yml)\n    [[ \"$wait\" =~ ^([0-9]|[1-5][0-9]|60)s$|^1m$ ]] || { echo \"status-page route waits $wait, more than 1 minute\"; exit 1; }\n```",
       "hubWhen": {
         "ONCALL": [
           "hours"
         ]
       }
-    },
-    {
-      "id": "ff-clean-logs",
-      "type": "fitness-fn",
-      "label": "Logs clean and correlated",
-      "x": 1040,
-      "y": 520,
-      "category": "structural",
-      "threshold": "0 log lines without a trace or correlation id, and 0 with a secret or an e-mail address, in a full test run",
-      "description": "The test suite's logs are collected; one step counts lines without the id, another scans them for secrets and personal data with gitleaks and an extra rule for e-mail addresses. With personal data in a restricted store, only the general logs are scanned.\n\nTool: gitleaks (with a custom rule) and jq, in the CI pipeline\n\n```yaml\n# .gitleaks-logs.toml\n[extend]\nuseDefault = true\n\n[[rules]]\nid = \"email-in-logs\"\ndescription = \"E-mail address in a log line\"\nregex = '''[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}'''\n---\n# CI step after the tests, which write JSON logs to test-logs/\n- run: |\n    missing=$(cat test-logs/*.json | jq -c 'select((.trace_id // .correlation_id) == null)' | wc -l)\n    test \"$missing\" -eq 0 || { echo \"::error::$missing log lines without a trace or correlation id\"; exit 1; }\n    gitleaks dir test-logs/ --config .gitleaks-logs.toml --redact --exit-code 1\n```"
     },
     {
       "id": "ff-retention",
@@ -744,8 +655,8 @@
       "x": 1040,
       "y": 650,
       "category": "structural",
-      "threshold": "Retention set to {{LOG_DAYS}} days in the log store; 0 log lines older than {{LOG_DAYS}} days",
-      "description": "The log store deletes lines older than the retention; the configuration is in the repository and reviewed, and a monthly query for the oldest line checks that deletion runs.\n\nTool: Grafana Loki (compactor retention); CloudWatch Logs or Elasticsearch ILM take the same number\n\n```yaml\n# loki config (excerpt)\ncompactor:\n  working_directory: /loki/compactor\n  retention_enabled: true\n  delete_request_store: s3\nlimits_config:\n  retention_period: {{LOG_DAYS}}d\n# Monthly check (logcli): nothing older than the retention is returned\n#   logcli query '{service_name=\"order-api\"}' --from=\"$(date -u -d '-{{LOG_DAYS}} days -1 day' +%FT%TZ)\" \\\n#     --to=\"$(date -u -d '-{{LOG_DAYS}} days' +%FT%TZ)\" --limit 1\n```"
+      "threshold": "Retention set to {{LOG_DAYS}} days in the log store; a monthly query for lines older than {{LOG_DAYS}} days plus 1 returns 0 lines",
+      "description": "The log store's retention is in the repository and reviewed; a monthly job queries the day before the retention boundary (one day of slack for the compactor's delete delay) and fails when any line comes back. CloudWatch Logs and Elasticsearch ILM take the same number; the query step uses their CLI instead of logcli.\n\nTool: Grafana Loki (compactor retention) and logcli in a scheduled job\n\n```yaml\n# loki config (excerpt)\ncompactor:\n  working_directory: /loki/compactor\n  retention_enabled: true\n  delete_request_store: s3\nlimits_config:\n  retention_period: {{LOG_DAYS}}d\n---\n# .github/workflows/log-retention.yml\nname: log-retention\non:\n  schedule: [{ cron: '0 6 1 * *' }]\njobs:\n  oldest-line:\n    runs-on: ubuntu-latest\n    steps:\n      - env: { LOKI_ADDR: https://loki.example.internal }\n        run: |\n          from=$(date -u -d \"-$(( {{LOG_DAYS}} + 2 )) days\" +%FT%TZ)\n          to=$(date -u -d \"-$(( {{LOG_DAYS}} + 1 )) days\" +%FT%TZ)\n          lines=$(logcli query '{service_name=\"order-api\"}' --quiet --output=raw --limit=1 --from=\"$from\" --to=\"$to\" | wc -l)\n          test \"$lines\" -eq 0 || { echo \"::error::log lines older than {{LOG_DAYS}} days are still kept\"; exit 1; }\n```"
     },
     {
       "id": "ff-trace-propagation",
@@ -754,11 +665,29 @@
       "x": 1040,
       "y": 780,
       "category": "structural",
-      "threshold": "A request through the element and its outgoing calls yields exactly 1 trace id, with a client span for every outgoing call",
-      "description": "An integration test sends a request with a known traceparent, lets the element make its outgoing calls (to a stub), and checks that every finished span carries that trace id and that the stub received the traceparent header.\n\nTool: Vitest with the OpenTelemetry InMemorySpanExporter\n\n```ts\nimport { trace, SpanKind } from '@opentelemetry/api'\nimport { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'\nimport { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'\nimport request from 'supertest'\n\nconst exporter = new InMemorySpanExporter()\nconst provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })\nprovider.register()\n\nit('keeps one trace across the element and its outgoing calls', async () => {\n  const traceId = '4bf92f3577b34da6a3ce929d0e0e4736'\n  await request(app).get('/orders/42').set('traceparent', `00-${traceId}-00f067aa0ba902b7-01`).expect(200)\n  const spans = exporter.getFinishedSpans()\n  expect(new Set(spans.map((s) => s.spanContext().traceId))).toEqual(new Set([traceId]))\n  expect(spans.some((s) => s.kind === SpanKind.CLIENT)).toBe(true)\n  expect(stub.lastRequest.headers.traceparent).toContain(traceId)\n})\n```",
+      "threshold": "A request through the element and its outgoing calls yields exactly 1 trace id, with as many client spans as outgoing calls, each carrying the traceparent",
+      "description": "An integration test registers the HTTP instrumentation before the app is loaded, serves the app on a port of its own, sends it a request with a known traceparent, lets the element make its outgoing calls to a stub, and checks that every finished span carries that trace id, that there is a client span per call, and that the stub received the traceparent header on each. The instrumentation patches http in the test process too, so the test's own request to the app is excluded by its port (ignoreOutgoingRequestHook): otherwise it would get a client span in a fresh trace and its traceparent would be overwritten. Under Vitest the modules are ES modules, which the instrumentation does not see being loaded; requiring node:http once after registering applies the patch to the module object the app shares (an app that imports named functions from node:http needs the instrumentation's ESM hook, node --import with @opentelemetry/instrumentation/hook.mjs, instead).\n\nTool: Vitest with supertest, the OpenTelemetry InMemorySpanExporter and HttpInstrumentation (OpenTelemetry JS SDK 2.x); for the JVM: the OpenTelemetry Java agent's testing exporter with JUnit 5\n\n```ts\nimport http from 'node:http'\nimport { createRequire } from 'node:module'\nimport type { AddressInfo } from 'node:net'\nimport { SpanKind } from '@opentelemetry/api'\nimport { registerInstrumentations } from '@opentelemetry/instrumentation'\nimport { HttpInstrumentation } from '@opentelemetry/instrumentation-http'\nimport { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'\nimport { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'\nimport request from 'supertest'\nimport { afterAll, expect, it, vi } from 'vitest'\n\nconst exporter = new InMemorySpanExporter()\nconst provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })\nprovider.register()\nlet appPort = -1\nregisterInstrumentations({ instrumentations: [new HttpInstrumentation({\n  ignoreOutgoingRequestHook: (req) => Number(req.port) === appPort,   // the test's own request is not one of the element's calls\n})] })\ncreateRequire(import.meta.url)('node:http')       // the instrumentation patches on require: the app and the test share this module\nconst { app } = await import('../src/app')        // loaded after the instrumentation, so http is patched\nconst { stub } = await import('./stubs/partner')  // records every request the element sends it\nconst server = http.createServer(app).listen(0)\nappPort = (server.address() as AddressInfo).port\nafterAll(() => { server.close() })\n\nit('keeps one trace across the element and its outgoing calls', async () => {\n  const traceId = '4bf92f3577b34da6a3ce929d0e0e4736'\n  exporter.reset()\n  await request(server).get('/orders/42').set('traceparent', `00-${traceId}-00f067aa0ba902b7-01`).expect(200)\n  await vi.waitFor(() => expect(exporter.getFinishedSpans().some((s) => s.kind === SpanKind.SERVER)).toBe(true))\n  const spans = exporter.getFinishedSpans()\n  expect(new Set(spans.map((s) => s.spanContext().traceId))).toEqual(new Set([traceId]))\n  expect(spans.filter((s) => s.kind === SpanKind.CLIENT)).toHaveLength(stub.requests.length)\n  expect(stub.requests.length).toBeGreaterThan(0)\n  for (const r of stub.requests) expect(r.headers.traceparent).toContain(traceId)\n})\n```",
       "hubWhen": {
         "SIGNALS": [
           "otel"
+        ]
+      }
+    },
+    {
+      "id": "ff-head-sampling",
+      "type": "fitness-fn",
+      "label": "SDK samples at the root",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "Every container of the element's Deployments, StatefulSets and DaemonSets sets OTEL_TRACES_SAMPLER=parentbased_traceidratio and OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100, directly or from a ConfigMap in the same manifests",
+      "description": "A policy over all the rendered manifests at once fails the pipeline when a container does not configure the SDK's parent-based trace-id-ratio sampler with the agreed share; parent-based means only the first element decides and the others follow. A value is read from env (value, or valueFrom.configMapKeyRef) or from a ConfigMap the container takes whole with envFrom, so the ConfigMaps must be among the manifests checked; an unset ratio counts as the SDK's default of 1. On other platforms the same two variables go in the service's environment and the same check reads it.\n\nTool: Conftest (Open Policy Agent, rego.v1): conftest test --combine manifests/\n\n```rego\n# conftest test --combine manifests/\npackage main\n\nimport rego.v1\n\ndocs contains d if { some f in input; is_array(f.contents); some d in f.contents }\ndocs contains d if { some f in input; is_object(f.contents); d := f.contents }\n\nworkloads contains w if { some w in docs; w.kind in {\"Deployment\", \"StatefulSet\", \"DaemonSet\"} }\n\nconfig_map(name) := object.get(cm, \"data\", {}) if { some cm in docs; cm.kind == \"ConfigMap\"; cm.metadata.name == name }\n\nhas_env(c, name) if { some e in c.env; e.name == name }\n\nenv_value(c, name) := v if { some e in c.env; e.name == name; v := e.value }\nenv_value(c, name) := v if {\n  some e in c.env\n  e.name == name\n  ref := e.valueFrom.configMapKeyRef\n  entries := config_map(ref.name)\n  v := entries[ref.key]\n}\nenv_value(c, name) := v if {\n  not has_env(c, name)\n  some f in c.envFrom\n  entries := config_map(f.configMapRef.name)\n  v := entries[name]\n}\n\nsampler_arg(c) := to_number(env_value(c, \"OTEL_TRACES_SAMPLER_ARG\"))\nsampler_arg(c) := 1 if not env_value(c, \"OTEL_TRACES_SAMPLER_ARG\")   # the SDK's default\n\ndeny contains msg if {\n  some w in workloads\n  some c in w.spec.template.spec.containers\n  not env_value(c, \"OTEL_TRACES_SAMPLER\") == \"parentbased_traceidratio\"\n  msg := sprintf(\"%s/%s: container %s must set OTEL_TRACES_SAMPLER=parentbased_traceidratio\", [w.kind, w.metadata.name, c.name])\n}\n\ndeny contains msg if {\n  some w in workloads\n  some c in w.spec.template.spec.containers\n  sampler_arg(c) != {{SAMPLE_PERCENT}} / 100\n  msg := sprintf(\"%s/%s: container %s must set OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100\", [w.kind, w.metadata.name, c.name])\n}\n```",
+      "hubWhen": {
+        "SIGNALS": [
+          "otel"
+        ],
+        "SAMPLING": [
+          "head"
         ]
       }
     },
@@ -767,10 +696,10 @@
       "type": "fitness-fn",
       "label": "Error traces always kept",
       "x": 1040,
-      "y": 910,
+      "y": 1040,
       "category": "operational",
-      "threshold": "100 % of traces with an error or slower than {{P95_MS}} ms kept; about {{SAMPLE_PERCENT}} % of the rest",
-      "description": "The Collector's tail sampling policy is kept in the repository; a test sends a known mix of traces through a Collector started in the pipeline and counts what reaches the exporter.\n\nTool: OpenTelemetry Collector (tail_sampling processor, contrib distribution)\n\n```yaml\nprocessors:\n  tail_sampling:\n    decision_wait: 10s\n    num_traces: 100000\n    policies:\n      - name: errors\n        type: status_code\n        status_code: { status_codes: [ERROR] }\n      - name: slow\n        type: latency\n        latency: { threshold_ms: {{P95_MS}} }\n      - name: the-rest\n        type: probabilistic\n        probabilistic: { sampling_percentage: {{SAMPLE_PERCENT}} }\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [tail_sampling, batch]\n      exporters: [otlp]\n```",
+      "threshold": "The Collector's tail sampling policy keeps traces with an error status or slower than {{SLOW_TRACE_MS}} ms and {{SAMPLE_PERCENT}} % of the rest; the configuration validates",
+      "description": "The Collector's configuration, with its tail sampling policy, is kept in the repository whole (receivers, processors, exporters and the traces pipeline) and validated with the Collector's own validate command in the pipeline, so a mistyped field or a component the pipeline names but nobody defines fails the build before it runs; reviewing the policy against the threshold is part of the change.\n\nTool: OpenTelemetry Collector contrib (tail_sampling processor; otelcol-contrib validate)\n\n```yaml\n# collector.yaml   (CI: otelcol-contrib validate --config=collector.yaml)\nreceivers:\n  otlp:\n    protocols:\n      grpc: { endpoint: 0.0.0.0:4317 }\n      http: { endpoint: 0.0.0.0:4318 }\nprocessors:\n  batch: {}\n  tail_sampling:\n    decision_wait: 10s\n    num_traces: 100000\n    policies:\n      - name: errors\n        type: status_code\n        status_code: { status_codes: [ERROR] }\n      - name: slow\n        type: latency\n        latency: { threshold_ms: {{SLOW_TRACE_MS}} }\n      - name: the-rest\n        type: probabilistic\n        probabilistic: { sampling_percentage: {{SAMPLE_PERCENT}} }\nexporters:\n  otlp:\n    endpoint: tempo-distributor.observability.svc:4317   # your trace backend\n    tls: { insecure: true }                               # inside the cluster; TLS as the Encryption pack decides\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [tail_sampling, batch]\n      exporters: [otlp]\n```",
       "hubWhen": {
         "SIGNALS": [
           "otel"
@@ -781,23 +710,35 @@
       }
     },
     {
+      "id": "ff-keep-all",
+      "type": "fitness-fn",
+      "label": "Nothing sampled, kept 7 days",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "Every container of the element (at least one) sets the SDK sampler to always_on, the Collector's traces pipeline has no sampling processor, and the trace store keeps blocks for at least 168 h",
+      "description": "A pipeline step reads the element's manifest, the Collector configuration and the trace store's configuration from the repository and fails when any of the three would drop or expire traces early. For a hosted backend, the retention check reads the backend's settings API instead.\n\nTool: yq in the CI pipeline (Grafana Tempo for the trace store)\n\n```bash\n# every container of the element samples nothing away\n# (at least one container, and each sets OTEL_TRACES_SAMPLER=always_on itself)\nyq -e '(.spec.template.spec.containers | length > 0) and (.spec.template.spec.containers | all_c((.env // []) | any_c(.name == \"OTEL_TRACES_SAMPLER\" and .value == \"always_on\")))' k8s/order-api.yaml\n# the Collector's traces pipeline has no sampling processor\nyq -e '[.service.pipelines.traces.processors[] | select(test(\"sampl\"))] | length == 0' collector.yaml\n# Tempo keeps blocks for at least 7 days (168h)\nyq -e '.compactor.compaction.block_retention | sub(\"h\", \"\") | tonumber >= 168' tempo.yaml\n```",
+      "hubWhen": {
+        "SIGNALS": [
+          "otel"
+        ],
+        "SAMPLING": [
+          "all"
+        ]
+      }
+    },
+    {
       "id": "ff-health",
       "type": "fitness-fn",
       "label": "Probes declared",
       "x": 1040,
-      "y": 1040,
+      "y": 1300,
       "category": "structural",
       "threshold": "0 deployed containers without a liveness and a readiness probe",
-      "description": "A policy over the Kubernetes manifests fails the pipeline when a container of the element has no liveness or no readiness probe.\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.livenessProbe\n  msg := sprintf(\"%s: container %s has no livenessProbe\", [input.metadata.name, c.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.readinessProbe\n  msg := sprintf(\"%s: container %s has no readinessProbe\", [input.metadata.name, c.name])\n}\n```"
+      "description": "A policy over the Kubernetes manifests fails the pipeline when a container of the element has no liveness or no readiness probe. On a managed runtime, the health check path of the service is set in its configuration and the same policy reads that.\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.livenessProbe\n  msg := sprintf(\"%s: container %s has no livenessProbe\", [input.metadata.name, c.name])\n}\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  some c in input.spec.template.spec.containers\n  not c.readinessProbe\n  msg := sprintf(\"%s: container %s has no readinessProbe\", [input.metadata.name, c.name])\n}\n```"
     }
   ],
   "relations": [
-    {
-      "id": "req-slo--derives--need",
-      "sourceId": "req-slo",
-      "targetId": "need",
-      "relationType": "derives"
-    },
     {
       "id": "req-sli-request--derives--need",
       "sourceId": "req-sli-request",
@@ -829,20 +770,8 @@
       "relationType": "derives"
     },
     {
-      "id": "req-logs--derives--need",
-      "sourceId": "req-logs",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-pii-redact--derives--need",
-      "sourceId": "req-pii-redact",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-pii-restricted--derives--need",
-      "sourceId": "req-pii-restricted",
+      "id": "req-retention--derives--need",
+      "sourceId": "req-retention",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -877,12 +806,6 @@
       "relationType": "derives"
     },
     {
-      "id": "sc-slo--verifies--req-slo",
-      "sourceId": "sc-slo",
-      "targetId": "req-slo",
-      "relationType": "verifies"
-    },
-    {
       "id": "sc-sli-request--verifies--req-sli-request",
       "sourceId": "sc-sli-request",
       "targetId": "req-sli-request",
@@ -913,21 +836,9 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-logs--verifies--req-logs",
-      "sourceId": "sc-logs",
-      "targetId": "req-logs",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-pii-redact--verifies--req-pii-redact",
-      "sourceId": "sc-pii-redact",
-      "targetId": "req-pii-redact",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-pii-restricted--verifies--req-pii-restricted",
-      "sourceId": "sc-pii-restricted",
-      "targetId": "req-pii-restricted",
+      "id": "sc-retention--verifies--req-retention",
+      "sourceId": "sc-retention",
+      "targetId": "req-retention",
       "relationType": "verifies"
     },
     {
@@ -961,14 +872,14 @@
       "relationType": "verifies"
     },
     {
-      "id": "ff-slo--implements--adr-otel",
-      "sourceId": "ff-slo",
+      "id": "ff-sli-request--implements--adr-otel",
+      "sourceId": "ff-sli-request",
       "targetId": "adr-otel",
       "relationType": "implements"
     },
     {
-      "id": "ff-slo--implements--adr-logs",
-      "sourceId": "ff-slo",
+      "id": "ff-sli-request--implements--adr-logs",
+      "sourceId": "ff-sli-request",
       "targetId": "adr-logs",
       "relationType": "implements"
     },
@@ -991,21 +902,15 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-escalation--implements--adr-oncall",
+      "sourceId": "ff-escalation",
+      "targetId": "adr-oncall",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-hours-routing--implements--adr-hours",
       "sourceId": "ff-hours-routing",
       "targetId": "adr-hours",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-clean-logs--implements--adr-otel",
-      "sourceId": "ff-clean-logs",
-      "targetId": "adr-otel",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-clean-logs--implements--adr-logs",
-      "sourceId": "ff-clean-logs",
-      "targetId": "adr-logs",
       "relationType": "implements"
     },
     {
@@ -1027,8 +932,20 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-head-sampling--implements--adr-otel",
+      "sourceId": "ff-head-sampling",
+      "targetId": "adr-otel",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-tail-sampling--implements--adr-otel",
       "sourceId": "ff-tail-sampling",
+      "targetId": "adr-otel",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-keep-all--implements--adr-otel",
+      "sourceId": "ff-keep-all",
       "targetId": "adr-otel",
       "relationType": "implements"
     },

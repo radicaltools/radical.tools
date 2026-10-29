@@ -430,7 +430,7 @@ test('Forge proposes a concern pack\'s answers from the description and imports 
   // Confirmed only once accepted.
   const confirm = page.getByRole('button', { name: 'Confirm answers' })
   await expect(confirm).toBeDisabled()
-  await machine.getByLabel('none, no other system calls it').check()
+  await machine.getByLabel('none', { exact: true }).check()
   await proposed.getByRole('button', { name: 'Accept these answers' }).click()
   await expect(proposed.getByRole('button', { name: 'Accepted ✓' })).toBeVisible()
   await confirm.click()
@@ -464,7 +464,7 @@ test('Forge asks a concern pack\'s questions and imports it whole', async ({ pag
   const sign = page.locator('.forge-clarify-q', { hasText: 'Authentication — How do people sign in?' })
   await expect(sign.getByLabel('an external identity provider (OpenID Connect)')).toBeChecked()
   await sign.getByLabel('nobody signs in').check()
-  await page.locator('.forge-clarify-q', { hasText: 'Authentication — How do other systems call it?' }).getByLabel('none, no other system calls it').check()
+  await page.locator('.forge-clarify-q', { hasText: 'Authentication — How do other systems call it?' }).getByLabel('none', { exact: true }).check()
   await page.getByRole('button', { name: 'Confirm answers' }).click()
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()

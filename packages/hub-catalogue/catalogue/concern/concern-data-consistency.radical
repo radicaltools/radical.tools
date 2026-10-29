@@ -3,14 +3,14 @@
     "id": "concern-data-consistency",
     "category": "concern",
     "name": "Data consistency",
-    "description": "How one business operation stays all-or-nothing across records, stores and services: transactions, isolation, events, sagas, and what readers may see.",
+    "description": "How one business operation stays all-or-nothing across records, stores and services: transactions, isolation, events, sagas, and what readers may see. Which element writes each table is decided in the Decomposition pack; how consumers absorb duplicates in the Messaging pack.",
     "tags": [
       "consistency",
       "transactions",
       "isolation",
       "outbox",
       "saga",
-      "idempotency"
+      "replicas"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "concern": {
@@ -36,6 +36,14 @@
       {
         "title": "Jepsen: Consistency Models",
         "url": "https://jepsen.io/consistency"
+      },
+      {
+        "title": "Garcia-Molina and Salem, Sagas (SIGMOD 1987)",
+        "url": "https://dl.acm.org/doi/10.1145/38713.38742"
+      },
+      {
+        "title": "Terry et al., Session Guarantees for Weakly Consistent Replicated Data (1994)",
+        "url": "https://ieeexplore.ieee.org/document/331722"
       }
     ],
     "templateParams": [
@@ -101,50 +109,25 @@
           },
           {
             "value": "ryw",
-            "label": "replicas, with read-your-writes",
+            "label": "replicas with read-your-writes",
             "description": "Reads go to replicas, but a user who has just written reads from the primary or from a replica that has caught up with their write. Pick it when reads must scale and users must see their own changes at once."
           },
           {
             "value": "bounded",
-            "label": "replicas and caches, with bounded staleness",
+            "label": "replicas and caches with bounded staleness",
             "description": "Reads may be a few seconds old, never more than a stated bound, and decisions that write are taken on the primary. Pick it for catalogues, dashboards and feeds where a few seconds do not matter."
           }
         ]
       },
       {
-        "key": "OWNERSHIP",
-        "title": "Source of truth",
-        "label": "Who may write each entity?",
-        "hint": "When several elements write the same tables, every invariant has to hold in all of them, and a change of schema is a change to all of them.",
-        "defaultValue": "owner",
-        "options": [
-          {
-            "value": "owner",
-            "label": "one owning element per entity",
-            "description": "Each entity has one element that writes it; others ask its API or keep read-only copies fed by its events. Pick it for services with their own databases, and for modules of a monolith that should be separable."
-          },
-          {
-            "value": "shared",
-            "label": "a database shared by several elements",
-            "description": "Several elements write the same tables. Pick it only for an existing system where splitting is not yet possible; invariants then have to live in the database itself."
-          }
-        ]
-      },
-      {
         "key": "PROPAGATION_SECONDS",
-        "label": "How many seconds may others see the old state after a commit?",
+        "label": "How many seconds may others see the old state after a commit? (the outbox relay's lag and a replica's staleness alike)",
         "defaultValue": "5",
         "type": "number"
       },
       {
-        "key": "IDEMPOTENCY_HOURS",
-        "label": "For how many hours are processed message ids remembered?",
-        "defaultValue": "72",
-        "type": "number"
-      },
-      {
         "key": "SAGA_MINUTES",
-        "label": "Within how many minutes must a saga complete or be compensated?",
+        "label": "Within how many minutes must a saga complete or be compensated? (sagas only)",
         "defaultValue": "15",
         "type": "number"
       }
@@ -159,7 +142,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Data consistency",
-      "description": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done."
+      "description": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-atomic",
@@ -169,7 +152,7 @@
       "y": 0,
       "ears_type": "ubiquitous",
       "action": "change every record of one business operation in a single database transaction, so that after a crash at any point either all of its changes are visible or none",
-      "rationale": "Atomicity of a single transaction is the simplest guarantee there is; it holds only while every record is in one database (PostgreSQL docs, Transactions; Jepsen consistency models).",
+      "rationale": "Atomicity of a single transaction is the simplest guarantee there is; it holds only while every record is in one database (PostgreSQL docs, Transaction Isolation; Jepsen consistency models).",
       "hubWhen": {
         "MODEL": [
           "acid"
@@ -188,7 +171,8 @@
       "rationale": "A dual write to a database and a broker loses or invents events when either fails; the transactional outbox makes the event part of the commit (microservices.io, Transactional outbox).",
       "hubWhen": {
         "MODEL": [
-          "outbox"
+          "outbox",
+          "saga"
         ]
       }
     },
@@ -224,28 +208,11 @@
       }
     },
     {
-      "id": "req-idempotent",
-      "type": "requirement",
-      "label": "Duplicates have no effect",
-      "x": 260,
-      "y": 520,
-      "ears_type": "unwanted-behaviour",
-      "unwanted_condition": "a consumer receives a message it has already processed",
-      "action": "acknowledge it without a second effect, recognising it by its message id, which is remembered for at least {{IDEMPOTENCY_HOURS}} hours in the same transaction as the effect",
-      "rationale": "Brokers and outbox relays deliver at least once, so duplicates are normal; an idempotent consumer makes them harmless (microservices.io, Idempotent consumer).",
-      "hubWhen": {
-        "MODEL": [
-          "outbox",
-          "saga"
-        ]
-      }
-    },
-    {
       "id": "req-lost-update",
       "type": "requirement",
       "label": "No lost updates",
       "x": 260,
-      "y": 650,
+      "y": 520,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "two transactions update the same record from the same version",
       "action": "commit the first and reject the second with a conflict, by checking a version column in the UPDATE's WHERE clause or locking the row with SELECT ... FOR UPDATE",
@@ -261,7 +228,7 @@
       "type": "requirement",
       "label": "No write skew",
       "x": 260,
-      "y": 780,
+      "y": 650,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "two concurrent transactions each read a set of rows and then write different rows of it, breaking a rule over the set",
       "action": "enforce that rule with a database constraint (unique, exclusion or check) or by locking the rows read with SELECT ... FOR UPDATE, and retry a transaction aborted by a serialization failure up to 3 times",
@@ -277,7 +244,7 @@
       "type": "requirement",
       "label": "Serialization failures retried",
       "x": 260,
-      "y": 910,
+      "y": 780,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "a transaction fails with a serialization failure (SQLSTATE 40001) or a deadlock (40P01)",
       "action": "retry it from the start up to 3 times with jittered backoff, and report a conflict to the caller only after the last attempt fails",
@@ -293,7 +260,7 @@
       "type": "requirement",
       "label": "Reads see every commit",
       "x": 260,
-      "y": 1040,
+      "y": 910,
       "ears_type": "ubiquitous",
       "action": "serve every read from the primary, so that a read started after a commit returns that commit",
       "rationale": "Reading from the primary gives linearizable reads for a single-leader database without further design (Jepsen: consistency models).",
@@ -308,7 +275,7 @@
       "type": "requirement",
       "label": "Users see their own writes",
       "x": 260,
-      "y": 1170,
+      "y": 1040,
       "ears_type": "event-driven",
       "trigger": "a user who has written within the last {{PROPAGATION_SECONDS}} seconds reads",
       "action": "serve the read from the primary, or from a replica that has replayed at least the position of the user's last commit (LSN or GTID)",
@@ -324,44 +291,14 @@
       "type": "requirement",
       "label": "Staleness bounded",
       "x": 260,
-      "y": 1300,
+      "y": 1170,
       "ears_type": "state-driven",
-      "precondition": "while a read is served from a replica or a cache",
+      "precondition": "a read is served from a replica or a cache",
       "action": "return data no older than {{PROPAGATION_SECONDS}} seconds, stop routing reads to a replica that lags more, and take every decision that writes on the primary",
       "rationale": "Bounded staleness keeps the gain of replicas while capping how wrong a reader can be (Jepsen: consistency models); decisions on stale data cause lost updates.",
       "hubWhen": {
         "READS": [
           "bounded"
-        ]
-      }
-    },
-    {
-      "id": "req-owner",
-      "type": "requirement",
-      "label": "One writer per entity",
-      "x": 260,
-      "y": 1430,
-      "ears_type": "ubiquitous",
-      "action": "let only the owning element write each entity's records, enforced by database roles, and let other elements read it through the owner's API or keep read-only copies fed by its events",
-      "rationale": "A single source of truth per entity keeps every invariant in one place (microservices.io, Database per service).",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "owner"
-        ]
-      }
-    },
-    {
-      "id": "req-shared",
-      "type": "requirement",
-      "label": "Shared tables guarded",
-      "x": 260,
-      "y": 1560,
-      "ears_type": "ubiquitous",
-      "action": "enforce every invariant of a table that several elements write with database constraints (primary and foreign keys, unique, check, exclusion), and list for each such table the elements that write it",
-      "rationale": "Application code in several elements cannot keep a rule consistently; the database is the only place all writers pass (PostgreSQL docs, Constraints).",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "shared"
         ]
       }
     },
@@ -391,7 +328,8 @@
       "then": "the first order's event is published within {{PROPAGATION_SECONDS}} seconds of the broker's return; the second has no event",
       "hubWhen": {
         "MODEL": [
-          "outbox"
+          "outbox",
+          "saga"
         ]
       }
     },
@@ -426,27 +364,11 @@
       }
     },
     {
-      "id": "sc-idempotent",
-      "type": "scenario",
-      "label": "Message delivered twice",
-      "x": 520,
-      "y": 520,
-      "given": "an OrderPlaced message already processed",
-      "when": "it is delivered again an hour later",
-      "then": "it is acknowledged and nothing is charged, reserved or sent a second time",
-      "hubWhen": {
-        "MODEL": [
-          "outbox",
-          "saga"
-        ]
-      }
-    },
-    {
       "id": "sc-lost-update",
       "type": "scenario",
       "label": "Concurrent edits",
       "x": 520,
-      "y": 650,
+      "y": 520,
       "given": "two users editing the same order at version 7",
       "when": "both save",
       "then": "one save succeeds and the other gets a conflict with the current version",
@@ -461,7 +383,7 @@
       "type": "scenario",
       "label": "Double booking prevented",
       "x": 520,
-      "y": 780,
+      "y": 650,
       "given": "one free slot",
       "when": "two customers book it at the same moment",
       "then": "exactly one booking is stored",
@@ -476,7 +398,7 @@
       "type": "scenario",
       "label": "Conflict retried",
       "x": 520,
-      "y": 910,
+      "y": 780,
       "given": "two transfers from the same account running at once",
       "when": "one is aborted with SQLSTATE 40001",
       "then": "it is retried and succeeds, and the balance is never negative",
@@ -491,7 +413,7 @@
       "type": "scenario",
       "label": "Saved and seen",
       "x": 520,
-      "y": 1040,
+      "y": 910,
       "given": "a user who has just saved an address",
       "when": "the next page loads",
       "then": "it shows the new address",
@@ -506,7 +428,7 @@
       "type": "scenario",
       "label": "Own change visible",
       "x": 520,
-      "y": 1170,
+      "y": 1040,
       "given": "replicas lagging 3 seconds behind",
       "when": "a user saves an address and reloads at once",
       "then": "the reload shows the new address",
@@ -521,43 +443,13 @@
       "type": "scenario",
       "label": "Lagging replica dropped",
       "x": 520,
-      "y": 1300,
+      "y": 1170,
       "given": "a replica whose lag grows past {{PROPAGATION_SECONDS}} seconds",
       "when": "reads arrive",
       "then": "they go to the primary or another replica until it catches up",
       "hubWhen": {
         "READS": [
           "bounded"
-        ]
-      }
-    },
-    {
-      "id": "sc-owner",
-      "type": "scenario",
-      "label": "Other writer refused",
-      "x": 520,
-      "y": 1430,
-      "given": "the orders table owned by the order service",
-      "when": "the inventory service tries to update an order",
-      "then": "the database refuses the write",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "owner"
-        ]
-      }
-    },
-    {
-      "id": "sc-shared",
-      "type": "scenario",
-      "label": "Constraint holds",
-      "x": 520,
-      "y": 1560,
-      "given": "two services writing order lines",
-      "when": "one inserts a line for an order that does not exist",
-      "then": "the database refuses it",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "shared"
         ]
       }
     },
@@ -571,7 +463,7 @@
       "status": "accepted",
       "date": "",
       "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
-      "decision": "Each business operation runs in one database transaction (PostgreSQL, MySQL InnoDB or SQL Server), opened and committed by one unit of work at the application's edge: Spring @Transactional, EF Core SaveChanges, Prisma $transaction or a hand-written withTransaction. No call to another service or broker happens inside it. Isolation: {{ISOLATION}}. Reads: {{READS}}. Writers: {{OWNERSHIP}}. Rules that span rows are database constraints where SQL can state them.",
+      "decision": "Each business operation runs in one database transaction (PostgreSQL, MySQL InnoDB or SQL Server), opened and committed by one unit of work at the application's edge: Spring @Transactional, EF Core SaveChanges, Prisma $transaction or a hand-written withTransaction. No call to another service or broker happens inside it. Isolation: {{ISOLATION}}. Reads: {{READS}}. Which element writes each table is decided in the Decomposition pack. Rules that span rows are database constraints where SQL can state them.",
       "consequences": "• All-or-nothing comes from the database, with no extra machinery.\n• Every record the operation changes must stay in that database: splitting it into services later means revisiting this decision.\n• Long transactions hold locks: work that is slow or calls out happens before or after, not inside.\n• Nothing outside the database learns of the change atomically; once events are needed, an outbox is.",
       "alternatives": "1. A transactional outbox: the same transaction plus reliable events for others.\n2. A saga: when the data is spread over services.\n3. Distributed transactions (XA, two-phase commit): atomic across stores, but blocking, rarely supported by brokers and cloud services.",
       "hubWhen": {
@@ -590,8 +482,8 @@
       "status": "accepted",
       "date": "",
       "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
-      "decision": "State changes and the events that announce them are written in one local transaction: the event goes to an outbox table, and a relay publishes it to the broker within {{PROPAGATION_SECONDS}} seconds, then marks it sent. The relay is change data capture with Debezium (its outbox event router) when Kafka Connect is already run, otherwise a polling publisher, or the framework's outbox (Spring Modulith event publication registry, MassTransit or NServiceBus outbox). Nothing publishes to the broker directly. Consumers are idempotent: they remember message ids for {{IDEMPOTENCY_HOURS}} hours in the same transaction as their effect. Isolation: {{ISOLATION}}. Reads: {{READS}}. Writers: {{OWNERSHIP}}.",
-      "consequences": "• No lost or invented events: an event exists if and only if its change committed.\n• Delivery is at least once, so every consumer must be idempotent.\n• Others see the change up to {{PROPAGATION_SECONDS}} seconds later; the relay's lag must be watched.\n• The outbox table needs cleaning up, and event order holds only per aggregate key.",
+      "decision": "State changes and the events that announce them are written in one local transaction: the event goes to an outbox table, and a relay publishes it to the broker within {{PROPAGATION_SECONDS}} seconds, then marks it sent. The relay is change data capture with Debezium (its outbox event router) when Kafka Connect is already run, otherwise a polling publisher, or the framework's outbox (Spring Modulith event publication registry, MassTransit or NServiceBus outbox). Nothing publishes to the broker directly. Delivery is at least once; consumers absorb duplicates as decided in the Messaging pack. Isolation: {{ISOLATION}}. Reads: {{READS}}. Which element writes each table is decided in the Decomposition pack.",
+      "consequences": "• No lost or invented events: an event exists if and only if its change committed.\n• Delivery is at least once, so every consumer must be idempotent (the Messaging pack decides how).\n• Others see the change up to {{PROPAGATION_SECONDS}} seconds later; the relay's lag must be watched.\n• The outbox table needs cleaning up, and event order holds only per aggregate key.",
       "alternatives": "1. Publish after commit (dual write): simpler, but a crash between commit and publish loses the event.\n2. Event sourcing: the events are the state, which removes the dual write but changes the whole persistence model.\n3. Two-phase commit between database and broker: blocking and seldom supported.",
       "hubWhen": {
         "MODEL": [
@@ -609,12 +501,126 @@
       "status": "accepted",
       "date": "",
       "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
-      "decision": "An operation that changes data in several services runs as an orchestrated saga: each step a local transaction in its own service, each with a compensating step, the saga's state durable so it resumes after a restart. The orchestrator is Temporal, AWS Step Functions, Camunda 8 or MassTransit state machines: Temporal when the team writes workflows in code and runs it itself or on Temporal Cloud, Step Functions on AWS for few steps and managed operation, Camunda when business owners read and change BPMN. Choreography by events only for two or three steps. Records the saga changes stay pending until it completes; a saga not done within {{SAGA_MINUTES}} minutes is compensated. Steps talk through the transactional outbox, and consumers remember message ids for {{IDEMPOTENCY_HOURS}} hours. Isolation of each local transaction: {{ISOLATION}}. Reads: {{READS}}. Writers: {{OWNERSHIP}}.",
+      "decision": "An operation that changes data in several services runs as an orchestrated saga: each step a local transaction in its own service, each with a compensating step, the saga's state durable so it resumes after a restart. The orchestrator is Temporal, AWS Step Functions, Camunda 8 or MassTransit state machines: Temporal when the team writes workflows in code and runs it itself or on Temporal Cloud, Step Functions on AWS for few steps and managed operation, Camunda when business owners read and change BPMN. Choreography by events only for two or three steps. Records the saga changes stay pending until it completes; a saga not done within {{SAGA_MINUTES}} minutes is compensated. The orchestrator calls each step over its own durable queue; each step's own state change and the events it emits go through that service's transactional outbox, and consumers absorb duplicates as decided in the Messaging pack. Isolation of each local transaction: {{ISOLATION}}. Reads: {{READS}}. Which element writes each table is decided in the Decomposition pack.",
       "consequences": "• Each service keeps its own database and its own transactions.\n• No isolation between sagas: others see pending states, and the design has to say what they may do with them.\n• Every step needs a compensating step that cannot fail for good, which is real design work (refunds, releases, cancellation notices).\n• An orchestrator is one more system to run and to keep available.",
       "alternatives": "1. Put the data in one database and use one transaction: simpler, if the service boundaries allow.\n2. Distributed transactions (XA, two-phase commit): atomic but blocking, and rarely available across services and SaaS APIs.\n3. Choreography without an orchestrator: no central component, but the flow is hard to see and to change past three steps.",
       "hubWhen": {
         "MODEL": [
           "saga"
+        ]
+      }
+    },
+    {
+      "id": "adr-read-committed",
+      "type": "adr",
+      "label": "Read Committed with version checks",
+      "x": 780,
+      "y": 390,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Transactions run at Read Committed, the database's default. Every read-modify-write carries a version column checked in the UPDATE's WHERE clause (optimistic locking: JPA @Version, EF Core concurrency tokens, Prisma or a hand-written version = $expected), or locks the row with SELECT ... FOR UPDATE where the write always follows the read; a conflict is reported to the caller with the current version. Rules over several rows are database constraints.",
+      "consequences": "• The cheapest level: no serialization aborts, no retry loop in every transaction.\n• Every read-modify-write must remember its version or lock: one forgotten is a lost update.\n• Rules that span rows cannot be enforced by the level and need a constraint or an explicit lock.",
+      "alternatives": "1. Repeatable Read (snapshot isolation): consistent multi-row reads, write skew remains.\n2. Serializable: no anomalies, at the cost of aborts and retries.",
+      "hubWhen": {
+        "ISOLATION": [
+          "read-committed"
+        ]
+      }
+    },
+    {
+      "id": "adr-snapshot",
+      "type": "adr",
+      "label": "Repeatable Read (snapshot isolation)",
+      "x": 780,
+      "y": 520,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Transactions run at Repeatable Read (PostgreSQL snapshot isolation, SQL Server SNAPSHOT), so each sees one consistent snapshot and a concurrent update of the same row aborts one of them, which is retried up to 3 times. Rules over a set of rows (one booking per slot, a balance never negative) are enforced with a unique, exclusion or check constraint, or by locking the rows read with SELECT ... FOR UPDATE, because snapshot isolation allows write skew.",
+      "consequences": "• Reports and multi-row reads are consistent without locks.\n• Every cross-row rule needs a constraint or a lock: the level does not protect it.\n• Concurrent updates of the same row abort: a retry loop is needed where that is common.\n• Long snapshots hold back vacuum in PostgreSQL: keep transactions short.",
+      "alternatives": "1. Read Committed with version checks: cheaper, no consistent multi-row reads.\n2. Serializable: write skew is caught by the database, with more aborts.",
+      "hubWhen": {
+        "ISOLATION": [
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "adr-serializable",
+      "type": "adr",
+      "label": "Serializable",
+      "x": 780,
+      "y": 650,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Transactions run at Serializable (PostgreSQL SSI, CockroachDB, Spanner), so the database guarantees the effect of some serial order and aborts a transaction that would break it. Every transaction is wrapped in one retry helper that retries a serialization failure (SQLSTATE 40001) or deadlock (40P01) up to 3 times with jittered backoff and reports a conflict only after the last attempt; the helper is the only way to open a transaction. Transactions stay short and touch few rows, so aborts stay rare.",
+      "consequences": "• Invariants that span rows hold without a constraint or lock for each.\n• A retry rate to watch: above a few percent, p99 latency rises and the hot rows need redesign.\n• Every transaction must be safe to run again from the start: no side effects before the commit.\n• PostgreSQL SSI costs memory for predicate locks on large scans.",
+      "alternatives": "1. Repeatable Read with constraints: fewer aborts, every cross-row rule stated by hand.\n2. Read Committed with version checks: cheapest, protects single rows only.",
+      "hubWhen": {
+        "ISOLATION": [
+          "serializable"
+        ]
+      }
+    },
+    {
+      "id": "adr-reads-primary",
+      "type": "adr",
+      "label": "Reads from the primary only",
+      "x": 780,
+      "y": 780,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Every read is served from the primary; no read replica or cache stands between the application and committed data. The application configures one connection pool and no read-only data source. Replicas, if any exist, serve backups and analytics only. Revisit when the primary's read load passes 60% of its capacity for a week.",
+      "consequences": "• A read after a commit always returns it: no session guarantees to build.\n• The primary carries every read: vertical scaling and query tuning are the levers.\n• No replica routing to get wrong.",
+      "alternatives": "1. Replicas with read-your-writes: reads scale, users still see their own changes.\n2. Replicas and caches with bounded staleness: the most scale, a stated staleness for everyone.",
+      "hubWhen": {
+        "READS": [
+          "primary"
+        ]
+      }
+    },
+    {
+      "id": "adr-ryw",
+      "type": "adr",
+      "label": "Replicas with read-your-writes",
+      "x": 780,
+      "y": 910,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Reads go to replicas through a router (the framework's read/write splitting, pgpool, ProxySQL or application code) that keeps, per user session, the position of their last commit (PostgreSQL LSN, MySQL GTID); a read within {{PROPAGATION_SECONDS}} seconds of that commit goes to the primary, or to a replica that has replayed past the position. A replica lagging more than {{PROPAGATION_SECONDS}} seconds is taken out of rotation.",
+      "consequences": "• Reads scale with replicas and users see what they just saved.\n• The router is on every request and has to carry the session's position (a cookie or token claim).\n• Other users still see changes late, up to the replica lag.\n• A replica's lag is an alert and a routing signal at once.",
+      "alternatives": "1. The primary only: no router, no lag, less scale.\n2. Bounded staleness for everyone: simpler router, and a user may miss their own write for a few seconds.",
+      "hubWhen": {
+        "READS": [
+          "ryw"
+        ]
+      }
+    },
+    {
+      "id": "adr-bounded",
+      "type": "adr",
+      "label": "Replicas and caches with bounded staleness",
+      "x": 780,
+      "y": 1040,
+      "concern": "data-consistency",
+      "status": "accepted",
+      "date": "",
+      "context": "This element writes to stores and queues, and one business operation often changes several records, sometimes in several stores or services. The forces: a crash between two writes leaves half an operation behind; writing to a database and then to a broker (a dual write) loses or invents events when either fails; concurrent transactions at the default isolation level lose updates and break invariants that span rows; brokers deliver at least once, so every message may come twice; replicas and caches lag, so a user may not see what they just saved; and when several elements write the same data, nobody knows which copy is the truth.",
+      "decision": "Reads are served from replicas and caches and may be up to {{PROPAGATION_SECONDS}} seconds old; the router takes a replica out of rotation when its lag passes that bound, and cache entries expire within it. Every decision that writes (a stock check before a reservation, a balance before a transfer) is taken on the primary inside the writing transaction, never on a replica or cache read.",
+      "consequences": "• The most read scale, with a staleness the product can state.\n• A user may not see their own change for a few seconds: the interface has to cope (optimistic updates, a \"saving\" state).\n• Any write that trusts a replica read is a lost update waiting to happen: the primary-only rule for decisions needs a review check.\n• Cache invalidation is bounded by expiry, not by correctness.",
+      "alternatives": "1. Replicas with read-your-writes: users see their own changes, at the cost of a session-aware router.\n2. The primary only: no staleness, no scale from replicas.",
+      "hubWhen": {
+        "READS": [
+          "bounded"
         ]
       }
     },
@@ -626,17 +632,47 @@
       "y": 0,
       "category": "structural",
       "threshold": "0 lost updates or broken invariants in 1,000 concurrent attempts against a real database at the chosen isolation level",
-      "description": "An integration test runs many concurrent operations that compete for the same records against the real database engine (not an in-memory fake), at the isolation level and with the retries of the decision, and checks the invariant afterwards.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nit('never sells more than is in stock', async () => {\n  await db.query(\"update stock set available = 10 where sku = 'A'\")\n  const attempts = Array.from({ length: 1000 }, () => placeOrder({ sku: 'A', quantity: 1 }).then(() => 1, () => 0))\n  const sold = (await Promise.all(attempts)).reduce((a, b) => a + b, 0)\n  const { rows } = await db.query(\"select available from stock where sku = 'A'\")\n  expect(sold).toBe(10)\n  expect(rows[0].available).toBe(0)\n})\n```"
+      "description": "An integration test runs many concurrent operations that compete for the same records against the real database engine (not an in-memory fake), at the isolation level and with the retries of the decision, and checks the invariant afterwards.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nimport { db } from './db'\nimport { placeOrder } from '../src/orders/placeOrder'\n\nit('never sells more than is in stock', async () => {\n  await db.query(\"update stock set available = 10 where sku = 'A'\")\n  const attempts = Array.from({ length: 1000 }, () => placeOrder({ sku: 'A', quantity: 1 }).then(() => 1, () => 0))\n  const sold = (await Promise.all(attempts)).reduce((a, b) => a + b, 0)\n  const { rows } = await db.query(\"select available from stock where sku = 'A'\")\n  expect(sold).toBe(10)\n  expect(rows[0].available).toBe(0)\n})\n```"
+    },
+    {
+      "id": "ff-lost-update",
+      "type": "fitness-fn",
+      "label": "Second writer gets a conflict",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "Of two updates from the same version, exactly 1 commits and 1 is refused with a conflict naming the current version",
+      "description": "An integration test reads one order at version 7 in two sessions, saves from both, and expects one success and one conflict that carries the current version; it runs against the real database.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nimport { orders } from '../src/orders/repository'\nimport { seedOrder } from './db'\n\nit('refuses the second update from the same version', async () => {\n  const id = await seedOrder({ version: 7 })\n  const [first, second] = await Promise.allSettled([\n    orders.update(id, { note: 'first' }, { expectedVersion: 7 }),\n    orders.update(id, { note: 'second' }, { expectedVersion: 7 }),\n  ])\n  const outcomes = [first, second].map((r) => r.status).sort()\n  expect(outcomes).toEqual(['fulfilled', 'rejected'])\n  const rejected = [first, second].find((r) => r.status === 'rejected') as PromiseRejectedResult\n  expect(rejected.reason).toMatchObject({ name: 'ConflictError', currentVersion: 8 })\n})\n```",
+      "hubWhen": {
+        "ISOLATION": [
+          "read-committed"
+        ]
+      }
+    },
+    {
+      "id": "ff-serialization-retry",
+      "type": "fitness-fn",
+      "label": "Serialization failures retried",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "The transaction helper retries SQLSTATE 40001 and 40P01 up to 3 times and reports a conflict after the 4th failure",
+      "description": "A unit test gives the retry helper a transaction body that fails with 40001 twice and then succeeds, expects 3 attempts, then one that always fails and expects a conflict after 4 attempts. The helper is the only way to open a transaction, which code review keeps.\n\nTool: Vitest\n\n```ts\nimport { withSerializableRetry } from '../src/db/transaction'\n\nconst serializationFailure = () => Object.assign(new Error('could not serialize access'), { code: '40001' })\n\nit('retries a serialization failure and gives up after the third retry', async () => {\n  let attempts = 0\n  const flaky = async () => { attempts++; if (attempts < 3) throw serializationFailure(); return 'ok' }\n  await expect(withSerializableRetry(flaky)).resolves.toBe('ok')\n  expect(attempts).toBe(3)\n\n  attempts = 0\n  const hopeless = async () => { attempts++; throw serializationFailure() }\n  await expect(withSerializableRetry(hopeless)).rejects.toMatchObject({ name: 'ConflictError' })\n  expect(attempts).toBe(4)\n})\n```",
+      "hubWhen": {
+        "ISOLATION": [
+          "serializable"
+        ]
+      }
     },
     {
       "id": "ff-atomic",
       "type": "fitness-fn",
       "label": "No half operations",
       "x": 1040,
-      "y": 130,
+      "y": 390,
       "category": "structural",
       "threshold": "0 records left behind when an operation fails at any of its steps",
-      "description": "An integration test makes the operation fail after each of its writes in turn and checks that none of its records exist afterwards.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nit.each(['afterReservation', 'afterInvoice', 'beforeCommit'])('leaves nothing when it fails %s', async (step) => {\n  const failAt = { [step]: () => { throw new Error('injected') } }\n  await expect(placeOrder({ sku: 'A', quantity: 1 }, { hooks: failAt })).rejects.toThrow('injected')\n  expect(await count('reservations')).toBe(0)\n  expect(await count('invoices')).toBe(0)\n})\n```",
+      "description": "An integration test makes the operation fail after each of its writes in turn and checks that none of its records exist afterwards.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nimport { placeOrder } from '../src/orders/placeOrder'\nimport { count } from './db'\n\nit.each(['afterReservation', 'afterInvoice', 'beforeCommit'])('leaves nothing when it fails %s', async (step) => {\n  const failAt = { [step]: () => { throw new Error('injected') } }\n  await expect(placeOrder({ sku: 'A', quantity: 1 }, { hooks: failAt })).rejects.toThrow('injected')\n  expect(await count('reservations')).toBe(0)\n  expect(await count('invoices')).toBe(0)\n})\n```",
       "hubWhen": {
         "MODEL": [
           "acid"
@@ -648,10 +684,26 @@
       "type": "fitness-fn",
       "label": "Only the relay publishes",
       "x": 1040,
-      "y": 260,
+      "y": 520,
       "category": "structural",
       "threshold": "0 modules outside the outbox relay that import a broker client",
-      "description": "A dependency rule fails the build when code outside the relay imports a broker client, which would be a dual write that can lose or invent events.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'publish-through-outbox',\n    comment: 'ADR Transactional outbox: write to the outbox table; only the relay talks to the broker',\n    severity: 'error',\n    from: { pathNot: '^src/outbox/relay' },\n    to: { path: 'node_modules/(kafkajs|amqplib|@aws-sdk/client-sqs|@aws-sdk/client-sns|@azure/service-bus|@google-cloud/pubsub)' },\n  }],\n}\n```",
+      "description": "A dependency rule fails the build when code outside the relay imports a broker client, which would be a dual write that can lose or invent events.\n\nTool: dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest)\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'publish-through-outbox',\n    comment: 'ADR Transactional outbox: write to the outbox table; only the relay talks to the broker',\n    severity: 'error',\n    from: { pathNot: '^src/outbox/relay' },\n    to: { path: 'node_modules/(kafkajs|amqplib|@aws-sdk/client-sqs|@aws-sdk/client-sns|@azure/service-bus|@google-cloud/pubsub)' },\n  }],\n}\n```",
+      "hubWhen": {
+        "MODEL": [
+          "outbox",
+          "saga"
+        ]
+      }
+    },
+    {
+      "id": "ff-outbox-test",
+      "type": "fitness-fn",
+      "label": "Events follow commits only",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "A committed change has its event on the broker within {{PROPAGATION_SECONDS}} seconds of the broker's return; a rolled-back change has 0 events",
+      "description": "An integration test stops the broker, places an order (committed) and makes a second one roll back, restarts the broker and reads the topic: the first order's event arrives within the bound, the second never.\n\nTool: Vitest with Testcontainers (PostgreSQL and the broker)\n\n```ts\nimport { placeOrder } from '../src/orders/placeOrder'\nimport { broker, topic } from './broker'    // the broker container and a consumer of the events topic\n\nit('publishes committed changes only, once the broker is back', async () => {\n  await broker.stop()\n  const committed = await placeOrder({ sku: 'A', quantity: 1 })\n  await expect(placeOrder({ sku: 'A', quantity: 1 }, { hooks: { beforeCommit: () => { throw new Error('injected') } } })).rejects.toThrow()\n  await broker.start()\n  const events = await topic.collect({ seconds: {{PROPAGATION_SECONDS}} })\n  expect(events.map((e) => e.orderId)).toEqual([committed.id])\n})\n```",
       "hubWhen": {
         "MODEL": [
           "outbox",
@@ -664,25 +716,10 @@
       "type": "fitness-fn",
       "label": "Outbox drained in time",
       "x": 1040,
-      "y": 390,
+      "y": 780,
       "category": "operational",
       "threshold": "The oldest unpublished outbox row is never older than {{PROPAGATION_SECONDS}} seconds for more than 2 minutes",
       "description": "The database exporter reports the age of the oldest unpublished outbox row; Prometheus pages when the relay falls behind, before consumers notice.\n\nTool: Prometheus with sql_exporter\n\n```yaml\n# sql_exporter collector\ncollector_name: outbox\nmetrics:\n  - metric_name: outbox_oldest_unpublished_seconds\n    type: gauge\n    help: 'Age of the oldest event not yet published'\n    values: [age]\n    query: |\n      SELECT coalesce(extract(epoch FROM now() - min(created_at)), 0) AS age FROM outbox WHERE published_at IS NULL\n---\n# Prometheus alerting rule\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: OutboxBehind\n        expr: outbox_oldest_unpublished_seconds > {{PROPAGATION_SECONDS}}\n        for: 2m\n        labels: { severity: page }\n```",
-      "hubWhen": {
-        "MODEL": [
-          "outbox"
-        ]
-      }
-    },
-    {
-      "id": "ff-idempotent",
-      "type": "fitness-fn",
-      "label": "Duplicates absorbed",
-      "x": 1040,
-      "y": 520,
-      "category": "structural",
-      "threshold": "Every consumer, given each message twice, produces exactly the effects of one delivery",
-      "description": "A test for each consumer delivers every message it handles twice, including a redelivery after a simulated crash before the acknowledgement, and compares the effects with a single delivery.\n\nTool: Vitest with Testcontainers (PostgreSQL and the broker)\n\n```ts\ndescribe.each(consumers)('%s', (consumer) => {\n  it('has the same effect for a message delivered twice', async () => {\n    const message = consumer.sampleMessage()\n    await consumer.handle(message)\n    const once = await snapshotEffects()\n    await consumer.handle(message)                       // redelivery\n    expect(await snapshotEffects()).toEqual(once)\n  })\n})\n```",
       "hubWhen": {
         "MODEL": [
           "outbox",
@@ -695,10 +732,25 @@
       "type": "fitness-fn",
       "label": "Sagas compensate",
       "x": 1040,
-      "y": 650,
+      "y": 910,
       "category": "structural",
       "threshold": "For every step of every saga, a failure there runs the compensations of all earlier steps in reverse order, and 0 steps without a compensation test",
-      "description": "A workflow test makes each step fail in turn on a time-skipping test server and checks that the completed steps were compensated in reverse order.\n\nTool: Temporal TypeScript SDK (@temporalio/testing)\n\n```ts\nimport { TestWorkflowEnvironment } from '@temporalio/testing'\nimport { Worker } from '@temporalio/worker'\nimport { placeOrder } from '../src/workflows'\n\nit('releases the stock when the payment fails', async () => {\n  const env = await TestWorkflowEnvironment.createTimeSkipping()\n  const done: string[] = []\n  const worker = await Worker.create({\n    connection: env.nativeConnection, taskQueue: 'test',\n    workflowsPath: require.resolve('../src/workflows'),\n    activities: {\n      reserveStock: async () => { done.push('reserve') },\n      releaseStock: async () => { done.push('release') },\n      chargePayment: async () => { throw new Error('card declined') },\n    },\n  })\n  await worker.runUntil(env.client.workflow.execute(placeOrder, { taskQueue: 'test', workflowId: 'order-1', args: [{ sku: 'A' }] }).catch(() => undefined))\n  expect(done).toEqual(['reserve', 'release'])\n  await env.teardown()\n})\n```",
+      "description": "A workflow test makes each step fail in turn on a time-skipping test server and checks that the completed steps were compensated in reverse order. The Temporal form is below; the same test is written with Step Functions Local, Camunda zeebe-process-test or the MassTransit test harness.\n\nTool: Temporal TypeScript SDK (@temporalio/testing); for Step Functions: Step Functions Local with mocked service integrations; for Camunda 8: zeebe-process-test; for MassTransit: the in-memory test harness\n\n```ts\nimport { fileURLToPath } from 'node:url'\nimport { TestWorkflowEnvironment } from '@temporalio/testing'\nimport { Worker } from '@temporalio/worker'\nimport { placeOrder } from '../src/workflows'\n\nconst steps = [\n  { name: 'reserveStock', compensations: [] },\n  { name: 'chargePayment', compensations: ['releaseStock'] },\n  { name: 'shipOrder', compensations: ['refundPayment', 'releaseStock'] },\n]\n\nit.each(steps)('compensates everything before $name in reverse order', async (failing) => {\n  const env = await TestWorkflowEnvironment.createTimeSkipping()\n  const done: string[] = []\n  const record = (name: string) => async () => { if (name === failing.name) throw new Error('fails for good'); done.push(name) }\n  const worker = await Worker.create({\n    connection: env.nativeConnection, taskQueue: 'test',\n    workflowsPath: fileURLToPath(new URL('../src/workflows', import.meta.url)),\n    activities: Object.fromEntries(['reserveStock', 'chargePayment', 'shipOrder', 'releaseStock', 'refundPayment'].map((n) => [n, record(n)])),\n  })\n  await worker.runUntil(env.client.workflow.execute(placeOrder, { taskQueue: 'test', workflowId: `order-${failing.name}`, args: [{ sku: 'A' }] }).catch(() => undefined))\n  expect(done.filter((n) => failing.compensations.includes(n))).toEqual(failing.compensations)\n  await env.teardown()\n})\n```",
+      "hubWhen": {
+        "MODEL": [
+          "saga"
+        ]
+      }
+    },
+    {
+      "id": "ff-saga-resume",
+      "type": "fitness-fn",
+      "label": "Sagas resume after a restart",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "A saga stopped after its second step continues from the third on a new worker, with 0 steps repeated, and the order stays pending until the saga completes",
+      "description": "A workflow test stops the worker once the second activity has completed, starts a new worker, and checks that the saga finishes with each step run exactly once and that the order's status was pending until the end.\n\nTool: Temporal TypeScript SDK (@temporalio/testing); for other orchestrators, the equivalent restart of the engine or harness mid-flow\n\n```ts\nimport { fileURLToPath } from 'node:url'\nimport { TestWorkflowEnvironment } from '@temporalio/testing'\nimport { Worker } from '@temporalio/worker'\nimport { placeOrder } from '../src/workflows'\nimport { orders } from '../src/orders/repository'\n\nit('continues from the third step on a new worker', async () => {\n  const env = await TestWorkflowEnvironment.createTimeSkipping()\n  const done: string[] = []\n  let secondDone!: () => void\n  const afterSecond = new Promise<void>((r) => { secondDone = r })\n  const activities = {\n    reserveStock: async () => { done.push('reserve') },\n    chargePayment: async () => { done.push('charge'); secondDone() },\n    shipOrder: async () => { done.push('ship'); expect((await orders.get('order-1')).status).toBe('pending') },\n    notify: async () => { done.push('notify') },\n  }\n  const options = { connection: env.nativeConnection, taskQueue: 'test', workflowsPath: fileURLToPath(new URL('../src/workflows', import.meta.url)), activities }\n  const first = await Worker.create(options)\n  const handle = await env.client.workflow.start(placeOrder, { taskQueue: 'test', workflowId: 'order-1', args: [{ sku: 'A' }] })\n  const run = first.run()\n  await afterSecond\n  first.shutdown()\n  await run\n  const second = await Worker.create(options)\n  await second.runUntil(handle.result())\n  expect(done).toEqual(['reserve', 'charge', 'ship', 'notify'])\n  expect((await orders.get('order-1')).status).toBe('completed')\n  await env.teardown()\n})\n```",
       "hubWhen": {
         "MODEL": [
           "saga"
@@ -710,7 +762,7 @@
       "type": "fitness-fn",
       "label": "No stuck sagas",
       "x": 1040,
-      "y": 780,
+      "y": 1170,
       "category": "operational",
       "threshold": "0 sagas open for more than {{SAGA_MINUTES}} minutes",
       "description": "The database exporter counts sagas neither completed nor compensated after the limit; Prometheus pages when there is one, since the records it holds stay pending.\n\nTool: Prometheus with sql_exporter\n\n```yaml\n# sql_exporter collector\ncollector_name: sagas\nmetrics:\n  - metric_name: sagas_overdue\n    type: gauge\n    help: 'Sagas open longer than allowed'\n    values: [n]\n    query: |\n      SELECT count(*) AS n FROM saga_instance\n      WHERE status NOT IN ('completed', 'compensated') AND started_at < now() - interval '{{SAGA_MINUTES}} minutes'\n---\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: SagaStuck\n        expr: sagas_overdue > 0\n        for: 5m\n        labels: { severity: page }\n```",
@@ -721,14 +773,29 @@
       }
     },
     {
+      "id": "ff-reads-primary",
+      "type": "fitness-fn",
+      "label": "Reads hit the primary",
+      "x": 1040,
+      "y": 1300,
+      "category": "structural",
+      "threshold": "Every connection pool the application opens reports pg_is_in_recovery() = false; 0 read-only data sources configured",
+      "description": "A test starts the application's data access with its production configuration shape, asks every pool it opened whether it is on a replica, and checks that no read-only data source is configured.\n\nTool: Vitest with Testcontainers (PostgreSQL primary and a replica, to make the check meaningful)\n\n```ts\nimport { dataSources } from '../src/db/dataSources'   // every pool the application opens, by name\n\nit('serves every read from the primary', async () => {\n  expect(Object.keys(dataSources.readOnly ?? {})).toEqual([])\n  for (const [name, pool] of Object.entries(dataSources.all())) {\n    const { rows } = await pool.query('select pg_is_in_recovery() as replica')\n    expect(rows[0].replica, `pool ${name} points at a replica`).toBe(false)\n  }\n})\n```",
+      "hubWhen": {
+        "READS": [
+          "primary"
+        ]
+      }
+    },
+    {
       "id": "ff-ryw",
       "type": "fitness-fn",
       "label": "Own writes read back",
       "x": 1040,
-      "y": 910,
+      "y": 1430,
       "category": "structural",
       "threshold": "0 of 100 write-then-read pairs return the old value while replicas lag",
-      "description": "An integration test delays replication on purpose (a paused WAL replay on the replica) and checks that a user's read straight after their write still returns it.\n\nTool: Vitest with Testcontainers (PostgreSQL primary and replica)\n\n```ts\nit('shows a user their own write while the replica lags', async () => {\n  await replica.query('select pg_wal_replay_pause()')\n  for (let i = 0; i < 100; i++) {\n    await api.as(user).put('/me/address', { street: `Street ${i}` })\n    const { body } = await api.as(user).get('/me/address')\n    expect(body.street).toBe(`Street ${i}`)\n  }\n  await replica.query('select pg_wal_replay_resume()')\n})\n```",
+      "description": "An integration test delays replication on purpose (a paused WAL replay on the replica) and checks that a user's read straight after their write still returns it.\n\nTool: Vitest with Testcontainers (PostgreSQL primary and replica)\n\n```ts\nimport { api, replica, user } from './replicas'\n\nit('shows a user their own write while the replica lags', async () => {\n  await replica.query('select pg_wal_replay_pause()')\n  for (let i = 0; i < 100; i++) {\n    await api.as(user).put('/me/address', { street: `Street ${i}` })\n    const { body } = await api.as(user).get('/me/address')\n    expect(body.street).toBe(`Street ${i}`)\n  }\n  await replica.query('select pg_wal_replay_resume()')\n})\n```",
       "hubWhen": {
         "READS": [
           "ryw"
@@ -738,46 +805,16 @@
     {
       "id": "ff-staleness",
       "type": "fitness-fn",
-      "label": "Replica lag bounded",
+      "label": "Replica lag bounded and routed",
       "x": 1040,
-      "y": 1040,
+      "y": 1560,
       "category": "operational",
-      "threshold": "Replica lag above {{PROPAGATION_SECONDS}} seconds for no more than 1 minute; a lagging replica receives no reads",
-      "description": "The PostgreSQL exporter reports each replica's lag; Prometheus alerts when it passes the bound, and the read router takes the replica out of rotation on the same signal.\n\nTool: Prometheus with postgres_exporter\n\n```yaml\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: ReplicaTooStale\n        expr: pg_replication_lag_seconds > {{PROPAGATION_SECONDS}}\n        for: 1m\n        labels: { severity: ticket }\n        annotations:\n          summary: 'Replica {{ $labels.instance }} is more than {{PROPAGATION_SECONDS}} s behind'\n```",
+      "threshold": "Replica lag above {{PROPAGATION_SECONDS}} seconds for no more than 1 minute; a replica lagging more than that receives no reads for more than 1 minute",
+      "description": "The PostgreSQL exporter reports each replica's lag, and the read router exports replica_in_rotation (1 while it sends reads to the replica); Prometheus alerts when the lag passes the bound, and pages when a lagging replica is still in rotation.\n\nTool: Prometheus with postgres_exporter (pg_replication_lag_seconds) and the router's own replica_in_rotation gauge\n\n```yaml\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: ReplicaTooStale\n        expr: pg_replication_lag_seconds > {{PROPAGATION_SECONDS}}\n        for: 1m\n        labels: { severity: ticket }\n        annotations:\n          summary: 'Replica {{ $labels.instance }} is more than {{PROPAGATION_SECONDS}} s behind'\n      - alert: StaleReplicaStillServingReads\n        expr: (pg_replication_lag_seconds > {{PROPAGATION_SECONDS}}) and on (instance) (replica_in_rotation == 1)\n        for: 1m\n        labels: { severity: page }\n        annotations:\n          summary: 'Replica {{ $labels.instance }} lags past the bound and still receives reads'\n```",
       "hubWhen": {
         "READS": [
           "ryw",
           "bounded"
-        ]
-      }
-    },
-    {
-      "id": "ff-owner",
-      "type": "fitness-fn",
-      "label": "Only owners write",
-      "x": 1040,
-      "y": 1170,
-      "category": "structural",
-      "threshold": "0 roles other than the owner's with INSERT, UPDATE or DELETE on an entity's tables",
-      "description": "A database test run in CI after the migrations asserts the privileges of every role on each entity's tables: the owner writes, others at most read.\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(3);\nSELECT table_privs_are('public', 'orders', 'order_service', ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']);\nSELECT table_privs_are('public', 'orders', 'inventory_service', ARRAY['SELECT'], 'inventory reads orders, never writes');\nSELECT table_privs_are('public', 'orders', 'reporting', ARRAY['SELECT']);\nSELECT * FROM finish();\nROLLBACK;\n```",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "owner"
-        ]
-      }
-    },
-    {
-      "id": "ff-constraints",
-      "type": "fitness-fn",
-      "label": "Shared rules in the database",
-      "x": 1040,
-      "y": 1300,
-      "category": "structural",
-      "threshold": "Every rule listed for a shared table is a constraint in the schema; 0 rules kept only in application code",
-      "description": "A database test run in CI after the migrations asserts that the keys, references and checks the shared tables rely on exist, so no writer can bypass them.\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(4);\nSELECT has_pk('public', 'order_lines', 'order lines have a key');\nSELECT fk_ok('public', 'order_lines', 'order_id', 'public', 'orders', 'id');\nSELECT col_is_unique('public', 'orders', ARRAY['customer_id', 'external_ref'], 'one order per external reference');\nSELECT has_check('public', 'stock', 'stock cannot go negative');\nSELECT * FROM finish();\nROLLBACK;\n```",
-      "hubWhen": {
-        "OWNERSHIP": [
-          "shared"
         ]
       }
     }
@@ -804,12 +841,6 @@
     {
       "id": "req-saga-state--derives--need",
       "sourceId": "req-saga-state",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-idempotent--derives--need",
-      "sourceId": "req-idempotent",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -850,18 +881,6 @@
       "relationType": "derives"
     },
     {
-      "id": "req-owner--derives--need",
-      "sourceId": "req-owner",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-shared--derives--need",
-      "sourceId": "req-shared",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
       "id": "sc-atomic--verifies--req-atomic",
       "sourceId": "sc-atomic",
       "targetId": "req-atomic",
@@ -883,12 +902,6 @@
       "id": "sc-saga-state--verifies--req-saga-state",
       "sourceId": "sc-saga-state",
       "targetId": "req-saga-state",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-idempotent--verifies--req-idempotent",
-      "sourceId": "sc-idempotent",
-      "targetId": "req-idempotent",
       "relationType": "verifies"
     },
     {
@@ -928,18 +941,6 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-owner--verifies--req-owner",
-      "sourceId": "sc-owner",
-      "targetId": "req-owner",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-shared--verifies--req-shared",
-      "sourceId": "sc-shared",
-      "targetId": "req-shared",
-      "relationType": "verifies"
-    },
-    {
       "id": "ff-concurrency--implements--adr-acid",
       "sourceId": "ff-concurrency",
       "targetId": "adr-acid",
@@ -955,6 +956,36 @@
       "id": "ff-concurrency--implements--adr-saga",
       "sourceId": "ff-concurrency",
       "targetId": "adr-saga",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-concurrency--implements--adr-read-committed",
+      "sourceId": "ff-concurrency",
+      "targetId": "adr-read-committed",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-concurrency--implements--adr-snapshot",
+      "sourceId": "ff-concurrency",
+      "targetId": "adr-snapshot",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-concurrency--implements--adr-serializable",
+      "sourceId": "ff-concurrency",
+      "targetId": "adr-serializable",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-lost-update--implements--adr-read-committed",
+      "sourceId": "ff-lost-update",
+      "targetId": "adr-read-committed",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-serialization-retry--implements--adr-serializable",
+      "sourceId": "ff-serialization-retry",
+      "targetId": "adr-serializable",
       "relationType": "implements"
     },
     {
@@ -976,20 +1007,26 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-outbox-test--implements--adr-outbox",
+      "sourceId": "ff-outbox-test",
+      "targetId": "adr-outbox",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-outbox-test--implements--adr-saga",
+      "sourceId": "ff-outbox-test",
+      "targetId": "adr-saga",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-outbox-lag--implements--adr-outbox",
       "sourceId": "ff-outbox-lag",
       "targetId": "adr-outbox",
       "relationType": "implements"
     },
     {
-      "id": "ff-idempotent--implements--adr-outbox",
-      "sourceId": "ff-idempotent",
-      "targetId": "adr-outbox",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-idempotent--implements--adr-saga",
-      "sourceId": "ff-idempotent",
+      "id": "ff-outbox-lag--implements--adr-saga",
+      "sourceId": "ff-outbox-lag",
       "targetId": "adr-saga",
       "relationType": "implements"
     },
@@ -1000,81 +1037,39 @@
       "relationType": "implements"
     },
     {
+      "id": "ff-saga-resume--implements--adr-saga",
+      "sourceId": "ff-saga-resume",
+      "targetId": "adr-saga",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-stuck-sagas--implements--adr-saga",
       "sourceId": "ff-stuck-sagas",
       "targetId": "adr-saga",
       "relationType": "implements"
     },
     {
-      "id": "ff-ryw--implements--adr-acid",
+      "id": "ff-reads-primary--implements--adr-reads-primary",
+      "sourceId": "ff-reads-primary",
+      "targetId": "adr-reads-primary",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ryw--implements--adr-ryw",
       "sourceId": "ff-ryw",
-      "targetId": "adr-acid",
+      "targetId": "adr-ryw",
       "relationType": "implements"
     },
     {
-      "id": "ff-ryw--implements--adr-outbox",
-      "sourceId": "ff-ryw",
-      "targetId": "adr-outbox",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-ryw--implements--adr-saga",
-      "sourceId": "ff-ryw",
-      "targetId": "adr-saga",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-staleness--implements--adr-acid",
+      "id": "ff-staleness--implements--adr-ryw",
       "sourceId": "ff-staleness",
-      "targetId": "adr-acid",
+      "targetId": "adr-ryw",
       "relationType": "implements"
     },
     {
-      "id": "ff-staleness--implements--adr-outbox",
+      "id": "ff-staleness--implements--adr-bounded",
       "sourceId": "ff-staleness",
-      "targetId": "adr-outbox",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-staleness--implements--adr-saga",
-      "sourceId": "ff-staleness",
-      "targetId": "adr-saga",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-owner--implements--adr-acid",
-      "sourceId": "ff-owner",
-      "targetId": "adr-acid",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-owner--implements--adr-outbox",
-      "sourceId": "ff-owner",
-      "targetId": "adr-outbox",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-owner--implements--adr-saga",
-      "sourceId": "ff-owner",
-      "targetId": "adr-saga",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-constraints--implements--adr-acid",
-      "sourceId": "ff-constraints",
-      "targetId": "adr-acid",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-constraints--implements--adr-outbox",
-      "sourceId": "ff-constraints",
-      "targetId": "adr-outbox",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-constraints--implements--adr-saga",
-      "sourceId": "ff-constraints",
-      "targetId": "adr-saga",
+      "targetId": "adr-bounded",
       "relationType": "implements"
     }
   ]

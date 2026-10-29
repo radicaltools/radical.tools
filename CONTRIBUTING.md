@@ -50,7 +50,7 @@ packages/
   layout/         — @radical/layout: Smart Layout and headless layout engines
   ui/             — @radical/ui: canvas, panels, views and the diagram store (Studio + Hub)
   host-bridge/    — @radical/host-bridge: Studio ↔ host contract (Electron, VS Code, browser)
-  hub-catalogue/  — @radical/hub-catalogue: Hub concepts (.radical files), validation, Vite plugin
+  hub-catalogue/  — @radical/hub-catalogue: the Hub's concern packs (specs, built .radical files), their standard, Vite plugin
   node-files/     — @radical/node-files: model folders on disk for Node (MCP, CLI)
 architecture/     — the architecture model of radical.tools itself, checked in CI
 ```

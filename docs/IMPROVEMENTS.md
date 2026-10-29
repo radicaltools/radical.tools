@@ -289,6 +289,47 @@ open:
    edges over 16 types; the legend filters and selection focus are the way
    to read it.
 
+### Dogfooding (2026-10-28): a review and fix round of all Hub concern packs
+
+Found while reviewing and rewriting the 33 packs (PR: Hub packs quality):
+
+1. **The concern wizard asks questions an earlier answer made moot** (STEP_UP
+   when nobody signs in, four of five questions of Personal data when it keeps
+   none, SAMPLING when traces are not collected). `TemplateParam` has no
+   `when`; the packs say "Only when …" in the hint instead. A `when` on
+   questions and details, honoured by the wizard and by Forge's proposals,
+   would remove the noise.
+2. **Details are asked for every answer** (ADR_DIR for a wiki decision log,
+   MEMORY_MB when performance is not the criterion). Same fix: `when` on
+   `DetailSpec`.
+3. **No shared snippet between packs**: the endoflife.date script is copied
+   between Backend stack and Frontend stack and will drift. A snippet library
+   in `packages/hub-catalogue/snippets/` that specs import would keep one copy.
+4. **A model-level fitness function has no tool to run it**: Communication
+   style's "0 interactions that are neither the default nor a recorded
+   exception" would be a `radical check` rule or a `radical query` over
+   relation `technology`; neither exists, so it is `unchecked`. A check rule
+   written in the model query language, in `check.json`, would make the model
+   its own fitness function.
+5. **`${{ … }}` inside a YAML flow mapping is invalid YAML**; four packs had
+   it in GitHub Actions steps. The snippet check in the build parses YAML
+   now; the gold pack should show block style.
+6. **Rego, HCL, Java, SQL and PromQL snippets cannot be run here**: 80 of
+   464 snippets were verified against documentation only. A CI job that runs
+   `opa check`, `promtool check rules`, `terraform validate` and `javac`
+   over the snippets extracted from the catalogue would close that.
+7. **Two agents sharing one scratchpad overwrote each other's scripts**; give
+   each agent of a round a sub-directory.
+8. **`when` can only AND its answers.** An element that applies to two
+   combinations (orchestration when choreography is picked with a synchronous
+   default; Terraform's checks when the cloud's own tool is picked on Google
+   Cloud or on premises) is built twice from one factory with a `-fallback`
+   or `-onprem` id. A `when` that takes a list of conditions (any of them)
+   would keep one element each.
+9. **Rego snippets (32) have never run**: `opa` could not be installed in the
+   agents' sandbox. `opa check` over the extracted snippets in CI is the
+   first item of point 6.
+
 ### Dogfooding (2026-10-06)
 
 `architecture/` now holds the model of radical.tools itself, built through the

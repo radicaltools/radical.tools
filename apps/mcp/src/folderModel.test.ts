@@ -1052,17 +1052,21 @@ describe('get_issues', () => {
     await add('add_node', { tempId: 'web', type: 'webapp', label: 'Web', parentId: 'shop' })
     await add('add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' })
     await add('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: {} })
-    const adr = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "adr"' })).text).rows as Array<{ id: string; label: string }>
-    expect(adr).toHaveLength(1)
+    // The default answers bring two decisions: sign-in through a provider and the second factor.
+    const adrs = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "adr"' })).text).rows as Array<{ id: string; label: string }>
+    expect(adrs.map((a) => a.label).sort()).toEqual(['A second factor for risky operations', 'Users sign in through an identity provider'])
+    const adr = adrs.filter((a) => a.label === 'Users sign in through an identity provider')
 
     const issues = (await model.call('get_issues', {})).text
     expect(issues).toContain('Unbound decisions (warnings of radical check\'s concern-unbound)')
     expect(issues).toContain(`- ADR "${adr[0].label}" (${adr[0].id}) settles the concern "authentication" but constrains no element. Bind it to Web (${ids.get('web')})`)
     const block = issues.split('\n- ').find((b) => b.startsWith('Authentication (conceptId')) ?? ''
-    expect(block).toContain(`Already imported, not bound: ADR "${adr[0].label}" (${adr[0].id}): bind it instead of importing the pack again`)
+    expect(block).toContain('Already imported, not bound: ')
+    expect(block).toContain(`ADR "${adr[0].label}" (${adr[0].id})`)
+    expect(block).toContain('bind it instead of importing the pack again')
     expect(block).not.toContain('Questions:')
 
-    await add('add_relation', { sourceId: adr[0].id, targetId: ids.get('web'), relationType: 'constrains' })
+    for (const a of adrs) await add('add_relation', { sourceId: a.id, targetId: ids.get('web'), relationType: 'constrains' })
     const bound = (await model.call('get_issues', {})).text
     expect(bound).not.toContain('Unbound decisions')
     expect(bound).not.toContain('- Authentication (conceptId concern-authentication)')

@@ -785,8 +785,10 @@ describe('forge_import_hub_concept', () => {
     expect(result.ok, result.text).toBe(true)
     expect(result.text).toContain('Bound to webapp "Storefront"')
     const data = await read()
-    const adr = data.nodes.find((n) => n.type === 'adr')! as unknown as Record<string, string>
-    expect(adr).toMatchObject({ label: 'Users sign in through an identity provider', concern: 'authentication', status: 'accepted' })
+    // The answers bring the sign-in decision and, with the second factor on by default, the step-up one.
+    const adr = data.nodes.find((n) => n.type === 'adr' && n.label === 'Users sign in through an identity provider')! as unknown as Record<string, string>
+    expect(adr).toMatchObject({ concern: 'authentication', status: 'accepted' })
+    expect(data.nodes.filter((n) => n.type === 'adr').map((n) => n.label).sort()).toEqual(['A second factor for risky operations', 'Users sign in through an identity provider'])
     expect(adr.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(adr.decision).toContain('Calls from other systems: mutual TLS.')
     // The answers picked the slice: no own user store, no public-by-design.

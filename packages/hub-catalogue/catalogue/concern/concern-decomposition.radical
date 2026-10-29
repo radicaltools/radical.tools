@@ -3,7 +3,7 @@
     "id": "concern-decomposition",
     "category": "concern",
     "name": "Decomposition",
-    "description": "How the system is split into deployables: one monolith, a modular monolith, microservices or serverless functions; where the boundaries go, who owns the data, and how an existing system is moved over.",
+    "description": "How the system is split into deployables: one monolith, a modular monolith, microservices or serverless functions; where the boundaries go, who owns the data, and how an existing system is moved over. The checks are shell and TypeScript scripts (run with tsx) over GitHub, Kubernetes manifests, PostgreSQL and the architecture model, plus Spring Modulith for the module test; each tool line names the alternatives.",
     "tags": [
       "architecture",
       "decomposition",
@@ -59,6 +59,18 @@
         "url": "https://www.oreilly.com/library/view/building-microservices-2nd/9781492034018/"
       },
       {
+        "title": "Matthew Skelton, Manuel Pais: Team Topologies",
+        "url": "https://teamtopologies.com/book"
+      },
+      {
+        "title": "AWS Well-Architected Framework, Serverless Applications Lens",
+        "url": "https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/welcome.html"
+      },
+      {
+        "title": "ISO/IEC 25010, Maintainability: modularity",
+        "url": "https://iso25000.com/index.php/en/iso-25000-standards/iso-25010"
+      },
+      {
         "title": "Spring Modulith reference documentation",
         "url": "https://docs.spring.io/spring-modulith/reference/"
       }
@@ -74,22 +86,22 @@
           {
             "value": "monolith",
             "label": "one monolith",
-            "description": "One deployable and one database, without enforced inner boundaries. Pick it for one team (up to about eight people), a new product whose domain is still being discovered, or a short-lived system."
+            "description": "One deployable and one database, without enforced inner boundaries. Pick it for one team (up to about eight people), a new product whose domain is still being discovered, or a short-lived system. Goes with one shared schema; the boundary question then says only how it would be cut later."
           },
           {
             "value": "modular",
             "label": "a modular monolith",
-            "description": "One deployable cut into modules, one per bounded context, each with a published API and its own data. Pick it for one to about three teams, when boundaries are not yet proven, or when the platform and on-call for many services are not there yet: modules can become services later."
+            "description": "One deployable cut into modules, one per bounded context, each with a published API and its own data. Pick it for one to about three teams, when boundaries are not yet proven, or when the platform and on-call for many services are not there yet: modules can become services later. Goes with a schema per module (or a database per module where isolation matters more than cost)."
           },
           {
             "value": "microservices",
             "label": "microservices, one per bounded context",
-            "description": "Each bounded context is a service with its own pipeline, data and owning team. Pick it when several teams (more than about three) must release independently, parts scale or fail differently, the boundaries are known, and there is a platform for deployment, observability and on-call per service."
+            "description": "Each bounded context is a service with its own pipeline, data and owning team. Pick it when several teams (more than about three) must release independently, parts scale or fail differently, the boundaries are known, and there is a platform for deployment, observability and on-call per service. Goes with a database per deployable; a shared schema would make them one service released many times."
           },
           {
             "value": "serverless",
             "label": "serverless functions, grouped per context",
-            "description": "Functions (AWS Lambda, Azure Functions, Google Cloud Functions) triggered by HTTP, queues and schedules, deployed per bounded context as one stack. Pick it for spiky or low, event-driven load where paying per call beats running servers, short tasks (seconds), and a team ready to work within the provider's limits."
+            "description": "Functions (AWS Lambda, Azure Functions, Google Cloud Functions) triggered by HTTP, queues and schedules, deployed per bounded context as one stack. Pick it for spiky or low, event-driven load where paying per call beats running servers, short tasks (seconds), and a team ready to work within the provider's limits. Goes with a database per deployable (per stack)."
           }
         ]
       },
@@ -97,23 +109,23 @@
         "key": "DATA",
         "title": "Data",
         "label": "Who owns which data?",
-        "hint": "Data shared between parts is coupling the network does not remove: parts that read each other's tables have to change together.",
+        "hint": "Data shared between parts is coupling the network does not remove: parts that read each other's tables have to change together. This pack owns the decision; the Data consistency pack refers to it.",
         "defaultValue": "schemas",
         "options": [
           {
             "value": "own",
             "label": "a database per deployable",
-            "description": "Each service or function group has its own database that nobody else reads; others get its data through its API or events. Pick it with microservices or serverless, or whenever parts must be released and scaled apart."
+            "description": "Each service or function group has its own database that nobody else reads; others get its data through its API or events. Pick it with microservices or serverless, or whenever parts must be released and scaled apart; not with one monolith, which has one database."
           },
           {
             "value": "schemas",
             "label": "one server, a schema per module",
-            "description": "One database server; each module has a schema and a database user of its own, and no query reaches another module's schema. Pick it for a modular monolith, or for services on their way out of one: cheap to run, and each schema can move to its own server later."
+            "description": "One database server; each module has a schema and a database user of its own, and no query reaches another module's schema. Pick it for a modular monolith, or for services on their way out of one: cheap to run, and each schema can move to its own server later. Not with one monolith, which has no modules to give schemas to."
           },
           {
             "value": "shared",
             "label": "one shared schema, writes owned",
-            "description": "All parts use one schema; each table has one owning module that alone writes it, and others read only through views it publishes. Pick it for a monolith, or an existing system whose tables cannot be split yet."
+            "description": "All parts use one schema; each table has one owning module that alone writes it, and others read only through views it publishes. Pick it for a monolith, or an existing system whose tables cannot be split yet. Not with microservices or serverless: services sharing a schema are one service released many times."
           }
         ]
       },
@@ -121,7 +133,7 @@
         "key": "BOUNDARY",
         "title": "Boundaries",
         "label": "What decides where a boundary goes?",
-        "hint": "A boundary in the wrong place makes every change cross it. This decides what a module or service is cut around.",
+        "hint": "A boundary in the wrong place makes every change cross it. This decides what a module or service is cut around. With one monolith there are no enforced boundaries yet; the answer then says how it would be cut.",
         "defaultValue": "context",
         "options": [
           {
@@ -136,7 +148,7 @@
           },
           {
             "value": "need",
-            "label": "only a measured need splits",
+            "label": "a measured need only",
             "description": "Everything stays together unless a part has a measured, different need: load, runtime, security zone or release rate, recorded with the numbers. Pick it when the domain is young and boundaries are not known, to avoid splitting too early."
           }
         ]
@@ -195,7 +207,7 @@
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Decomposition",
-      "description": "{{TEAMS}} teams build this system. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is."
+      "description": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-inventory",
@@ -204,7 +216,7 @@
       "x": 260,
       "y": 0,
       "ears_type": "ubiquitous",
-      "action": "record every deployable of the system in the architecture model with its owning team, the bounded contexts or modules it holds and the data stores it owns, with 0 deployed units missing from the model",
+      "action": "record every deployable of the system in the architecture model as a container or web app, and in the service catalog with its owning team, with 0 deployable folders missing from the model",
       "rationale": "A decomposition nobody can see drifts: services appear without owners and data without a home (Newman, Building Microservices, ch. 1; ISO/IEC 25010 modularity)."
     },
     {
@@ -214,7 +226,7 @@
       "x": 260,
       "y": 130,
       "ears_type": "event-driven",
-      "trigger": "the number of teams moves away from {{TEAMS}}, building and testing a deployable passes {{BUILD_MINUTES}} minutes, or two deployables are released together more than twice in a quarter",
+      "trigger": "building and testing a deployable passes {{BUILD_MINUTES}} minutes, two deployables are released together more than twice in a quarter, or the number of teams moves away from {{TEAMS}}",
       "action": "review this decision and record the outcome in an ADR within one month",
       "rationale": "The right split depends on teams, size and coupling, which change; these signals say the current one no longer fits (Fowler, MonolithFirst; Newman, Monolith to Microservices)."
     },
@@ -257,7 +269,7 @@
       "y": 520,
       "ears_type": "event-driven",
       "trigger": "a service or function group changes",
-      "action": "build, test and deploy it to production without building, deploying or waiting for the release of any other, with 0 releases coordinated between deployables in a quarter",
+      "action": "build, test and deploy it to production from a pipeline of its own that builds no other deployable, with 0 pairs of deployables released together more than twice in a quarter",
       "rationale": "Independent deployability is the reason to split; services that must be released together carry the costs of distribution without its benefit (Lewis and Fowler, Microservices; Newman, Building Microservices).",
       "hubWhen": {
         "SPLIT": [
@@ -273,8 +285,8 @@
       "x": 260,
       "y": 650,
       "ears_type": "ubiquitous",
-      "action": "give every deployable exactly one owning team and let no team own more than {{PER_TEAM}} deployables",
-      "rationale": "A service is as small as one team can own completely, building and running it; more per team than it can operate becomes neglect (Newman, Building Microservices, ch. 15; Team Topologies).",
+      "action": "give every deployable exactly one owning team in its catalog entry and let no team own more than {{PER_TEAM}} deployables",
+      "rationale": "A service is as small as one team can own completely, building and running it; more per team than it can operate becomes neglect (Newman, Building Microservices, ch. 15; Skelton and Pais, Team Topologies).",
       "hubWhen": {
         "SPLIT": [
           "microservices",
@@ -290,7 +302,7 @@
       "y": 780,
       "ears_type": "ubiquitous",
       "action": "deploy the functions of one bounded context together as one stack, give each one trigger and a timeout of at most 30 seconds, and tag each with its context and owning team",
-      "rationale": "Functions deployed one by one become hundreds of unowned units; grouping per context keeps the boundary and the ownership (AWS Well-Architected Serverless Lens).",
+      "rationale": "Functions deployed one by one become hundreds of unowned units; grouping per context keeps the boundary and the ownership (AWS Well-Architected, Serverless Applications Lens).",
       "hubWhen": {
         "SPLIT": [
           "serverless"
@@ -334,7 +346,7 @@
       "x": 260,
       "y": 1170,
       "ears_type": "ubiquitous",
-      "action": "record an owning module for every table, let only that module's database user insert, update or delete its rows, and let other modules read only through views the owner publishes",
+      "action": "record an owning module for every table in its table comment, let only that module's database user insert, update or delete its rows, and let other modules read only through views the owner publishes",
       "rationale": "A shared database is the simplest store but couples everything that writes to it; single writers keep the coupling to reads (microservices.io, Shared database).",
       "hubWhen": {
         "DATA": [
@@ -351,9 +363,15 @@
       "ears_type": "ubiquitous",
       "action": "draw every boundary between modules or services along a bounded context of the context map, with 0 contexts split across two deployables or modules",
       "rationale": "A bounded context is the boundary inside which a model is consistent; cutting across one splits a model that has to change together (Fowler, BoundedContext).",
+      "unchecked": "The architects trace the context map to the deployables at the quarterly architecture review; a context map is a drawing people agree on, which no tool reads.",
       "hubWhen": {
         "BOUNDARY": [
           "context"
+        ],
+        "SPLIT": [
+          "modular",
+          "microservices",
+          "serverless"
         ]
       }
     },
@@ -364,11 +382,16 @@
       "x": 260,
       "y": 1430,
       "ears_type": "ubiquitous",
-      "action": "keep the boundaries so that at least 80% of merged changes in a quarter touch only the parts of one team, and redraw them when that share falls",
+      "action": "keep the boundaries so that at least 80% of the pull requests merged in a quarter touch only the parts of one team, and redraw them when that share falls",
       "rationale": "Boundaries that match the teams keep coordination low; the share of single-team changes measures it (Conway's law; Skelton and Pais, Team Topologies).",
       "hubWhen": {
         "BOUNDARY": [
           "team"
+        ],
+        "SPLIT": [
+          "modular",
+          "microservices",
+          "serverless"
         ]
       }
     },
@@ -380,8 +403,9 @@
       "y": 1560,
       "ears_type": "event-driven",
       "trigger": "a part is proposed to become a deployable or module of its own",
-      "action": "split it only when an ADR records the measured need: a load, runtime, security zone or release rate that differs from the rest by at least a factor of 2 or a compliance boundary",
+      "action": "split it only when an ADR records the measured need: a load, runtime, security zone or release rate that differs from the rest by at least a factor of 2, or a compliance boundary",
       "rationale": "Splitting before the need is known pays the microservice premium for nothing (Fowler, MicroservicePremium).",
+      "unchecked": "The reviewers of the pull request that adds a deployable ask for the ADR with the numbers; whether a measured need is real is judged by people, not read by a tool.",
       "hubWhen": {
         "BOUNDARY": [
           "need"
@@ -396,7 +420,7 @@
       "y": 1690,
       "ears_type": "event-driven",
       "trigger": "a capability of the old system has been rebuilt",
-      "action": "route its traffic through the routing facade to the new part, keep the route switchable back for 30 days, then remove the old code, and retire the old system within {{MIGRATION_MONTHS}} months",
+      "action": "route its traffic through the routing facade to the new part, keep the route switchable back for 30 days, then remove the old code, so that the old system's share of requests falls every month and reaches 0 within {{MIGRATION_MONTHS}} months",
       "rationale": "The strangler fig replaces a system while it keeps running, each step small and reversible (Fowler, StranglerFigApplication; Newman, Monolith to Microservices, ch. 3).",
       "hubWhen": {
         "MIGRATION": [
@@ -410,9 +434,9 @@
       "label": "Every deployable known",
       "x": 520,
       "y": 0,
-      "given": "the list of units deployed to production",
-      "when": "it is compared with the deployables in the model",
-      "then": "every unit is in the model with an owning team and its data stores"
+      "given": "the deployable folders under services",
+      "when": "they are compared with the containers and web apps in the model",
+      "then": "every folder is in the model, and the build fails naming the missing ones otherwise"
     },
     {
       "id": "sc-revisit",
@@ -421,8 +445,8 @@
       "x": 520,
       "y": 130,
       "given": "the decomposition decision",
-      "when": "two services are released together for the third time in a quarter",
-      "then": "within a month an ADR records whether they are merged, re-cut or left as they are"
+      "when": "the build passes {{BUILD_MINUTES}} minutes, or two services are released together for the third time in a quarter",
+      "then": "the check fails, and within a month an ADR records whether they are merged, re-cut or left as they are"
     },
     {
       "id": "sc-build",
@@ -463,7 +487,7 @@
       "y": 520,
       "given": "two services where one calls the other",
       "when": "the called service is changed and released",
-      "then": "it reaches production on its own and the calling service is neither rebuilt nor redeployed",
+      "then": "it reaches production from its own pipeline and the calling service is neither rebuilt nor redeployed",
       "hubWhen": {
         "SPLIT": [
           "microservices",
@@ -508,8 +532,8 @@
       "label": "No foreign credentials",
       "x": 520,
       "y": 910,
-      "given": "the deployment configuration of every service",
-      "when": "the database credentials each receives are listed",
+      "given": "the deployment manifests of every workload",
+      "when": "the database secrets each receives are listed, as environment variables, envFrom and volumes",
       "then": "each receives only those of its own database",
       "hubWhen": {
         "DATA": [
@@ -559,6 +583,11 @@
       "hubWhen": {
         "BOUNDARY": [
           "context"
+        ],
+        "SPLIT": [
+          "modular",
+          "microservices",
+          "serverless"
         ]
       }
     },
@@ -574,6 +603,11 @@
       "hubWhen": {
         "BOUNDARY": [
           "team"
+        ],
+        "SPLIT": [
+          "modular",
+          "microservices",
+          "serverless"
         ]
       }
     },
@@ -617,8 +651,8 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The system is one deployable with one database, built by one pipeline in at most {{BUILD_MINUTES}} minutes and released as a whole; {{TEAMS}} teams work in it. Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. It is revisited when the number of teams grows, the build passes {{BUILD_MINUTES}} minutes, or parts need different scaling. Criteria that made it the choice: one team or very few, a domain still being discovered, no platform for running many services.",
-      "consequences": "• Simplest to build, test, deploy and debug: local calls, one transaction, one log.\n• Everyone releases together, so a broken part blocks the release and teams wait on each other as they grow.\n• Without enforced boundaries the code tends to tangle; moving to modules later means drawing them first.\n• Scales as a whole: running more copies scales every part at once.",
+      "decision": "The system is one deployable with one database, built by one pipeline in at most {{BUILD_MINUTES}} minutes and released as a whole; {{TEAMS}} team(s) work in it. Data: {{DATA}}. There are no enforced inner boundaries yet; should the code be cut later, boundaries are drawn by {{BOUNDARY}}. Starting point: {{MIGRATION}}. The decision is revisited when the number of teams grows, the build passes {{BUILD_MINUTES}} minutes, or parts need different scaling. Criteria that made it the choice: one team or very few, a domain still being discovered, no platform for running many services.",
+      "consequences": "• Simplest to build, test, deploy and debug: local calls, one transaction, one log.\n• Everyone releases together, so a broken part blocks the release and teams wait on each other as they grow.\n• Without enforced boundaries the code tends to tangle; moving to modules later means drawing them first, by the boundary rule above.\n• Scales as a whole: running more copies scales every part at once.\n• A new system starts with nothing to migrate; a replacement adds the facade and the deadline of the strangler decision.",
       "alternatives": "1. A modular monolith: the same single deployable with enforced module boundaries, ready to split later.\n2. Microservices: independent releases per team, at the cost of distribution and operations.\n3. Serverless functions: no servers to run, but many small units and provider limits.",
       "hubWhen": {
         "SPLIT": [
@@ -636,8 +670,8 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The system is one deployable cut into modules, one per bounded context, each with a published API, its own data and an owning team; {{TEAMS}} teams work in it and it is built in at most {{BUILD_MINUTES}} minutes. Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Each module starts and is tested on its own (Spring Modulith's @ApplicationModuleTest on Spring Boot; on .NET one project per module with its own test project; in TypeScript an Nx project per module). A module is extracted into a service only when a team or a measured need justifies it (Module boundaries keeps the rules between modules).",
-      "consequences": "• Boundaries by domain without the network: one deploy, local calls, one transaction where really needed.\n• Modules with a clean API and private data can become services later with little rework.\n• All modules release together, so one broken module blocks the others' release.\n• One runtime: a module that needs very different scaling or technology is a reason to extract it.",
+      "decision": "The system is one deployable cut into modules, one per bounded context, each with a published API, its own data and an owning team; {{TEAMS}} team(s) work in it and it is built in at most {{BUILD_MINUTES}} minutes. Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Starting point: {{MIGRATION}}. Each module starts and is tested on its own (Spring Modulith's @ApplicationModuleTest on Spring Boot; on .NET one project per module with its own test project; in TypeScript an Nx project per module). A module is extracted into a service only when a team or a measured need justifies it (Module boundaries keeps the rules between modules).",
+      "consequences": "• Boundaries by domain without the network: one deploy, local calls, one transaction where really needed.\n• Modules with a clean API and private data can become services later with little rework.\n• All modules release together, so one broken module blocks the others' release.\n• One runtime: a module that needs very different scaling or technology is a reason to extract it.\n• A new system starts with nothing to migrate; a replacement adds the facade and the deadline of the strangler decision.",
       "alternatives": "1. A plain monolith: simpler, but boundaries erode and splitting later is harder.\n2. Microservices from the start: independent releases, at the cost of distribution before boundaries are proven.\n3. Separate repositories per module in one deployable: strong boundaries, slow cross-module changes.",
       "hubWhen": {
         "SPLIT": [
@@ -655,8 +689,8 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The system is split into services, one per bounded context, each with its own repository or Nx project, pipeline, data store and one owning team; {{TEAMS}} teams own at most {{PER_TEAM}} services each. Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Services meet only through versioned contracts, and each is deployed on its own after its consumers' contracts pass (Pact can-i-deploy). A service runs on the shared platform (Kubernetes with a paved-road template, or a managed container service such as ECS, Cloud Run or Azure Container Apps), with per-service dashboards and on-call. Criteria that made it the choice: more teams than one deployable can carry, parts that scale or fail differently, known boundaries, and a platform to run them.",
-      "consequences": "• Teams release, scale and choose technology per service without waiting for each other.\n• Every call between contexts is a network call that can fail or be slow, and an operation across services needs events or sagas instead of one transaction.\n• More to run: a pipeline, data store, dashboards and on-call per service, and a platform team to make that cheap.\n• A wrong boundary is expensive to move; boundaries should be proven, ideally first as modules.",
+      "decision": "The system is split into services, one per bounded context, each in services/<name> with a pipeline, data store and one owning team of its own; {{TEAMS}} team(s) own at most {{PER_TEAM}} services each. Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Starting point: {{MIGRATION}}. Services meet only through contracts checked as the Communication style pack decides, and each is deployed on its own from its own pipeline. A service runs on the shared platform (Kubernetes with a paved-road template, or a managed container service such as ECS, Cloud Run or Azure Container Apps), with per-service dashboards and on-call. Criteria that made it the choice: more teams than one deployable can carry, parts that scale or fail differently, known boundaries, and a platform to run them.",
+      "consequences": "• Teams release, scale and choose technology per service without waiting for each other.\n• Every call between contexts is a network call that can fail or be slow, and an operation across services needs events or sagas instead of one transaction.\n• More to run: a pipeline, data store, dashboards and on-call per service, and a platform team to make that cheap.\n• A wrong boundary is expensive to move; boundaries should be proven, ideally first as modules.\n• A new system starts with nothing to migrate; a replacement adds the facade and the deadline of the strangler decision.",
       "alternatives": "1. A modular monolith: the same boundaries in one deployable, simpler to run, released together.\n2. Services per technical layer (a data service, a UI service): every feature touches all of them.\n3. A distributed monolith with a shared database: services in name only.",
       "hubWhen": {
         "SPLIT": [
@@ -674,8 +708,8 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The system is built from functions grouped per bounded context: each context is one stack (AWS SAM, AWS CDK or the Serverless Framework on AWS Lambda; Bicep with Azure Functions; Terraform with Google Cloud Functions) with its functions, queues and data store, owned by one team; {{TEAMS}} teams own at most {{PER_TEAM}} stacks each. Each function has one trigger and a timeout of at most 30 seconds; longer work runs as a workflow (Step Functions, Durable Functions). Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Criteria that made it the choice: spiky or low event-driven load, short tasks, and a team at home with the provider's limits.",
-      "consequences": "• No servers to patch or scale; cost follows use and is near zero when idle.\n• Cold starts add latency to the first call after idle; latency-critical paths need provisioned concurrency.\n• Provider limits (duration, payload, concurrency) shape the design, and local testing needs emulators or a cloud sandbox.\n• Strong lock-in to the provider's triggers and services.",
+      "decision": "The system is built from functions grouped per bounded context: each context is one stack in services/<name> (AWS SAM or AWS CDK on AWS Lambda, where the template check below runs; Bicep with Azure Functions or Terraform with Google Cloud Functions need the equivalent policy named in the check) with its functions, queues and data store, owned by one team; {{TEAMS}} team(s) own at most {{PER_TEAM}} stacks each. Each function has one trigger and a timeout of at most 30 seconds; longer work runs as a workflow (Step Functions, Durable Functions). Boundaries are drawn by {{BOUNDARY}}; data: {{DATA}}. Starting point: {{MIGRATION}}. Criteria that made it the choice: spiky or low event-driven load, short tasks, and a team at home with the provider's limits.",
+      "consequences": "• No servers to patch or scale; cost follows use and is near zero when idle.\n• Cold starts add latency to the first call after idle; latency-critical paths need provisioned concurrency.\n• Provider limits (duration, payload, concurrency) shape the design, and local testing needs emulators or a cloud sandbox.\n• Strong lock-in to the provider's triggers and services.\n• A new system starts with nothing to migrate; a replacement adds the facade and the deadline of the strangler decision.",
       "alternatives": "1. Containers per context (microservices): no cold starts or duration limits, but servers to run.\n2. A modular monolith on a managed platform: simplest, at the cost of paying for idle capacity.\n3. One function per endpoint deployed alone: maximal granularity, unmanageable ownership.",
       "hubWhen": {
         "SPLIT": [
@@ -693,7 +727,7 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "Each deployable has its own database (a separate database or managed instance) and holds the only credentials to it; other deployables get its data through its API or by consuming its events into a copy of their own. Reports that need data from several deployables read a reporting store fed by events or change data capture (Debezium), never the services' databases.",
+      "decision": "Each deployable has its own database (a separate database or managed instance) and holds the only credentials to it, mounted from a Kubernetes secret named db-<deployable>; other deployables get its data through its API or by consuming its events into a copy of their own. Reports that need data from several deployables read a reporting store fed by events or change data capture (Debezium), never the services' databases. Which element writes each table is decided here; the Data consistency pack refers to it.",
       "consequences": "• Each deployable changes its schema and scales its store without asking anyone.\n• No joins or transactions across deployables: queries across them are API compositions or read models, and consistency across them is eventual.\n• More databases to back up, patch and watch.\n• Duplicated data must have one owner; copies are read-only.",
       "alternatives": "1. One server with a schema per deployable: cheaper, same ownership, less isolation of load.\n2. A shared database: easy joins, but every schema change couples all its users.",
       "hubWhen": {
@@ -712,7 +746,7 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The modules share one database server; each module has a schema and a database user of its own, granted only on that schema, and its migrations (Flyway or Liquibase locations, EF Core migrations per DbContext) touch only it. A module that needs another's data calls its API or keeps a copy fed by its events; there are no cross-schema joins or foreign keys.",
+      "decision": "The modules share one database server; each module has a schema and a database user of its own (module_<name>), granted only on that schema, and its migrations (Flyway or Liquibase locations, EF Core migrations per DbContext) touch only it. A module that needs another's data calls its API or keeps a copy fed by its events; there are no cross-schema joins or foreign keys. Which element writes each table is decided here; the Data consistency pack refers to it.",
       "consequences": "• One server to run and back up, while a cross-module query fails at once.\n• A module can move to its own server later by pointing its user elsewhere.\n• No database-enforced references between modules; consistency between them is the modules' job.\n• Load is still shared: a heavy module slows the others.",
       "alternatives": "1. A database per deployable: full isolation, more to run.\n2. One shared schema: joins anywhere, and boundaries only by convention.",
       "hubWhen": {
@@ -731,7 +765,7 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "All parts use one schema. Every table has one owning module, recorded in a table comment and in the model; only the owner's database user may insert, update or delete it, and other modules read it only through views the owner publishes as its read API. New tables follow the module's name prefix. This is a stage: tables move into a schema per module as boundaries firm up.",
+      "decision": "All parts use one schema. Every table has one owning module, recorded in its table comment and in the model; only the owner's database user (module_<name>) may insert, update or delete it, and other modules read it only through views the owner publishes as its read API. This is a stage: tables move into a schema per module as boundaries firm up. Which element writes each table is decided here; the Data consistency pack refers to it.",
       "consequences": "• Simple and cheap; existing queries and reports keep working.\n• Reads across modules stay possible and therefore coupling stays: a view is a contract to keep.\n• Single writers stop the worst coupling (two modules changing the same rows).\n• Splitting the data later means moving tables and replacing views with APIs or events.",
       "alternatives": "1. A schema per module: enforced isolation on the same server.\n2. A database per deployable: full isolation, more to run.",
       "hubWhen": {
@@ -750,8 +784,8 @@
       "status": "accepted",
       "date": "",
       "context": "The system has to be built, released and run by a given number of teams. How it is split into deployables decides how independently they can work and how much there is to operate. The forces: several teams in one deployable wait for each other's releases and step on each other's code; every split adds network calls that fail and are slow, data that is no longer in one transaction, and pipelines, dashboards and on-call to run (the microservice premium); boundaries drawn before the domain is understood are expensive to move once they are services; two services sharing a database are one service released twice; and an existing system cannot be replaced in one step.",
-      "decision": "The old system is replaced piece by piece. A routing facade (an API gateway or reverse proxy: Envoy, NGINX, YARP, Spring Cloud Gateway, or the cloud's gateway) sits in front of it from the first step; capabilities are rebuilt one at a time in order of value and risk, their routes switched to the new parts and kept switchable back for 30 days, then the old code is removed. Data moves with its capability, synchronised both ways (change data capture) while both sides write. The share of traffic still reaching the old system is reported every month; it reaches zero within {{MIGRATION_MONTHS}} months.",
-      "consequences": "• Value arrives with every capability moved, and each step can be reversed.\n• For a while two systems run, and data synchronisation between them is extra work and risk.\n• The facade is on every request path and must be as reliable as the system.\n• Without a deadline and a measure the last 20% never moves; the monthly share keeps it honest.",
+      "decision": "The old system is replaced piece by piece. A routing facade (an API gateway or reverse proxy: Envoy, NGINX, YARP, Spring Cloud Gateway, or the cloud's gateway) sits in front of it from the first step and labels every request with the backend that served it; capabilities are rebuilt one at a time in order of value and risk, their routes switched to the new parts and kept switchable back for 30 days, then the old code is removed. Data moves with its capability, synchronised both ways (change data capture) while both sides write. The share of traffic still reaching the old system falls every month and reaches zero within {{MIGRATION_MONTHS}} months of the start, which the facade exports as migration_started_timestamp_seconds.",
+      "consequences": "• Value arrives with every capability moved, and each step can be reversed.\n• For a while two systems run, and data synchronisation between them is extra work and risk.\n• The facade is on every request path and must be as reliable as the system.\n• Without a deadline and a measure the last 20% never moves; the monthly share and the alerts keep it honest.",
       "alternatives": "1. A big-bang rewrite: no parallel running, but all value at the end and a high risk of overrun.\n2. Branch by abstraction inside the old code: no facade needed, but works only where the old code can still be changed.\n3. Leaving the old system and building around it: no migration cost, and the old system's problems stay.",
       "hubWhen": {
         "MIGRATION": [
@@ -760,14 +794,24 @@
       }
     },
     {
+      "id": "ff-inventory",
+      "type": "fitness-fn",
+      "label": "Every deployable in the model",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "0 folders under services that are not a container or web app in the architecture model",
+      "description": "A test reads the architecture model's node files, collects the labels of its containers and web apps, and compares them with the folders under services (a label matches a folder when it equals the folder name ignoring case and spaces); a folder without an element fails the test naming it.\n\nTool: Vitest with the yaml package over the Radical Markdown folder; for a model kept as a single .radical file: the same test over its nodes array\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { join } from 'node:path'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\nconst MODEL = 'architecture/nodes'\nconst files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })\n  .flatMap((e) => e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith('.md') ? [join(dir, e.name)] : [])\nconst frontMatter = (file: string) => parse(readFileSync(file, 'utf8').split(/^---$/m)[1] ?? '') ?? {}\nconst slug = (s: string) => s.toLowerCase().replace(/\\s+/g, '-')\n\nit('every deployable folder is a container or web app in the model', () => {\n  const modelled = new Set(files(MODEL).map(frontMatter)\n    .filter((n) => n.type === 'container' || n.type === 'webapp')\n    .map((n) => slug(String(n.label))))\n  const missing = readdirSync('services', { withFileTypes: true })\n    .filter((e) => e.isDirectory()).map((e) => e.name).filter((name) => !modelled.has(slug(name)))\n  expect(missing, 'deployables missing from the architecture model').toEqual([])\n})\n```"
+    },
+    {
       "id": "ff-build-time",
       "type": "fitness-fn",
       "label": "Pipeline within limit",
       "x": 1040,
-      "y": 0,
+      "y": 130,
       "category": "process",
       "threshold": "Build, test and package finish within {{BUILD_MINUTES}} minutes on the main branch",
-      "description": "The CI job that builds, tests and packages the deployable has a timeout; when it is hit, the job fails and the trend is reviewed as a signal to revisit the decomposition.\n\nTool: GitHub Actions (timeout-minutes)\n\n```yaml\n# .github/workflows/build.yml\nname: build\non: { push: { branches: [main] }, pull_request: {} }\njobs:\n  build:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{BUILD_MINUTES}}   # ADR: one deployable stays fast to build\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./mvnw -B verify package\n```",
+      "description": "The CI job that builds, tests and packages the deployable has a timeout; when it is hit, the job fails and the failure is the signal to review the decomposition within a month.\n\nTool: GitHub Actions (timeout-minutes); the build command is the stack's (./mvnw or ./gradlew on the JVM, dotnet on .NET, npm in TypeScript)\n\n```yaml\n# .github/workflows/build.yml\nname: build\non: { push: { branches: [main] }, pull_request: {} }\njobs:\n  build:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{BUILD_MINUTES}}   # ADR: one deployable stays fast to build\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: ./mvnw -B verify package\n```",
       "hubWhen": {
         "SPLIT": [
           "monolith",
@@ -780,10 +824,10 @@
       "type": "fitness-fn",
       "label": "Modules start alone",
       "x": 1040,
-      "y": 130,
+      "y": 260,
       "category": "structural",
       "threshold": "Every module starts and passes its integration tests with the other modules absent",
-      "description": "Each module has an integration test that bootstraps only that module (Spring Modulith's standalone bootstrap mode), with the APIs of the modules it depends on mocked. A module that needs another to start fails its test. On .NET, a WebApplicationFactory per module does the same.\n\nTool: Spring Modulith (@ApplicationModuleTest)\n\n```java\n@ApplicationModuleTest(mode = BootstrapMode.STANDALONE)\nclass OrderingModuleTest {\n  @Autowired Ordering ordering;      // the module's own API\n  @MockitoBean BillingApi billing;   // the API of a module ordering depends on\n\n  @Test\n  void placesAnOrderOnItsOwn(Scenario scenario) {\n    scenario.stimulate(() -> ordering.place(new PlaceOrder(CUSTOMER, LINES)))\n        .andWaitForEventOfType(OrderPlaced.class)\n        .toArrive();\n  }\n}\n```",
+      "description": "Each module has an integration test that bootstraps only that module (Spring Modulith's standalone bootstrap mode, the default), with the beans of the modules it depends on mocked. A module that needs another to start fails its test.\n\nTool: Spring Modulith (@ApplicationModuleTest, JUnit 5); for .NET: a WebApplicationFactory per module project; for TypeScript: one Nx project per module with its own test target\n\n```java\n@ApplicationModuleTest   // bootstraps the ordering module alone (BootstrapMode.STANDALONE is the default)\nclass OrderingModuleTest {\n  @Autowired Ordering ordering;      // the module's own API\n  @MockitoBean BillingApi billing;   // the API of a module ordering depends on\n\n  @Test\n  void placesAnOrderOnItsOwn(Scenario scenario) {\n    scenario.stimulate(() -> ordering.place(new PlaceOrder(CUSTOMER, LINES)))\n        .andWaitForEventOfType(OrderPlaced.class)\n        .toArrive();\n  }\n}\n```",
       "hubWhen": {
         "SPLIT": [
           "modular"
@@ -791,14 +835,30 @@
       }
     },
     {
-      "id": "ff-can-i-deploy",
+      "id": "ff-own-pipeline",
       "type": "fitness-fn",
-      "label": "Deploys checked alone",
+      "label": "A pipeline per deployable",
       "x": 1040,
-      "y": 260,
+      "y": 390,
+      "category": "structural",
+      "threshold": "100% of the deployables have a deploy workflow triggered only by their own folder; 0 workflow steps that build or deploy another deployable",
+      "description": "A test reads each deployable's workflow file, checks that it is triggered by changes under its own folder only, and that no run step names another deployable's folder; a workflow that builds or deploys two deployables fails the test.\n\nTool: Vitest with the yaml package over .github/workflows; for GitLab CI: the same test over the rules:changes of each job\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\nconst deployables = readdirSync('services', { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)\n\nit.each(deployables)('%s deploys from a pipeline of its own', (name) => {\n  const workflow = parse(readFileSync(`.github/workflows/deploy-${name}.yml`, 'utf8'))\n  expect(workflow.on.push.paths).toEqual([`services/${name}/**`])\n  const steps: string[] = Object.values<any>(workflow.jobs).flatMap((job) => job.steps.map((s: any) => s.run ?? ''))\n  for (const other of deployables.filter((o) => o !== name))\n    for (const step of steps) expect(step, `${name}'s pipeline touches ${other}`).not.toContain(`services/${other}`)\n})\n```",
+      "hubWhen": {
+        "SPLIT": [
+          "microservices",
+          "serverless"
+        ]
+      }
+    },
+    {
+      "id": "ff-coordinated-releases",
+      "type": "fitness-fn",
+      "label": "No releases in lockstep",
+      "x": 1040,
+      "y": 520,
       "category": "process",
-      "threshold": "0 deployments that need another deployable released first; each deploys when its consumers' contracts pass",
-      "description": "Each deployable has its own pipeline, triggered only by changes in its own folder. Before deploying, it asks the Pact Broker whether the version is compatible with what is in production; it deploys alone if so, and the release is recorded for its consumers.\n\nTool: Pact Broker (can-i-deploy) in GitHub Actions\n\n```yaml\n# .github/workflows/ordering.yml\non: { push: { branches: [main], paths: ['services/ordering/**'] } }\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: >\n          npx pact-broker can-i-deploy --pacticipant ordering\n          --version ${{ github.sha }} --to-environment production\n          --broker-base-url ${{ vars.PACT_BROKER_URL }}\n      - run: ./deploy.sh services/ordering\n      - run: >\n          npx pact-broker record-deployment --pacticipant ordering\n          --version ${{ github.sha }} --environment production\n```",
+      "threshold": "0 pairs of deployables released within 15 minutes of each other more than twice in the last quarter",
+      "description": "A monthly job lists the successful runs of every deployable's deploy workflow on main over the last quarter and counts, per pair, the releases that happened within 15 minutes of each other; a pair over the limit fails the job, which is the signal to review the decomposition within a month.\n\nTool: GitHub CLI (gh run list) in a TypeScript script run with tsx from a scheduled GitHub Actions job; for GitLab: the same over the pipelines API\n\n```ts\n// scripts/coordinated-releases.ts — scheduled monthly: npx tsx scripts/coordinated-releases.ts\nimport { execFileSync } from 'node:child_process'\nimport { readdirSync } from 'node:fs'\n\nconst since = new Date()\nsince.setMonth(since.getMonth() - 3)\nconst deployables = readdirSync('services', { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)\n\nconst releases = (name: string): number[] =>\n  JSON.parse(execFileSync('gh', ['run', 'list', '--workflow', `deploy-${name}.yml`, '--branch', 'main', '--status', 'success',\n    '--limit', '500', '--json', 'createdAt'], { encoding: 'utf8' }))\n    .map((run: { createdAt: string }) => Date.parse(run.createdAt))\n    .filter((t: number) => t > since.getTime())\n\nconst times = Object.fromEntries(deployables.map((d) => [d, releases(d)]))\nconst together: string[] = []\nfor (const a of deployables) for (const b of deployables) if (a < b) {\n  const n = times[a].filter((ta) => times[b].some((tb) => Math.abs(ta - tb) < 15 * 60_000)).length\n  if (n > 2) together.push(`${a} and ${b}: released together ${n} times`)\n}\nif (together.length) {\n  console.error('deployables released in lockstep this quarter (ADR: deployed independently):\\n' + together.join('\\n'))\n  process.exit(1)\n}\n```",
       "hubWhen": {
         "SPLIT": [
           "microservices",
@@ -811,10 +871,10 @@
       "type": "fitness-fn",
       "label": "Owners within limit",
       "x": 1040,
-      "y": 390,
+      "y": 650,
       "category": "process",
-      "threshold": "Every deployable has one owner in its catalog entry; no team owns more than {{PER_TEAM}}",
-      "description": "Each deployable has a Backstage catalog-info.yaml naming its owner; a CI step counts deployables per owner and fails when one is missing or a team owns more than the limit.\n\nTool: yq over Backstage catalog-info.yaml\n\n```bash\n# every service folder has catalog-info.yaml with spec.owner\nfor f in services/*/catalog-info.yaml; do\n  owner=$(yq -r '.spec.owner // \"\"' \"$f\")\n  [ -n \"$owner\" ] || { echo \"no owner: $f\"; exit 1; }\n  echo \"$owner\"\ndone | sort | uniq -c | awk -v max={{PER_TEAM}} '$1 > max { print \"too many for \" $2 \": \" $1; bad = 1 } END { exit bad }'\n```",
+      "threshold": "Every deployable names one owner in its catalog entry; no team owns more than {{PER_TEAM}}",
+      "description": "Each deployable has a Backstage catalog-info.yaml naming its owner; a CI step collects the owners, fails when one is missing, and fails when a team owns more than the limit.\n\nTool: yq (mikefarah) in a shell step over Backstage catalog-info.yaml; for a different catalog: the same over its owner field\n\n```bash\nset -euo pipefail\n# every service folder has catalog-info.yaml with spec.owner\n: > owners.txt\nfor f in services/*/catalog-info.yaml; do\n  owner=$(yq '.spec.owner // \"\"' \"$f\")\n  [ -n \"$owner\" ] || { echo \"no owner: $f\"; exit 1; }\n  echo \"$owner\" >> owners.txt\ndone\nsort owners.txt | uniq -c | awk -v max={{PER_TEAM}} '$1 > max { print \"too many deployables for \" $2 \": \" $1; bad = 1 } END { exit bad }'\n```",
       "hubWhen": {
         "SPLIT": [
           "microservices",
@@ -827,10 +887,10 @@
       "type": "fitness-fn",
       "label": "Functions belong to a stack",
       "x": 1040,
-      "y": 520,
+      "y": 780,
       "category": "structural",
       "threshold": "0 functions without a context and owner tag or with a timeout above 30 seconds",
-      "description": "A CloudFormation Guard rule runs over every synthesised template (SAM or CDK) in CI and fails on a function that does not belong to a context or runs too long.\n\nTool: AWS CloudFormation Guard (cfn-guard)\n\n```text\n# rules/functions.guard  —  cfn-guard validate -d template.yaml -r rules/functions.guard\nlet functions = Resources.*[ Type == 'AWS::Serverless::Function' ]\n\nrule functions_belong_to_a_context when %functions !empty {\n  %functions.Properties.Tags.context exists\n  %functions.Properties.Tags.owner exists\n  %functions.Properties.Timeout <= 30\n}\n```",
+      "description": "A CloudFormation Guard rule runs over every synthesised template in CI and fails on a function without a context and owner tag or with a timeout over 30 seconds: SAM functions carry Tags as a map, CDK output as the Lambda resource with a list of Key/Value pairs, and a Lambda function without a Timeout keeps the 3-second default and passes.\n\nTool: AWS CloudFormation Guard (cfn-guard validate) over SAM and CDK-synthesised templates; for Bicep: PSRule for Azure with a custom rule; for Terraform: Conftest over the plan JSON\n\n```text\n# rules/functions.guard  —  cfn-guard validate -d template.yaml -r rules/functions.guard\nlet sam_functions = Resources.*[ Type == 'AWS::Serverless::Function' ]\nlet lambda_functions = Resources.*[ Type == 'AWS::Lambda::Function' ]\n\nrule sam_functions_belong_to_a_context when %sam_functions !empty {\n  %sam_functions.Properties {\n    Tags.context exists\n    Tags.owner exists\n    Timeout !exists or Timeout <= 30\n  }\n}\n\nrule lambda_functions_belong_to_a_context when %lambda_functions !empty {\n  %lambda_functions.Properties {\n    Tags[ Key == 'context' ] !empty\n    Tags[ Key == 'owner' ] !empty\n    Timeout !exists or Timeout <= 30\n  }\n}\n```",
       "hubWhen": {
         "SPLIT": [
           "serverless"
@@ -842,10 +902,10 @@
       "type": "fitness-fn",
       "label": "No foreign credentials",
       "x": 1040,
-      "y": 650,
+      "y": 910,
       "category": "structural",
-      "threshold": "0 deployments that receive another deployable's database secret",
-      "description": "A policy over the Kubernetes manifests fails when a workload references a database secret other than its own (secrets are named db-<app>).\n\nTool: Conftest (Open Policy Agent)\n\n```rego\npackage main\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"Deployment\"\n  app := input.metadata.labels[\"app.kubernetes.io/name\"]\n  some c in input.spec.template.spec.containers\n  some src in c.envFrom\n  startswith(src.secretRef.name, \"db-\")\n  src.secretRef.name != sprintf(\"db-%s\", [app])\n  msg := sprintf(\"%s reads database secret %s (ADR A database per deployable)\", [app, src.secretRef.name])\n}\n```",
+      "threshold": "0 workloads that receive another deployable's database secret",
+      "description": "A policy over the Kubernetes manifests fails when a Deployment, StatefulSet, Job or CronJob references a database secret other than its own (secrets are named db-<app>), whether through envFrom, an env entry with secretKeyRef, or a secret volume.\n\nTool: Conftest (Open Policy Agent, rego.v1) over the rendered manifests; for ECS: the same rule over the task definitions' secrets\n\n```rego\npackage main\nimport rego.v1\n\nworkloads := {\"Deployment\", \"StatefulSet\", \"Job\", \"CronJob\"}\n\npod_spec := input.spec.template.spec if { input.kind in {\"Deployment\", \"StatefulSet\", \"Job\"} }\npod_spec := input.spec.jobTemplate.spec.template.spec if { input.kind == \"CronJob\" }\n\ndb_secrets contains name if {\n  some c in pod_spec.containers\n  some src in c.envFrom\n  name := src.secretRef.name\n}\ndb_secrets contains name if {\n  some c in pod_spec.containers\n  some e in c.env\n  name := e.valueFrom.secretKeyRef.name\n}\ndb_secrets contains name if {\n  some v in pod_spec.volumes\n  name := v.secret.secretName\n}\n\ndeny contains msg if {\n  input.kind in workloads\n  app := input.metadata.labels[\"app.kubernetes.io/name\"]\n  some name in db_secrets\n  startswith(name, \"db-\")\n  name != sprintf(\"db-%s\", [app])\n  msg := sprintf(\"%s %s reads database secret %s (ADR A database per deployable)\", [input.kind, app, name])\n}\n```",
       "hubWhen": {
         "DATA": [
           "own"
@@ -857,10 +917,10 @@
       "type": "fitness-fn",
       "label": "Schemas closed to others",
       "x": 1040,
-      "y": 780,
+      "y": 1040,
       "category": "structural",
       "threshold": "0 module users with any privilege on another module's schema",
-      "description": "An integration test starts PostgreSQL in a container, runs every module's migrations and grants, and runs this query; any row fails the test.\n\nTool: Testcontainers (PostgreSQL)\n\n```sql\n-- module users are named module_<name>, schemas <name>\nSELECT r.rolname AS module_user, n.nspname AS foreign_schema\nFROM pg_roles r CROSS JOIN pg_namespace n\nWHERE r.rolname LIKE 'module\\_%'\n  AND n.nspname NOT IN ('public', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%'\n  AND n.nspname <> substring(r.rolname FROM 8)\n  AND has_schema_privilege(r.rolname, n.oid, 'USAGE');\n-- expected: 0 rows\n```",
+      "description": "An integration test starts PostgreSQL in a container, runs every module's migrations and grants, and runs this query; any row fails the test.\n\nTool: Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL\n\n```sql\n-- module users are named module_<name>, schemas <name>\nSELECT r.rolname AS module_user, n.nspname AS foreign_schema\nFROM pg_roles r CROSS JOIN pg_namespace n\nWHERE r.rolname LIKE 'module\\_%'\n  AND n.nspname NOT IN ('public', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%'\n  AND n.nspname <> substring(r.rolname FROM 8)\n  AND has_schema_privilege(r.rolname, n.oid, 'USAGE');\n-- expected: 0 rows\n```",
       "hubWhen": {
         "DATA": [
           "schemas"
@@ -872,13 +932,33 @@
       "type": "fitness-fn",
       "label": "One writer per table",
       "x": 1040,
-      "y": 910,
+      "y": 1170,
       "category": "structural",
-      "threshold": "0 tables writable by a module user other than the owner's",
-      "description": "An integration test starts PostgreSQL in a container, runs the migrations and grants, and checks that each table (prefixed with its owning module) can be written only by its owner's user.\n\nTool: Testcontainers (PostgreSQL)\n\n```sql\n-- tables are named <module>_<name>, module users module_<module>\nSELECT r.rolname AS module_user, c.relname AS foreign_table\nFROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\nCROSS JOIN pg_roles r\nWHERE n.nspname = 'public' AND c.relkind = 'r' AND r.rolname LIKE 'module\\_%'\n  AND split_part(c.relname, '_', 1) <> substring(r.rolname FROM 8)\n  AND has_table_privilege(r.rolname, c.oid, 'INSERT, UPDATE, DELETE');\n-- expected: 0 rows\n```",
+      "threshold": "0 tables writable by a module user other than the owner's; 0 tables without an owner in their comment",
+      "description": "An integration test starts PostgreSQL in a container, runs the migrations and grants, and checks that every table (including partitioned ones) names its owning module in its table comment and can be written only by that module's user.\n\nTool: Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL\n\n```sql\n-- tables carry their owning module in the table comment (COMMENT ON TABLE orders IS 'ordering'); module users are module_<module>\nSELECT r.rolname AS module_user, c.relname AS foreign_table, obj_description(c.oid, 'pg_class') AS owner\nFROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\nCROSS JOIN pg_roles r\nWHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND r.rolname LIKE 'module\\_%'\n  AND (obj_description(c.oid, 'pg_class') IS NULL OR obj_description(c.oid, 'pg_class') <> substring(r.rolname FROM 8))\n  AND has_table_privilege(r.rolname, c.oid, 'INSERT, UPDATE, DELETE');\n-- expected: 0 rows\n```",
       "hubWhen": {
         "DATA": [
           "shared"
+        ]
+      }
+    },
+    {
+      "id": "ff-team-changes",
+      "type": "fitness-fn",
+      "label": "Changes stay with one team",
+      "x": 1040,
+      "y": 1300,
+      "category": "process",
+      "threshold": "At least 80% of the pull requests merged in the last quarter touch the parts of one team only",
+      "description": "A monthly job lists the pull requests merged in the last quarter with their files, maps each file to its owning team through the CODEOWNERS entries (folder prefixes, one per part, as the Code review and branching pack keeps them) and counts the pull requests whose files belong to one team; below 80% the job fails and the boundaries are reviewed.\n\nTool: GitHub CLI (gh pr list) in a TypeScript script run with tsx from a scheduled GitHub Actions job\n\n```ts\n// scripts/single-team-changes.ts — scheduled monthly: npx tsx scripts/single-team-changes.ts\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\n\nconst since = new Date()\nsince.setMonth(since.getMonth() - 3)\nconst owners = readFileSync('.github/CODEOWNERS', 'utf8').split('\\n')\n  .filter((line) => line.trim() && !line.startsWith('#'))\n  .map((line) => { const [pattern, team] = line.trim().split(/\\s+/); return { prefix: pattern.replace(/^\\//, ''), team } })\nconst teamOf = (file: string) => owners.filter((o) => file.startsWith(o.prefix)).sort((a, b) => b.prefix.length - a.prefix.length)[0]?.team\n\nconst prs: Array<{ files: Array<{ path: string }> }> = JSON.parse(execFileSync('gh', ['pr', 'list', '--state', 'merged',\n  '--search', `merged:>=${since.toISOString().slice(0, 10)}`, '--limit', '1000', '--json', 'files'], { encoding: 'utf8' }))\nconst singleTeam = prs.filter((pr) => new Set(pr.files.map((f) => teamOf(f.path)).filter(Boolean)).size <= 1).length\nconst share = Math.round((singleTeam * 100) / Math.max(prs.length, 1))\nconsole.log(`${singleTeam} of ${prs.length} merged pull requests touched one team's parts (${share}%)`)\nif (share < 80) process.exit(1)\n```",
+      "hubWhen": {
+        "BOUNDARY": [
+          "team"
+        ],
+        "SPLIT": [
+          "modular",
+          "microservices",
+          "serverless"
         ]
       }
     },
@@ -887,10 +967,10 @@
       "type": "fitness-fn",
       "label": "Legacy traffic falls",
       "x": 1040,
-      "y": 1040,
+      "y": 1430,
       "category": "operational",
-      "threshold": "The share of requests reaching the old system falls every month and is 0 within {{MIGRATION_MONTHS}} months",
-      "description": "The routing facade labels each request with the backend that served it; a recording rule keeps the share of the old system, a dashboard shows the trend, and an alert fires when it has not fallen over a month.\n\nTool: Prometheus recording and alerting rules\n\n```yaml\ngroups:\n  - name: strangler\n    rules:\n      - record: migration:legacy_share:ratio_7d\n        expr: |\n          sum(rate(facade_requests_total{backend=\"legacy\"}[7d])) / sum(rate(facade_requests_total[7d]))\n      - alert: MigrationStalled\n        expr: migration:legacy_share:ratio_7d >= migration:legacy_share:ratio_7d offset 30d\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Legacy share has not fallen in 30 days; it must reach 0 within {{MIGRATION_MONTHS}} months\"\n```",
+      "threshold": "The share of requests reaching the old system falls every 30 days while above 0, and is 0 within {{MIGRATION_MONTHS}} months of the migration's start",
+      "description": "The routing facade labels each request with the backend that served it and exports the migration's start as migration_started_timestamp_seconds; a recording rule keeps the old system's 7-day share, one alert fires when the share is above 0 and has not fallen in 30 days, another when it is above 0 past the deadline.\n\nTool: Prometheus recording and alerting rules\n\n```yaml\ngroups:\n  - name: strangler\n    rules:\n      - record: migration:legacy_share:ratio_7d\n        expr: |\n          sum(rate(facade_requests_total{backend=\"legacy\"}[7d])) / sum(rate(facade_requests_total[7d]))\n      - alert: MigrationStalled\n        expr: |\n          migration:legacy_share:ratio_7d > 0\n          and migration:legacy_share:ratio_7d >= migration:legacy_share:ratio_7d offset 30d\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Legacy share has not fallen in 30 days; it must reach 0 within {{MIGRATION_MONTHS}} months\"\n      - alert: MigrationPastDeadline\n        expr: |\n          migration:legacy_share:ratio_7d > 0\n          and time() - max(migration_started_timestamp_seconds) > {{MIGRATION_MONTHS}} * 30 * 86400\n        labels: { severity: page }\n        annotations:\n          summary: \"The old system still serves traffic {{MIGRATION_MONTHS}} months after the migration started (ADR Strangler fig migration)\"\n```",
       "hubWhen": {
         "MIGRATION": [
           "strangler"
@@ -1068,6 +1148,30 @@
       "relationType": "verifies"
     },
     {
+      "id": "ff-inventory--implements--adr-monolith",
+      "sourceId": "ff-inventory",
+      "targetId": "adr-monolith",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-inventory--implements--adr-modular-monolith",
+      "sourceId": "ff-inventory",
+      "targetId": "adr-modular-monolith",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-inventory--implements--adr-microservices",
+      "sourceId": "ff-inventory",
+      "targetId": "adr-microservices",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-inventory--implements--adr-serverless",
+      "sourceId": "ff-inventory",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
       "id": "ff-build-time--implements--adr-monolith",
       "sourceId": "ff-build-time",
       "targetId": "adr-monolith",
@@ -1086,14 +1190,26 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-can-i-deploy--implements--adr-microservices",
-      "sourceId": "ff-can-i-deploy",
+      "id": "ff-own-pipeline--implements--adr-microservices",
+      "sourceId": "ff-own-pipeline",
       "targetId": "adr-microservices",
       "relationType": "implements"
     },
     {
-      "id": "ff-can-i-deploy--implements--adr-serverless",
-      "sourceId": "ff-can-i-deploy",
+      "id": "ff-own-pipeline--implements--adr-serverless",
+      "sourceId": "ff-own-pipeline",
+      "targetId": "adr-serverless",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-coordinated-releases--implements--adr-microservices",
+      "sourceId": "ff-coordinated-releases",
+      "targetId": "adr-microservices",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-coordinated-releases--implements--adr-serverless",
+      "sourceId": "ff-coordinated-releases",
       "targetId": "adr-serverless",
       "relationType": "implements"
     },
@@ -1131,6 +1247,30 @@
       "id": "ff-table-writers--implements--adr-shared-schema",
       "sourceId": "ff-table-writers",
       "targetId": "adr-shared-schema",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-team-changes--implements--adr-monolith",
+      "sourceId": "ff-team-changes",
+      "targetId": "adr-monolith",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-team-changes--implements--adr-modular-monolith",
+      "sourceId": "ff-team-changes",
+      "targetId": "adr-modular-monolith",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-team-changes--implements--adr-microservices",
+      "sourceId": "ff-team-changes",
+      "targetId": "adr-microservices",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-team-changes--implements--adr-serverless",
+      "sourceId": "ff-team-changes",
+      "targetId": "adr-serverless",
       "relationType": "implements"
     },
     {
