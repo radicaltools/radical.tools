@@ -3,14 +3,14 @@ import type { PackSpec, When } from '../../src/packSpec'
 const STYLES = ['adr-exceptions', 'adr-result', 'adr-codes']
 const EDGE: When = { BOUNDARY: ['edge'] }
 const LAYERED: When = { BOUNDARY: ['layered'] }
-const FORCES = 'Code in this element fails: a dependency times out, input is wrong, a record is gone, a bug is hit. The forces: a failure that is swallowed becomes a wrong answer nobody can explain; one that is logged at every layer on its way up becomes five lines about one event; a caller that is handed a stack trace learns the file layout, the framework and sometimes the SQL; a log line without the request\'s id cannot be found when it matters; logs are read widely and copied to places with weaker access, so a password or an e-mail address in them is a leak; expected failures (not found, rejected, conflict) and unexpected ones (bugs, outages) need different handling, and a style that does not separate them handles both badly; and every convention here is kept by hundreds of hands, so it holds only if a tool checks it. What is done with the lines once written (shipping, retention, alerting, traces) is the Observability concern\'s decision, not this one\'s; that pack takes the shape and redaction decided here as given. The snippets assume one repository layout: source in src/ with the edge in src/http, the inner code in src/domain and src/application, the error types in src/errors, the logger in src/logger.js, and tests in test/; the TypeScript snippets name the Python, JVM, Go and .NET equivalents.'
+const FORCES = 'Code in this element fails: a dependency times out, input is wrong, a record is gone, a bug is hit. The forces: a failure that is swallowed becomes a wrong answer nobody can explain; one that is logged at every layer on its way up becomes five lines about one event; a caller that is handed a stack trace learns the file layout, the framework and sometimes the SQL; a log line without the request\'s id cannot be found when it matters; logs are read widely and copied to places with weaker access, so a password or an e-mail address in them is a leak; expected failures (not found, rejected, conflict) and unexpected ones (bugs, outages) need different handling, and a style that does not separate them handles both badly; and every convention here is kept by hundreds of hands, so it holds only if a tool checks it. What is done with the lines once written (shipping, retention, alerting, traces) is the Observability concern\'s decision, not this one\'s; that pack takes the shape and redaction decided here as given. What an HTTP API\'s error body looks like (its format, codes and field errors) is the Errors pack\'s decision; what must never reach a caller at any edge is this one\'s. The snippets assume one repository layout: source in src/ with the edge in src/http, the inner code in src/domain and src/application, the error types in src/errors, the logger in src/logger.js, and tests in test/; the TypeScript snippets name the Python, JVM, Go and .NET equivalents.'
 
 const pack: PackSpec = {
   id: 'concern-error-handling-logging',
   name: 'Error handling and logging conventions',
   group: 'coding',
-  description: 'How the code signals, propagates and records failures: the error style, where errors are handled, what an error that reaches a caller looks like, how a log line is shaped, and what must never be in one.',
-  tags: ['maintainability', 'error handling', 'exceptions', 'result types', 'logging', 'redaction', 'problem details'],
+  description: 'How the code signals, propagates and records failures: the error style, where errors are handled, what never reaches a caller, how a log line is shaped, and what must never be in one. What an HTTP API\'s error body looks like is decided in the Errors pack.',
+  tags: ['maintainability', 'error handling', 'exceptions', 'result types', 'logging', 'redaction', 'information leakage'],
   concern: {
     id: 'error-handling-logging',
     trigger: 'LIST NODES WHERE (type = "container" OR type = "webapp") AND external != true',
@@ -69,15 +69,6 @@ const pack: PackSpec = {
         { value: 'denylist', label: 'a deny-list of redacted paths', description: 'The logger redacts known secret and personal-data fields by path (password, token, authorization, cookie, e-mail, IBAN) wherever they appear, and everything else is allowed. Pick it as the baseline for an internal log store, where a new field is more often useful than dangerous.' },
       ],
     },
-    {
-      key: 'CALLER', title: 'What a caller sees', label: 'What does an error look like to a caller?',
-      hint: 'A client acts on what it is given: a stable code it can key on, a message it may show, and never a stack trace to learn from.',
-      default: 'problem-details',
-      options: [
-        { value: 'problem-details', label: 'RFC 9457 problem details', description: 'Every error response is application/problem+json with type (a URI that documents the error), title, status, detail, instance, a stable code and the correlation id; no stack traces in production. Pick it for any HTTP API with more than one client or a public one. How the shape evolves across API versions is the API evolution concern\'s decision.' },
-        { value: 'minimal', label: 'status, code and message', description: 'An error response is the HTTP status plus a JSON body with a stable code, a message and the correlation id, nothing more. Pick it for an internal API with one client owned by the same team, or a non-HTTP edge (queue, CLI) where problem details do not apply.' },
-      ],
-    },
   ],
   details: [
     { key: 'BASE_ERROR', label: 'Name of the base error class or error type', default: 'AppError' },
@@ -121,7 +112,7 @@ const pack: PackSpec = {
     {
       id: 'req-codes', label: 'Errors come from the catalogue', when: { STYLE: ['codes'] }, ears_type: 'ubiquitous',
       action: 'signal every error with a code from the one catalogue in the repository (code, status, message template), 0 codes invented at a call site, and never remove or rename a code once released (a code can only be added or deprecated)',
-      rationale: 'Clients key on codes; a code that changes meaning or vanishes breaks them silently, and a code made up inline is one the catalogue cannot document (RFC 9457, section 4.2: extension members for stable codes; OWASP Error Handling Cheat Sheet).',
+      rationale: 'Clients key on codes; a code that changes meaning or vanishes breaks them silently, and a code made up inline is one the catalogue cannot document (RFC 9457, section 3.2: extension members for stable codes; OWASP Error Handling Cheat Sheet).',
       scenario: { label: 'Unknown code refused', given: 'a change that returns a code that is not in the catalogue', when: 'the catalogue test runs', then: 'it fails naming the code; a change that renames an existing code fails the catalogue snapshot' },
     },
     {
@@ -169,18 +160,11 @@ const pack: PackSpec = {
       scenario: { label: 'Secrets logged clean', given: 'a log call with each of {{REDACTED_FIELDS}} at the top level and one level down, and a log call passing a whole request object', when: 'the logger test and the Semgrep rules run', then: 'the written line holds only redaction markers (or only the allowed fields), and the whole-object call fails the lint' },
     },
     {
-      id: 'req-problem-details', label: 'Callers get problem details, never a stack', when: { CALLER: ['problem-details'] }, ears_type: 'unwanted-behaviour',
-      unwanted_condition: 'an error reaches a caller in production',
-      action: 'answer with application/problem+json holding type (a URI that documents the error), title, status, detail, instance, a stable code and the {{CORRELATION_FIELD}}, and never a stack trace, exception class name, SQL, file path or internal host name; for an unexpected error the detail is generic and the status 500',
-      rationale: 'A documented shape lets clients act on the code and show the detail, and the correlation id lets support find the lines; a stack trace tells an attacker the framework and the file layout (RFC 9457; OWASP Error Handling Cheat Sheet; OWASP Top 10 A09).',
-      scenario: { label: 'Unexpected error answered clean', given: 'a route that throws a TypeError, with the element configured as in production', when: 'it is called', then: 'the response is 500 application/problem+json with type, title, status, code and {{CORRELATION_FIELD}}, and its body matches no stack-trace pattern, class name, path or SQL' },
-    },
-    {
-      id: 'req-minimal', label: 'Callers get status, code and message, never a stack', when: { CALLER: ['minimal'] }, ears_type: 'unwanted-behaviour',
-      unwanted_condition: 'an error reaches a caller in production',
-      action: 'answer with the HTTP status (or exit status at a CLI, or a dead-letter reason at a queue) and a body holding only a stable code, a message and the {{CORRELATION_FIELD}}, never a stack trace, exception class name, SQL, file path or internal host name; for an unexpected error the message is generic',
-      rationale: 'A client needs a code to key on and an id to quote to support; everything else in an error body is attack surface (OWASP Error Handling Cheat Sheet; OWASP Top 10 A09).',
-      scenario: { label: 'Unexpected error answered clean', given: 'a route that throws a TypeError, with the element configured as in production', when: 'it is called', then: 'the response is 500 with exactly the fields code, message and {{CORRELATION_FIELD}}, and its body matches no stack-trace pattern, class name, path or SQL' },
+      id: 'req-no-leak', label: 'Nothing internal reaches a caller', ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'an error reaches a caller at any edge of the element (an HTTP response, a reply or dead-letter message, a CLI\'s output)',
+      action: 'keep every stack trace, exception class name, SQL statement, file path and internal host name or address out of what the caller receives, so that 0 of them appear with production settings; they go to the one log line of that failure only',
+      rationale: 'A stack trace tells an attacker the framework, the file layout and sometimes the SQL; the caller needs a code and an id, the investigator the log line. This holds whatever the error body looks like, so it belongs to the handler, not to the format (OWASP Error Handling Cheat Sheet; OWASP Top 10 A09).',
+      scenario: { label: 'Unexpected error answered clean', given: 'a route and a CLI command that throw a TypeError, with the element configured as in production', when: 'each is called', then: 'the HTTP body and the CLI\'s output match no stack-trace pattern, exception class name, source path, SQL or internal address' },
     },
     {
       id: 'req-levels', label: 'Levels mean something', ears_type: 'ubiquitous',
@@ -192,31 +176,31 @@ const pack: PackSpec = {
   adrs: [
     {
       id: 'adr-exceptions', label: 'Exceptions with a small domain hierarchy', when: { STYLE: ['exceptions'] },
-      decision: 'Expected failures are thrown as subclasses of one base class {{BASE_ERROR}} in src/errors (NotFoundError, ValidationError, ConflictError, UpstreamUnavailableError, each with a stable code and an HTTP status hint; under ten classes in all); unexpected errors (TypeError, NullPointerException, driver errors nobody translated) are not caught below the boundary. Every wrap passes the original as the cause (Error.cause, inner exception, raise … from). Errors are handled by: {{BOUNDARY}}; the handler maps {{BASE_ERROR}} subclasses by their code, treats everything else as 500 and logs each failure once at the level its meaning asks for ({{LEVELS}}). A caller sees {{CALLER}}. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context (AsyncLocalStorage, MDC, contextvars), and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger (pino redact or serializers, structlog processors, Serilog destructuring policies, logback masking). Conventions are held by the linters: ESLint (no-empty, preserve-caught-error, only-throw-error), Semgrep (log-and-continue, log-and-rethrow, whole objects), Ruff (BLE, TRY, LOG), Error Prone and Sonar on the JVM; in .NET the Roslyn analyzers CA1031 (do not catch general exceptions) and CA2200 (rethrow to preserve the stack), configured as errors in .editorconfig.',
+      decision: 'Expected failures are thrown as subclasses of one base class {{BASE_ERROR}} in src/errors (NotFoundError, ValidationError, ConflictError, UpstreamUnavailableError, each with a stable code and an HTTP status hint; under ten classes in all); unexpected errors (TypeError, NullPointerException, driver errors nobody translated) are not caught below the boundary. Every wrap passes the original as the cause (Error.cause, inner exception, raise … from). Errors are handled by: {{BOUNDARY}}; the handler maps {{BASE_ERROR}} subclasses by their code, treats everything else as 500 and logs each failure once at the level its meaning asks for ({{LEVELS}}). An HTTP caller sees the error body the Errors pack decides (RFC 9457 problem details unless it says otherwise), and no caller at any edge sees a stack trace, class name, SQL, path or internal host. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context (AsyncLocalStorage, MDC, contextvars), and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger (pino redact or serializers, structlog processors, Serilog destructuring policies, logback masking). Conventions are held by the linters: ESLint (no-empty, preserve-caught-error, only-throw-error), Semgrep (log-and-continue, log-and-rethrow, whole objects), Ruff (BLE, TRY, LOG), Error Prone and Sonar on the JVM; in .NET the Roslyn analyzers CA1031 (do not catch general exceptions) and CA2200 (rethrow to preserve the stack), configured as errors in .editorconfig.',
       consequences: '• Little ceremony: the happy path reads straight, and the frameworks already map exceptions to responses.\n• A function\'s signature does not say what it can fail with; reviewers and the hierarchy carry that knowledge.\n• An exception used for an expected case that is frequent (a cache miss, a validation on every field) costs stack capture; batch validation is reported as a notification object, not thrown field by field.\n• The hierarchy must stay small (under ten classes, checked) or it becomes a second type system nobody keeps up.',
       alternatives: '1. Result types: failures in the signature, at the cost of handling at every call and fighting libraries that throw.\n2. Error codes from a catalogue: stable for clients, but codes compared by hand everywhere inside the code.\n3. Catch-all handlers per controller: the same mapping written many times, drifting apart.',
     },
     {
       id: 'adr-result', label: 'Result types for expected failures', when: { STYLE: ['result'] },
-      decision: 'A function that can fail in an expected way returns a Result: Result<T, E> and the ? operator in Rust (thiserror for error types, anyhow only at the binary\'s edge), error values with %w and errors.Is/As in Go, kotlin.Result or Arrow\'s Either in Kotlin, neverthrow (or fp-ts Either) in TypeScript. The error type of each module names its cases and carries a stable code; wraps keep the source. Exceptions and panics are for bugs and broken invariants only and are never caught except at the boundary. An ignored Result fails the build (unused_must_use, errcheck, neverthrow/must-use-result). Errors are handled by: {{BOUNDARY}}; the handler maps the error cases to responses and logs each failure once at the level its meaning asks for ({{LEVELS}}). A caller sees {{CALLER}}. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context, and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger (zap or slog handlers, tracing layers, pino redact or serializers).',
+      decision: 'A function that can fail in an expected way returns a Result: Result<T, E> and the ? operator in Rust (thiserror for error types, anyhow only at the binary\'s edge), error values with %w and errors.Is/As in Go, kotlin.Result or Arrow\'s Either in Kotlin, neverthrow (or fp-ts Either) in TypeScript. The error type of each module names its cases and carries a stable code; wraps keep the source. Exceptions and panics are for bugs and broken invariants only and are never caught except at the boundary. An ignored Result fails the build (unused_must_use, errcheck, neverthrow/must-use-result). Errors are handled by: {{BOUNDARY}}; the handler maps the error cases to responses and logs each failure once at the level its meaning asks for ({{LEVELS}}). An HTTP caller sees the error body the Errors pack decides (RFC 9457 problem details unless it says otherwise), and no caller at any edge sees a stack trace, class name, SQL, path or internal host. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context, and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger (zap or slog handlers, tracing layers, pino redact or serializers).',
       consequences: '• Every expected failure is in the signature; forgetting one is a compile error, not an incident.\n• Every call that can fail is handled or passed on explicitly, which is more code and a style the whole team must share.\n• Libraries that throw (HTTP clients, ORMs, JSON parsers) are wrapped at the module boundary into Results, and that wrapping is where bugs hide.\n• Unexpected errors still need the boundary handler, so the element has two mechanisms, not one.',
       alternatives: '1. Exceptions with a hierarchy: less ceremony, failures invisible in signatures.\n2. Error codes from a catalogue: values too, but untyped; a Result\'s error type can carry the catalogue code.\n3. Results everywhere, bugs included: panics wrapped as values hide what should crash loudly.',
     },
     {
       id: 'adr-codes', label: 'Error codes from a catalogue', when: { STYLE: ['codes'] },
-      decision: 'One catalogue in the repository (src/errors/catalogue.ts, or a generated enum from it) defines every error: a stable upper-case code (ORDER_NOT_FOUND), the HTTP status or exit status, a message template with named placeholders and a documentation URI. Code signals an error by returning or raising an error value built from a catalogue entry (fail(\'ORDER_NOT_FOUND\', { orderId }) in TypeScript or Python, an error struct with the code in Go, an enum in C), never an ad-hoc string; a code that is not in the catalogue fails a test, and a renamed or removed code fails the catalogue snapshot (codes are added or deprecated, never changed). Errors are handled by: {{BOUNDARY}}; the handler maps the catalogue entry to the status and to {{CALLER}}, with the code as the stable member, and logs each failure once at the level its meaning asks for ({{LEVELS}}), with the code as a field. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context, and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger. Unexpected errors map to one catalogue entry (INTERNAL) and keep their cause in the log only.',
+      decision: 'One catalogue in the repository (src/errors/catalogue.ts, or a generated enum from it) defines every error: a stable upper-case code (ORDER_NOT_FOUND), the HTTP status or exit status, a message template with named placeholders and a type URI. Code signals an error by returning or raising an error value built from a catalogue entry (fail(\'ORDER_NOT_FOUND\', { orderId }) in TypeScript or Python, an error struct with the code in Go, an enum in C), never an ad-hoc string; a code that is not in the catalogue fails a test, and a renamed or removed code fails the catalogue snapshot (codes are added or deprecated, never changed). Errors are handled by: {{BOUNDARY}}; the handler maps the catalogue entry to the status and to the error body the Errors pack decides (RFC 9457 problem details unless it says otherwise), with the catalogue\'s code as the stable code wherever that pack gives callers codes (its api/errors/codes.yaml is generated from this catalogue, so there is one list), and logs each failure once at the level its meaning asks for ({{LEVELS}}), with the code as a field. Log lines are {{LOGS}} with the {{CORRELATION_FIELD}} from the logger\'s context, and {{REDACTED_FIELDS}} are kept out by {{REDACTION}} in the logger. Unexpected errors map to one catalogue entry (INTERNAL) and keep their cause in the log only.',
       consequences: '• Clients and support share one documented list; a code never changes meaning.\n• The catalogue is a shared file everyone edits; ownership and review of it must be clear or it fills with near-duplicates.\n• Codes are compared as values inside the code too, which is weaker than types; a generated enum limits typos.\n• Message templates in one place are easy to translate and easy to leave stale.',
       alternatives: '1. Exceptions with a hierarchy: the type is the code; works until a client needs the list.\n2. Result types with an error enum per module: typed, but there is no one list across the element.\n3. Codes invented at call sites: what a catalogue replaces; nobody can list them.',
     },
     {
       id: 'adr-edge', label: 'Errors handled once at the edge', when: EDGE,
-      decision: 'One error handler per kind of edge owns the mapping from errors to the outside: an Express or Fastify error handler, a NestJS exception filter, a Spring @ControllerAdvice, an ASP.NET exception handler middleware, a FastAPI exception handler; a queue consumer\'s and a scheduled job\'s outer loop do the same for their failures (acknowledge, retry or dead-letter by error kind). The handler maps the error to {{CALLER}}, logs it exactly once with the cause chain and the {{CORRELATION_FIELD}}, and never leaks a stack trace in production. Domain and application code import no HTTP framework and know no status code; a dependency rule (dependency-cruiser, ArchUnit, import-linter) keeps it so.',
+      decision: 'One error handler per kind of edge owns the mapping from errors to the outside: an Express or Fastify error handler, a NestJS exception filter, a Spring @ControllerAdvice, an ASP.NET exception handler middleware, a FastAPI exception handler; a queue consumer\'s and a scheduled job\'s outer loop do the same for their failures (acknowledge, retry or dead-letter by error kind). The handler maps the error to what its edge answers (for HTTP, the error body the Errors pack decides (RFC 9457 problem details unless it says otherwise)), logs it exactly once with the cause chain and the {{CORRELATION_FIELD}}, and never leaks a stack trace in production. Domain and application code import no HTTP framework and know no status code; a dependency rule (dependency-cruiser, ArchUnit, import-linter) keeps it so.',
       consequences: '• One place to get the mapping right, one log line per failure, and inner code reusable behind another edge.\n• The handler needs the error\'s kind to map it, so the error style must carry it (a subclass, a Result case or a code).\n• A library\'s raw error that reaches the handler untranslated becomes a 500, which is right for a bug and wrong for an expected case someone forgot to type.',
       alternatives: '1. Translation per layer: keeps driver types out of the domain, at the cost of error classes per layer.\n2. Try/catch in every controller action: the same mapping written many times.',
     },
     {
       id: 'adr-layered', label: 'Errors translated layer by layer', when: LAYERED,
-      decision: 'Each layer defines its own error types and translates the ones from below at its boundary: the persistence adapter catches driver errors (SQLException, DataAccessException, pg errors) and raises persistence errors (DuplicateKey, Unavailable); the domain and application layers raise their own (OrderNotFound, OrderAlreadyPaid), all extending {{BASE_ERROR}}, and wrap persistence errors they cannot handle; the API adapter maps domain errors to {{CALLER}} and logs each failure once with the cause chain and the {{CORRELATION_FIELD}}. Every translation keeps the original as the cause. An architecture test (ArchUnit, dependency-cruiser, import-linter) fails when the domain or application layer depends on a driver or framework error type, and the linters fail a translation that drops the cause.',
+      decision: 'Each layer defines its own error types and translates the ones from below at its boundary: the persistence adapter catches driver errors (SQLException, DataAccessException, pg errors) and raises persistence errors (DuplicateKey, Unavailable); the domain and application layers raise their own (OrderNotFound, OrderAlreadyPaid), all extending {{BASE_ERROR}}, and wrap persistence errors they cannot handle; the API adapter maps domain errors to the error body the Errors pack decides (RFC 9457 problem details unless it says otherwise) and logs each failure once with the cause chain and the {{CORRELATION_FIELD}}. Every translation keeps the original as the cause. An architecture test (ArchUnit, dependency-cruiser, import-linter) fails when the domain or application layer depends on a driver or framework error type, and the linters fail a translation that drops the cause.',
       consequences: '• The domain depends on no vendor\'s types and the same application layer serves HTTP, messaging and batch edges.\n• More error classes and more code at each boundary; a lazy translation that drops the cause is the common bug, so the linters check for it.\n• Logging still happens once, at the edge; a layer that logs what it translates doubles the lines.',
       alternatives: '1. Handled once at the edge: less code, but the domain sees driver errors unless it never catches at all.\n2. One flat hierarchy shared by all layers: fewer classes, but the domain imports the persistence errors.',
     },
@@ -428,26 +412,29 @@ it('every log line of the test run is well-formed, correlated and levelled by me
 })`,
     },
     {
-      id: 'ff-no-stack-to-caller', label: 'A 500 carries no stack trace', category: 'process', implements: STYLES,
-      checks: ['req-problem-details', 'req-minimal'],
-      threshold: '0 stack-trace patterns, class names, paths or SQL in the body of a 500 response with production settings; the body holds exactly the agreed fields and the {{CORRELATION_FIELD}}',
-      description: 'An integration test starts the element with production settings, calls a route that throws an unexpected error, and asserts the response shape ({{CALLER}}) and that the body matches no stack-trace, class-name, path or SQL pattern. The same test with a route that throws an expected error checks the mapped status.',
+      id: 'ff-no-stack-to-caller', label: 'Nothing internal reaches a caller', category: 'process', implements: STYLES,
+      checks: ['req-no-leak'],
+      threshold: '0 stack-trace patterns, exception class names, source paths, SQL or internal addresses in the body of a 500 response or in the output of a failing CLI command, with production settings',
+      description: 'An integration test starts the element with production settings, calls a route that throws an unexpected error, runs the CLI\'s test-only command that throws the same, and asserts that neither the HTTP body nor the CLI output matches a stack-trace, class-name, path, SQL or address pattern. Drop the CLI test where the element has none; a queue consumer\'s test applies the same pattern to the reason it writes on a dead-lettered message. The shape of the HTTP error body is checked in the Errors pack.',
       tool: 'Vitest with supertest; the same test with httpx under pytest for Python',
       language: 'ts',
       snippet: `// test/http/error-response.test.ts   (NODE_ENV=production in this file's setup)
+import { spawnSync } from 'node:child_process'
 import request from 'supertest'
 import { expect, it } from 'vitest'
 import { app } from '../../src/app'   // registers GET /__boom in tests only: throws new TypeError('kaput')
 
 const LEAKS = /\\n\\s+at |TypeError|kaput|\\/src\\/|node_modules|\\.ts:\\d+|SELECT |INSERT |localhost|10\\.\\d+\\.\\d+\\.\\d+/
 
-it('an unexpected error reaches the caller as a clean 500', async () => {
-  const res = await request(app).get('/__boom').set('traceparent', '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01')
+it('an unexpected error reaches an HTTP caller as a clean 500', async () => {
+  const res = await request(app).get('/__boom')
   expect(res.status).toBe(500)
-  expect(JSON.stringify(res.body)).not.toMatch(LEAKS)
-  expect(res.body['{{CORRELATION_FIELD}}']).toBe('4bf92f3577b34da6a3ce929d0e0e4736')
-  expect(Object.keys(res.body).sort()).toMatchSnapshot()   // the agreed fields, nothing more; reviewed when it changes
-  // problem details: expect(res.headers['content-type']).toMatch(/application\\/problem\\+json/); expect(res.body.type).toMatch(/^https?:/)
+  expect(res.text).not.toMatch(LEAKS)
+})
+it('an unexpected error reaches a CLI user as a clean message', () => {
+  const run = spawnSync('node', ['dist/cli.js', '__boom'], { env: { ...process.env, NODE_ENV: 'production' }, encoding: 'utf8' })   // test-only command: throws new TypeError('kaput')
+  expect(run.status).not.toBe(0)
+  expect(run.stdout + run.stderr).not.toMatch(LEAKS)
 })`,
     },
     {
@@ -553,7 +540,7 @@ export default [{
       id: 'ff-codes-catalogue', label: 'Every code is in the catalogue and stable', when: { STYLE: ['codes'] }, category: 'structural', implements: ['adr-codes'],
       checks: ['req-codes'],
       threshold: '100 % of codes used in src exist in the catalogue; the sorted list of codes matches its snapshot, so a rename or removal fails the build',
-      description: 'A test collects every code used in src, checks each against the catalogue, snapshots the sorted list of codes so that a removed or renamed code is a reviewed change, and checks that every entry has a status, a documentation URI and a message template under the length limit.',
+      description: 'A test collects every code used in src, checks each against the catalogue, snapshots the sorted list of codes so that a removed or renamed code is a reviewed change, and checks that every entry has a status, a type URI (absolute, or a relative reference /problems/… where the Errors pack keeps codes as identifiers) and a message template under the length limit.',
       tool: 'Vitest (a test over the error catalogue); the same test under pytest for Python',
       language: 'ts',
       snippet: `// test/errors/catalogue.test.ts
@@ -569,10 +556,10 @@ it('every code used in src is in the catalogue', () => {
 it('codes are added or deprecated, never renamed or removed', () => {
   expect(Object.keys(CATALOGUE).sort()).toMatchSnapshot()
 })
-it('every entry has a status, a documentation URI and a short message', () => {
+it('every entry has a status, a type URI and a short message', () => {
   for (const [code, e] of Object.entries(CATALOGUE)) {
     expect(e.status, code).toBeGreaterThanOrEqual(400)
-    expect(e.type, code).toMatch(/^https?:\\/\\//)
+    expect(e.type, code).toMatch(/^(https?:\\/\\/|\\/)/)
     expect(e.message.length, code).toBeLessThanOrEqual({{MAX_MESSAGE_CHARS}})
   }
 })`,

@@ -1,0 +1,1323 @@
+{
+  "hub": {
+    "id": "concern-release-versioning",
+    "category": "concern",
+    "name": "Release and versioning",
+    "description": "How a release of the element is named, described, approved and supported: the version scheme, where the release notes come from, which release lines get security fixes, and who decides that a release goes out. The snippets assume a GitHub repository, GitHub releases and the GitHub CLI.",
+    "tags": [
+      "sdlc",
+      "releases",
+      "versioning",
+      "semver",
+      "calver",
+      "changelog",
+      "release notes"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "release-versioning",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "these elements are built and released, so how a release is numbered, described, approved and supported has to be decided.",
+      "group": "sdlc"
+    },
+    "sources": [
+      {
+        "title": "Semantic Versioning 2.0.0",
+        "url": "https://semver.org/spec/v2.0.0.html"
+      },
+      {
+        "title": "Calendar Versioning (CalVer)",
+        "url": "https://calver.org/"
+      },
+      {
+        "title": "Keep a Changelog 1.1.0",
+        "url": "https://keepachangelog.com/en/1.1.0/"
+      },
+      {
+        "title": "Conventional Commits 1.0.0",
+        "url": "https://www.conventionalcommits.org/en/v1.0.0/"
+      },
+      {
+        "title": "Google SRE book, chapter 8: Release Engineering",
+        "url": "https://sre.google/sre-book/release-engineering/"
+      },
+      {
+        "title": "release-please",
+        "url": "https://github.com/googleapis/release-please"
+      },
+      {
+        "title": "semantic-release",
+        "url": "https://semantic-release.gitbook.io/semantic-release"
+      },
+      {
+        "title": "git-cliff documentation",
+        "url": "https://git-cliff.org/docs/"
+      },
+      {
+        "title": "GitHub Docs: Automatically generated release notes",
+        "url": "https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes"
+      },
+      {
+        "title": "GitHub Docs: Immutable releases",
+        "url": "https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases"
+      },
+      {
+        "title": "GitHub Docs: Adding a security policy to your repository",
+        "url": "https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/add-security-policy"
+      },
+      {
+        "title": "GitHub Docs: Deployments and environments (required reviewers)",
+        "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "SCHEME",
+        "title": "Version scheme",
+        "label": "How is a release of the element numbered?",
+        "hint": "The number is what users, support and tools compare: it decides what a release promises about compatibility, and whether there are numbered releases at all. This is the version of what is shipped, not of an API: how an API names its versions is decided in the API evolution pack.",
+        "defaultValue": "semver",
+        "options": [
+          {
+            "value": "semver",
+            "label": "semantic versions (MAJOR.MINOR.PATCH)",
+            "description": "Releases are numbered MAJOR.MINOR.PATCH by Semantic Versioning 2.0.0: a breaking change raises MAJOR, new functionality or a deprecation MINOR, a fix PATCH, computed from what the release contains. Pick it when others install, pin or build against the element (an image customers run, a self-hosted product, an SDK or a command-line tool), so the number has to say whether an upgrade breaks them."
+          },
+          {
+            "value": "calver",
+            "label": "calendar versions (YYYY.M.MICRO)",
+            "description": "Releases are numbered by the year and month their line started, with a counter for the fixes after it (2026.10.0, 2026.10.1), by CalVer; the month has no leading zero, so the number stays valid for semantic-versioning tools. Pick it when releases follow the calendar (a monthly or quarterly product release, an app store build) and how old a release is matters more to its users than whether it breaks them."
+          },
+          {
+            "value": "none",
+            "label": "no version numbers, a commit SHA per build",
+            "description": "No releases are cut: every build is named by the full SHA of the commit it was built from, and every production deploy is recorded with that SHA. Pick it for a service the team deploys continuously that nobody else installs or pins, where a number would only restate the commit."
+          }
+        ]
+      },
+      {
+        "key": "CHANGELOG",
+        "title": "Release notes",
+        "label": "Where do the release notes come from?",
+        "hint": "Every release says what changed in it; the source decides whether the notes are complete, readable, or both. Only when releases are numbered (semantic or calendar versions): with a commit SHA per build, the compare view of two deploys is the record.",
+        "defaultValue": "commits",
+        "options": [
+          {
+            "value": "commits",
+            "label": "notes generated from Conventional Commits",
+            "description": "release-please, semantic-release or git-cliff group the commits since the last release by type (breaking changes, features, fixes) and, for semantic versions, compute the next number from them. Pick it when the Code review and branching pack has chosen Conventional Commits; with free-form commit messages there is nothing to generate from."
+          },
+          {
+            "value": "keepachangelog",
+            "label": "a hand-written changelog in the Keep a Changelog format",
+            "description": "Every pull request that changes shipped code adds a line under Unreleased in CHANGELOG.md, in one of six categories (Added, Changed, Deprecated, Removed, Fixed, Security); a release moves those lines under its version. Pick it when the readers are customers or operators who need sentences, not commit subjects, and the team will write one with each change."
+          },
+          {
+            "value": "labels",
+            "label": "notes generated from pull request labels",
+            "description": "Every pull request carries one release label (breaking-change, feature, deprecation, fix or internal) and GitHub generates the notes from the merged pull requests, grouped by label through .github/release.yml. Pick it when commit messages are free-form but every change goes through a pull request with a title worth reading."
+          }
+        ]
+      },
+      {
+        "key": "SUPPORT",
+        "title": "Support",
+        "label": "Which releases get fixes?",
+        "hint": "Every line kept in support needs its own branch, its own builds and a copy of every security fix. A line is a MAJOR version under semantic versions and a YYYY.M line under calendar versions. Only when releases are numbered: with a commit SHA per build, only the latest build runs.",
+        "defaultValue": "latest",
+        "options": [
+          {
+            "value": "latest",
+            "label": "support for the latest release line only",
+            "description": "Fixes ship only as the next release on the newest line; users of an older line upgrade to get them. Pick it for a hosted service, or whenever users can move to a new line within weeks without a migration project."
+          },
+          {
+            "value": "lts",
+            "label": "security fixes for the newest release lines (LTS)",
+            "description": "The newest lines (two by default) get security fixes, cherry-picked from main onto a maintenance branch per line and released within days. Pick it when customers run the element themselves and cannot take a new line as fast as you ship one: on-premises installs, regulated environments, SDK users."
+          }
+        ]
+      },
+      {
+        "key": "APPROVAL",
+        "title": "Release approval",
+        "label": "Who decides that a release goes out?",
+        "hint": "Cutting a release here means numbering it, writing its notes and publishing it; when it reaches production is the Deployment pack's cadence. Only when releases are numbered: with a commit SHA per build, every merge is simply a build.",
+        "defaultValue": "auto",
+        "options": [
+          {
+            "value": "auto",
+            "label": "an automatic release on every merge to main",
+            "description": "The release workflow publishes a release for every merge that changes shipped code, with nobody to approve it. Pick it with the Deployment pack's continuous deployment, where every merge reaches production anyway and should carry its own version."
+          },
+          {
+            "value": "owner",
+            "label": "the release owner's approval of each release",
+            "description": "The job that publishes a release waits in a protected GitHub environment until a member of the release-owner team approves it; with release-please, merging its release pull request starts that job. Pick it with the Deployment pack's weekly release train, or when a person must read the notes before customers do."
+          }
+        ]
+      },
+      {
+        "key": "RELEASE_HOURS",
+        "label": "Within how many hours must a merged change be in a release? (automatic releases only)",
+        "defaultValue": "1",
+        "type": "number"
+      },
+      {
+        "key": "RELEASE_OWNER",
+        "label": "Which GitHub team approves each release (its slug)? (the release owner's approval only)",
+        "defaultValue": "release-owners"
+      },
+      {
+        "key": "LTS_LINES",
+        "label": "How many release lines get security fixes? (LTS only)",
+        "defaultValue": "2",
+        "type": "number"
+      },
+      {
+        "key": "BACKPORT_DAYS",
+        "label": "Within how many days must a security fix be released on every supported line? (LTS only)",
+        "defaultValue": "7",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Every release says what it is",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Release and versioning",
+      "description": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
+    },
+    {
+      "id": "req-version-visible",
+      "type": "requirement",
+      "label": "Running build names itself",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "answer GET /version (a /version.json file for a web app) with the version it was released as (its commit SHA where builds carry no version number) and the full SHA of the commit it was built from, so that the deploy job can confirm both within 90 seconds of every deploy",
+      "rationale": "An incident starts with \"which build is running?\"; a build that reports its own identity answers it in one request and ties what runs to the source it came from (Google SRE book, Release Engineering: every package labelled with its build ID)."
+    },
+    {
+      "id": "req-semver",
+      "type": "requirement",
+      "label": "Tags are semantic versions",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "tag every release v followed by a valid Semantic Versioning 2.0.0 version (MAJOR.MINOR.PATCH with an optional pre-release suffix), and never publish two releases with the same version",
+      "rationale": "Tools compare versions only when they follow the grammar, and a version published twice means two different things (Semantic Versioning 2.0.0, items 2 and 3).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "req-semver-bump",
+      "type": "requirement",
+      "label": "Number matches the changes",
+      "x": 260,
+      "y": 260,
+      "ears_type": "ubiquitous",
+      "action": "raise MAJOR for a release with a breaking change (MINOR while MAJOR is 0), MINOR for one with new functionality or a deprecation and nothing breaking, and PATCH for one with fixes only, each by exactly one step from the previous version",
+      "rationale": "The number is a promise to everyone who upgrades: a breaking change in a minor or patch release breaks them without warning, and a deprecation is announced by a minor release (Semantic Versioning 2.0.0, items 4, 6, 7 and 8).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "req-calver",
+      "type": "requirement",
+      "label": "Tags are calendar versions",
+      "x": 260,
+      "y": 390,
+      "ears_type": "ubiquitous",
+      "action": "tag every release vYYYY.M.MICRO, where YYYY.M is the UTC year and month in which the line's first release (MICRO 0) is published, the month without a leading zero, and MICRO counts the line's later releases without gaps; a release with new functionality, a deprecation or a breaking change starts a new line",
+      "rationale": "The date tells users how old a line is; a month without a leading zero keeps the number valid for semantic-versioning tools, and keeping fixes on their line keeps the date honest (Calendar Versioning).",
+      "hubWhen": {
+        "SCHEME": [
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "req-immutable",
+      "type": "requirement",
+      "label": "Published releases never change",
+      "x": 260,
+      "y": 520,
+      "ears_type": "ubiquitous",
+      "action": "publish every release as an immutable GitHub release, so that its tag cannot be moved or deleted and its assets cannot be replaced, and ship any correction as a new version",
+      "rationale": "A release that can change after publication is no longer the one its users tested and installed (Semantic Versioning 2.0.0, item 3; GitHub Docs, Immutable releases).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "req-build-id",
+      "type": "requirement",
+      "label": "Builds named by their commit",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "tag every image with the full SHA of the commit it was built from, reference it in the deployment by that tag or by digest and never by a mutable tag such as latest, record every production deploy as a GitHub deployment of a commit on main, and create no version tags",
+      "rationale": "Without version numbers the commit is the version; a mutable tag makes it impossible to say afterwards what ran (Google SRE book, Release Engineering: builds tied to identifiers).",
+      "hubWhen": {
+        "SCHEME": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "req-notes-commits",
+      "type": "requirement",
+      "label": "Notes list every change",
+      "x": 260,
+      "y": 780,
+      "ears_type": "event-driven",
+      "trigger": "a release is published",
+      "action": "list in its notes every feat, fix and perf commit merged since the previous release, each with its pull request number or its short commit SHA",
+      "rationale": "Generated notes are worth having only when they are complete: the release carries a report of every change it contains (Conventional Commits 1.0.0; Google SRE book, Release Engineering: a report of all changes contained in a release).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "commits"
+        ]
+      }
+    },
+    {
+      "id": "req-changelog-entry",
+      "type": "requirement",
+      "label": "Changelog line with every change",
+      "x": 260,
+      "y": 910,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a pull request changes code under src/ without adding an entry under Unreleased in CHANGELOG.md and without the skip-changelog label",
+      "action": "refuse the merge, and accept under Unreleased only the headings Added, Changed, Deprecated, Removed, Fixed and Security, and as release headings only ## [version] - YYYY-MM-DD",
+      "rationale": "A hand-written changelog is complete only when the line is written with the change, by the person who knows what it means for users (Keep a Changelog 1.1.0).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "keepachangelog"
+        ]
+      }
+    },
+    {
+      "id": "req-pr-labels",
+      "type": "requirement",
+      "label": "One release label per pull request",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a pull request carries none, or more than one, of the labels breaking-change, feature, deprecation, fix and internal",
+      "action": "refuse the merge until it carries exactly one, so that the generated notes put every merged pull request in one category",
+      "rationale": "Generated notes group pull requests by label; an unlabelled one lands in no category or in the wrong one (GitHub Docs, Automatically generated release notes).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "labels"
+        ]
+      }
+    },
+    {
+      "id": "req-latest-only",
+      "type": "requirement",
+      "label": "Only the newest line is supported",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "release fixes only on the newest release line, publish nothing on an older line after a newer line's first release, and list only the newest line as supported in SECURITY.md",
+      "rationale": "Users must know which releases still get fixes; one supported line is a promise the team can keep, and a fix is always a new version on it (GitHub Docs, Adding a security policy; Semantic Versioning 2.0.0, item 3).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "req-lts-policy",
+      "type": "requirement",
+      "label": "Newest lines supported, each with its branch",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "list exactly the newest {{LTS_LINES}} release lines as supported in SECURITY.md, keep a maintenance branch release/<line>.x for each of them but the newest, and publish nothing on a line after it has left support",
+      "rationale": "Customers who cannot upgrade at once must know which lines get fixes; a line is kept on a branch cut from its release, which takes fixes and nothing else (Google SRE book, Release Engineering: release branches; GitHub Docs, Adding a security policy).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "req-backport",
+      "type": "requirement",
+      "label": "Security fixes reach every supported line",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "event-driven",
+      "trigger": "a pull request labelled security is merged to main",
+      "action": "cherry-pick its fix with git cherry-pick -x onto the maintenance branch of every supported line that lacks it, and release it there within {{BACKPORT_DAYS}} days of the merge",
+      "rationale": "Fixes land on the mainline first and are cherry-picked into the release branches, never made there, so that no line misses one (Google SRE book, Release Engineering: cherry picks into release branches).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "req-owner-approves",
+      "type": "requirement",
+      "label": "Release owner approves each release",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "ubiquitous",
+      "action": "publish a release only from the release workflow's job in the GitHub environment release, after a member of the team {{RELEASE_OWNER}} who did not start the run approves it, and never by hand",
+      "rationale": "Who may release is a policy the release system enforces, not one people remember (Google SRE book, Release Engineering: enforcement of policies and procedures; GitHub Docs, Deployments and environments: required reviewers).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "owner"
+        ]
+      }
+    },
+    {
+      "id": "req-auto-release",
+      "type": "requirement",
+      "label": "Every merge released",
+      "x": 260,
+      "y": 1690,
+      "ears_type": "event-driven",
+      "trigger": "a change to code under src/ is merged to main",
+      "action": "publish it in a release within {{RELEASE_HOURS}} hours, with nobody approving",
+      "rationale": "Frequent releases keep the changes between versions few, so each release is easier to test and a fault easier to trace to its change (Google SRE book, Release Engineering: high velocity).",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "id": "sc-version-visible",
+      "type": "scenario",
+      "label": "Deploy confirms what runs",
+      "x": 520,
+      "y": 0,
+      "given": "a release deployed to an environment",
+      "when": "the deploy job calls GET /version",
+      "then": "within 90 seconds the answer names the version and commit the job deployed, and the job fails if it does not"
+    },
+    {
+      "id": "sc-semver",
+      "type": "scenario",
+      "label": "Malformed tag refused",
+      "x": 520,
+      "y": 130,
+      "given": "the releases of the repository",
+      "when": "the release check lists their tags",
+      "then": "every tag is v and a valid semantic version and no version appears twice; a tag such as v1.02.0 or release-5 fails the check",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "sc-semver-bump",
+      "type": "scenario",
+      "label": "Breaking change raises major",
+      "x": 520,
+      "y": 260,
+      "given": "version 2.3.1 and a new release whose notes list a breaking change",
+      "when": "the release check compares the new number with its notes",
+      "then": "v3.0.0 passes, while v2.4.0, v2.3.2 or v4.0.0 fails the check",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "sc-calver",
+      "type": "scenario",
+      "label": "Line dated by its first release",
+      "x": 520,
+      "y": 390,
+      "given": "a line started on 2026-10-29 and a fix to it published on 2026-11-03",
+      "when": "the release check runs",
+      "then": "v2026.10.0 and v2026.10.1 pass, while v2026.010.0, a v2026.10.2 with no v2026.10.1, and a v2026.10.1 whose notes list a feature fail",
+      "hubWhen": {
+        "SCHEME": [
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "sc-immutable",
+      "type": "scenario",
+      "label": "Releases are immutable",
+      "x": 520,
+      "y": 520,
+      "given": "immutable releases turned on for the repository",
+      "when": "the release check lists the releases published since",
+      "then": "every one is marked immutable, and GitHub refuses to move the tag of any of them",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "sc-build-id",
+      "type": "scenario",
+      "label": "Every deploy names its commit",
+      "x": 520,
+      "y": 650,
+      "given": "the deployment manifests and the production deployments",
+      "when": "the build-id check runs",
+      "then": "every image reference ends in a 40-character SHA or a sha256 digest, every production deployment points at a commit on main, and the repository has no version tags",
+      "hubWhen": {
+        "SCHEME": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "sc-notes-commits",
+      "type": "scenario",
+      "label": "Missing change found",
+      "x": 520,
+      "y": 780,
+      "given": "three feat and fix commits merged since the previous release",
+      "when": "the release is published and the notes check runs",
+      "then": "the notes name all three by pull request number or SHA, and the check fails when one is missing",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "commits"
+        ]
+      }
+    },
+    {
+      "id": "sc-changelog-entry",
+      "type": "scenario",
+      "label": "Change without a line refused",
+      "x": 520,
+      "y": 910,
+      "given": "a pull request that changes src/ and leaves CHANGELOG.md alone",
+      "when": "the changelog check runs",
+      "then": "it fails until an entry is added under ## [Unreleased] in one of the six categories, or the pull request is labelled skip-changelog",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "keepachangelog"
+        ]
+      }
+    },
+    {
+      "id": "sc-pr-labels",
+      "type": "scenario",
+      "label": "Unlabelled pull request refused",
+      "x": 520,
+      "y": 1040,
+      "given": "a pull request with no release label, and then with both fix and feature",
+      "when": "the label check runs",
+      "then": "it fails both times, and passes once only fix remains",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "labels"
+        ]
+      }
+    },
+    {
+      "id": "sc-latest-only",
+      "type": "scenario",
+      "label": "Old line gets no release",
+      "x": 520,
+      "y": 1170,
+      "given": "line 3 started after line 2",
+      "when": "the support check reads SECURITY.md and the releases",
+      "then": "only 3.x is listed as supported, and a 2.4.1 published after 3.0.0 fails the check",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "sc-lts-policy",
+      "type": "scenario",
+      "label": "Support table matches the lines",
+      "x": 520,
+      "y": 1300,
+      "given": "{{LTS_LINES}} + 1 release lines",
+      "when": "the support check runs",
+      "then": "SECURITY.md lists the newest {{LTS_LINES}} as supported, each older supported line has its release/<line>.x branch, and a release on the oldest line after it left support fails the check",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "sc-backport",
+      "type": "scenario",
+      "label": "Fix released on the older line",
+      "x": 520,
+      "y": 1430,
+      "given": "a security fix merged to main and two supported lines",
+      "when": "{{BACKPORT_DAYS}} days have passed and the backport check runs",
+      "then": "the older line has a commit cherry-picked from the fix in a released tag, and the check fails for a line that has none",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "sc-owner-approves",
+      "type": "scenario",
+      "label": "Release waits for its owner",
+      "x": 520,
+      "y": 1560,
+      "given": "a release pull request merged by a developer",
+      "when": "the release job reaches the environment release",
+      "then": "it waits until a member of {{RELEASE_OWNER}} other than the developer approves, and a release created by hand fails the approval check",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "owner"
+        ]
+      }
+    },
+    {
+      "id": "sc-auto-release",
+      "type": "scenario",
+      "label": "Merge reaches a release",
+      "x": 520,
+      "y": 1690,
+      "given": "a fix merged to main",
+      "when": "{{RELEASE_HOURS}} hours have passed",
+      "then": "a release containing it is published, and the release check fails while the merge still waits",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "id": "adr-semver",
+      "type": "adr",
+      "label": "Semantic versions",
+      "x": 780,
+      "y": 0,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "Every release of the element is numbered by Semantic Versioning 2.0.0 and tagged vMAJOR.MINOR.PATCH on the commit it was built from. A breaking change to what users rely on (its API, configuration, data formats, command line or image contract) raises MAJOR, new functionality or a deprecation raises MINOR, a fix raises PATCH; while MAJOR is 0 a breaking change raises MINOR, and 1.0.0 is declared when the element is stable. The number is computed from the same categories the release notes are grouped by (commit types, changelog categories or pull request labels), never typed by hand, and a check compares the number with the notes on every release. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. Release approval: {{APPROVAL}}. With the release owner's approval, the job that publishes a release runs in the GitHub environment release, which waits for a review by a member of the team {{RELEASE_OWNER}} other than the person who started the run; with automatic releases, the release workflow runs on every push to main and publishes within {{RELEASE_HOURS}} hours of the merge, waiting for nobody. Either way only the release workflow publishes releases, never a person by hand. A breaking change to an API the element serves is also a MAJOR release here; how that API names its own versions is decided in the API evolution pack.",
+      "consequences": "• Users and their tools (Renovate, Dependabot, version ranges) can tell from the number alone whether an upgrade may break them.\n• Someone decides what counts as breaking: the categories put that decision on each change, with its author, and a wrong category makes a wrong number.\n• Breaking changes become visible and expensive, which pushes towards additive changes and deprecations first.\n• Immutable releases forbid fixing a release in place: a bad release is followed by a new one, never replaced, and assets have to be attached to a draft before it is published.\n• A service that nobody pins gains little from the number beyond the order of its releases.",
+      "alternatives": "1. Calendar versions: they say how old a release is, not whether it breaks anything.\n2. A commit SHA per build: nothing to number, but nothing for an installer or a dependency bot to compare.\n3. Numbers chosen by hand at release time: where most teams start, and how a breaking change ends up in a patch release.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "adr-calver",
+      "type": "adr",
+      "label": "Calendar versions",
+      "x": 780,
+      "y": 130,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "Every release of the element is numbered by calendar versioning as vYYYY.M.MICRO (CalVer) and tagged on the commit it was built from. YYYY.M is the UTC year and month in which the release line's first release is published, with no leading zero on the month, so the number stays valid for semantic-versioning tools; MICRO is 0 for that first release and counts the line's later releases. A release with new functionality, a deprecation or a breaking change starts a new line; a release with fixes only is the next MICRO of the newest line. The release workflow computes the tag from the date and the existing tags, since release-please and semantic-release compute semantic versions only. The notes carry a breaking-changes section whenever a release breaks something, because the number does not say so. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. Release approval: {{APPROVAL}}. With the release owner's approval, the job that publishes a release runs in the GitHub environment release, which waits for a review by a member of the team {{RELEASE_OWNER}} other than the person who started the run; with automatic releases, the release workflow runs on every push to main and publishes within {{RELEASE_HOURS}} hours of the merge, waiting for nobody. Either way only the release workflow publishes releases, never a person by hand.",
+      "consequences": "• Users and support see at a glance how old a release is and how far behind a customer runs.\n• The number says nothing about compatibility: breaking changes are read in the notes, and dependency bots treat every new line as an upgrade of unknown risk.\n• A fix to a line keeps the line's date (2026.10.3 may ship in December), which surprises people who read the number as a release date.\n• No standard release tool computes the number: the release workflow does, and a check holds it to the rule.\n• Immutable releases forbid fixing a release in place; a bad release is followed by a new one.",
+      "alternatives": "1. Semantic versions: they say whether an upgrade breaks, not how old a release is.\n2. A zero-padded month (YYYY.0M): sorts as text, but is not a valid semantic version, which strict tools such as Cargo and Go refuse (CalVer).\n3. The full date as the version (2026.10.29): no room for two releases a day or for a fix to a line.",
+      "hubWhen": {
+        "SCHEME": [
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "adr-build-id",
+      "type": "adr",
+      "label": "A commit SHA per build, no version numbers",
+      "x": 780,
+      "y": 260,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack. Here the team deploys the element itself, continuously, and nobody outside installs or pins it.",
+      "decision": "The element has no version numbers and no releases: every build is named by the full SHA of the commit it was built from. The image is tagged with that SHA, the deployment references it by that tag or by digest and never by a mutable tag such as latest, and every production deploy is recorded as a GitHub deployment of its SHA, so what changed between two deploys is GitHub's compare view of their SHAs. The running element answers GET /version with that SHA as its version and its commit. No release tool, changelog file or version tag is kept, and nothing older than the latest build is supported. When anyone outside the team starts to install or pin the element, or to be told about its releases, this decision is superseded by semantic or calendar versions.",
+      "consequences": "• Nothing to number, write or approve: the build id costs nothing and is never wrong.\n• What changed in a deploy is a list of pull requests in a compare view, readable by the team and nobody else.\n• Users and support cannot name a release in words; they quote a SHA or a date.\n• Only the latest build runs, so there is no older release to support or to fix.",
+      "alternatives": "1. Semantic versions with automatic releases: a number for every merge at the cost of a release tool, worth it once someone outside depends on the element.\n2. Calendar versions: a readable date per release, for products released on a calendar.\n3. The pipeline's run number as the version: readable, but tied to one CI system and to nothing in the source.",
+      "hubWhen": {
+        "SCHEME": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "adr-notes-commits",
+      "type": "adr",
+      "label": "Release notes generated from Conventional Commits",
+      "x": 780,
+      "y": 390,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "Release notes are generated from the Conventional Commits on main since the previous release, grouped as breaking changes, features and fixes, each entry linking its commit and pull request; the commit format itself is enforced in the Code review and branching pack. Nobody edits the generated entries; a summary for customers, when one is needed, is written above them. With semantic versions the tool also computes the number: release-please (release-please-config.json with bump-minor-pre-major) for releases with the release owner's approval, since it keeps a release pull request open and merging it starts the release; semantic-release (preset conventionalcommits, with releaseRules giving refactor, build and style commits a patch so that every change to shipped code is released) for automatic releases. With calendar versions, git-cliff renders the notes for the tag the release workflow computed (git cliff --unreleased --tag <tag> --strip all). The notes are the body of the GitHub release, and CHANGELOG.md is kept by the same tool. A check confirms after each release that every feat, fix and perf commit is in its notes.",
+      "consequences": "• Complete notes for free: every typed commit is in them, linked to its change.\n• The notes read like commit subjects; customers who need sentences need a summary on top.\n• The number is only as right as the commit types: a breaking change committed as fix: becomes a patch release, so review checks the type as well as the code.\n• Depends on the Code review and branching pack keeping Conventional Commits; free-form subjects there leave nothing to generate from.",
+      "alternatives": "1. A hand-written changelog in the Keep a Changelog format: better sentences, but lines get forgotten without a check.\n2. Notes from pull request labels: no commit convention needed, one label per pull request instead.\n3. Changesets: a change file per pull request with its bump, from which the version and changelog are computed; made for monorepos that publish several packages.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "commits"
+        ]
+      }
+    },
+    {
+      "id": "adr-notes-keepachangelog",
+      "type": "adr",
+      "label": "A hand-written changelog in the Keep a Changelog format",
+      "x": 780,
+      "y": 520,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "CHANGELOG.md at the root follows Keep a Changelog 1.1.0: an Unreleased section on top, then one section per release headed ## [version] - YYYY-MM-DD, entries grouped under Added, Changed, Deprecated, Removed, Fixed and Security, and a breaking entry starting with **BREAKING:**. Every pull request that changes code under src/ adds its entry under Unreleased, or carries the skip-changelog label when users cannot notice the change; a required check enforces both. At release time the Unreleased entries move under the new version's heading, and that section becomes the body of the GitHub release. With semantic versions the number follows the categories: a Removed or **BREAKING:** entry makes a breaking release, Added or Deprecated a minor one, anything else a patch. With calendar versions an Added, Changed, Deprecated or Removed entry starts a new line, and Fixed or Security entries alone make the next MICRO. With the release owner's approval, the release owner moves the entries in a release pull request; with automatic releases, the release workflow moves them on every merge that leaves Unreleased non-empty, committing to main as a GitHub App on the branch ruleset's bypass list. A release that is pulled keeps its section, marked [YANKED].",
+      "consequences": "• Notes written for the reader: what changed for them, in words a customer understands.\n• Every pull request costs a sentence; the check makes forgetting it impossible, not making it good, so review reads it.\n• Two pull requests adding lines to the same section conflict in CHANGELOG.md; the rebase takes seconds but happens daily on a busy repository.\n• The number depends on the categories authors choose, which review has to check.\n• With automatic releases a bot commits to main, which the branch ruleset has to allow.",
+      "alternatives": "1. Notes generated from Conventional Commits: complete without effort, but they read like commits.\n2. Changesets: a file per pull request instead of one shared CHANGELOG.md, so no conflicts, with the bump declared with each change; its changelog does not follow Keep a Changelog.\n3. Notes written at release time from memory: what gets forgotten is what users needed to know.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "keepachangelog"
+        ]
+      }
+    },
+    {
+      "id": "adr-notes-labels",
+      "type": "adr",
+      "label": "Release notes generated from pull request labels",
+      "x": 780,
+      "y": 650,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "Release notes are generated by GitHub from the pull requests merged since the previous release (gh release create <tag> --generate-notes --verify-tag), grouped by .github/release.yml into ⚠ Breaking changes (label breaking-change), Features (feature), Deprecations (deprecation), Fixes (fix) and Other changes (internal). Every pull request carries exactly one of these labels before it can merge; a required check enforces it. With semantic versions the release workflow computes the number from the labels of those pull requests: breaking-change makes a breaking release, feature or deprecation a minor one, the rest a patch. With calendar versions a breaking-change, feature or deprecation label starts a new line, and fix or internal alone make the next MICRO. The notes are the body of the GitHub release; no CHANGELOG.md is kept.",
+      "consequences": "• No commit convention needed: a pull request's title and label are its entry.\n• The notes are only as good as the pull request titles, which become what users read.\n• Labels can still change after the merge and later notes follow them; the label check runs on the pull request, not on history.\n• Tied to GitHub: moving the repository elsewhere means another way to generate the notes.",
+      "alternatives": "1. Notes generated from Conventional Commits: the same automation from commit types, and portable across hosts.\n2. A hand-written changelog: better sentences at the cost of a line per change.\n3. Release Drafter: keeps a draft release up to date from the labels as pull requests merge, with its own version resolver; one more app to configure and trust.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "labels"
+        ]
+      }
+    },
+    {
+      "id": "adr-support-latest",
+      "type": "adr",
+      "label": "Support for the latest line only",
+      "x": 780,
+      "y": 780,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "Only the newest release line gets fixes: a security or bug fix ships as the next release on that line (the next PATCH under semantic versions, the next MICRO under calendar versions), and nothing is released on an older line once a newer line has its first release. SECURITY.md at the root says so in its Supported versions table, which lists the newest line as supported and every older line as not; users of an older line upgrade to get a fix. No maintenance branches are kept for older lines.",
+      "consequences": "• One line to fix, test and release: a security fix is out as soon as it is merged and released.\n• Users have to keep up: crossing a breaking change is the price of every fix after it, so breaking releases need an upgrade path in their notes.\n• Customers who cannot upgrade quickly run unpatched versions; for them this decision is superseded by long-term support.",
+      "alternatives": "1. Security fixes for the newest lines (LTS): users can stay on a line while the team back-ports every security fix.\n2. Support by contract for each customer's version: unbounded, and every customer's version becomes a fork.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "adr-support-lts",
+      "type": "adr",
+      "label": "Security fixes for the newest lines (LTS)",
+      "x": 780,
+      "y": 910,
+      "concern": "release-versioning",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says \"patch\" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.",
+      "decision": "The newest {{LTS_LINES}} release lines get security fixes; a line is a MAJOR version under semantic versions and a YYYY.M line under calendar versions. Each supported line other than the newest has a maintenance branch release/<line>.x (release/2.x, release/2026.10.x) cut from its first release tag and protected like main. A security fix is merged to main first, labelled security, then cherry-picked with git cherry-pick -x onto every supported maintenance branch and released there within {{BACKPORT_DAYS}} days of the merge; bug fixes that are not security fixes go to the newest line only. SECURITY.md at the root lists the supported lines in its Supported versions table, newest first, and nothing is released on a line once it has left support. The branches follow the branching model of the Code review and branching pack; under GitFlow they play the part of its support branches.",
+      "consequences": "• Customers can stay on a line until {{LTS_LINES}} newer lines have shipped, and still get security fixes.\n• Every security fix is made once per supported line: cherry-picks that conflict, a build and a release per line; the cost grows with how far the lines have drifted apart.\n• Old lines keep old dependencies and old build tooling alive, and their pipelines must keep working.\n• How long a line is supported depends on how often new lines start: frequent breaking releases shorten every line's support.",
+      "alternatives": "1. Support for the latest line only: one line to fix, and users upgrade to get fixes.\n2. Designated long-term lines (one in every few, supported for years on a calendar of their own): longer support for fewer lines.\n3. Back-ports on request: no promise to customers, and no plan when the request comes.",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "ff-version-endpoint",
+      "type": "fitness-fn",
+      "label": "Deploy confirms the running version",
+      "x": 1040,
+      "y": 0,
+      "category": "operational",
+      "threshold": "Within 90 seconds of every deploy, GET /version answers with the deployed version and commit; otherwise the deploy job fails",
+      "description": "The last step of every deploy job polls the element's version endpoint and fails the deploy unless it answers with the version the job deployed (the tag, or the commit SHA where builds carry no version number) and the commit SHA of the workflow run. The element fills both from build arguments baked into the image (or into /version.json for a web app), never from its environment at run time.\n\nTool: curl and jq in the deploy job (GitHub Actions)\n\n```bash\n# the last step of every deploy job; APP_URL is the environment's address, EXPECTED_VERSION the tag deployed\n# (or the commit SHA, where builds carry no version number)\nset -euo pipefail\nfor attempt in 1 2 3 4 5 6; do                               # 6 tries, 90 seconds at most\n  body=$(curl -fsS --max-time 5 \"$APP_URL/version\" || true)   # /version.json for a web app\n  if echo \"$body\" | jq -e --arg version \"$EXPECTED_VERSION\" --arg commit \"$GITHUB_SHA\" \\\n      '.version == $version and .commit == $commit' >/dev/null 2>&1; then\n    echo \"running $EXPECTED_VERSION at $GITHUB_SHA\"; exit 0\n  fi\n  sleep 10\ndone\necho \"expected $EXPECTED_VERSION at $GITHUB_SHA, the element answers: ${body:-nothing}\"; exit 1\n```"
+    },
+    {
+      "id": "ff-semver-release",
+      "type": "fitness-fn",
+      "label": "Semantic versions follow their notes",
+      "x": 1040,
+      "y": 130,
+      "category": "process",
+      "threshold": "0 release tags that are not v and a valid semantic version and 0 versions released twice; for releases published since the rules were adopted, 0 mutable releases and 0 numbers other than the one their notes call for",
+      "description": "A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against the regular expression semver.org publishes, refuses a version released twice, and requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable. Then it sorts the final releases by version and, for each, reads its notes: a breaking or Removed heading or a **BREAKING:** entry calls for MAJOR (MINOR while MAJOR is 0), a Features, Added or Deprecated heading for MINOR, anything else for PATCH, one step from the version before; the move from 0.y.z to 1.0.0 is declared, not computed. The headings are the ones release-please, semantic-release, the .github/release.yml of the label decision and Keep a Changelog write.\n\nTool: Node.js with the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-semver.mjs — tags are semantic versions, each released once and immutable, each bump what its notes call for\nimport { execFileSync } from 'node:child_process'\nconst gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))\nconst SINCE = process.env.SINCE ?? '1970-01-01'   // the day these rules and immutable releases were adopted; older releases are not judged\nconst SEMVER = /^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$/\nconst BREAKING = /^#{2,4} .*(breaking|removed)|^[-*] \\*\\*BREAKING/im   // headings of release-please, semantic-release, .github/release.yml, Keep a Changelog\nconst MINOR = /^#{2,4} .*(features|added|deprecat)/im\nconst releases = gh('release', 'list', '--exclude-drafts', '--limit', '1000', '--json', 'tagName,publishedAt,isImmutable')\nconst core = (tag) => tag.replace(/\\+.*$/, '')\nconst problems = releases.filter((r) => !SEMVER.test(r.tagName)).map((r) => `${r.tagName}: not v + a semantic version`)\nproblems.push(...releases.filter((r) => !r.isImmutable && r.publishedAt > SINCE).map((r) => `${r.tagName}: not an immutable release`))\nproblems.push(...releases.map((r) => core(r.tagName)).filter((v, i, all) => all.indexOf(v) !== i).map((v) => `${v}: released twice`))\nconst final = releases.map((r) => [r, r.tagName.match(SEMVER)]).filter(([, m]) => m && !m[4]).map(([r, m]) => [r, ...m.slice(1, 4).map(Number)])\n  .sort((a, b) => a[1] - b[1] || a[2] - b[2] || a[3] - b[3])\nfor (let i = 1; i < final.length; i++) {\n  const [[prev, ma, mi, pa], [cur]] = [final[i - 1], final[i]]\n  if (cur.publishedAt <= SINCE || (ma === 0 && core(cur.tagName) === 'v1.0.0')) continue   // 0.y.z to 1.0.0 is declared, not computed\n  const body = gh('release', 'view', cur.tagName, '--json', 'body').body\n  const level = BREAKING.test(body) ? (ma === 0 ? 'minor' : 'major') : MINOR.test(body) ? 'minor' : 'patch'\n  const expected = level === 'major' ? `v${ma + 1}.0.0` : level === 'minor' ? `v${ma}.${mi + 1}.0` : `v${ma}.${mi}.${pa + 1}`\n  if (core(cur.tagName) !== expected) problems.push(`${cur.tagName}: its notes call for a ${level} release after ${prev.tagName}, so ${expected}`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver"
+        ]
+      }
+    },
+    {
+      "id": "ff-calver-release",
+      "type": "fitness-fn",
+      "label": "Calendar versions follow the rule",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "0 release tags outside vYYYY.M.MICRO, 0 lines whose first release was published outside their month, 0 gaps in a line's MICRO numbers; for releases published since the rules were adopted, 0 mutable releases and 0 fix releases whose notes bring new functionality, a deprecation or a breaking change",
+      "description": "A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against vYYYY.M.MICRO with no leading zero on the month, compares each line's first release with the UTC month it was published in, requires each line's MICRO numbers to count 0, 1, 2 without gaps, requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable, and reads the notes of every fix release for headings only a new line may carry.\n\nTool: Node.js with the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-calver.mjs — tags are vYYYY.M.MICRO, lines dated by their first release, MICRO counting fixes, releases immutable\nimport { execFileSync } from 'node:child_process'\nconst gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))\nconst SINCE = process.env.SINCE ?? '1970-01-01'   // the day these rules and immutable releases were adopted; older releases are not judged\nconst CALVER = /^v(\\d{4})\\.([1-9]|1[0-2])\\.(0|[1-9]\\d*)$/\nconst NEW_LINE = /^#{2,4} .*(breaking|removed|features|added|deprecat)|^[-*] \\*\\*BREAKING/im   // what only a new line may bring\nconst problems = []\nconst lines = new Map()\nfor (const { tagName, publishedAt, isImmutable } of gh('release', 'list', '--exclude-drafts', '--limit', '1000', '--json', 'tagName,publishedAt,isImmutable')) {\n  const m = tagName.match(CALVER)\n  if (!m) { problems.push(`${tagName}: not vYYYY.M.MICRO`); continue }\n  if (!isImmutable && publishedAt > SINCE) problems.push(`${tagName}: not immutable`)\n  const [, year, month, micro] = m.map(Number)\n  const at = new Date(publishedAt)\n  if (micro === 0 && (year !== at.getUTCFullYear() || month !== at.getUTCMonth() + 1)) problems.push(`${tagName}: first release of its line published ${publishedAt.slice(0, 10)}`)\n  if (micro > 0 && publishedAt > SINCE && NEW_LINE.test(gh('release', 'view', tagName, '--json', 'body').body)) problems.push(`${tagName}: new functionality in a fix release; start a new line`)\n  lines.set(`${year}.${month}`, [...(lines.get(`${year}.${month}`) ?? []), micro])\n}\nfor (const [line, micros] of lines) {\n  micros.sort((a, b) => a - b)\n  if (micros.some((n, i) => n !== i)) problems.push(`v${line}: MICRO ${micros.join(', ')} does not count 0, 1, 2, …`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "calver"
+        ]
+      }
+    },
+    {
+      "id": "ff-build-id",
+      "type": "fitness-fn",
+      "label": "Builds deployed by their commit",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "0 image references in deploy/ without a full commit SHA or a sha256 digest, 0 of the last 30 production deployments of a commit not on main, 0 version tags",
+      "description": "A step on every pull request and after every deploy reads the manifests the pipeline applies, refuses any image referenced by a mutable tag, checks with the GitHub API that the recent production deployments are of commits on main, and fails when a version tag appears, which would mean releases started without their decision.\n\nTool: grep and the GitHub CLI (gh api repos/{owner}/{repo}/deployments) in a GitHub Actions step\n\n```bash\n# on every pull request and after every deploy; deploy/ holds the manifests the pipeline applies (render Helm or Kustomize into it first)\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\nimages=$(grep -rhoE '^[[:space:]-]*image:[[:space:]]*[\"'\\'']?[^\"'\\''[:space:]]+' deploy/ | sed -E 's/.*image:[[:space:]]*[\"'\\'']?//')\nmutable=$(echo \"$images\" | grep -Ev '(@sha256:[0-9a-f]{64}|:[0-9a-f]{40})$' || true)\n[ -z \"$mutable\" ] || { echo \"images not referenced by a full commit SHA or a digest:\"; echo \"$mutable\"; exit 1; }\n# every production deploy is recorded with a commit of main\ngit fetch --quiet origin main\nfor sha in $(gh api \"repos/$REPO/deployments?environment=production&per_page=30\" --jq '.[].sha'); do\n  git merge-base --is-ancestor \"$sha\" origin/main || { echo \"production deployment of $sha, which is not on main\"; exit 1; }\ndone\n# no version numbers: the decision is a commit SHA per build\n[ -z \"$(git tag --list 'v[0-9]*')\" ] || { echo \"version tags exist; supersede the decision before numbering releases\"; exit 1; }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "ff-notes-complete",
+      "type": "fitness-fn",
+      "label": "Notes list every typed commit",
+      "x": 1040,
+      "y": 520,
+      "category": "process",
+      "threshold": "0 feat, fix or perf commits between the previous and the latest release missing from the latest release's notes",
+      "description": "After each release the release workflow lists the commits between the two latest releases and looks for each feat, fix and perf commit in the new release's notes, by the pull request number its squash subject ends with, or else by its short SHA (release-please, semantic-release and the git-cliff template all link both).\n\nTool: Node.js with git and the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-release-notes.mjs — every feat, fix and perf commit of the latest release is in its notes\nimport { execFileSync } from 'node:child_process'\nconst run = (cmd, ...args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim()\nconst [latest, previous] = JSON.parse(run('gh', 'release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '2', '--json', 'tagName'))\n  .map((r) => r.tagName)\nconst body = JSON.parse(run('gh', 'release', 'view', latest, '--json', 'body')).body\nconst range = previous ? `${previous}..${latest}` : latest\nconst missing = run('git', 'log', '--format=%H%x09%s', range).split('\\n').filter(Boolean)\n  .map((line) => line.split('\\t'))\n  .filter(([, subject]) => /^(feat|fix|perf)(\\([^)]*\\))?!?: /.test(subject))\n  .filter(([sha, subject]) => {\n    const pr = subject.match(/\\(#(\\d+)\\)$/)\n    return !(pr ? new RegExp(`#${pr[1]}\\\\b`).test(body) : body.includes(sha.slice(0, 7)))\n  })\nif (missing.length) {\n  console.error(`${latest}: commits missing from the release notes:\\n${missing.map(([sha, s]) => `${sha.slice(0, 7)} ${s}`).join('\\n')}`)\n  process.exit(1)\n}\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "commits"
+        ]
+      }
+    },
+    {
+      "id": "ff-changelog-entry",
+      "type": "fitness-fn",
+      "label": "Changelog line with each change",
+      "x": 1040,
+      "y": 650,
+      "category": "process",
+      "threshold": "Every pull request that changes src/ adds an entry under ## [Unreleased] or carries skip-changelog; 0 headings under Unreleased outside the six categories; 0 release headings other than ## [version] - YYYY-MM-DD",
+      "description": "A required check on every pull request compares it with its base: when code under src/ changed and the pull request is not labelled skip-changelog, the lines it adds to CHANGELOG.md must be entries inside the Unreleased section, that section may hold only the six Keep a Changelog categories, and every release heading must read ## [version] - YYYY-MM-DD, optionally followed by [YANKED].\n\nTool: git, awk and jq in a GitHub Actions step on pull_request\n\n```bash\n# CI on every pull request (fetch-depth: 0); LABELS is toJSON(github.event.pull_request.labels.*.name)\nset -euo pipefail\nbase=\"origin/${GITHUB_BASE_REF:-main}\"\nif git diff --quiet \"$base\"...HEAD -- src/; then exit 0; fi                   # no shipped code changed\nif echo \"$LABELS\" | jq -e 'index(\"skip-changelog\")' >/dev/null; then exit 0; fi  # nothing a user can notice\nunreleased=$(awk '/^## \\[Unreleased\\]/ { on = 1; next } /^## \\[/ { on = 0 } on' CHANGELOG.md)\nadded=$(git diff -U0 \"$base\"...HEAD -- ./CHANGELOG.md | sed -n 's/^+\\(- .*\\)$/\\1/p')\n[ -n \"$added\" ] || { echo \"src/ changed: add an entry under ## [Unreleased] in CHANGELOG.md, or label the pull request skip-changelog\"; exit 1; }\nwhile IFS= read -r entry; do\n  grep -Fxq -- \"$entry\" <<<\"$unreleased\" || { echo \"entry outside ## [Unreleased]: $entry\"; exit 1; }\ndone <<<\"$added\"\nbad=$(grep -E '^### ' <<<\"$unreleased\" | grep -Evx '### (Added|Changed|Deprecated|Removed|Fixed|Security)' || true)\n[ -z \"$bad\" ] || { echo \"not a Keep a Changelog category: $bad\"; exit 1; }\nheads=$(grep -E '^## ' CHANGELOG.md | grep -Evx '## \\[(Unreleased|[0-9][0-9A-Za-z.+-]*)\\]( - [0-9]{4}-[0-9]{2}-[0-9]{2}( \\[YANKED\\])?)?' || true)\n[ -z \"$heads\" ] || { echo \"release headings must read ## [version] - YYYY-MM-DD: $heads\"; exit 1; }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "keepachangelog"
+        ]
+      }
+    },
+    {
+      "id": "ff-pr-labels",
+      "type": "fitness-fn",
+      "label": "Exactly one release label",
+      "x": 1040,
+      "y": 780,
+      "category": "process",
+      "threshold": "Every pull request carries exactly 1 of the 5 release labels before it can merge",
+      "description": "A workflow that the main branch's ruleset lists as a required check runs whenever a pull request is opened, edited, synchronised or relabelled, and fails unless exactly one of the labels that .github/release.yml groups the notes by is set.\n\nTool: GitHub Actions with jq; GitHub's generated release notes (.github/release.yml)\n\n```yaml\n# .github/workflows/release-label.yml, a required check. The notes' categories, in .github/release.yml:\n#   changelog:\n#     categories:\n#       - title: ⚠ Breaking changes\n#         labels: [breaking-change]\n#       - title: Features\n#         labels: [feature]\n#       - title: Deprecations\n#         labels: [deprecation]\n#       - title: Fixes\n#         labels: [fix]\n#       - title: Other changes\n#         labels: [internal]\nname: release-label\non:\n  pull_request:\n    types: [opened, reopened, edited, labeled, unlabeled, synchronize]\njobs:\n  label:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Exactly one release-notes label\n        env:\n          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}\n        run: |\n          n=$(echo \"$LABELS\" | jq '[.[] | select(IN(\"breaking-change\", \"feature\", \"deprecation\", \"fix\", \"internal\"))] | length')\n          [ \"$n\" -eq 1 ] || { echo \"label the pull request with exactly one of breaking-change, feature, deprecation, fix, internal (it has $n)\"; exit 1; }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "CHANGELOG": [
+          "labels"
+        ]
+      }
+    },
+    {
+      "id": "ff-support-latest",
+      "type": "fitness-fn",
+      "label": "Only the newest line supported",
+      "x": 1040,
+      "y": 910,
+      "category": "process",
+      "threshold": "SECURITY.md lists exactly the newest line as supported; 0 releases on an older line published after a newer line's first release",
+      "description": "A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest line, and fails on any release published on a line after the next newer line started.\n\nTool: Node.js with the GitHub CLI (gh release list)\n\n```js\n// scripts/check-support.mjs — SECURITY.md supports the newest line only, and no older line gets a release once a newer one has started\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\nconst releases = JSON.parse(execFileSync('gh', ['release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '1000', '--json', 'tagName,publishedAt'], { encoding: 'utf8' }))\n  .filter((r) => /^v\\d+\\.\\d+\\.\\d+$/.test(r.tagName)).map((r) => ({ tag: r.tagName, v: r.tagName.slice(1).split('.').map(Number), at: r.publishedAt }))\nconst lineOf = (v) => (v[0] >= 1000 ? v.slice(0, 2) : v.slice(0, 1)).join('.')   // YYYY.M under calendar versions, MAJOR under semantic ones\nconst starts = new Map()   // line -> when its first release was published\nfor (const { v, at } of releases) if (!starts.has(lineOf(v)) || at < starts.get(lineOf(v))) starts.set(lineOf(v), at)\nconst num = (line) => line.split('.').map(Number)\nconst lines = [...starts.keys()].sort((a, b) => num(b)[0] - num(a)[0] || (num(b)[1] ?? 0) - (num(a)[1] ?? 0))   // newest first\nconst supported = readFileSync('SECURITY.md', 'utf8').split('\\n')\n  .map((row) => row.match(/^\\|\\s*v?(\\d+(?:\\.\\d+)?)\\.x\\s*\\|\\s*(?:✅|:white_check_mark:)/)).filter(Boolean).map((m) => m[1])\nconst problems = []\nif (supported.join() !== lines.slice(0, 1).join()) problems.push(`SECURITY.md supports ${supported.join(', ') || 'nothing'}; only the newest line, ${lines[0]}, is`)\nlines.slice(1).forEach((line, i) => {\n  const leftAt = starts.get(lines[i])   // the next newer line's first release ends this one's support\n  for (const r of releases) if (lineOf(r.v) === line && r.at > leftAt) problems.push(`${r.tag}: released on ${line} after ${lines[i]} started`)\n})\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "ff-support-lts",
+      "type": "fitness-fn",
+      "label": "Supported lines match the policy",
+      "x": 1040,
+      "y": 1040,
+      "category": "process",
+      "threshold": "SECURITY.md lists exactly the newest {{LTS_LINES}} lines as supported; 1 maintenance branch release/<line>.x per older supported line; 0 releases on a line published after it left support",
+      "description": "A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest {{LTS_LINES}} lines, checks that each older supported line has its maintenance branch on origin, and fails on any release published on a line after the line {{LTS_LINES}} places newer started.\n\nTool: Node.js with git and the GitHub CLI (gh release list)\n\n```js\n// scripts/check-support.mjs — SECURITY.md supports the newest {{LTS_LINES}} lines, each older one has its branch, none is released on after it left support\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\nconst SUPPORTED_LINES = {{LTS_LINES}}\nconst run = (cmd, ...args) => execFileSync(cmd, args, { encoding: 'utf8' })\nconst releases = JSON.parse(run('gh', 'release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '1000', '--json', 'tagName,publishedAt'))\n  .filter((r) => /^v\\d+\\.\\d+\\.\\d+$/.test(r.tagName)).map((r) => ({ tag: r.tagName, v: r.tagName.slice(1).split('.').map(Number), at: r.publishedAt }))\nconst lineOf = (v) => (v[0] >= 1000 ? v.slice(0, 2) : v.slice(0, 1)).join('.')   // YYYY.M under calendar versions, MAJOR under semantic ones\nconst starts = new Map()   // line -> when its first release was published\nfor (const { v, at } of releases) if (!starts.has(lineOf(v)) || at < starts.get(lineOf(v))) starts.set(lineOf(v), at)\nconst num = (line) => line.split('.').map(Number)\nconst lines = [...starts.keys()].sort((a, b) => num(b)[0] - num(a)[0] || (num(b)[1] ?? 0) - (num(a)[1] ?? 0))   // newest first\nconst supported = readFileSync('SECURITY.md', 'utf8').split('\\n')\n  .map((row) => row.match(/^\\|\\s*v?(\\d+(?:\\.\\d+)?)\\.x\\s*\\|\\s*(?:✅|:white_check_mark:)/)).filter(Boolean).map((m) => m[1])\nconst expected = lines.slice(0, SUPPORTED_LINES)\nconst problems = []\nif ([...supported].sort().join() !== [...expected].sort().join()) problems.push(`SECURITY.md supports ${supported.join(', ') || 'nothing'}, the decision ${expected.join(', ')}`)\nfor (const line of expected.slice(1)) if (!run('git', 'ls-remote', '--heads', 'origin', `release/${line}.x`).trim()) problems.push(`release/${line}.x: no maintenance branch`)\nlines.forEach((line, i) => {\n  if (i < SUPPORTED_LINES) return\n  const leftAt = starts.get(lines[i - SUPPORTED_LINES])   // a line leaves support when the line SUPPORTED_LINES places newer starts\n  for (const r of releases) if (lineOf(r.v) === line && r.at > leftAt) problems.push(`${r.tag}: released after line ${line} left support`)\n})\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "ff-backports",
+      "type": "fitness-fn",
+      "label": "Security fixes back-ported in time",
+      "x": 1040,
+      "y": 1170,
+      "category": "process",
+      "threshold": "0 security fixes merged to main more than {{BACKPORT_DAYS}} days ago without a cherry-picked commit in a released tag on every older supported line",
+      "description": "A nightly job lists the pull requests labelled security that were merged to main more than {{BACKPORT_DAYS}} days ago, and for each older line SECURITY.md supports, looks on release/<line>.x for the commit git cherry-pick -x made from the fix (its \"cherry picked from commit\" line) and for a release tag containing it. A line cut after the fix already contains it and is skipped.\n\nTool: git and the GitHub CLI (gh pr list) in a scheduled GitHub Actions job\n\n```bash\n# nightly, in a full clone; SECURITY.md lists the supported lines newest first (| 2.x | ✅ |), the newest released from main\nset -euo pipefail\ngit fetch --quiet --tags origin '+refs/heads/release/*:refs/remotes/origin/release/*'\nolder=$(grep -E '^\\|' SECURITY.md | grep -E '✅|:white_check_mark:' | awk -F'|' '{ gsub(/[ v]/, \"\", $2); print $2 }' | tail -n +2)\nfixes=$(gh pr list --base main --state merged --label security --limit 200 --json mergeCommit,mergedAt \\\n  --jq '.[] | select(now - (.mergedAt | fromdateiso8601) > {{BACKPORT_DAYS}} * 86400) | .mergeCommit.oid')\nlate=0\nfor fix in $fixes; do\n  for line in $older; do\n    branch=\"origin/release/$line\"                                          # release/2.x\n    git merge-base --is-ancestor \"$fix\" \"$branch\" && continue               # the line was cut after the fix\n    pick=$(git log \"$branch\" --format=%H -n 1 --grep \"cherry picked from commit $fix\")\n    if [ -z \"$pick\" ] || [ -z \"$(git tag --list 'v*' --contains \"$pick\")\" ]; then\n      echo \"security fix $fix is not released on $line within {{BACKPORT_DAYS}} days\"; late=1\n    fi\n  done\ndone\nexit \"$late\"\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "SUPPORT": [
+          "lts"
+        ]
+      }
+    },
+    {
+      "id": "ff-release-approval",
+      "type": "fitness-fn",
+      "label": "Releases wait for the release owner",
+      "x": 1040,
+      "y": 1300,
+      "category": "process",
+      "threshold": "The environment release requires a review by the team {{RELEASE_OWNER}} alone, with self-review prevented; every workflow that publishes releases runs in it; 0 of the last 100 releases published by anyone but the release workflow",
+      "description": "A weekly job, and one on every change under .github/, reads the protection rules of the environment release through the GitHub API, checks that every workflow file that publishes releases (gh release, release-please or semantic-release) declares environment: release, and lists the published releases whose author is not github-actions[bot], which means someone published one by hand.\n\nTool: the GitHub CLI (gh api repos/{owner}/{repo}/environments/release and /releases) with jq\n\n```bash\n# weekly and on changes to .github/; GH_TOKEN may read the repository's environments and releases\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\ngh api \"repos/$REPO/environments/release\" --jq '.protection_rules' | jq -e --arg team '{{RELEASE_OWNER}}' '\n  map(select(.type == \"required_reviewers\")) | length == 1 and .[0].prevent_self_review == true\n  and (.[0].reviewers | length == 1 and .[0].type == \"Team\" and .[0].reviewer.slug == $team)' >/dev/null \\\n  || { echo \"environment release must wait for a review by the team {{RELEASE_OWNER}} alone, with self-review prevented\"; exit 1; }\n# every job that publishes a release runs in that environment\nfor wf in $(grep -lE 'gh release (create|edit)|release-please-action|semantic-release' .github/workflows/*.yml); do\n  grep -qE '^\\s+environment:\\s*release\\s*$' \"$wf\" || { echo \"$wf publishes releases outside the environment release\"; exit 1; }\ndone\n# and nobody publishes one by hand\nby_hand=$(gh api \"repos/$REPO/releases?per_page=100\" --jq '.[] | select(.draft | not) | select(.author.login != \"github-actions[bot]\") | .tag_name')\n[ -z \"$by_hand\" ] || { echo \"releases not published by the release workflow: $by_hand\"; exit 1; }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "owner"
+        ]
+      }
+    },
+    {
+      "id": "ff-auto-release",
+      "type": "fitness-fn",
+      "label": "No merge waits for its release",
+      "x": 1040,
+      "y": 1430,
+      "category": "process",
+      "threshold": "0 commits changing src/ (tests excluded) merged to main more than {{RELEASE_HOURS}} hours ago and not in a release; release.yml runs on pushes to main and waits in no environment",
+      "description": "An hourly job finds the latest release tag on main and lists the first-parent commits after it that change code under src/, test files excluded; any older than {{RELEASE_HOURS}} hours fails the job. It also checks that the release workflow starts on pushes to main and declares no environment, where it would wait for a reviewer. A commit typed docs or test that touches src/ is reported too: type it so that it releases, or keep it out of src/.\n\nTool: git in a scheduled GitHub Actions job\n\n```bash\n# hourly, in a full clone: no change to shipped code waits on main longer than {{RELEASE_HOURS}} hours for its release\nset -euo pipefail\ngit fetch --quiet --tags origin main\nlatest=$(git describe --tags --abbrev=0 --match 'v*' origin/main)\ncutoff=$(( $(date +%s) - {{RELEASE_HOURS}} * 3600 ))\nwaiting=$(git log \"$latest..origin/main\" --first-parent --format='%h %ct %s' -- src/ ':(glob,exclude)src/**/*.test.*' | awk -v c=\"$cutoff\" '$2 < c')\n[ -z \"$waiting\" ] || { echo \"merged more than {{RELEASE_HOURS}} hours ago and in no release after $latest:\"; echo \"$waiting\"; exit 1; }\n# and no release waits for a person: the release workflow starts on every push to main, in no environment with reviewers\ngrep -qE '^\\s+branches:\\s*\\[\\s*main\\s*\\]' .github/workflows/release.yml || { echo \"release.yml does not run on pushes to main\"; exit 1; }\n! grep -qE '^\\s+environment:' .github/workflows/release.yml || { echo \"release.yml waits in an environment; automatic releases do not\"; exit 1; }\n```",
+      "hubWhen": {
+        "SCHEME": [
+          "semver",
+          "calver"
+        ],
+        "APPROVAL": [
+          "auto"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-version-visible--derives--need",
+      "sourceId": "req-version-visible",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-semver--derives--need",
+      "sourceId": "req-semver",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-semver-bump--derives--need",
+      "sourceId": "req-semver-bump",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-calver--derives--need",
+      "sourceId": "req-calver",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-immutable--derives--need",
+      "sourceId": "req-immutable",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-build-id--derives--need",
+      "sourceId": "req-build-id",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-notes-commits--derives--need",
+      "sourceId": "req-notes-commits",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-changelog-entry--derives--need",
+      "sourceId": "req-changelog-entry",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pr-labels--derives--need",
+      "sourceId": "req-pr-labels",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-latest-only--derives--need",
+      "sourceId": "req-latest-only",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-lts-policy--derives--need",
+      "sourceId": "req-lts-policy",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-backport--derives--need",
+      "sourceId": "req-backport",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-owner-approves--derives--need",
+      "sourceId": "req-owner-approves",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-auto-release--derives--need",
+      "sourceId": "req-auto-release",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-version-visible--verifies--req-version-visible",
+      "sourceId": "sc-version-visible",
+      "targetId": "req-version-visible",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-semver--verifies--req-semver",
+      "sourceId": "sc-semver",
+      "targetId": "req-semver",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-semver-bump--verifies--req-semver-bump",
+      "sourceId": "sc-semver-bump",
+      "targetId": "req-semver-bump",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-calver--verifies--req-calver",
+      "sourceId": "sc-calver",
+      "targetId": "req-calver",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-immutable--verifies--req-immutable",
+      "sourceId": "sc-immutable",
+      "targetId": "req-immutable",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-build-id--verifies--req-build-id",
+      "sourceId": "sc-build-id",
+      "targetId": "req-build-id",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-notes-commits--verifies--req-notes-commits",
+      "sourceId": "sc-notes-commits",
+      "targetId": "req-notes-commits",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-changelog-entry--verifies--req-changelog-entry",
+      "sourceId": "sc-changelog-entry",
+      "targetId": "req-changelog-entry",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pr-labels--verifies--req-pr-labels",
+      "sourceId": "sc-pr-labels",
+      "targetId": "req-pr-labels",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-latest-only--verifies--req-latest-only",
+      "sourceId": "sc-latest-only",
+      "targetId": "req-latest-only",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-lts-policy--verifies--req-lts-policy",
+      "sourceId": "sc-lts-policy",
+      "targetId": "req-lts-policy",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-backport--verifies--req-backport",
+      "sourceId": "sc-backport",
+      "targetId": "req-backport",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-owner-approves--verifies--req-owner-approves",
+      "sourceId": "sc-owner-approves",
+      "targetId": "req-owner-approves",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-auto-release--verifies--req-auto-release",
+      "sourceId": "sc-auto-release",
+      "targetId": "req-auto-release",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-version-endpoint--implements--adr-semver",
+      "sourceId": "ff-version-endpoint",
+      "targetId": "adr-semver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-version-endpoint--implements--adr-calver",
+      "sourceId": "ff-version-endpoint",
+      "targetId": "adr-calver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-version-endpoint--implements--adr-build-id",
+      "sourceId": "ff-version-endpoint",
+      "targetId": "adr-build-id",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-semver-release--implements--adr-semver",
+      "sourceId": "ff-semver-release",
+      "targetId": "adr-semver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-calver-release--implements--adr-calver",
+      "sourceId": "ff-calver-release",
+      "targetId": "adr-calver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-build-id--implements--adr-build-id",
+      "sourceId": "ff-build-id",
+      "targetId": "adr-build-id",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-notes-complete--implements--adr-notes-commits",
+      "sourceId": "ff-notes-complete",
+      "targetId": "adr-notes-commits",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-changelog-entry--implements--adr-notes-keepachangelog",
+      "sourceId": "ff-changelog-entry",
+      "targetId": "adr-notes-keepachangelog",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pr-labels--implements--adr-notes-labels",
+      "sourceId": "ff-pr-labels",
+      "targetId": "adr-notes-labels",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-support-latest--implements--adr-support-latest",
+      "sourceId": "ff-support-latest",
+      "targetId": "adr-support-latest",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-support-lts--implements--adr-support-lts",
+      "sourceId": "ff-support-lts",
+      "targetId": "adr-support-lts",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-backports--implements--adr-support-lts",
+      "sourceId": "ff-backports",
+      "targetId": "adr-support-lts",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-release-approval--implements--adr-semver",
+      "sourceId": "ff-release-approval",
+      "targetId": "adr-semver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-release-approval--implements--adr-calver",
+      "sourceId": "ff-release-approval",
+      "targetId": "adr-calver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-auto-release--implements--adr-semver",
+      "sourceId": "ff-auto-release",
+      "targetId": "adr-semver",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-auto-release--implements--adr-calver",
+      "sourceId": "ff-auto-release",
+      "targetId": "adr-calver",
+      "relationType": "implements"
+    }
+  ]
+}

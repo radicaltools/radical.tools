@@ -294,19 +294,13 @@ open:
 The 33 packs moved whole into eight groups by standard (ADR Concern groups and
 pack standard, amended 2026-10-29). Agreed next, in this order:
 
-1. **SDLC Standard and API Guidelines packs.** SDLC: *Release and versioning*
-   (SemVer or CalVer, changelog source, older versions supported, who approves;
-   commit format stays in Code review and branching, cadence in Deployment),
-   *Delivery metrics* (the four DORA metrics, where measured, targets in
-   check.json), *Definition of Done and change approval* (what every change
-   carries, peer review / CAB / pipeline, segregation of duties, emergency
-   changes, requirement → commit → release). API Guidelines: *API style guide*
-   (Microsoft, Zalando, Google AIP or own; lint in CI with Spectral/Zally;
-   design-first or code-first), *Resource design*, *Errors* (RFC 9457; takes
-   over CALLER from Error handling and logging conventions), *Collections*,
-   *Idempotency and concurrency* (the API we offer; calls we make stay in
-   Integration resilience). The chosen style guide should suggest the answers
-   of the group's other packs: a new mechanism, packs are independent today.
+1. **Done (2026-10-29):** SDLC Standard (*Release and versioning*, *Delivery
+   metrics*, *Definition of Done and change approval*) and API Guidelines (*API
+   style guide*, *Resource design*, *Errors*, which took CALLER from Error
+   handling and logging conventions, *Collections*, *Idempotency and
+   concurrency*). Left open: the chosen style guide does not yet suggest the
+   answers of the group's other packs (casing in Resource design, the format in
+   Errors); packs are independent today, so each says it in its hint.
 2. **Compliance**: *Data classification* (with a check on the model itself:
    restricted data flowing to an external system unencrypted), *Retention and
    deletion*, *Audit trail* (evidence for a regulator; detection stays in
@@ -326,6 +320,14 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    federated models.
 5. The ISO/IEC 25010 characteristics still sit on the groups; with groups by
    standard they belong on each pack.
+6. **Contradictions between packs are not flagged.** The concern wizard checks
+   one pack at a time: *a named release approver for every production
+   deployment* (Definition of Done and change approval) contradicts continuous
+   deployment *without a manual step* (Deployment and rollback), and only the
+   option descriptions say so. The same holds for the API style guide's guide
+   and the casing in Resource design or the format in Errors. A list of
+   incompatible answer pairs across packs, checked by the wizard and by
+   `radical check` on the imported ADRs, would catch them.
 
 ### Dogfooding (2026-10-28): a review and fix round of all Hub concern packs
 
