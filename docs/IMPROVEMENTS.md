@@ -294,19 +294,13 @@ open:
 The 33 packs moved whole into eight groups by standard (ADR Concern groups and
 pack standard, amended 2026-10-29). Agreed next, in this order:
 
-1. **SDLC Standard and API Guidelines packs.** SDLC: *Release and versioning*
-   (SemVer or CalVer, changelog source, older versions supported, who approves;
-   commit format stays in Code review and branching, cadence in Deployment),
-   *Delivery metrics* (the four DORA metrics, where measured, targets in
-   check.json), *Definition of Done and change approval* (what every change
-   carries, peer review / CAB / pipeline, segregation of duties, emergency
-   changes, requirement → commit → release). API Guidelines: *API style guide*
-   (Microsoft, Zalando, Google AIP or own; lint in CI with Spectral/Zally;
-   design-first or code-first), *Resource design*, *Errors* (RFC 9457; takes
-   over CALLER from Error handling and logging conventions), *Collections*,
-   *Idempotency and concurrency* (the API we offer; calls we make stay in
-   Integration resilience). The chosen style guide should suggest the answers
-   of the group's other packs: a new mechanism, packs are independent today.
+1. **Done (2026-10-29):** SDLC Standard (*Release and versioning*, *Delivery
+   metrics*, *Definition of Done and change approval*) and API Guidelines (*API
+   style guide*, *Resource design*, *Errors*, which took CALLER from Error
+   handling and logging conventions, *Collections*, *Idempotency and
+   concurrency*). Left open: the chosen style guide does not yet suggest the
+   answers of the group's other packs (casing in Resource design, the format in
+   Errors); packs are independent today, so each says it in its hint.
 2. **Compliance**: *Data classification* (with a check on the model itself:
    restricted data flowing to an external system unencrypted), *Retention and
    deletion*, *Audit trail* (evidence for a regulator; detection stays in

@@ -1,0 +1,1100 @@
+{
+  "hub": {
+    "id": "concern-api-collections",
+    "category": "concern",
+    "name": "Collections",
+    "description": "How an HTTP API returns lists, the same way for every list operation: pages and page sizes, page tokens, filtering, sorting, partial responses and totals. Paths, field casing and methods are decided in the Resource design pack, the error body in the Errors pack. The snippets are for a Node API described in OpenAPI 3.1, checked with Spectral, Vitest with supertest, and k6.",
+    "tags": [
+      "api",
+      "collections",
+      "pagination",
+      "filtering",
+      "sorting",
+      "page tokens"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "api-collections",
+      "trigger": "LIST RELATIONS WHERE source.type != \"person\" AND target.external != true AND (target.type = \"container\" OR target.type = \"component\")",
+      "applyTo": "target",
+      "why": "other parts and systems call these elements, so how their APIs return lists has to be decided.",
+      "group": "api"
+    },
+    "sources": [
+      {
+        "title": "Google AIP-158, Pagination",
+        "url": "https://google.aip.dev/158"
+      },
+      {
+        "title": "Google AIP-160, Filtering",
+        "url": "https://google.aip.dev/160"
+      },
+      {
+        "title": "Google AIP-132, Standard methods: List (ordering)",
+        "url": "https://google.aip.dev/132"
+      },
+      {
+        "title": "Google AIP-157, Partial responses",
+        "url": "https://google.aip.dev/157"
+      },
+      {
+        "title": "Microsoft Azure REST API Guidelines, Collections",
+        "url": "https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#collections"
+      },
+      {
+        "title": "Zalando RESTful API Guidelines (rules 137, 157, 159, 160, 248, 254)",
+        "url": "https://opensource.zalando.com/restful-api-guidelines/"
+      },
+      {
+        "title": "Markus Winand, Use The Index, Luke: Paging Through Results (the seek method)",
+        "url": "https://use-the-index-luke.com/sql/partial-results/fetch-next-page"
+      },
+      {
+        "title": "RFC 8288, Web Linking",
+        "url": "https://www.rfc-editor.org/rfc/rfc8288"
+      },
+      {
+        "title": "Spectral: custom rulesets and core functions",
+        "url": "https://docs.stoplight.io/docs/spectral/e5b9616d6d50c-rulesets"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "PAGING",
+        "title": "Pagination",
+        "label": "How does a caller read a long list page by page?",
+        "hint": "This decides most of what follows: what a deep page costs, whether items are skipped or read twice while the collection changes, and whether a caller can jump to a page. How many requests a caller may send is decided in the Rate limiting pack.",
+        "defaultValue": "cursor",
+        "options": [
+          {
+            "value": "cursor",
+            "label": "an opaque page token over a stable sort",
+            "description": "Each response carries next_page_token, an encrypted token saying where the page ended, and the next request sends it back as page_token (Google AIP-158; cursors in Zalando rule 160). A page costs the same at any depth, and items added or removed while a caller reads shift nothing. Pick it for collections that grow without limit (orders, events, logs) and for any public or partner API."
+          },
+          {
+            "value": "offset",
+            "label": "offset and limit, with a maximum offset",
+            "description": "The caller sends offset and limit, so it can jump to any page and show page numbers; offsets past a cap are refused, because the database reads and throws away every skipped row. Pick it for back-office tables that need page numbers over collections of at most tens of thousands of items, whose callers can live with items shifting between pages while the collection changes."
+          },
+          {
+            "value": "bounded",
+            "label": "no pagination, bounded lists only",
+            "description": "Every list comes back whole, because the domain caps it (a customer's addresses, an order's lines) and the API refuses to grow it past the cap. Pick it only when no list the API serves can grow without limit; the first collection that can needs this decision superseded."
+          }
+        ]
+      },
+      {
+        "key": "FILTER",
+        "title": "Filtering",
+        "label": "How does a caller filter a list?",
+        "hint": "Every filterable field is an index to keep and a promise to callers. Whatever is chosen here, a parameter or field the operation does not know is refused with 400, never ignored.",
+        "defaultValue": "params",
+        "options": [
+          {
+            "value": "params",
+            "label": "a query parameter per filterable field",
+            "description": "Each filterable field is a documented query parameter of its own: equality (?status=paid), a comma-separated list for any of (?status=paid,shipped), and _after and _before suffixes for time ranges (?created_after=2026-01-01T00:00:00Z). Pick it by default: the OpenAPI document lists every filter, request validation checks it, and generated clients get typed arguments."
+          },
+          {
+            "value": "expression",
+            "label": "a filter expression (Google AIP-160)",
+            "description": "One filter parameter holds an expression in the AIP-160 grammar (filter=status = \"paid\" AND total > 100), parsed on the server over an allow-list of fields and turned into parameterised SQL. Pick it when callers need OR, NOT and comparisons across several fields, typically reporting or partner APIs. The OData-style filter of the Microsoft guidelines (status eq 'paid') is the same choice for .NET stacks."
+          },
+          {
+            "value": "none",
+            "label": "no filtering",
+            "description": "Lists take no filter; the path itself is the only selection (/customers/{id}/orders). Pick it for small or bounded lists, or when callers always read a list whole."
+          }
+        ]
+      },
+      {
+        "key": "SORT",
+        "title": "Sorting",
+        "label": "Can a caller choose the order of a list?",
+        "hint": "Each order offered needs an index on its fields ending in the id; with page tokens, the token carries the order it was issued for.",
+        "defaultValue": "allowlist",
+        "options": [
+          {
+            "value": "allowlist",
+            "label": "an order_by parameter over an allow-list of fields",
+            "description": "order_by takes a comma-separated list of fields from the operation's allow-list, each optionally followed by desc (Google AIP-132: order_by=total desc), and the id is always added as the last key. Pick it when callers show the list in tables they sort."
+          },
+          {
+            "value": "fixed",
+            "label": "one fixed order per list",
+            "description": "Each list has one documented order (by default newest first, then by id) and takes no order parameter. Pick it for feeds, logs and lists read by programs that walk them in one order; it needs one index per list."
+          }
+        ]
+      },
+      {
+        "key": "FIELDS",
+        "title": "Fields",
+        "label": "Can a caller ask for only some fields of each item?",
+        "hint": "Partial responses save bandwidth for wide items and mobile clients, at the cost of a response shape that varies with the request.",
+        "defaultValue": "full",
+        "options": [
+          {
+            "value": "partial",
+            "label": "partial responses through a fields parameter",
+            "description": "fields names the field paths to return, comma-separated, with dots for nested fields (fields=status,total,customer.name), as Google AIP-157 field masks and Zalando rule 157 do; the id always comes back. Pick it when items are wide (dozens of fields, embedded objects) and callers such as mobile apps read a few of them."
+          },
+          {
+            "value": "full",
+            "label": "the full representation always",
+            "description": "Every item comes back whole in every list. Pick it by default: one shape per resource, easy to cache and to type; if items are too wide, make the resource narrower instead."
+          }
+        ]
+      },
+      {
+        "key": "DEFAULT_PAGE_SIZE",
+        "label": "How many items does a page hold when the caller names no size?",
+        "defaultValue": "50",
+        "type": "number"
+      },
+      {
+        "key": "MAX_PAGE_SIZE",
+        "label": "What is the largest page a caller may ask for?",
+        "defaultValue": "100",
+        "type": "number"
+      },
+      {
+        "key": "TOKEN_HOURS",
+        "label": "For how many hours does a page token stay valid (page tokens only)?",
+        "defaultValue": "72",
+        "type": "number"
+      },
+      {
+        "key": "MAX_OFFSET",
+        "label": "What is the largest offset accepted (offset and limit only)?",
+        "defaultValue": "10000",
+        "type": "number"
+      },
+      {
+        "key": "MAX_ITEMS",
+        "label": "At most how many items may a bounded list hold (bounded lists only)?",
+        "defaultValue": "200",
+        "type": "number"
+      },
+      {
+        "key": "DEFAULT_ORDER",
+        "label": "In which order are lists returned when the caller names none (the last key unique)?",
+        "defaultValue": "created_at desc, id desc"
+      },
+      {
+        "key": "LIST_P95_MS",
+        "label": "Within how many milliseconds must 95% of page requests be answered, deep pages included?",
+        "defaultValue": "300",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Lists stay fast, complete and exact",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Collections",
+      "description": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
+    },
+    {
+      "id": "req-paged",
+      "type": "requirement",
+      "label": "Pages are bounded",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "return at most {{MAX_PAGE_SIZE}} items in one response of every list operation, {{DEFAULT_PAGE_SIZE}} when the caller names no page size, and refuse a page size below 1, above {{MAX_PAGE_SIZE}} or not a whole number with 400",
+      "rationale": "A list without a cap works in testing and times out in production; Zalando rule 159 makes pagination a must for that reason. Refusing an oversized page instead of shrinking it keeps the contract exact, as for any parameter the operation cannot serve (Microsoft Azure REST API Guidelines, Collections); Google AIP-158 shrinks it instead, which the decision weighs among its alternatives.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "req-token-opaque",
+      "type": "requirement",
+      "label": "Page tokens reveal nothing",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "issue every page token encrypted and authenticated with AES-256-GCM, so that no item id, sort value or position can be read from it or changed in it",
+      "rationale": "Google AIP-158: page tokens must be opaque and must not be user-parseable; Zalando rule 160: a cursor is never inspected or constructed by clients. A readable token becomes an interface callers build on, and an editable one lets a caller page through data it never queried.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "req-token-refused",
+      "type": "requirement",
+      "label": "Bad page tokens refused",
+      "x": 260,
+      "y": 260,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a request carries a page token that has been altered, was issued by another list operation, or is older than {{TOKEN_HOURS}} hours",
+      "action": "refuse it with 400 and tell the caller to start again from the first page",
+      "rationale": "Google AIP-158: every other parameter must match the call that issued the token, and tokens may expire some time after they are sent (three days is its rule of thumb). A token taken to another list or kept for days reads a position that no longer means anything.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "req-cursor-consistent",
+      "type": "requirement",
+      "label": "Changes during a read skip nothing",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "items are added to or removed from a collection while a caller reads it page by page with page tokens",
+      "action": "return every item that existed throughout the read exactly once",
+      "rationale": "A token that holds the last item's sort keys continues after that item wherever it now is, where an offset shifts by every item added or removed before it (Winand, the seek method). The Microsoft guidelines ask to document whether items can be skipped or read twice; with page tokens they cannot.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "req-offset-cap",
+      "type": "requirement",
+      "label": "Deep offsets refused",
+      "x": 260,
+      "y": 520,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a request asks for an offset greater than {{MAX_OFFSET}}",
+      "action": "refuse it with 400 naming the largest offset accepted, before any query runs",
+      "rationale": "With OFFSET the database counts every row from the beginning up to the page, so a page costs more the deeper it is (Winand); the cap bounds that cost. Zalando rule 160 prefers cursors for the same reason.",
+      "hubWhen": {
+        "PAGING": [
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "req-bounded",
+      "type": "requirement",
+      "label": "Bounded lists stay bounded",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "return every list whole in one response of at most {{MAX_ITEMS}} items, and refuse with 409 a request that would add an item to a list already holding {{MAX_ITEMS}}",
+      "rationale": "Zalando rule 159 asks for pagination to protect the service against overload; a list served without pages is safe only while the domain bounds it, and the bound holds only if it is enforced where items are added.",
+      "hubWhen": {
+        "PAGING": [
+          "bounded"
+        ]
+      }
+    },
+    {
+      "id": "req-order",
+      "type": "requirement",
+      "label": "Lists have a total order",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "return the items of every list in a total order, the one the caller asked for or else {{DEFAULT_ORDER}}, always ending in the unique id, so that reading every page of an unchanged collection yields each item exactly once",
+      "rationale": "Paging requires a deterministic sort order (Winand): two items with the same creation time can swap places between requests, and then one is read twice and the other never. Google AIP-132 lets an order name several fields, which is how the id is added."
+    },
+    {
+      "id": "req-unknown",
+      "type": "requirement",
+      "label": "Unknown parameters refused",
+      "x": 260,
+      "y": 910,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a list request carries a query parameter the operation does not document, or names a filter, sort or field that is not on the operation's allow-list",
+      "action": "refuse it with 400 naming that parameter or field, and never answer as if it were absent",
+      "rationale": "An ignored parameter hands unfiltered or misordered data to a caller who believes it was applied. The Microsoft guidelines return an error for an unsupported parameter, filter operator and sort field; Google AIP-160 returns INVALID_ARGUMENT for a filter that names a field that does not exist. The body of the error is decided in the Errors pack."
+    },
+    {
+      "id": "req-filter",
+      "type": "requirement",
+      "label": "Filters apply before paging",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "ubiquitous",
+      "action": "apply every filter on the server before paging, so that the pages together hold exactly the items that match, and refuse a filter value that does not fit its field's type with 400",
+      "rationale": "A filter applied after paging returns short or empty pages and hides matches behind them. Google AIP-160 refuses values that do not fit the field's type and asks the API to document which fields a filter may name, which the OpenAPI document does.",
+      "hubWhen": {
+        "FILTER": [
+          "params",
+          "expression"
+        ]
+      }
+    },
+    {
+      "id": "req-sort",
+      "type": "requirement",
+      "label": "Callers choose the order",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "event-driven",
+      "trigger": "a caller names in order_by fields from the operation's allow-list, each optionally followed by desc",
+      "action": "return the list in that order across every page, with the id as the last key in the direction of the last field named",
+      "rationale": "Google AIP-132 defines order_by as a comma-separated list of fields with a desc suffix. The id as the last key makes the order total, and keeping it in the direction of the last field lets a page continue with one row comparison (Winand, the seek method).",
+      "hubWhen": {
+        "SORT": [
+          "allowlist"
+        ]
+      }
+    },
+    {
+      "id": "req-fields",
+      "type": "requirement",
+      "label": "Only the fields asked for",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "event-driven",
+      "trigger": "a list request names field paths in fields",
+      "action": "return only those fields and the id of each item, on every page",
+      "rationale": "Wide items cost bandwidth and parsing that a mobile client does not need (Google AIP-157, partial responses; Zalando rule 157).",
+      "hubWhen": {
+        "FIELDS": [
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "req-latency",
+      "type": "requirement",
+      "label": "Deep pages stay fast",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "answer 95% of requests for a page of {{MAX_PAGE_SIZE}} items within {{LIST_P95_MS}} ms, the deepest pages a caller can reach included",
+      "rationale": "OFFSET paging gets slower the further back a caller reads (Winand), and a test of the first page hides it; with page tokens the hundredth page should cost what the first does, which this proves.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "sc-paged",
+      "type": "scenario",
+      "label": "Page size held to its range",
+      "x": 520,
+      "y": 0,
+      "given": "a list operation over a collection of more than {{MAX_PAGE_SIZE}} items",
+      "when": "it is called with no page size, with {{MAX_PAGE_SIZE}}, with one more, with 0, with -1 and with a word",
+      "then": "the first call returns {{DEFAULT_PAGE_SIZE}} items, the second {{MAX_PAGE_SIZE}}, and the other four are refused with 400",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "sc-token-opaque",
+      "type": "scenario",
+      "label": "Token holds nothing readable",
+      "x": 520,
+      "y": 130,
+      "given": "the first page of a list and the token for the next one",
+      "when": "the token is decoded from base64url",
+      "then": "the id of the page's last item does not appear in it",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "sc-token-refused",
+      "type": "scenario",
+      "label": "Altered, foreign and expired tokens refused",
+      "x": 520,
+      "y": 260,
+      "given": "a page token issued by the orders list",
+      "when": "it is sent back with one character changed, to the customers list, and backdated past {{TOKEN_HOURS}} hours",
+      "then": "each request is refused with 400",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "sc-cursor-consistent",
+      "type": "scenario",
+      "label": "Read survives concurrent changes",
+      "x": 520,
+      "y": 390,
+      "given": "a collection of five pages",
+      "when": "a caller reads it page by page, and after the second page five items are added and five not yet read are removed",
+      "then": "every other item is read exactly once and no item twice",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "sc-offset-cap",
+      "type": "scenario",
+      "label": "Offset past the cap refused",
+      "x": 520,
+      "y": 520,
+      "given": "a list operation with offset and limit",
+      "when": "it is called with offset {{MAX_OFFSET}} and with offset {{MAX_OFFSET}} plus one",
+      "then": "the first is answered and the second refused with 400, its message naming {{MAX_OFFSET}}",
+      "hubWhen": {
+        "PAGING": [
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "sc-bounded",
+      "type": "scenario",
+      "label": "Full list refuses another item",
+      "x": 520,
+      "y": 650,
+      "given": "a list holding {{MAX_ITEMS}} items",
+      "when": "one more item is added and the list is read",
+      "then": "the addition is refused with 409, and the list returns all {{MAX_ITEMS}} items in one response with no page token",
+      "hubWhen": {
+        "PAGING": [
+          "bounded"
+        ]
+      }
+    },
+    {
+      "id": "sc-order",
+      "type": "scenario",
+      "label": "Ties broken by the id",
+      "x": 520,
+      "y": 780,
+      "given": "a collection in which twenty items share one creation time",
+      "when": "a caller reads every page in the default order",
+      "then": "each item appears exactly once, in the order {{DEFAULT_ORDER}}, and no two neighbours tie"
+    },
+    {
+      "id": "sc-unknown",
+      "type": "scenario",
+      "label": "Unknown names refused",
+      "x": 520,
+      "y": 910,
+      "given": "a list operation",
+      "when": "it is called with an undocumented parameter, an order_by field off its allow-list, a filter on an unknown field and an unknown field in fields",
+      "then": "each call is refused with 400 and the error names what it did not know"
+    },
+    {
+      "id": "sc-filter",
+      "type": "scenario",
+      "label": "Filtered pages hold exactly the matches",
+      "x": 520,
+      "y": 1040,
+      "given": "a seeded collection and a filter on each filterable field",
+      "when": "a caller reads every page with the filter, and once with a value of the wrong type",
+      "then": "the pages hold exactly the items the filter matches, in order, and the wrong value is refused with 400",
+      "hubWhen": {
+        "FILTER": [
+          "params",
+          "expression"
+        ]
+      }
+    },
+    {
+      "id": "sc-sort",
+      "type": "scenario",
+      "label": "Sorted both ways across pages",
+      "x": 520,
+      "y": 1170,
+      "given": "each field on the allow-list",
+      "when": "the list is read page by page ordered by it ascending and descending",
+      "then": "every read is ordered by the field, ties by id in the same direction",
+      "hubWhen": {
+        "SORT": [
+          "allowlist"
+        ]
+      }
+    },
+    {
+      "id": "sc-fields",
+      "type": "scenario",
+      "label": "Partial items",
+      "x": 520,
+      "y": 1300,
+      "given": "orders with a dozen fields and an embedded customer",
+      "when": "the list is read with fields=status,total,customer.name",
+      "then": "each item holds exactly id, status, total and a customer with only its name",
+      "hubWhen": {
+        "FIELDS": [
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "sc-latency",
+      "type": "scenario",
+      "label": "Deep page under load",
+      "x": 520,
+      "y": 1430,
+      "given": "a production-sized collection in a test environment",
+      "when": "ten callers request a page a hundred pages deep, or at the largest offset accepted, for two minutes",
+      "then": "the 95th percentile of the response times stays below {{LIST_P95_MS}} ms",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "adr-cursor",
+      "type": "adr",
+      "label": "Lists paged with opaque page tokens",
+      "x": 780,
+      "y": 0,
+      "concern": "api-collections",
+      "status": "accepted",
+      "date": "",
+      "context": "Callers read lists from this element over HTTP (orders, customers, events), and the collections behind them grow. The forces: a list that returns everything works in testing and times out in production; a deep OFFSET page makes the database read and throw away every row before it, while a cursor cannot jump to page 40; items added or removed while a caller reads shift offset pages, so items are skipped or read twice; an order that is not total (two orders created in the same millisecond) does the same even when nothing changes; every filter and sort field offered is an index to keep and a promise to callers; a parameter the API ignores returns the wrong data to a caller who believes it was applied; and a page token with readable ids or offsets becomes an interface callers build on. Paths, field casing and methods are decided in the Resource design pack, the error body in the Errors pack, and how many requests a caller may send in the Rate limiting pack.",
+      "decision": "Every list operation takes page_size (1 to {{MAX_PAGE_SIZE}}, default {{DEFAULT_PAGE_SIZE}}) and page_token, and answers an object { items, next_page_token }, never a bare array, with next_page_token left out on the last page (Google AIP-158; Microsoft guidelines, Collections). The token holds the last item's sort values and id, the operation, a hash of the filter, order and field parameters and its time of issue, sealed with AES-256-GCM (Node crypto, javax.crypto on the JVM) under a key from the secrets store; it is valid for {{TOKEN_HOURS}} hours and refused with 400 when altered, foreign or expired. The next page is read with the seek method, WHERE (created_at, id) < (last created_at, last id) ORDER BY created_at DESC, id DESC LIMIT page_size + 1, over an index on the sort keys and the id; the extra row says whether there is a next page. Default order: {{DEFAULT_ORDER}}. Filtering: {{FILTER}}. Sorting: {{SORT}}. Fields: {{FIELDS}}. No total count is returned (Zalando rule 254; the Microsoft guidelines advise against a count); a caller that needs the number uses a report. Requests are validated against the OpenAPI document (express-openapi-validator in Node, swagger-request-validator on the JVM), so an undocumented parameter or a page size out of range is refused with 400.",
+      "consequences": "• Every page costs one index range scan at any depth, and items added or removed during a read shift nothing.\n• No page numbers and no jumping to page 40: a caller reads forward from the first page; a table that needs page numbers needs offset paging or a search engine.\n• Each order offered needs an index on its fields and the id; an order mixing directions (total desc, created_at asc) cannot use one row comparison and needs an expanded WHERE.\n• The sealing key is a secret to rotate; tokens sealed with a retired key are refused and callers start again from the first page.\n• After {{TOKEN_HOURS}} hours a token is refused, so a long export has to finish sooner or start over.\n• Lowering the maximum page size later narrows the contract and is a breaking change, decided in the API evolution pack.",
+      "alternatives": "1. Offset and limit: page numbers and jumps, but deep pages cost every skipped row and items shift while the collection changes (Winand).\n2. Readable cursors (base64 of the last id): simpler, but callers decode and build them, and an edited one reads data the caller never queried (Zalando rule 160).\n3. Next-page links in a Link header (RFC 8288) instead of a token in the body: fits hypermedia clients, but generated clients read the body more easily.\n4. Shrinking a too-large page size to the maximum, as Google AIP-158 does: kinder to callers that ask for too much and lets the maximum fall later without a break, but the contract then accepts what it does not serve.",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "adr-offset",
+      "type": "adr",
+      "label": "Lists paged with offset and limit",
+      "x": 780,
+      "y": 130,
+      "concern": "api-collections",
+      "status": "accepted",
+      "date": "",
+      "context": "Callers read lists from this element over HTTP (orders, customers, events), and the collections behind them grow. The forces: a list that returns everything works in testing and times out in production; a deep OFFSET page makes the database read and throw away every row before it, while a cursor cannot jump to page 40; items added or removed while a caller reads shift offset pages, so items are skipped or read twice; an order that is not total (two orders created in the same millisecond) does the same even when nothing changes; every filter and sort field offered is an index to keep and a promise to callers; a parameter the API ignores returns the wrong data to a caller who believes it was applied; and a page token with readable ids or offsets becomes an interface callers build on. Paths, field casing and methods are decided in the Resource design pack, the error body in the Errors pack, and how many requests a caller may send in the Rate limiting pack.",
+      "decision": "Every list operation takes limit (1 to {{MAX_PAGE_SIZE}}, default {{DEFAULT_PAGE_SIZE}}) and offset (0 to {{MAX_OFFSET}}), the names Zalando rule 137 reserves, and answers an object { items, next_offset }, never a bare array, with next_offset left out on the last page. The query runs ORDER BY the requested order LIMIT limit + 1 OFFSET offset over an index on the sort keys and the id; the extra row says whether there is a next page. An offset above {{MAX_OFFSET}} is refused with 400 naming the cap: a caller that needs to reach further narrows the list with filters. Each list operation's description says that items added or removed during a read can shift between pages (Microsoft guidelines, Collections). Default order: {{DEFAULT_ORDER}}. Filtering: {{FILTER}}. Sorting: {{SORT}}. Fields: {{FIELDS}}. No total count is returned (Zalando rule 254; the Microsoft guidelines advise against a count). Requests are validated against the OpenAPI document (express-openapi-validator in Node, swagger-request-validator on the JVM), so an undocumented parameter, a limit out of range or an offset past the cap is refused with 400.",
+      "consequences": "• A caller can jump to any page and show page numbers.\n• The database reads and discards every row before the offset, so a page costs more the deeper it is; the cap bounds that cost and leaves the rest of a long list reachable only through filters.\n• Items added or removed during a read shift the pages, so an item can be read twice or missed: exports and synchronisation must not read these lists.\n• Simple to build with any ORM and any database.\n• Lowering the maximum page size or the cap later narrows the contract and is a breaking change, decided in the API evolution pack.",
+      "alternatives": "1. Opaque page tokens: the same cost at every depth and no shifting, but no page numbers.\n2. No cap on the offset: every page reachable, and one request can make the database read a whole table.\n3. A page number and page size instead of offset and limit: the same query and costs, and a page size change moves every page boundary.\n4. Shrinking a too-large limit to the maximum, as Google AIP-158 does: kinder to callers that ask for too much, but the contract then accepts what it does not serve.",
+      "hubWhen": {
+        "PAGING": [
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "adr-bounded",
+      "type": "adr",
+      "label": "Lists served whole, bounded by the domain",
+      "x": 780,
+      "y": 260,
+      "concern": "api-collections",
+      "status": "accepted",
+      "date": "",
+      "context": "Callers read lists from this element over HTTP (orders, customers, events), and the collections behind them grow. The forces: a list that returns everything works in testing and times out in production; a deep OFFSET page makes the database read and throw away every row before it, while a cursor cannot jump to page 40; items added or removed while a caller reads shift offset pages, so items are skipped or read twice; an order that is not total (two orders created in the same millisecond) does the same even when nothing changes; every filter and sort field offered is an index to keep and a promise to callers; a parameter the API ignores returns the wrong data to a caller who believes it was applied; and a page token with readable ids or offsets becomes an interface callers build on. Paths, field casing and methods are decided in the Resource design pack, the error body in the Errors pack, and how many requests a caller may send in the Rate limiting pack. Here every collection the API lists is capped by the domain, so none needs pages yet.",
+      "decision": "Every list operation returns the whole list as an object { items }, never a bare array (Microsoft guidelines, Collections). Each listed collection is capped by the domain at {{MAX_ITEMS}} items (a customer's addresses, an order's lines), the cap is declared as maxItems on items in the OpenAPI document, and a request that would add an item past it is refused with 409. A collection that can grow without limit (orders, events, audit records) is not served as a list until this decision is superseded. Default order: {{DEFAULT_ORDER}}. Filtering: {{FILTER}}. Sorting: {{SORT}}. Fields: {{FIELDS}}. Requests are validated against the OpenAPI document (express-openapi-validator in Node, swagger-request-validator on the JVM), so an undocumented parameter is refused with 400.",
+      "consequences": "• No paging code in the API or in its callers: every list is one request.\n• The cap is a product rule: it is agreed with the business and shown to users before they meet it.\n• Adding pages later is still a breaking change for callers that never followed a token (the Microsoft guidelines say so of adding paging); the object shape only keeps the response parsable, and the change goes through the API evolution pack.\n• The first collection that can grow without limit needs this decision superseded.",
+      "alternatives": "1. Opaque page tokens on every list from the start: nothing to supersede later, at the cost of paging code for lists that never need it.\n2. Lists without a cap: one request returns a whole table the first time it grows.",
+      "hubWhen": {
+        "PAGING": [
+          "bounded"
+        ]
+      }
+    },
+    {
+      "id": "adr-filter-expression",
+      "type": "adr",
+      "label": "Lists filtered with AIP-160 expressions",
+      "x": 780,
+      "y": 390,
+      "concern": "api-collections",
+      "status": "accepted",
+      "date": "",
+      "context": "Callers read lists from this element over HTTP (orders, customers, events), and the collections behind them grow. The forces: a list that returns everything works in testing and times out in production; a deep OFFSET page makes the database read and throw away every row before it, while a cursor cannot jump to page 40; items added or removed while a caller reads shift offset pages, so items are skipped or read twice; an order that is not total (two orders created in the same millisecond) does the same even when nothing changes; every filter and sort field offered is an index to keep and a promise to callers; a parameter the API ignores returns the wrong data to a caller who believes it was applied; and a page token with readable ids or offsets becomes an interface callers build on. Paths, field casing and methods are decided in the Resource design pack, the error body in the Errors pack, and how many requests a caller may send in the Rate limiting pack.",
+      "decision": "Lists are filtered through one filter parameter holding an expression in the Google AIP-160 grammar: comparisons (=, !=, <, >, <=, >=), AND, OR, NOT and the has operator (:) over the fields on each operation's allow-list, which the parameter's description in the OpenAPI document lists with their types. The server parses the expression with go.einride.tech/aip/filtering in Go, or with a parser generated from the published AIP-160 EBNF grammar (ANTLR on the JVM, Peggy in Node), checks every field against the allow-list and every value against the field's type, and turns it into parameterised SQL; the expression is never concatenated into a query. A field off the list, a value of the wrong type or an unsupported operator is refused with 400. A page token or offset is valid only with the expression it was issued for.",
+      "consequences": "• Callers combine conditions (OR, NOT, ranges on several fields) without a new parameter for each.\n• A parser, a type check and a translation to SQL to build and keep; a flaw there reaches the database, so it is tested like any other input handling.\n• Request validation cannot check an expression: the OpenAPI document sees one string, and generated clients get no typed filter arguments.\n• An expression can combine fields no index serves; a field enters the allow-list together with its index.",
+      "alternatives": "1. A query parameter per filterable field: typed, documented and validated through the OpenAPI document, but no OR and no NOT.\n2. The OData-style filter of the Microsoft guidelines (status eq 'paid'): the same power, natural on .NET stacks with an OData library, unfamiliar elsewhere.\n3. A search engine (OpenSearch) for free-form queries: full text and facets, at the cost of a second store kept in sync.",
+      "hubWhen": {
+        "FILTER": [
+          "expression"
+        ]
+      }
+    },
+    {
+      "id": "ff-spectral-cursor",
+      "type": "fitness-fn",
+      "label": "Every list documents page tokens and a page-size cap",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "0 Spectral errors: every list operation in api/openapi.yaml takes page_token and page_size with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and answers an object with items and next_page_token",
+      "description": "Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then enforces the range at run time.\n\nTool: Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error\n\n```yaml\nextends: spectral:oas\nrules:\n  list-page-parameters:\n    description: Every list operation takes page_token, and page_size from 1 to {{MAX_PAGE_SIZE}} with default {{DEFAULT_PAGE_SIZE}}.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then:\n      field: parameters\n      function: schema\n      functionOptions:\n        schema:\n          type: array\n          allOf:\n            - contains: { required: [name], properties: { name: { const: page_token } } }\n            - contains:\n                required: [name, schema]\n                properties:\n                  name: { const: page_size }\n                  schema: { required: [minimum, maximum, default], properties: { minimum: { const: 1 }, maximum: { maximum: {{MAX_PAGE_SIZE}} }, default: { const: {{DEFAULT_PAGE_SIZE}} } } }\n  list-page-object:\n    description: Every list operation answers an object with items and next_page_token, never a bare array.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_page_token] } } } } }\n```",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "ff-spectral-offset",
+      "type": "fitness-fn",
+      "label": "Every list documents limit and a capped offset",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "0 Spectral errors: every list operation in api/openapi.yaml takes limit with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and offset with minimum 0 and maximum at most {{MAX_OFFSET}}, and answers an object with items and next_offset",
+      "description": "Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then refuses a limit or offset out of range with 400.\n\nTool: Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error\n\n```yaml\nextends: spectral:oas\nrules:\n  list-limit-offset:\n    description: Every list operation takes limit (1 to {{MAX_PAGE_SIZE}}, default {{DEFAULT_PAGE_SIZE}}) and offset (0 to {{MAX_OFFSET}}).\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then:\n      field: parameters\n      function: schema\n      functionOptions:\n        schema:\n          type: array\n          allOf:\n            - contains:\n                required: [name, schema]\n                properties:\n                  name: { const: limit }\n                  schema: { required: [minimum, maximum, default], properties: { minimum: { const: 1 }, maximum: { maximum: {{MAX_PAGE_SIZE}} }, default: { const: {{DEFAULT_PAGE_SIZE}} } } }\n            - contains: { required: [name, schema], properties: { name: { const: offset }, schema: { required: [minimum, maximum], properties: { minimum: { const: 0 }, maximum: { maximum: {{MAX_OFFSET}} } } } } }\n  list-page-object:\n    description: Every list operation answers an object with items and next_offset, never a bare array.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_offset] } } } } }\n```",
+      "hubWhen": {
+        "PAGING": [
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "ff-page-size",
+      "type": "fitness-fn",
+      "label": "Page size held to its range",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "No page size returns {{DEFAULT_PAGE_SIZE}} items, {{MAX_PAGE_SIZE}} returns {{MAX_PAGE_SIZE}}; {{MAX_PAGE_SIZE}} + 1, 0, -1 and a word are refused with 400; with offsets, offset {{MAX_OFFSET}} is answered and {{MAX_OFFSET}} + 1 refused with 400 naming {{MAX_OFFSET}}",
+      "description": "An HTTP test against the application calls the orders list with each page size at and around the limits, and with offset and limit also with the offsets at and past the cap. The fixture names the page-size parameter of the decision (page_size with page tokens, limit with offsets).\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { PAGED_BY, SIZE_PARAM, seedOrders } from './collections/fixtures' // SIZE_PARAM: page_size or limit\n\nconst DEFAULT_SIZE = {{DEFAULT_PAGE_SIZE}}\nconst MAX_SIZE = {{MAX_PAGE_SIZE}}\nconst MAX_OFFSET = {{MAX_OFFSET}}\nconst list = (query: Record<string, string | number> = {}) => request(app).get('/orders').query(query)\n\nbeforeAll(() => seedOrders(MAX_SIZE + 10))\n\nit('serves the default size and the maximum, and refuses anything outside 1 to the maximum', async () => {\n  expect((await list()).body.items).toHaveLength(DEFAULT_SIZE)\n  expect((await list({ [SIZE_PARAM]: MAX_SIZE })).body.items).toHaveLength(MAX_SIZE)\n  for (const size of [MAX_SIZE + 1, 0, -1, 'ten']) expect((await list({ [SIZE_PARAM]: size })).status).toBe(400)\n})\n\nit.runIf(PAGED_BY === 'offset')('refuses an offset past the cap, naming it', async () => {\n  expect((await list({ offset: MAX_OFFSET })).status).toBe(200)\n  const past = await list({ offset: MAX_OFFSET + 1 })\n  expect(past.status).toBe(400)\n  expect(JSON.stringify(past.body)).toContain(String(MAX_OFFSET))\n})\n```",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    },
+    {
+      "id": "ff-cursor-tokens",
+      "type": "fitness-fn",
+      "label": "Page tokens sealed and checked",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "The last item's id appears 0 times in the decoded token; an altered token, a token sent to another list and a token older than {{TOKEN_HOURS}} hours are each refused with 400",
+      "description": "An HTTP test reads the first page, decodes its token to show it holds no readable id, then sends the token back with one character changed, to the customers list, and resealed with an issue time {{TOKEN_HOURS}} hours and one more in the past, using the same sealing module the list operations use.\n\nTool: Vitest with supertest, the token module of the application (Node crypto, AES-256-GCM)\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { openPageToken, sealPageToken } from '../src/collections/pageToken' // AES-256-GCM, as the lists use it\nimport { seedOrders } from './collections/fixtures'\n\nconst TOKEN_HOURS = {{TOKEN_HOURS}}\n\nbeforeAll(() => seedOrders(30))\n\nit('issues tokens that reveal nothing, and refuses altered, foreign and expired ones', async () => {\n  const first = await request(app).get('/orders').query({ page_size: 10 })\n  const token: string = first.body.next_page_token\n  expect(Buffer.from(token, 'base64url').toString('latin1')).not.toContain(first.body.items.at(-1).id)\n  const altered = token.slice(0, 20) + (token[20] === 'A' ? 'B' : 'A') + token.slice(21)\n  const expired = sealPageToken({ ...openPageToken(token), issuedAt: Date.now() - (TOKEN_HOURS + 1) * 3_600_000 })\n  for (const [path, pageToken] of [['/orders', altered], ['/customers', token], ['/orders', expired]]) {\n    const res = await request(app).get(path).query({ page_size: 10, page_token: pageToken })\n    expect(res.status, `${path} with a bad token`).toBe(400)\n  }\n})\n```",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "ff-cursor-walk",
+      "type": "fitness-fn",
+      "label": "A read survives concurrent changes",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "While 5 items are added and 5 not yet read are removed during a read of 5 pages, every other item is read exactly once and 0 items twice",
+      "description": "An HTTP test reads the orders list page by page with page tokens; after the second page it adds five orders and removes the last five of the list, which have not been read yet, then checks what the read returned against the ids the database held before.\n\nTool: Vitest with supertest, with fixtures that write to the test database\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { createOrders, deleteOrders, orderIds, seedOrders } from './collections/fixtures' // orderIds: in the default order\n\nbeforeAll(() => seedOrders(50))\n\nit('reads every surviving item once while items are added and removed', async () => {\n  const before = await orderIds()\n  const removed = before.slice(-5) // not read yet when they go\n  const read: string[] = []\n  let token: string | undefined\n  for (let page = 1; page === 1 || token; page++) {\n    const { body } = await request(app).get('/orders').query({ page_size: 10, ...(token ? { page_token: token } : {}) })\n    read.push(...body.items.map((o: { id: string }) => o.id))\n    token = body.next_page_token\n    if (page === 2) { await createOrders(5); await deleteOrders(removed) }\n  }\n  expect(new Set(read).size).toBe(read.length)\n  for (const id of before.filter((id) => !removed.includes(id))) expect(read).toContain(id)\n})\n```",
+      "hubWhen": {
+        "PAGING": [
+          "cursor"
+        ]
+      }
+    },
+    {
+      "id": "ff-order",
+      "type": "fitness-fn",
+      "label": "Lists read in a total order",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "Reading every page of the orders list in the default order returns each seeded item exactly once, and every item comes strictly after its neighbour in the order {{DEFAULT_ORDER}}",
+      "description": "An HTTP test seeds orders of which twenty share one creation time, reads every page with the walk helper (which follows the pagination of the decision: page tokens, offsets, or the one response of a bounded list), and checks that no item is missing or repeated and that each item comes strictly after the one before it in the default order, so ties are broken.\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, expect, it } from 'vitest'\nimport { SEEDED, seedOrders, walk } from './collections/fixtures' // walk: every page, as the decision pages\n\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\ntype Item = Record<string, any>\nconst ORDER = '{{DEFAULT_ORDER}}'.split(',').map((key) => key.trim().split(/\\s+/))\nconst strictlyBefore = (a: Item, b: Item): boolean => {\n  for (const [field, direction] of ORDER) {\n    if (a[field] === b[field]) continue\n    return direction === 'desc' ? a[field] > b[field] : a[field] < b[field]\n  }\n  return false\n}\n\nbeforeAll(() => seedOrders(SEEDED, { sameCreatedAt: 20 })) // twenty items share one creation time\n\nit('reads each item once, in the default order, with every tie broken', async () => {\n  const items: Item[] = await walk('/orders', {})\n  expect(items).toHaveLength(SEEDED)\n  expect(new Set(items.map((item) => item.id)).size).toBe(SEEDED)\n  for (let i = 1; i < items.length; i++) expect(strictlyBefore(items[i - 1], items[i])).toBe(true)\n})\n```"
+    },
+    {
+      "id": "ff-bounded",
+      "type": "fitness-fn",
+      "label": "Bounded lists refuse to grow",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "A list holding {{MAX_ITEMS}} items refuses one more with 409 and returns all {{MAX_ITEMS}} in one response without a page token; one test per bounded list",
+      "description": "An HTTP test per bounded list fills it to the cap through the API, adds one more and reads the list back. The example is a customer's addresses.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { createCustomer } from './collections/fixtures'\n\nconst MAX_ITEMS = {{MAX_ITEMS}}\n\nit('serves a customer\\'s addresses whole and refuses to grow them past the cap', async () => {\n  const customer = await createCustomer()\n  const addresses = `/customers/${customer.id}/addresses`\n  const add = () => request(app).post(addresses).send({ line1: 'Main Street 1', city: 'Gdansk', country: 'PL' })\n  for (let i = 0; i < MAX_ITEMS; i++) expect((await add()).status).toBe(201)\n  expect((await add()).status).toBe(409)\n  const { body } = await request(app).get(addresses)\n  expect(body.items).toHaveLength(MAX_ITEMS)\n  expect(body).not.toHaveProperty('next_page_token')\n})\n```",
+      "hubWhen": {
+        "PAGING": [
+          "bounded"
+        ]
+      }
+    },
+    {
+      "id": "ff-unknown",
+      "type": "fitness-fn",
+      "label": "Unknown parameters refused",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "An undocumented parameter, an order_by field off the allow-list, a filter on an unknown field and an unknown field in fields are each refused with 400, the error naming the parameter or field",
+      "description": "An HTTP test calls the orders list four times with something it does not know. The same four calls hold for every answer: where the pack decided no order_by, filter or fields parameter, the parameter itself is the unknown one.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../src/app'\n\nit.each([\n  { label: 'an undocumented parameter', query: { colour: 'red' }, names: /colour/ },\n  { label: 'an order_by field off the allow-list', query: { order_by: 'internal_cost' }, names: /order_by|internal_cost/ },\n  { label: 'a filter on an unknown field', query: { filter: 'internal_cost > 1' }, names: /filter|internal_cost/ },\n  { label: 'an unknown field in fields', query: { fields: 'internal_cost' }, names: /fields|internal_cost/ },\n])('refuses $label with 400, naming it', async ({ query, names }) => {\n  const res = await request(app).get('/orders').query(query)\n  expect(res.status).toBe(400)\n  expect(JSON.stringify(res.body)).toMatch(names)\n})\n```"
+    },
+    {
+      "id": "ff-filter",
+      "type": "fitness-fn",
+      "label": "Filters apply before paging",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "For each filterable field, the filtered read across every page returns exactly the matching items of the unfiltered read, in the same order; a value of the wrong type is refused with 400",
+      "description": "An HTTP test per filterable field reads the whole list, then the list with the filter, and compares the ids; a second call sends a value that does not fit the field. The cases live in the fixtures, one per filterable field of the OpenAPI document, written as the decision filters (a parameter per field, or an AIP-160 expression).\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, describe, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { FILTER_CASES, SEEDED, seedOrders, walk } from './collections/fixtures'\n// one case per filterable field, for example\n//   { field: 'status', query: { status: 'paid' }, invalid: { created_after: 'yesterday' }, matches: (o) => o.status === 'paid' }\n//   { field: 'status', query: { filter: 'status = \"paid\"' }, invalid: { filter: 'total > \"many\"' }, matches: (o) => o.status === 'paid' }\n\nbeforeAll(() => seedOrders(SEEDED))\n\ndescribe.each(FILTER_CASES)('filter on $field', ({ query, invalid, matches }) => {\n  it('returns exactly the matching items across every page, in order', async () => {\n    const all = await walk('/orders', {})\n    expect((await walk('/orders', query)).map((o) => o.id)).toEqual(all.filter(matches).map((o) => o.id))\n  })\n  it('refuses a value that does not fit the field', async () => {\n    expect((await request(app).get('/orders').query(invalid)).status).toBe(400)\n  })\n})\n```",
+      "hubWhen": {
+        "FILTER": [
+          "params",
+          "expression"
+        ]
+      }
+    },
+    {
+      "id": "ff-sort",
+      "type": "fitness-fn",
+      "label": "Every allowed order holds across pages",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "For each field on the order_by allow-list, ascending and descending, every item read across all pages comes after its neighbour by the field, ties by id in the same direction",
+      "description": "An HTTP test reads the orders list page by page once per allowed field and direction, with twenty orders sharing one creation time so ties occur, and checks each neighbouring pair. The allow-list comes from the fixtures, which read it from the OpenAPI document.\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, describe, expect, it } from 'vitest'\nimport { SEEDED, SORTABLE, seedOrders, walk } from './collections/fixtures' // SORTABLE: the order_by allow-list\n\nbeforeAll(() => seedOrders(SEEDED, { sameCreatedAt: 20 }))\n\nconst cases = SORTABLE.flatMap((field: string) => [{ field, direction: 'asc' }, { field, direction: 'desc' }])\n\ndescribe.each(cases)('order_by $field $direction', ({ field, direction }) => {\n  it('orders every page by the field, ties by id in the same direction', async () => {\n    const items = await walk('/orders', { order_by: direction === 'desc' ? `${field} desc` : field })\n    for (let i = 1; i < items.length; i++) {\n      const [a, b] = direction === 'desc' ? [items[i], items[i - 1]] : [items[i - 1], items[i]]\n      expect(a[field] < b[field] || (a[field] === b[field] && a.id < b.id)).toBe(true)\n    }\n  })\n})\n```",
+      "hubWhen": {
+        "SORT": [
+          "allowlist"
+        ]
+      }
+    },
+    {
+      "id": "ff-fields",
+      "type": "fitness-fn",
+      "label": "Partial items hold only what was asked",
+      "x": 1040,
+      "y": 1300,
+      "category": "structural",
+      "threshold": "With fields=status,total,customer.name, every item on every page holds exactly id, status, total and a customer with only its name",
+      "description": "An HTTP test reads every page of the orders list with a fields parameter that names two top-level fields and one nested field, and checks the keys of each item.\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, expect, it } from 'vitest'\nimport { SEEDED, seedOrders, walk } from './collections/fixtures'\n\nbeforeAll(() => seedOrders(SEEDED))\n\nit('returns only the named fields and the id, on every page', async () => {\n  const items = await walk('/orders', { fields: 'status,total,customer.name' })\n  expect(items).toHaveLength(SEEDED)\n  for (const item of items) {\n    expect(Object.keys(item).sort()).toEqual(['customer', 'id', 'status', 'total'])\n    expect(Object.keys(item.customer)).toEqual(['name'])\n  }\n})\n```",
+      "hubWhen": {
+        "FIELDS": [
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "ff-latency",
+      "type": "fitness-fn",
+      "label": "Deep pages answered in time",
+      "x": 1040,
+      "y": 1430,
+      "category": "operational",
+      "threshold": "p95 of http_req_duration for the deep page below {{LIST_P95_MS}} ms over 2 minutes with 10 virtual users",
+      "description": "A k6 script run nightly against a test environment with a production-sized collection: its setup finds a page a hundred pages deep by following page tokens (with offsets it takes the largest offset accepted), then ten virtual users request that page for two minutes; the threshold fails the run when the 95th percentile is too slow. Only the deep-page requests are tagged, so the setup does not count.\n\nTool: k6 (k6 run tests/load/deep-pages.js with BASE_URL and PAGED_BY=token or offset)\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nconst BASE = __ENV.BASE_URL\nconst SIZE = {{MAX_PAGE_SIZE}}\nexport const options = {\n  vus: 10,\n  duration: '2m',\n  thresholds: { 'http_req_duration{page:deep}': ['p(95)<{{LIST_P95_MS}}'] },\n}\n\nexport function setup() {\n  if (__ENV.PAGED_BY === 'offset') return { url: `${BASE}/orders?limit=${SIZE}&offset={{MAX_OFFSET}}` }\n  let query = `page_size=${SIZE}`\n  for (let page = 1; page < 100; page++) query = `page_size=${SIZE}&page_token=${http.get(`${BASE}/orders?${query}`).json('next_page_token')}`\n  return { url: `${BASE}/orders?${query}` }\n}\n\nexport default function (data) {\n  check(http.get(data.url, { tags: { page: 'deep' } }), { 'deep page served': (r) => r.status === 200 })\n}\n```",
+      "hubWhen": {
+        "PAGING": [
+          "cursor",
+          "offset"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-paged--derives--need",
+      "sourceId": "req-paged",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-token-opaque--derives--need",
+      "sourceId": "req-token-opaque",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-token-refused--derives--need",
+      "sourceId": "req-token-refused",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-cursor-consistent--derives--need",
+      "sourceId": "req-cursor-consistent",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-offset-cap--derives--need",
+      "sourceId": "req-offset-cap",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-bounded--derives--need",
+      "sourceId": "req-bounded",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-order--derives--need",
+      "sourceId": "req-order",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-unknown--derives--need",
+      "sourceId": "req-unknown",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-filter--derives--need",
+      "sourceId": "req-filter",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-sort--derives--need",
+      "sourceId": "req-sort",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-fields--derives--need",
+      "sourceId": "req-fields",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-latency--derives--need",
+      "sourceId": "req-latency",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-paged--verifies--req-paged",
+      "sourceId": "sc-paged",
+      "targetId": "req-paged",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-token-opaque--verifies--req-token-opaque",
+      "sourceId": "sc-token-opaque",
+      "targetId": "req-token-opaque",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-token-refused--verifies--req-token-refused",
+      "sourceId": "sc-token-refused",
+      "targetId": "req-token-refused",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-cursor-consistent--verifies--req-cursor-consistent",
+      "sourceId": "sc-cursor-consistent",
+      "targetId": "req-cursor-consistent",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-offset-cap--verifies--req-offset-cap",
+      "sourceId": "sc-offset-cap",
+      "targetId": "req-offset-cap",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-bounded--verifies--req-bounded",
+      "sourceId": "sc-bounded",
+      "targetId": "req-bounded",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-order--verifies--req-order",
+      "sourceId": "sc-order",
+      "targetId": "req-order",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-unknown--verifies--req-unknown",
+      "sourceId": "sc-unknown",
+      "targetId": "req-unknown",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-filter--verifies--req-filter",
+      "sourceId": "sc-filter",
+      "targetId": "req-filter",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-sort--verifies--req-sort",
+      "sourceId": "sc-sort",
+      "targetId": "req-sort",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-fields--verifies--req-fields",
+      "sourceId": "sc-fields",
+      "targetId": "req-fields",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-latency--verifies--req-latency",
+      "sourceId": "sc-latency",
+      "targetId": "req-latency",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-spectral-cursor--implements--adr-cursor",
+      "sourceId": "ff-spectral-cursor",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-spectral-offset--implements--adr-offset",
+      "sourceId": "ff-spectral-offset",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-page-size--implements--adr-cursor",
+      "sourceId": "ff-page-size",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-page-size--implements--adr-offset",
+      "sourceId": "ff-page-size",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cursor-tokens--implements--adr-cursor",
+      "sourceId": "ff-cursor-tokens",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-cursor-walk--implements--adr-cursor",
+      "sourceId": "ff-cursor-walk",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-order--implements--adr-cursor",
+      "sourceId": "ff-order",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-order--implements--adr-offset",
+      "sourceId": "ff-order",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-order--implements--adr-bounded",
+      "sourceId": "ff-order",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-bounded--implements--adr-bounded",
+      "sourceId": "ff-bounded",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-unknown--implements--adr-cursor",
+      "sourceId": "ff-unknown",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-unknown--implements--adr-offset",
+      "sourceId": "ff-unknown",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-unknown--implements--adr-bounded",
+      "sourceId": "ff-unknown",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-filter--implements--adr-cursor",
+      "sourceId": "ff-filter",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-filter--implements--adr-offset",
+      "sourceId": "ff-filter",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-filter--implements--adr-bounded",
+      "sourceId": "ff-filter",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-filter--implements--adr-filter-expression",
+      "sourceId": "ff-filter",
+      "targetId": "adr-filter-expression",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sort--implements--adr-cursor",
+      "sourceId": "ff-sort",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sort--implements--adr-offset",
+      "sourceId": "ff-sort",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sort--implements--adr-bounded",
+      "sourceId": "ff-sort",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fields--implements--adr-cursor",
+      "sourceId": "ff-fields",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fields--implements--adr-offset",
+      "sourceId": "ff-fields",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fields--implements--adr-bounded",
+      "sourceId": "ff-fields",
+      "targetId": "adr-bounded",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-latency--implements--adr-cursor",
+      "sourceId": "ff-latency",
+      "targetId": "adr-cursor",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-latency--implements--adr-offset",
+      "sourceId": "ff-latency",
+      "targetId": "adr-offset",
+      "relationType": "implements"
+    }
+  ]
+}

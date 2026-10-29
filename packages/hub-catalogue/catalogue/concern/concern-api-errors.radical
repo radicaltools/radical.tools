@@ -1,0 +1,1147 @@
+{
+  "hub": {
+    "id": "concern-api-errors",
+    "category": "concern",
+    "name": "Errors",
+    "description": "What an error looks like to a caller of an HTTP API: the body's format, stable error codes, how validation errors are reported, and where the codes are documented. What must never reach a caller is decided in Error handling and logging conventions.",
+    "tags": [
+      "api",
+      "errors",
+      "problem details",
+      "rfc 9457",
+      "error codes",
+      "validation"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "api-errors",
+      "trigger": "LIST RELATIONS WHERE source.type != \"person\" AND target.external != true AND (target.type = \"container\" OR target.type = \"component\")",
+      "applyTo": "target",
+      "why": "other parts of the system or other systems call these elements, so what an error looks like to a caller has to be decided once for every operation they offer.",
+      "group": "api"
+    },
+    "sources": [
+      {
+        "title": "RFC 9457, Problem Details for HTTP APIs",
+        "url": "https://www.rfc-editor.org/rfc/rfc9457"
+      },
+      {
+        "title": "RFC 6901, JavaScript Object Notation (JSON) Pointer",
+        "url": "https://www.rfc-editor.org/rfc/rfc6901"
+      },
+      {
+        "title": "RFC 9110, HTTP Semantics (15. Status Codes)",
+        "url": "https://www.rfc-editor.org/rfc/rfc9110#name-status-codes"
+      },
+      {
+        "title": "Microsoft Azure REST API Guidelines: Handling errors",
+        "url": "https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#handling-errors"
+      },
+      {
+        "title": "Google AIP-193, Errors",
+        "url": "https://google.aip.dev/193"
+      },
+      {
+        "title": "google/rpc/error_details.proto (ErrorInfo, BadRequest, RequestInfo, Help)",
+        "url": "https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto"
+      },
+      {
+        "title": "Zalando RESTful API Guidelines: MUST support problem JSON [176], MUST not expose stack traces [177]",
+        "url": "https://opensource.zalando.com/restful-api-guidelines/#176"
+      },
+      {
+        "title": "OWASP Error Handling Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html"
+      },
+      {
+        "title": "Spectral: custom rulesets",
+        "url": "https://github.com/stoplightio/spectral/blob/develop/docs/guides/4-custom-rulesets.md"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "FORMAT",
+        "title": "Error body",
+        "label": "What does an error look like to a caller?",
+        "hint": "Every client parses this body, so it is the one shape the whole API keeps. Follow the guide chosen in the API style guide pack: Zalando's guidelines ask for problem details, Microsoft's for its error object, Google's AIPs for google.rpc.Status. How the shape changes across versions is the API evolution pack's decision.",
+        "defaultValue": "problem-details",
+        "options": [
+          {
+            "value": "problem-details",
+            "label": "RFC 9457 problem details",
+            "description": "Every error is application/problem+json with type (a URI reference naming the problem), title, status, detail and instance, plus a stable code and the correlation id as extension members. Pick it for any HTTP API with more than one client or a public one, and whenever the chosen guide is Zalando's or your own: it is the IETF standard, and Spring, ASP.NET Core and most gateways write it already."
+          },
+          {
+            "value": "microsoft",
+            "label": "Microsoft's error object",
+            "description": "Every error is a JSON body {\"error\": {\"code\", \"message\", \"target\", \"details\", \"innererror\"}} with the code repeated in an x-ms-error-code header, as the Microsoft Azure REST API Guidelines require. Pick it when the chosen guide is Microsoft's, or the API sits beside Azure or Microsoft Graph APIs whose clients already parse that shape."
+          },
+          {
+            "value": "google",
+            "label": "google.rpc.Status as JSON",
+            "description": "Every error is a JSON body {\"error\": {\"code\", \"message\", \"status\", \"details\"}} where code is the HTTP status, status the google.rpc.Code name and details holds a google.rpc.ErrorInfo with a stable reason, as Google AIP-193 requires. Pick it when the chosen guide is Google's AIPs, or the API is gRPC transcoded to HTTP/JSON, where this is the shape the gateway speaks."
+          },
+          {
+            "value": "minimal",
+            "label": "a minimal body of status, code and message",
+            "description": "The HTTP status plus a JSON body holding only a stable code, a message and the correlation id. Pick it for an internal API with one client owned by the same team, where a standard shape buys nothing yet; moving to problem details later is a breaking change."
+          }
+        ]
+      },
+      {
+        "key": "CODES",
+        "title": "Error codes",
+        "label": "How does a client tell one error from another?",
+        "hint": "The status says what kind of failure it was; a code says which one. A code a client keys on is part of the contract, so it must be listed and must never change meaning.",
+        "defaultValue": "catalogue",
+        "options": [
+          {
+            "value": "catalogue",
+            "label": "a catalogue of stable codes, listed per operation",
+            "description": "Every error carries a machine-readable code from one catalogue kept with the OpenAPI document (ORDER_NOT_FOUND, PAYMENT_DECLINED), each operation lists the codes it may return, and a released code is never renamed or removed. Pick it when clients act differently on errors of the same status, or the API is public or used by partners."
+          },
+          {
+            "value": "status-only",
+            "label": "the HTTP status alone",
+            "description": "Clients key on the HTTP status only; where the format has a code field it holds the status's reason phrase (NOT_FOUND, INTERNAL_SERVER_ERROR), and problem details use type about:blank. Pick it for an internal API whose one client treats every error of a status the same, so a catalogue would be paperwork."
+          }
+        ]
+      },
+      {
+        "key": "VALIDATION",
+        "title": "Invalid input",
+        "label": "How are invalid fields in a request reported?",
+        "hint": "A client that fills a form wants to mark every wrong field at once; one that only logs the failure needs just the first.",
+        "defaultValue": "all",
+        "options": [
+          {
+            "value": "all",
+            "label": "every field error in one response",
+            "description": "One response lists every invalid field of the request body, each with its location (a JSON Pointer, RFC 6901, or the dotted field path of google.rpc.BadRequest) and a field-level code. Pick it whenever a person fills the request in through a form, and as the default for any public API."
+          },
+          {
+            "value": "first",
+            "label": "the first field error only",
+            "description": "Validation stops at the first invalid field and the response names that one, with its location and code. Pick it for machine-to-machine APIs whose callers build requests in code and treat any invalid request as a bug."
+          }
+        ]
+      },
+      {
+        "key": "DOCS",
+        "title": "Code documentation",
+        "label": "Where does a developer read what a code means?",
+        "hint": "Only when codes come from a catalogue: with the HTTP status alone there is nothing beyond the status to document, and this answer decides nothing. RFC 9457 suggests type URIs that resolve to a page; Zalando deliberately keeps them as identifiers documented in the OpenAPI document.",
+        "defaultValue": "page",
+        "options": [
+          {
+            "value": "page",
+            "label": "a documentation page per code",
+            "description": "Every code has a public page under one base URL (when it happens, what the caller should do), which the problem details type URI or a google.rpc.Help link points to. Pick it for public and partner APIs, where the developer who hits an error is not the one who read the reference."
+          },
+          {
+            "value": "identifiers",
+            "label": "identifiers documented in the OpenAPI document only",
+            "description": "Codes and type URIs are identifiers that do not resolve (type /problems/order-not-found); each code is described in the catalogue and published with the OpenAPI document beside the operations that return it. Pick it for internal APIs, or when a separate documentation site would fall out of step with the contract, as the Zalando guidelines argue."
+          }
+        ]
+      },
+      {
+        "key": "CODE_PATTERN",
+        "label": "Regular expression every error code and field-level code matches",
+        "defaultValue": "^[A-Z][A-Z0-9_]*[A-Z0-9]$"
+      },
+      {
+        "key": "VALIDATION_STATUS",
+        "label": "Status of a response to a request body that fails validation (400, or 422 for content that parses but breaks a rule)",
+        "defaultValue": "400",
+        "type": "number"
+      },
+      {
+        "key": "GENERIC_MESSAGE",
+        "label": "Text every unexpected (5xx) error gives its caller",
+        "defaultValue": "An unexpected error occurred. Quote the trace id of this response when you contact support."
+      },
+      {
+        "key": "ERROR_DOCS_URL",
+        "label": "Base URL of the error code pages (a documentation page per code only)",
+        "defaultValue": "https://developer.example.com/errors/"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Errors a caller can act on",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Errors",
+      "description": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
+    },
+    {
+      "id": "req-problem-details",
+      "type": "requirement",
+      "label": "Errors answered as problem details",
+      "x": 260,
+      "y": 0,
+      "ears_type": "event-driven",
+      "trigger": "an operation answers with a 4xx or 5xx status",
+      "action": "send a body of media type application/problem+json holding type (a URI reference), title, status equal to the response's status, detail, instance, and as extension members a code matching {{CODE_PATTERN}} and the correlation id under the field set in Error handling and logging conventions; where codes are the HTTP status alone, type is about:blank and title the status's reason phrase",
+      "rationale": "One standard shape lets every client parse every error with one library, and the extension members carry what the five standard ones do not; clients must ignore extensions they do not know, so adding one breaks nobody (RFC 9457, sections 3.1, 3.2 and 4.2.1; Zalando guidelines, rule 176).",
+      "hubWhen": {
+        "FORMAT": [
+          "problem-details"
+        ]
+      }
+    },
+    {
+      "id": "req-microsoft-error",
+      "type": "requirement",
+      "label": "Errors answered as Microsoft's error object",
+      "x": 260,
+      "y": 130,
+      "ears_type": "event-driven",
+      "trigger": "an operation answers with a 4xx or 5xx status",
+      "action": "send a JSON body whose only top-level member is error, an object holding code (matching {{CODE_PATTERN}}), message, and where they apply target and details (each an object of the same shape), with the correlation id as a property of error under the field set in Error handling and logging conventions; repeat the code in an x-ms-error-code header, and send no innererror with production settings",
+      "rationale": "The guidelines make the top-level code and the header the contract and leave the other fields free; innererror is for debugging detail, which belongs in the log, not in the answer (Microsoft Azure REST API Guidelines, Handling errors; OWASP Error Handling Cheat Sheet).",
+      "hubWhen": {
+        "FORMAT": [
+          "microsoft"
+        ]
+      }
+    },
+    {
+      "id": "req-google-status",
+      "type": "requirement",
+      "label": "Errors answered as google.rpc.Status",
+      "x": 260,
+      "y": 260,
+      "ears_type": "event-driven",
+      "trigger": "an operation answers with a 4xx or 5xx status",
+      "action": "send a JSON body whose only top-level member is error, holding code (the HTTP status), status (the google.rpc.Code name, such as NOT_FOUND or INTERNAL), message, and details with exactly one google.rpc.ErrorInfo (reason matching {{CODE_PATTERN}}, domain the service's name) and one google.rpc.RequestInfo whose requestId is the correlation id, no detail type twice",
+      "rationale": "AIP-193 requires an ErrorInfo in every error and keeps its reason and domain stable as the machine-readable identity of the error; RequestInfo is the detail meant for the id a client quotes when it reports a problem (Google AIP-193; google/rpc/error_details.proto).",
+      "hubWhen": {
+        "FORMAT": [
+          "google"
+        ]
+      }
+    },
+    {
+      "id": "req-minimal",
+      "type": "requirement",
+      "label": "Errors answered as status, code and message",
+      "x": 260,
+      "y": 390,
+      "ears_type": "event-driven",
+      "trigger": "an operation answers with a 4xx or 5xx status",
+      "action": "send a JSON body holding only code (matching {{CODE_PATTERN}}), message and the correlation id under the field set in Error handling and logging conventions, plus the list of field errors when the request failed validation, and nothing else",
+      "rationale": "A client owned by the same team needs a code to key on and an id to quote; every further field is one more thing to keep stable and one more place for internals to slip out (OWASP Error Handling Cheat Sheet).",
+      "hubWhen": {
+        "FORMAT": [
+          "minimal"
+        ]
+      }
+    },
+    {
+      "id": "req-correlation",
+      "type": "requirement",
+      "label": "Every error carries the request's id",
+      "x": 260,
+      "y": 520,
+      "ears_type": "event-driven",
+      "trigger": "an operation answers with a 4xx or 5xx status",
+      "action": "carry in the error body the correlation id of the request (the trace id of an incoming traceparent header, or the id created at the edge when there is none), in the place the error format gives it and under the field set in Error handling and logging conventions",
+      "rationale": "The id in the answer is what a client quotes to support and what finds the one log line of that failure among millions; without it a report of an error cannot be traced (RFC 9457, section 3.2 extension members; google.rpc.RequestInfo; OWASP Error Handling Cheat Sheet)."
+    },
+    {
+      "id": "req-caller-text",
+      "type": "requirement",
+      "label": "Error text written for the caller",
+      "x": 260,
+      "y": 650,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "an error is caused by an exception, a driver error or an upstream system's answer",
+      "action": "fill the human-readable text of the error body (detail, message) only with text written for callers (the code's catalogue entry, or the operation's own wording), never with the exception's or upstream's message, and give every 5xx error the fixed text \"{{GENERIC_MESSAGE}}\"",
+      "rationale": "An exception's message is written for the developer and describes the code, not what the caller should do; passing it through also passes on whatever it names. The leak of stack traces, class names and SQL is ruled out in Error handling and logging conventions; this rules out the text (OWASP Error Handling Cheat Sheet; RFC 9457, section 4: not a debugging tool)."
+    },
+    {
+      "id": "req-documented",
+      "type": "requirement",
+      "label": "Error responses documented per operation",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "document in the OpenAPI document, for every operation, at least one 4xx response and a default response, each with its content described, so that 0 operations leave a caller to guess what their errors look like",
+      "rationale": "Clients are generated from the document; an error response it does not describe is one the client has no type for (Zalando guidelines, rule 151, MUST specify success and error responses; Microsoft Azure REST API Guidelines, Handling errors)."
+    },
+    {
+      "id": "req-codes",
+      "type": "requirement",
+      "label": "Codes come from one catalogue",
+      "x": 260,
+      "y": 910,
+      "ears_type": "ubiquitous",
+      "action": "take every error code from the one catalogue api/errors/codes.yaml (each code matching {{CODE_PATTERN}}, with its status of at least 400, a title and a description), list in each operation's x-error-codes the codes it may return, and never rename or remove a released code",
+      "rationale": "A client keys on codes, so a code is part of the contract: renamed or removed, it breaks callers silently, and a code returned but never listed is one no client was written for (Microsoft Azure REST API Guidelines: error codes are part of the API contract; Google AIP-193: the same reason and domain for the same error, consistent over time).",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ]
+      }
+    },
+    {
+      "id": "req-status-only",
+      "type": "requirement",
+      "label": "Errors keyed on the status alone",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "ubiquitous",
+      "action": "give every error the code of its HTTP status where the format has a code field (the status's reason phrase in upper snake case: NOT_FOUND, UNPROCESSABLE_CONTENT, INTERNAL_SERVER_ERROR), and in problem details the type about:blank, so that no code carries more than the status does",
+      "rationale": "With one client that treats every error of a status alike, a code that only repeats the status is honest about what the client may rely on; about:blank is the type RFC 9457 defines for exactly that (RFC 9457, section 4.2.1; RFC 9110, section 15).",
+      "hubWhen": {
+        "CODES": [
+          "status-only"
+        ]
+      }
+    },
+    {
+      "id": "req-validation-all",
+      "type": "requirement",
+      "label": "Every invalid field reported at once",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "event-driven",
+      "trigger": "a request body fails validation",
+      "action": "answer {{VALIDATION_STATUS}} listing every invalid field in one response, each with its location (a JSON Pointer per RFC 6901 into the body; the dotted field path of google.rpc.BadRequest in that format) and a field-level code matching {{CODE_PATTERN}}",
+      "rationale": "A user who submits a form with three mistakes should learn of all three at once, and a client can only mark the fields if it can locate them; RFC 9457 shows exactly this list of detail and pointer (RFC 9457, section 3; RFC 6901; google.rpc.BadRequest field violations).",
+      "hubWhen": {
+        "VALIDATION": [
+          "all"
+        ]
+      }
+    },
+    {
+      "id": "req-validation-first",
+      "type": "requirement",
+      "label": "First invalid field reported",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "event-driven",
+      "trigger": "a request body fails validation",
+      "action": "answer {{VALIDATION_STATUS}} naming only the first invalid field found, with its location (a JSON Pointer per RFC 6901 into the body; the dotted field path of google.rpc.BadRequest in that format) and a field-level code matching {{CODE_PATTERN}}, in the place the format keeps field errors",
+      "rationale": "A caller that builds requests in code fixes a bug, not a form; one located error is enough to find it, and stopping early keeps validation simple (RFC 6901; RFC 9110, section 15.5.1).",
+      "hubWhen": {
+        "VALIDATION": [
+          "first"
+        ]
+      }
+    },
+    {
+      "id": "req-docs-page",
+      "type": "requirement",
+      "label": "A page for every code",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "publish for every code of the catalogue a page at {{ERROR_DOCS_URL}} followed by the code in lower case with dashes (ORDER_NOT_FOUND at order-not-found), reachable without signing in and answering 200 with HTML that names the code",
+      "rationale": "The developer who meets an error is often not the one who read the reference; a type URI that resolves to human-readable documentation is what RFC 9457 recommends, and AIP-193 requires the links of a publicly documented service to be reachable without authentication (RFC 9457, sections 3.1.1 and 4; Google AIP-193, Help).",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ],
+        "DOCS": [
+          "page"
+        ]
+      }
+    },
+    {
+      "id": "req-docs-identifiers",
+      "type": "requirement",
+      "label": "Codes documented in the contract",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "ubiquitous",
+      "action": "document every code in its catalogue entry with a description of when it happens and what the caller should do, published with the OpenAPI document beside the operations whose x-error-codes list it",
+      "rationale": "An identifier that does not resolve is fine when the contract itself explains it; the Zalando guidelines keep type URIs as identifiers precisely so that the documentation lives in the OpenAPI document and cannot drift from it (Zalando guidelines, rule 176; RFC 9457, section 3.1.1: the type URI may be non-resolvable).",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ],
+        "DOCS": [
+          "identifiers"
+        ]
+      }
+    },
+    {
+      "id": "sc-problem-details",
+      "type": "scenario",
+      "label": "Not found and crash answered as problems",
+      "x": 520,
+      "y": 0,
+      "given": "the element running with production settings",
+      "when": "an order that does not exist is requested and a route that throws an unexpected error is called, both with a traceparent header",
+      "then": "both answers are application/problem+json with type, title, status equal to the response's, detail, instance, a code matching {{CODE_PATTERN}} and the trace id of the traceparent",
+      "hubWhen": {
+        "FORMAT": [
+          "problem-details"
+        ]
+      }
+    },
+    {
+      "id": "sc-microsoft-error",
+      "type": "scenario",
+      "label": "Not found and crash answered as error objects",
+      "x": 520,
+      "y": 130,
+      "given": "the element running with production settings",
+      "when": "an order that does not exist is requested and a route that throws an unexpected error is called, both with a traceparent header",
+      "then": "both answers are JSON with only the member error, whose code matches {{CODE_PATTERN}} and equals the x-ms-error-code header, which has a message and the trace id of the traceparent, and no innererror",
+      "hubWhen": {
+        "FORMAT": [
+          "microsoft"
+        ]
+      }
+    },
+    {
+      "id": "sc-google-status",
+      "type": "scenario",
+      "label": "Not found and crash answered as statuses",
+      "x": 520,
+      "y": 260,
+      "given": "the element running with production settings",
+      "when": "an order that does not exist is requested and a route that throws an unexpected error is called, both with a traceparent header",
+      "then": "both answers are JSON with only the member error, whose code equals the response's status, whose status is a google.rpc.Code name, and whose details hold one ErrorInfo with a reason matching {{CODE_PATTERN}} and one RequestInfo with the trace id of the traceparent",
+      "hubWhen": {
+        "FORMAT": [
+          "google"
+        ]
+      }
+    },
+    {
+      "id": "sc-minimal",
+      "type": "scenario",
+      "label": "Not found and crash answered minimally",
+      "x": 520,
+      "y": 390,
+      "given": "the element running with production settings",
+      "when": "an order that does not exist is requested and a route that throws an unexpected error is called, both with a traceparent header",
+      "then": "both answers are JSON with exactly the fields code, message and the correlation field, the code matching {{CODE_PATTERN}} and the id the trace id of the traceparent",
+      "hubWhen": {
+        "FORMAT": [
+          "minimal"
+        ]
+      }
+    },
+    {
+      "id": "sc-correlation",
+      "type": "scenario",
+      "label": "Trace id handed back",
+      "x": 520,
+      "y": 520,
+      "given": "a request with the traceparent 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "when": "it fails with a 404 and another fails with a 500",
+      "then": "both error bodies carry 4bf92f3577b34da6a3ce929d0e0e4736 as the correlation id"
+    },
+    {
+      "id": "sc-caller-text",
+      "type": "scenario",
+      "label": "Exception text stays inside",
+      "x": 520,
+      "y": 650,
+      "given": "a route that throws an unexpected error and one that throws an expected error, both with a random marker in their message",
+      "when": "each is called with production settings",
+      "then": "neither answer holds the marker, and the 500 answer holds \"{{GENERIC_MESSAGE}}\""
+    },
+    {
+      "id": "sc-documented",
+      "type": "scenario",
+      "label": "Undocumented errors refused",
+      "x": 520,
+      "y": 780,
+      "given": "a pull request adding an operation with only a 200 response, and one whose 404 response has no content",
+      "when": "the Spectral rules run on the OpenAPI documents",
+      "then": "both fail, naming the operation and the missing response or content"
+    },
+    {
+      "id": "sc-codes",
+      "type": "scenario",
+      "label": "Unknown and renamed codes refused",
+      "x": 520,
+      "y": 910,
+      "given": "a pull request that lists a code on an operation that the catalogue lacks, and another that renames a code in the catalogue",
+      "when": "the catalogue test runs",
+      "then": "the first fails naming the operation and the code, the second fails the snapshot of the codes",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ]
+      }
+    },
+    {
+      "id": "sc-status-only",
+      "type": "scenario",
+      "label": "Status names the error",
+      "x": 520,
+      "y": 1040,
+      "given": "the element running with production settings",
+      "when": "an order that does not exist is requested and a route that throws an unexpected error is called",
+      "then": "the first answer is 404 with the code NOT_FOUND and the second 500 with INTERNAL_SERVER_ERROR, and a problem details type is about:blank",
+      "hubWhen": {
+        "CODES": [
+          "status-only"
+        ]
+      }
+    },
+    {
+      "id": "sc-validation-all",
+      "type": "scenario",
+      "label": "Three mistakes, one answer",
+      "x": 520,
+      "y": 1170,
+      "given": "a new order with an invalid e-mail address, a quantity of 0 in its first item and an unknown currency",
+      "when": "it is posted",
+      "then": "the answer is {{VALIDATION_STATUS}} and lists exactly three field errors, located at the e-mail address, the first item's quantity and the currency, each with a code matching {{CODE_PATTERN}}",
+      "hubWhen": {
+        "VALIDATION": [
+          "all"
+        ]
+      }
+    },
+    {
+      "id": "sc-validation-first",
+      "type": "scenario",
+      "label": "Three mistakes, the first reported",
+      "x": 520,
+      "y": 1300,
+      "given": "a new order with an invalid e-mail address, a quantity of 0 in its first item and an unknown currency",
+      "when": "it is posted",
+      "then": "the answer is {{VALIDATION_STATUS}} and lists exactly one field error, with a location and a code matching {{CODE_PATTERN}}",
+      "hubWhen": {
+        "VALIDATION": [
+          "first"
+        ]
+      }
+    },
+    {
+      "id": "sc-docs-page",
+      "type": "scenario",
+      "label": "Every code has its page",
+      "x": 520,
+      "y": 1430,
+      "given": "the catalogue and the published documentation site",
+      "when": "the page of each code is fetched",
+      "then": "every page answers 200 with HTML that names its code; a code added without a page fails the check",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ],
+        "DOCS": [
+          "page"
+        ]
+      }
+    },
+    {
+      "id": "sc-docs-identifiers",
+      "type": "scenario",
+      "label": "Undescribed code refused",
+      "x": 520,
+      "y": 1560,
+      "given": "a pull request adding a code to the catalogue without a description",
+      "when": "the catalogue test runs",
+      "then": "it fails naming the code",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ],
+        "DOCS": [
+          "identifiers"
+        ]
+      }
+    },
+    {
+      "id": "adr-problem-details",
+      "type": "adr",
+      "label": "Errors are RFC 9457 problem details",
+      "x": 780,
+      "y": 0,
+      "concern": "api-errors",
+      "status": "accepted",
+      "date": "",
+      "context": "Other parts of the system or other systems call this element's HTTP API, and every one of them has to handle its errors in code. The forces: a client can only act on what it can parse, so an error body that changes shape from one operation to the next is handled by string matching or not at all; the HTTP status alone does not tell \"order not found\" from \"customer not found\", so clients that need to tell them apart need a code that never changes meaning; a form that shows one invalid field per round trip costs the user a submit per mistake; a message copied from an exception tells the caller about the code, not about what to do; a code nobody documented is a support ticket; and a published guide (Zalando, Microsoft, Google) already fixes a shape, which costs nothing to follow and a lot to argue with. What never reaches a caller (stack traces, class names, SQL, paths, hosts) and the correlation field are decided in Error handling and logging conventions, which this pack takes as given; conflicts and failed preconditions (409, 412) in Idempotency and concurrency, 429 in Rate limiting, and how the error shape changes across versions in API evolution.",
+      "decision": "Every error response is application/problem+json (RFC 9457): type (a URI reference naming the problem), title, status (equal to the response's), detail (text written for the caller, \"{{GENERIC_MESSAGE}}\" for every 5xx), instance (the request path), plus two extension members: code, matching {{CODE_PATTERN}}, and the correlation id under the field set in Error handling and logging conventions. Field errors go in an errors extension member, an array of { pointer, code, detail } with pointer a JSON Pointer (RFC 6901) into the body, as RFC 9457 section 3 shows. Codes: {{CODES}}. Invalid input: {{VALIDATION}}, answered {{VALIDATION_STATUS}}. Where codes come from a catalogue, what a code means is read in {{DOCS}}: with a page per code the type is that page's URL under {{ERROR_DOCS_URL}}; with identifiers it is the relative reference /problems/<code in lower case with dashes>, never resolved, as the Zalando guidelines do. The one error handler of Error handling and logging conventions writes the body: Spring Framework 6 ProblemDetail with a @ControllerAdvice extending ResponseEntityExceptionHandler, ASP.NET Core AddProblemDetails() with a custom InvalidModelStateResponseFactory for the errors array, a FastAPI exception handler, or a small mapper in src/http/problem.ts for Express. Every operation documents a default response with the Problem schema in the OpenAPI document. Statuses follow RFC 9110; conflicts and failed preconditions (409, 412) are decided in Idempotency and concurrency, 429 in Rate limiting, and how this shape evolves across versions in API evolution.",
+      "consequences": "• One shape for every error, a standard with libraries on every major stack, and a type field clients can switch on.\n• Clients that send Accept: application/json only may get problem+json anyway; some HTTP clients do not parse +json as JSON, which the Zalando guidelines warn about.\n• ASP.NET Core's ValidationProblemDetails writes errors as a map of field names to messages, not the pointer array; it has to be replaced, and so does any framework default that differs.\n• The code and the correlation id are extension members: standard parsers keep them, but a client must know their names.",
+      "alternatives": "1. Microsoft's error object: equally complete, but a shape of one vendor's guide, and no type URI to document.\n2. google.rpc.Status as JSON: natural behind a gRPC gateway, verbose over plain HTTP.\n3. A minimal body: less to build now, and a breaking change the day a second client needs more.",
+      "hubWhen": {
+        "FORMAT": [
+          "problem-details"
+        ]
+      }
+    },
+    {
+      "id": "adr-microsoft-error",
+      "type": "adr",
+      "label": "Errors are Microsoft's error object",
+      "x": 780,
+      "y": 130,
+      "concern": "api-errors",
+      "status": "accepted",
+      "date": "",
+      "context": "Other parts of the system or other systems call this element's HTTP API, and every one of them has to handle its errors in code. The forces: a client can only act on what it can parse, so an error body that changes shape from one operation to the next is handled by string matching or not at all; the HTTP status alone does not tell \"order not found\" from \"customer not found\", so clients that need to tell them apart need a code that never changes meaning; a form that shows one invalid field per round trip costs the user a submit per mistake; a message copied from an exception tells the caller about the code, not about what to do; a code nobody documented is a support ticket; and a published guide (Zalando, Microsoft, Google) already fixes a shape, which costs nothing to follow and a lot to argue with. What never reaches a caller (stack traces, class names, SQL, paths, hosts) and the correlation field are decided in Error handling and logging conventions, which this pack takes as given; conflicts and failed preconditions (409, 412) in Idempotency and concurrency, 429 in Rate limiting, and how the error shape changes across versions in API evolution.",
+      "decision": "Every error response is application/json {\"error\": {\"code\", \"message\", \"target\", \"details\", \"innererror\"}} as the Microsoft Azure REST API Guidelines define it: code matching {{CODE_PATTERN}} and repeated in the x-ms-error-code header, message written for the caller (\"{{GENERIC_MESSAGE}}\" for every 5xx), target naming what failed, details an array of error objects of the same shape, and the correlation id as a property of error under the field set in Error handling and logging conventions. innererror is never sent with production settings: what it would hold goes to the log. Field errors are entries of details with code, message and target, the target a JSON Pointer (RFC 6901) into the body. Codes: {{CODES}}. Invalid input: {{VALIDATION}}, answered {{VALIDATION_STATUS}}. Where codes come from a catalogue, what a code means is read in {{DOCS}} (with a page per code, at {{ERROR_DOCS_URL}}<code in lower case with dashes>, linked from the code's description in the OpenAPI document). The one error handler of Error handling and logging conventions writes the body: an ASP.NET Core exception handler and InvalidModelStateResponseFactory, a Spring @ControllerAdvice, or an Express error handler in src/http. Every operation documents a default response with the error schema in the OpenAPI document. Statuses follow RFC 9110; conflicts and failed preconditions (409, 412) are decided in Idempotency and concurrency, 429 in Rate limiting, and how this shape evolves across versions in API evolution.",
+      "consequences": "• Clients of Azure and Microsoft Graph APIs parse it already, and the header lets a gateway or log read the code without the body.\n• No framework writes it by default; the handler and the validation response are ours to build and keep.\n• The guidelines treat only the top-level code as contract; target and details may change, so clients must not key on them.\n• Adding a top-level code is, in the guidelines' words, a change that needs a new service version, which the API evolution pack decides.",
+      "alternatives": "1. RFC 9457 problem details: the standard with framework support everywhere.\n2. google.rpc.Status as JSON: the other big vendor's shape, natural behind gRPC.\n3. A minimal body: simpler, but no place for field errors beyond a list of our own.",
+      "hubWhen": {
+        "FORMAT": [
+          "microsoft"
+        ]
+      }
+    },
+    {
+      "id": "adr-google-status",
+      "type": "adr",
+      "label": "Errors are google.rpc.Status as JSON",
+      "x": 780,
+      "y": 260,
+      "concern": "api-errors",
+      "status": "accepted",
+      "date": "",
+      "context": "Other parts of the system or other systems call this element's HTTP API, and every one of them has to handle its errors in code. The forces: a client can only act on what it can parse, so an error body that changes shape from one operation to the next is handled by string matching or not at all; the HTTP status alone does not tell \"order not found\" from \"customer not found\", so clients that need to tell them apart need a code that never changes meaning; a form that shows one invalid field per round trip costs the user a submit per mistake; a message copied from an exception tells the caller about the code, not about what to do; a code nobody documented is a support ticket; and a published guide (Zalando, Microsoft, Google) already fixes a shape, which costs nothing to follow and a lot to argue with. What never reaches a caller (stack traces, class names, SQL, paths, hosts) and the correlation field are decided in Error handling and logging conventions, which this pack takes as given; conflicts and failed preconditions (409, 412) in Idempotency and concurrency, 429 in Rate limiting, and how the error shape changes across versions in API evolution.",
+      "decision": "Every error response is application/json {\"error\": {\"code\", \"message\", \"status\", \"details\"}}, the HTTP/JSON form of google.rpc.Status that Google AIP-193 defines: code is the HTTP status, status the google.rpc.Code name (NOT_FOUND, INVALID_ARGUMENT, INTERNAL), message written for the developer (\"{{GENERIC_MESSAGE}}\" for every 5xx), and details a list of typed messages, each type at most once: one google.rpc.ErrorInfo always (reason matching {{CODE_PATTERN}}, domain the service's name, metadata for the values the message names), one google.rpc.RequestInfo whose requestId is the correlation id, a google.rpc.BadRequest whose fieldViolations hold the field errors (field the dotted path, reason the field-level code), and, with a page per code, a google.rpc.Help link to it. Codes: {{CODES}}. Invalid input: {{VALIDATION}}, answered {{VALIDATION_STATUS}}. Where codes come from a catalogue, what a code means is read in {{DOCS}} (with a page per code, at {{ERROR_DOCS_URL}}<code in lower case with dashes>). The details are built from the google.rpc types (api-common-protos; com.google.rpc in proto-google-common-protos for Java); behind grpc-gateway the default error handler writes the bare Status with the gRPC code, so runtime.WithErrorHandler is set to write this form. Every operation documents a default response with the Status schema in the OpenAPI document. Statuses follow RFC 9110; conflicts and failed preconditions (409, 412) are decided in Idempotency and concurrency, 429 in Rate limiting, and how this shape evolves across versions in API evolution.",
+      "consequences": "• Identical errors over gRPC and HTTP, and clients of Google APIs parse it already.\n• Verbose: three typed details in every error, each with an @type URL.\n• Field paths are dotted protobuf paths (items[0].quantity), not JSON Pointers; a client that expects pointers needs a converter.\n• AIP-193 makes reason, domain and the metadata keys permanent once sent: a key may get an empty value, never disappear.",
+      "alternatives": "1. RFC 9457 problem details: lighter over plain HTTP, but a second shape beside gRPC's own.\n2. Microsoft's error object: no typed details, a vendor shape all the same.\n3. The bare Status grpc-gateway writes by default: the gRPC code where clients expect the HTTP status.",
+      "hubWhen": {
+        "FORMAT": [
+          "google"
+        ]
+      }
+    },
+    {
+      "id": "adr-minimal-body",
+      "type": "adr",
+      "label": "Errors are status, code and message",
+      "x": 780,
+      "y": 390,
+      "concern": "api-errors",
+      "status": "accepted",
+      "date": "",
+      "context": "Other parts of the system or other systems call this element's HTTP API, and every one of them has to handle its errors in code. The forces: a client can only act on what it can parse, so an error body that changes shape from one operation to the next is handled by string matching or not at all; the HTTP status alone does not tell \"order not found\" from \"customer not found\", so clients that need to tell them apart need a code that never changes meaning; a form that shows one invalid field per round trip costs the user a submit per mistake; a message copied from an exception tells the caller about the code, not about what to do; a code nobody documented is a support ticket; and a published guide (Zalando, Microsoft, Google) already fixes a shape, which costs nothing to follow and a lot to argue with. What never reaches a caller (stack traces, class names, SQL, paths, hosts) and the correlation field are decided in Error handling and logging conventions, which this pack takes as given; conflicts and failed preconditions (409, 412) in Idempotency and concurrency, 429 in Rate limiting, and how the error shape changes across versions in API evolution.",
+      "decision": "Every error response is application/json {\"code\", \"message\", and the correlation id under the field set in Error handling and logging conventions}, with the HTTP status carrying the kind of failure: code matching {{CODE_PATTERN}}, message written for the caller (\"{{GENERIC_MESSAGE}}\" for every 5xx), and nothing else, except an errors array of { pointer, code, message } for field errors, with pointer a JSON Pointer (RFC 6901) into the body. Codes: {{CODES}}. Invalid input: {{VALIDATION}}, answered {{VALIDATION_STATUS}}. Where codes come from a catalogue, what a code means is read in {{DOCS}} (with a page per code, at {{ERROR_DOCS_URL}}<code in lower case with dashes>). The one error handler of Error handling and logging conventions writes the body (an Express error handler in src/http, a Spring @ControllerAdvice, an ASP.NET Core exception handler). Every operation documents a default response with the error schema in the OpenAPI document. This decision holds while the API has one client owned by the same team; a second client, or a client outside the team, supersedes it with problem details. Statuses follow RFC 9110; conflicts and failed preconditions (409, 412) are decided in Idempotency and concurrency, 429 in Rate limiting, and how this shape evolves across versions in API evolution.",
+      "consequences": "• The least to build and the least to keep stable.\n• No standard parser knows the shape; every client writes its own, which is cheap with one client and costly with five.\n• Moving to problem details later changes every error response: a breaking change that needs a new version under API evolution.",
+      "alternatives": "1. RFC 9457 problem details: a few more fields, and a standard any later client knows.\n2. The HTTP status alone with an empty body: nothing to quote to support, and no field errors.",
+      "hubWhen": {
+        "FORMAT": [
+          "minimal"
+        ]
+      }
+    },
+    {
+      "id": "ff-problem-shape",
+      "type": "fitness-fn",
+      "label": "Errors are problem details",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "A 404 and a 500 answered with production settings are application/problem+json with type, title, status equal to the response's, detail, instance, a code matching {{CODE_PATTERN}} and the trace id of the request's traceparent",
+      "description": "An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the media type, the five members, the code and the correlation id in each answer. The correlation field's name is the one set in Error handling and logging conventions. For Java the same test is MockMvc or RestAssured; for .NET, WebApplicationFactory with xUnit.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/problem-details.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // GET /__boom throws an unexpected error, in tests only\n\nconst TRACE = 'traceId'   // the correlation field set in Error handling and logging conventions\nconst TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'\n\nit.each(['/orders/does-not-exist', '/__boom'])('GET %s answers problem details', async (path) => {\n  const res = await request(app).get(path).set('traceparent', TRACEPARENT)\n  expect(res.status).toBeGreaterThanOrEqual(400)\n  expect(res.headers['content-type']).toMatch(/^application\\/problem\\+json/)\n  expect(res.body).toMatchObject({ type: expect.any(String), title: expect.any(String), status: res.status, detail: expect.any(String), instance: expect.any(String) })\n  expect(res.body.code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n  expect(res.body[TRACE]).toBe('4bf92f3577b34da6a3ce929d0e0e4736')\n})\n```",
+      "hubWhen": {
+        "FORMAT": [
+          "problem-details"
+        ]
+      }
+    },
+    {
+      "id": "ff-microsoft-shape",
+      "type": "fitness-fn",
+      "label": "Errors are Microsoft's error object",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "A 404 and a 500 answered with production settings are JSON with only the member error, whose code matches {{CODE_PATTERN}} and equals the x-ms-error-code header, with a message, the trace id of the request's traceparent and no innererror",
+      "description": "An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the envelope, the code against the header, the message, the correlation id and the absence of innererror. The correlation field's name is the one set in Error handling and logging conventions.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/error-object.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // GET /__boom throws an unexpected error, in tests only\n\nconst TRACE = 'traceId'   // the correlation field set in Error handling and logging conventions\nconst TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'\n\nit.each(['/orders/does-not-exist', '/__boom'])('GET %s answers the error object', async (path) => {\n  const res = await request(app).get(path).set('traceparent', TRACEPARENT)\n  expect(res.status).toBeGreaterThanOrEqual(400)\n  expect(res.headers['content-type']).toMatch(/^application\\/json/)\n  expect(Object.keys(res.body)).toEqual(['error'])\n  const { error } = res.body\n  expect(error.code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n  expect(res.headers['x-ms-error-code']).toBe(error.code)\n  expect(error.message).toEqual(expect.any(String))\n  expect(error[TRACE]).toBe('4bf92f3577b34da6a3ce929d0e0e4736')\n  expect(error).not.toHaveProperty('innererror')\n})\n```",
+      "hubWhen": {
+        "FORMAT": [
+          "microsoft"
+        ]
+      }
+    },
+    {
+      "id": "ff-google-shape",
+      "type": "fitness-fn",
+      "label": "Errors are google.rpc.Status",
+      "x": 1040,
+      "y": 260,
+      "category": "structural",
+      "threshold": "A 404 and a 500 answered with production settings are JSON with only the member error, whose code equals the response's status, whose status is an upper-case google.rpc.Code name, and whose details hold exactly one ErrorInfo with a reason matching {{CODE_PATTERN}} and a domain, and one RequestInfo with the trace id of the request's traceparent",
+      "description": "An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the envelope, the HTTP status in code, the google.rpc.Code name, the ErrorInfo and the RequestInfo by their @type, and that no detail type appears twice.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/rpc-status.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // GET /__boom throws an unexpected error, in tests only\n\nconst TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'\nconst T = 'type.googleapis.com/google.rpc.'\n\nit.each(['/orders/does-not-exist', '/__boom'])('GET %s answers google.rpc.Status', async (path) => {\n  const res = await request(app).get(path).set('traceparent', TRACEPARENT)\n  expect(Object.keys(res.body)).toEqual(['error'])\n  const { error } = res.body\n  expect(error).toMatchObject({ code: res.status, status: expect.stringMatching(/^[A-Z_]+$/), message: expect.any(String) })\n  const types = error.details.map((d: { '@type': string }) => d['@type'])\n  expect(new Set(types).size).toBe(types.length)\n  const info = error.details.find((d: { '@type': string }) => d['@type'] === T + 'ErrorInfo')\n  expect(info.reason).toMatch(new RegExp('{{CODE_PATTERN}}'))\n  expect(info.domain).toEqual(expect.any(String))\n  expect(error.details.find((d: { '@type': string }) => d['@type'] === T + 'RequestInfo').requestId).toBe('4bf92f3577b34da6a3ce929d0e0e4736')\n})\n```",
+      "hubWhen": {
+        "FORMAT": [
+          "google"
+        ]
+      }
+    },
+    {
+      "id": "ff-minimal-shape",
+      "type": "fitness-fn",
+      "label": "Errors are status, code and message",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "A 404 and a 500 answered with production settings are JSON with exactly the fields code, message and the correlation field, the code matching {{CODE_PATTERN}} and the id the trace id of the request's traceparent",
+      "description": "An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks that the body holds exactly the three fields, nothing more. The correlation field's name is the one set in Error handling and logging conventions.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/error-body.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // GET /__boom throws an unexpected error, in tests only\n\nconst TRACE = 'traceId'   // the correlation field set in Error handling and logging conventions\nconst TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'\n\nit.each(['/orders/does-not-exist', '/__boom'])('GET %s answers code, message and id only', async (path) => {\n  const res = await request(app).get(path).set('traceparent', TRACEPARENT)\n  expect(res.status).toBeGreaterThanOrEqual(400)\n  expect(res.headers['content-type']).toMatch(/^application\\/json/)\n  expect(Object.keys(res.body).sort()).toEqual(['code', 'message', TRACE].sort())\n  expect(res.body.code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n  expect(res.body[TRACE]).toBe('4bf92f3577b34da6a3ce929d0e0e4736')\n})\n```",
+      "hubWhen": {
+        "FORMAT": [
+          "minimal"
+        ]
+      }
+    },
+    {
+      "id": "ff-caller-text",
+      "type": "fitness-fn",
+      "label": "No exception text reaches the caller",
+      "x": 1040,
+      "y": 520,
+      "category": "process",
+      "threshold": "0 occurrences of an exception's message in the answers to an unexpected and an expected error with production settings; the 500 answer holds \"{{GENERIC_MESSAGE}}\"",
+      "description": "An integration test puts a random marker in the messages of the errors two test-only routes throw (an unexpected TypeError and an expected not-found error), calls both, and checks that the marker appears in neither answer and that the 500 answer holds the fixed text. The leak of stack traces, class names and SQL is checked in Error handling and logging conventions; this checks the text.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/caller-text.test.ts   (NODE_ENV=production in this file's setup)\nimport { randomUUID } from 'node:crypto'\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\n\nprocess.env.ERROR_MARK = `mark-${randomUUID()}`\nconst { app } = await import('../../src/app')   // GET /__boom and GET /__expected throw errors whose message is ERROR_MARK\n\nit('passes no exception message to the caller', async () => {\n  for (const path of ['/__boom', '/__expected']) {\n    const res = await request(app).get(path)\n    expect(res.status, path).toBeGreaterThanOrEqual(400)\n    expect(res.text, path).not.toContain(process.env.ERROR_MARK)\n  }\n})\nit('answers every unexpected error with the fixed text', async () => {\n  const res = await request(app).get('/__boom')\n  expect(res.status).toBe(500)\n  expect(res.text).toContain('{{GENERIC_MESSAGE}}')\n})\n```"
+    },
+    {
+      "id": "ff-openapi-errors",
+      "type": "fitness-fn",
+      "label": "Every operation documents its errors",
+      "x": 1040,
+      "y": 650,
+      "category": "structural",
+      "threshold": "0 Spectral errors from the two error rules on the OpenAPI documents under api/ on every pull request: every operation has a default response and at least one 4xx response, and every 4xx, 5xx and default response describes its content",
+      "description": "Spectral lints the OpenAPI documents with these rules on every pull request, failing at severity error: where the API style guide pack lints with Spectral, api/style/ruleset.yaml lists this file in its extends and its job runs them; otherwise a job of their own runs spectral lint \"api/*.yaml\" --ruleset api/style/errors.yaml --fail-severity=error. The first rule demands a default response and a 4xx response on every operation; the second demands content on every error response. The schema each response points to is the one the decision names.\n\nTool: Spectral (@stoplight/spectral-cli 6)\n\n```yaml\n# api/style/errors.yaml\nformats: [oas3]\nrules:\n  error-responses-documented:\n    description: Every operation documents a default response and at least one 4xx response\n    severity: error\n    given: $.paths[*][get,put,post,patch,delete].responses\n    then:\n      - field: default\n        function: truthy\n      - function: schema\n        functionOptions:\n          schema:\n            not: { propertyNames: { not: { pattern: '^4' } } }\n  error-responses-have-content:\n    description: Every error response describes its body\n    severity: error\n    given: $.paths[*][get,put,post,patch,delete].responses[?(@property.match(/^(4|5|default)/))]\n    then:\n      field: content\n      function: truthy\n```"
+    },
+    {
+      "id": "ff-error-codes",
+      "type": "fitness-fn",
+      "label": "Codes listed, catalogued, described and kept",
+      "x": 1040,
+      "y": 780,
+      "category": "structural",
+      "threshold": "Every operation in the OpenAPI documents under api/ lists at least one code in x-error-codes and every listed code is in api/errors/codes.yaml; every catalogue code matches {{CODE_PATTERN}} and has a status of at least 400 and a non-empty description; the sorted list of codes matches its snapshot",
+      "description": "A test reads every OpenAPI document under api/ and the catalogue, checks every operation's x-error-codes against the catalogue, checks each entry, and snapshots the sorted codes, so that a renamed or removed code fails until the snapshot is updated in a reviewed change (which API evolution then judges). Where Error handling and logging conventions keeps an error catalogue in the code, api/errors/codes.yaml is generated from it, so there is one list.\n\nTool: Vitest with the yaml package\n\n```ts\n// test/api/error-codes.test.ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { expect, it } from 'vitest'\nimport { parse } from 'yaml'\n\ntype Entry = { status: number; title: string; description: string }\ntype Paths = Record<string, Record<string, { 'x-error-codes'?: string[] }>>\nconst catalogue: Record<string, Entry> = parse(readFileSync('api/errors/codes.yaml', 'utf8'))\nconst docs = readdirSync('api').filter((f) => f.endsWith('.yaml')).map((f) => ({ f, doc: parse(readFileSync(`api/${f}`, 'utf8')) }))\nconst operations = docs.filter(({ doc }) => doc?.openapi).flatMap(({ f, doc }) => Object.entries(doc.paths as Paths).flatMap(([path, item]) =>\n  ['get', 'put', 'post', 'patch', 'delete'].filter((m) => item[m]).map((m) => ({ name: `${f} ${m.toUpperCase()} ${path}`, codes: item[m]['x-error-codes'] ?? [] }))))\n\nit.each(operations)('$name lists its codes, all in the catalogue', ({ codes }) => {\n  expect(codes.length).toBeGreaterThan(0)\n  for (const code of codes) expect(Object.keys(catalogue)).toContain(code)\n})\nit('every code is well-formed, described and keeps its name', () => {\n  for (const [code, e] of Object.entries(catalogue)) {\n    expect(code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n    expect(e.status, code).toBeGreaterThanOrEqual(400)\n    expect(e.description?.trim(), code).toBeTruthy()\n  }\n  expect(Object.keys(catalogue).sort()).toMatchSnapshot()\n})\n```",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ]
+      }
+    },
+    {
+      "id": "ff-status-codes",
+      "type": "fitness-fn",
+      "label": "Codes repeat the status",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "An unknown order answers 404 with the code NOT_FOUND and the test-only crash 500 with INTERNAL_SERVER_ERROR; a problem details type, where present, is about:blank",
+      "description": "An integration test calls an unknown order and the test-only route that throws and looks for the status's reason phrase as the code anywhere in the body (the code member, error.code, or ErrorInfo.reason, by format).\n\nTool: Vitest with supertest\n\n```ts\n// test/http/status-codes.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // GET /__boom throws an unexpected error, in tests only\n\nit.each([\n  { path: '/orders/does-not-exist', status: 404, code: 'NOT_FOUND' },\n  { path: '/__boom', status: 500, code: 'INTERNAL_SERVER_ERROR' },\n])('GET $path answers $status with the code $code', async ({ path, status, code }) => {\n  const res = await request(app).get(path)\n  expect(res.status).toBe(status)\n  expect(res.text).toContain(`\"${code}\"`)\n  if (res.body.type !== undefined) expect(res.body.type).toBe('about:blank')\n})\n```",
+      "hubWhen": {
+        "CODES": [
+          "status-only"
+        ]
+      }
+    },
+    {
+      "id": "ff-validation-all",
+      "type": "fitness-fn",
+      "label": "Every invalid field reported",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "An order posted with three invalid fields is answered {{VALIDATION_STATUS}} with exactly three field errors, located at the e-mail address, the first item's quantity and the currency, each with a code matching {{CODE_PATTERN}}",
+      "description": "An integration test posts an order with three mistakes and reads the field errors wherever the format keeps them: errors in problem details and the minimal body, error.details in Microsoft's object, the fieldViolations of a google.rpc.BadRequest. Locations are JSON Pointers, or dotted paths in Google's format.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/validation.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\n\ntype Field = { field?: string; code?: string }\nconst fieldErrors = (b: any): Field[] =>\n  b.errors?.map((e: any) => ({ field: e.pointer, code: e.code }))\n  ?? b.error?.details?.flatMap((d: any) => d.fieldViolations?.map((v: any) => ({ field: v.field, code: v.reason }))\n    ?? (d['@type'] ? [] : [{ field: d.target, code: d.code }])) ?? []\n\nit('reports every invalid field in one answer', async () => {\n  const res = await request(app).post('/orders').send({ email: 'not-an-email', items: [{ sku: 'A-1', quantity: 0 }], currency: 'XYZ' })\n  expect(res.status).toBe({{VALIDATION_STATUS}})\n  const errors = fieldErrors(res.body)\n  expect([['/currency', '/email', '/items/0/quantity'], ['currency', 'email', 'items[0].quantity']]).toContainEqual(errors.map((e) => e.field).sort())\n  for (const e of errors) expect(e.code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n})\n```",
+      "hubWhen": {
+        "VALIDATION": [
+          "all"
+        ]
+      }
+    },
+    {
+      "id": "ff-validation-first",
+      "type": "fitness-fn",
+      "label": "The first invalid field reported",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "An order posted with three invalid fields is answered {{VALIDATION_STATUS}} with exactly one field error, with a location and a code matching {{CODE_PATTERN}}",
+      "description": "An integration test posts an order with three mistakes and reads the field errors wherever the format keeps them: errors in problem details and the minimal body, error.details in Microsoft's object, the fieldViolations of a google.rpc.BadRequest.\n\nTool: Vitest with supertest\n\n```ts\n// test/http/validation.test.ts   (NODE_ENV=production in this file's setup)\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\n\ntype Field = { field?: string; code?: string }\nconst fieldErrors = (b: any): Field[] =>\n  b.errors?.map((e: any) => ({ field: e.pointer, code: e.code }))\n  ?? b.error?.details?.flatMap((d: any) => d.fieldViolations?.map((v: any) => ({ field: v.field, code: v.reason }))\n    ?? (d['@type'] ? [] : [{ field: d.target, code: d.code }])) ?? []\n\nit('reports the first invalid field only', async () => {\n  const res = await request(app).post('/orders').send({ email: 'not-an-email', items: [{ sku: 'A-1', quantity: 0 }], currency: 'XYZ' })\n  expect(res.status).toBe({{VALIDATION_STATUS}})\n  const errors = fieldErrors(res.body)\n  expect(errors).toHaveLength(1)\n  expect(errors[0].field).toEqual(expect.any(String))\n  expect(errors[0].code).toMatch(new RegExp('{{CODE_PATTERN}}'))\n})\n```",
+      "hubWhen": {
+        "VALIDATION": [
+          "first"
+        ]
+      }
+    },
+    {
+      "id": "ff-docs-pages",
+      "type": "fitness-fn",
+      "label": "Every code has a page",
+      "x": 1040,
+      "y": 1300,
+      "category": "operational",
+      "threshold": "Every code in api/errors/codes.yaml has a page at {{ERROR_DOCS_URL}}<code in lower case with dashes> that answers 200 without credentials, with an HTML content type and the code in its text; checked after every documentation deploy and nightly",
+      "description": "A script fetches the page of every code in the catalogue, without credentials, and fails naming each code whose page is missing, not HTML or does not name the code. It runs in the documentation site's deploy job and on a nightly schedule.\n\nTool: Node.js 20 (a script with fetch and the yaml package)\n\n```js\n// scripts/check-error-pages.mjs   (node scripts/check-error-pages.mjs)\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\n\nconst BASE = '{{ERROR_DOCS_URL}}'\nconst codes = Object.keys(parse(readFileSync('api/errors/codes.yaml', 'utf8')))\nconst missing = []\nfor (const code of codes) {\n  const url = BASE + code.toLowerCase().replaceAll('_', '-')\n  const res = await fetch(url, { redirect: 'follow' }).catch((e) => ({ ok: false, status: e.message }))\n  const html = res.ok && (res.headers.get('content-type') ?? '').startsWith('text/html') ? await res.text() : ''\n  if (!html.includes(code)) missing.push(`${code}: no HTML page naming it at ${url} (${res.status})`)\n}\nif (missing.length) {\n  console.error(missing.join('\\n'))\n  process.exit(1)\n}\nconsole.log(`${codes.length} error pages found`)\n```",
+      "hubWhen": {
+        "CODES": [
+          "catalogue"
+        ],
+        "DOCS": [
+          "page"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-problem-details--derives--need",
+      "sourceId": "req-problem-details",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-microsoft-error--derives--need",
+      "sourceId": "req-microsoft-error",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-google-status--derives--need",
+      "sourceId": "req-google-status",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-minimal--derives--need",
+      "sourceId": "req-minimal",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-correlation--derives--need",
+      "sourceId": "req-correlation",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-caller-text--derives--need",
+      "sourceId": "req-caller-text",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-documented--derives--need",
+      "sourceId": "req-documented",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-codes--derives--need",
+      "sourceId": "req-codes",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-status-only--derives--need",
+      "sourceId": "req-status-only",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-validation-all--derives--need",
+      "sourceId": "req-validation-all",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-validation-first--derives--need",
+      "sourceId": "req-validation-first",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-docs-page--derives--need",
+      "sourceId": "req-docs-page",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-docs-identifiers--derives--need",
+      "sourceId": "req-docs-identifiers",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-problem-details--verifies--req-problem-details",
+      "sourceId": "sc-problem-details",
+      "targetId": "req-problem-details",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-microsoft-error--verifies--req-microsoft-error",
+      "sourceId": "sc-microsoft-error",
+      "targetId": "req-microsoft-error",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-google-status--verifies--req-google-status",
+      "sourceId": "sc-google-status",
+      "targetId": "req-google-status",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-minimal--verifies--req-minimal",
+      "sourceId": "sc-minimal",
+      "targetId": "req-minimal",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-correlation--verifies--req-correlation",
+      "sourceId": "sc-correlation",
+      "targetId": "req-correlation",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-caller-text--verifies--req-caller-text",
+      "sourceId": "sc-caller-text",
+      "targetId": "req-caller-text",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-documented--verifies--req-documented",
+      "sourceId": "sc-documented",
+      "targetId": "req-documented",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-codes--verifies--req-codes",
+      "sourceId": "sc-codes",
+      "targetId": "req-codes",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-status-only--verifies--req-status-only",
+      "sourceId": "sc-status-only",
+      "targetId": "req-status-only",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-validation-all--verifies--req-validation-all",
+      "sourceId": "sc-validation-all",
+      "targetId": "req-validation-all",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-validation-first--verifies--req-validation-first",
+      "sourceId": "sc-validation-first",
+      "targetId": "req-validation-first",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-docs-page--verifies--req-docs-page",
+      "sourceId": "sc-docs-page",
+      "targetId": "req-docs-page",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-docs-identifiers--verifies--req-docs-identifiers",
+      "sourceId": "sc-docs-identifiers",
+      "targetId": "req-docs-identifiers",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-problem-shape--implements--adr-problem-details",
+      "sourceId": "ff-problem-shape",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-microsoft-shape--implements--adr-microsoft-error",
+      "sourceId": "ff-microsoft-shape",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-google-shape--implements--adr-google-status",
+      "sourceId": "ff-google-shape",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-minimal-shape--implements--adr-minimal-body",
+      "sourceId": "ff-minimal-shape",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-caller-text--implements--adr-problem-details",
+      "sourceId": "ff-caller-text",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-caller-text--implements--adr-microsoft-error",
+      "sourceId": "ff-caller-text",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-caller-text--implements--adr-google-status",
+      "sourceId": "ff-caller-text",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-caller-text--implements--adr-minimal-body",
+      "sourceId": "ff-caller-text",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-openapi-errors--implements--adr-problem-details",
+      "sourceId": "ff-openapi-errors",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-openapi-errors--implements--adr-microsoft-error",
+      "sourceId": "ff-openapi-errors",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-openapi-errors--implements--adr-google-status",
+      "sourceId": "ff-openapi-errors",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-openapi-errors--implements--adr-minimal-body",
+      "sourceId": "ff-openapi-errors",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-error-codes--implements--adr-problem-details",
+      "sourceId": "ff-error-codes",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-error-codes--implements--adr-microsoft-error",
+      "sourceId": "ff-error-codes",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-error-codes--implements--adr-google-status",
+      "sourceId": "ff-error-codes",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-error-codes--implements--adr-minimal-body",
+      "sourceId": "ff-error-codes",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-status-codes--implements--adr-problem-details",
+      "sourceId": "ff-status-codes",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-status-codes--implements--adr-microsoft-error",
+      "sourceId": "ff-status-codes",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-status-codes--implements--adr-google-status",
+      "sourceId": "ff-status-codes",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-status-codes--implements--adr-minimal-body",
+      "sourceId": "ff-status-codes",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-all--implements--adr-problem-details",
+      "sourceId": "ff-validation-all",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-all--implements--adr-microsoft-error",
+      "sourceId": "ff-validation-all",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-all--implements--adr-google-status",
+      "sourceId": "ff-validation-all",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-all--implements--adr-minimal-body",
+      "sourceId": "ff-validation-all",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-first--implements--adr-problem-details",
+      "sourceId": "ff-validation-first",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-first--implements--adr-microsoft-error",
+      "sourceId": "ff-validation-first",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-first--implements--adr-google-status",
+      "sourceId": "ff-validation-first",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-validation-first--implements--adr-minimal-body",
+      "sourceId": "ff-validation-first",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-pages--implements--adr-problem-details",
+      "sourceId": "ff-docs-pages",
+      "targetId": "adr-problem-details",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-pages--implements--adr-microsoft-error",
+      "sourceId": "ff-docs-pages",
+      "targetId": "adr-microsoft-error",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-pages--implements--adr-google-status",
+      "sourceId": "ff-docs-pages",
+      "targetId": "adr-google-status",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-docs-pages--implements--adr-minimal-body",
+      "sourceId": "ff-docs-pages",
+      "targetId": "adr-minimal-body",
+      "relationType": "implements"
+    }
+  ]
+}
