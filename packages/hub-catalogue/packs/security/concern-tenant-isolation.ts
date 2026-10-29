@@ -9,7 +9,7 @@ const FORCES = 'This element keeps data, and the system may serve several custom
 const pack: PackSpec = {
   id: 'concern-tenant-isolation',
   name: 'Tenant isolation',
-  group: 'identity',
+  group: 'security',
   description: 'How one customer organisation\'s data and load stay apart from another\'s: where tenants are separated, how a noisy neighbour is held back, whose keys encrypt the data, and how a tenant leaves.',
   tags: ['security', 'multi-tenancy', 'saas', 'isolation', 'row-level-security', 'encryption'],
   concern: {

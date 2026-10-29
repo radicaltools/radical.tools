@@ -16,7 +16,7 @@
       "id": "technical-debt",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "code lives in these elements and accumulates shortcuts, so where that debt is recorded, how it is repaid and how old code is retired has to be decided; one decision usually covers a whole repository and is bound to every element built from it.",
-      "group": "maintainability"
+      "group": "coding"
     },
     "sources": [
       {

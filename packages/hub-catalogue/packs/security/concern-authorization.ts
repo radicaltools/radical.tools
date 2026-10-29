@@ -7,7 +7,7 @@ const FORCES = 'People and other systems use this element with different rights.
 const pack: PackSpec = {
   id: 'concern-authorization',
   name: 'Authorization',
-  group: 'identity',
+  group: 'security',
   description: 'What each caller may see and do: how permissions are modelled, where they are decided, how privileged access is given, and how permissions are taken back.',
   tags: ['security', 'authorization', 'access-control', 'rbac', 'abac', 'rebac', 'policy-as-code'],
   concern: {

@@ -7,7 +7,7 @@ const FORCES = 'This store keeps data, and some of it may be about people. The f
 const pack: PackSpec = {
   id: 'concern-personal-data',
   name: 'Personal data',
-  group: 'data',
+  group: 'compliance',
   description: 'Data about people in the stores: on what basis it is kept, for how long, where it may go, and how a person gets it or has it erased.',
   tags: ['privacy', 'gdpr', 'personal-data', 'retention', 'erasure', 'compliance'],
   concern: {

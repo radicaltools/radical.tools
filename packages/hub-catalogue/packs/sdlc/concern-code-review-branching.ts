@@ -8,7 +8,7 @@ const FORCES = 'Several people change the code of this element every day, and ev
 const pack: PackSpec = {
   id: 'concern-code-review-branching',
   name: 'Code review and branching',
-  group: 'maintainability',
+  group: 'sdlc',
   description: 'How a change travels from a developer\'s machine to the main branch: the branching model, who reviews it and how many must approve, who owns which code, how big a change may be and how old a branch, and what a commit message says.',
   tags: ['maintainability', 'code review', 'branching', 'trunk-based development', 'codeowners', 'conventional commits', 'pull requests'],
   concern: {

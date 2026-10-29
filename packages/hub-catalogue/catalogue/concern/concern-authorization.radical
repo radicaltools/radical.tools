@@ -19,7 +19,7 @@
       "trigger": "LIST RELATIONS WHERE (source.type = \"person\" OR source.external = true) AND target.external != true AND (target.type = \"system\" OR target.type = \"container\" OR target.type = \"webapp\" OR target.type = \"component\")",
       "applyTo": "target",
       "why": "people or other systems use these elements, so what each of them may see and do has to be decided.",
-      "group": "identity"
+      "group": "security"
     },
     "sources": [
       {

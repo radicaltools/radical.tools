@@ -8,7 +8,7 @@ const FORCES = 'This element runs on capacity someone has to provide. The forces
 const pack: PackSpec = {
   id: 'concern-capacity',
   name: 'Capacity and scaling',
-  group: 'reliability',
+  group: 'operability',
   description: 'How much load it carries: the expected load and its peak, the latency budget under load, how it scales to meet it, what it does when overloaded, and how often the capacity is proven with a load test.',
   tags: ['reliability', 'performance', 'capacity', 'scaling', 'autoscaling', 'load-shedding', 'backpressure', 'load-testing'],
   concern: {

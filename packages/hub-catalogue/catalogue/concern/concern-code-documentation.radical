@@ -18,7 +18,7 @@
       "id": "code-documentation",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "code lives in these elements, so what is written down about it, where, and how it is kept true has to be decided; one decision usually covers a whole repository and is bound to every element built from it.",
-      "group": "maintainability"
+      "group": "coding"
     },
     "sources": [
       {

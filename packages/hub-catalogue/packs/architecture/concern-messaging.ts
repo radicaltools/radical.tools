@@ -8,7 +8,7 @@ const FORCES = 'Parts of the system, or other systems, talk through this queue i
 const pack: PackSpec = {
   id: 'concern-messaging',
   name: 'Messaging',
-  group: 'integration',
+  group: 'architecture',
   description: 'Messages through queues and topics: how often each is delivered, whether order matters, which broker carries them, how their schemas change, and what happens to one that cannot be handled. That a message and the change it reports are written together is decided in the Data consistency pack.',
   tags: ['messaging', 'queues', 'events', 'kafka', 'rabbitmq', 'sqs', 'idempotency', 'dead-letter', 'schema-registry'],
   concern: {

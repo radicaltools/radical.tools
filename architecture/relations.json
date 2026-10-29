@@ -7138,6 +7138,12 @@
     "targetId": "e32b7ec0-3949-40dd-bbeb-f89bfd9b2954"
   },
   {
+    "id": "6ce3b866-c0be-4dcf-bb15-521a1b62a2ce",
+    "relationType": "derives",
+    "sourceId": "f3190c2b-5608-40ce-8aa2-b65c4107fac1",
+    "targetId": "931c0c74-8206-449c-92db-a0968501f994"
+  },
+  {
     "id": "6d213464-11ad-466e-b584-f5b0b8817629",
     "label": "bundled into",
     "relationType": "interacts",

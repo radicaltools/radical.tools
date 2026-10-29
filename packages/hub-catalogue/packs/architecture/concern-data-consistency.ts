@@ -7,7 +7,7 @@ const FORCES = 'This element writes to stores and queues, and one business opera
 const pack: PackSpec = {
   id: 'concern-data-consistency',
   name: 'Data consistency',
-  group: 'data',
+  group: 'architecture',
   description: 'How one business operation stays all-or-nothing across records, stores and services: transactions, isolation, events, sagas, and what readers may see. Which element writes each table is decided in the Decomposition pack; how consumers absorb duplicates in the Messaging pack.',
   tags: ['consistency', 'transactions', 'isolation', 'outbox', 'saga', 'replicas'],
   concern: {

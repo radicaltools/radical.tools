@@ -7,7 +7,7 @@ const FORCES = 'People or other systems reach this element from outside, so it m
 const pack: PackSpec = {
   id: 'concern-authentication',
   name: 'Authentication',
-  group: 'identity',
+  group: 'security',
   description: 'Who is calling: how people and other systems prove who they are, how long that lasts, and how it is taken back.',
   tags: ['security', 'authentication', 'identity', 'sessions', 'oidc', 'mfa'],
   concern: {

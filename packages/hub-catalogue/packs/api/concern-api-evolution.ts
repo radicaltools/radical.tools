@@ -7,7 +7,7 @@ const FORCES = 'Other systems call this element through its API, and they are bu
 const pack: PackSpec = {
   id: 'concern-api-evolution',
   name: 'API evolution',
-  group: 'integration',
+  group: 'api',
   description: 'An API that systems outside yours call: how its contract is written, how it may change without breaking its callers, how versions are named, and how long an old one lives. Contracts between your own parts are decided in the Communication style pack.',
   tags: ['api', 'versioning', 'compatibility', 'contracts', 'deprecation', 'contract-testing'],
   concern: {

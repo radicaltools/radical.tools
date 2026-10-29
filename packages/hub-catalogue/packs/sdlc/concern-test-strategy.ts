@@ -6,7 +6,7 @@ const FORCES = 'Code lives in this element and changes every week; the tests dec
 const pack: PackSpec = {
   id: 'concern-test-strategy',
   name: 'Test strategy',
-  group: 'maintainability',
+  group: 'sdlc',
   description: 'Which tests the element has at which level, which gates a change must pass, where end-to-end tests run, where test data comes from, and what happens to a flaky test. The snippets are for a Node project with Vitest, Playwright, Stryker, SonarQube and Checkly; each tool line names the JVM equivalent.',
   tags: ['maintainability', 'testing', 'test pyramid', 'testing trophy', 'mutation testing', 'flaky tests'],
   concern: {

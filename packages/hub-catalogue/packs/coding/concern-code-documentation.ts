@@ -6,7 +6,7 @@ const FORCES = 'Code lives in this element and will be read, changed and operate
 const pack: PackSpec = {
   id: 'concern-code-documentation',
   name: 'Code documentation',
-  group: 'maintainability',
+  group: 'coding',
   description: 'What about the element is written down, where it lives and how it stays true: the decisions, the API reference, the README of each module, the documentation site, and the diagrams or the architecture model.',
   tags: ['maintainability', 'documentation', 'adr', 'docs as code', 'api docs', 'diagrams', 'readme'],
   concern: {

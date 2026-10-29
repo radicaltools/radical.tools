@@ -17,7 +17,7 @@
       "id": "test-strategy",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "code lives in these elements, so how it is tested before a change is released has to be decided.",
-      "group": "maintainability"
+      "group": "sdlc"
     },
     "sources": [
       {

@@ -28,19 +28,18 @@ export type ConcernPack = Pick<HubConceptMeta, 'id' | 'name' | 'description' | '
   templateParams?: TemplateParam[]
 }
 
-/** The groups of concern packs, by the area of the architecture where the
- *  decision is made, each with the ISO/IEC 25010 characteristics it serves.
- *  ADR Concern groups and pack standard. */
+/** The groups of concern packs, by the standard a decision belongs to and
+ *  the role that keeps it, each with the ISO/IEC 25010 characteristics it
+ *  serves. ADR Concern groups and pack standard. */
 export const CONCERN_GROUPS = [
-  { id: 'architecture', label: 'Architecture', description: 'How the system is structured and divided, and how its parts talk to each other.', iso: ['Maintainability', 'Compatibility', 'Flexibility'] },
-  { id: 'identity', label: 'Identity & access', description: 'Who calls, and what they may see and do.', iso: ['Security'] },
-  { id: 'security', label: 'Security', description: 'Protection against abuse, leaks and tampering.', iso: ['Security'] },
-  { id: 'data', label: 'Data', description: 'What is kept, for how long, and how consistently.', iso: ['Reliability', 'Security'] },
-  { id: 'integration', label: 'Integration', description: 'How the system talks to other systems.', iso: ['Compatibility', 'Reliability'] },
-  { id: 'reliability', label: 'Reliability', description: 'How it behaves under failure and load.', iso: ['Reliability', 'Performance efficiency'] },
-  { id: 'operations', label: 'Operations', description: 'How it is run, released and watched.', iso: ['Maintainability', 'Reliability'] },
-  { id: 'maintainability', label: 'Maintainability', description: 'How its code can be understood, tested and changed.', iso: ['Maintainability'] },
-  { id: 'technology', label: 'Technology', description: 'What it is built on and why.', iso: ['Maintainability', 'Flexibility'] },
+  { id: 'security', label: 'Secure by Design', description: 'Who calls, what they may do, and how the system is kept safe from abuse, leaks and tampering, held to OWASP.', iso: ['Security'] },
+  { id: 'api', label: 'API Guidelines', description: 'How the APIs that others call are shaped, versioned and evolved, held to a published guideline.', iso: ['Compatibility', 'Maintainability'] },
+  { id: 'architecture', label: 'Architecture', description: 'How the system is structured and divided, and how its parts talk to each other and stay consistent.', iso: ['Maintainability', 'Compatibility', 'Flexibility', 'Reliability'] },
+  { id: 'coding', label: 'Coding Standards', description: 'How the code is written: errors and logs, dependencies, documentation and technical debt.', iso: ['Maintainability'] },
+  { id: 'sdlc', label: 'SDLC Standard', description: 'How a change travels from a branch to production: review, quality gates, tests and deployment.', iso: ['Maintainability', 'Reliability'] },
+  { id: 'technology', label: 'Tech Radar', description: 'What it is built on and why: the stacks, the data stores and the infrastructure.', iso: ['Maintainability', 'Flexibility'] },
+  { id: 'compliance', label: 'Compliance', description: 'What law and regulation require of the data and the system, such as the GDPR for personal data.', iso: ['Security'] },
+  { id: 'operability', label: 'Operability & Reliability', description: 'How it is run, watched and kept available under failure and load.', iso: ['Reliability', 'Performance efficiency'] },
 ] as const
 
 export type ConcernGroupId = typeof CONCERN_GROUPS[number]['id']
