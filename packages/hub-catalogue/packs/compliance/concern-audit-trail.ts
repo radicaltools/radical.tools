@@ -1,0 +1,499 @@
+import type { PackSpec } from '../../src/packSpec'
+
+const STORE_ADRS = ['adr-table', 'adr-worm', 'adr-ledger']
+const FORCES = 'This element runs operations that someone may later have to account for: money moved, customer records changed, permissions given, restricted data read or exported. The forces: a record written beside the change rather than with it goes missing exactly when something fails; whoever administers the store can edit what it holds unless the store refuses or the edit shows; a record detailed enough to answer an investigation holds personal data, which the trail then keeps for years; the people who read the trail are often among the people it records; clocks on different hosts disagree; and a trail kept for detection (a SIEM) is tuned for alerts and a short retention, not for evidence. Which sign-in and privileged-access events are audited is decided in the Authentication and Authorization packs, which write into this trail; operational logs and their retention belong to the Observability pack, redaction in log lines to the Error handling and logging conventions pack, and alerting on security events to the planned Security event logging and detection pack.'
+
+const pack: PackSpec = {
+  id: 'concern-audit-trail',
+  name: 'Audit trail',
+  group: 'compliance',
+  description: 'Who did what, when, to which record and from where: which operations are recorded, what a record holds, where records are kept so that tampering shows, for how long, and who may read them. The snippets are for a Node service on PostgreSQL or Azure SQL, with S3 or Azure storage; each tool line names the alternatives.',
+  tags: ['compliance', 'audit-trail', 'audit-log', 'tamper-evidence', 'worm', 'retention'],
+  concern: {
+    id: 'audit-trail',
+    trigger: 'LIST NODES WHERE (type = "container" OR type = "webapp") AND external != true',
+    why: 'these elements run the operations a regulator, an auditor or an investigation may ask about, so how their audit trail is recorded, protected, kept and read has to be decided.',
+  },
+  sources: [
+    { title: 'OWASP Logging Cheat Sheet', url: 'https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html' },
+    { title: 'NIST SP 800-92, Guide to Computer Security Log Management', url: 'https://csrc.nist.gov/pubs/sp/800/92/final' },
+    { title: 'NIST SP 800-53 Rev. 5, Security and Privacy Controls, AU family (AU-2, AU-3, AU-5, AU-8, AU-9, AU-11)', url: 'https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final' },
+    { title: 'ISO/IEC 27001:2022, Annex A 8.15 Logging and 8.17 Clock synchronization', url: 'https://www.iso.org/standard/27001' },
+    { title: 'PCI DSS v4.0.1, Requirement 10: Log and monitor all access to system components and cardholder data', url: 'https://www.pcisecuritystandards.org/document_library/' },
+    { title: 'Amazon S3 User Guide: Locking objects with Object Lock', url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html' },
+    { title: 'Azure Storage: Immutable storage for blob data', url: 'https://learn.microsoft.com/en-us/azure/storage/blobs/immutable-storage-overview' },
+    { title: 'Google Cloud Storage: Bucket Lock', url: 'https://docs.cloud.google.com/storage/docs/bucket-lock' },
+    { title: 'Microsoft Learn: Ledger overview (SQL Server 2022, Azure SQL)', url: 'https://learn.microsoft.com/en-us/sql/relational-databases/security/ledger/ledger-overview' },
+    { title: 'Debezium blog: Building Audit Logs with Change Data Capture and Stream Processing', url: 'https://debezium.io/blog/2019/10/01/audit-logs-with-change-data-capture-and-stream-processing/' },
+    { title: 'Regulation (EU) 2016/679 (GDPR), Article 17', url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj' },
+  ],
+  questions: [
+    {
+      key: 'STORE', title: 'Store', label: 'Where are audit records kept, and how does tampering show?',
+      hint: 'The store decides who could change a record unnoticed: the database\'s owner, the cloud account\'s administrators, or nobody within the retention. In every option the record is written in the same transaction as the change, so a change never commits without it.',
+      default: 'table',
+      options: [
+        { value: 'table', label: 'an append-only table with a hash chain', description: 'Records are rows of an audit table in the element\'s own PostgreSQL database: the application may only insert, a trigger refuses updates and deletes, each row carries the hash of the one before, and the head of the chain is copied to write-once storage every hour. Pick it for an element with its own PostgreSQL database and moderate write rates, when nobody requires WORM storage for the records themselves.' },
+        { value: 'worm', label: 'write-once object storage', description: 'Records go to an outbox table in the same transaction and are shipped within minutes, in numbered batches, to storage that nobody can change or delete within the retention: S3 Object Lock in compliance mode, an Azure container with a locked time-based retention policy, or a Cloud Storage bucket with a locked retention policy. Pick it when an auditor or regulator expects WORM storage, or when the records must outlive the database.' },
+        { value: 'ledger', label: 'a ledger database', description: 'Records are rows of an append-only ledger table in SQL Server 2022 or later, Azure SQL Database or Azure SQL Managed Instance; the database hashes every transaction into a chain of blocks, stores the digests in immutable Azure storage and verifies them on request. Pick it when the element already runs on SQL Server or Azure SQL. Old rows can never be deleted from such a table. Amazon QLDB, once the managed ledger on AWS, reached its end of support on 31 July 2025.' },
+      ],
+    },
+    {
+      key: 'SCOPE', title: 'Scope', label: 'Which operations are recorded?',
+      hint: 'A catalogue records what the business means (a payment approved), but only for the operations someone listed; capturing every write also catches changes made around the element (a migration, a fix in a database console, a batch job), at the cost of a pipeline to run. Reads and exports leave nothing in the database\'s log, so they stay in the catalogue either way.',
+      default: 'catalogue',
+      options: [
+        { value: 'catalogue', label: 'the operations listed in a catalogue', description: 'A file in the repository lists the audited operations, at the least money movements, changes to customer records, permission changes, reads of restricted data and exports, and every other operation that changes data is listed as exempt with a reason; each audited operation writes its record in code. Pick it when every change goes through the element\'s own operations and nobody changes data in the database directly.' },
+        { value: 'cdc', label: 'every write to the element\'s stores, plus the catalogue\'s reads', description: 'Change data capture (Debezium reading the database\'s log) records every committed insert, update and delete, whatever made it, joined with the actor its transaction names; the catalogue still lists reads, exports and the business operations. Pick it when data is also changed by jobs, migrations or people outside the element\'s operations, or an auditor asks for every change to the records.' },
+      ],
+    },
+    {
+      key: 'ACCESS', title: 'Readers', label: 'Who may read the audit trail?',
+      hint: 'Whoever reads the trail learns what everyone did, and the people who run the element are among those it records. Every read of the trail is itself recorded, whichever you pick (PCI DSS v4.0.1 10.2.1.3).',
+      default: 'auditors',
+      options: [
+        { value: 'auditors', label: 'a named audit role', description: 'Only members of one audit role, held by compliance, internal audit or security and by nobody who develops or operates the element, read records, through the element\'s audit read operation. Pick it when the element handles money, customer records or regulated data, or an external audit is expected.' },
+        { value: 'team', label: 'the team that runs the element', description: 'The members of the owning team read records to investigate incidents and support cases, and the list of their reads goes to the security owner every month. Pick it for internal tools and for organisations without a separate audit or compliance function.' },
+      ],
+    },
+    {
+      key: 'CONTENT', title: 'Change detail', label: 'What does a record keep of the change itself?',
+      hint: 'Nobody can edit the audit trail, so any personal data in it stays for the whole retention, past the erasure the Personal data pack decides. A keyed hash proves what a value was without keeping it.',
+      default: 'hashes',
+      options: [
+        { value: 'hashes', label: 'the changed fields with keyed hashes of their values', description: 'Each record names the fields a change touched and holds an HMAC-SHA-256 of the old and the new value, under a key kept in the key management service; the values themselves stay in the business store. Pick it when records touch personal data, which is almost always, or when values are large.' },
+        { value: 'values', label: 'the old and new values', description: 'Each record holds the old and new value of every changed field, except secrets and card numbers. Pick it when an investigation must read past values years later without the business store or its backups, and either the fields hold no personal data or the organisation\'s DPO has confirmed a legal obligation to keep them for the retention.' },
+      ],
+    },
+  ],
+  details: [
+    { key: 'AUDITED_OPERATIONS', label: 'Which operations must the catalogue list at the least?', default: 'money movements, changes to customer records, permission changes, reads of restricted data, exports' },
+    { key: 'AUDIT_YEARS', label: 'For how many years are audit records kept? (a regulation or a contract may set it; PCI DSS asks for at least one)', default: '5', number: true },
+    { key: 'VERIFY_HOURS', label: 'Within how many hours must tampering with a record be detected?', default: '24', number: true },
+    { key: 'CLOCK_MS', label: 'How far may the clock of a host that writes records drift from UTC (milliseconds)?', default: '100', number: true },
+    { key: 'SHIP_MINUTES', label: 'Within how many minutes must a record reach write-once storage? (write-once object storage only)', default: '15', number: true },
+    { key: 'CDC_MINUTES', label: 'Within how many minutes must a captured write appear in the audit trail? (every write captured only)', default: '15', number: true },
+  ],
+  need: {
+    label: 'Who did what can be proved',
+    text: 'This element moves money, changes customers\' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation\'s compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router\'s table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml).',
+  },
+  forces: FORCES,
+  requirements: [
+    {
+      id: 'req-catalogue', label: 'Catalogued operations recorded', ears_type: 'ubiquitous',
+      action: 'list its audited operations in audit/catalogue.yaml in the repository, at the least {{AUDITED_OPERATIONS}}, name every other operation that changes data in the same file as exempt with a reason, and write exactly one audit record for every call of an audited operation, refused and failed calls included',
+      rationale: 'A trail is evidence only of what it was meant to record; a list kept in the repository makes that choice reviewable, and refused attempts matter as much as successes after an incident (NIST SP 800-53 AU-2, Event Logging; OWASP Logging Cheat Sheet, which events to log).',
+      scenario: { label: 'Every audited call leaves a record', given: 'the catalogue and the element\'s operations', when: 'each audited operation is called once by a permitted caller and once by a caller it refuses', then: 'each call leaves exactly one record, the refused one with outcome refused, and an operation that changes data but is in neither list fails the test' },
+    },
+    {
+      id: 'req-record', label: 'A record says who, what, when, where', ears_type: 'ubiquitous',
+      action: 'give every audit record the actor, the person or system it acted for when that differs, the action, the target\'s type and id, the outcome, the time in UTC with milliseconds, the correlation id its log lines carry, the source (client address and client or calling system) and the version of the record format',
+      rationale: 'A record must say who did what, when, to which record and from where to stand as evidence (OWASP Logging Cheat Sheet, event attributes; NIST SP 800-53 AU-3, Content of Audit Records; PCI DSS v4.0.1 10.2.2). The correlation id is the one the Error handling and logging conventions pack puts in every log line, so a record leads to the request\'s logs.',
+      scenario: { label: 'Records have every field', given: 'the records written while every audited operation was called', when: 'each is validated against audit/record.schema.json', then: 'every record has actor, action, target, outcome, time, correlation id, source and version, and none is rejected' },
+    },
+    {
+      id: 'req-atomic', label: 'No change without its record', ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'the audit record of a change cannot be written',
+      action: 'roll the change back and fail the operation, so that no change is committed without its record',
+      rationale: 'A trail that quietly misses records while its store is failing cannot be relied on for any period; NIST SP 800-53 AU-5 asks for a decided response to a failure of audit logging, and here the response is to stop the one operation (AU-5(4), shutdown on failure, at the scale of a transaction).',
+      scenario: { label: 'Failed record stops the change', given: 'an audited operation whose audit write is made to fail in the test', when: 'the operation is called', then: 'it fails, the business record is unchanged, and no partial change remains' },
+    },
+    {
+      id: 'req-hashes', label: 'Values kept only as keyed hashes', when: { CONTENT: ['hashes'] }, ears_type: 'ubiquitous',
+      action: 'record the changed fields with an HMAC-SHA-256 of the old and of the new value under the element\'s audit key, and never write a value itself into an audit record',
+      rationale: 'Records nobody can edit must not become the one copy of a person\'s data that cannot be erased (GDPR Art. 17); a keyed hash still proves what a value was, and unlike a plain hash it cannot be confirmed by guessing (OWASP Logging Cheat Sheet: data to exclude, hash or encrypt).',
+      scenario: { label: 'E-mail kept as a hash', given: 'a customer record', when: 'its e-mail address is changed to a random value', then: 'the record names the field, its new-value hash equals the HMAC of the random value, and the value appears nowhere in the audit store' },
+    },
+    {
+      id: 'req-values', label: 'Old and new values, no secrets', when: { CONTENT: ['values'] }, ears_type: 'ubiquitous',
+      action: 'record the old and the new value of each changed field, and never write a password, token, key or full card number into an audit record, naming such a field as changed without its value',
+      rationale: 'Past values in the trail let an investigation read what changed without the business store; secrets in it would turn the evidence into the leak (OWASP Logging Cheat Sheet, data to exclude).',
+      scenario: { label: 'Address kept, password not', given: 'a customer record and an account', when: 'the customer\'s address and the account\'s password are changed', then: 'the record holds the old and new address, names the password as changed, and the password appears nowhere in the audit store' },
+    },
+    {
+      id: 'req-clock', label: 'Times from a synchronised clock', ears_type: 'ubiquitous',
+      action: 'take the time of every audit record from a clock synchronised over NTP and kept within {{CLOCK_MS}} ms of UTC on every host that writes records',
+      rationale: 'Records from several hosts can be put in order and matched with other evidence only if their clocks agree (NIST SP 800-53 AU-8, Time Stamps; ISO/IEC 27001:2022 A.8.17; PCI DSS v4.0.1 10.6.1; OWASP Logging Cheat Sheet, synchronise time).',
+      scenario: { label: 'Clock in step', given: 'every host that writes audit records', when: 'its clock is compared with its NTP sources', then: 'it is synchronised and its offset is within {{CLOCK_MS}} ms' },
+    },
+    {
+      id: 'req-append-only', label: 'Records cannot be changed', ears_type: 'ubiquitous',
+      action: 'refuse every update and delete of an audit record within the retention, from any identity, the element\'s own and administrators\' included',
+      rationale: 'A record its subject can edit is no evidence against that subject (NIST SP 800-53 AU-9, Protection of Audit Information; OWASP Logging Cheat Sheet: store log data on read-only media as soon as possible).',
+      scenario: { label: 'Edits refused', given: 'a stored audit record', when: 'the element\'s own identity and an administrator each try to update it and to delete it', then: 'all four attempts are refused and the record is unchanged' },
+    },
+    {
+      id: 'req-tamper', label: 'Tampering detected', ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'an audit record has been changed or removed, by any means, the store\'s own protection bypassed included',
+      action: 'detect it within {{VERIFY_HOURS}} hours, name the first record affected, and alert the audit owner',
+      rationale: 'Whoever controls the machine can bypass any protection; tamper evidence makes the bypass visible (OWASP Logging Cheat Sheet: build in tamper detection; NIST SP 800-53 AU-9 and AU-9(3), Cryptographic Protection; PCI DSS v4.0.1 10.3.4).',
+      scenario: { label: 'Edited copy fails verification', given: 'a copy of the audit store', when: 'one record is changed and another removed in the copy, around the application, and verification runs on the copy', then: 'verification fails, names the first record affected, and the audit owner is alerted' },
+    },
+    {
+      id: 'req-retention', label: 'Records kept for the retention', ears_type: 'ubiquitous',
+      action: 'keep every audit record for at least {{AUDIT_YEARS}} years from the time it was written',
+      rationale: 'An audit, a dispute or a regulator\'s request can come years after the event (NIST SP 800-53 AU-11, Audit Record Retention; NIST SP 800-92; PCI DSS v4.0.1 10.5.1 asks for at least 12 months). The period is the organisation\'s to set from the regulations and contracts that apply to it.',
+      scenario: { label: 'Retention configured', given: 'the audit store as deployed', when: 'its retention configuration is read', then: 'no record can be removed before {{AUDIT_YEARS}} years' },
+    },
+    {
+      id: 'req-readers-auditors', label: 'Only the audit role reads', when: { ACCESS: ['auditors'] }, ears_type: 'ubiquitous',
+      action: 'let only members of the audit role read audit records, through the element\'s audit read operation, and refuse everyone else, the element\'s developers and operators included',
+      rationale: 'People are recorded in the trail they would read; keeping its readers apart from those it records keeps the trail private and its reading honest (NIST SP 800-53 AU-9(4), Access by Subset of Privileged Users; PCI DSS v4.0.1 10.3.1).',
+      scenario: { label: 'Outsiders refused', given: 'a member of the audit role, a developer of the element and a customer', when: 'each asks the audit read operation for the records of one customer', then: 'only the audit role\'s member gets them; the others are refused with 403' },
+    },
+    {
+      id: 'req-readers-team', label: 'The team reads, the security owner sees', when: { ACCESS: ['team'] }, ears_type: 'ubiquitous',
+      action: 'let only members of the team that runs the element read audit records, through the element\'s audit read operation, and send the list of the past month\'s reads to the security owner every month',
+      rationale: 'Without a separate audit function the readers are among the recorded; a monthly list read by someone outside the team keeps their reading visible (PCI DSS v4.0.1 10.3.1 and 10.2.1.3).',
+      scenario: { label: 'Team reads are reported', given: 'a member of the team and a developer of another team', when: 'each asks the audit read operation for records and the month\'s report is made', then: 'only the team member gets them, and the report to the security owner lists that read' },
+    },
+    {
+      id: 'req-reads-recorded', label: 'Reads of the trail recorded', ears_type: 'event-driven',
+      trigger: 'someone reads audit records',
+      action: 'write an audit record of the read itself, with the reader, the time and the filter used',
+      rationale: 'Reading the trail is an access worth evidence of its own (PCI DSS v4.0.1 10.2.1.3: audit logs capture all access to audit logs).',
+      scenario: { label: 'A search leaves a record', given: 'a permitted reader of the audit trail', when: 'they search the records of one customer', then: 'a new record with action audit.read names the reader, the time and the filter' },
+    },
+    {
+      id: 'req-cdc', label: 'Every write captured', when: { SCOPE: ['cdc'] }, ears_type: 'event-driven',
+      trigger: 'a write to one of the element\'s stores is committed, whatever made it',
+      action: 'record it in the audit trail within {{CDC_MINUTES}} minutes with the table, the key, the changed columns and the actor of its transaction, or as unattributed with the database user when its transaction named no actor',
+      rationale: 'Changes made around the operations (a migration, a fix in a console, a batch job) are exactly the ones a catalogue misses; reading the database\'s log catches every committed change, and joining it with the transaction\'s context says who made it (Debezium, audit logs with change data capture).',
+      scenario: { label: 'Direct change recorded', given: 'the change data capture pipeline running', when: 'a row is changed directly in the database, outside the element', then: 'within {{CDC_MINUTES}} minutes the audit trail holds a record of it, marked unattributed with the database user' },
+    },
+  ],
+  adrs: [
+    {
+      id: 'adr-table', label: 'Audit records in an append-only table with a hash chain', when: { STORE: ['table'] },
+      decision: 'Audit records are rows of an append-only table audit.records in the element\'s own PostgreSQL database, partitioned by month with pg_partman, inserted in the same transaction as the change they record, so that the change and its record commit or roll back together. The application\'s role may only insert and read; a row-level trigger refuses UPDATE and DELETE for every role, the owner included. Each row carries chain_pos, prev_hash and hash = SHA-256(prev_hash ‖ audit.canonical(row)), set by a SECURITY DEFINER trigger that takes a transaction-level advisory lock, so rows are chained in commit order; audit.canonical is versioned and never changed for rows already written. Every hour a job copies the chain head (position and hash) to write-once storage (S3 Object Lock in compliance mode, or an Azure container with a locked time-based policy); every {{VERIFY_HOURS}} hours a job recomputes the chain, compares it with the copied heads and pages the audit owner on a mismatch. pg_partman drops a month\'s partition once it is {{AUDIT_YEARS}} years old. Recorded: {{SCOPE}}. Each record keeps {{CONTENT}}. Readers: {{ACCESS}}, through the element\'s audit read operation, which records every read.',
+      consequences: '• No new infrastructure: the record commits with the change, and a failed audit write fails the change.\n• The database\'s owner can still disable the trigger, rewrite rows and recompute the chain after the last copied head: the copied heads limit that to the last hour, and the verification notices it rather than prevents it.\n• The advisory lock serialises audited transactions from the moment they write their record until they commit; at high write rates, keep one chain per tenant or per partition, or choose write-once storage.\n• {{AUDIT_YEARS}} years of records live in the operational database: its storage, backups and restore times grow with them.\n• The hash code and the trigger are ours to keep right; a change to audit.canonical needs a new version, not an edit.',
+      alternatives: '1. Write-once object storage: nobody can change a shipped record within the retention, but records travel through an outbox and arrive minutes later.\n2. A ledger database (SQL Server or Azure SQL ledger tables): the database chains and verifies for us, but only on SQL Server or Azure SQL, and records can never be removed.\n3. pgAudit or the database\'s own audit log: it records statements rather than business operations, and its log is kept by the same administrators.',
+    },
+    {
+      id: 'adr-worm', label: 'Audit records in write-once object storage', when: { STORE: ['worm'] },
+      decision: 'Audit records are inserted into an outbox table audit_outbox in the element\'s database in the same transaction as the change they record. A relay, the only writer, numbers them gap-free and ships them at least every {{SHIP_MINUTES}} minutes as JSON Lines batches named audit/<element>/<yyyy>/<mm>/<dd>/<first>-<last>.jsonl.gz, and deletes them from the outbox only after the upload succeeded. The storage refuses any change or deletion within the retention: an S3 bucket with Object Lock in compliance mode and a default retention of {{AUDIT_YEARS}} years, an Azure container with a locked time-based retention policy of the same length, or a Cloud Storage bucket with a locked retention policy; a lifecycle rule removes batches whose retention has passed. Every {{VERIFY_HOURS}} hours a job checks that the record numbers of the listed batches have no gap (a delete marker hiding a batch shows as one) and that the outbox holds nothing older than {{SHIP_MINUTES}} minutes, and pages the audit owner otherwise. Recorded: {{SCOPE}}. Each record keeps {{CONTENT}}. Readers: {{ACCESS}}, through the element\'s audit read operation, which records every read; nobody else holds read access to the bucket.',
+      consequences: '• Within the retention nobody can change or delete a shipped batch, the account\'s root user included (S3 compliance mode, a locked Azure or Cloud Storage policy); S3 Object Lock and Azure immutable storage have been assessed against SEC 17a-4(f).\n• Records wait up to {{SHIP_MINUTES}} minutes in the outbox, where the database\'s owner could still remove them; the gap check only sees what the relay numbered.\n• A retention set too long cannot be shortened: in S3 compliance mode the only way out is closing the account, so try the configuration in governance mode or with an unlocked policy first.\n• Searching needs an index or a query engine over the bucket (Amazon Athena, Azure Synapse serverless SQL); the audit read operation has to provide it for the readers.\n• Storage is cheap over {{AUDIT_YEARS}} years, and the records outlive the database and its backups.',
+      alternatives: '1. An append-only table with a hash chain: no relay and no bucket, but the database\'s owner can rewrite the tail after the last copied head.\n2. A ledger database: verification built in, tied to SQL Server or Azure SQL.\n3. Records shipped only to the SIEM: searchable at once, but its administrators can delete them and its retention is set for detection, not evidence (the planned Security event logging and detection pack).',
+    },
+    {
+      id: 'adr-ledger', label: 'Audit records in a ledger table', when: { STORE: ['ledger'] },
+      decision: 'Audit records are rows of an append-only ledger table audit.records (CREATE TABLE … WITH (LEDGER = ON (APPEND_ONLY = ON))) in the element\'s own database on SQL Server 2022 or later, Azure SQL Database or Azure SQL Managed Instance, inserted in the same transaction as the change they record. The database refuses UPDATE and DELETE on the table for every user, administrators included, hashes every transaction into a chain of blocks, and stores the database digests automatically in an Azure storage container with a locked time-based immutability policy of at least {{AUDIT_YEARS}} years (or in Azure Confidential Ledger). Every {{VERIFY_HOURS}} hours a job runs sys.sp_verify_database_ledger_from_digest_storage over the digest locations and pages the audit owner when it fails or the digest locations change. Recorded: {{SCOPE}}. Each record keeps {{CONTENT}}. Readers: {{ACCESS}}, through the element\'s audit read operation, which records every read.',
+      consequences: '• Tamper evidence and its verification come with the database: no hash code of our own.\n• Only on SQL Server 2022 or later and Azure SQL: a ledger table cannot be turned back into an ordinary table, and TRUNCATE and partition switching are not supported on it.\n• Old rows cannot be deleted from an append-only ledger table: records stay for the life of the database, well past {{AUDIT_YEARS}} years, and any personal data in them with them; dropping the table only renames it.\n• An administrator of the machine can still edit the database files; ledger cannot prevent that, only detect it at the next verification.\n• Amazon QLDB, the managed ledger on AWS, reached its end of support on 31 July 2025: on AWS, choose one of the other stores.',
+      alternatives: '1. An append-only table with a hash chain on PostgreSQL: the same idea in code of our own, with deletion after the retention.\n2. Write-once object storage: deletion after the retention is possible, verification of completeness is ours.\n3. Azure Confidential Ledger as the store itself: tamper-proof, but outside the business transaction, so a change could commit without its record.',
+    },
+    {
+      id: 'adr-cdc', label: 'Every write captured from the database log', when: { SCOPE: ['cdc'] },
+      decision: 'Besides the catalogue\'s operations, every committed insert, update and delete in the element\'s stores is recorded. Each audited transaction also inserts one row into audit.transaction_context (actor, on-behalf-of, correlation id, source). Debezium\'s connector for the element\'s database (PostgreSQL through pgoutput, SQL Server through its change data capture tables) captures that table with the others, with transaction metadata on (provide.transaction.metadata), and a Kafka Streams enricher joins every change event to the context row of the same transaction id and appends the result to the audit store within {{CDC_MINUTES}} minutes. A change whose transaction wrote no context row (a migration, a console fix, a batch job) is recorded as unattributed with the database user, and the day\'s unattributed changes are reported to the element\'s owner. Reads and exports stay in the catalogue, since the database\'s log does not show them.',
+      consequences: '• Changes made around the element\'s operations are recorded too, and the unattributed ones become visible.\n• Kafka, Kafka Connect, Debezium and the enricher join the chain of evidence: an outage delays records, and a lost offset or a re-snapshot can skip or repeat them.\n• A captured change says which columns changed, not which business operation meant it; the catalogue still names the operations.\n• Captured changes reach the trail up to {{CDC_MINUTES}} minutes later, outside the business transaction.\n• A replication slot (or the change data capture tables) holds back the database\'s log while the connector is down: the database\'s disk has to be watched.',
+      alternatives: '1. The catalogue alone: no pipeline, but changes made outside the operations go unrecorded.\n2. Database triggers writing every change into the audit table: no pipeline, but the actor has to travel in a session setting and every write pays for the trigger.\n3. The database\'s own audit (pgAudit, SQL Server Audit): it records statements rather than rows, kept by the database\'s administrators.',
+    },
+    {
+      id: 'adr-hashes', label: 'Records keep keyed hashes, not values', when: { CONTENT: ['hashes'] },
+      decision: 'An audit record names the fields a change touched and holds, for each, an HMAC-SHA-256 of the old and of the new value under an audit key kept in the key management service (AWS KMS, Azure Key Vault or Google Cloud KMS) and usable only by the element; the record never holds the values. The key\'s id is stored in each record, so the key can be rotated. A secret (password, token, key) is named as changed without any hash. To prove what a value was, an investigator computes the HMAC of the value from the business store or a backup and compares. The actor and target ids in the trail are internal ids; whether keeping them for the retention beside an erasure is covered by a legal obligation (GDPR Art. 17(3)(b)) is for the organisation\'s DPO to confirm.',
+      consequences: '• The trail holds no personal values, so the erasure decided in the Personal data pack does not have to reach it; once a person\'s records are erased, the internal ids in the trail point to nobody.\n• An investigation needs the business store or a backup to learn what a value was; once the backup is gone, a record proves only that a field changed and whether a given value matches.\n• The audit key is a secret of its own: lost, no value can be checked; leaked, short values such as a birth date can be guessed back from their hashes.\n• Records stay small, whatever the size of the values.',
+      alternatives: '1. The old and new values: readable without the business store, but personal data stays in a store nobody can edit.\n2. A plain SHA-256 without a key: anyone holding the trail can confirm a guessed e-mail address or name.\n3. Values encrypted under a key per person (crypto-shredding): readable until the person is erased, at the cost of a key lookup for every record.',
+    },
+    {
+      id: 'adr-values', label: 'Records keep the old and new values', when: { CONTENT: ['values'] },
+      decision: 'An audit record holds, as JSON, the old and new value of every field a change touched, except secrets (passwords, tokens, keys) and full card numbers, which are named as changed without a value; the exclusions are one list in src/audit, tested. Which fields hold personal data is taken from the classification the Personal data pack keeps; keeping those values for {{AUDIT_YEARS}} years rests on a legal obligation that the organisation\'s DPO or compliance officer has confirmed in writing (GDPR Art. 17(3)(b)), linked from this decision.',
+      consequences: '• An investigation reads what changed from the trail alone, years later.\n• Personal values in the trail cannot be erased within the retention: an erasure request leaves them in place, which the DPO must accept and the privacy notice must say.\n• Records grow with the values: large documents are referenced by a hash, not copied.\n• A field that later becomes a secret or special-category data must join the exclusions before its first change is recorded.',
+      alternatives: '1. Keyed hashes of the values: no personal data in the trail, proof only with the business store or a backup.\n2. Values encrypted under a key per person: erasable by destroying the key, more to run.',
+    },
+  ],
+  fitness: [
+    {
+      id: 'ff-catalogue', label: 'Every audited call leaves a valid record', category: 'structural', implements: STORE_ADRS, checks: ['req-catalogue', 'req-record'],
+      threshold: '0 operations that change data outside the catalogue and the exemptions; exactly 1 record per call of each audited operation, permitted and refused, and 0 records rejected by audit/record.schema.json',
+      description: 'A test lists the operations from the router (not from a list kept by hand) and fails on any that changes data but is neither audited nor exempt in audit/catalogue.yaml. It then calls each audited operation as a permitted and as a refused caller, reads the records written since the call, expects exactly one, and validates it against audit/record.schema.json, whose required fields are actor, action, target, outcome, at, correlationId, source and version.',
+      tool: 'Vitest with supertest, js-yaml and Ajv (or the test runner and HTTP client of your stack: JUnit with MockMvc and networknt json-schema-validator, xUnit with WebApplicationFactory)',
+      language: 'ts',
+      snippet: `import { readFileSync } from 'node:fs'
+import Ajv from 'ajv'
+import { load } from 'js-yaml'
+import request from 'supertest'
+import { app, routes } from '../src/app'        // routes: the router's table
+import { audit } from '../src/audit/store'
+import { exampleBody, tokenFor } from './audit/fixtures'
+
+const catalogue = load(readFileSync('audit/catalogue.yaml', 'utf8')) as { audited: string[]; exempt: Record<string, string> }
+const validate = new Ajv({ allErrors: true }).compile(JSON.parse(readFileSync('audit/record.schema.json', 'utf8')))
+const key = (r: { method: string; path: string }) => \`\${r.method} \${r.path}\`
+
+it('names every operation that changes data as audited or exempt', () => {
+  const writes = routes.filter((r) => r.method !== 'GET').map(key)
+  expect(writes.filter((op) => !catalogue.audited.includes(op) && !(op in catalogue.exempt))).toEqual([])
+})
+
+describe.each(routes.filter((r) => catalogue.audited.includes(key(r))))('$method $path', (route) => {
+  it.each(['permitted', 'refused'])('leaves one valid record when %s', async (who) => {
+    const since = new Date()
+    await request(app)[route.method.toLowerCase()](route.example).set('Authorization', \`Bearer \${await tokenFor(who, route)}\`).send(exampleBody(route))
+    const records = await audit.find({ operation: key(route), since })
+    expect(records).toHaveLength(1)
+    expect(validate(records[0]), JSON.stringify(validate.errors)).toBe(true)
+  })
+})`,
+    },
+    {
+      id: 'ff-atomic', label: 'A failed record stops the change', category: 'structural', implements: STORE_ADRS, checks: ['req-atomic'],
+      threshold: 'With the audit write failing, the operation answers 5xx and 0 business rows are changed',
+      description: 'An integration test against the real database makes the audit writer fail once, calls an audited operation that changes a customer, and reads the customer back: the change must have been rolled back with the failed record. The audit writer runs on the business transaction\'s connection, which is what this test proves.',
+      tool: 'Vitest with supertest and a database started by Testcontainers (or the test runner of your stack with a spy on the audit writer)',
+      language: 'ts',
+      snippet: `import request from 'supertest'
+import { expect, it, vi } from 'vitest'
+import { app } from '../src/app'
+import { audit } from '../src/audit/store'
+import { db } from './db'
+import { createCustomer, tokenFor } from './audit/fixtures'
+
+it('commits no change without its audit record', async () => {
+  const customer = await createCustomer({ email: 'before@example.test' })
+  const append = vi.spyOn(audit, 'append').mockRejectedValueOnce(new Error('audit store unavailable'))
+  const res = await request(app).patch(\`/customers/\${customer.id}\`).send({ email: 'after@example.test' })
+    .set('Authorization', \`Bearer \${await tokenFor('support')}\`)
+  expect(append).toHaveBeenCalledOnce()
+  expect(res.status).toBeGreaterThanOrEqual(500)
+  const { rows } = await db.query('select email from customers where id = $1', [customer.id])
+  expect(rows[0].email).toBe('before@example.test')
+})`,
+    },
+    {
+      id: 'ff-hashes', label: 'Only keyed hashes in the trail', when: { CONTENT: ['hashes'] }, category: 'structural', implements: ['adr-hashes'], checks: ['req-hashes'],
+      threshold: 'The new-value hash of a changed field equals HMAC-SHA-256 of the value under the test audit key; 0 occurrences of the value in the audit store',
+      description: 'An integration test changes a customer\'s e-mail address to a random value, reads the record, recomputes the HMAC with the test instance of the audit key, and searches a dump of the whole audit store (rows, outbox or shipped batches, as decided) for the value.',
+      tool: 'Vitest with supertest and node:crypto (or the test runner of your stack with its HMAC implementation)',
+      language: 'ts',
+      snippet: `import { createHmac, randomUUID } from 'node:crypto'
+import request from 'supertest'
+import { app } from '../src/app'
+import { audit } from '../src/audit/store'
+import { auditKey, createCustomer, dumpAuditStore, tokenFor } from './audit/fixtures'   // auditKey: the test instance of the key
+
+it('keeps a keyed hash of the new value and never the value', async () => {
+  const customer = await createCustomer()
+  const email = \`\${randomUUID()}@example.test\`
+  await request(app).patch(\`/customers/\${customer.id}\`).send({ email })
+    .set('Authorization', \`Bearer \${await tokenFor('support')}\`).expect(200)
+  const [record] = await audit.find({ action: 'customer.update', target: { type: 'customer', id: customer.id } })
+  const expected = createHmac('sha256', auditKey).update(email).digest('hex')
+  expect(record.changes).toContainEqual(expect.objectContaining({ field: 'email', after: expected }))
+  expect(await dumpAuditStore()).not.toContain(email)
+})`,
+    },
+    {
+      id: 'ff-values', label: 'Values kept, secrets not', when: { CONTENT: ['values'] }, category: 'structural', implements: ['adr-values'], checks: ['req-values'],
+      threshold: 'The record of an address change holds the old and new address; the record of a password change names the field with no value; 0 occurrences of the password in the audit store',
+      description: 'An integration test changes a customer\'s address and an account\'s password (a random value), reads both records, and searches a dump of the whole audit store for the password.',
+      tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
+      language: 'ts',
+      snippet: `import { randomUUID } from 'node:crypto'
+import request from 'supertest'
+import { app } from '../src/app'
+import { audit } from '../src/audit/store'
+import { createAccount, createCustomer, dumpAuditStore, tokenFor } from './audit/fixtures'
+
+it('keeps old and new values and never a secret', async () => {
+  const customer = await createCustomer({ address: 'Old Street 1' })
+  const account = await createAccount()
+  const password = \`pw-\${randomUUID()}\`
+  const auth = \`Bearer \${await tokenFor('support')}\`
+  await request(app).patch(\`/customers/\${customer.id}\`).send({ address: 'New Street 2' }).set('Authorization', auth).expect(200)
+  await request(app).put(\`/accounts/\${account.id}/password\`).send({ password }).set('Authorization', auth).expect(204)
+  const [address] = await audit.find({ action: 'customer.update', target: { type: 'customer', id: customer.id } })
+  expect(address.changes).toContainEqual({ field: 'address', before: 'Old Street 1', after: 'New Street 2' })
+  const [secret] = await audit.find({ action: 'account.password.change', target: { type: 'account', id: account.id } })
+  expect(secret.changes).toEqual([{ field: 'password' }])
+  expect(await dumpAuditStore()).not.toContain(password)
+})`,
+    },
+    {
+      id: 'ff-chain', label: 'Hash chain verified', when: { STORE: ['table'] }, category: 'operational', implements: ['adr-table'], checks: ['req-tamper'],
+      threshold: 'Every {{VERIFY_HOURS}} hours: 0 rows whose hash differs from SHA-256(prev_hash ‖ canonical row), 0 breaks in prev_hash or chain_pos, and 0 copied heads that differ from the row at their position',
+      description: 'A scheduled job recomputes each row\'s hash with the same audit.canonical function the trigger uses, checks that every row points at the hash of the row before and that positions have no gap, then compares the heads copied to write-once storage over the last 30 days with the rows at their positions. Any finding names the first position affected and fails the job, which pages the audit owner. Positions below the oldest partition kept are skipped, since pg_partman dropped them after the retention.',
+      tool: 'bash with psql and the AWS CLI in a scheduled job (for an Azure container, az storage blob download in place of aws s3 cp)',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# audit/verify-chain.sh: AUDIT_DATABASE_URL and HEADS_BUCKET are set by the scheduled job
+set -euo pipefail
+broken=$(psql "$AUDIT_DATABASE_URL" -v ON_ERROR_STOP=1 -qAtc "
+  select chain_pos from (
+    select chain_pos, hash, prev_hash, sha256(coalesce(prev_hash, ''::bytea) || audit.canonical(r)) as recomputed,
+           lag(hash) over (order by chain_pos) as previous, lag(chain_pos) over (order by chain_pos) as previous_pos
+    from audit.records r) c
+  where hash <> recomputed
+     or (previous_pos is not null and (chain_pos <> previous_pos + 1 or prev_hash is distinct from previous))
+  order by chain_pos limit 1")
+[ -z "$broken" ] || { echo "audit chain broken at position $broken"; exit 1; }
+for day in $(seq 0 29); do
+  key="heads/$(date -u -d "-$day days" +%F).txt"            # lines: <chain_pos> <hash in hex>, one per hour
+  aws s3 cp "s3://$HEADS_BUCKET/$key" - 2>/dev/null || continue
+done | while read -r pos hash; do
+  stored=$(psql "$AUDIT_DATABASE_URL" -qAtc "select encode(hash, 'hex') from audit.records where chain_pos = $pos")
+  [ -z "$stored" ] || [ "$stored" = "$hash" ] || { echo "row $pos differs from its copied head"; exit 1; }
+done`,
+    },
+    {
+      id: 'ff-table-append-only', label: 'Audit table only appends and keeps', when: { STORE: ['table'] }, category: 'structural', implements: ['adr-table'], checks: ['req-append-only', 'req-retention'],
+      threshold: 'The application role holds only INSERT and SELECT on audit.records; an UPDATE and a DELETE by the table\'s owner are refused; pg_partman retention is {{AUDIT_YEARS}} years',
+      description: 'A database test runs in CI after the migrations, as the table\'s owner: it checks the application role\'s privileges, appends one record, expects the append-only trigger to refuse an update and a delete of it, and reads the retention pg_partman applies to the table.',
+      tool: 'pgTAP (run with pg_prove) with pg_partman 5',
+      language: 'sql',
+      snippet: `BEGIN;
+SELECT plan(5);
+SELECT table_privs_are('audit', 'records', 'app', ARRAY['INSERT', 'SELECT'], 'the application only appends and reads');
+SELECT lives_ok($$INSERT INTO audit.records (actor, action, target_type, target_id, outcome, correlation_id, source, version)
+                  VALUES ('test', 'test.append-only', 'test', '1', 'success', 'test', '{}', 1)$$, 'a record is appended');
+SELECT throws_ok($$UPDATE audit.records SET outcome = 'refused' WHERE action = 'test.append-only'$$,
+                 'P0001', 'audit records are append-only', 'an update is refused, even for the owner');
+SELECT throws_ok($$DELETE FROM audit.records WHERE action = 'test.append-only'$$,
+                 'P0001', 'audit records are append-only', 'a delete is refused, even for the owner');
+SELECT is((SELECT retention FROM partman.part_config WHERE parent_table = 'audit.records'), '{{AUDIT_YEARS}} years',
+          'partitions are dropped only after the retention');
+SELECT * FROM finish();
+ROLLBACK;`,
+    },
+    {
+      id: 'ff-object-lock', label: 'Audit bucket locked for the retention', when: { STORE: ['worm'] }, category: 'structural', implements: ['adr-worm'], checks: ['req-append-only', 'req-retention'],
+      threshold: '0 audit buckets in the Terraform plan without an Object Lock configuration in compliance mode with a default retention of at least {{AUDIT_YEARS}} years',
+      description: 'A policy over the Terraform plan in CI fails when the audit bucket has no Object Lock configuration, when its default retention is in governance mode, or when it is shorter than the retention, so that no identity, the account\'s root user included, can change or delete a batch before it is due.',
+      tool: 'Conftest on the Terraform plan (terraform show -json); on Azure check azurerm_storage_container_immutability_policy (immutability_period_in_days, protected_append_writes_enabled false, locked), on Google Cloud google_storage_bucket retention_policy with is_locked = true',
+      language: 'rego',
+      snippet: `package main
+
+import rego.v1
+
+min_days := {{AUDIT_YEARS}} * 365
+
+locks := [r | some r in input.resource_changes; r.type == "aws_s3_bucket_object_lock_configuration"]
+
+deny contains "no Object Lock configuration on the audit bucket" if count(locks) == 0
+
+deny contains msg if {
+	some l in locks
+	some rule in l.change.after.rule
+	some retention in rule.default_retention
+	retention.mode != "COMPLIANCE"
+	msg := sprintf("%s is not in compliance mode", [l.address])
+}
+
+deny contains msg if {
+	some l in locks
+	some rule in l.change.after.rule
+	some retention in rule.default_retention
+	number_or_zero(retention.years) * 365 + number_or_zero(retention.days) < min_days
+	msg := sprintf("%s keeps audit records for less than %d days", [l.address, min_days])
+}
+
+number_or_zero(x) := x if is_number(x)
+
+number_or_zero(x) := 0 if not is_number(x)`,
+    },
+    {
+      id: 'ff-batches', label: 'No batch missing, nothing left behind', when: { STORE: ['worm'] }, category: 'operational', implements: ['adr-worm'], checks: ['req-tamper'],
+      threshold: 'Every {{VERIFY_HOURS}} hours: 0 gaps between the record numbers of the listed batches, and 0 outbox rows older than {{SHIP_MINUTES}} minutes',
+      description: 'A scheduled job lists the element\'s batches, sorts them by first record number and fails on the first gap, which a batch hidden by a delete marker also shows as; it then counts the outbox rows waiting longer than the shipping limit. A failure pages the audit owner.',
+      tool: 'bash with the AWS CLI, jq and psql in a scheduled job (for Azure, az storage blob list --query "[].name" in place of aws s3api list-objects-v2)',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# audit/verify-batches.sh: AUDIT_BUCKET, ELEMENT and DATABASE_URL are set by the scheduled job
+set -euo pipefail
+aws s3api list-objects-v2 --bucket "$AUDIT_BUCKET" --prefix "audit/$ELEMENT/" --query 'Contents[].Key' --output json > keys.json
+gap=$(jq -r '
+  [ (. // [])[] | capture("/(?<first>[0-9]+)-(?<last>[0-9]+)\\\\.jsonl\\\\.gz$") | {first: (.first | tonumber), last: (.last | tonumber)} ]
+  | sort_by(.first)
+  | [ range(1; length) as $i | select(.[$i].first != .[$i - 1].last + 1) | .[$i - 1].last + 1 ]
+  | first // empty' keys.json)
+[ -z "$gap" ] || { echo "audit batches missing from record $gap"; exit 1; }
+waiting=$(psql "$DATABASE_URL" -qAtc "select count(*) from audit_outbox where created_at < now() - interval '{{SHIP_MINUTES}} minutes'")
+[ "$waiting" -eq 0 ] || { echo "$waiting audit records waited more than {{SHIP_MINUTES}} minutes to be shipped"; exit 1; }`,
+    },
+    {
+      id: 'ff-ledger', label: 'Ledger verified against its digests', when: { STORE: ['ledger'] }, category: 'operational', implements: ['adr-ledger'], checks: ['req-tamper', 'req-append-only', 'req-retention'],
+      threshold: 'Every {{VERIFY_HOURS}} hours: audit.records is an APPEND_ONLY_LEDGER_TABLE, automatic digest storage is on, ledger verification succeeds, and the digest container\'s immutability policy is Locked for at least {{AUDIT_YEARS}} × 365 days',
+      description: 'A scheduled job checks in the catalog views that the audit table is an append-only ledger table (so updates and deletes are refused by the database) and that a current digest location exists, runs the ledger verification over every digest location, and reads the immutability policy of the container that holds the digests. Any failure ends the job with an error and pages the audit owner.',
+      tool: 'bash with sqlcmd (-b ends on the first error) and the Azure CLI in a scheduled job or an Elastic Job',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# audit/verify-ledger.sh: SQLCMDSERVER, SQLCMDDATABASE, the sign-in and DIGEST_ACCOUNT are set by the scheduled job
+set -euo pipefail
+sqlcmd -b -Q "
+SET NOCOUNT ON;
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE SCHEMA_NAME(schema_id) = 'audit' AND name = 'records' AND ledger_type_desc = 'APPEND_ONLY_LEDGER_TABLE')
+  THROW 50001, 'audit.records is not an append-only ledger table', 1;
+IF NOT EXISTS (SELECT 1 FROM sys.database_ledger_digest_locations WHERE is_current = 1)
+  THROW 50002, 'automatic digest storage is off', 1;
+DECLARE @digest_locations NVARCHAR(MAX) = (SELECT * FROM sys.database_ledger_digest_locations FOR JSON AUTO, INCLUDE_NULL_VALUES);
+EXECUTE sys.sp_verify_database_ledger_from_digest_storage @digest_locations;"
+read -r state days < <(az storage container immutability-policy show --account-name "$DIGEST_ACCOUNT" \\
+  --container-name sqldbledgerdigests --query '[state, immutabilityPeriodSinceCreationInDays]' -o tsv)
+[ "$state" = Locked ] && [ "$days" -ge $(( {{AUDIT_YEARS}} * 365 )) ] || { echo "digest container policy is $state for $days days"; exit 1; }`,
+    },
+    {
+      id: 'ff-readers', label: 'Only the decided readers read, and reads are recorded', category: 'structural', implements: STORE_ADRS, checks: ['req-readers-auditors', 'req-readers-team', 'req-reads-recorded'],
+      threshold: 'A search of the audit trail by a caller outside audit/readers.yaml is refused with 403; one by a reader succeeds and leaves exactly 1 audit.read record naming the reader and the filter; where reads are reported, the month\'s report lists it',
+      description: 'audit/readers.yaml names the role that may read the trail (the audit role or the team, as decided) and, for the team, whom the monthly report of reads goes to. A test searches the trail as a member of another team and as a customer, expects 403, searches as a reader, and checks the record of the read and, where reads are reported, the report.',
+      tool: 'Vitest with supertest and js-yaml (or the test runner and HTTP client of your stack)',
+      language: 'ts',
+      snippet: `import { readFileSync } from 'node:fs'
+import { load } from 'js-yaml'
+import request from 'supertest'
+import { app } from '../src/app'
+import { audit } from '../src/audit/store'
+import { monthlyReadReport, tokenFor } from './audit/fixtures'
+
+const readers = load(readFileSync('audit/readers.yaml', 'utf8')) as { role: string; reportTo?: string }
+const search = async (who: string) => request(app).get('/audit/records?target=customer:42')
+  .set('Authorization', \`Bearer \${await tokenFor(who)}\`)
+
+it('lets only the decided readers search, and records each search', async () => {
+  for (const outsider of ['other-team', 'customer']) expect((await search(outsider)).status).toBe(403)
+  const since = new Date()
+  expect((await search(readers.role)).status).toBe(200)
+  const reads = await audit.find({ action: 'audit.read', since })
+  expect(reads).toHaveLength(1)
+  expect(reads[0]).toMatchObject({ actor: { role: readers.role }, details: { filter: 'target=customer:42' } })
+  if (readers.reportTo) expect(await monthlyReadReport()).toContainEqual(expect.objectContaining({ id: reads[0].id }))
+})`,
+    },
+    {
+      id: 'ff-clock', label: 'Clocks in step with UTC', category: 'operational', implements: STORE_ADRS, checks: ['req-clock'],
+      threshold: 'On every host that writes audit records, every 5 minutes: chrony is synchronised and its system time offset is within {{CLOCK_MS}} ms',
+      description: 'A check on every host that writes audit records (a cron job or the monitoring agent\'s script check, which pages on failure) reads chrony\'s tracking report and fails when the clock is not synchronised or its offset from NTP time is over the limit. On a managed runtime without host access (AWS Lambda, Fargate, Cloud Run) the provider keeps the clock, and the check runs on the hosts the team does run.',
+      tool: 'bash with chronyc (chrony 4), as a cron job or a monitoring agent\'s script check',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# audit/check-clock.sh, every 5 minutes on each host that writes audit records
+set -euo pipefail
+tracking=$(chronyc tracking)
+leap=$(awk -F' *: ' '/^Leap status/ {print $2}' <<< "$tracking")
+offset=$(awk '/^System time/ {print $4}' <<< "$tracking")   # seconds, fast or slow of NTP time
+[ "$leap" != "Not synchronised" ] || { echo "clock not synchronised"; exit 1; }
+awk -v s="$offset" -v max="{{CLOCK_MS}}" 'BEGIN { exit !(s * 1000 <= max) }' \\
+  || { echo "clock is \${offset}s off NTP time, over {{CLOCK_MS}} ms"; exit 1; }`,
+    },
+    {
+      id: 'ff-cdc', label: 'Direct writes reach the trail', when: { SCOPE: ['cdc'] }, category: 'operational', implements: ['adr-cdc'], checks: ['req-cdc'],
+      threshold: 'Every hour: the connector and all its tasks are RUNNING, and a canary row written outside the element appears in the audit trail as unattributed within {{CDC_MINUTES}} minutes',
+      description: 'A scheduled job asks Kafka Connect for the connector\'s status, writes a canary row straight into the database (outside the element, so with no transaction context), and polls the element\'s audit read operation until the change appears as unattributed, failing past the limit. The job\'s own searches are recorded like any read.',
+      tool: 'bash with curl, jq and psql in a scheduled job (sqlcmd -Q on SQL Server), against the Kafka Connect REST API',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# audit/canary-cdc.sh: CONNECT_URL, CONNECTOR, DATABASE_URL, APP_URL and AUDIT_READER_TOKEN are set by the scheduled job
+set -euo pipefail
+curl -fsS "$CONNECT_URL/connectors/$CONNECTOR/status" \\
+  | jq -e '.connector.state == "RUNNING" and all(.tasks[]; .state == "RUNNING")' > /dev/null \\
+  || { echo "connector $CONNECTOR is not running"; exit 1; }
+id=$(psql "$DATABASE_URL" -qAtc "insert into audit_canary (touched_at) values (now()) returning id")
+deadline=$(( $(date +%s) + {{CDC_MINUTES}} * 60 ))
+until curl -fsS -H "Authorization: Bearer $AUDIT_READER_TOKEN" "$APP_URL/audit/records?target=audit_canary:$id" \\
+  | jq -e '.items[] | select(.actor == "unattributed")' > /dev/null; do
+  [ "$(date +%s)" -lt "$deadline" ] || { echo "canary write $id not in the audit trail after {{CDC_MINUTES}} minutes"; exit 1; }
+  sleep 30
+done`,
+    },
+  ],
+}
+
+export default pack
