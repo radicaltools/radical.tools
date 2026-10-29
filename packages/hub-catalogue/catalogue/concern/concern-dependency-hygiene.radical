@@ -105,7 +105,7 @@
           {
             "value": "lockfile-ranges",
             "label": "ranges in the manifest, exact versions in a committed lockfile",
-            "description": "The manifest declares caret ranges, the committed lockfile fixes every version, transitive ones included, and CI installs exactly the lockfile (npm ci, pnpm install --frozen-lockfile, uv sync --locked, go mod verify). Pick it as the default for applications: reproducible builds, and updates arrive as lockfile changes the bot can open."
+            "description": "The manifest declares caret ranges (except the formatter, which is pinned exactly, as the Code style and conventions pack decides), the committed lockfile fixes every version, transitive ones included, and CI installs exactly the lockfile (npm ci, pnpm install --frozen-lockfile, uv sync --locked, go mod verify). Pick it as the default for applications: reproducible builds, and updates arrive as lockfile changes the bot can open."
           },
           {
             "value": "exact",

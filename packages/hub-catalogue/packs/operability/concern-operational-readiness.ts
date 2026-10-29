@@ -1,0 +1,475 @@
+import type { PackSpec, When } from '../../src/packSpec'
+
+const REVIEWED: When = { PRR: ['sre', 'self'] }
+const REVIEW_ADRS = ['adr-prr-sre', 'adr-prr-self']
+const MAIN_ADRS = ['adr-prr-sre', 'adr-prr-self', 'adr-prr-none']
+const FORCES = 'This element will run in production, and somebody will be paged for it. The forces: the team that has just built something is the worst judge of what it forgot; a review held after launch reviews nothing; a checklist that copies every number goes stale the day a neighbouring decision changes; a review that blocks every launch until it is perfect is soon skipped; a runbook not linked from the alert is not found at three in the morning, and one nobody has followed is a guess; a game day costs the rotation an afternoon each quarter, while automated experiments cost the platform work to run them safely; and an element whose owner is unknown is fixed by whoever happens to be nearest. The availability target is decided in the Availability pack; the alerts, their routing and the on-call rotation in the Observability pack; load tests in the Capacity and scaling pack; restore drills in the Backup and recovery pack; rollout and rollback in the Deployment and rollback pack; incident handling and postmortems in the Incident management pack; and who approves each change in the Definition of Done pack. The readiness review approves the element, not a change.'
+
+const pack: PackSpec = {
+  id: 'concern-operational-readiness',
+  name: 'Operational readiness',
+  group: 'operability',
+  description: 'What must be true before it first takes production traffic, and how the team keeps practising running it: the production readiness review and its checklist, the runbooks the alerts link to, game days or chaos experiments, and who owns it and whom to call.',
+  tags: ['operations', 'readiness review', 'runbooks', 'game days', 'chaos engineering', 'ownership'],
+  concern: {
+    id: 'operational-readiness',
+    trigger: 'LIST NODES WHERE (type = "container" OR type = "webapp") AND external != true',
+    why: 'these elements will run in production, so what must be ready before their first production traffic, and how the team keeps practising running them, has to be decided.',
+  },
+  sources: [
+    { title: 'Google SRE book, chapter 32: The Evolving SRE Engagement Model (Production Readiness Review)', url: 'https://sre.google/sre-book/evolving-sre-engagement-model/' },
+    { title: 'Google SRE workbook, chapter 18: SRE Engagement Model', url: 'https://sre.google/workbook/engagement-model/' },
+    { title: 'Google SRE book, chapter 1: Introduction (playbooks and MTTR)', url: 'https://sre.google/sre-book/introduction/' },
+    { title: 'AWS Well-Architected, Operational Excellence: OPS07-BP02 Ensure a consistent review of operational readiness', url: 'https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/ops_ready_to_support_const_orr.html' },
+    { title: 'AWS Well-Architected, Operational Excellence: OPS07-BP03 Use runbooks to perform procedures', url: 'https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/ops_ready_to_support_use_runbooks.html' },
+    { title: 'AWS whitepaper: Operational Readiness Reviews (ORR)', url: 'https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/wa-operational-readiness-reviews.html' },
+    { title: 'AWS Well-Architected, Reliability: REL12-BP05 Conduct game days regularly', url: 'https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_game_days_resiliency.html' },
+    { title: 'AWS Well-Architected, Reliability: REL12-BP04 Test resiliency using chaos engineering', url: 'https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_failure_injection_resiliency.html' },
+    { title: 'Principles of Chaos Engineering', url: 'https://principlesofchaos.org/' },
+    { title: 'AWS Fault Injection Service: stop conditions', url: 'https://docs.aws.amazon.com/fis/latest/userguide/stop-conditions.html' },
+    { title: 'Chaos Mesh documentation', url: 'https://chaos-mesh.org/docs/' },
+    { title: 'Backstage: Descriptor Format of Catalog Entities', url: 'https://backstage.io/docs/features/software-catalog/descriptor-format/' },
+    { title: 'GitHub Docs: About code owners', url: 'https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners' },
+  ],
+  questions: [
+    {
+      key: 'PRR', title: 'Readiness review', label: 'Who reviews it before it takes production traffic?',
+      hint: 'A production readiness review checks against a written checklist that the element can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, load tests, restores and rollback have been decided and tried. Held before the first production traffic and again after a major change, it is the cheapest point to find what is missing. The checklist links to the decisions of the Availability, Observability, Capacity and scaling, Backup and recovery, Deployment and rollback and Incident management packs instead of repeating them.',
+      default: 'self',
+      options: [
+        { value: 'sre', label: 'a readiness review signed off by SRE or the platform team', description: 'The owning team fills in the checklist with evidence; an engineer of the SRE or platform team who is not in the owning team checks every item and approves the record, before the first production traffic and after each major change. Pick it when such a team exists and will help run the element or its platform, or when the element is on a revenue path.' },
+        { value: 'self', label: 'a self-assessment by the owning team', description: 'The owning team fills in the same checklist with evidence and its lead signs the record; nobody outside the team checks it. Pick it when there is no SRE or platform team, or when the team builds and runs the element alone.' },
+        { value: 'none', label: 'no readiness review', description: 'The element goes to production without a review, and the decision says so and until when. Pick it only for a prototype or an internal tool that the owning team alone uses; the first user outside the team ends it.' },
+      ],
+    },
+    {
+      key: 'RUNBOOKS', title: 'Runbooks', label: 'How are the runbooks organised?',
+      hint: 'Whoever is paged needs the next step one click from the alert. The alerts, their routing and who is paged are decided in the Observability pack; this decides where the steps are written and how an alert leads to them. Either way, each alerting rule carries a runbook_url annotation.',
+      default: 'alert',
+      options: [
+        { value: 'alert', label: 'a runbook per alert, linked from the alert', description: 'Each alerting rule links to a page of its own under docs/runbooks, named after the alert: what it means, the user impact, how to diagnose, mitigate and escalate. Pick it when the element has more than a handful of alerts or several people on the rotation, so that each page stays short and is found from the page.' },
+        { value: 'element', label: 'one runbook per element, a section per alert', description: 'One document per element under docs/runbooks with its dependencies, dashboards and routine operations, and one section per alert, which the alert links to by its anchor. Pick it for an element with a few alerts and one small team, where one document is easier to keep current than many.' },
+      ],
+    },
+    {
+      key: 'PRACTICE', title: 'Practice', label: 'How does the team keep practising running it?',
+      hint: 'Runbooks and a response that are never exercised fail on the night they are needed. The drills that prove a decision are decided where the decision is: instance, zone and region loss in the Availability pack, restores in the Backup and recovery pack, rollback in the Deployment and rollback pack, peak load in the Capacity and scaling pack. This decides how the team practises the rest: the runbooks, the response, and the failure modes the readiness review listed.',
+      default: 'gameday',
+      options: [
+        { value: 'gameday', label: 'game days on a written scenario', description: 'Every quarter by default, the people on the rotation spend a few hours responding with the runbooks to a failure a facilitator injects into staging, while observers note what was missing; the findings become tickets. Pick it when the team is starting to practise, or when what most needs exercising is people, runbooks and communication.' },
+        { value: 'chaos', label: 'automated chaos experiments in staging', description: 'Fault experiments, each with a steady-state hypothesis and a stop condition, run on a schedule (weekly by default) against staging with AWS Fault Injection Service, Chaos Mesh or LitmusChaos, and a broken hypothesis becomes a ticket. Pick it when the platform can inject faults safely and the element changes so often that a quarterly exercise falls behind.' },
+        { value: 'none', label: 'no practice beyond the drills of the other packs', description: 'No game days and no chaos experiments; the team relies on the drills the other packs decide and on real incidents, and the decision records it. Pick it for an internal tool with an availability target of 99.0 % or less, or a team of two or three people.' },
+      ],
+    },
+    {
+      key: 'OWNERSHIP', title: 'Ownership', label: 'Where are the owner and the escalation contact recorded?',
+      hint: 'When it breaks at night, or another team needs a change, the first question is who owns it and whom to call. The on-call rotation and its escalation policy are decided in the Observability pack; this decides where the element points to them.',
+      default: 'catalog',
+      options: [
+        { value: 'catalog', label: 'a service catalogue entry (Backstage catalog-info.yaml)', description: 'A catalog-info.yaml beside the code describes the element as a Backstage Component with its owning team (spec.owner), its lifecycle (spec.lifecycle) and the paging service to escalate to (the PagerDuty plugin\'s pagerduty.com/service-id annotation); the catalogue shows every element\'s owner in one place. Pick it when the organisation runs Backstage (self-hosted or as Roadie), or has more than a handful of teams.' },
+        { value: 'readme', label: 'an ownership section in the README', description: 'The repository\'s README.md has an Ownership section naming the owning GitHub team, its channel and the on-call schedule to escalate to. Pick it for a few teams without a service catalogue; move to a catalogue when people start asking which repository is whose.' },
+      ],
+    },
+  ],
+  details: [
+    { key: 'PRR_TEAM', label: 'Which GitHub team signs the readiness review (SRE or platform)? Only with a review signed off by SRE or the platform team', default: '@shop/sre' },
+    { key: 'PRR_MONTHS', label: 'After how many months must the readiness review be held again, even without a major change?', default: '12', number: true },
+    { key: 'GAP_DAYS', label: 'Within how many days of the review must a gap it found be closed?', default: '90', number: true },
+    { key: 'RUNBOOK_DAYS', label: 'Within how many days must each runbook be reviewed again?', default: '180', number: true },
+    { key: 'GAMEDAY_DAYS', label: 'How many days may pass between two game days? Only with game days', default: '92', number: true },
+    { key: 'CHAOS_DAYS', label: 'Within how many days must each chaos experiment have completed a run? Only with automated chaos experiments', default: '7', number: true },
+  ],
+  need: {
+    label: 'Ready to run before it goes live',
+    text: 'Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies.',
+  },
+  forces: FORCES,
+  requirements: [
+    {
+      id: 'req-prr-gate', label: 'No production deployment without a review', when: REVIEWED, ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'a production deployment of the element starts without an approved readiness review on record, or with one older than {{PRR_MONTHS}} months',
+      action: 'stop the deployment before it changes anything in production, and name the missing or stale review',
+      rationale: 'A review held after launch reviews nothing; tying it to the deployment makes the first production traffic wait for it, and the age limit catches the drift that no single change announced (Google SRE book, chapter 32; AWS Well-Architected OPS07-BP02).',
+      scenario: { label: 'Stale review stops the deployment', given: 'an element whose newest review record is older than {{PRR_MONTHS}} months', when: 'a production deployment starts', then: 'the deployment stops before any change and names the stale review; once an approved record is merged, it runs' },
+    },
+    {
+      id: 'req-prr-gaps', label: 'Gaps written down with a date', when: REVIEWED, ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'a checklist item is not met when the review is signed',
+      action: 'record it in the review as a gap with a ticket and a due date at most {{GAP_DAYS}} days after the review, so that a review may approve with known gaps but never with unknown ones',
+      rationale: 'Waiting for a perfect review delays launch until the review is skipped; an approval with written, dated gaps keeps both the launch and the follow-up honest (AWS whitepaper, Operational Readiness Reviews).',
+      scenario: { label: 'Missing load test becomes a dated gap', given: 'a review held before the first load test has run', when: 'the record is signed', then: 'it lists the load test as a gap with a ticket and a due date within {{GAP_DAYS}} days, and a gap without either fails the review check' },
+    },
+    {
+      id: 'req-prr-signoff', label: 'Review signed outside the team', when: { PRR: ['sre'] }, ears_type: 'ubiquitous',
+      action: 'have every readiness review approved by a member of {{PRR_TEAM}}, who checks each checklist item against its evidence, through a required code-owner review of the pull request that adds the record',
+      rationale: 'The team that built the element is the worst judge of what it forgot; the engaging SRE team checks it against its checklist (Google SRE book, chapter 32), and the required code-owner approval is the signature (GitHub Docs, About code owners).',
+      scenario: { label: 'Owning team cannot sign alone', given: 'a pull request adding a review record, approved only by the owning team', when: 'it is to be merged', then: 'the merge is blocked until a member of {{PRR_TEAM}} approves it' },
+    },
+    {
+      id: 'req-prr-checklist', label: 'One checklist that links, not copies', when: REVIEWED, ears_type: 'ubiquitous',
+      action: 'be reviewed against one checklist kept in the repository, with a section for each of ownership, availability objective, alerts and on-call, runbooks, capacity and load test, backup and restore, rollout and rollback, incident response, dependencies and failure modes, and practice, each section linking to the decision or the latest record it rests on instead of repeating its numbers',
+      rationale: 'A written checklist makes reviews comparable across elements and reviewers; links instead of copies keep it right when a neighbouring decision changes (AWS whitepaper, Operational Readiness Reviews; Google SRE workbook, chapter 18).',
+      scenario: { label: 'Checklist keeps its sections', given: 'the checklist in the repository', when: 'a section is removed, or a section holds no link', then: 'the checklist check fails naming the section' },
+    },
+    {
+      id: 'req-prr-major', label: 'Reviewed again after a major change', when: REVIEWED, ears_type: 'event-driven',
+      trigger: 'a major change reaches the element: a new dependency or data store, a new region, a higher availability target or a new owning team',
+      action: 'review it again against the checklist before the change takes production traffic, with every dependency the architecture model shows listed in the new review',
+      rationale: 'Most of what a first review finds comes back with a new dependency or a new owner, and the review is cheapest before the change is live (Google SRE book, chapter 32).',
+      scenario: { label: 'New dependency asks for a review', given: 'the architecture model and the newest review, which lists the element\'s dependencies', when: 'a pull request adds a call from the element to a new system in the model', then: 'the dependency check fails until a new review lists the system' },
+    },
+    {
+      id: 'req-prr-none', label: 'Unreviewed only while nobody else depends on it', when: { PRR: ['none'] }, ears_type: 'state-driven',
+      precondition: 'the element runs in production without a readiness review',
+      action: 'serve no user outside the owning team, and have the first such user, or an availability target above 99.0 %, supersede the decision with a review',
+      rationale: 'Skipping the review is a bet that nobody depends on the element yet; writing down when the bet ends keeps it from becoming permanent.',
+      scenario: { label: 'First outside user ends the exemption', given: 'an element running without a readiness review', when: 'a team outside the owning team asks to use it', then: 'the decision is superseded and the element is reviewed before that team\'s traffic arrives' },
+      unchecked: 'The owning team\'s lead confirms at each quarterly planning that nobody outside the team uses the element; who calls it in production is a fact no repository check sees reliably.',
+    },
+    {
+      id: 'req-runbook-alert', label: 'Each alert links its own runbook', when: { RUNBOOKS: ['alert'] }, ears_type: 'ubiquitous',
+      action: 'give every alerting rule a runbook_url annotation that resolves to a runbook page of its own under docs/runbooks, shared with no other alert, which says what the alert means, the user impact, and how to diagnose, mitigate and escalate',
+      rationale: 'The engineer who is paged starts from the alert; a playbook written ahead of time cuts the time to repair roughly threefold compared with winging it (Google SRE book, chapter 1), and a short page per alert is found from the page and kept current (AWS Well-Architected OPS07-BP03).',
+      scenario: { label: 'Alert without a runbook refused', given: 'the alerting rules', when: 'an alert is added without a runbook_url, with one that does not resolve, or with one another alert uses', then: 'the runbook check fails naming the alert' },
+    },
+    {
+      id: 'req-runbook-element', label: 'Each alert links its section of the runbook', when: { RUNBOOKS: ['element'] }, ears_type: 'ubiquitous',
+      action: 'keep one runbook for the element under docs/runbooks, with its dependencies, dashboards and routine operations, and give every alerting rule a runbook_url annotation that resolves to the section of that runbook written for the alert, no two alerts sharing a section',
+      rationale: 'The engineer who is paged starts from the alert; a playbook written ahead of time cuts the time to repair roughly threefold compared with winging it (Google SRE book, chapter 1), and an anchor to the alert\'s own section saves the scrolling (AWS Well-Architected OPS07-BP03).',
+      scenario: { label: 'Broken anchor refused', given: 'the alerting rules and the element\'s runbook', when: 'an alert links to a section heading that does not exist, or to the section of another alert', then: 'the runbook check fails naming the alert' },
+    },
+    {
+      id: 'req-runbook-review', label: 'Runbooks reviewed on time', ears_type: 'ubiquitous',
+      action: 'have every runbook reviewed by someone on the rotation at least every {{RUNBOOK_DAYS}} days and after each incident in which it was used, with the date of the last review in the runbook itself',
+      rationale: 'Runbooks decay as the element changes; a review date the check reads makes the decay visible before the night it matters (AWS Well-Architected OPS07-BP03).',
+      scenario: { label: 'Stale runbook flagged', given: 'a runbook last reviewed {{RUNBOOK_DAYS}} days and one day ago', when: 'the daily runbook check runs', then: 'it fails naming the runbook' },
+    },
+    {
+      id: 'req-gameday', label: 'Game days held and recorded', when: { PRACTICE: ['gameday'] }, ears_type: 'ubiquitous',
+      action: 'hold a game day at least every {{GAMEDAY_DAYS}} days, in which at least two people on the rotation respond with the runbooks to a failure injected on a written scenario with a hypothesis, and record the scenario, the hypothesis, the participants, the outcome and a ticket for each finding under docs/gamedays',
+      rationale: 'A practised response is what makes a runbook trustworthy; a written scenario and hypothesis turn the afternoon into an experiment rather than a demonstration (AWS Well-Architected REL12-BP05; Principles of Chaos Engineering).',
+      scenario: { label: 'Overdue game day flagged', given: 'the game-day records', when: 'the newest is older than {{GAMEDAY_DAYS}} days, or a finding has no ticket', then: 'the scheduled check fails naming what is missing' },
+    },
+    {
+      id: 'req-chaos', label: 'Chaos experiments run continuously', when: { PRACTICE: ['chaos'] }, ears_type: 'ubiquitous',
+      action: 'complete a run of each of its chaos experiments against staging at least every {{CHAOS_DAYS}} days, each stating a steady-state hypothesis on the service level indicator and injecting one failure mode the readiness review or an incident named',
+      rationale: 'Systems drift; experiments that run continuously against a hypothesis about the steady state catch what a change broke before an incident does (Principles of Chaos Engineering; AWS Well-Architected REL12-BP04).',
+      scenario: { label: 'Experiment that stopped running flagged', given: 'an experiment template for the element', when: 'it has no completed run in the last {{CHAOS_DAYS}} days', then: 'the scheduled check fails naming the template' },
+    },
+    {
+      id: 'req-chaos-abort', label: 'Experiments stop when the steady state breaks', when: { PRACTICE: ['chaos'] }, ears_type: 'unwanted-behaviour',
+      unwanted_condition: 'the steady state breaks while an experiment runs',
+      action: 'stop the experiment at once through a stop condition on the alarm that measures the steady state, so that no experiment of the element is defined without one',
+      rationale: 'Minimising the blast radius is a principle of chaos engineering, and a stop condition bound to the steady-state alarm is its mechanism (Principles of Chaos Engineering; AWS Fault Injection Service, stop conditions).',
+      scenario: { label: 'Experiment aborts on the alarm', given: 'an experiment whose steady-state alarm goes into alarm during the run', when: 'the alarm fires', then: 'the experiment ends as stopped; and a template whose only stop condition is none fails the guard check' },
+    },
+    {
+      id: 'req-owner-catalog', label: 'Owner and escalation in the catalogue', when: { OWNERSHIP: ['catalog'] }, ears_type: 'ubiquitous',
+      action: 'be described by a catalog-info.yaml at its repository root as a Backstage Component whose spec.owner names a group in the catalogue with at least one member, whose spec.lifecycle is experimental, production or deprecated, and whose pagerduty.com/service-id annotation names the paging service to escalate to',
+      rationale: 'One file beside the code, read by the catalogue, answers who owns it and whom to call for every element in one place; owner and lifecycle are required fields of a Component (Backstage, Descriptor Format).',
+      scenario: { label: 'Ownerless entry refused', given: 'the element\'s catalog-info.yaml', when: 'its owner names a group missing from the catalogue or without members, or its escalation annotation is removed', then: 'the ownership check fails naming what is missing' },
+    },
+    {
+      id: 'req-owner-readme', label: 'Owner and escalation in the README', when: { OWNERSHIP: ['readme'] }, ears_type: 'ubiquitous',
+      action: 'state in README.md, under an Ownership heading, the owning GitHub team, its channel and the on-call schedule to escalate to, the team having at least one member',
+      rationale: 'Without a catalogue the README is the first place anyone looks; a fixed heading and fixed fields let a check keep it filled in and the team behind it real.',
+      scenario: { label: 'Ownership section kept', given: 'the README', when: 'the Ownership section loses its escalation line, or names a team with no members', then: 'the ownership check fails naming what is missing' },
+    },
+  ],
+  adrs: [
+    {
+      id: 'adr-prr-sre', label: 'Readiness review signed off by SRE', when: { PRR: ['sre'] },
+      decision: 'Before the element takes its first production traffic, after each major change (a new dependency or data store, a new region, a higher availability target, a new owning team) and at the latest {{PRR_MONTHS}} months after the last review, it passes a production readiness review. The owning team fills in the checklist docs/operations/prr-checklist.md with evidence for each item and opens a pull request adding the record docs/operations/prr/YYYY-MM-DD.md (result, reviewer, the dependencies reviewed, the gaps); an engineer of {{PRR_TEAM}} who is not in the owning team checks it and approves the pull request, which CODEOWNERS and the main-branch ruleset make required. Items not met are listed as gaps with a ticket and a due date at most {{GAP_DAYS}} days away. The production deployment job stops when no approved record younger than {{PRR_MONTHS}} months exists, and a check on every pull request fails when the architecture model shows a dependency the newest review did not list. The checklist links to the decisions and latest records of the Availability, Observability, Capacity and scaling, Backup and recovery, Deployment and rollback and Incident management packs, never copying their numbers. Runbooks: {{RUNBOOKS}}. Practice: {{PRACTICE}}. Owner and escalation contact: {{OWNERSHIP}}.',
+      consequences: '• A second team sees the element before users do, and knows it before it is asked to help run it.\n• Launches wait for the reviewer: {{PRR_TEAM}} needs time for reviews, or the review becomes the queue every launch stands in.\n• Approving with dated gaps keeps launches moving only if the gaps are closed; the gap tickets are debt the owning team carries.\n• A review older than {{PRR_MONTHS}} months stops production deployments until it is renewed, which has to be planned, not discovered on release day.\n• The dependency check ties the review to the architecture model, so the model has to be kept current.',
+      alternatives: '1. A self-assessment by the owning team: no queue, but nobody outside the team checks what it forgot.\n2. A launch meeting without a written checklist: depends on who attends, and leaves no record to compare reviews by.\n3. A full hand-over in which SRE takes the pager: the deepest review, but Google reserves it for the services that need it most, and most elements stay with the team that builds them (Google SRE book, chapter 32).',
+    },
+    {
+      id: 'adr-prr-self', label: 'Readiness review as a self-assessment', when: { PRR: ['self'] },
+      decision: 'Before the element takes its first production traffic, after each major change (a new dependency or data store, a new region, a higher availability target, a new owning team) and at the latest {{PRR_MONTHS}} months after the last review, the owning team assesses it against the checklist docs/operations/prr-checklist.md, with evidence for each item, and its lead signs the record docs/operations/prr/YYYY-MM-DD.md (result, reviewer, the dependencies reviewed, the gaps) in a pull request reviewed like any other. Items not met are listed as gaps with a ticket and a due date at most {{GAP_DAYS}} days away. The production deployment job stops when no approved record younger than {{PRR_MONTHS}} months exists, and a check on every pull request fails when the architecture model shows a dependency the newest review did not list. The checklist is the one an SRE or platform team would use, and links to the decisions and latest records of the Availability, Observability, Capacity and scaling, Backup and recovery, Deployment and rollback and Incident management packs, never copying their numbers. Runbooks: {{RUNBOOKS}}. Practice: {{PRACTICE}}. Owner and escalation contact: {{OWNERSHIP}}.',
+      consequences: '• No queue behind another team: the review happens when the owning team is ready.\n• Nobody outside the team checks the answers, so what the team does not know it does not know stays unseen; the evidence links are what keep it honest.\n• Approving with dated gaps keeps launches moving only if the gaps are closed.\n• A review older than {{PRR_MONTHS}} months stops production deployments until it is renewed.\n• Moving to an SRE sign-off later needs no new checklist, only a new code owner for the records.',
+      alternatives: '1. A review signed off by SRE or the platform team: a second pair of eyes, at the cost of a queue.\n2. No review: nothing to fill in, and the gaps are found by the first incident.\n3. A one-off launch checklist in the ticket system: no record beside the code, and nothing to repeat after a major change.',
+    },
+    {
+      id: 'adr-prr-none', label: 'No readiness review for now', when: { PRR: ['none'] },
+      context: `${FORCES} Here the element is a prototype or an internal tool that only the owning team uses.`,
+      decision: 'The element runs in production without a readiness review. This holds while only the owning team uses it and its availability target is 99.0 % or less; the first user outside the team, or a higher target, supersedes this decision with a review against a checklist as the other answers of this pack describe. Runbooks: {{RUNBOOKS}}. Practice: {{PRACTICE}}. Owner and escalation contact: {{OWNERSHIP}}. These are kept even without a review, since they are what makes a later review short.',
+      consequences: '• Nothing waits for a review, and nothing records what was never checked.\n• The first outage may also be the first time anyone asks who owns it and what to do; the runbooks and the ownership record are the only preparation.\n• The exemption ends by a decision, not by drift: the team\'s lead confirms each quarter that nobody else uses the element.',
+      alternatives: '1. A self-assessment by the owning team: an afternoon with the checklist, and a record to start from.\n2. A review signed off by SRE or the platform team: more than a prototype needs.',
+    },
+    {
+      id: 'adr-gamedays', label: 'Game days on a written scenario', when: { PRACTICE: ['gameday'] },
+      decision: 'The team holds a game day at least every {{GAMEDAY_DAYS}} days. A facilitator writes the scenario beforehand (the failure, a hypothesis about how the element and the people respond, the abort criteria), chosen from the failure modes the readiness review listed or from recent incidents, and injects it into staging, or into production once the team trusts its abort. At least two people from the rotation respond with the runbooks and the alerts as they are, while observers note where a runbook, an alert or a dashboard fell short. The record docs/gamedays/YYYY-MM-DD.md holds the scenario, the hypothesis, the participants, the outcome and a ticket for every finding, and a runbook found wrong is corrected within the week. The drills of the Availability, Backup and recovery and Deployment and rollback packs prove their own decisions; a game day may reuse their faults to exercise the people.',
+      consequences: '• The people practise the response, not only the system: runbooks, hand-overs and communication are tried before a real incident.\n• It costs the rotation an afternoon each time, plus the facilitator\'s preparation.\n• Between game days, drift is caught only by the other packs\' drills and by incidents.\n• A game day is worth its tickets: one whose findings are never fixed teaches the team that game days do not matter.',
+      alternatives: '1. Automated chaos experiments: catch drift every week, but exercise the system rather than the people.\n2. Tabletop exercises only, talking a scenario through without injecting it: cheap, and nobody finds out that the dashboard link is dead.\n3. No practice: nothing to plan, and the runbooks are first followed at night.',
+    },
+    {
+      id: 'adr-chaos', label: 'Automated chaos experiments in staging', when: { PRACTICE: ['chaos'] },
+      decision: 'Fault experiments run against staging on a schedule, each completing a run at least every {{CHAOS_DAYS}} days: on AWS as AWS Fault Injection Service experiment templates tagged service=order-api, started by an EventBridge Scheduler schedule; on Kubernetes as Chaos Mesh Schedules, with a Chaos Mesh Workflow whose StatusCheck aborts it (abortWithStatusCheck) where a stop condition is needed, or LitmusChaos experiments with probes. Each experiment states a steady-state hypothesis on the service level indicator decided in the Observability pack, injects one failure mode the readiness review or an incident named (latency or errors from a dependency, a lost instance, CPU or memory pressure, a full disk), and stops on the alarm that measures the steady state. Staging carries generated traffic, so that the indicator moves. An experiment that stops on its condition, or fails, gets a ticket, and the experiment is fixed or the element is. Experiments start small, one instance or one dependency, and widen only after they pass. The experiments that prove redundancy for the availability target are the Availability pack\'s; these cover the other failure modes.',
+      consequences: '• Drift is caught within {{CHAOS_DAYS}} days of the change that caused it, not at the next incident.\n• Needs a staging environment close enough to production for the hypothesis to mean something, and generated traffic in it.\n• Fault injection needs permissions of its own (an IAM role for Fault Injection Service, the Chaos Mesh controller in the cluster), which are an attack surface to guard.\n• The people are not exercised: a passing experiment says the system coped, not that whoever was paged would have.',
+      alternatives: '1. Game days: exercise the people and the runbooks, but only a few times a year.\n2. Experiments in production: the only place with real traffic, but only after staging has passed them for months and with a stop condition proven to work (Principles of Chaos Engineering).\n3. No practice: nothing to build, and failure modes are first met by users.',
+    },
+    {
+      id: 'adr-no-practice', label: 'No practice beyond the other packs\' drills', when: { PRACTICE: ['none'] },
+      decision: 'The team holds no game days and runs no chaos experiments for this element. It relies on the drills the Availability, Backup and recovery, Capacity and scaling and Deployment and rollback packs decide, and on real incidents; the runbooks are kept current only by their review every {{RUNBOOK_DAYS}} days and by use. The first incident in which a runbook or the response itself failed supersedes this decision.',
+      consequences: '• No afternoons spent and no fault-injection tooling to run.\n• Runbooks are first followed under pressure, by whoever is paged; their review is the only check that they still fit.\n• Failure modes outside the other packs\' drills are met first in production.',
+      alternatives: '1. Game days on a written scenario: an afternoon a quarter to try the runbooks and the response.\n2. Automated chaos experiments in staging: drift caught weekly, at the cost of the tooling.',
+    },
+  ],
+  fitness: [
+    {
+      id: 'ff-prr-gate', label: 'Production deployment waits for an approved review', when: REVIEWED, category: 'process', implements: REVIEW_ADRS, checks: ['req-prr-gate', 'req-prr-gaps'],
+      threshold: 'The newest record under docs/operations/prr is approved, names a reviewer and is at most {{PRR_MONTHS}} months old, and every gap in it has a ticket and a due date within {{GAP_DAYS}} days of the review; otherwise the production deployment stops',
+      description: 'The production deployment job runs this script before its deploy step (needs: in GitHub Actions, a stage before deploy in GitLab CI), so the first production deployment waits for an approved review and a stale one stops the next. Each record is docs/operations/prr/YYYY-MM-DD.md with YAML front matter: result (approved or not-approved), reviewer, dependencies (labels of the elements it calls, as in the architecture model) and gaps (item, ticket, due).',
+      tool: 'Node.js script with js-yaml, run by the production deployment job',
+      language: 'js',
+      snippet: `// scripts/prr-gate.mjs: the production deploy job runs it before the deploy step (node scripts/prr-gate.mjs)
+import { readdirSync, readFileSync } from 'node:fs'
+import yaml from 'js-yaml'
+
+const MAX_MONTHS = {{PRR_MONTHS}}
+const GAP_DAYS = {{GAP_DAYS}}
+const DIR = 'docs/operations/prr'
+const fail = (message) => { console.error(\`readiness review: \${message}\`); process.exit(1) }
+
+const records = readdirSync(DIR).filter((f) => /^\\d{4}-\\d{2}-\\d{2}\\.md$/.test(f)).sort()
+if (!records.length) fail(\`no review under \${DIR}; the first production deployment waits for one\`)
+const file = records.at(-1)
+const record = yaml.load(readFileSync(\`\${DIR}/\${file}\`, 'utf8').split(/^---$/m)[1] ?? '') ?? {}
+const reviewed = Date.parse(file.slice(0, 10))
+const months = (Date.now() - reviewed) / (30.44 * 86_400_000)
+if (record.result !== 'approved') fail(\`\${file} is not approved (result: \${record.result})\`)
+if (!record.reviewer) fail(\`\${file} names no reviewer\`)
+if (months > MAX_MONTHS) fail(\`\${file} is \${months.toFixed(1)} months old; review the element again\`)
+for (const gap of record.gaps ?? []) {
+  const days = (new Date(gap.due).getTime() - reviewed) / 86_400_000
+  if (!gap.ticket || !(days <= GAP_DAYS)) fail(\`gap "\${gap.item}" needs a ticket and a due date within \${GAP_DAYS} days of the review\`)
+}
+console.log(\`readiness review \${file}: approved by \${record.reviewer}\`)`,
+    },
+    {
+      id: 'ff-prr-signoff', label: 'Review records need the signing team', when: { PRR: ['sre'] }, category: 'structural', implements: ['adr-prr-sre'], checks: ['req-prr-signoff'],
+      threshold: 'The last line of .github/CODEOWNERS gives /docs/operations/prr/ to {{PRR_TEAM}}, and the rules of the main branch include a pull_request rule with require_code_owner_review true',
+      description: 'A pull request adding a review record can only merge with an approval from a code owner of the records, and GitHub does not let authors approve their own pull requests, so the approval of a {{PRR_TEAM}} member is the signature. The step checks both halves on every change to CODEOWNERS and nightly, since the ruleset can be changed in the settings. In CODEOWNERS the last matching pattern wins, so the line must come last.',
+      tool: 'GitHub CODEOWNERS and repository rulesets, checked with grep and gh api (GET /repos/{owner}/{repo}/rules/branches/{branch})',
+      language: 'bash',
+      snippet: `set -euo pipefail
+# .github/CODEOWNERS ends with the line:  /docs/operations/prr/  {{PRR_TEAM}}
+grep -Eq '^/docs/operations/prr/[[:space:]]+{{PRR_TEAM}}([[:space:]]|$)' .github/CODEOWNERS \\
+  || { echo "CODEOWNERS does not give /docs/operations/prr/ to {{PRR_TEAM}}"; exit 1; }
+tail -n 1 .github/CODEOWNERS | grep -q '^/docs/operations/prr/' \\
+  || { echo "the /docs/operations/prr/ line must be the last of CODEOWNERS (the last match wins)"; exit 1; }
+# the main branch requires a code owner's review, so their approval is the signature
+gh api 'repos/{owner}/{repo}/rules/branches/main' \\
+  --jq '[.[] | select(.type == "pull_request") | .parameters.require_code_owner_review] | any' \\
+  | grep -qx true || { echo "main does not require a code owner's review"; exit 1; }`,
+    },
+    {
+      id: 'ff-prr-checklist', label: 'Checklist complete and linked', when: REVIEWED, category: 'structural', implements: REVIEW_ADRS, checks: ['req-prr-checklist'],
+      threshold: 'docs/operations/prr-checklist.md has the 10 sections, and every second-level section holds at least one Markdown link',
+      description: 'A CI step on every change to the checklist checks that its ten sections are there and that each links to the decision or the latest record it rests on (the availability objective, the alert rules, the last load test, the last restore and rollback drills, the incident process), so the checklist points to the neighbouring packs\' records instead of copying their numbers.',
+      tool: 'grep and awk in a CI step',
+      language: 'bash',
+      snippet: `set -euo pipefail
+file=docs/operations/prr-checklist.md
+status=0
+for section in 'Ownership' 'Availability objective' 'Alerts and on-call' 'Runbooks' 'Capacity and load test' \\
+  'Backup and restore' 'Rollout and rollback' 'Incident response' 'Dependencies and failure modes' 'Practice'; do
+  grep -qx "## \${section}" "$file" || { echo "missing section: ## \${section}"; status=1; }
+done
+# every section links to the decision or record it rests on instead of copying its numbers
+unlinked=$(awk '/^## /{ if (s && !l) print s; s = $0; l = 0; next } /\\]\\(/{ l = 1 } END { if (s && !l) print s }' "$file")
+[ -z "$unlinked" ] || { echo "sections without a link:"; echo "$unlinked"; status=1; }
+exit $status`,
+    },
+    {
+      id: 'ff-prr-dependencies', label: 'Review covers every dependency in the model', when: REVIEWED, category: 'structural', implements: REVIEW_ADRS, checks: ['req-prr-major'],
+      threshold: '0 elements the model shows the element calling (interacts relations from it) that the newest review record does not list under dependencies',
+      description: 'On every pull request that changes architecture/ or the review records, a script reads the architecture model (the front matter of each element under architecture/nodes and architecture/relations.json), lists the elements the element calls, and fails when the newest review does not list one of them: a new dependency in the model asks for a new review in the same pull request. A new region, a higher target or a new owner is not visible this way; the decision names them, and the age limit of the gate catches what is missed.',
+      tool: 'Node.js script with js-yaml over the Radical Markdown folder',
+      language: 'js',
+      snippet: `// scripts/prr-dependencies.mjs: on every pull request that changes architecture/ or docs/operations/prr/
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import yaml from 'js-yaml'
+
+const ELEMENT = 'Order API'   // the element's label in the architecture model
+const front = (file) => yaml.load(readFileSync(file, 'utf8').split(/^---$/m)[1] ?? '') ?? {}
+const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.md') ? [join(dir, e.name)] : [])
+const nodes = Object.fromEntries(walk('architecture/nodes').map(front).filter((n) => n.id).map((n) => [n.id, n]))
+const element = Object.values(nodes).find((n) => n.label === ELEMENT)
+if (!element) throw new Error(\`no element labelled \${ELEMENT} in architecture/nodes\`)
+const calls = JSON.parse(readFileSync('architecture/relations.json', 'utf8'))
+  .filter((r) => r.relationType === 'interacts' && r.sourceId === element.id && nodes[r.targetId])
+  .map((r) => nodes[r.targetId].label)
+const reviews = readdirSync('docs/operations/prr').filter((f) => /^\\d{4}-\\d{2}-\\d{2}\\.md$/.test(f)).sort()
+const reviewed = new Set(reviews.length ? front(\`docs/operations/prr/\${reviews.at(-1)}\`).dependencies ?? [] : [])
+const unreviewed = [...new Set(calls)].filter((label) => !reviewed.has(label))
+if (unreviewed.length) {
+  console.error(\`dependencies not in the last readiness review: \${unreviewed.join(', ')}; review the element again\`)
+  process.exit(1)
+}`,
+    },
+    {
+      id: 'ff-runbook-links', label: 'Every alert links a runbook that resolves', category: 'structural', implements: MAIN_ADRS, checks: ['req-runbook-alert', 'req-runbook-element'],
+      threshold: '0 alerting rules under monitoring/rules without a runbook_url, with one outside docs/runbooks or to a missing file or heading, or with one another alert uses',
+      description: 'A CI step on every change to the rules or the runbooks reads every Prometheus rule file (groups at the top) and PrometheusRule manifest (groups under spec), and resolves each alert\'s runbook_url annotation to a file in the repository and, when it has an anchor, to a heading in that file (GitHub\'s heading anchors: lower case, punctuation dropped, spaces as dashes). Alerts of the same name at two severities may share a runbook. Alert rules that Sloth generates take the annotation from the SLO\'s alerting annotations. promtool check rules still validates the files themselves; runbook_url is an annotation by convention, which Prometheus passes on but does not check.',
+      tool: 'Node.js script with js-yaml, beside promtool check rules',
+      language: 'js',
+      snippet: `// scripts/runbook-links.mjs: in CI on every change to monitoring/rules or docs/runbooks
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import yaml from 'js-yaml'
+
+const BASE = 'https://github.com/shop/order-api/blob/main/'   // where the repository's files are browsed
+const slug = (h) => h.trim().toLowerCase().replace(/[^\\p{L}\\p{N}\\s_-]/gu, '').replace(/\\s/g, '-')
+const problems = []
+const seen = new Map()
+for (const file of readdirSync('monitoring/rules').filter((f) => /\\.ya?ml$/.test(f))) {
+  for (const doc of yaml.loadAll(readFileSync(\`monitoring/rules/\${file}\`, 'utf8'))) {
+    // a Prometheus rule file has groups at the top, a PrometheusRule manifest under spec
+    for (const rule of (doc?.groups ?? doc?.spec?.groups ?? []).flatMap((g) => g.rules ?? []).filter((r) => r.alert)) {
+      const url = rule.annotations?.runbook_url ?? ''
+      const [path, anchor] = url.startsWith(BASE) ? url.slice(BASE.length).split('#') : []
+      if (!path?.startsWith('docs/runbooks/') || !existsSync(path)) { problems.push(\`\${rule.alert}: runbook_url "\${url}" is no runbook in docs/runbooks\`); continue }
+      const headings = readFileSync(path, 'utf8').split('\\n').filter((l) => /^#{1,6} /.test(l)).map((l) => slug(l.replace(/^#+ /, '')))
+      if (anchor && !headings.includes(anchor)) problems.push(\`\${rule.alert}: no heading #\${anchor} in \${path}\`)
+      if (seen.has(url) && seen.get(url) !== rule.alert) problems.push(\`\${rule.alert} shares its runbook with \${seen.get(url)}\`)
+      seen.set(url, rule.alert)
+    }
+  }
+}
+if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
+    },
+    {
+      id: 'ff-runbook-review', label: 'Runbooks reviewed on time', category: 'process', implements: [...MAIN_ADRS, 'adr-no-practice'], checks: ['req-runbook-review'],
+      threshold: '0 runbooks under docs/runbooks whose last_reviewed is missing or older than {{RUNBOOK_DAYS}} days, and 0 without a diagnosis, a mitigation and an escalation heading',
+      description: 'A daily scheduled job reads the last_reviewed date from each runbook\'s front matter and checks that it has headings for diagnosis, mitigation and escalation; a failure notifies the owning team. Reviewing a runbook after an incident means updating the date in the same pull request as the correction.',
+      tool: 'Node.js script with js-yaml in a scheduled CI job',
+      language: 'js',
+      snippet: `// scripts/runbook-review.mjs: a daily scheduled job; every runbook starts with front matter holding last_reviewed: YYYY-MM-DD
+import { readdirSync, readFileSync } from 'node:fs'
+import yaml from 'js-yaml'
+
+const MAX_DAYS = {{RUNBOOK_DAYS}}
+const problems = []
+for (const file of readdirSync('docs/runbooks').filter((f) => f.endsWith('.md'))) {
+  const text = readFileSync(\`docs/runbooks/\${file}\`, 'utf8')
+  const reviewed = new Date(yaml.load(text.split(/^---$/m)[1] ?? '')?.last_reviewed ?? NaN)
+  const days = (Date.now() - reviewed.getTime()) / 86_400_000
+  if (!(days <= MAX_DAYS)) problems.push(\`\${file}: last reviewed \${isNaN(days) ? 'never' : \`\${Math.floor(days)} days ago\`}\`)
+  for (const [stem, name] of [['Diagnos', 'diagnosis'], ['Mitigat', 'mitigation'], ['Escalat', 'escalation']]) {
+    if (!new RegExp(\`^#+ .*\${stem}\`, 'mi').test(text)) problems.push(\`\${file}: no \${name} heading\`)
+  }
+}
+if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
+    },
+    {
+      id: 'ff-gameday', label: 'Game days on record', when: { PRACTICE: ['gameday'] }, category: 'process', implements: ['adr-gamedays'], checks: ['req-gameday'],
+      threshold: 'The newest record under docs/gamedays is at most {{GAMEDAY_DAYS}} days old; every record has a scenario, a hypothesis, an outcome and at least 2 participants, and every finding a ticket',
+      description: 'Each game day is recorded as docs/gamedays/YYYY-MM-DD.md with YAML front matter: scenario, hypothesis, participants, outcome and findings (text, ticket). A daily scheduled job fails, and notifies the owning team, when the newest record is too old or a record is incomplete.',
+      tool: 'Node.js script with js-yaml in a scheduled CI job',
+      language: 'js',
+      snippet: `// scripts/gameday-overdue.mjs: a daily scheduled job over the records docs/gamedays/YYYY-MM-DD.md
+import { readdirSync, readFileSync } from 'node:fs'
+import yaml from 'js-yaml'
+
+const MAX_DAYS = {{GAMEDAY_DAYS}}
+const records = readdirSync('docs/gamedays').filter((f) => /^\\d{4}-\\d{2}-\\d{2}\\.md$/.test(f)).sort()
+const latest = records.at(-1)
+const age = latest ? (Date.now() - Date.parse(latest.slice(0, 10))) / 86_400_000 : Infinity
+const problems = age > MAX_DAYS ? [\`the last game day was \${latest?.slice(0, 10) ?? 'never'}, more than \${MAX_DAYS} days ago\`] : []
+for (const file of records) {
+  const r = yaml.load(readFileSync(\`docs/gamedays/\${file}\`, 'utf8').split(/^---$/m)[1] ?? '') ?? {}
+  for (const key of ['scenario', 'hypothesis', 'outcome']) if (!r[key]) problems.push(\`\${file}: no \${key}\`)
+  if ((r.participants ?? []).length < 2) problems.push(\`\${file}: fewer than 2 participants\`)
+  for (const finding of r.findings ?? []) if (!finding.ticket) problems.push(\`\${file}: finding "\${finding.text}" has no ticket\`)
+}
+if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
+    },
+    {
+      id: 'ff-chaos-guarded', label: 'Every experiment has a stop condition', when: { PRACTICE: ['chaos'] }, category: 'structural', implements: ['adr-chaos'], checks: ['req-chaos-abort'],
+      threshold: 'At least 1 Fault Injection Service experiment template tagged service=order-api, and 0 such templates without a stop condition whose source is aws:cloudwatch:alarm',
+      description: 'A nightly job lists the experiment templates tagged for the element and reads each one\'s stop conditions; a template without a CloudWatch alarm stop condition (source none) fails it. The alarm is the one on the steady state: the service level indicator the hypothesis names. On Kubernetes with Chaos Mesh, the same check reads each Workflow for a StatusCheck node with abortWithStatusCheck set (kubectl get workflows.chaos-mesh.org -o json).',
+      tool: 'AWS CLI (aws fis list-experiment-templates, aws fis get-experiment-template) with jq',
+      language: 'bash',
+      snippet: `set -euo pipefail
+# every FIS experiment template of the element stops on a CloudWatch alarm
+ids=$(aws fis list-experiment-templates --output json \\
+  | jq -r '.experimentTemplates[] | select(.tags.service == "order-api") | .id')
+[ -n "$ids" ] || { echo "no experiment template tagged service=order-api"; exit 1; }
+status=0
+for id in $ids; do
+  aws fis get-experiment-template --id "$id" --output json \\
+    | jq -e '[.experimentTemplate.stopConditions[]? | select(.source == "aws:cloudwatch:alarm")] | length > 0' >/dev/null \\
+    || { echo "template $id has no stop condition on a CloudWatch alarm"; status=1; }
+done
+exit $status`,
+    },
+    {
+      id: 'ff-chaos-recent', label: 'Every experiment completed a run recently', when: { PRACTICE: ['chaos'] }, category: 'operational', implements: ['adr-chaos'], checks: ['req-chaos'],
+      threshold: 'Every Fault Injection Service experiment template tagged service=order-api has a run in state completed created within the last {{CHAOS_DAYS}} days',
+      description: 'A daily job lists the runs of each experiment template of the element and fails when the newest completed one is too old: the schedule stopped, the experiment failed, or it stopped on its condition and nobody fixed the cause. Runs that stopped or failed do not count. On Kubernetes with Chaos Mesh, the Schedule\'s status.time holds the time of its last scheduled run (kubectl get schedules.chaos-mesh.org -o json).',
+      tool: 'AWS CLI (aws fis list-experiments --experiment-template-id) with jq',
+      language: 'bash',
+      snippet: `set -euo pipefail
+max_days={{CHAOS_DAYS}}
+cutoff=$(( $(date +%s) - max_days * 86400 ))
+status=0
+for id in $(aws fis list-experiment-templates --output json \\
+    | jq -r '.experimentTemplates[] | select(.tags.service == "order-api") | .id'); do
+  # creationTime is epoch seconds (AWS CLI v1) or ISO 8601 (v2); only completed runs count
+  last=$(aws fis list-experiments --experiment-template-id "$id" --output json | jq '
+    [.experiments[] | select(.state.status == "completed") | .creationTime
+     | if type == "number" then floor else .[0:19] + "Z" | fromdateiso8601 end] | max // 0')
+  [ "$last" -ge "$cutoff" ] || { echo "template $id has no completed experiment in the last $max_days days"; status=1; }
+done
+exit $status`,
+    },
+    {
+      id: 'ff-catalog-owner', label: 'Catalogue entry names a real owner and escalation', when: { OWNERSHIP: ['catalog'] }, category: 'structural', implements: MAIN_ADRS, checks: ['req-owner-catalog'],
+      threshold: 'catalog-info.yaml is a Component with spec.lifecycle experimental, production or deprecated and a pagerduty.com/service-id annotation, and its spec.owner is a group the catalogue returns with at least 1 hasMember relation',
+      description: 'A CI step on every change to catalog-info.yaml, and nightly, parses the file and asks the Backstage catalogue API (GET /api/catalog/entities/by-name/group/<namespace>/<name>) for the owning group, so an owner renamed or dissolved in the catalogue is caught too. The pagerduty.com/service-id annotation is the PagerDuty plugin\'s; with another paging tool, use its plugin\'s annotation instead.',
+      tool: 'Node.js script with js-yaml and the Backstage catalogue API',
+      language: 'js',
+      snippet: `// scripts/catalog-owner.mjs: in CI on every change to catalog-info.yaml, and nightly; BACKSTAGE_URL and BACKSTAGE_TOKEN from the pipeline's secrets
+import { readFileSync } from 'node:fs'
+import yaml from 'js-yaml'
+
+const entity = yaml.load(readFileSync('catalog-info.yaml', 'utf8')) ?? {}
+const { owner, lifecycle } = entity.spec ?? {}
+const problems = []
+if (entity.kind !== 'Component') problems.push('catalog-info.yaml does not describe a Component')
+if (!['experimental', 'production', 'deprecated'].includes(lifecycle)) problems.push(\`spec.lifecycle "\${lifecycle}" is not experimental, production or deprecated\`)
+if (!entity.metadata?.annotations?.['pagerduty.com/service-id']) problems.push('no pagerduty.com/service-id annotation: nobody to escalate to')
+const [, namespace = 'default', name] = String(owner ?? '').match(/^(?:group:)?(?:([^/:]+)\\/)?([^/:]+)$/) ?? []
+const res = name && await fetch(\`\${process.env.BACKSTAGE_URL}/api/catalog/entities/by-name/group/\${namespace}/\${name}\`,
+  { headers: { Authorization: \`Bearer \${process.env.BACKSTAGE_TOKEN}\` } })
+const group = res?.ok ? await res.json() : undefined
+if (!group) problems.push(\`spec.owner "\${owner}" is no group in the catalogue\`)
+else if (!(group.relations ?? []).some((r) => r.type === 'hasMember')) problems.push(\`group \${name} has no members\`)
+if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
+    },
+    {
+      id: 'ff-readme-owner', label: 'README names a real owner and escalation', when: { OWNERSHIP: ['readme'] }, category: 'structural', implements: MAIN_ADRS, checks: ['req-owner-readme'],
+      threshold: 'README.md has an Ownership section with Team, Channel and Escalation lines, and the GitHub team named has at least 1 member',
+      description: 'A CI step on every change to README.md, and nightly, reads the Ownership section and asks GitHub for the members of the team it names (GET /orgs/{org}/teams/{team_slug}/members); the job needs a token that may read the organisation\'s teams (read:org), which the default GITHUB_TOKEN may not.',
+      tool: 'awk, sed and gh api in a CI step',
+      language: 'bash',
+      snippet: `set -euo pipefail
+# README.md holds, for example:
+#   ## Ownership
+#   - Team: @shop/orders
+#   - Channel: https://shop.slack.com/archives/C0123ORDERS
+#   - Escalation: https://shop.pagerduty.com/schedules/P123ABC
+section=$(awk '/^## Ownership$/{ on = 1; next } /^## /{ on = 0 } on' README.md)
+for field in Team Channel Escalation; do
+  printf '%s\\n' "$section" | grep -Eq "^- \${field}: [^ ]+" || { echo "README.md, Ownership: no \${field} line"; exit 1; }
+done
+team=$(printf '%s\\n' "$section" | sed -nE 's#^- Team: @([^/ ]+/[^ ]+).*#\\1#p')
+members=$(gh api "orgs/\${team%%/*}/teams/\${team#*/}/members" --jq 'length')
+[ "$members" -gt 0 ] || { echo "team @\${team} has no members"; exit 1; }`,
+    },
+  ],
+}
+
+export default pack

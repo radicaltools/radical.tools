@@ -356,7 +356,7 @@ export default function () {
       id: 'ff-region-failover', label: 'Region failover drilled', when: { TIER: ['99.99'] }, category: 'operational', implements: ['adr-multi-region'],
       checks: ['req-region'],
       threshold: 'With one region cut off, every request is answered from the other region within 60 seconds; 0 % errors after that',
-      description: 'A quarterly game day cuts the application subnets of one region off the network while a k6 probe calls the global endpoint every second from outside; the probe fails if any request fails more than 60 seconds after the cut. The stop condition ends the experiment when the global error alarm fires. The experiment shown is AWS-bound (Fault Injection Service); on Azure, Chaos Studio\'s network disconnect fault on the region\'s virtual network does the same, and on Google Cloud a firewall rule that drops the region\'s ingress, applied by the game-day script.',
+      description: 'A quarterly failover drill cuts the application subnets of one region off the network while a k6 probe calls the global endpoint every second from outside; the probe fails if any request fails more than 60 seconds after the cut. The stop condition ends the experiment when the global error alarm fires. The experiment shown is AWS-bound (Fault Injection Service); on Azure, Chaos Studio\'s network disconnect fault on the region\'s virtual network does the same, and on Google Cloud a firewall rule that drops the region\'s ingress, applied by the drill script.',
       tool: 'AWS Fault Injection Service (network disruption), with a k6 probe on the global endpoint',
       language: 'json',
       snippet: `{

@@ -47,12 +47,12 @@ const pack: PackSpec = {
     },
     {
       key: 'READS', title: 'Reads', label: 'Where are reads served from?',
-      hint: 'Replicas and caches take load off the primary, but lag behind it: a user may not see what they just saved, or two pages may disagree.',
+      hint: 'Replicas take load off the primary, but lag behind it: a user may not see what they just saved, or two pages may disagree. A cache in front of the store is decided in the Caching pack.',
       default: 'primary',
       options: [
         { value: 'primary', label: 'the primary only', description: 'Every read sees every committed write. Pick it while the primary can carry the reads, which is longer than most expect.' },
         { value: 'ryw', label: 'replicas with read-your-writes', description: 'Reads go to replicas, but a user who has just written reads from the primary or from a replica that has caught up with their write. Pick it when reads must scale and users must see their own changes at once.' },
-        { value: 'bounded', label: 'replicas and caches with bounded staleness', description: 'Reads may be a few seconds old, never more than a stated bound, and decisions that write are taken on the primary. Pick it for catalogues, dashboards and feeds where a few seconds do not matter.' },
+        { value: 'bounded', label: 'replicas with bounded staleness', description: 'Reads may be a few seconds old, never more than a stated bound, and decisions that write are taken on the primary. Pick it for catalogues, dashboards and feeds where a few seconds do not matter.' },
       ],
     },
   ],
@@ -173,9 +173,9 @@ const pack: PackSpec = {
     },
     {
       id: 'adr-reads-primary', label: 'Reads from the primary only', when: { READS: ['primary'] },
-      decision: 'Every read is served from the primary; no read replica or cache stands between the application and committed data. The application configures one connection pool and no read-only data source. Replicas, if any exist, serve backups and analytics only. Revisit when the primary\'s read load passes 60% of its capacity for a week.',
+      decision: 'Every read is served from the primary; no read replica stands between the application and committed data; a cache in front of the store is decided in the Caching pack and, with this decision, removes an entry when its data changes (deletion by the writer or by change events). The application configures one connection pool and no read-only data source. Replicas, if any exist, serve backups and analytics only. Revisit when the primary\'s read load passes 60% of its capacity for a week.',
       consequences: '• A read after a commit always returns it: no session guarantees to build.\n• The primary carries every read: vertical scaling and query tuning are the levers.\n• No replica routing to get wrong.',
-      alternatives: '1. Replicas with read-your-writes: reads scale, users still see their own changes.\n2. Replicas and caches with bounded staleness: the most scale, a stated staleness for everyone.',
+      alternatives: '1. Replicas with read-your-writes: reads scale, users still see their own changes.\n2. Replicas with bounded staleness: the most scale, a stated staleness for everyone.',
     },
     {
       id: 'adr-ryw', label: 'Replicas with read-your-writes', when: { READS: ['ryw'] },
@@ -184,9 +184,9 @@ const pack: PackSpec = {
       alternatives: '1. The primary only: no router, no lag, less scale.\n2. Bounded staleness for everyone: simpler router, and a user may miss their own write for a few seconds.',
     },
     {
-      id: 'adr-bounded', label: 'Replicas and caches with bounded staleness', when: { READS: ['bounded'] },
-      decision: 'Reads are served from replicas and caches and may be up to {{PROPAGATION_SECONDS}} seconds old; the router takes a replica out of rotation when its lag passes that bound, and cache entries expire within it. Every decision that writes (a stock check before a reservation, a balance before a transfer) is taken on the primary inside the writing transaction, never on a replica or cache read.',
-      consequences: '• The most read scale, with a staleness the product can state.\n• A user may not see their own change for a few seconds: the interface has to cope (optimistic updates, a "saving" state).\n• Any write that trusts a replica read is a lost update waiting to happen: the primary-only rule for decisions needs a review check.\n• Cache invalidation is bounded by expiry, not by correctness.',
+      id: 'adr-bounded', label: 'Replicas with bounded staleness', when: { READS: ['bounded'] },
+      decision: 'Reads are served from replicas and caches and may be up to {{PROPAGATION_SECONDS}} seconds old; the router takes a replica out of rotation when its lag passes that bound, and cache entries are removed or expire within it, as the Caching pack decides. Every decision that writes (a stock check before a reservation, a balance before a transfer) is taken on the primary inside the writing transaction, never on a replica or cache read.',
+      consequences: '• The most read scale, with a staleness the product can state.\n• A user may not see their own change for a few seconds: the interface has to cope (optimistic updates, a "saving" state).\n• Any write that trusts a replica read is a lost update waiting to happen: the primary-only rule for decisions needs a review check.\n• A cache entry is wrong until it is removed or expires; which of the two bounds it is the Caching pack\'s decision, and its expiry must fit within the same bound.',
       alternatives: '1. Replicas with read-your-writes: users see their own changes, at the cost of a session-aware router.\n2. The primary only: no staleness, no scale from replicas.',
     },
   ],
