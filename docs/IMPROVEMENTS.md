@@ -301,12 +301,12 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    concurrency*). Left open: the chosen style guide does not yet suggest the
    answers of the group's other packs (casing in Resource design, the format in
    Errors); packs are independent today, so each says it in its hint.
-2. **Compliance**: *Data classification* (with a check on the model itself:
-   restricted data flowing to an external system unencrypted), *Retention and
-   deletion*, *Audit trail* (evidence for a regulator; detection stays in
-   Secure by Design), then regulation packs that ask whether they apply and
-   refer to the owner packs (DORA first, then NIS2, PCI DSS). Name DORA the
-   regulation (EU 2022/2554) apart from the DORA delivery metrics.
+2. **Done (2026-10-29):** Compliance (*Data classification*, *Retention and
+   deletion*, *Audit trail*, *EU DORA*). Audit trail now owns where audit
+   records are kept and for how long; Authentication and Authorization refer
+   to it. Next regulation packs: NIS2, PCI DSS. Personal data's
+   record-of-processing and Data classification's data inventory are two
+   files about the same stores; one inventory would be better.
 3. **Secure by Design**: *Threat modelling*, *Security event logging and
    detection*, *Secure development process* (SSDF, SAMM). The ASVS level stays
    in Secure coding. **Operability & Reliability**: *Incident management*,
@@ -328,6 +328,20 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    and the casing in Resource design or the format in Errors. A list of
    incompatible answer pairs across packs, checked by the wizard and by
    `radical check` on the imported ADRs, would catch them.
+
+### Dogfooding (2026-10-29): model checks a pack cannot express
+
+Writing the Compliance packs, a check that belongs on the model itself (data
+of the highest classification flowing to an external system; an external
+system the system calls with no entry in the DORA register of information)
+had to be a script that parses the model folder's Markdown and
+relations.json. `radical check` has fixed rules only. A query rule in
+check.json (`"rules": { "<name>": { "query": "LIST RELATIONS WHERE …",
+"severity": "error", "message": "…" } }`), with the same query language the
+packs' triggers use, would let a pack ship a fitness function that runs in
+`radical check` and in Studio's Inspector, and would let the classification
+level and the register entry live on the elements as properties instead of in
+a side file.
 
 ### Dogfooding (2026-10-28): a review and fix round of all Hub concern packs
 

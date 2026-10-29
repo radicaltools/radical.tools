@@ -203,7 +203,7 @@
       "x": 260,
       "y": 390,
       "ears_type": "ubiquitous",
-      "action": "record every sign-in, failed sign-in, sign-out and revocation in the audit log with the account, the time, the client and the source address, keep the records for at least 12 months, and never record the credential itself",
+      "action": "record every sign-in, failed sign-in, sign-out and revocation in the audit trail, with the account, the time, the client and the source address, and never record the credential itself; where the trail is kept and for how long is decided in the Audit trail pack",
       "rationale": "After an incident this is the record of who was in; with the credential in it, the log becomes the leak (ASVS V7.1).",
       "hubWhen": {
         "IDENTITY": [
@@ -352,7 +352,7 @@
       "y": 390,
       "given": "an account",
       "when": "it signs in, fails to sign in, signs out and has a session revoked",
-      "then": "the audit log holds the four events with account, time, client and address, and no credential",
+      "then": "the audit trail holds the four events with account, time, client and address, and no credential",
       "hubWhen": {
         "IDENTITY": [
           "idp",
@@ -583,8 +583,8 @@
       "x": 1040,
       "y": 260,
       "category": "structural",
-      "threshold": "Each of sign-in, failed sign-in, sign-out and revocation produces 1 audit record with account, time, client and source address; 0 occurrences of the password or token in the audit log and the application log",
-      "description": "An integration test performs the four events for one account with a password and token of a known random value, reads the audit records back and checks their fields, then searches the audit log and the captured application log for the credential values.\n\nTool: Vitest with supertest, the logs captured to a file by the test harness\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { createAccount, signInAs, signOut, revokeAll } from './auth/fixtures'\n\nit('audits the four sign-in events without the credential', async () => {\n  const password = `pw-${crypto.randomUUID()}`\n  const account = await createAccount({ password })\n  const token = await signInAs(app, account, password)\n  await signInAs(app, account, 'wrong-' + password).catch(() => undefined)\n  await signOut(app, token)\n  await revokeAll(app, account)\n  const records = await audit.find({ account: account.id })\n  expect(records.map((r) => r.event).sort()).toEqual(['revoke', 'sign-in', 'sign-in-failed', 'sign-out'])\n  for (const r of records) expect(r).toMatchObject({ at: expect.any(Date), client: expect.any(String), sourceAddress: expect.any(String) })\n  const logs = JSON.stringify(records) + readFileSync(process.env.APP_LOG_FILE!, 'utf8')\n  expect(logs).not.toContain(password)\n  expect(logs).not.toContain(token)\n})\n```",
+      "threshold": "Each of sign-in, failed sign-in, sign-out and revocation produces 1 audit record naming the account as its target, with time, client and source address; 0 occurrences of the password or token in the audit trail and the application log",
+      "description": "An integration test performs the four events for one account with a password and token of a known random value, reads back the audit records whose target is the account and checks their fields (action, at, source.client and source.address, as in the Audit trail pack's record format), then searches them and the captured application log for the credential values.\n\nTool: Vitest with supertest, the logs captured to a file by the test harness\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { createAccount, signInAs, signOut, revokeAll } from './auth/fixtures'\n\nit('audits the four sign-in events without the credential', async () => {\n  const password = `pw-${crypto.randomUUID()}`\n  const account = await createAccount({ password })\n  const token = await signInAs(app, account, password)\n  await signInAs(app, account, 'wrong-' + password).catch(() => undefined)\n  await signOut(app, token)\n  await revokeAll(app, account)\n  const records = await audit.find({ target: { type: 'account', id: account.id } })\n  expect(records.map((r) => r.action).sort()).toEqual(['revoke', 'sign-in', 'sign-in-failed', 'sign-out'])\n  for (const r of records) expect(r).toMatchObject({ at: expect.any(Date), source: { client: expect.any(String), address: expect.any(String) } })\n  const logs = JSON.stringify(records) + readFileSync(process.env.APP_LOG_FILE!, 'utf8')\n  expect(logs).not.toContain(password)\n  expect(logs).not.toContain(token)\n})\n```",
       "hubWhen": {
         "IDENTITY": [
           "idp",

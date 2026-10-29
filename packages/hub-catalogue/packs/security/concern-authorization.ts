@@ -82,7 +82,7 @@ const pack: PackSpec = {
       unwanted_condition: 'a caller asks for data or an action its permissions do not grant',
       action: 'refuse it with 403 (or 404 for a record the caller may not know of) before any part of the operation runs, and record the refusal with the caller, the operation and the record',
       rationale: 'The refusal must not run half the operation or tell an attacker what exists, and repeated refusals are a signal worth alerting on (ASVS V4.1, V7.1; OWASP Authorization Cheat Sheet).',
-      scenario: { label: 'Unpermitted call refused', given: 'a caller without the permission to delete orders', when: 'it calls the delete operation directly, without the interface', then: 'the call is refused with 403, the order stays, and the refusal is in the log' },
+      scenario: { label: 'Unpermitted call refused', given: 'a caller without the permission to delete orders', when: 'it calls the delete operation directly, without the interface', then: 'the call is refused with 403, the order stays, and the refusal is in the audit trail' },
     },
     {
       id: 'req-default-deny', label: 'Denied by default', when: PERMISSIONS, ears_type: 'ubiquitous',
@@ -175,9 +175,9 @@ const pack: PackSpec = {
     },
     {
       id: 'req-admin-audit', label: 'Privileged actions audited', when: { ADMIN: ['jit', 'standing'] }, ears_type: 'ubiquitous',
-      action: 'record every action taken with administrator rights with the person, the time, the target and the ticket or reason, in a log the administrators cannot change, and keep it for at least 12 months',
+      action: 'record every action taken with administrator rights with the person, the time, the target and the ticket or reason, in the audit trail, which the administrators cannot change and whose store and retention the Audit trail pack decides',
       rationale: 'Privileged actions are the ones that most need a trail an administrator cannot edit afterwards (ASVS V7.1, V4.3; NIST SP 800-53 AU-9).',
-      scenario: { label: 'Admin action leaves a trail', given: 'an administrator', when: 'they change a customer\'s data and then try to delete the log entry', then: 'the action is in the log with person, time, target and reason, and the deletion is refused' },
+      scenario: { label: 'Admin action leaves a trail', given: 'an administrator', when: 'they change a customer\'s data and then try to delete its audit record', then: 'the action is in the audit trail with person, time, target and reason, and the deletion is refused' },
     },
     {
       id: 'req-no-direct', label: 'No direct data access', when: { ADMIN: ['none'] }, ears_type: 'ubiquitous',
@@ -244,13 +244,13 @@ const pack: PackSpec = {
     },
     {
       id: 'adr-jit', label: 'Just-in-time privileged access', when: { ADMIN: ['jit'] },
-      decision: 'Nobody holds standing administrator rights in production. Operators request elevation with a ticket reference; a second person approves it; it expires after at most {{ELEVATION_HOURS}} hours. Use the platform\'s mechanism: Microsoft Entra Privileged Identity Management, AWS IAM Identity Center with temporary elevated access, Google Cloud Privileged Access Manager, or Teleport or HashiCorp Boundary for hosts and databases, chosen by where the infrastructure runs. One sealed break-glass account per environment, its credential split or in a safe, alerts on use and is rotated after it. Every privileged action goes to an append-only audit log the administrators cannot change (CloudTrail to a bucket with Object Lock, Azure Activity Log to an immutable storage account, or the SIEM), kept 12 months.',
+      decision: 'Nobody holds standing administrator rights in production. Operators request elevation with a ticket reference; a second person approves it; it expires after at most {{ELEVATION_HOURS}} hours. Use the platform\'s mechanism: Microsoft Entra Privileged Identity Management, AWS IAM Identity Center with temporary elevated access, Google Cloud Privileged Access Manager, or Teleport or HashiCorp Boundary for hosts and databases, chosen by where the infrastructure runs. One sealed break-glass account per environment, its credential split or in a safe, alerts on use and is rotated after it. Every privileged action is recorded in the audit trail, which the administrators cannot change; its store, tamper evidence and retention are decided in the Audit trail pack. Actions on the cloud\'s control plane reach it through the provider\'s own log (a CloudTrail trail with log file validation, or the Azure Activity Log) delivered to storage the administrators cannot change, kept for the audit trail\'s retention and never under 365 days.',
       consequences: '• A phished operator account gives nothing in production by itself.\n• Emergencies need an approver awake, or the break-glass path.\n• Every elevation leaves a record of who, why and for how long.\n• The elevation tool is itself a critical system to protect.',
       alternatives: '1. Named standing administrators: simpler, but the rights are there for whoever takes the account.\n2. No direct access at all: the strongest, but every support need must be built into the product first.',
     },
     {
       id: 'adr-standing', label: 'Named standing administrators', when: { ADMIN: ['standing'] },
-      decision: 'At most 5 named people hold administrator rights in production all the time; each signs in with phishing-resistant MFA (FIDO2 security key or platform passkey), and the list is confirmed every 30 days. Every privileged action is written to an append-only audit log the administrators cannot change (CloudTrail to a bucket with Object Lock, Azure Activity Log to an immutable storage account, or the SIEM), kept 12 months. Revisit when the team grows past 10 people or the data becomes regulated: just-in-time elevation is then the next step.',
+      decision: 'At most 5 named people hold administrator rights in production all the time; each signs in with phishing-resistant MFA (FIDO2 security key or platform passkey), and the list is confirmed every 30 days. Every privileged action is recorded in the audit trail, which the administrators cannot change; its store, tamper evidence and retention are decided in the Audit trail pack. Actions on the cloud\'s control plane reach it through the provider\'s own log (a CloudTrail trail with log file validation, or the Azure Activity Log) delivered to storage the administrators cannot change, kept for the audit trail\'s retention and never under 365 days. Revisit when the team grows past 10 people or the data becomes regulated: just-in-time elevation is then the next step.',
       consequences: '• No approval waits: administrators can act at once.\n• A stolen administrator session is a full compromise until it is noticed.\n• The audit log is the main control, so someone has to read it.',
       alternatives: '1. Just-in-time elevation with approval: smaller window, needs an approver available.\n2. No direct access: support only through the product.',
     },
@@ -594,8 +594,8 @@ where attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess';
     },
     {
       id: 'ff-audit-immutable', label: 'Audit log cannot be changed', when: { ADMIN: ['jit', 'standing'] }, category: 'structural', implements: ['adr-jit', 'adr-standing'], checks: ['req-admin-audit'],
-      threshold: 'The audit trail writes to a bucket with Object Lock in compliance mode for at least 365 days and has log file validation on; 0 trails without both',
-      description: 'A policy over the Terraform plan in CI fails when the CloudTrail trail has no log file validation, or its bucket has no Object Lock configuration in compliance mode with a default retention of at least 365 days, so that no administrator can delete or edit an entry within the retention.',
+      threshold: 'The CloudTrail trail has log file validation on and writes to a bucket with Object Lock in compliance mode for at least 365 days, a floor below the audit trail\'s retention; 0 trails without both',
+      description: 'A policy over the Terraform plan in CI fails when the CloudTrail trail has no log file validation, or its bucket has no Object Lock configuration in compliance mode with a default retention (in days or years) of at least 365 days, so that no administrator can delete or edit an entry within the retention. 365 days is only a floor: the retention itself is the one the Audit trail pack decides, and the bucket is set to it.',
       tool: 'Conftest on the Terraform plan (AWS form; on Azure check the storage account\'s immutability policy, on Google Cloud the bucket\'s retention policy with locked = true)',
       language: 'rego',
       snippet: `package main
@@ -627,9 +627,13 @@ deny contains msg if {
 	some l in locks
 	some rule in l.change.after.rule
 	some retention in rule.default_retention
-	retention.days < 365
-	msg := sprintf("%s keeps the audit log for fewer than 365 days", [l.address])
-}`,
+	number_or_zero(retention.years) * 365 + number_or_zero(retention.days) < 365
+	msg := sprintf("%s keeps the audit log for fewer than 365 days, the floor below the audit trail's retention", [l.address])
+}
+
+number_or_zero(x) := x if is_number(x)
+
+number_or_zero(x) := 0 if not is_number(x)`,
     },
     {
       id: 'ff-no-data-access', label: 'No person reaches data', when: { ADMIN: ['none'] }, category: 'structural', implements: ['adr-no-direct'], checks: ['req-no-direct'],
