@@ -33,7 +33,7 @@ test('landing page', async ({ page, studio }) => {
   await page.goto('/')
   await studio.until(page.getByRole('button', { name: 'Browse the catalogue' }))
   // One tile per group, with its number of packs.
-  for (const [label, group] of [['Identity & access', 'identity'], ['Data', 'data'], ['Technology', 'technology']]) {
+  for (const [label, group] of [['Secure by Design', 'security'], ['Compliance', 'compliance'], ['Tech Radar', 'technology']]) {
     const count = all.filter((c) => c.concern?.group === group).length
     expect(count).toBeGreaterThan(0)
     await expect(page.getByRole('button', { name: new RegExp(`^${label}\\s*${count}\\b`) })).toBeVisible()
@@ -44,16 +44,16 @@ test('landing page', async ({ page, studio }) => {
 
 test('browse a category and search', async ({ page, studio }) => {
   const all = await catalogue(page)
-  const packs = all.filter((c) => c.concern?.group === 'data')
+  const packs = all.filter((c) => c.concern?.group === 'operability')
   await page.goto('/')
-  await studio.until(page.getByRole('button', { name: /^Data\s*\d/ }))
-  await page.getByRole('button', { name: /^Data\s*\d/ }).click()
+  await studio.until(page.getByRole('button', { name: /^Operability & Reliability\s*\d/ }))
+  await page.getByRole('button', { name: /^Operability & Reliability\s*\d/ }).click()
   await studio.until(page.getByText(`${packs.length} of ${all.length}`))
-  await expect(page).toHaveURL(/#\/cat\/data/)
+  await expect(page).toHaveURL(/#\/cat\/operability/)
   for (const c of packs) await expect(page.getByText(c.name, { exact: true })).toBeVisible()
   await expect(page.getByText('Authentication', { exact: true })).toHaveCount(0)
   await studio.settle()
-  await expect(page).toHaveScreenshot('category-data.png')
+  await expect(page).toHaveScreenshot('category-operability.png')
 
   await page.getByPlaceholder('Search concepts…').fill('backup')
   await studio.advance(500)
@@ -89,7 +89,7 @@ test('a concern pack shows its group', async ({ page, studio }) => {
   const pack = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
   await page.goto(`/#/c/${CONCEPT}/v/wiki`)
   await studio.until(page.getByText(pack.hub.name, { exact: true }).first())
-  await expect(page.locator('.hub-toolbar-cat')).toHaveText(/Identity & access/)
+  await expect(page.locator('.hub-toolbar-cat')).toHaveText(/Secure by Design/)
 })
 
 test('a concept link followed inside the Hub opens that concept', async ({ page, studio }) => {

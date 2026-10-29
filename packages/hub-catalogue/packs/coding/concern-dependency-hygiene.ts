@@ -7,7 +7,7 @@ const FORCES = 'This element is built from third-party packages that keep moving
 const pack: PackSpec = {
   id: 'concern-dependency-hygiene',
   name: 'Dependency hygiene',
-  group: 'maintainability',
+  group: 'coding',
   description: 'Keeping third-party dependencies current, pinned, used and licensed: how updates arrive, how versions are locked, what happens to an unused or abandoned dependency, which licences are allowed, and how far behind upstream the element may fall.',
   tags: ['maintainability', 'dependencies', 'renovate', 'dependabot', 'lockfile', 'libyear', 'licences'],
   concern: {

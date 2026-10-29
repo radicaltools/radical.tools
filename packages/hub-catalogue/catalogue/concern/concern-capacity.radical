@@ -19,7 +19,7 @@
       "id": "capacity",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\" OR type = \"database\" OR type = \"queue\") AND external != true",
       "why": "these elements run on capacity of their own (instances, connections, storage, throughput), so the load they must carry, how they scale and what they do when overloaded has to be decided.",
-      "group": "reliability"
+      "group": "operability"
     },
     "sources": [
       {

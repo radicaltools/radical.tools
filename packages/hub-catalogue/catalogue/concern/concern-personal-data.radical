@@ -17,7 +17,7 @@
       "id": "personal-data",
       "trigger": "LIST NODES WHERE type = \"database\" AND external != true",
       "why": "these stores keep data, and whether any of it is about people decides on what basis it is kept, for how long, where it may go and how it is erased.",
-      "group": "data"
+      "group": "compliance"
     },
     "sources": [
       {

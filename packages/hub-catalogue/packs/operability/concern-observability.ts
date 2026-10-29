@@ -7,7 +7,7 @@ const FORCES = 'This element runs in production. The forces: users notice an out
 const pack: PackSpec = {
   id: 'concern-observability',
   name: 'Observability',
-  group: 'operations',
+  group: 'operability',
   description: 'Running in production: which signals are collected, how the service level indicator is measured, who is alerted and when, how long logs are kept, and how a failure is traced to its cause.',
   tags: ['operations', 'observability', 'sli', 'logging', 'tracing', 'alerting', 'opentelemetry'],
   concern: {

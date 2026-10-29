@@ -289,6 +289,44 @@ open:
    edges over 16 types; the legend filters and selection focus are the way
    to read it.
 
+### Hub groups by standard (2026-10-29): what comes after the regrouping
+
+The 33 packs moved whole into eight groups by standard (ADR Concern groups and
+pack standard, amended 2026-10-29). Agreed next, in this order:
+
+1. **SDLC Standard and API Guidelines packs.** SDLC: *Release and versioning*
+   (SemVer or CalVer, changelog source, older versions supported, who approves;
+   commit format stays in Code review and branching, cadence in Deployment),
+   *Delivery metrics* (the four DORA metrics, where measured, targets in
+   check.json), *Definition of Done and change approval* (what every change
+   carries, peer review / CAB / pipeline, segregation of duties, emergency
+   changes, requirement → commit → release). API Guidelines: *API style guide*
+   (Microsoft, Zalando, Google AIP or own; lint in CI with Spectral/Zally;
+   design-first or code-first), *Resource design*, *Errors* (RFC 9457; takes
+   over CALLER from Error handling and logging conventions), *Collections*,
+   *Idempotency and concurrency* (the API we offer; calls we make stay in
+   Integration resilience). The chosen style guide should suggest the answers
+   of the group's other packs: a new mechanism, packs are independent today.
+2. **Compliance**: *Data classification* (with a check on the model itself:
+   restricted data flowing to an external system unencrypted), *Retention and
+   deletion*, *Audit trail* (evidence for a regulator; detection stays in
+   Secure by Design), then regulation packs that ask whether they apply and
+   refer to the owner packs (DORA first, then NIS2, PCI DSS). Name DORA the
+   regulation (EU 2022/2554) apart from the DORA delivery metrics.
+3. **Secure by Design**: *Threat modelling*, *Security event logging and
+   detection*, *Secure development process* (SSDF, SAMM). The ASVS level stays
+   in Secure coding. **Operability & Reliability**: *Incident management*,
+   *Operational readiness*. **Architecture**: *Quality attribute priorities*,
+   *Caching*. **Coding Standards**: *Code style and conventions*. **Tech
+   Radar**: *Technology lifecycle* (rings, moving between them, the Hold list
+   checked against the SBOM), maybe *AI / LLM stack*.
+4. **The radar view** (ADR Tech Radar derived from ADRs, proposed): ring from
+   the ADR status, quadrant from the pack, optional radar ring / radar
+   quadrant / technology properties. Later an organisation's radar across
+   federated models.
+5. The ISO/IEC 25010 characteristics still sit on the groups; with groups by
+   standard they belong on each pack.
+
 ### Dogfooding (2026-10-28): a review and fix round of all Hub concern packs
 
 Found while reviewing and rewriting the 33 packs (PR: Hub packs quality):

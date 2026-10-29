@@ -18,7 +18,7 @@
       "id": "observability",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "these elements run in production, so how you will know they are healthy, and find out why when they are not, has to be decided.",
-      "group": "operations"
+      "group": "operability"
     },
     "sources": [
       {

@@ -142,7 +142,7 @@ test('the import dialog filters concern packs by group, counts them and keeps it
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   const groups = dialog.getByRole('group', { name: 'Concern groups' })
-  await expect(groups.locator('.hi-group-label')).toHaveText(['All', 'Architecture', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
+  await expect(groups.locator('.hi-group-label')).toHaveText(['All', 'Secure by Design', 'API Guidelines', 'Architecture', 'Coding Standards', 'SDLC Standard', 'Tech Radar', 'Compliance', 'Operability & Reliability'])
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
   const all = await dialog.locator('h4').count()
   // All counts every pack, and each group as many as it lists.
@@ -150,18 +150,18 @@ test('the import dialog filters concern packs by group, counts them and keeps it
   // Measured once the dialog has risen into place.
   await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
   const size = await dialog.boundingBox()
-  const data = groups.getByRole('button', { name: /^Data/ })
-  await data.click()
-  await expect(data).toHaveAttribute('aria-pressed', 'true')
+  const compliance = groups.getByRole('button', { name: /^Compliance/ })
+  await compliance.click()
+  await expect(compliance).toHaveAttribute('aria-pressed', 'true')
   await expect(dialog.getByRole('heading', { name: 'Personal data', exact: true })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toHaveCount(0)
-  await expect(data.locator('.hi-group-count')).toHaveText(String(await dialog.locator('h4').count()))
+  await expect(compliance.locator('.hi-group-count')).toHaveText(String(await dialog.locator('h4').count()))
   // A group with fewer packs keeps the dialog's size.
   expect(await dialog.boundingBox()).toEqual(size)
   // Every card names its group.
   const cards = dialog.locator('h4')
   for (const name of await cards.allInnerTexts()) {
-    await expect(dialog.locator('li', { has: page.getByRole('heading', { name, exact: true }) })).toContainText('Data')
+    await expect(dialog.locator('li', { has: page.getByRole('heading', { name, exact: true }) })).toContainText('Compliance')
   }
   // The counts follow the search.
   await dialog.getByPlaceholder('Search concern packs…').fill('Authentication')

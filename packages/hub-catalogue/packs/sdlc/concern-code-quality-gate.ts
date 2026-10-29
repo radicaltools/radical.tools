@@ -8,7 +8,7 @@ const FORCES = 'Code lives in this element and is changed by several people, soo
 const pack: PackSpec = {
   id: 'concern-code-quality-gate',
   name: 'Code quality gate',
-  group: 'maintainability',
+  group: 'sdlc',
   description: 'What a change must pass before it is merged, beyond the tests: which static analysis is enforced, how strict the types are, whether size and complexity are limited, how new findings are treated against the old ones, and what happens to duplicated code.',
   tags: ['maintainability', 'static analysis', 'linting', 'quality gate', 'complexity', 'technical debt', 'type safety'],
   concern: {

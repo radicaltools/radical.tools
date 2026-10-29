@@ -20,7 +20,7 @@
       "id": "messaging",
       "trigger": "LIST NODES WHERE type = \"queue\" AND external != true",
       "why": "messages pass through these queues, so how often each is delivered, in what order, and what happens to one that cannot be handled has to be decided.",
-      "group": "integration"
+      "group": "architecture"
     },
     "sources": [
       {

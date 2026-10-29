@@ -18,7 +18,7 @@
       "id": "dependency-hygiene",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "these elements are built from third-party packages that keep moving, so how updates arrive, how versions are locked and what happens to unused, abandoned or wrongly licensed dependencies has to be decided; one decision usually covers a whole repository and is bound to every element built from it.",
-      "group": "maintainability"
+      "group": "coding"
     },
     "sources": [
       {

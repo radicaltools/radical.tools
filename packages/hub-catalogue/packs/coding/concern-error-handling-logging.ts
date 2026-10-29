@@ -8,7 +8,7 @@ const FORCES = 'Code in this element fails: a dependency times out, input is wro
 const pack: PackSpec = {
   id: 'concern-error-handling-logging',
   name: 'Error handling and logging conventions',
-  group: 'maintainability',
+  group: 'coding',
   description: 'How the code signals, propagates and records failures: the error style, where errors are handled, what an error that reaches a caller looks like, how a log line is shaped, and what must never be in one.',
   tags: ['maintainability', 'error handling', 'exceptions', 'result types', 'logging', 'redaction', 'problem details'],
   concern: {

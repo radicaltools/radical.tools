@@ -17,7 +17,7 @@ function good(): HubRadicalDoc {
   return {
     hub: {
       id: 'concern-x', category: 'concern', name: 'X', description: 'd', tags: [],
-      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "database"', why: 'w', group: 'data' },
+      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "database"', why: 'w', group: 'compliance' },
       sources: [{ title: 'One', url: 'https://example.org/1' }, { title: 'Two', url: 'https://example.org/2' }],
       templateParams: [question('A'), question('B'), question('C')],
     },
@@ -39,7 +39,7 @@ function good(): HubRadicalDoc {
 describe('concernPackProblems', () => {
   it('passes a pack that meets the standard', () => {
     expect(concernPackProblems(good())).toEqual([])
-    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['architecture', 'identity', 'security', 'data', 'integration', 'reliability', 'operations', 'maintainability', 'technology'])
+    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['security', 'api', 'architecture', 'coding', 'sdlc', 'technology', 'compliance', 'operability'])
   })
 
   it('names each way a pack falls below the standard', () => {
@@ -50,7 +50,7 @@ describe('concernPackProblems', () => {
     doc.nodes[4].description = 'Checked somehow.'
     const problems = concernPackProblems(doc)
     expect(problems).toEqual(expect.arrayContaining([
-      expect.stringContaining('hub.concern.group must be one of architecture, identity, security'),
+      expect.stringContaining('hub.concern.group must be one of security, api, architecture'),
       'a concern pack asks at least three questions with options (it asks 2)',
       'question B: option "b" does not say what it means and when to pick it',
       'a concern pack names at least two sources (it names 1)',
@@ -99,7 +99,7 @@ describe('buildConcernInsert', () => {
     ] as C4Node[]).map((n) => [n.id, n]))
     const concept: HubConcept = {
       id: 'concern-x', category: 'concern', name: 'X', description: 'd', tags: [],
-      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "webapp"', why: 'w', group: 'data' },
+      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "webapp"', why: 'w', group: 'compliance' },
       nodes: [
         { id: 'need', type: 'need', label: 'N', x: 0, y: 0 },
         { id: 'req', type: 'requirement', label: 'R', x: 300, y: 0 },
@@ -128,7 +128,7 @@ describe('buildConcernInsert', () => {
   it('refuses a pack the model\'s metamodel cannot hold, saying which types it lacks', () => {
     const concept: HubConcept = {
       id: 'concern-x', category: 'concern', name: 'X', description: 'd', tags: [],
-      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "webapp"', why: 'w', group: 'data' },
+      concern: { id: 'x', trigger: 'LIST NODES WHERE type = "webapp"', why: 'w', group: 'compliance' },
       nodes: [{ id: 'need', type: 'need', label: 'N', x: 0, y: 0 }, { id: 'adr', type: 'adr', label: 'D', concern: 'x', x: 300, y: 0 }],
       relations: [],
     }

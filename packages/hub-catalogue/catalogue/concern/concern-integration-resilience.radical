@@ -21,7 +21,7 @@
       "trigger": "LIST RELATIONS WHERE source.external != true AND target.external = true AND (source.type = \"system\" OR source.type = \"container\" OR source.type = \"webapp\" OR source.type = \"component\")",
       "applyTo": "source",
       "why": "these elements call systems outside your control, so what happens when those are slow, down or answer twice has to be decided.",
-      "group": "integration"
+      "group": "architecture"
     },
     "sources": [
       {

@@ -19,7 +19,7 @@
       "id": "deployment",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "these elements are deployed and changed in production, so how a change rolls out, and how it is taken back, has to be decided.",
-      "group": "operations"
+      "group": "sdlc"
     },
     "sources": [
       {

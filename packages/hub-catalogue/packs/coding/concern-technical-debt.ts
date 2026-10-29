@@ -8,7 +8,7 @@ const FORCES = 'Code lives in this element and every deadline leaves a shortcut 
 const pack: PackSpec = {
   id: 'concern-technical-debt',
   name: 'Technical debt',
-  group: 'maintainability',
+  group: 'coding',
   description: 'Where technical debt is written down so that it can be seen, how much of the team\'s time repaying it gets, how deprecated code and endpoints are retired (a flag past its rollout is a debt item; its removal is decided in the Deployment and rollback pack), and how a rewrite is decided.',
   tags: ['maintainability', 'technical debt', 'deprecation', 'strangler fig', 'refactoring'],
   concern: {

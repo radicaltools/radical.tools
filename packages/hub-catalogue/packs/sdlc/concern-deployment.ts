@@ -6,7 +6,7 @@ const FORCES = 'This element is changed and deployed while people use it. The fo
 const pack: PackSpec = {
   id: 'concern-deployment',
   name: 'Deployment and rollback',
-  group: 'operations',
+  group: 'sdlc',
   description: 'How a change reaches production and how it is undone: the rollout strategy and its automatic checks, database migrations that keep rollback possible, feature flags and their removal, the time to roll back, and the release cadence measured with the DORA metrics.',
   tags: ['operations', 'deployment', 'rollback', 'canary', 'blue-green', 'migrations', 'feature-flags', 'dora'],
   concern: {

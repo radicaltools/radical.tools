@@ -18,7 +18,7 @@
       "id": "code-review-branching",
       "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
       "why": "code lives in these elements and several people change it, so how a change is branched, reviewed and merged has to be decided; one decision usually covers a whole repository and is bound to every element built from it.",
-      "group": "maintainability"
+      "group": "sdlc"
     },
     "sources": [
       {

@@ -18,7 +18,7 @@
       "trigger": "LIST RELATIONS WHERE (source.type = \"container\" OR source.type = \"component\" OR source.type = \"webapp\" OR source.type = \"system\") AND source.external != true AND (target.type = \"database\" OR target.type = \"queue\") AND target.external != true",
       "applyTo": "source",
       "why": "these elements write to stores or queues, so how an operation that changes several records stays consistent, and what readers may see meanwhile, has to be decided.",
-      "group": "data"
+      "group": "architecture"
     },
     "sources": [
       {

@@ -8,7 +8,7 @@ const FORCES = 'This store keeps data that the system cannot work without. The f
 const pack: PackSpec = {
   id: 'concern-backup-recovery',
   name: 'Backup and recovery',
-  group: 'data',
+  group: 'operability',
   description: 'When a store is lost: how much data may go with it, how fast it comes back, where the copies are kept, and the drill that proves it.',
   tags: ['reliability', 'backup', 'disaster-recovery', 'rpo', 'rto', 'ransomware'],
   concern: {

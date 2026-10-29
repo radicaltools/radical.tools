@@ -7,7 +7,7 @@ const FORCES = 'This element calls systems it does not run: payment, e-mail, map
 const pack: PackSpec = {
   id: 'concern-integration-resilience',
   name: 'Integration resilience',
-  group: 'integration',
+  group: 'architecture',
   description: 'Calls to systems outside your control: how long to wait, when and how to try again, how not to do anything twice, when to stop calling, and what the user gets while the other side is down.',
   tags: ['reliability', 'integration', 'timeouts', 'retries', 'backoff', 'idempotency', 'circuit-breaker', 'resilience4j', 'polly'],
   concern: {

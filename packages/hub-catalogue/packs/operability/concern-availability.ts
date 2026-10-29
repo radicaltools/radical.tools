@@ -7,7 +7,7 @@ const FORCES = 'People or other systems reach this element, so when it is down s
 const pack: PackSpec = {
   id: 'concern-availability',
   name: 'Availability',
-  group: 'reliability',
+  group: 'operability',
   description: 'How available it must be: the target and its error budget, the redundancy that target needs, what happens when the budget is spent, and how dependencies and planned work count against it.',
   tags: ['reliability', 'availability', 'slo', 'error-budget', 'redundancy', 'multi-zone', 'failover'],
   concern: {
