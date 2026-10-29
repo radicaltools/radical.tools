@@ -10,8 +10,7 @@ async function packWizard(page: import('@playwright/test').Page, name: string): 
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concern packs…').pressSequentially(name)
-  await dialog.locator('div', { has: page.getByRole('heading', { name, exact: true }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  await dialog.locator('li', { has: page.getByRole('heading', { name, exact: true }) })
     .getByRole('button', { name: 'Add to Model' }).click()
   return page.getByTestId('concern-wizard')
 }
@@ -70,8 +69,7 @@ test('a concern pack is imported with its answers and bound to the element in on
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   await dialog.getByPlaceholder('Search concern packs…').pressSequentially('Authentication')
-  const card = dialog.locator('div', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
-    .filter({ has: page.getByRole('button', { name: 'Add to Model' }) }).last()
+  const card = dialog.locator('li', { has: page.getByRole('heading', { name: 'Authentication', exact: true }) })
   await card.getByRole('button', { name: 'Add to Model' }).click()
 
   // A wizard: where it applies first, the shop suggested since it covers
@@ -137,23 +135,41 @@ test('a concern pack is imported with its answers and bound to the element in on
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before)
 })
 
-test('the import dialog filters concern packs by group', async ({ page, studio }) => {
+test('the import dialog filters concern packs by group, counts them and keeps its size', async ({ page, studio }) => {
   await studio.seed('bookstore')
   await studio.open('v-containers')
   await page.getByRole('button', { name: 'Models', exact: true }).click()
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   const groups = dialog.getByRole('group', { name: 'Concern groups' })
-  await expect(groups.getByRole('button')).toHaveText(['All', 'Architecture', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
+  await expect(groups.locator('.hi-group-label')).toHaveText(['All', 'Architecture', 'Identity & access', 'Security', 'Data', 'Integration', 'Reliability', 'Operations', 'Maintainability', 'Technology'])
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
-  await groups.getByRole('button', { name: 'Data', exact: true }).click()
+  const all = await dialog.locator('h4').count()
+  // All counts every pack, and each group as many as it lists.
+  await expect(groups.getByRole('button', { name: /^All/ }).locator('.hi-group-count')).toHaveText(String(all))
+  // Measured once the dialog has risen into place.
+  await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
+  const size = await dialog.boundingBox()
+  const data = groups.getByRole('button', { name: /^Data/ })
+  await data.click()
+  await expect(data).toHaveAttribute('aria-pressed', 'true')
   await expect(dialog.getByRole('heading', { name: 'Personal data', exact: true })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toHaveCount(0)
+  await expect(data.locator('.hi-group-count')).toHaveText(String(await dialog.locator('h4').count()))
+  // A group with fewer packs keeps the dialog's size.
+  expect(await dialog.boundingBox()).toEqual(size)
   // Every card names its group.
   const cards = dialog.locator('h4')
   for (const name of await cards.allInnerTexts()) {
-    await expect(dialog.locator('div', { has: page.getByRole('heading', { name, exact: true }) }).last()).toContainText('Data')
+    await expect(dialog.locator('li', { has: page.getByRole('heading', { name, exact: true }) })).toContainText('Data')
   }
+  // The counts follow the search.
+  await dialog.getByPlaceholder('Search concern packs…').fill('Authentication')
+  await groups.getByRole('button', { name: /^All/ }).click()
+  await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
+  const shown = String(await dialog.locator('h4').count())
+  expect(Number(shown)).toBeLessThan(all)
+  await expect(groups.getByRole('button', { name: /^All/ }).locator('.hi-group-count')).toHaveText(shown)
 })
 
 test('several concern packs from a Hub link open their wizards one after another, each with its view', async ({ page, studio }) => {
