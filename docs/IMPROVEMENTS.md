@@ -330,6 +330,17 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    incompatible answer pairs across packs, checked by the wizard and by
    `radical check` on the imported ADRs, would catch them.
 
+### Hub answers preview (2026-10-29): next
+
+1. *Add to Studio* opens the concern wizard on the defaults; the answers
+   picked in the Hub's Answers panel could travel with the link
+   (`?hub=<id>&answers=KEY:value,…`) and preselect the wizard.
+2. The canvas keeps the pack's stored positions, so removed elements leave
+   gaps; a quick relayout of the shown variant (or packed positions per
+   variant at build time) would close them.
+3. The answers are not in the page link yet, so a preview cannot be shared
+   with its answers.
+
 ### Flaky e2e (2026-10-29)
 
 `apps/e2e/tests/studio/metamodel-diagram.spec.ts › selecting a type shows its
@@ -337,6 +348,9 @@ rules; Edit opens it in the list` failed once in a full run on
 feat/hub-more-packs (`toBeCloseTo`, a position on the metamodel diagram) and
 passed three times alone. The change touched only Hub packs, so the test is
 flaky; its position assertion likely races the layout settling.
+`apps/e2e/tests/studio/alignment.spec.ts › a collapsed container aligns its
+children, which line up when it is expanded` timed out (1 min) once in a full
+run on feat/hub-answers-preview and passed three times alone in 3.3 s.
 
 ### Dogfooding (2026-10-29): model checks a pack cannot express
 

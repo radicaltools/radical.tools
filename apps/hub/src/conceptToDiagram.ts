@@ -12,6 +12,8 @@ import type { C4Node, C4Relation, C4ElementType, DiagramData, DiagramSequence, D
 import { NODE_SIZES, trimStepBackward } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { HubConcept, TemplateParam } from '@radical/common/hubFormat'
+import { resolveParamValues } from '@radical/common/hubImport'
+import { answerTexts, pickVariant } from '@radical/common/concerns'
 import { conceptViewsToDiagram } from '@radical/ui/viewer'
 
 export const HUB_WIKI_VIEW_ID = 'hub-wiki'
@@ -63,11 +65,48 @@ export function substituteTemplateDefaults(str: string, params: TemplateParam[] 
   })
 }
 
-/** `layoutFrom`: id of one of the concept's views whose stored positions
- *  replace the node coordinates — the Hub viewer runs in explore mode, where
+/** A concern pack's questions: the parameters with options to pick from. */
+export function packQuestions(concept: HubConcept): TemplateParam[] {
+  return (concept.templateParams ?? []).filter((p) => p.options?.length)
+}
+
+/** The answers a concern pack opens with: each question's default. */
+export function defaultAnswers(concept: HubConcept): Record<string, string> {
+  return Object.fromEntries(packQuestions(concept).map((p) => [p.key, p.defaultValue ?? p.options![0].value]))
+}
+
+/** The pack as the answers make it, as Studio's concern wizard imports it:
+ *  only the elements they pick, and each question's option label in place of
+ *  its default, so the texts read with the answers. */
+export function answeredConcept(concept: HubConcept, answers: Record<string, string>): HubConcept {
+  const values = resolveParamValues(concept.templateParams, answers)
+  const texts = answerTexts(concept.templateParams, values)
+  return {
+    ...pickVariant(concept, values),
+    templateParams: concept.templateParams?.map((p) => (p.options?.length ? { ...p, defaultValue: texts[p.key] } : p)),
+  }
+}
+
+/** How many elements picking `value` for `key` would add to, and remove
+ *  from, what the current answers bring in. */
+export function answerDelta(concept: HubConcept, answers: Record<string, string>, key: string, value: string): { added: number; removed: number } {
+  const ids = (a: Record<string, string>) => new Set(pickVariant(concept, resolveParamValues(concept.templateParams, a)).nodes.map((n) => String(n.id)))
+  const now = ids(answers)
+  const next = ids({ ...answers, [key]: value })
+  let added = 0
+  let removed = 0
+  for (const id of next) if (!now.has(id)) added++
+  for (const id of now) if (!next.has(id)) removed++
+  return { added, removed }
+}
+
+/** `answers`: a concern pack's answers, to show only what they bring in
+ *  (null or absent: every variant at once). `layoutFrom`: id of one of the
+ *  concept's views whose stored positions replace the node coordinates — the Hub viewer runs in explore mode, where
  *  switching the active view deliberately keeps the current layout, so it
  *  reloads the concept laid out for the chosen view instead. */
-export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: string | null } = {}): DiagramData {
+export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: string | null; answers?: Record<string, string> | null } = {}): DiagramData {
+  if (opts.answers) concept = answeredConcept(concept, opts.answers)
   const ids = new Set(concept.nodes.map((n) => String(n.id)))
   const params = concept.templateParams
 

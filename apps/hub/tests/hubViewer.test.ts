@@ -10,7 +10,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  answerDelta,
+  answeredConcept,
   conceptToDiagramData,
+  defaultAnswers,
   defaultViewKind,
   kindForViewId,
   substituteTemplateDefaults,
@@ -212,5 +215,37 @@ describe('concept views', () => {
       { id: 'id-1', name: 'CQRS — Write flow', kind: 'static', nodeIds: ['new-sys'], positions: {} },
       { id: 'id-2', name: 'CQRS — Docs', kind: 'wiki', nodeIds: ['new-sys'], positions: {}, wikiFocusId: 'new-sys' },
     ])
+  })
+})
+
+describe('a concern pack\'s answers', () => {
+  const pack: HubConcept = {
+    id: 'concern-x', category: 'concern', name: 'X', description: 'x', tags: [],
+    templateParams: [
+      { key: 'MODE', label: 'Which mode?', defaultValue: 'a', options: [{ value: 'a', label: 'mode A' }, { value: 'b', label: 'mode B' }] },
+      { key: 'LIMIT', label: 'Limit', defaultValue: '5' },
+    ],
+    nodes: [
+      { id: 'need', type: 'need', label: 'Need' },
+      { id: 'adr-a', type: 'adr', label: 'Use {{MODE}}', hubWhen: { MODE: ['a'] } },
+      { id: 'adr-b', type: 'adr', label: 'Use {{MODE}} within {{LIMIT}}', hubWhen: { MODE: ['b'] } },
+      { id: 'ff-b', type: 'fitness-fn', label: 'Check B', hubWhen: { MODE: ['b'] } },
+    ],
+    relations: [{ id: 'r', sourceId: 'ff-b', targetId: 'adr-b', relationType: 'implements' }],
+  } as unknown as HubConcept
+
+  it('opens on the defaults and keeps only what the answers pick, texts filled with them', () => {
+    expect(defaultAnswers(pack)).toEqual({ MODE: 'a' })
+    const data = conceptToDiagramData(pack, { answers: { MODE: 'b' } })
+    expect(data.nodes.map((n) => n.id).sort()).toEqual(['adr-b', 'ff-b', 'need'])
+    expect(data.nodes.find((n) => n.id === 'adr-b')!.label).toBe('Use {{mode B}} within {{5}}')
+    expect(data.relations).toHaveLength(1)
+    expect(answeredConcept(pack, { MODE: 'a' }).nodes.map((n) => n.id)).toEqual(['need', 'adr-a'])
+  })
+
+  it('shows every variant without answers, and counts what another answer changes', () => {
+    expect(conceptToDiagramData(pack).nodes).toHaveLength(4)
+    expect(answerDelta(pack, { MODE: 'a' }, 'MODE', 'b')).toEqual({ added: 2, removed: 1 })
+    expect(answerDelta(pack, { MODE: 'a' }, 'MODE', 'a')).toEqual({ added: 0, removed: 0 })
   })
 })
