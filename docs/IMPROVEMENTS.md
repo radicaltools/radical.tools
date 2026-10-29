@@ -348,6 +348,9 @@ rules; Edit opens it in the list` failed once in a full run on
 feat/hub-more-packs (`toBeCloseTo`, a position on the metamodel diagram) and
 passed three times alone. The change touched only Hub packs, so the test is
 flaky; its position assertion likely races the layout settling.
+`apps/e2e/tests/studio/alignment.spec.ts › a collapsed container aligns its
+children, which line up when it is expanded` timed out (1 min) once in a full
+run on feat/hub-answers-preview and passed three times alone in 3.3 s.
 
 ### Dogfooding (2026-10-29): model checks a pack cannot express
 
