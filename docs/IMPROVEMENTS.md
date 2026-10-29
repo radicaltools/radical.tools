@@ -307,13 +307,14 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    to it. Next regulation packs: NIS2, PCI DSS. Personal data's
    record-of-processing and Data classification's data inventory are two
    files about the same stores; one inventory would be better.
-3. **Secure by Design**: *Threat modelling*, *Security event logging and
-   detection*, *Secure development process* (SSDF, SAMM). The ASVS level stays
-   in Secure coding. **Operability & Reliability**: *Incident management*,
-   *Operational readiness*. **Architecture**: *Quality attribute priorities*,
-   *Caching*. **Coding Standards**: *Code style and conventions*. **Tech
-   Radar**: *Technology lifecycle* (rings, moving between them, the Hold list
-   checked against the SBOM), maybe *AI / LLM stack*.
+3. **Done (2026-10-29):** Secure by Design (*Threat modelling*, *Security
+   event logging and detection*, *Secure development process*), Operability
+   & Reliability (*Incident management*, *Operational readiness*),
+   Architecture (*Quality attribute priorities*, *Caching*), Coding Standards
+   (*Code style and conventions*), Tech Radar (*Technology lifecycle*, which
+   computes the radar from the model's ADRs and keeps Trial and names in an
+   overrides file until the ADR properties exist). Not done: *AI / LLM stack*.
+   Gap found: no pack owns the GDPR Art. 33 breach notification.
 4. **The radar view** (ADR Tech Radar derived from ADRs, proposed): ring from
    the ADR status, quadrant from the pack, optional radar ring / radar
    quadrant / technology properties. Later an organisation's radar across
@@ -328,6 +329,14 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    and the casing in Resource design or the format in Errors. A list of
    incompatible answer pairs across packs, checked by the wizard and by
    `radical check` on the imported ADRs, would catch them.
+
+### Flaky e2e (2026-10-29)
+
+`apps/e2e/tests/studio/metamodel-diagram.spec.ts › selecting a type shows its
+rules; Edit opens it in the list` failed once in a full run on
+feat/hub-more-packs (`toBeCloseTo`, a position on the metamodel diagram) and
+passed three times alone. The change touched only Hub packs, so the test is
+flaky; its position assertion likely races the layout settling.
 
 ### Dogfooding (2026-10-29): model checks a pack cannot express
 

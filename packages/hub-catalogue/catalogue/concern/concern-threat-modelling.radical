@@ -1,0 +1,1113 @@
+{
+  "hub": {
+    "id": "concern-threat-modelling",
+    "category": "concern",
+    "name": "Threat modelling",
+    "description": "How the threats to an element reached across a trust boundary are found and ended: when the threat model is made and redone, with which method, where it lives, and how each threat ends (mitigated, accepted by a named owner until a date, or transferred). The snippets are Node and Python scripts and shell steps for GitHub Actions.",
+    "tags": [
+      "security",
+      "threat modelling",
+      "stride",
+      "linddun",
+      "pasta",
+      "threat dragon",
+      "pytm"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "threat-modelling",
+      "trigger": "LIST RELATIONS WHERE (source.type = \"person\" OR source.external = true) AND target.external != true AND (target.type = \"system\" OR target.type = \"container\" OR target.type = \"webapp\" OR target.type = \"component\")",
+      "applyTo": "target",
+      "why": "people or external systems reach these elements across a trust boundary, so how their threats are found and ended has to be decided.",
+      "group": "security"
+    },
+    "sources": [
+      {
+        "title": "Threat Modeling Manifesto",
+        "url": "https://www.threatmodelingmanifesto.org/"
+      },
+      {
+        "title": "OWASP Threat Modeling Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html"
+      },
+      {
+        "title": "Adam Shostack: Threat Modeling: Designing for Security (Wiley, 2014)",
+        "url": "https://www.wiley.com/en-us/Threat+Modeling%3A+Designing+for+Security-p-9781118809990"
+      },
+      {
+        "title": "Microsoft Threat Modeling Tool: threats (the STRIDE model)",
+        "url": "https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats"
+      },
+      {
+        "title": "LINDDUN privacy threat modeling framework: threat types",
+        "url": "https://linddun.org/threat-types/"
+      },
+      {
+        "title": "Tony UcedaVélez, Marco M. Morana: Risk Centric Threat Modeling: Process for Attack Simulation and Threat Analysis (Wiley, 2015)",
+        "url": "https://www.wiley.com/en-us/Risk+Centric+Threat+Modeling%3A+Process+for+Attack+Simulation+and+Threat+Analysis-p-9780470500965"
+      },
+      {
+        "title": "NIST SP 800-218, Secure Software Development Framework (SSDF) 1.1",
+        "url": "https://csrc.nist.gov/pubs/sp/800/218/final"
+      },
+      {
+        "title": "OWASP Threat Dragon documentation",
+        "url": "https://www.threatdragon.com/docs/"
+      },
+      {
+        "title": "OWASP pytm",
+        "url": "https://github.com/OWASP/pytm"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "WHEN",
+        "title": "When",
+        "label": "When is the threat model made and redone?",
+        "hint": "A threat model describes the system as it was when it was made. How often it is redone decides how long a new caller, data store or third party can run with nobody having asked what could go wrong there. Every answer makes the first threat model before the first release.",
+        "defaultValue": "change",
+        "options": [
+          {
+            "value": "change",
+            "label": "on every change to a trust boundary",
+            "description": "Every pull request that adds or moves a trust boundary (a new external caller, a new data store, a new third party) changes the threat model too, and gets a security review. Pick it when boundaries change during the release cycle and the files that define them can be named (infrastructure code, route tables, the API description)."
+          },
+          {
+            "value": "release",
+            "label": "once per release",
+            "description": "Before each release is tagged, the team reviews the changes since the previous release against the threat model and commits the review. Pick it when releases come every few weeks and boundaries are defined in places no path list can catch."
+          },
+          {
+            "value": "yearly",
+            "label": "once a year per system",
+            "description": "Each system's threat model is reviewed at least once every 12 months, in a session on the calendar. Pick it only for stable systems whose boundaries rarely change, or where a yearly review is all a standard asks; boundaries added between reviews wait for the next one."
+          }
+        ]
+      },
+      {
+        "key": "METHOD",
+        "title": "Method",
+        "label": "With which method are threats found?",
+        "hint": "The method decides which threats the team looks for and how each is recorded. STRIDE is the common starting point; LINDDUN adds the privacy harms STRIDE does not name; PASTA starts from the business and ranks threats by risk.",
+        "defaultValue": "stride",
+        "options": [
+          {
+            "value": "stride",
+            "label": "STRIDE per element and data flow",
+            "description": "A data-flow diagram with its trust boundaries, then each element and flow examined for spoofing, tampering, repudiation, information disclosure, denial of service and elevation of privilege. Pick it for most systems: it is quick to learn and every tool supports it."
+          },
+          {
+            "value": "stride-linddun",
+            "label": "STRIDE per element and data flow, with LINDDUN for privacy threats",
+            "description": "STRIDE for security threats, and the seven LINDDUN categories (linking, identifying, non-repudiation, detecting, data disclosure, unawareness and unintervenability, non-compliance) on the same diagram for privacy threats. Pick it when the system handles personal data, so harms to the people in the data are looked for, not only attacks on the system."
+          },
+          {
+            "value": "pasta",
+            "label": "PASTA, risk-centric",
+            "description": "The seven stages of the Process for Attack Simulation and Threat Analysis: business objectives first, attack scenarios against them, and every threat scored by likelihood and impact. Pick it when the business wants threats ranked by risk to its objectives (finance, regulated services) and the team can afford the longer process."
+          }
+        ]
+      },
+      {
+        "key": "WHERE",
+        "title": "Where",
+        "label": "Where does the threat model live?",
+        "hint": "Every answer keeps the threat model in the repository, so it is reviewed with the code and read by the checks; the answer picks its form. A commercial platform keeps it outside the repository, which these checks cannot read; that is listed among the alternatives.",
+        "defaultValue": "dragon",
+        "options": [
+          {
+            "value": "dragon",
+            "label": "OWASP Threat Dragon models in the repository",
+            "description": "One Threat Dragon model per system as JSON in threat-model/, drawn in the Threat Dragon desktop or web app, with threats, their category, severity, status and mitigation on the diagram's elements; acceptances and transfers in a small YAML file beside them. Pick it when the people who model prefer drawing to code."
+          },
+          {
+            "value": "pytm",
+            "label": "OWASP pytm models with a triaged threat register",
+            "description": "Each system described in Python with pytm (elements, trust boundaries, data flows); pytm generates candidate threats from its library and draws the diagram, and every finding is triaged in a YAML register beside it. Pick it when the team prefers code and wants threats suggested from the model, and accepts triaging pytm's findings."
+          },
+          {
+            "value": "register",
+            "label": "a YAML threat register beside a data-flow diagram",
+            "description": "Per system a folder with a Mermaid data-flow diagram in README.md and the threats in threats.yaml, written by hand. Pick it for few, small systems, or when no tool is wanted beyond the repository."
+          }
+        ]
+      },
+      {
+        "key": "UNMITIGATED",
+        "title": "Unmitigated",
+        "label": "What stops a threat that is not mitigated?",
+        "hint": "A threat ends mitigated, transferred to a party under contract, or accepted by a named owner until a date. This decides whether an acceptance is enough for every threat, or whether a high or critical one must be mitigated or transferred before a release.",
+        "defaultValue": "expiry",
+        "options": [
+          {
+            "value": "expiry",
+            "label": "the expiry of its acceptance",
+            "description": "Any threat may be accepted by a named owner with a reason, until an expiry date; past that date the build fails until it is mitigated, transferred or accepted again. Pick it when the owner of the risk should be free to weigh it, and the expiry is enough to bring it back."
+          },
+          {
+            "value": "release-block",
+            "label": "the expiry of its acceptance, and a blocked release for a high or critical threat",
+            "description": "The same expiry, and no release while a high or critical threat is open or accepted: those must be mitigated or transferred first. Pick it for systems where a high threat in production would be a reportable incident (personal, financial or health data)."
+          }
+        ]
+      },
+      {
+        "key": "BOUNDARY_PATHS",
+        "label": "Which paths define a trust boundary (git pathspecs, separated by spaces)? (on every change to a trust boundary only)",
+        "defaultValue": "infra/ src/routes/ openapi.yaml"
+      },
+      {
+        "key": "ACCEPT_DAYS",
+        "label": "For at most how many days may a threat be accepted before it must be decided again?",
+        "defaultValue": "180",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Threats are found and ended before attackers find them",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Threat modelling",
+      "description": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
+    },
+    {
+      "id": "req-redo-change",
+      "type": "requirement",
+      "label": "Boundary changes update the threat model",
+      "x": 260,
+      "y": 0,
+      "ears_type": "event-driven",
+      "trigger": "a pull request changes a file that defines a trust boundary ({{BOUNDARY_PATHS}}): a new external caller, a new data store, a new third party, or a moved boundary",
+      "action": "change the system's threat model under threat-model/ in the same pull request, and give that pull request the security-review label, so that it merges only after the security review the Secure development process pack sets up",
+      "rationale": "Threat modelling is most useful early and often, following design changes in manageable steps (Threat Modeling Manifesto, principles); the model must be kept up to date as the system changes (OWASP Threat Modeling Cheat Sheet; NIST SP 800-218 PW.1.1).",
+      "hubWhen": {
+        "WHEN": [
+          "change"
+        ]
+      }
+    },
+    {
+      "id": "req-redo-release",
+      "type": "requirement",
+      "label": "Each release reviews the threat model",
+      "x": 260,
+      "y": 130,
+      "ears_type": "event-driven",
+      "trigger": "a release is tagged",
+      "action": "publish it only when threat-model/ has a commit after the previous release tag, the record of that release's threat-model review",
+      "rationale": "The threat model is kept current as the system changes (OWASP Threat Modeling Cheat Sheet; NIST SP 800-218 PW.1.1); a review per release is the step the Manifesto asks for, sized to the release.",
+      "hubWhen": {
+        "WHEN": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "req-redo-yearly",
+      "type": "requirement",
+      "label": "Threat models reviewed every year",
+      "x": 260,
+      "y": 260,
+      "ears_type": "ubiquitous",
+      "action": "review the threat model of each system at least once every 12 months, recording the review as a commit to that system's model",
+      "rationale": "A yearly review is the least that keeps a model from describing a system that no longer exists; the Manifesto prefers continuous refinement to a single delivery, which this answer accepts as a cost (Threat Modeling Manifesto, values; NIST SP 800-218 PW.1.1).",
+      "hubWhen": {
+        "WHEN": [
+          "yearly"
+        ]
+      }
+    },
+    {
+      "id": "req-in-repo",
+      "type": "requirement",
+      "label": "Threat model kept in the repository",
+      "x": 260,
+      "y": 390,
+      "ears_type": "ubiquitous",
+      "action": "keep each system's threat model in the repository under threat-model/ as {{WHERE}}, in a form the pipeline reads into one list of threats (reports/threats.json) on every pull request, and change it only through pull requests",
+      "rationale": "Documents record the shared understanding and make it measurable (Threat Modeling Manifesto, principles); kept with the code, the model is reviewed and versioned with what it describes, and available to those who need it (OWASP Threat Modeling Cheat Sheet)."
+    },
+    {
+      "id": "req-pytm-triaged",
+      "type": "requirement",
+      "label": "Every pytm finding triaged",
+      "x": 260,
+      "y": 520,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "pytm generates a finding from a system's tm.py that the system's threats.yaml does not list by its threat id and element",
+      "action": "fail the build, naming the finding, until it is triaged in threats.yaml with a category, a severity and a status",
+      "rationale": "pytm suggests threats from its library; a suggestion nobody looked at is neither a threat found nor one ruled out (OWASP pytm; OWASP Threat Modeling Cheat Sheet: what are we going to do about it).",
+      "hubWhen": {
+        "WHERE": [
+          "pytm"
+        ]
+      }
+    },
+    {
+      "id": "req-external-callers",
+      "type": "requirement",
+      "label": "Every outside caller in the threat model",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "name in the threat model every person and every external system that the architecture model shows calling one of the system's elements",
+      "rationale": "Each outside caller is an entry point across a trust boundary; one missing from the threat model is a boundary nobody examined (Shostack, Threat Modeling, ch. 2: what are you building; OWASP Threat Modeling Cheat Sheet: system modeling)."
+    },
+    {
+      "id": "req-statuses",
+      "type": "requirement",
+      "label": "Every threat has a status that ends it",
+      "x": 260,
+      "y": 780,
+      "ears_type": "ubiquitous",
+      "action": "give every threat an id, the element or data flow it threatens, a severity of low, medium, high or critical, and one status: mitigated, naming the test, ADR or ticket that carries the control; transferred, naming the party that carries the risk and the contract or policy that says so; accepted; not applicable, with the reason; or open, naming the ticket that will close it",
+      "rationale": "Each threat gets a response (mitigate, eliminate, transfer or accept) and the response is recorded; a transfer does not lower the risk, so who carries it must be written down (OWASP Threat Modeling Cheat Sheet, response and mitigations)."
+    },
+    {
+      "id": "req-acceptance",
+      "type": "requirement",
+      "label": "Acceptances have an owner and an expiry",
+      "x": 260,
+      "y": 910,
+      "ears_type": "event-driven",
+      "trigger": "a threat is accepted",
+      "action": "record its risk owner by name (a person, not a team), the reason, the date of the acceptance and an expiry date at most {{ACCEPT_DAYS}} days later",
+      "rationale": "Accepting a risk is a decision someone takes for the business; with a name and a date it is visible and comes back for a new decision (OWASP Threat Modeling Cheat Sheet: accept; Threat Modeling Manifesto: a culture of finding and fixing over checkbox compliance)."
+    },
+    {
+      "id": "req-expired",
+      "type": "requirement",
+      "label": "Expired acceptances fail the build",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "an accepted threat passes its expiry date",
+      "action": "fail the main branch's build and every pull request's, naming the threat and its owner, until the threat is mitigated, transferred or accepted again by its owner with a new expiry",
+      "rationale": "An acceptance that never expires is a threat nobody will look at again; failing the build makes the renewal a decision instead of a habit (OWASP Threat Modeling Cheat Sheet: residual risk)."
+    },
+    {
+      "id": "req-high-blocks",
+      "type": "requirement",
+      "label": "No release with a high threat open or accepted",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "a threat of high or critical severity is open or accepted when a release is built",
+      "action": "stop the release, naming the threat, until it is mitigated or transferred",
+      "rationale": "For the threats that would be an incident, an accepted risk is not enough: the release waits for a control or a party who carries it (OWASP Threat Modeling Cheat Sheet: mitigate, transfer).",
+      "hubWhen": {
+        "UNMITIGATED": [
+          "release-block"
+        ]
+      }
+    },
+    {
+      "id": "req-stride",
+      "type": "requirement",
+      "label": "Threats classified by STRIDE",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "find threats per element and data flow of the diagram, and record each security threat under exactly one of the six STRIDE categories: spoofing, tampering, repudiation, information disclosure, denial of service, elevation of privilege",
+      "rationale": "STRIDE gives every team the same list of what can go wrong, and applied per element it walks every part of the diagram (Microsoft Threat Modeling Tool, the STRIDE model; Shostack, Threat Modeling, ch. 3).",
+      "hubWhen": {
+        "METHOD": [
+          "stride",
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "req-linddun",
+      "type": "requirement",
+      "label": "Privacy threats under LINDDUN",
+      "x": 260,
+      "y": 1430,
+      "ears_type": "ubiquitous",
+      "action": "examine every data flow and store that carries personal data under the seven LINDDUN categories (linking, identifying, non-repudiation, detecting, data disclosure, unawareness and unintervenability, non-compliance), so that each category appears in every system's threat model as a threat or as a not-applicable entry with its reason",
+      "rationale": "LINDDUN names the privacy harms that STRIDE does not, such as linking records to a person or detecting that a person is in the data (LINDDUN threat types; OWASP Threat Modeling Cheat Sheet).",
+      "hubWhen": {
+        "METHOD": [
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "req-pasta",
+      "type": "requirement",
+      "label": "Threats scored against business objectives",
+      "x": 260,
+      "y": 1560,
+      "ears_type": "ubiquitous",
+      "action": "list the business objectives and the attack scenarios against them in threat-model/objectives/<system>.md, and give every threat a risk score of likelihood times impact (each 1 to 5) with its severity following the score: low 1 to 5, medium 6 to 11, high 12 to 19, critical 20 to 25",
+      "rationale": "PASTA starts from the business objectives (stage 1), simulates attacks against them (stage 6) and ranks the threats by risk and impact (stage 7), so what is fixed first is what would hurt the business most (UcedaVélez and Morana, Risk Centric Threat Modeling).",
+      "hubWhen": {
+        "METHOD": [
+          "pasta"
+        ]
+      }
+    },
+    {
+      "id": "sc-redo-change",
+      "type": "scenario",
+      "label": "New partner route modelled",
+      "x": 520,
+      "y": 0,
+      "given": "a pull request that adds a route for a new partner under one of {{BOUNDARY_PATHS}}",
+      "when": "its checks run",
+      "then": "they fail until the same pull request changes threat-model/ and carries the security-review label",
+      "hubWhen": {
+        "WHEN": [
+          "change"
+        ]
+      }
+    },
+    {
+      "id": "sc-redo-release",
+      "type": "scenario",
+      "label": "Release without review stopped",
+      "x": 520,
+      "y": 130,
+      "given": "a release tag with no commit to threat-model/ since the previous tag",
+      "when": "the release job runs",
+      "then": "it fails, and it passes once the review is committed and the release is tagged again",
+      "hubWhen": {
+        "WHEN": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "sc-redo-yearly",
+      "type": "scenario",
+      "label": "Stale model reported",
+      "x": 520,
+      "y": 260,
+      "given": "a system whose threat model was last committed 13 months ago",
+      "when": "the monthly job runs",
+      "then": "it fails naming the system and the date of the last review",
+      "hubWhen": {
+        "WHEN": [
+          "yearly"
+        ]
+      }
+    },
+    {
+      "id": "sc-in-repo",
+      "type": "scenario",
+      "label": "Model read on every change",
+      "x": 520,
+      "y": 390,
+      "given": "a pull request",
+      "when": "the pipeline runs",
+      "then": "the reader of the threat model writes reports/threats.json with every threat of every system, and fails on a model it cannot read"
+    },
+    {
+      "id": "sc-pytm-triaged",
+      "type": "scenario",
+      "label": "New finding waits for triage",
+      "x": 520,
+      "y": 520,
+      "given": "a change to tm.py that adds a data store",
+      "when": "pytm generates findings for it",
+      "then": "the build fails naming each new finding until threats.yaml lists it with a category, a severity and a status",
+      "hubWhen": {
+        "WHERE": [
+          "pytm"
+        ]
+      }
+    },
+    {
+      "id": "sc-external-callers",
+      "type": "scenario",
+      "label": "New caller missing",
+      "x": 520,
+      "y": 650,
+      "given": "an architecture model with a new external system that calls the system",
+      "when": "the check runs over the architecture model and threat-model/",
+      "then": "it fails naming that system until the threat model names it"
+    },
+    {
+      "id": "sc-statuses",
+      "type": "scenario",
+      "label": "Unended threat refused",
+      "x": 520,
+      "y": 780,
+      "given": "a threat marked mitigated with no reference, and one marked transferred with no party",
+      "when": "the check runs",
+      "then": "it fails naming both threats"
+    },
+    {
+      "id": "sc-acceptance",
+      "type": "scenario",
+      "label": "Acceptance without owner refused",
+      "x": 520,
+      "y": 910,
+      "given": "a threat accepted by a team handle, and one accepted for {{ACCEPT_DAYS}} days and one more",
+      "when": "the check runs",
+      "then": "it fails naming both acceptances"
+    },
+    {
+      "id": "sc-expired",
+      "type": "scenario",
+      "label": "Expired acceptance stops the build",
+      "x": 520,
+      "y": 1040,
+      "given": "a threat accepted until yesterday",
+      "when": "the nightly build of the main branch runs",
+      "then": "it fails naming the threat and its owner"
+    },
+    {
+      "id": "sc-high-blocks",
+      "type": "scenario",
+      "label": "High threat stops release",
+      "x": 520,
+      "y": 1170,
+      "given": "a high threat accepted until next month",
+      "when": "the release job runs",
+      "then": "it fails naming the threat, and passes once the threat is mitigated",
+      "hubWhen": {
+        "UNMITIGATED": [
+          "release-block"
+        ]
+      }
+    },
+    {
+      "id": "sc-stride",
+      "type": "scenario",
+      "label": "Uncategorised threat refused",
+      "x": 520,
+      "y": 1300,
+      "given": "a threat with no category, and one with the category \"injection\"",
+      "when": "the check runs",
+      "then": "it fails naming both threats",
+      "hubWhen": {
+        "METHOD": [
+          "stride",
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "sc-linddun",
+      "type": "scenario",
+      "label": "Privacy category skipped",
+      "x": 520,
+      "y": 1430,
+      "given": "a system whose threat model has no threat and no not-applicable entry under detecting",
+      "when": "the check runs",
+      "then": "it fails naming the system and the category",
+      "hubWhen": {
+        "METHOD": [
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "sc-pasta",
+      "type": "scenario",
+      "label": "Unscored threat refused",
+      "x": 520,
+      "y": 1560,
+      "given": "a threat with no score, and one scored 16 but rated medium",
+      "when": "the check runs",
+      "then": "it fails naming both threats",
+      "hubWhen": {
+        "METHOD": [
+          "pasta"
+        ]
+      }
+    },
+    {
+      "id": "adr-on-change",
+      "type": "adr",
+      "label": "Threat model redone on every change to a trust boundary",
+      "x": 780,
+      "y": 0,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system that people or external systems reach has one threat model, made before its first release and redone in the pull request that adds or moves a trust boundary: a new external caller, a new data store, a new third party, a changed path between zones. The files that define a trust boundary are {{BOUNDARY_PATHS}}; a pull request check fails while the last change to one of them is newer than the last change to threat-model/, and a pull request that changes threat-model/ carries the security-review label, whose reviewers the Secure development process pack names. Method: {{METHOD}}. Form: {{WHERE}}. Each threat ends mitigated, transferred, or accepted by a named owner until a date at most {{ACCEPT_DAYS}} days away; what stops a threat that is not mitigated: {{UNMITIGATED}}. Findings from scanners and tests follow the Secure coding pack, not this register.",
+      "consequences": "• The threat model stays as current as the boundaries in the code; a new partner or data store is examined before it merges.\n• The pull requests that touch a boundary take longer: an hour for a new route, a session for a new third party.\n• The list of paths must stay true: a boundary defined elsewhere (a cloud console, another repository) escapes the check, so the review still asks.\n• Git dates prove the model was changed, not that it was thought through; the security review carries that.",
+      "alternatives": "1. Once per release: fewer sessions, but a boundary added early in a release runs unexamined until the release.\n2. Once a year: cheapest, and a snapshot of a system that keeps changing (Threat Modeling Manifesto: continuous refinement over a single delivery).\n3. A threat model per feature: finer grained, but threats that cross features (a shared store, a partner calling two features) are nowhere in full.",
+      "hubWhen": {
+        "WHEN": [
+          "change"
+        ]
+      }
+    },
+    {
+      "id": "adr-per-release",
+      "type": "adr",
+      "label": "Threat model reviewed once per release",
+      "x": 780,
+      "y": 130,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system that people or external systems reach has one threat model, made before its first release and reviewed before each later release is tagged: the team walks through the changes since the previous tag, updates the model and commits the review to threat-model/ (at least the reviewer and date in the model). The release job fails when threat-model/ has no commit since the previous tag. Method: {{METHOD}}. Form: {{WHERE}}. Each threat ends mitigated, transferred, or accepted by a named owner until a date at most {{ACCEPT_DAYS}} days away; what stops a threat that is not mitigated: {{UNMITIGATED}}. Findings from scanners and tests follow the Secure coding pack, not this register.",
+      "consequences": "• One planned session per release, which the release job enforces.\n• A boundary added early in a release runs unexamined until the release is tagged.\n• A release with no boundary change still needs a commit, a small ritual that keeps the check honest.\n• With continuous deployment there is no release to hang the review on; the change-driven answer fits better there.",
+      "alternatives": "1. On every change to a trust boundary: current all the time, but every boundary change waits for the model.\n2. Once a year: cheaper, and up to a year behind the code.",
+      "hubWhen": {
+        "WHEN": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "adr-yearly",
+      "type": "adr",
+      "label": "Threat model reviewed once a year",
+      "x": 780,
+      "y": 260,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system that people or external systems reach has one threat model, made before its first release and reviewed at least once every 12 months in a session on the team's calendar; the review is committed to the system's model, and a monthly job fails when a system's model has no commit for 365 days. Boundaries added between reviews wait for the next one: this decision accepts that. Method: {{METHOD}}. Form: {{WHERE}}. Each threat ends mitigated, transferred, or accepted by a named owner until a date at most {{ACCEPT_DAYS}} days away; what stops a threat that is not mitigated: {{UNMITIGATED}}. Findings from scanners and tests follow the Secure coding pack, not this register.",
+      "consequences": "• The cheapest rhythm: one session per system per year.\n• A new third party or data store can run for up to a year before anyone asks what can go wrong there.\n• It fits stable systems and standards that ask for a yearly review; it is the snapshot the Manifesto warns about.\n• The first change to a boundary that worries someone should bring the review forward, by hand.",
+      "alternatives": "1. Once per release: tied to what actually changes.\n2. On every change to a trust boundary: current all the time, at a cost in the changes that touch boundaries.",
+      "hubWhen": {
+        "WHEN": [
+          "yearly"
+        ]
+      }
+    },
+    {
+      "id": "adr-stride",
+      "type": "adr",
+      "label": "Threats found with STRIDE per element",
+      "x": 780,
+      "y": 390,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Threats are found with STRIDE per element and data flow: first the data-flow diagram with its trust boundaries (what are we working on), then each element and flow examined under the STRIDE categories that apply to its type, and every security threat recorded under one of the six categories: spoofing, tampering, repudiation, information disclosure, denial of service, elevation of privilege. Privacy harms that are not attacks (linking records to a person, a person unaware of the processing) are out of this method; a system that starts handling personal data supersedes this decision with STRIDE and LINDDUN.",
+      "consequences": "• Quick to learn: the Elevation of Privilege card game and every tool teach it.\n• Every threat has a category, so a category nobody looked at shows up in review.\n• STRIDE finds threats, it does not rank them: the severity is the team's judgement.\n• Privacy harms to the people in the data are not looked for.",
+      "alternatives": "1. STRIDE with LINDDUN: the same, plus privacy threats; more time per data flow with personal data.\n2. PASTA: ranks threats by risk to the business, at the cost of a longer process.\n3. Attack trees alone: deep on one goal, but no list that walks the whole diagram.",
+      "hubWhen": {
+        "METHOD": [
+          "stride"
+        ]
+      }
+    },
+    {
+      "id": "adr-stride-linddun",
+      "type": "adr",
+      "label": "Threats found with STRIDE, privacy threats with LINDDUN",
+      "x": 780,
+      "y": 520,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Security threats are found with STRIDE per element and data flow and recorded under its six categories; privacy threats are found with LINDDUN on the same diagram, on every data flow and store that carries personal data, and recorded under its seven categories, written as: linking, identifying, non-repudiation, detecting, data disclosure, unawareness & unintervenability, non-compliance (Threat Dragon's older names linkability, identifiability, detectability, disclosure of information and unawareness are read as these). Each system's threat model considers every LINDDUN category at least once, as a threat or as a not-applicable entry with its reason. Which data is personal is recorded as the Data classification pack decides.",
+      "consequences": "• Harms to the people in the data are looked for, not only attacks on the system.\n• Each flow with personal data takes longer: thirteen categories instead of six.\n• Non-repudiation means opposite things in the two methods (a STRIDE control, a LINDDUN threat to the person): the category names keep them apart.\n• Not-applicable entries with reasons show that a category was considered, which a privacy review can read.",
+      "alternatives": "1. STRIDE alone: quicker, and blind to privacy harms that are not attacks.\n2. A separate data protection impact assessment only: required by law in some cases, but done once and away from the design.\n3. PASTA: risk-ranked, with no privacy categories of its own.",
+      "hubWhen": {
+        "METHOD": [
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "adr-pasta",
+      "type": "adr",
+      "label": "Threats found and ranked with PASTA",
+      "x": 780,
+      "y": 650,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Threats are found with PASTA, the seven-stage Process for Attack Simulation and Threat Analysis: (1) business objectives, (2) technical scope, (3) decomposition into the data-flow diagram, (4) threat analysis, (5) weaknesses, (6) attack scenarios, (7) risk and impact. Stages 1 and 6 are written in threat-model/objectives/<system>.md under the headings Business objectives and Attack scenarios; every threat carries a risk score of likelihood times impact, each from 1 to 5, and its severity follows the score: low 1 to 5, medium 6 to 11, high 12 to 19, critical 20 to 25. A threat may also name its STRIDE category, which nothing checks.",
+      "consequences": "• Threats are ranked by what they would cost the business, so the order of work is argued from the objectives.\n• The process is longer: the objectives and the attack scenarios need people from the business, not only engineers.\n• Likelihood and impact are estimates; the scale keeps them comparable, not exact.\n• Without fixed categories, completeness rests on the attack scenarios and the review.",
+      "alternatives": "1. STRIDE per element: quicker and complete over the diagram, but unranked.\n2. STRIDE with a separate risk rating (DREAD or CVSS): ranking without the business objectives.",
+      "hubWhen": {
+        "METHOD": [
+          "pasta"
+        ]
+      }
+    },
+    {
+      "id": "adr-dragon",
+      "type": "adr",
+      "label": "Threat models kept as OWASP Threat Dragon files",
+      "x": 780,
+      "y": 780,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system's threat model is an OWASP Threat Dragon 2 model, threat-model/<system>.json, drawn with the Threat Dragon desktop app or the web app and committed through pull requests. Threats sit on the diagram's elements and flows with their category (type), severity, status (Open, Mitigated, N/A) and mitigation, which for a mitigated threat names the test, ADR or ticket and for an open one the ticket. Acceptances and transfers, which Threat Dragon 2.6 cannot hold with an owner and an expiry, are kept in threat-model/risk-decisions.yaml by the threat's id. scripts/threats-dragon.mjs reads both into reports/threats.json for the checks.",
+      "consequences": "• People draw the model; no code to learn.\n• The JSON carries positions and styles, so diffs are long; review the diagram, not the diff.\n• Two files to keep in step for accepted and transferred threats; the reader joins them by id.\n• The development branch of Threat Dragon adds Accepted and Transferred statuses; the reader maps them already, and the register still holds the owner and the expiry.",
+      "alternatives": "1. OWASP pytm: the model as code with suggested threats, but code to write and findings to triage.\n2. A YAML register beside a Mermaid diagram: no tool at all, and no threats suggested.\n3. Threagile (YAML): its last release, 0.9.1, dates from July 2024.\n4. A commercial platform (ThreatModeler, which acquired IriusRisk in January 2026): libraries and workflows, but the model lives outside the repository and the checks would need an export.",
+      "hubWhen": {
+        "WHERE": [
+          "dragon"
+        ]
+      }
+    },
+    {
+      "id": "adr-pytm",
+      "type": "adr",
+      "label": "Threat models kept as OWASP pytm code",
+      "x": 780,
+      "y": 910,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system's threat model is code: threat-model/<system>/tm.py describes its elements, trust boundaries (Boundary) and data flows (Dataflow) with OWASP pytm (1.4), and pytm generates candidate threats from its threat library; python3 tm.py --dfd | dot -Tpng draws the diagram. Every finding is triaged in threat-model/<system>/threats.yaml by its threat id (finding) and element (pytm's target), with a category of the chosen method, severity, status and the fields the status needs; the triage lives in the register rather than in pytm's overrides, which replace the threat's text. scripts/threats_register.py runs each tm.py with --json, fails on an untriaged finding and writes reports/threats.json.",
+      "consequences": "• Threats are suggested from the model, so a new data store brings its threats with it.\n• Diffs are readable and the diagram is drawn from the code.\n• pytm's library is not classified by STRIDE or LINDDUN: the category is set in triage, and a library update can bring new findings to triage.\n• Needs Python and Graphviz in the pipeline, and someone who reads Python in every modelling session.",
+      "alternatives": "1. OWASP Threat Dragon: drawn, not coded, and nothing suggested.\n2. A YAML register beside a Mermaid diagram: no tool at all.\n3. Threagile: suggests threats from YAML, but its last release, 0.9.1, dates from July 2024.",
+      "hubWhen": {
+        "WHERE": [
+          "pytm"
+        ]
+      }
+    },
+    {
+      "id": "adr-register",
+      "type": "adr",
+      "label": "Threat models kept as a YAML register",
+      "x": 780,
+      "y": 1040,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "Each system's threat model is a folder threat-model/<system>/: README.md holds the data-flow diagram as a Mermaid flowchart with the trust boundaries as subgraphs, and threats.yaml lists the threats, each with id, element, category, threat, severity, status, mitigation (the test, ADR or ticket, the ticket of an open threat, or the reason it does not apply), and for an accepted threat owner, reason, accepted and expires, for a transferred one to and reference. scripts/threats_register.py reads every register into reports/threats.json and fails when a system has no diagram.",
+      "consequences": "• Nothing to install; GitHub renders the diagram and the register reads like a table.\n• Nothing suggests threats: completeness rests on the method and the session.\n• The diagram and the register can drift apart; the review of each change looks at both.",
+      "alternatives": "1. OWASP Threat Dragon: a drawing tool with threats on the diagram.\n2. OWASP pytm: threats suggested from the model in code.\n3. A document in a wiki: easy to write, outside the review of the code and unreadable by the checks.",
+      "hubWhen": {
+        "WHERE": [
+          "register"
+        ]
+      }
+    },
+    {
+      "id": "adr-release-block",
+      "type": "adr",
+      "label": "No release with a high threat open or accepted",
+      "x": 780,
+      "y": 1170,
+      "concern": "threat-modelling",
+      "status": "accepted",
+      "date": "",
+      "context": "People and other systems reach this element across a trust boundary, and every boundary is a place where data can be read, changed, faked or denied. The forces: a design flaw found in a threat model costs a conversation, the same flaw found in production costs an incident; a threat model made once and filed away describes a system that no longer exists, while one redone on every change costs time in the changes that matter most; a method gives the team a shared list of what can go wrong, but each method sees some threats and misses others (STRIDE sees attackers, not privacy harms; LINDDUN sees privacy, not tampering; PASTA weighs risk to the business but takes longer); a threat model kept where the code is gets reviewed with it, one kept in a tool nobody opens does not; and a threat nobody mitigated must still end somewhere: accepted by a named person until a date, or carried by a party under contract, never left open by default. The mitigations themselves are decided in the Authentication, Authorization, Encryption, Rate limiting and Software supply chain packs; who facilitates the sessions in the Secure development process pack.",
+      "decision": "A threat of high or critical severity cannot ride into production on an acceptance: the release job reads reports/threats.json and fails while any high or critical threat is open or accepted, until it is mitigated or transferred. Low and medium threats may still be accepted by a named owner until their expiry, at most {{ACCEPT_DAYS}} days.",
+      "consequences": "• No high threat reaches production on a signature alone.\n• A release can wait on a mitigation; the severity becomes something people argue about, so the method's rating rules matter.\n• An urgent fix that is blocked by an unrelated high threat needs that threat transferred or mitigated first, or this decision superseded for the occasion, in writing.",
+      "alternatives": "1. Acceptance with expiry for every threat: faster releases, and a high threat can go live on one person's word.\n2. Blocking every open threat of any severity: thorough, and soon worked around by rating everything low.",
+      "hubWhen": {
+        "UNMITIGATED": [
+          "release-block"
+        ]
+      }
+    },
+    {
+      "id": "ff-fresh-change",
+      "type": "fitness-fn",
+      "label": "Threat model newer than the last boundary change",
+      "x": 1040,
+      "y": 0,
+      "category": "process",
+      "threshold": "The last commit to threat-model/ is no older than the last commit to {{BOUNDARY_PATHS}}; a pull request that changes threat-model/ carries the security-review label",
+      "description": "A pull-request check compares git dates: the last commit that touched a file defining a trust boundary against the last commit that touched threat-model/. A boundary change without a model change fails; so does a change to the model without the security-review label, which the Secure development process pack's check then turns into a required security approval. Run it on opened, synchronize, labeled and unlabeled, with the full history checked out.\n\nTool: git and jq in a GitHub Actions step (bash)\n\n```bash\n# pull-request check (on: pull_request, types opened, synchronize, labeled, unlabeled; actions/checkout with fetch-depth: 0)\nset -euo pipefail\nboundary=$(git log -1 --format=%ct HEAD -- {{BOUNDARY_PATHS}})\nmodel=$(git log -1 --format=%ct HEAD -- threat-model/)\nif [ -n \"$boundary\" ] && [ \"${model:-0}\" -lt \"$boundary\" ]; then\n  echo \"A trust boundary changed after the threat model did:\"\n  git log -1 --format='  %h %cs %s' HEAD -- {{BOUNDARY_PATHS}}\n  echo \"Change threat-model/ in this pull request.\"\n  exit 1\nfi\nif [ -n \"$(git diff --name-only \"origin/$GITHUB_BASE_REF...HEAD\" -- threat-model/)\" ] &&\n   ! jq -e '.pull_request.labels | any(.name == \"security-review\")' \"$GITHUB_EVENT_PATH\" > /dev/null; then\n  echo \"threat-model/ changed: add the security-review label, so the change gets its security review before the merge\"\n  exit 1\nfi\necho \"the threat model is newer than every change to a trust boundary\"\n```",
+      "hubWhen": {
+        "WHEN": [
+          "change"
+        ]
+      }
+    },
+    {
+      "id": "ff-fresh-release",
+      "type": "fitness-fn",
+      "label": "Threat model reviewed since the previous release",
+      "x": 1040,
+      "y": 130,
+      "category": "process",
+      "threshold": "threat-model/ has at least 1 commit after the previous release tag",
+      "description": "The release job, running on the new tag before anything is published, finds the previous tag and fails when threat-model/ has no commit after it. The first release passes: the model made before it is checked by the other functions.\n\nTool: git in a GitHub Actions release job (bash)\n\n```bash\n# release job, run on the new tag (actions/checkout with fetch-depth: 0): the threat model was reviewed since the previous release\nset -euo pipefail\nprevious=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null) || { echo \"first release: nothing to compare\"; exit 0; }\nsince=$(git log -1 --format=%ct \"$previous\")\nmodel=$(git log -1 --format=%ct HEAD -- threat-model/)\nif [ \"${model:-0}\" -le \"$since\" ]; then\n  echo \"threat-model/ has no commit since $previous: review the threat model and commit the review before this release\"\n  exit 1\nfi\necho \"threat model reviewed on $(git log -1 --format=%cs HEAD -- threat-model/), after $previous\"\n```",
+      "hubWhen": {
+        "WHEN": [
+          "release"
+        ]
+      }
+    },
+    {
+      "id": "ff-fresh-yearly",
+      "type": "fitness-fn",
+      "label": "Every threat model reviewed within a year",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "0 systems under threat-model/ whose last commit is more than 365 days old",
+      "description": "A scheduled job runs monthly over each system's model (a folder threat-model/<system>/ or a file threat-model/<system>.json) and fails naming every one whose last commit is more than 365 days old, with the date of that commit.\n\nTool: git in a scheduled GitHub Actions job (bash)\n\n```bash\n# scheduled job, monthly (actions/checkout with fetch-depth: 0): every system's threat model reviewed within a year\nset -euo pipefail\nlimit=$(( $(date +%s) - 365 * 86400 ))\nstatus=0\nfor model in threat-model/*/ threat-model/*.json; do\n  [ -e \"$model\" ] || continue\n  last=$(git log -1 --format=%ct HEAD -- \"$model\")\n  if [ \"${last:-0}\" -lt \"$limit\" ]; then\n    echo \"$model: last reviewed $(git log -1 --format=%cs HEAD -- \"$model\" | grep . || echo never), over a year ago\"\n    status=1\n  fi\ndone\nexit $status\n```",
+      "hubWhen": {
+        "WHEN": [
+          "yearly"
+        ]
+      }
+    },
+    {
+      "id": "ff-dragon",
+      "type": "fitness-fn",
+      "label": "Threat Dragon models read into one list",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "Every threat-model/*.json is a Threat Dragon 2 model and every threat on it is written to reports/threats.json, joined with its entry in threat-model/risk-decisions.yaml",
+      "description": "A Node script reads each Threat Dragon model (version 2.x), takes every threat from the cells of every diagram with its element (a flow as source -> target: name), category, severity, status and mitigation, joins the acceptances and transfers from risk-decisions.yaml by threat id, and writes reports/threats.json for the other checks. It runs on every pull request; a file that is not a Threat Dragon 2 model fails it.\n\nTool: Node 20 with js-yaml, reading the Threat Dragon 2 JSON format\n\n```js\n// scripts/threats-dragon.mjs: the Threat Dragon models and threat-model/risk-decisions.yaml into reports/threats.json\nimport { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst decisionsFile = 'threat-model/risk-decisions.yaml'   // [{ threat, decision: accepted | transferred, owner, reason, accepted, expires, to, reference }]\nconst decisions = existsSync(decisionsFile) ? yaml.load(readFileSync(decisionsFile, 'utf8')) ?? [] : []\nconst STATUS = { Mitigated: 'mitigated', Avoided: 'mitigated', Eliminated: 'mitigated', NotApplicable: 'not-applicable', Accepted: 'accepted', Transferred: 'transferred' }\nconst threats = []\nfor (const file of readdirSync('threat-model').filter((f) => f.endsWith('.json'))) {\n  const model = JSON.parse(readFileSync(`threat-model/${file}`, 'utf8'))\n  if (!/^2\\./.test(model.version ?? '')) throw new Error(`${file}: not a Threat Dragon 2 model (version ${model.version})`)\n  for (const diagram of model.detail.diagrams) {\n    const name = Object.fromEntries(diagram.cells.map((c) => [c.id, String(c.data?.name ?? '').replace(/\\s+/g, ' ')]))\n    for (const cell of diagram.cells) for (const t of cell.data?.threats ?? []) {\n      const element = cell.shape === 'flow' ? `${name[cell.source?.cell] ?? 'outside'} -> ${name[cell.target?.cell] ?? 'outside'}: ${name[cell.id]}` : name[cell.id]\n      const decision = decisions.find((d) => d.threat === t.id) ?? {}\n      threats.push({ system: file.replace(/\\.json$/, ''), id: t.id, element, category: t.type, severity: String(t.severity ?? '').toLowerCase(),\n        mitigation: t.mitigation ?? '', score: t.score, ...decision, status: decision.decision ?? STATUS[t.status] ?? 'open' })\n    }\n  }\n}\nmkdirSync('reports', { recursive: true })\nwriteFileSync('reports/threats.json', JSON.stringify(threats, null, 2))\nconsole.log(`${threats.length} threats from ${new Set(threats.map((t) => t.system)).size} Threat Dragon models`)\n```",
+      "hubWhen": {
+        "WHERE": [
+          "dragon"
+        ]
+      }
+    },
+    {
+      "id": "ff-register",
+      "type": "fitness-fn",
+      "label": "Threat registers read into one list, pytm findings triaged",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "Every threat-model/<system>/threats.yaml is written to reports/threats.json; 0 pytm findings missing from their register; 0 hand-written registers without a Mermaid flowchart in README.md",
+      "description": "A Python script reads every register into reports/threats.json. Where a system has a tm.py, it runs pytm with --json and fails on every finding (threat id and element) the register does not list; where it has none, it fails when README.md holds no Mermaid flowchart. It runs on every pull request.\n\nTool: Python 3 with PyYAML, and OWASP pytm 1.4 (python3 tm.py --json) where a system has a tm.py\n\n```python\n# scripts/threats_register.py: each threat-model/<system>/threats.yaml into reports/threats.json; with pytm, every finding of tm.py triaged there\nimport json, pathlib, subprocess, sys\nimport yaml\n\nthreats, problems = [], []\npathlib.Path(\"reports\").mkdir(exist_ok=True)\nfor register in sorted(pathlib.Path(\"threat-model\").glob(\"*/threats.yaml\")):\n    system = register.parent\n    entries = yaml.safe_load(register.read_text()) or []\n    threats += [{**t, \"system\": system.name, \"severity\": str(t.get(\"severity\", \"\")).lower()} for t in entries]\n    if (system / \"tm.py\").exists():   # pytm: the findings it generates, each triaged by finding id and element\n        found = pathlib.Path(f\"reports/pytm-{system.name}.json\").resolve()\n        subprocess.run([sys.executable, \"tm.py\", \"--json\", str(found)], cwd=system, check=True)\n        triaged = {(t.get(\"finding\"), t.get(\"element\")) for t in entries}\n        problems += [f\"{system.name}: pytm finding {f['threat_id']} on {f['target']} is not triaged in threats.yaml\"\n                     for f in json.loads(found.read_text())[\"findings\"] if (f[\"threat_id\"], f[\"target\"]) not in triaged]\n    elif \"flowchart\" not in ((system / \"README.md\").read_text() if (system / \"README.md\").exists() else \"\"):\n        problems.append(f\"{system.name}: no README.md with the data-flow diagram as a Mermaid flowchart\")\npathlib.Path(\"reports/threats.json\").write_text(json.dumps(threats, indent=2, default=str))\nprint(f\"{len(threats)} threats from {len(set(t['system'] for t in threats))} registers\")\nif problems:\n    sys.exit(\"\\n\".join(problems))\n```",
+      "hubWhen": {
+        "WHERE": [
+          "pytm",
+          "register"
+        ]
+      }
+    },
+    {
+      "id": "ff-threat-status",
+      "type": "fitness-fn",
+      "label": "Every threat ends somewhere",
+      "x": 1040,
+      "y": 650,
+      "category": "process",
+      "threshold": "100% of threats in reports/threats.json have a rated severity and a status with what it needs: a reference for mitigated and open, a reason for not applicable, a party and a contract for transferred, a named owner, a reason and an unexpired acceptance of at most {{ACCEPT_DAYS}} days for accepted",
+      "description": "A Node script over reports/threats.json, run on every pull request and nightly on the main branch, so an acceptance that expires fails the build on the day after. A reference is a ticket key (SHOP-123), an issue number (#123), an ADR id (adr-…) or a test file (….test.ts).\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-threats.mjs: every threat in reports/threats.json ends mitigated, transferred, accepted until a date, not applicable, or open with a ticket\nimport { readFileSync } from 'node:fs'\n\nconst MAX_DAYS = {{ACCEPT_DAYS}}\nconst REF = /\\b[A-Z][A-Z0-9]+-\\d+\\b|#\\d+\\b|\\badr-[\\w-]+|[\\w./-]+\\.(test|spec)\\.\\w+/   // a ticket, an ADR or a test file\nconst DAY = 86_400_000\nconst problems = []\nfor (const t of JSON.parse(readFileSync('reports/threats.json', 'utf8'))) {\n  const at = `${t.system} ${t.id} (${t.element})`\n  if (!['low', 'medium', 'high', 'critical'].includes(t.severity)) problems.push(`${at}: severity \"${t.severity}\" is not rated`)\n  if (t.status === 'mitigated' && !REF.test(t.mitigation ?? '')) problems.push(`${at}: mitigated, but names no test, ADR or ticket`)\n  else if (t.status === 'open' && !REF.test(t.mitigation ?? '')) problems.push(`${at}: open without the ticket that will close it`)\n  else if (t.status === 'not-applicable' && !String(t.mitigation ?? '').trim()) problems.push(`${at}: not applicable without a reason`)\n  else if (t.status === 'transferred' && !(t.to && t.reference)) problems.push(`${at}: transferred without the party and the contract or policy`)\n  else if (t.status === 'accepted') {\n    const accepted = Date.parse(t.accepted), expires = Date.parse(t.expires)\n    if (!t.owner || String(t.owner).startsWith('@') || !t.reason) problems.push(`${at}: accepted without a named owner and a reason`)\n    else if (!(expires > Date.now())) problems.push(`${at}: the acceptance by ${t.owner} expired on ${t.expires}`)\n    else if (!(expires - accepted <= MAX_DAYS * DAY)) problems.push(`${at}: the acceptance runs past ${MAX_DAYS} days`)\n  } else if (!['mitigated', 'open', 'not-applicable', 'transferred'].includes(t.status)) problems.push(`${at}: status \"${t.status}\" is not one of the five`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log('every threat has a status that ends it')\n```"
+    },
+    {
+      "id": "ff-release-gate",
+      "type": "fitness-fn",
+      "label": "Release waits for high threats",
+      "x": 1040,
+      "y": 780,
+      "category": "process",
+      "threshold": "0 threats of high or critical severity with the status open or accepted when a release is built",
+      "description": "A step in the release job, after the reader of the threat model has written reports/threats.json, selects the high and critical threats that are open or accepted and fails the release naming them.\n\nTool: jq in a GitHub Actions release job (bash)\n\n```bash\n# release job, after the reader of the threat model wrote reports/threats.json\nset -euo pipefail\nblocking=$(jq -r '.[]\n  | select((.severity == \"high\" or .severity == \"critical\") and (.status == \"open\" or .status == \"accepted\"))\n  | \"\\(.system) \\(.id) \\(.severity) \\(.status): \\(.element)\"' reports/threats.json)\nif [ -n \"$blocking\" ]; then\n  echo \"High or critical threats neither mitigated nor transferred; the release stops:\"\n  echo \"$blocking\"\n  exit 1\nfi\necho \"no open or accepted high or critical threat\"\n```",
+      "hubWhen": {
+        "UNMITIGATED": [
+          "release-block"
+        ]
+      }
+    },
+    {
+      "id": "ff-external-callers",
+      "type": "fitness-fn",
+      "label": "Threat model names every outside caller",
+      "x": 1040,
+      "y": 910,
+      "category": "structural",
+      "threshold": "0 persons or external systems that the architecture model shows calling an element of the system and that no file under threat-model/ names",
+      "description": "A Node script reads the architecture model folder: the front matter of every node under architecture/nodes and the interacts relations in relations.json. It collects the label of every person or external element that calls an element that is not external, and fails for each label that appears nowhere under threat-model/ (case and spacing ignored). It runs on every pull request, so a caller added to the architecture model waits for the threat model.\n\nTool: Node 20 with js-yaml, over the architecture model's Markdown folder\n\n```js\n// scripts/check-callers.mjs: the threat model names every person and external system the architecture model shows calling the system\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { join } from 'node:path'\nimport yaml from 'js-yaml'\n\nconst walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))\nconst nodes = {}\nfor (const file of walk('architecture/nodes').filter((f) => f.endsWith('.md'))) {\n  const front = yaml.load(readFileSync(file, 'utf8').split(/^---\\s*$/m)[1] ?? '') ?? {}\n  if (front.id) nodes[front.id] = front\n}\nconst outside = (n) => n.type === 'person' || n.external === true\nconst callers = new Set(JSON.parse(readFileSync('architecture/relations.json', 'utf8'))\n  .filter((r) => r.relationType === 'interacts' && nodes[r.sourceId] && nodes[r.targetId] && outside(nodes[r.sourceId]) && !outside(nodes[r.targetId]))\n  .map((r) => nodes[r.sourceId].label))\nconst model = walk('threat-model').map((f) => readFileSync(f, 'utf8')).join('\\n').toLowerCase().replace(/\\s+/g, ' ')\nconst missing = [...callers].filter((label) => !model.includes(label.toLowerCase().replace(/\\s+/g, ' ')))\nconsole.log(`${callers.size} outside callers in the architecture model, ${missing.length} not named in threat-model/`)\nif (missing.length) { console.error(missing.map((m) => `  ${m}`).join('\\n')); process.exit(1) }\n```"
+    },
+    {
+      "id": "ff-categories",
+      "type": "fitness-fn",
+      "label": "Threats under the method's categories",
+      "x": 1040,
+      "y": 1040,
+      "category": "structural",
+      "threshold": "100% of threats carry a STRIDE category (or, with LINDDUN, a STRIDE or LINDDUN category); with LINDDUN, all 7 LINDDUN categories appear in each system's threat model",
+      "description": "A Node script over reports/threats.json checks each threat's category against the method's list, reading Threat Dragon's older LINDDUN names as the current ones, and with LINDDUN fails for each system where a category appears nowhere, as a threat or as a not-applicable entry.\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-categories.mjs: every threat in reports/threats.json under a category of the method: {{METHOD}}\nimport { readFileSync } from 'node:fs'\n\nconst STRIDE = ['spoofing', 'tampering', 'repudiation', 'information disclosure', 'denial of service', 'elevation of privilege']\nconst LINDDUN = ['linking', 'identifying', 'non-repudiation', 'detecting', 'data disclosure', 'unawareness & unintervenability', 'non-compliance']\nconst OLDER = { linkability: 'linking', identifiability: 'identifying', detectability: 'detecting', 'disclosure of information': 'data disclosure', unawareness: 'unawareness & unintervenability' }   // Threat Dragon's names\nconst withLinddun = '{{METHOD}}'.includes('LINDDUN')\nconst allowed = withLinddun ? [...STRIDE, ...LINDDUN] : STRIDE\nconst category = (t) => { const c = String(t.category ?? '').trim().toLowerCase(); return OLDER[c] ?? c }\nconst threats = JSON.parse(readFileSync('reports/threats.json', 'utf8'))\nconst problems = threats.filter((t) => !allowed.includes(category(t)))\n  .map((t) => `${t.system} ${t.id}: category \"${t.category ?? ''}\" is none of ${withLinddun ? 'STRIDE and LINDDUN' : 'STRIDE'}`)\nif (withLinddun) for (const system of new Set(threats.map((t) => t.system))) {\n  const seen = new Set(threats.filter((t) => t.system === system).map(category))\n  for (const c of LINDDUN.filter((c) => !seen.has(c))) problems.push(`${system}: LINDDUN \"${c}\" considered nowhere (a threat, or a not-applicable entry with its reason)`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log(`${threats.length} threats, each under a category of the method`)\n```",
+      "hubWhen": {
+        "METHOD": [
+          "stride",
+          "stride-linddun"
+        ]
+      }
+    },
+    {
+      "id": "ff-pasta",
+      "type": "fitness-fn",
+      "label": "Threats scored, objectives written",
+      "x": 1040,
+      "y": 1170,
+      "category": "structural",
+      "threshold": "100% of threats carry a whole risk score from 1 to 25 and the severity that score gives; every system has threat-model/objectives/<system>.md with the sections Business objectives and Attack scenarios",
+      "description": "A Node script over reports/threats.json checks each threat's score (the score field of a Threat Dragon threat or of a register entry) and the severity it gives, and that each system has its objectives file with the two sections of PASTA stages 1 and 6.\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-pasta.mjs: every threat scored and rated by its score; every system with its objectives and attack scenarios\nimport { existsSync, readFileSync } from 'node:fs'\n\nconst rating = (score) => (score >= 20 ? 'critical' : score >= 12 ? 'high' : score >= 6 ? 'medium' : 'low')\nconst threats = JSON.parse(readFileSync('reports/threats.json', 'utf8'))\nconst problems = []\nfor (const t of threats) {\n  const score = Number(t.score)   // likelihood (1-5) x impact (1-5)\n  if (!Number.isInteger(score) || score < 1 || score > 25) problems.push(`${t.system} ${t.id}: risk score \"${t.score ?? ''}\" is not likelihood x impact (1 to 25)`)\n  else if (t.severity !== rating(score)) problems.push(`${t.system} ${t.id}: severity ${t.severity}, but a score of ${score} is ${rating(score)}`)\n}\nfor (const system of new Set(threats.map((t) => t.system))) {\n  const file = `threat-model/objectives/${system}.md`\n  const text = existsSync(file) ? readFileSync(file, 'utf8') : ''\n  for (const heading of ['## Business objectives', '## Attack scenarios'])\n    if (!text.includes(heading)) problems.push(`${file}: no \"${heading}\" section (PASTA stages 1 and 6)`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log(`${threats.length} threats scored, objectives and attack scenarios for every system`)\n```",
+      "hubWhen": {
+        "METHOD": [
+          "pasta"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-redo-change--derives--need",
+      "sourceId": "req-redo-change",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-redo-release--derives--need",
+      "sourceId": "req-redo-release",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-redo-yearly--derives--need",
+      "sourceId": "req-redo-yearly",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-in-repo--derives--need",
+      "sourceId": "req-in-repo",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pytm-triaged--derives--need",
+      "sourceId": "req-pytm-triaged",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-external-callers--derives--need",
+      "sourceId": "req-external-callers",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-statuses--derives--need",
+      "sourceId": "req-statuses",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-acceptance--derives--need",
+      "sourceId": "req-acceptance",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-expired--derives--need",
+      "sourceId": "req-expired",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-high-blocks--derives--need",
+      "sourceId": "req-high-blocks",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-stride--derives--need",
+      "sourceId": "req-stride",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-linddun--derives--need",
+      "sourceId": "req-linddun",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-pasta--derives--need",
+      "sourceId": "req-pasta",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-redo-change--verifies--req-redo-change",
+      "sourceId": "sc-redo-change",
+      "targetId": "req-redo-change",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-redo-release--verifies--req-redo-release",
+      "sourceId": "sc-redo-release",
+      "targetId": "req-redo-release",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-redo-yearly--verifies--req-redo-yearly",
+      "sourceId": "sc-redo-yearly",
+      "targetId": "req-redo-yearly",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-in-repo--verifies--req-in-repo",
+      "sourceId": "sc-in-repo",
+      "targetId": "req-in-repo",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pytm-triaged--verifies--req-pytm-triaged",
+      "sourceId": "sc-pytm-triaged",
+      "targetId": "req-pytm-triaged",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-external-callers--verifies--req-external-callers",
+      "sourceId": "sc-external-callers",
+      "targetId": "req-external-callers",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-statuses--verifies--req-statuses",
+      "sourceId": "sc-statuses",
+      "targetId": "req-statuses",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-acceptance--verifies--req-acceptance",
+      "sourceId": "sc-acceptance",
+      "targetId": "req-acceptance",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-expired--verifies--req-expired",
+      "sourceId": "sc-expired",
+      "targetId": "req-expired",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-high-blocks--verifies--req-high-blocks",
+      "sourceId": "sc-high-blocks",
+      "targetId": "req-high-blocks",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-stride--verifies--req-stride",
+      "sourceId": "sc-stride",
+      "targetId": "req-stride",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-linddun--verifies--req-linddun",
+      "sourceId": "sc-linddun",
+      "targetId": "req-linddun",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pasta--verifies--req-pasta",
+      "sourceId": "sc-pasta",
+      "targetId": "req-pasta",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-fresh-change--implements--adr-on-change",
+      "sourceId": "ff-fresh-change",
+      "targetId": "adr-on-change",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fresh-release--implements--adr-per-release",
+      "sourceId": "ff-fresh-release",
+      "targetId": "adr-per-release",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-fresh-yearly--implements--adr-yearly",
+      "sourceId": "ff-fresh-yearly",
+      "targetId": "adr-yearly",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-dragon--implements--adr-dragon",
+      "sourceId": "ff-dragon",
+      "targetId": "adr-dragon",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-register--implements--adr-pytm",
+      "sourceId": "ff-register",
+      "targetId": "adr-pytm",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-register--implements--adr-register",
+      "sourceId": "ff-register",
+      "targetId": "adr-register",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-threat-status--implements--adr-on-change",
+      "sourceId": "ff-threat-status",
+      "targetId": "adr-on-change",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-threat-status--implements--adr-per-release",
+      "sourceId": "ff-threat-status",
+      "targetId": "adr-per-release",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-threat-status--implements--adr-yearly",
+      "sourceId": "ff-threat-status",
+      "targetId": "adr-yearly",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-release-gate--implements--adr-release-block",
+      "sourceId": "ff-release-gate",
+      "targetId": "adr-release-block",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-external-callers--implements--adr-on-change",
+      "sourceId": "ff-external-callers",
+      "targetId": "adr-on-change",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-external-callers--implements--adr-per-release",
+      "sourceId": "ff-external-callers",
+      "targetId": "adr-per-release",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-external-callers--implements--adr-yearly",
+      "sourceId": "ff-external-callers",
+      "targetId": "adr-yearly",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-categories--implements--adr-stride",
+      "sourceId": "ff-categories",
+      "targetId": "adr-stride",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-categories--implements--adr-stride-linddun",
+      "sourceId": "ff-categories",
+      "targetId": "adr-stride-linddun",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pasta--implements--adr-pasta",
+      "sourceId": "ff-pasta",
+      "targetId": "adr-pasta",
+      "relationType": "implements"
+    }
+  ]
+}

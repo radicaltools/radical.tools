@@ -1,0 +1,1120 @@
+{
+  "hub": {
+    "id": "concern-security-detection",
+    "category": "concern",
+    "name": "Security event logging and detection",
+    "description": "Which security events the element raises, named with the OWASP Application Logging Vocabulary; where they go and how long they are kept; which detection rules run on them; who answers an alert and how fast; and a daily drill that proves the whole path. The snippets are for a Node service shipping with Vector; each tool line names the alternatives.",
+    "tags": [
+      "security",
+      "siem",
+      "detection",
+      "security-logging",
+      "sigma",
+      "alerting"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "security-detection",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "attackers reach the system through these elements, so which security events they raise, which rules watch them and who answers an alert has to be decided.",
+      "group": "security"
+    },
+    "sources": [
+      {
+        "title": "OWASP Application Logging Vocabulary Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP Logging Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      },
+      {
+        "title": "OWASP Top 10:2025, A09 Security Logging and Alerting Failures",
+        "url": "https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/"
+      },
+      {
+        "title": "NIST SP 800-92, Guide to Computer Security Log Management",
+        "url": "https://csrc.nist.gov/pubs/sp/800/92/final"
+      },
+      {
+        "title": "NIST SP 800-61 Rev. 3, Incident Response Recommendations and Considerations for Cybersecurity Risk Management",
+        "url": "https://csrc.nist.gov/pubs/sp/800/61/r3/final"
+      },
+      {
+        "title": "MITRE ATT&CK, T1110 Brute Force",
+        "url": "https://attack.mitre.org/techniques/T1110/"
+      },
+      {
+        "title": "Sigma rules (SigmaHQ documentation)",
+        "url": "https://sigmahq.io/docs/basics/rules.html"
+      },
+      {
+        "title": "Sigma correlation rules specification",
+        "url": "https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md"
+      },
+      {
+        "title": "sigma-cli",
+        "url": "https://github.com/SigmaHQ/sigma-cli"
+      },
+      {
+        "title": "Microsoft Sentinel: scheduled analytics rules",
+        "url": "https://learn.microsoft.com/en-us/azure/sentinel/scheduled-rules-overview"
+      },
+      {
+        "title": "Splunk Enterprise Security 8 documentation",
+        "url": "https://help.splunk.com/en/splunk-enterprise-security-8"
+      },
+      {
+        "title": "Elastic Security: detections and alerts",
+        "url": "https://www.elastic.co/docs/solutions/security/detect-and-alert"
+      },
+      {
+        "title": "OpenSearch Security Analytics",
+        "url": "https://docs.opensearch.org/latest/security-analytics/"
+      },
+      {
+        "title": "Grafana Loki: log retention (retention_stream)",
+        "url": "https://grafana.com/docs/loki/latest/operations/storage/retention/"
+      },
+      {
+        "title": "PagerDuty REST API: analytics raw data for multiple incidents",
+        "url": "https://docs.pagerduty.com/developer/api/reference/rest/analytics/get-analytics-incidents"
+      },
+      {
+        "title": "Vector: unit tests",
+        "url": "https://vector.dev/docs/reference/configuration/unit-tests/"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "SIEM",
+        "title": "SIEM",
+        "label": "Where are security events collected and correlated?",
+        "hint": "The SIEM decides the rule language, what comes prebuilt, what correlates with the identity provider's and the cloud's logs, and the bill, which grows with every gigabyte sent. Not having one yet is a decision too, and is recorded as one.",
+        "defaultValue": "logs",
+        "options": [
+          {
+            "value": "sentinel",
+            "label": "Microsoft Sentinel",
+            "description": "Microsoft's cloud SIEM on a Log Analytics workspace: KQL rules, connectors for Entra ID, Microsoft 365 and Azure, incidents in the Defender portal. Pick it when the organisation runs on Microsoft 365 or Azure, or signs people in with Entra ID."
+          },
+          {
+            "value": "splunk",
+            "label": "Splunk Enterprise Security",
+            "description": "Splunk's SIEM: SPL correlation searches over indexes, events mapped to the Common Information Model, a large library of maintained detections. Pick it when the organisation already runs Splunk, or needs the deepest correlation and can pay for the volume."
+          },
+          {
+            "value": "elastic",
+            "label": "Elastic Security",
+            "description": "Detection rules on Elasticsearch (query, threshold, EQL and ES|QL), prebuilt rules mapped to ATT&CK and kept in an open repository, self-managed or on Elastic Cloud. Pick it when the logs are already in Elasticsearch, or the volume makes per-gigabyte pricing too dear."
+          },
+          {
+            "value": "opensearch",
+            "label": "OpenSearch Security Analytics",
+            "description": "The open-source (Apache 2.0) SIEM of OpenSearch: detectors that run Sigma rules on a log type, plus Alerting monitors for counts over time; on your own cluster or Amazon OpenSearch Service. Pick it when licence cost rules out the commercial ones and the team can run a cluster and write its own detections."
+          },
+          {
+            "value": "logs",
+            "label": "the log platform's security stream (no SIEM yet)",
+            "description": "No SIEM yet: security events stay in the log store the Observability pack decides, in a stream of their own kept longer, with alert rules there (the Loki ruler, OpenSearch monitors, CloudWatch alarms). Pick it for a first release or a small system with nothing else to correlate with; the decision records the gap."
+          }
+        ]
+      },
+      {
+        "key": "RULES",
+        "title": "Rules",
+        "label": "How are detection rules written and kept?",
+        "hint": "Rules as code are reviewed and survive a change of SIEM; the vendor's own rules come with its content team and its editor. Either way the rules live in or are named in the repository, so coverage can be checked.",
+        "defaultValue": "sigma",
+        "options": [
+          {
+            "value": "sigma",
+            "label": "Sigma rules in the repository",
+            "description": "Rules are written in Sigma, the vendor-neutral YAML format, under rules/ in the repository; the pipeline checks them with sigma-cli and converts them for the SIEM with its pySigma backend. Pick it when the rules should outlive the SIEM, several tools read the same events, or the team wants to adopt community rules from SigmaHQ."
+          },
+          {
+            "value": "native",
+            "label": "the SIEM's own rules",
+            "description": "The SIEM's built-in detections are switched on, and rules for the element's own events are written in the SIEM's language (KQL, SPL, ES|QL, LogQL), exported to the repository and deployed from it, with a file that maps each event to its rule. Pick it when the team leans on the vendor's content and no move of SIEM is foreseen."
+          }
+        ]
+      },
+      {
+        "key": "RESPONSE",
+        "title": "Response",
+        "label": "Who answers a high security alert?",
+        "hint": "An alert nobody answers is a log line with a sound. Severities, incident command and the post-incident review are decided in the Incident management pack; this decides who looks first and how fast. A managed service connects to commercial SIEMs first: with OpenSearch or the log platform, check that a provider will take it.",
+        "defaultValue": "soc",
+        "options": [
+          {
+            "value": "soc",
+            "label": "the security on-call (SOC)",
+            "description": "A security rotation (an in-house SOC or security engineers), separate from the product team's on-call, is paged for high and critical alerts at any hour and acknowledges within minutes (15 by default). Pick it when the organisation has at least four people who can share a security rotation."
+          },
+          {
+            "value": "mdr",
+            "label": "a managed detection and response (MDR) service",
+            "description": "A provider watches the SIEM's alerts around the clock under contract, triages them within a contracted time, may contain an attack, and pages our security contact for a confirmed one. Pick it when there is no security team big enough for a rotation but the data is worth watching at night."
+          },
+          {
+            "value": "team",
+            "label": "the team's own on-call",
+            "description": "The product team's around-the-clock rotation, the one the Observability pack decides, also takes security pages, with a runbook per rule. Pick it for a small organisation without a security team, and only when that rotation pages around the clock."
+          }
+        ]
+      },
+      {
+        "key": "REQUIRED_EVENTS",
+        "label": "Which vocabulary events must the catalogue list at the least (as raised, or as not raised with a reason)?",
+        "defaultValue": "authn_login_fail, authn_login_lock, authz_fail, authz_admin, privilege_permissions_changed, input_validation_fail, excess_rate_limit_exceeded, user_created, user_deleted, sys_monitor_disabled"
+      },
+      {
+        "key": "FAILED_LOGINS",
+        "label": "How many failed sign-ins for one account make a password-guessing alert?",
+        "defaultValue": "10",
+        "type": "number"
+      },
+      {
+        "key": "WINDOW_MINUTES",
+        "label": "Within how many minutes?",
+        "defaultValue": "5",
+        "type": "number"
+      },
+      {
+        "key": "ALERT_MINUTES",
+        "label": "Within how many minutes of the events must the alert be raised?",
+        "defaultValue": "15",
+        "type": "number"
+      },
+      {
+        "key": "ACK_MINUTES",
+        "label": "Within how many minutes must a page for a high alert be acknowledged?",
+        "defaultValue": "15",
+        "type": "number"
+      },
+      {
+        "key": "EVENT_DAYS",
+        "label": "For how many days are security events kept searchable?",
+        "defaultValue": "365",
+        "type": "number"
+      },
+      {
+        "key": "MDR_TRIAGE_MINUTES",
+        "label": "Within how many minutes must the provider triage a high alert? (managed detection and response only)",
+        "defaultValue": "30",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "Attacks are seen and answered",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: Security event logging and detection",
+      "description": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
+    },
+    {
+      "id": "req-catalogue",
+      "type": "requirement",
+      "label": "Security events catalogued",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "list every security event it raises in security/events.yaml by its OWASP Application Logging Vocabulary name (authn_login_fail, authz_fail, input_validation_fail and so on), with the vocabulary's level and the trigger that raises it, and list each of {{REQUIRED_EVENTS}} either as raised or as not raised with the reason (sign-in happens at an identity provider, the element takes no uploads)",
+      "rationale": "One vocabulary lets one rule read every element's events, and a list in the repository makes the choice of what is recorded reviewable (OWASP Application Logging Vocabulary Cheat Sheet; OWASP Logging Cheat Sheet, which events to record; NIST SP 800-92, log management planning)."
+    },
+    {
+      "id": "req-event-shape",
+      "type": "requirement",
+      "label": "Events carry their fields",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "write each security event as one JSON line with datetime (ISO 8601 with its UTC offset), appid, event (the vocabulary name with its arguments, as authn_login_fail:joebob1), level, description and hostname, plus source_ip, useragent, request_uri, request_method and the correlation id when a request raised it, and the account as userid, whatever level the operational logs are written at, and with no password, token, session id or other value the Error handling and logging conventions pack keeps out of log lines",
+      "rationale": "Rules count and group by fields, so a missing or renamed field blinds them without a sound; an event dropped because the log level was raised against noise is an attack unrecorded; and a credential in an event makes the SIEM the leak (OWASP Application Logging Vocabulary Cheat Sheet, the format; OWASP Logging Cheat Sheet, data to exclude)."
+    },
+    {
+      "id": "req-forward",
+      "type": "requirement",
+      "label": "Events reach the SIEM",
+      "x": 260,
+      "y": 260,
+      "ears_type": "event-driven",
+      "trigger": "the element writes a security event",
+      "action": "have the shipper deliver it to {{SIEM}} on a route of its own, which no level filter or sampling of the operational logs touches, and send ordinary log lines nowhere near that route",
+      "rationale": "A detection path is as strong as its weakest link; a security route that the operational log settings cannot thin out keeps the events when those settings change for cost or noise (NIST SP 800-92, log transmission; OWASP Top 10 A09:2025)."
+    },
+    {
+      "id": "req-retention",
+      "type": "requirement",
+      "label": "Events kept for investigations",
+      "x": 260,
+      "y": 390,
+      "ears_type": "ubiquitous",
+      "action": "keep its security events searchable in {{SIEM}} for {{EVENT_DAYS}} days, apart from the operational logs and their retention decided in the Observability pack",
+      "rationale": "Intrusions are often found weeks or months after they began, and an investigation needs the events from the first step; operational logs are kept for days (NIST SP 800-92, retention; OWASP Logging Cheat Sheet)."
+    },
+    {
+      "id": "req-brute-force",
+      "type": "requirement",
+      "label": "Password guessing alerts",
+      "x": 260,
+      "y": 520,
+      "ears_type": "unwanted-behaviour",
+      "unwanted_condition": "{{FAILED_LOGINS}} or more failed sign-ins (authn_login_fail, or the identity provider's failures) for one account arrive within {{WINDOW_MINUTES}} minutes",
+      "action": "raise a high alert naming the account, the source addresses and the count, within {{ALERT_MINUTES}} minutes of the last of them",
+      "rationale": "Password guessing, spraying and credential stuffing are the commonest attacks on sign-in, and they show only as a count over time, never in a single event (MITRE ATT&CK T1110, Brute Force; OWASP Application Logging Vocabulary: authn_login_fail)."
+    },
+    {
+      "id": "req-coverage",
+      "type": "requirement",
+      "label": "Every warning event watched",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "run at least one detection rule over every catalogued event at level WARN or CRITICAL, kept in the repository or named there, and have every high or critical rule name the MITRE ATT&CK technique it detects",
+      "rationale": "An event no rule reads is stored, not watched; naming the technique shows which attacks are covered and which are not (MITRE ATT&CK; Sigma rules, tags)."
+    },
+    {
+      "id": "req-sigma",
+      "type": "requirement",
+      "label": "Rules checked as code",
+      "x": 260,
+      "y": 780,
+      "ears_type": "event-driven",
+      "trigger": "a detection rule is added or changed",
+      "action": "write it as a Sigma rule under rules/, pass sigma check with 0 errors and 0 issues, convert it for {{SIEM}} in the pipeline, and deploy only what the pipeline converted",
+      "rationale": "Rules as code are reviewed, versioned and portable across SIEMs; a rule changed in a console is none of these (Sigma rules; sigma-cli).",
+      "hubWhen": {
+        "RULES": [
+          "sigma"
+        ]
+      }
+    },
+    {
+      "id": "req-drill",
+      "type": "requirement",
+      "label": "Detection proven daily",
+      "x": 260,
+      "y": 910,
+      "ears_type": "event-driven",
+      "trigger": "a day has passed since the last detection drill",
+      "action": "run a drill against production that fails {{FAILED_LOGINS}} sign-ins for a canary account nobody uses, look for the resulting alert in {{SIEM}}, and fail the drill, which alerts the security owner, when it is not found within {{ALERT_MINUTES}} minutes; the drill's own alert is routed away from people",
+      "rationale": "Every link of the path breaks silently: a renamed field, a stopped shipper, a disabled rule, a lapsed connector. A daily drill finds the break within a day instead of during an attack, and an account nobody uses alerts with almost no false positives (OWASP Top 10 A09:2025, honeytokens and alerting; NIST SP 800-92)."
+    },
+    {
+      "id": "req-page",
+      "type": "requirement",
+      "label": "High alerts answered in time",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "event-driven",
+      "trigger": "a high or critical security alert is raised",
+      "action": "page {{RESPONSE}} at any hour and have the page acknowledged within {{ACK_MINUTES}} minutes; open a ticket for a medium alert, triaged the next working day; notify nobody of a low one; and hand a confirmed alert on as an incident of type Security, run as the Incident management pack decides",
+      "rationale": "An alert nobody answers is the failure A09:2025 is named for; a bounded time to acknowledge is what makes detection worth its cost, and routing by level keeps the pager for what needs a person now (OWASP Top 10 A09:2025; NIST SP 800-61 Rev. 3).",
+      "hubWhen": {
+        "RESPONSE": [
+          "soc",
+          "team"
+        ]
+      }
+    },
+    {
+      "id": "req-mdr-escalation",
+      "type": "requirement",
+      "label": "Confirmed attacks escalated",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "event-driven",
+      "trigger": "the managed detection and response provider confirms an alert as a likely attack",
+      "action": "have the provider page our security contact through the paging tool, with the alert, its analysis and the actions it took or proposes, and have that page acknowledged within {{ACK_MINUTES}} minutes at any hour; the incident is then run as the Incident management pack decides",
+      "rationale": "A provider can watch and contain, but decisions about the business stay with us; the escalation is the handover that must not wait for the morning (NIST SP 800-61 Rev. 3).",
+      "hubWhen": {
+        "RESPONSE": [
+          "mdr"
+        ]
+      }
+    },
+    {
+      "id": "req-mdr-triage",
+      "type": "requirement",
+      "label": "Provider triages in time",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "have every high or critical alert triaged by the provider within {{MDR_TRIAGE_MINUTES}} minutes of being raised, as the contract states, and reported monthly",
+      "rationale": "The provider's speed is the system's speed for every alert nobody else watches; it belongs in the contract and in a report that is read (NIST SP 800-61 Rev. 3).",
+      "unchecked": "The provider triages in its own tools, which the team cannot query; the security owner compares the provider's monthly service report with the contracted triage time every month and takes breaches up with the provider.",
+      "hubWhen": {
+        "RESPONSE": [
+          "mdr"
+        ]
+      }
+    },
+    {
+      "id": "sc-catalogue",
+      "type": "scenario",
+      "label": "Catalogue matches the code",
+      "x": 520,
+      "y": 0,
+      "given": "the catalogue and the element",
+      "when": "the events test runs",
+      "then": "each catalogued event is raised by its trigger, and each of {{REQUIRED_EVENTS}} is listed as raised or as not raised with a reason"
+    },
+    {
+      "id": "sc-event-shape",
+      "type": "scenario",
+      "label": "Events keep their shape",
+      "x": 520,
+      "y": 130,
+      "given": "the element started with its operational log level at error",
+      "when": "each catalogued event is raised",
+      "then": "each line parses as JSON with every field named, its datetime carries an offset, and no line holds a password, token or session id"
+    },
+    {
+      "id": "sc-forward",
+      "type": "scenario",
+      "label": "Security route holds",
+      "x": 520,
+      "y": 260,
+      "given": "the shipper's configuration",
+      "when": "its unit tests insert a security event at level INFO and an ordinary line",
+      "then": "the security event comes out on the SIEM route and the ordinary line does not"
+    },
+    {
+      "id": "sc-retention",
+      "type": "scenario",
+      "label": "Retention long enough",
+      "x": 520,
+      "y": 390,
+      "given": "the SIEM's configuration for the element's events",
+      "when": "the daily drill reads their retention",
+      "then": "it is at least {{EVENT_DAYS}} days"
+    },
+    {
+      "id": "sc-brute-force",
+      "type": "scenario",
+      "label": "Guessing raises an alert",
+      "x": 520,
+      "y": 520,
+      "given": "the canary account",
+      "when": "{{FAILED_LOGINS}} sign-ins with wrong passwords are made for it within {{WINDOW_MINUTES}} minutes",
+      "then": "a high alert for the canary account is found in {{SIEM}} within {{ALERT_MINUTES}} minutes"
+    },
+    {
+      "id": "sc-coverage",
+      "type": "scenario",
+      "label": "Uncovered event found",
+      "x": 520,
+      "y": 650,
+      "given": "a new catalogued event at level WARN that no rule uses",
+      "when": "the coverage check runs",
+      "then": "it fails, naming the event"
+    },
+    {
+      "id": "sc-sigma",
+      "type": "scenario",
+      "label": "Broken rule refused",
+      "x": 520,
+      "y": 780,
+      "given": "a pull request adding a Sigma rule with a misspelt field modifier",
+      "when": "the pipeline runs sigma check",
+      "then": "the check fails and nothing is deployed",
+      "hubWhen": {
+        "RULES": [
+          "sigma"
+        ]
+      }
+    },
+    {
+      "id": "sc-drill",
+      "type": "scenario",
+      "label": "Broken path found",
+      "x": 520,
+      "y": 910,
+      "given": "the password-guessing rule disabled by mistake",
+      "when": "the daily drill runs",
+      "then": "no alert is found within {{ALERT_MINUTES}} minutes, the drill fails and the security owner is alerted"
+    },
+    {
+      "id": "sc-page",
+      "type": "scenario",
+      "label": "Night alert answered",
+      "x": 520,
+      "y": 1040,
+      "given": "a high alert raised at 03:00",
+      "when": "it fires",
+      "then": "{{RESPONSE}} is paged, the page is acknowledged within {{ACK_MINUTES}} minutes, and the monthly report shows its time to acknowledge",
+      "hubWhen": {
+        "RESPONSE": [
+          "soc",
+          "team"
+        ]
+      }
+    },
+    {
+      "id": "sc-mdr-escalation",
+      "type": "scenario",
+      "label": "Escalation acknowledged",
+      "x": 520,
+      "y": 1170,
+      "given": "an attack the provider confirms at night",
+      "when": "it pages our security contact",
+      "then": "the page is acknowledged within {{ACK_MINUTES}} minutes and the monthly report shows its time to acknowledge",
+      "hubWhen": {
+        "RESPONSE": [
+          "mdr"
+        ]
+      }
+    },
+    {
+      "id": "sc-mdr-triage",
+      "type": "scenario",
+      "label": "Triage time reported",
+      "x": 520,
+      "y": 1300,
+      "given": "a month of alerts",
+      "when": "the provider's monthly report arrives",
+      "then": "every high or critical alert was triaged within {{MDR_TRIAGE_MINUTES}} minutes, or the breach is taken up with the provider",
+      "hubWhen": {
+        "RESPONSE": [
+          "mdr"
+        ]
+      }
+    },
+    {
+      "id": "adr-sentinel",
+      "type": "adr",
+      "label": "Security events in Microsoft Sentinel",
+      "x": 780,
+      "y": 0,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "Microsoft Sentinel is the SIEM. The shipper sends the element's security events through the Logs Ingestion API (Vector's azure_logs_ingestion sink, or the Azure Monitor Agent reading the log file) and a data collection rule into a custom table of their own, such as ShopSecurityEvents_CL, whose total retention is {{EVENT_DAYS}} days; the identity provider's sign-in logs come through its data connector (Microsoft Entra ID, Okta). Detections are scheduled analytics rules in KQL running every 5 minutes, deployed from the repository with Terraform (azurerm_sentinel_alert_rule_scheduled) or Bicep, with the account and the address mapped as entities. Rules: {{RULES}}. High alerts reach {{RESPONSE}} through an automation rule and a playbook that calls the paging tool; alerts on the canary account go to a drill service there instead of to people. A daily drill proves the path.",
+      "consequences": "• Connectors and analytics rule templates for Entra ID, Microsoft 365 and Azure come with it.\n• Billed per gigabyte ingested and per day kept beyond the included retention: sending only the catalogued events keeps the bill bounded.\n• Scheduled rules run at most every 5 minutes and on a 5-minute delay for ingestion, so an alert takes about 10 to 15 minutes; near-real-time rules are faster with fewer features.\n• Sentinel is moving to the Defender portal: after 31 March 2027 it is no longer supported in the Azure portal.\n• KQL rules are tied to Sentinel; a move of SIEM rewrites them unless they are kept as Sigma.",
+      "alternatives": "1. Splunk Enterprise Security: deeper correlation and a larger detection library, at a higher licence cost.\n2. Elastic Security: open rules and lower cost at volume, but a cluster to run unless hosted.\n3. Alerts in the log platform: nothing to buy, but no correlation, no prebuilt rules and no case handling.",
+      "hubWhen": {
+        "SIEM": [
+          "sentinel"
+        ]
+      }
+    },
+    {
+      "id": "adr-splunk",
+      "type": "adr",
+      "label": "Security events in Splunk Enterprise Security",
+      "x": 780,
+      "y": 130,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "Splunk Enterprise Security is the SIEM. The shipper sends the security events to an HTTP Event Collector (Vector's splunk_hec_logs sink) into an index of their own, such as shop_security, whose frozenTimePeriodInSecs keeps them {{EVENT_DAYS}} days; the identity provider's logs come through its add-on. The events are also mapped to the Common Information Model's Authentication data model (action, user, src) so that the shipped correlation searches read them. Detections are correlation searches kept in an app in the repository (savedsearches.conf) and deployed by the pipeline; they create findings (notable events) in the notable index. Rules: {{RULES}}. Findings of high and critical urgency reach {{RESPONSE}} through the paging tool's alert action; findings on the canary account go to a drill service there instead of to people. A daily drill proves the path.",
+      "consequences": "• SPL is the richest correlation language of the options, and Splunk's security content library is maintained for it.\n• Licensed by data ingested per day or by compute: the dearest option at volume.\n• Each new event type needs its CIM mapping, or the shipped searches do not see it.\n• Correlation searches usually run every 5 minutes, so an alert takes 5 to 10 minutes after ingestion.",
+      "alternatives": "1. Microsoft Sentinel: cheaper to start for a Microsoft estate, KQL instead of SPL.\n2. Elastic Security: open rules and lower cost at volume.\n3. Alerts in the log platform: nothing to buy, and nothing to correlate with.",
+      "hubWhen": {
+        "SIEM": [
+          "splunk"
+        ]
+      }
+    },
+    {
+      "id": "adr-elastic",
+      "type": "adr",
+      "label": "Security events in Elastic Security",
+      "x": 780,
+      "y": 260,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "Elastic Security is the SIEM. The shipper sends the security events to Elasticsearch (Vector's elasticsearch sink) into a data stream of their own, such as logs-shop.security-default, with the Elastic Common Schema fields (event.category: authentication, event.outcome: failure, user.name, source.ip) beside the vocabulary's, and an index lifecycle policy that deletes them after {{EVENT_DAYS}} days; the identity provider's logs come through its integration. Detections are detection rules (query, threshold, EQL or ES|QL) running every 5 minutes, imported from the repository through Kibana's detection rules import API. Rules: {{RULES}}. High and critical alerts reach {{RESPONSE}} through the rule's PagerDuty connector or a webhook; alerts on the canary account go to a drill service there instead of to people. A daily drill proves the path.",
+      "consequences": "• Hundreds of prebuilt rules mapped to ATT&CK, developed in the open (elastic/detection-rules).\n• Self-managed, the cluster and its upgrades are the team's; on Elastic Cloud, the cost follows resources or ingest.\n• Prebuilt rules read ECS fields: events not mapped to ECS are invisible to them.\n• Rules run every 5 minutes by default with a look-back that covers ingestion delay.",
+      "alternatives": "1. OpenSearch Security Analytics: fully open source and Sigma-native, with fewer prebuilt rules.\n2. Splunk Enterprise Security: deeper correlation, higher cost.\n3. Alerts in the log platform: nothing to buy, and nothing to correlate with.",
+      "hubWhen": {
+        "SIEM": [
+          "elastic"
+        ]
+      }
+    },
+    {
+      "id": "adr-opensearch",
+      "type": "adr",
+      "label": "Security events in OpenSearch Security Analytics",
+      "x": 780,
+      "y": 390,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "OpenSearch Security Analytics is the SIEM, on a cluster the team runs or on Amazon OpenSearch Service. The shipper sends the security events (Vector's opensearch sink) to indexes of their own, such as shop-security-*, under an Index State Management policy that deletes them after {{EVENT_DAYS}} days. A detector with a custom log type for the element runs Sigma rules over the events as they arrive; counts over time, such as password guessing, are bucket-level monitors of the Alerting plugin, which group and count explicitly. Rules: {{RULES}}. High alerts reach {{RESPONSE}} through a notification channel (a webhook to the paging tool's events API); alerts on the canary account go to a drill service there instead of to people. A daily drill proves the path.",
+      "consequences": "• Open source (Apache 2.0): no licence per gigabyte; the cost is the cluster and the people who run it.\n• Sigma rules load as they are for single-event detections, without conversion.\n• Few prebuilt rules for application events and no vendor content team: detection engineering is the team's own.\n• Case handling is thinner than in the commercial SIEMs: confirmed alerts are worked in the paging tool and the process the Incident management pack decides.",
+      "alternatives": "1. Wazuh: an open-source SIEM with host agents, frequency rules and wazuh-logtest to try them, but its rules are its own XML and sigma-cli lists no backend for it.\n2. Elastic Security: more prebuilt content, under Elastic's licences.\n3. Alerts in the log platform: no cluster of its own, and no detectors.",
+      "hubWhen": {
+        "SIEM": [
+          "opensearch"
+        ]
+      }
+    },
+    {
+      "id": "adr-logs",
+      "type": "adr",
+      "label": "Security events in the log platform, no SIEM yet",
+      "x": 780,
+      "y": 520,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "No SIEM yet: the security events stay in the log store the Observability pack decides, in a stream of their own, and the alerts run there; this is recorded so that the gap stays visible. In Grafana Loki, security events carry the label stream=\"security\", and a retention_stream rule keeps that stream {{EVENT_DAYS}} days while other logs go after the Observability pack's retention; detections are LogQL alerting rules in the Loki ruler, sent through Alertmanager. With Elasticsearch or OpenSearch as the log store, the same is a data stream with its own lifecycle policy and Kibana alerting rules or OpenSearch bucket-level monitors; with CloudWatch Logs, a log group with its own retention and metric filters with alarms. Rules: {{RULES}}. High alerts reach {{RESPONSE}} through Alertmanager's PagerDuty receiver; alerts on the canary account go to a drill receiver. A daily drill proves the path. A SIEM is due when the identity provider's or the cloud's logs must be correlated with the element's, or a customer or regulator asks for one.",
+      "consequences": "• Nothing new to buy or run; the events are where the engineers already look.\n• No correlation across sources, no prebuilt rules, no case handling: every detection is written and kept by the team.\n• LogQL counts over time well (password guessing) but joins nothing, so an attack visible only across systems is missed.\n• Moving to a SIEM later re-points the shipper's security route and, with Sigma rules, converts them again.",
+      "alternatives": "1. A SIEM now: Microsoft Sentinel, Splunk Enterprise Security, Elastic Security or OpenSearch Security Analytics.\n2. Events kept for investigations without alerts: cheaper still, and the attack is found by a customer.",
+      "hubWhen": {
+        "SIEM": [
+          "logs"
+        ]
+      }
+    },
+    {
+      "id": "adr-sigma",
+      "type": "adr",
+      "label": "Detection rules as Sigma code",
+      "x": 780,
+      "y": 650,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "Detection rules are Sigma rules in the repository, one detection per file, reviewed in pull requests: a single-event rule per catalogued event worth watching under rules/events, and Sigma correlation rules (event_count grouped by userid or source_ip over a timespan) for counts such as password guessing under rules/correlations. Every high or critical rule carries its MITRE ATT&CK tags (attack.credential-access, attack.t1110). The pipeline runs sigma check with --fail-on-issues and converts the rules with the pySigma backend of {{SIEM}}, with a processing pipeline in the repository that maps the element's log source to its index or table: Splunk with -t splunk -f savedsearches, Elastic with -t esql -f siem_rule_ndjson, Loki with -t loki wrapped into a ruler file by a pipeline step. The Kusto backend for Sentinel and the OpenSearch Lucene backend refuse correlation rules, so with those SIEMs only rules/events is converted, each correlation rule is implemented in KQL or as a bucket-level monitor kept beside it, and the Sigma rule stays its specification. sigma-cli and each backend are pinned: the backends move to pySigma 2 one by one, and some still need sigma-cli 3. Rules are deployed only by the pipeline; a change made in the SIEM's console is overwritten by the next deployment.",
+      "consequences": "• Rules outlive the SIEM: a move converts them again instead of rewriting them.\n• Community rules from the SigmaHQ repository can be adopted for the identity provider and the cloud.\n• Conversion is not complete everywhere: correlations for Sentinel and OpenSearch, and anything a backend cannot express, are written natively and kept beside their Sigma rule.\n• Someone owns the processing pipelines that map log sources to the SIEM's indexes and fields.",
+      "alternatives": "1. The SIEM's own rules: the vendor's content and editor, no conversion step, and a rewrite when the SIEM changes.\n2. Rules kept only in the console: quickest to start, and nobody can review what runs.",
+      "hubWhen": {
+        "RULES": [
+          "sigma"
+        ]
+      }
+    },
+    {
+      "id": "adr-native",
+      "type": "adr",
+      "label": "Detection with the SIEM's own rules",
+      "x": 780,
+      "y": 780,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "Detection rules are the SIEM's own. Its built-in detections that read the element's and the identity provider's events are switched on, and the rules for the element's own events are written in the language of {{SIEM}} (KQL analytics rules, SPL correlation searches, Elastic query, threshold or ES|QL rules, OpenSearch detectors and bucket-level monitors, LogQL rules for the Loki ruler), exported to siem/rules in the repository and deployed from there by the pipeline. security/detections.yaml maps every catalogued event at level WARN or CRITICAL to the rule that covers it, built-in (by its id) or written (by its file), with its level and ATT&CK technique.",
+      "consequences": "• Vendor content arrives with updates; the team writes only what the vendor cannot know.\n• No conversion step, and the SIEM's full language.\n• A move of SIEM rewrites the rules.\n• Built-in rules read the vendor's schema (ASIM in Sentinel, CIM in Splunk, ECS in Elastic): the element's events must be mapped to it, or those rules do not see them.",
+      "alternatives": "1. Sigma rules in the repository: portable and reviewed as code, with a conversion step and gaps in some backends.\n2. Rules kept only in the console: quickest to start, and nobody can review what runs.",
+      "hubWhen": {
+        "RULES": [
+          "native"
+        ]
+      }
+    },
+    {
+      "id": "adr-soc",
+      "type": "adr",
+      "label": "Security alerts answered by a security on-call",
+      "x": 780,
+      "y": 910,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "High and critical security alerts page a security rotation (an in-house SOC or security engineers), separate from the rotation the Observability pack decides for outages, at any hour; the page is acknowledged within {{ACK_MINUTES}} minutes and escalates to the secondary and then the security lead when it is not. Medium alerts become tickets triaged the next working day; low ones notify nobody and stay searchable. The rotation runs in PagerDuty (or the paging tool the organisation uses) on a service of its own, high urgency for high and critical alerts. Each rule links a runbook that says what to check first. A confirmed alert is declared an incident of type Security and run as the Incident management pack decides; a false positive is closed with a reason, and a rule that pages falsely twice in a month is tuned or lowered.",
+      "consequences": "• Someone who knows attacks looks at each high alert within minutes, day and night.\n• A rotation needs at least four people for each to be on call one week in four or less; a smaller security team burns out.\n• Product engineers are pulled in only for confirmed incidents.\n• Pages cost sleep: noisy rules must be tuned or lowered, or the rotation learns to ignore them.",
+      "alternatives": "1. A managed detection and response service: analysts around the clock without a rotation of our own, at a contract price.\n2. The team's own on-call: no new rotation, but product engineers judge security alerts.",
+      "hubWhen": {
+        "RESPONSE": [
+          "soc"
+        ]
+      }
+    },
+    {
+      "id": "adr-mdr",
+      "type": "adr",
+      "label": "Security alerts answered by a managed detection and response service",
+      "x": 780,
+      "y": 1040,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "A managed detection and response (MDR) provider that supports the SIEM chosen (Expel, Arctic Wolf, CrowdStrike Falcon Complete and others) watches the SIEM's alerts around the clock under contract, triages every high and critical alert within {{MDR_TRIAGE_MINUTES}} minutes, takes the containment actions the contract lists (disabling an account, revoking its sessions, isolating a host), and escalates a confirmed attack by paging our security contact through PagerDuty, who acknowledges within {{ACK_MINUTES}} minutes. The incident is then run as the Incident management pack decides. The provider gets read access to the SIEM, the event catalogue and a runbook per rule saying what is normal for the element; its access is reviewed like any privileged access. The security owner reads its monthly report of triage times and escalations.",
+      "consequences": "• Analysts around the clock from the first month, without hiring a rotation.\n• The provider knows attacks but not the business: the runbooks must tell it what is normal.\n• A contract price per user, endpoint or gigabyte, and a third party with privileged access to the SIEM.\n• Containment without us needs the actions agreed in advance; anything else waits for our acknowledgement.",
+      "alternatives": "1. A security on-call of our own: closest to the business, and at least four people to staff it.\n2. The team's own on-call: no contract, but product engineers judge security alerts.",
+      "hubWhen": {
+        "RESPONSE": [
+          "mdr"
+        ]
+      }
+    },
+    {
+      "id": "adr-team",
+      "type": "adr",
+      "label": "Security alerts answered by the team's own on-call",
+      "x": 780,
+      "y": 1170,
+      "concern": "security-detection",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is where an attacker meets the system: passwords are guessed, records probed by id, inputs fuzzed, and an account taken over starts doing what its owner never did. The forces: an attack nobody records cannot be investigated, and one recorded but not watched is found months later by someone else (OWASP Top 10 A09:2025); every SIEM charges by volume, so sending everything costs more than it detects; a rule that alerts too often is muted, and a muted rule is a missing one; the detection path (code, shipper, SIEM, rule, page) breaks silently at any link; and whoever is paged at night must be able to act. Security events are not the audit trail: the Audit trail pack keeps the evidence of who did what for auditors and regulators in its own store, and the two may be raised by the same code. The shape and redaction of a log line are decided in the Error handling and logging conventions pack, operational logs and the shipper in the Observability pack, and severities and incident command in the Incident management pack.",
+      "decision": "High and critical security alerts page the team's own on-call rotation, the one the Observability pack decides for outages, at any hour, on a separate PagerDuty service so that security pages are counted apart; the page is acknowledged within {{ACK_MINUTES}} minutes. Medium alerts become tickets for the next working day; low ones notify nobody. Each rule links a runbook written for an engineer who is not a security specialist: what to check, how to lock an account and revoke its sessions, when to call the security owner. A confirmed attack is run as an incident as the Incident management pack decides. This holds while that rotation pages around the clock; if alerts move to working hours only, this decision is superseded first.",
+      "consequences": "• No new rotation and no contract: the people paged already know the element.\n• Engineers judge security alerts without a specialist's eye; runbooks and a security owner on call-back carry the gap.\n• Security pages add to the outage pages of one rotation; noisy rules wear it down faster.\n• The rotation must keep paging around the clock, or high alerts wait for the morning.",
+      "alternatives": "1. A security on-call: specialists on every alert, at least four people to staff it.\n2. A managed detection and response service: specialists around the clock, at a contract price.",
+      "hubWhen": {
+        "RESPONSE": [
+          "team"
+        ]
+      }
+    },
+    {
+      "id": "ff-events",
+      "type": "fitness-fn",
+      "label": "Catalogued events raised with their fields",
+      "x": 1040,
+      "y": 0,
+      "category": "structural",
+      "threshold": "Each of {{REQUIRED_EVENTS}} is listed as raised or not raised; 100% of catalogued events are raised by their trigger with the element at log level error, with their level, every field named and an offset in datetime; 0 lines hold the password, token or session id the test signed in with",
+      "description": "A test reads security/events.yaml, checks that each required event is listed, then makes the element raise each catalogued event through its trigger (the harness starts it with LOG_LEVEL=error, signs in with a password, token and session id of random value, and captures the JSON lines it writes) and checks the line: the vocabulary name, the catalogue's level, the fields every event carries, the request fields when a request raised it, and none of those credential values.\n\nTool: Vitest with js-yaml (or JUnit 5 with SnakeYAML, pytest with PyYAML: the same test over the same file)\n\n```ts\n// test/security/events.test.ts\nimport { readFileSync } from 'node:fs'\nimport { load } from 'js-yaml'\nimport { describe, expect, it } from 'vitest'\nimport { raiseAndCapture, SECRETS } from './harness' // starts the element with LOG_LEVEL=error, runs a trigger, returns the JSON lines; SECRETS: the password, token and session id it used\ntype Entry = { event: string; level: 'INFO' | 'WARN' | 'CRITICAL'; trigger: string; request: boolean }\nconst catalogue = load(readFileSync('security/events.yaml', 'utf8')) as { events: Entry[]; notRaised: Array<{ event: string; reason: string }> }\nconst REQUIRED = '{{REQUIRED_EVENTS}}'.split(/,\\s*/)\nconst FIELDS = ['datetime', 'appid', 'event', 'level', 'description', 'hostname']\nconst REQUEST_FIELDS = ['source_ip', 'useragent', 'request_uri', 'request_method', 'correlation_id']\nit('lists every required event, raised or not raised with a reason', () => {\n  const listed = new Set([...catalogue.events, ...catalogue.notRaised.filter((e) => e.reason)].map((e) => e.event))\n  expect(REQUIRED.filter((e) => !listed.has(e))).toEqual([])\n})\ndescribe.each(catalogue.events)('$event', ({ event, level, trigger, request }) => {\n  it('is raised with its name, level and fields, and no credential', async () => {\n    const line = (await raiseAndCapture(trigger)).find((l) => l.event === event || String(l.event).startsWith(event + ':'))\n    expect(line, event + ' was not raised').toBeDefined()\n    for (const field of request ? [...FIELDS, ...REQUEST_FIELDS] : FIELDS) expect(line).toHaveProperty(field)\n    expect(line!.level).toBe(level)\n    expect(String(line!.datetime)).toMatch(/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?(Z|[+-]\\d\\d:?\\d\\d)$/)\n    for (const secret of SECRETS) expect(JSON.stringify(line)).not.toContain(secret)\n  })\n})\n```"
+    },
+    {
+      "id": "ff-route",
+      "type": "fitness-fn",
+      "label": "Security route in the shipper",
+      "x": 1040,
+      "y": 130,
+      "category": "structural",
+      "threshold": "In the shipper's unit tests, a security event at level INFO comes out of the security route and an ordinary line does not; the tests run on every change to vector.yaml",
+      "description": "The shipper's configuration splits the element's output: lines whose event field starts with a vocabulary prefix go to the SIEM sink, read straight from the parsed lines, before any level filter or sampling of the operational logs. Vector's own unit tests, run with vector test in CI, prove both directions; the SIEM sink buffers on disk and blocks when full, so a SIEM outage delays events instead of dropping them.\n\nTool: Vector (vector test); with Fluent Bit, a rewrite_tag filter on the event field and a test that runs fluent-bit with a dummy input\n\n```yaml\n# vector.yaml; CI: vector test vector.yaml\nsources: { app: { type: kubernetes_logs } }\ntransforms:\n  parsed:\n    type: remap\n    inputs: [app]\n    source: |\n      parsed, err = parse_json(.message)\n      if err == null && is_object(parsed) { . = merge(., object!(parsed)) }\n  security:   # read from the parsed lines, before any level filter or sampling of the operational logs\n    type: filter\n    inputs: [parsed]\n    condition: |\n      match(string(.event) ?? \"\", r'^(authn|authz|crypt|excess|upload|input|malicious|mcp|privilege|sensitive|sequence|session|sys|user)_')\nsinks:\n  siem:   # splunk_hec_logs here; azure_logs_ingestion, elasticsearch, opensearch or loki for the other SIEMs\n    { type: splunk_hec_logs, inputs: [security], endpoint: 'https://splunk.example.com:8088', default_token: '${SPLUNK_HEC_TOKEN}',\n      encoding: { codec: json }, buffer: { type: disk, max_size: 268435488, when_full: block } }\ntests:\n  - name: an INFO security event takes the security route\n    inputs: [{ insert_at: security, type: log, log_fields: { event: 'authn_login_success:joebob1', level: INFO } }]\n    outputs: [{ extract_from: security, conditions: [{ type: vrl, source: 'assert_eq!(.event, \"authn_login_success:joebob1\")' }] }]\n  - name: an ordinary line does not\n    no_outputs_from: [security]\n    inputs: [{ insert_at: security, type: log, log_fields: { message: 'order placed', level: INFO } }]\n```"
+    },
+    {
+      "id": "ff-sigma-check",
+      "type": "fitness-fn",
+      "label": "Sigma rules pass the check",
+      "x": 1040,
+      "y": 260,
+      "category": "process",
+      "threshold": "sigma check reports 0 errors, 0 condition errors and 0 issues over rules/, and the conversion for the SIEM's backend fails on any rule it cannot convert",
+      "description": "Every pull request that touches rules/ runs sigma check with --fail-on-issues over the whole folder, then converts the rules for the SIEM with --fail-unsupported, so a rule the backend cannot express fails the build instead of disappearing from the output. The snippet is the password-guessing pair the drill exercises, two files shown together: a single-event rule and a Sigma correlation rule counting it per account.\n\nTool: sigma-cli (pip install sigma-cli and sigma plugin install <backend>, both pinned; sigma-cli 4 for the Splunk and Loki backends, sigma-cli 3 for the Kusto, Elasticsearch and OpenSearch backends)\n\n```yaml\n# rules/events/authn-login-fail.yml, then rules/correlations/password-guessing.yml\n# CI: sigma check --fail-on-issues rules/ && sigma convert --fail-unsupported -t splunk -p pipelines/splunk.yml -f savedsearches rules/\n#   Elastic: -t esql -f siem_rule_ndjson rules/; Loki: -t loki rules/; Sentinel (-t kusto) and OpenSearch (-t opensearch_lucene): rules/events/ only\ntitle: Failed sign-in\nid: 1f0c6a2e-3b7d-4c1e-9a55-6d2f0b8e7c41\nname: app_authn_login_fail\nstatus: stable\nlogsource: { product: shop, service: security }\ndetection:\n  selection:\n    event|startswith: 'authn_login_fail:'\n  condition: selection\nlevel: low\n---\ntitle: Password guessing on one account\nid: 9b3e7d14-5a20-4f8b-8c6e-2e1d4a7f0b93\nstatus: stable\ncorrelation:\n  type: event_count\n  rules: [app_authn_login_fail]\n  group-by: [userid]\n  timespan: {{WINDOW_MINUTES}}m\n  condition: { gte: {{FAILED_LOGINS}} }\ntags: [attack.credential-access, attack.t1110]\nlevel: high\n```",
+      "hubWhen": {
+        "RULES": [
+          "sigma"
+        ]
+      }
+    },
+    {
+      "id": "ff-sigma-coverage",
+      "type": "fitness-fn",
+      "label": "Every warning event has a Sigma rule",
+      "x": 1040,
+      "y": 390,
+      "category": "structural",
+      "threshold": "0 catalogued events at level WARN or CRITICAL that no Sigma rule's detection uses; 0 high or critical rules without an attack.tNNNN tag",
+      "description": "A script in CI reads the catalogue and every rule under rules/ (several rules per file included), fails on a high or critical rule without an ATT&CK technique tag, and on a WARN or CRITICAL event whose name no rule's detection mentions.\n\nTool: Node 20.1 or later with js-yaml (readdirSync with recursive)\n\n```js\n// scripts/check-detections.mjs; CI: node scripts/check-detections.mjs\nimport { readFileSync, readdirSync } from 'node:fs'\nimport { join } from 'node:path'\nimport { load, loadAll } from 'js-yaml'\n\nconst { events } = load(readFileSync('security/events.yaml', 'utf8'))\nconst files = readdirSync('rules', { recursive: true }).filter((f) => f.endsWith('.yml')).map((f) => join('rules', f))\nconst rules = files.flatMap((f) => loadAll(readFileSync(f, 'utf8')).map((rule) => ({ f, rule })))\nconst problems = []\nfor (const { f, rule } of rules) {\n  if (['high', 'critical'].includes(rule.level) && !(rule.tags ?? []).some((t) => /^attack\\.t\\d{4}(\\.\\d{3})?$/.test(t)))\n    problems.push(f + ': \"' + rule.title + '\" is ' + rule.level + ' but names no ATT&CK technique')\n}\nconst detections = JSON.stringify(rules.map(({ rule }) => rule.detection ?? {}))\nfor (const { event, level } of events) {\n  if (level !== 'INFO' && !new RegExp('\"' + event + '(:|\")').test(detections)) problems.push(event + ' (' + level + ') is used by no Sigma rule')\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "RULES": [
+          "sigma"
+        ]
+      }
+    },
+    {
+      "id": "ff-native-coverage",
+      "type": "fitness-fn",
+      "label": "Every warning event mapped to a rule",
+      "x": 1040,
+      "y": 520,
+      "category": "structural",
+      "threshold": "0 catalogued events at level WARN or CRITICAL without an entry in security/detections.yaml; 0 entries naming a missing rule file or no built-in rule id; 0 high or critical entries without an ATT&CK technique",
+      "description": "security/detections.yaml lists, per event, the rule that covers it: a built-in rule by the SIEM's id, or a rule written by the team by its file under siem/rules. A script in CI checks the mapping against the catalogue and the files. Whether a built-in rule is switched on is shown by the SIEM; the daily drill proves the one for password guessing.\n\nTool: Node 20 or later with js-yaml\n\n```js\n// scripts/check-detections.mjs; security/detections.yaml holds entries like\n//   - { event: authn_login_fail, rule: Password guessing on one account, file: siem/rules/password-guessing.kql, level: high, technique: T1110 }\n//   - { event: authz_admin, rule: Admin operation by a new account, builtin: <the SIEM's rule id>, level: medium }\nimport { existsSync, readFileSync } from 'node:fs'\nimport { load } from 'js-yaml'\n\nconst { events } = load(readFileSync('security/events.yaml', 'utf8'))\nconst map = load(readFileSync('security/detections.yaml', 'utf8'))\nconst problems = []\nfor (const { event, level } of events) {\n  if (level !== 'INFO' && !map.some((d) => d.event === event)) problems.push(event + ' (' + level + ') is covered by no rule')\n}\nfor (const d of map) {\n  if (!d.builtin && !(d.file && existsSync(d.file))) problems.push(d.rule + ': no built-in id and no rule file')\n  if (['high', 'critical'].includes(d.level) && !/^T\\d{4}(\\.\\d{3})?$/.test(d.technique ?? '')) problems.push(d.rule + ': ' + d.level + ' but no ATT&CK technique')\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
+      "hubWhen": {
+        "RULES": [
+          "native"
+        ]
+      }
+    },
+    {
+      "id": "ff-ack",
+      "type": "fitness-fn",
+      "label": "Security pages acknowledged in time",
+      "x": 1040,
+      "y": 650,
+      "category": "process",
+      "threshold": "0 high-urgency incidents on the security service in the last 30 days acknowledged later than {{ACK_MINUTES}} minutes or never",
+      "description": "A monthly job asks the paging tool's analytics API for the high-urgency incidents of the security service (the drill service left out) created in the last 30 days, prints the time to first acknowledgement of each, and fails on any later than the limit or never acknowledged. With a managed service, the security service is the one its escalations page. The report goes to the security owner.\n\nTool: PagerDuty REST API, POST /analytics/raw/incidents, with curl and jq; for another paging tool, the same report from its incident API\n\n```bash\n# security/ack-report.sh; monthly\nset -euo pipefail\nbody=$(jq -n --arg svc \"$PD_SECURITY_SERVICE_ID\" --arg from \"$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)\" \\\n  --arg to \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\\n  '{filters: {created_at_start: $from, created_at_end: $to, service_ids: [$svc], urgency: \"high\"}, limit: 1000, time_zone: \"Etc/UTC\"}')\ncurl -fsS -X POST https://api.pagerduty.com/analytics/raw/incidents \\\n  -H \"Authorization: Token token=$PD_API_KEY\" -H 'Accept: application/vnd.pagerduty+json;version=2' \\\n  -H 'Content-Type: application/json' -d \"$body\" > incidents.json\njq -r '.data[] | [.incident_number, .created_at, (.seconds_to_first_ack // \"never\")] | @tsv' incidents.json\nlate=$(jq --argjson limit $(( {{ACK_MINUTES}} * 60 )) '[.data[] | select(.seconds_to_first_ack == null or .seconds_to_first_ack > $limit)] | length' incidents.json)\n[ \"$late\" -eq 0 ] || { echo \"$late security pages acknowledged after {{ACK_MINUTES}} minutes or never\"; exit 1; }\n```"
+    },
+    {
+      "id": "ff-drill-sentinel",
+      "type": "fitness-fn",
+      "label": "Daily drill on Sentinel",
+      "x": 1040,
+      "y": 780,
+      "category": "operational",
+      "threshold": "The canary account's password-guessing alert is in the SecurityAlert table within {{ALERT_MINUTES}} minutes of the drill; the security table's total retention is at least {{EVENT_DAYS}} days",
+      "description": "A scheduled job fails the canary account's sign-in the set number of times, polls the workspace for the analytics rule's alert with the canary account among its entities, and then reads the custom table's total retention. A failure alerts the security owner. The rule's alerts on the canary account are routed to the drill service, not to people.\n\nTool: Azure CLI (az monitor log-analytics query from the log-analytics extension; az monitor log-analytics workspace table show), curl and jq; scheduled by GitHub Actions or the platform's scheduler\n\n```bash\n# security/drill.sh (Microsoft Sentinel); daily\nset -euo pipefail\nstart=$(date -u +%Y-%m-%dT%H:%M:%SZ); start_s=$(date -u +%s)\nfor i in $(seq {{FAILED_LOGINS}}); do   # the canary account, a wrong password each time\n  curl -s -o /dev/null -X POST \"$SIGN_IN_URL\" -H 'Content-Type: application/json' \\\n    -d \"$(jq -n --arg u \"$CANARY_USER\" --arg p \"drill-$i-$RANDOM\" '{username: $u, password: $p}')\"\ndone\ndeadline=$(( $(date +%s) + {{ALERT_MINUTES}} * 60 ))\nalerts() { az monitor log-analytics query -w \"$WORKSPACE_ID\" -o tsv --query '[0].Count' --analytics-query \\\n  \"SecurityAlert | where TimeGenerated > datetime($start) and AlertName == 'Password guessing on one account' and Entities has '$CANARY_USER' | count\"; }\nuntil [ \"$(alerts)\" -gt 0 ]; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"no alert within {{ALERT_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\ndays=$(az monitor log-analytics workspace table show -g \"$RESOURCE_GROUP\" --workspace-name \"$WORKSPACE\" -n ShopSecurityEvents_CL \\\n  --query 'totalRetentionInDays || properties.totalRetentionInDays' -o tsv)\n[ \"$days\" -ge {{EVENT_DAYS}} ] || { echo \"security events kept $days days, fewer than {{EVENT_DAYS}}\"; exit 1; }\n```",
+      "hubWhen": {
+        "SIEM": [
+          "sentinel"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-splunk",
+      "type": "fitness-fn",
+      "label": "Daily drill on Splunk",
+      "x": 1040,
+      "y": 910,
+      "category": "operational",
+      "threshold": "The canary account's password-guessing finding is in the notable index within {{ALERT_MINUTES}} minutes of the drill; the security index keeps events at least {{EVENT_DAYS}} days (frozenTimePeriodInSecs)",
+      "description": "A scheduled job fails the canary account's sign-in the set number of times, searches the notable index through the REST export endpoint for the correlation search's finding on that account, and then reads the security index's frozenTimePeriodInSecs. A failure alerts the security owner.\n\nTool: Splunk REST API (search/v2/jobs/export, data/indexes/{name}) with curl and jq\n\n```bash\n# security/drill.sh (Splunk Enterprise Security); daily\nset -euo pipefail\nstart=$(date -u +%Y-%m-%dT%H:%M:%SZ); start_s=$(date -u +%s)\nfor i in $(seq {{FAILED_LOGINS}}); do   # the canary account, a wrong password each time\n  curl -s -o /dev/null -X POST \"$SIGN_IN_URL\" -H 'Content-Type: application/json' \\\n    -d \"$(jq -n --arg u \"$CANARY_USER\" --arg p \"drill-$i-$RANDOM\" '{username: $u, password: $p}')\"\ndone\ndeadline=$(( $(date +%s) + {{ALERT_MINUTES}} * 60 ))\nalerts() { curl -fsS -H \"Authorization: Bearer $SPLUNK_TOKEN\" \"$SPLUNK_URL/services/search/v2/jobs/export\" -d output_mode=json -d earliest_time=\"$start_s\" \\\n  --data-urlencode \"search=search index=notable search_name=\\\"Password guessing on one account\\\" userid=\\\"$CANARY_USER\\\" | stats count\" \\\n  | jq -rs 'map(select(.result)) | last.result.count // \"0\"'; }\nuntil [ \"$(alerts)\" -gt 0 ]; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"no alert within {{ALERT_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\nsecs=$(curl -fsS -H \"Authorization: Bearer $SPLUNK_TOKEN\" \"$SPLUNK_URL/services/data/indexes/shop_security?output_mode=json\" | jq '.entry[0].content.frozenTimePeriodInSecs | tonumber')\n[ \"$secs\" -ge $(( {{EVENT_DAYS}} * 86400 )) ] || { echo \"security index keeps $secs seconds, less than {{EVENT_DAYS}} days\"; exit 1; }\n```",
+      "hubWhen": {
+        "SIEM": [
+          "splunk"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-elastic",
+      "type": "fitness-fn",
+      "label": "Daily drill on Elastic Security",
+      "x": 1040,
+      "y": 1040,
+      "category": "operational",
+      "threshold": "The password-guessing rule's alert is found through the alerts search API within {{ALERT_MINUTES}} minutes of the drill; the security data stream's lifecycle policy deletes after at least {{EVENT_DAYS}} days",
+      "description": "A scheduled job fails the canary account's sign-in the set number of times, searches the detection alerts for the rule's name since the drill began (the drill runs at a quiet hour, so an alert of that rule in the window is the drill's), and then reads the delete phase of the data stream's lifecycle policy. A failure alerts the security owner.\n\nTool: Kibana detection engine API (POST /api/detection_engine/signals/search) and the Elasticsearch ILM API (GET _ilm/policy), with curl and jq\n\n```bash\n# security/drill.sh (Elastic Security); daily\nset -euo pipefail\nstart=$(date -u +%Y-%m-%dT%H:%M:%SZ); start_s=$(date -u +%s)\nfor i in $(seq {{FAILED_LOGINS}}); do   # the canary account, a wrong password each time\n  curl -s -o /dev/null -X POST \"$SIGN_IN_URL\" -H 'Content-Type: application/json' \\\n    -d \"$(jq -n --arg u \"$CANARY_USER\" --arg p \"drill-$i-$RANDOM\" '{username: $u, password: $p}')\"\ndone\ndeadline=$(( $(date +%s) + {{ALERT_MINUTES}} * 60 ))\nquery=$(jq -n --arg since \"$start\" '{size: 0, track_total_hits: true, query: {bool: {filter: [\n  {term: {\"kibana.alert.rule.name\": \"Password guessing on one account\"}}, {range: {\"@timestamp\": {gte: $since}}}]}}}')\nalerts() { curl -fsS -X POST \"$KIBANA_URL/api/detection_engine/signals/search\" -H \"Authorization: ApiKey $ELASTIC_API_KEY\" \\\n  -H 'kbn-xsrf: true' -H 'Content-Type: application/json' -d \"$query\" | jq '.hits.total.value'; }\nuntil [ \"$(alerts)\" -gt 0 ]; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"no alert within {{ALERT_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\nage=$(curl -fsS \"$ES_URL/_ilm/policy/shop-security\" -H \"Authorization: ApiKey $ELASTIC_API_KEY\" | jq -r '.\"shop-security\".policy.phases.delete.min_age // \"0d\"')\n[[ \"$age\" =~ ^([0-9]+)d$ ]] && [ \"${BASH_REMATCH[1]}\" -ge {{EVENT_DAYS}} ] || { echo \"security events deleted after $age, before {{EVENT_DAYS}} days\"; exit 1; }\n```",
+      "hubWhen": {
+        "SIEM": [
+          "elastic"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-opensearch",
+      "type": "fitness-fn",
+      "label": "Daily drill on OpenSearch",
+      "x": 1040,
+      "y": 1170,
+      "category": "operational",
+      "threshold": "The password-guessing monitor has an alert that started after the drill within {{ALERT_MINUTES}} minutes; the security indexes' ISM policy moves them to delete after at least {{EVENT_DAYS}} days",
+      "description": "A scheduled job fails the canary account's sign-in the set number of times, lists the alerts of the password-guessing bucket-level monitor through the Alerting API and counts those that started after the drill, and then reads the min_index_age of the policy's transition to its delete state. A failure alerts the security owner.\n\nTool: OpenSearch Alerting API (GET _plugins/_alerting/monitors/alerts) and Index State Management API (GET _plugins/_ism/policies), with curl and jq\n\n```bash\n# security/drill.sh (OpenSearch Security Analytics); daily\nset -euo pipefail\nstart=$(date -u +%Y-%m-%dT%H:%M:%SZ); start_s=$(date -u +%s)\nfor i in $(seq {{FAILED_LOGINS}}); do   # the canary account, a wrong password each time\n  curl -s -o /dev/null -X POST \"$SIGN_IN_URL\" -H 'Content-Type: application/json' \\\n    -d \"$(jq -n --arg u \"$CANARY_USER\" --arg p \"drill-$i-$RANDOM\" '{username: $u, password: $p}')\"\ndone\ndeadline=$(( $(date +%s) + {{ALERT_MINUTES}} * 60 ))\nalerts() { curl -fsS -u \"$OPENSEARCH_USER:$OPENSEARCH_PASSWORD\" \"$OPENSEARCH_URL/_plugins/_alerting/monitors/alerts?monitorId=$GUESSING_MONITOR_ID&size=100\" \\\n  | jq --argjson since \"$(( start_s * 1000 ))\" '[.alerts[] | select(.start_time >= $since)] | length'; }\nuntil [ \"$(alerts)\" -gt 0 ]; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"no alert within {{ALERT_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\nage=$(curl -fsS -u \"$OPENSEARCH_USER:$OPENSEARCH_PASSWORD\" \"$OPENSEARCH_URL/_plugins/_ism/policies/shop-security\" \\\n  | jq -r '[.policy.states[].transitions[]? | select(.state_name == \"delete\") | .conditions.min_index_age][0] // \"0d\"')\n[[ \"$age\" =~ ^([0-9]+)d$ ]] && [ \"${BASH_REMATCH[1]}\" -ge {{EVENT_DAYS}} ] || { echo \"security indexes deleted after $age, before {{EVENT_DAYS}} days\"; exit 1; }\n```",
+      "hubWhen": {
+        "SIEM": [
+          "opensearch"
+        ]
+      }
+    },
+    {
+      "id": "ff-drill-logs",
+      "type": "fitness-fn",
+      "label": "Daily drill on the log platform",
+      "x": 1040,
+      "y": 1300,
+      "category": "operational",
+      "threshold": "Alertmanager holds a PasswordGuessing alert for the canary account that started after the drill within {{ALERT_MINUTES}} minutes; Loki's compactor applies retention and the security stream's retention_stream period is at least {{EVENT_DAYS}} days",
+      "description": "A scheduled job fails the canary account's sign-in the set number of times, asks Alertmanager for the ruler's PasswordGuessing alert with the canary account's userid label, and then reads the Loki configuration in the repository: retention must be enabled in the compactor and the security stream must have a retention_stream rule of its own. A failure alerts the security owner. With Elasticsearch, OpenSearch or CloudWatch Logs as the log store, the same drill reads their alerts and lifecycle settings instead.\n\nTool: Alertmanager API v2 (GET /api/v2/alerts with filter), curl, jq, and Node with js-yaml over the Loki configuration\n\n```bash\n# security/drill.sh (alerts in Loki through Alertmanager); daily\nset -euo pipefail\nstart=$(date -u +%Y-%m-%dT%H:%M:%SZ); start_s=$(date -u +%s)\nfor i in $(seq {{FAILED_LOGINS}}); do   # the canary account, a wrong password each time\n  curl -s -o /dev/null -X POST \"$SIGN_IN_URL\" -H 'Content-Type: application/json' \\\n    -d \"$(jq -n --arg u \"$CANARY_USER\" --arg p \"drill-$i-$RANDOM\" '{username: $u, password: $p}')\"\ndone\ndeadline=$(( $(date +%s) + {{ALERT_MINUTES}} * 60 ))\nalerts() { curl -fsS -G \"$ALERTMANAGER_URL/api/v2/alerts\" --data-urlencode 'filter=alertname=\"PasswordGuessing\"' \\\n  --data-urlencode \"filter=userid=\\\"$CANARY_USER\\\"\" | jq --arg since \"$start\" '[.[] | select(.startsAt >= $since)] | length'; }\nuntil [ \"$(alerts)\" -gt 0 ]; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"no alert within {{ALERT_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\nhours=$(node -e '\n  const c = require(\"js-yaml\").load(require(\"fs\").readFileSync(\"deploy/loki/config.yaml\", \"utf8\"))\n  const r = (c.limits_config?.retention_stream ?? []).find((s) => s.selector === \"{stream=\\\"security\\\"}\")\n  const m = /^(\\d+)(h|d|w)$/.exec(r?.period ?? \"\")\n  console.log(c.compactor?.retention_enabled === true && m ? Number(m[1]) * { h: 1, d: 24, w: 168 }[m[2]] : 0)')\n[ \"$hours\" -ge $(( {{EVENT_DAYS}} * 24 )) ] || { echo \"security stream kept $hours hours, less than {{EVENT_DAYS}} days\"; exit 1; }\n```",
+      "hubWhen": {
+        "SIEM": [
+          "logs"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-catalogue--derives--need",
+      "sourceId": "req-catalogue",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-event-shape--derives--need",
+      "sourceId": "req-event-shape",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-forward--derives--need",
+      "sourceId": "req-forward",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-retention--derives--need",
+      "sourceId": "req-retention",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-brute-force--derives--need",
+      "sourceId": "req-brute-force",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-coverage--derives--need",
+      "sourceId": "req-coverage",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-sigma--derives--need",
+      "sourceId": "req-sigma",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-drill--derives--need",
+      "sourceId": "req-drill",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-page--derives--need",
+      "sourceId": "req-page",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-mdr-escalation--derives--need",
+      "sourceId": "req-mdr-escalation",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "req-mdr-triage--derives--need",
+      "sourceId": "req-mdr-triage",
+      "targetId": "need",
+      "relationType": "derives"
+    },
+    {
+      "id": "sc-catalogue--verifies--req-catalogue",
+      "sourceId": "sc-catalogue",
+      "targetId": "req-catalogue",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-event-shape--verifies--req-event-shape",
+      "sourceId": "sc-event-shape",
+      "targetId": "req-event-shape",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-forward--verifies--req-forward",
+      "sourceId": "sc-forward",
+      "targetId": "req-forward",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-retention--verifies--req-retention",
+      "sourceId": "sc-retention",
+      "targetId": "req-retention",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-brute-force--verifies--req-brute-force",
+      "sourceId": "sc-brute-force",
+      "targetId": "req-brute-force",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-coverage--verifies--req-coverage",
+      "sourceId": "sc-coverage",
+      "targetId": "req-coverage",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-sigma--verifies--req-sigma",
+      "sourceId": "sc-sigma",
+      "targetId": "req-sigma",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-drill--verifies--req-drill",
+      "sourceId": "sc-drill",
+      "targetId": "req-drill",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-page--verifies--req-page",
+      "sourceId": "sc-page",
+      "targetId": "req-page",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-mdr-escalation--verifies--req-mdr-escalation",
+      "sourceId": "sc-mdr-escalation",
+      "targetId": "req-mdr-escalation",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-mdr-triage--verifies--req-mdr-triage",
+      "sourceId": "sc-mdr-triage",
+      "targetId": "req-mdr-triage",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-events--implements--adr-sentinel",
+      "sourceId": "ff-events",
+      "targetId": "adr-sentinel",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-events--implements--adr-splunk",
+      "sourceId": "ff-events",
+      "targetId": "adr-splunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-events--implements--adr-elastic",
+      "sourceId": "ff-events",
+      "targetId": "adr-elastic",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-events--implements--adr-opensearch",
+      "sourceId": "ff-events",
+      "targetId": "adr-opensearch",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-events--implements--adr-logs",
+      "sourceId": "ff-events",
+      "targetId": "adr-logs",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-route--implements--adr-sentinel",
+      "sourceId": "ff-route",
+      "targetId": "adr-sentinel",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-route--implements--adr-splunk",
+      "sourceId": "ff-route",
+      "targetId": "adr-splunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-route--implements--adr-elastic",
+      "sourceId": "ff-route",
+      "targetId": "adr-elastic",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-route--implements--adr-opensearch",
+      "sourceId": "ff-route",
+      "targetId": "adr-opensearch",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-route--implements--adr-logs",
+      "sourceId": "ff-route",
+      "targetId": "adr-logs",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sigma-check--implements--adr-sigma",
+      "sourceId": "ff-sigma-check",
+      "targetId": "adr-sigma",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-sigma-coverage--implements--adr-sigma",
+      "sourceId": "ff-sigma-coverage",
+      "targetId": "adr-sigma",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-native-coverage--implements--adr-native",
+      "sourceId": "ff-native-coverage",
+      "targetId": "adr-native",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-sentinel",
+      "sourceId": "ff-ack",
+      "targetId": "adr-sentinel",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-splunk",
+      "sourceId": "ff-ack",
+      "targetId": "adr-splunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-elastic",
+      "sourceId": "ff-ack",
+      "targetId": "adr-elastic",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-opensearch",
+      "sourceId": "ff-ack",
+      "targetId": "adr-opensearch",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-logs",
+      "sourceId": "ff-ack",
+      "targetId": "adr-logs",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-soc",
+      "sourceId": "ff-ack",
+      "targetId": "adr-soc",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-mdr",
+      "sourceId": "ff-ack",
+      "targetId": "adr-mdr",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-ack--implements--adr-team",
+      "sourceId": "ff-ack",
+      "targetId": "adr-team",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-sentinel--implements--adr-sentinel",
+      "sourceId": "ff-drill-sentinel",
+      "targetId": "adr-sentinel",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-splunk--implements--adr-splunk",
+      "sourceId": "ff-drill-splunk",
+      "targetId": "adr-splunk",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-elastic--implements--adr-elastic",
+      "sourceId": "ff-drill-elastic",
+      "targetId": "adr-elastic",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-opensearch--implements--adr-opensearch",
+      "sourceId": "ff-drill-opensearch",
+      "targetId": "adr-opensearch",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-drill-logs--implements--adr-logs",
+      "sourceId": "ff-drill-logs",
+      "targetId": "adr-logs",
+      "relationType": "implements"
+    }
+  ]
+}

@@ -79,7 +79,7 @@
         "key": "STANDARD",
         "title": "Standard",
         "label": "Which standard is the code held to?",
-        "hint": "The standard decides what \"secure\" means for a change: a list of controls a tool can verify, the same plus a threat model per feature, or a language rule set for code where a wrong index is a remote code execution.",
+        "hint": "The standard decides what \"secure\" means for a change: a list of controls a tool can verify, the same plus design-level controls carried by a threat model, or a language rule set for code where a wrong index is a remote code execution.",
         "defaultValue": "asvs-l1",
         "options": [
           {
@@ -89,8 +89,8 @@
           },
           {
             "value": "asvs-l2",
-            "label": "OWASP ASVS level 2 with a threat model per feature",
-            "description": "ASVS Level 2: everything in Level 1, plus design-level controls and a threat model (STRIDE) kept beside each feature and updated with every new trust boundary. Pick it for applications handling personal, financial or health data, or where a flaw in one feature's design would be a reportable incident."
+            "label": "OWASP ASVS level 2, with a threat model as the Threat modelling pack decides",
+            "description": "ASVS Level 2: everything in Level 1, plus design-level controls, carried by the threat model the Threat modelling pack decides (when it is made, with which method, where it lives). Pick it for applications handling personal, financial or health data, or where a flaw in one feature's design would be a reportable incident."
           },
           {
             "value": "cert-misra",
@@ -156,8 +156,8 @@
           },
           {
             "value": "periodic",
-            "label": "a scheduled ZAP full scan or penetration test",
-            "description": "A ZAP full scan runs on a schedule against staging, and a penetration test is commissioned on a longer one; findings enter the same deadlines. Pick it when deployments are rare or the pipeline cannot reach the running system."
+            "label": "a scheduled ZAP full scan",
+            "description": "A ZAP full scan runs on a schedule against staging, and its findings enter the same deadlines; how often an external penetration test runs is decided in the Secure development process pack. Pick it when deployments are rare or the pipeline cannot reach the running system."
           },
           {
             "value": "none",
@@ -217,14 +217,9 @@
       },
       {
         "key": "DAST_DAYS",
-        "label": "Most days between dynamic tests of the production configuration. Only with scheduled dynamic testing",
+        "label": "Most days between two ZAP full scans of the production configuration. Only with a scheduled ZAP full scan",
         "defaultValue": "90",
         "type": "number"
-      },
-      {
-        "key": "THREAT_MODEL_TRIGGER",
-        "label": "Which changes require the threat model to be updated? Only with ASVS level 2",
-        "defaultValue": "a new endpoint, a new data store, a new trust boundary"
       }
     ]
   },
@@ -374,13 +369,13 @@
     {
       "id": "req-dast-periodic",
       "type": "requirement",
-      "label": "Dynamic tests stay recent",
+      "label": "Full scans stay recent",
       "x": 260,
       "y": 1170,
       "ears_type": "state-driven",
-      "precondition": "the last dynamic test (a ZAP full scan or a penetration test) of the production configuration is more than {{DAST_DAYS}} days old",
-      "action": "run or commission a new one within 14 days, and put each of its high and critical findings under the deadlines of its severity as code scanning alerts",
-      "rationale": "A dynamic test ages with every release; a bound on its age is what keeps \"we had a pentest\" from meaning one from three years ago (NIST SSDF PW.8; OWASP ZAP documentation: full scan).",
+      "precondition": "the last ZAP full scan of the production configuration is more than {{DAST_DAYS}} days old",
+      "action": "run a new one within 14 days, and put each of its high and critical findings under the deadlines of its severity as code scanning alerts",
+      "rationale": "A dynamic scan ages with every release; a bound on its age is what keeps \"we scanned it\" from meaning a scan of a configuration three releases old (NIST SSDF PW.8; OWASP ZAP documentation: full scan). External penetration tests and how often they run are decided in the Secure development process pack.",
       "hubWhen": {
         "DAST": [
           "periodic"
@@ -430,27 +425,11 @@
       "rationale": "Broken access control is OWASP Top 10 A01:2021 and no scanner finds it, because the code is correct for the right user; only a test that is the wrong user does (ASVS 4.0.3 V4.1.1, V4.1.3; the rules themselves are decided in Authorization)."
     },
     {
-      "id": "req-threat-model",
-      "type": "requirement",
-      "label": "Threat model per feature",
-      "x": 260,
-      "y": 1690,
-      "ears_type": "event-driven",
-      "trigger": "a change adds {{THREAT_MODEL_TRIGGER}}",
-      "action": "update the feature's threat model (a STRIDE table in threat-model.md beside the code: asset, threat, mitigation, status) in the same pull request, with every threat either mitigated or carried as a numbered finding under its deadline, and have it reviewed before the merge",
-      "rationale": "Level 2 asks for design-level controls, which no scanner verifies; a threat model kept beside the code and changed with it is the lightest form that stays true (ASVS 4.0.3 V1.1.2; Threat Modeling Manifesto: continuous, with the people who build the system).",
-      "hubWhen": {
-        "STANDARD": [
-          "asvs-l2"
-        ]
-      }
-    },
-    {
       "id": "req-memory-safety",
       "type": "requirement",
       "label": "Memory safety rules",
       "x": 260,
-      "y": 1820,
+      "y": 1690,
       "ears_type": "ubiquitous",
       "action": "check every array index and buffer length before use, use only bounded string and memory functions (snprintf, strlcpy or strncpy_s, memcpy with a checked length), check integer arithmetic on sizes and indices for overflow, run the tests under AddressSanitizer and UndefinedBehaviorSanitizer, and ban gets, strcpy, strcat, sprintf, scanf without field widths, system and alloca by the analyser, with every deviation recorded",
       "rationale": "In unmanaged code the vulnerability class that matters is memory corruption, and the standards name the rules that prevent it (SEI CERT ARR30-C, STR31-C, INT30-C, ENV33-C; MISRA C:2023 Rule 21.6, Rule 21.8, Directive 4.11, Directive 4.14).",
@@ -643,26 +622,11 @@
       "then": "customer B gets 404 or 403, the anonymous caller 401, and the test runs in the pull-request suite tagged with the route"
     },
     {
-      "id": "sc-threat-model",
-      "type": "scenario",
-      "label": "New endpoint modelled",
-      "x": 520,
-      "y": 1690,
-      "given": "a pull request that adds a public endpoint to a feature",
-      "when": "it is reviewed",
-      "then": "it changes the feature's threat-model.md with rows for the endpoint, the check finds every STRIDE category and every row mitigated or carried as a numbered finding, and a reviewer approved the table",
-      "hubWhen": {
-        "STANDARD": [
-          "asvs-l2"
-        ]
-      }
-    },
-    {
       "id": "sc-memory-safety",
       "type": "scenario",
       "label": "Overflow refused",
       "x": 520,
-      "y": 1820,
+      "y": 1690,
       "given": "a function that copies a caller-supplied string into a fixed buffer",
       "when": "it is called with a string longer than the buffer under AddressSanitizer",
       "then": "the copy is truncated or refused with an error, the sanitizer reports 0 overflows, and the analyser flags 0 banned functions",
@@ -681,10 +645,10 @@
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts and tests under tests/; Python, Go, the JVM and C get their own tool named beside each.",
       "decision": "The code is held to OWASP ASVS Level 1 (4.0.3, moving to 5.0), and every Level 1 control is mapped to a lint rule, a test or a scanner rather than to a document. Data reaches the database only through parameterised queries or the ORM's query builder, checked by a lint rule on every pull request; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security with no-eval and react/no-danger, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware with secure defaults. Input is validated {{INPUT}}. Static analysis: {{SAST}}. Dynamic testing: {{DAST}}. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
-      "consequences": "• Most of the standard is checked on every change by tools; a reviewer checks the rest from a short list.\n• Level 1 verifies code, not design: a feature with a flawed design passes if its code is clean, which is what Level 2's threat model adds.\n• Lint bans are blunt: the reporting query built from an allow-list of column names needs a suppression with a reason, and reviewers must read suppressions.\n• Needs a framework with auto-escaping and security middleware; hand-rolled HTTP handling has to add both.",
-      "alternatives": "1. ASVS Level 2: adds a threat model per feature and design-level controls; the right bar for personal, financial or health data.\n2. A language coding standard (SEI CERT, MISRA): for C, C++ and embedded code, where the classes of flaw are different.\n3. The OWASP Top 10 as the only checklist: an awareness document, too coarse to map to checks.",
+      "consequences": "• Most of the standard is checked on every change by tools; a reviewer checks the rest from a short list.\n• Level 1 verifies code, not design: a feature with a flawed design passes if its code is clean, which is what Level 2's design-level controls, carried by the threat model, add.\n• Lint bans are blunt: the reporting query built from an allow-list of column names needs a suppression with a reason, and reviewers must read suppressions.\n• Needs a framework with auto-escaping and security middleware; hand-rolled HTTP handling has to add both.",
+      "alternatives": "1. ASVS Level 2: adds design-level controls, carried by the threat model the Threat modelling pack decides; the right bar for personal, financial or health data.\n2. A language coding standard (SEI CERT, MISRA): for C, C++ and embedded code, where the classes of flaw are different.\n3. The OWASP Top 10 as the only checklist: an awareness document, too coarse to map to checks.",
       "hubWhen": {
         "STANDARD": [
           "asvs-l1"
@@ -694,16 +658,16 @@
     {
       "id": "adr-asvs-l2",
       "type": "adr",
-      "label": "OWASP ASVS level 2 with a threat model per feature",
+      "label": "OWASP ASVS level 2, with a threat model as the Threat modelling pack decides",
       "x": 780,
       "y": 130,
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
-      "decision": "The code is held to OWASP ASVS Level 2 (4.0.3, moving to 5.0): every Level 1 control is mapped to a lint rule, a test or a scanner, and the design-level controls are carried by a threat model per feature, a STRIDE table in threat-model.md beside the feature's code, updated in the same pull request whenever a change adds {{THREAT_MODEL_TRIGGER}}, and reviewed before the merge; a check fails the build when a feature has no threat model or a row that is neither mitigated nor a numbered finding. Data reaches the database only through parameterised queries or the ORM's query builder, checked by a lint rule on every pull request; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware. Input is validated {{INPUT}}. Static analysis: {{SAST}}. Dynamic testing: {{DAST}}. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
-      "consequences": "• Design flaws (a missing check on a new trust boundary, a data store nobody thought about) are found at the pull request, where they are cheap.\n• Every feature carries a threat model that must be kept true; a stale one is worse than none, so the check and the review are not optional.\n• Costs an hour or two per new trust boundary from the people who build the feature, not from a security team.\n• Level 2 also expects a verification by someone other than the author per release; plan a review or a penetration test cycle for it.",
-      "alternatives": "1. ASVS Level 1: the same tools without the threat model; enough where a design flaw is not a reportable incident.\n2. ASVS Level 3: adds verification of every control by a reviewer and architecture-level requirements; for systems where a breach endangers life or critical infrastructure.\n3. A threat model for the whole system once a year: cheaper, and stale by the second release.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts and tests under tests/; Python, Go, the JVM and C get their own tool named beside each.",
+      "decision": "The code is held to OWASP ASVS Level 2 (4.0.3, moving to 5.0): every Level 1 control is mapped to a lint rule, a test or a scanner, and the design-level controls are carried by the threat model the Threat modelling pack decides: when it is made and redone, with which method, where it lives and how each threat ends are that pack's decisions, and this one relies on them. Data reaches the database only through parameterised queries or the ORM's query builder, checked by a lint rule on every pull request; output goes through the template engine's auto-escaping and raw-HTML sinks are banned by lint; eval, dynamic code, shell commands with interpolated strings and deserialisation of untrusted data are banned by lint (eslint-plugin-security, Bandit, gosec, SpotBugs find-sec-bugs by language); CSRF, CORS, cookie flags and security headers come from the framework's middleware. Input is validated {{INPUT}}. Static analysis: {{SAST}}. Dynamic testing: {{DAST}}. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Authorization-sensitive paths have negative tests. Dependencies and base images are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization.",
+      "consequences": "• Design flaws (a missing check on a new trust boundary, a data store nobody thought about) are found in the threat model, before an attacker finds them in the code.\n• Level 2 holds only while the threat model is current; this pack's checks do not verify that, the Threat modelling pack's checks do.\n• More controls to map and verify than Level 1, and the design-level ones need people, not scanners.\n• Level 2 also expects verification by someone other than the author; external penetration tests and how often they run are decided in the Secure development process pack.",
+      "alternatives": "1. ASVS Level 1: the same tools without the design-level controls; enough where a design flaw is not a reportable incident.\n2. ASVS Level 3: adds verification of every control by a reviewer and architecture-level requirements; for systems where a breach endangers life or critical infrastructure.\n3. The OWASP Top 10 as the only checklist: an awareness document, too coarse to map to checks.",
       "hubWhen": {
         "STANDARD": [
           "asvs-l2"
@@ -719,7 +683,7 @@
       "concern": "secure-coding",
       "status": "accepted",
       "date": "",
-      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts, tests under tests/ and features under src/features/; Python, Go, the JVM and C get their own tool named beside each.",
+      "context": "Code is written for this element every week, by people who are thinking about the feature, not about the attacker. The forces: the same few vulnerability classes (injection, broken access control, cross-site scripting, unsafe deserialisation, memory corruption in unmanaged code) account for most breaches year after year, and every one of them is a pattern a tool can find; a standard nobody can check against becomes a document nobody reads; validation spread over every layer is validation nobody owns, while validation nowhere lets a string reach the query; static analysis that blocks the merge stops new flaws but stalls work on a false positive, and analysis that only reports fills a queue nobody empties; dynamic testing finds what the running system exposes, but only in an environment someone deploys to; and a finding without a deadline or a signed acceptance is a finding that stays open. What goes into the build (dependencies, base images) and the deadlines for vulnerable dependencies are decided in Software supply chain, credentials in Secrets, who may call what in Authentication and Authorization; this concern is about the code itself, and its deadlines are for findings in our own code. The snippets assume a TypeScript service with its routes in src/app.ts and tests under tests/; Python, Go, the JVM and C get their own tool named beside each.",
       "decision": "The code is held to a language coding standard: SEI CERT C/C++ (or CERT Java) for application and systems code, MISRA C:2023 where a safety standard or a customer asks for it. Compliance is checked by an analyser in CI, not by reading: clang-tidy with the cert-*, bugprone-* and clang-analyzer-* checks as errors, cppcheck with the MISRA add-on, or a certified analyser (PC-lint Plus, Polyspace, Coverity) where the safety case needs one; the compiler runs with -Wall -Wextra -Werror, -fstack-protector-strong and _FORTIFY_SOURCE=2, and the tests under AddressSanitizer and UndefinedBehaviorSanitizer. Every array index and buffer length is checked, only bounded string functions are used, integer arithmetic on sizes is checked for overflow, and gets, strcpy, strcat, sprintf, scanf without widths, system and alloca are banned by the analyser; each deviation is recorded with its justification in a deviation record the analyser reads. Queries to any database go through bound parameters, checked by a lint rule. Input is validated {{INPUT}}. Security scanner suites beyond the analyser: {{SAST}}. Dynamic testing: {{DAST}}; with no HTTP surface, libFuzzer or AFL++ over every parser instead. A finding gets {{FINDINGS}}: critical within {{CRITICAL_DAYS}} days, high {{HIGH_DAYS}}, medium {{MEDIUM_DAYS}}. Dependencies and toolchains are decided in Software supply chain, credentials in Secrets.",
       "consequences": "• The flaws that matter in unmanaged code (overruns, overflows, use after free) are caught by the analyser and the sanitizers, not by the customer.\n• The analyser reports many findings on an existing codebase; adopt it with a baseline and fix new code first, or the warnings are ignored.\n• MISRA's rules forbid constructs application developers use daily; deviations need a record and a reviewer, which takes time and a person who owns the standard.\n• A certified analyser costs licences; clang-tidy and cppcheck cover most of CERT and much of MISRA for free.",
       "alternatives": "1. ASVS Level 1 or 2: the web application classes of flaw; wrong for code where the problem is memory.\n2. Rewriting in a memory-safe language (Rust, Go): removes the class rather than checking for it; a project, not a rule.\n3. Sanitizers and fuzzing only, no coding standard: finds what the tests reach, and nothing in the paths they do not.",
@@ -821,12 +785,12 @@
     {
       "id": "ff-dast-age",
       "type": "fitness-fn",
-      "label": "Dynamic test not older than the limit",
+      "label": "ZAP full scan not older than the limit",
       "x": 1040,
       "y": 780,
       "category": "process",
-      "threshold": "The newest dynamic test report (ZAP full scan or penetration test) of the production configuration is at most {{DAST_DAYS}} days old, and the newest ZAP report holds 0 high or critical alerts",
-      "description": "A scheduled workflow runs the ZAP full scan against staging and commits its JSON report to security/dast/ as <date>-zap-staging.json; a penetration test is filed beside it as <date>-pentest.pdf with its findings uploaded to code scanning as SARIF, so the deadline job covers them. A daily check fails when the newest report of either kind is older than the limit, or when the newest ZAP report still holds high alerts.\n\nTool: OWASP ZAP (zaproxy/action-full-scan) and a shell check over the reports\n\n```bash\n# the scan: a workflow on a cron that fits {{DAST_DAYS}} days (e.g. '0 3 1 */3 *' for quarterly, with a 90-day limit):\n#   - uses: zaproxy/action-full-scan@v0.12.0   # pin by commit SHA in your repository\n#     with: { target: https://staging.shop.example, cmd_options: '-J report.json', fail_action: false }\n#   then: cp report.json \"security/dast/$(date +%F)-zap-staging.json\" and commit\n# the daily check:\nlatest=$(ls security/dast/ | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-(zap-.*\\.json|pentest\\.pdf)$' | sort | tail -1)\nreport_date=$(echo \"$latest\" | cut -c1-10)\nage=$(( ( $(date +%s) - $(date -d \"$report_date\" +%s) ) / 86400 ))\n[ \"$age\" -le {{DAST_DAYS}} ] || { echo \"newest dynamic test $report_date is $age days old\"; exit 1; }\nlatest_zap=$(ls security/dast/*-zap-*.json | sort | tail -1)\njq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' \"$latest_zap\" \\\n  || { echo \"$latest_zap still holds high alerts\"; exit 1; }\n```",
+      "threshold": "The newest ZAP full scan report in security/dast/ is at most {{DAST_DAYS}} days old and holds 0 high-risk alerts (riskcode 3)",
+      "description": "A scheduled workflow runs the ZAP full scan against staging and commits its JSON report to security/dast/ as <date>-zap-staging.json. A daily check fails when there is no such report, when the newest is older than the limit, or when it still holds high-risk alerts. Penetration tests are recorded in security/pentests.yaml and checked by the Secure development process pack, not here.\n\nTool: OWASP ZAP (zaproxy/action-full-scan) and a shell check over the reports\n\n```bash\n# the scan: a workflow on a cron that fits {{DAST_DAYS}} days (e.g. '0 3 1 */3 *' for quarterly, with a 90-day limit):\n#   - uses: zaproxy/action-full-scan@v0.12.0   # pin by commit SHA in your repository\n#     with: { target: https://staging.shop.example, cmd_options: '-J report.json', fail_action: false }\n#   then: cp report.json \"security/dast/$(date +%F)-zap-staging.json\" and commit\n# the daily check (GNU date, as on ubuntu-latest):\nlatest=$(ls security/dast/ | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-zap-.*\\.json$' | sort | tail -1)\n[ -n \"$latest\" ] || { echo \"no ZAP full scan report in security/dast/\"; exit 1; }\nreport_date=$(echo \"$latest\" | cut -c1-10)\nage=$(( ( $(date +%s) - $(date -d \"$report_date\" +%s) ) / 86400 ))\n[ \"$age\" -le {{DAST_DAYS}} ] || { echo \"newest ZAP full scan $report_date is $age days old\"; exit 1; }\njq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' \"security/dast/$latest\" \\\n  || { echo \"$latest still holds high alerts\"; exit 1; }\n```",
       "hubWhen": {
         "DAST": [
           "periodic"
@@ -949,21 +913,6 @@
           "cert-misra"
         ]
       }
-    },
-    {
-      "id": "ff-threat-model",
-      "type": "fitness-fn",
-      "label": "Every feature has a current threat model",
-      "x": 1040,
-      "y": 1950,
-      "category": "process",
-      "threshold": "100 % of feature directories hold a threat-model.md with a row for each STRIDE category, and 100 % of rows have the status mitigated or finding #<number>",
-      "description": "A check in the pull-request pipeline walks the feature directories and fails when one has no threat-model.md, its table lacks a STRIDE category, or a row's status (the last column) is anything but mitigated or a numbered finding under its deadline; a CODEOWNERS entry for threat-model.md makes a security reviewer's approval required when it changes.\n\nTool: A shell check in CI with CODEOWNERS\n\n```bash\n# threat-model.md: a table | Category | Asset | Threat | Mitigation | Status |, status = mitigated or finding #123\nstatus=0\nfor feature in src/features/*/; do\n  tm=\"${feature}threat-model.md\"\n  [ -f \"$tm\" ] || { echo \"$feature: no threat-model.md\"; status=1; continue; }\n  for category in Spoofing Tampering Repudiation \"Information disclosure\" \"Denial of service\" \"Elevation of privilege\"; do\n    grep -qi \"^| *$category\" \"$tm\" || { echo \"$tm: no row for $category\"; status=1; }\n  done\n  # every data row's last cell is \"mitigated\" or \"finding #<n>\"\n  grep -E '^\\|' \"$tm\" | grep -viE '^\\| *(category|-)' | awk -F'|' -v tm=\"$tm\" '\n    { s = $(NF-1); gsub(/^ +| +$/, \"\", s); if (s !~ /^(mitigated|finding #[0-9]+)$/) { print tm \": row not mitigated or a numbered finding: \" $0; bad = 1 } }\n    END { exit bad }' || status=1\ndone\nexit $status\n# CODEOWNERS:  **/threat-model.md  @our-org/security-reviewers\n```",
-      "hubWhen": {
-        "STANDARD": [
-          "asvs-l2"
-        ]
-      }
     }
   ],
   "relations": [
@@ -1042,12 +991,6 @@
     {
       "id": "req-authz-tests--derives--need",
       "sourceId": "req-authz-tests",
-      "targetId": "need",
-      "relationType": "derives"
-    },
-    {
-      "id": "req-threat-model--derives--need",
-      "sourceId": "req-threat-model",
       "targetId": "need",
       "relationType": "derives"
     },
@@ -1133,12 +1076,6 @@
       "id": "sc-authz-tests--verifies--req-authz-tests",
       "sourceId": "sc-authz-tests",
       "targetId": "req-authz-tests",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-threat-model--verifies--req-threat-model",
-      "sourceId": "sc-threat-model",
-      "targetId": "req-threat-model",
       "relationType": "verifies"
     },
     {
@@ -1391,12 +1328,6 @@
       "id": "ff-clang-tidy--implements--adr-cert-misra",
       "sourceId": "ff-clang-tidy",
       "targetId": "adr-cert-misra",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-threat-model--implements--adr-asvs-l2",
-      "sourceId": "ff-threat-model",
-      "targetId": "adr-asvs-l2",
       "relationType": "implements"
     }
   ]

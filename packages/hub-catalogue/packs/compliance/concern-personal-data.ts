@@ -2,7 +2,8 @@ import type { PackSpec, When } from '../../src/packSpec'
 
 const PERSONAL: When = { PERSONAL: ['yes'] }
 const ERASURE_ADRS = ['adr-delete', 'adr-anonymise', 'adr-crypto']
-const FORCES = 'This store keeps data, and some of it may be about people. The forces: data protection law (GDPR) limits why personal data may be processed, for how long it is kept and where it may go, and gives people the rights to get, take away and erase it, each within one month; copies multiply (replicas, backups, logs, exports, analytics, processors) and every one of them has to follow; health, biometric and other special categories carry a higher bar; erasing must not break the records others still need (invoices, the audit trail); and the controller has to be able to prove all of it (accountability, Art. 5(2)).'
+const BREACH = 'A breach of personal data is assessed and notified as this decision says, whatever incident it arrives through: the breach lead named in docs/breaches/runbook.md decides, on the data protection officer\'s advice, whether it is unlikely to result in a risk to people; unless it is, the supervisory authority named in the runbook is notified without undue delay and within 72 hours of becoming aware of it, with the content of GDPR Art. 33(3), in phases when facts are still missing; the people affected are told without undue delay when the risk is high, unless an exception of Art. 34(3) applies; and every breach, notified or not, is documented in docs/breaches/register.json with its facts, effects, remedy and the reason for each decision. Every processor is bound by contract to tell the controller of a breach within {{PROCESSOR_NOTICE_HOURS}} hours, as processors.yaml records.'
+const FORCES = 'This store keeps data, and some of it may be about people. The forces: data protection law (GDPR) limits why personal data may be processed, for how long it is kept and where it may go, and gives people the rights to get, take away and erase it, each within one month; copies multiply (replicas, backups, logs, exports, analytics, processors) and every one of them has to follow; health, biometric and other special categories carry a higher bar; a breach has to be assessed, and most often notified to the authority, within 72 hours of becoming aware of it, when the facts are still unclear; erasing must not break the records others still need (invoices, the audit trail); and the controller has to be able to prove all of it (accountability, Art. 5(2)).'
 
 const pack: PackSpec = {
   id: 'concern-personal-data',
@@ -18,6 +19,7 @@ const pack: PackSpec = {
   sources: [
     { title: 'Regulation (EU) 2016/679, General Data Protection Regulation (GDPR)', url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj' },
     { title: 'EDPB guidelines, recommendations and best practices (consent, data subject rights, transfers)', url: 'https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en' },
+    { title: 'EDPB Guidelines 9/2022 on personal data breach notification under GDPR', url: 'https://www.edpb.europa.eu/system/files/2023-04/edpb_guidelines_202209_personal_data_breach_notification_v2.0_en.pdf' },
     { title: 'ICO, UK GDPR guidance and resources', url: 'https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/' },
     { title: 'Article 29 Working Party, Opinion 05/2014 on Anonymisation Techniques', url: 'https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2014/wp216_en.pdf' },
     { title: 'CJEU C-311/18 (Schrems II)', url: 'https://curia.europa.eu/juris/liste.jsf?num=C-311/18' },
@@ -76,10 +78,11 @@ const pack: PackSpec = {
     { key: 'RETENTION_MONTHS', label: 'After how many months unused is personal data erased? (data about people only)', default: '24', number: true },
     { key: 'REQUEST_DAYS', label: 'Within how many days is an access or erasure request answered (at most 30)? (data about people only)', default: '30', number: true },
     { key: 'BACKUP_DAYS', label: 'For how many days are backups kept? (data about people only)', default: '35', number: true },
+    { key: 'PROCESSOR_NOTICE_HOURS', label: 'Within how many hours must a processor tell you of a breach? (data about people only)', default: '24', number: true },
   ],
   need: {
     label: 'People\'s data handled lawfully',
-    text: 'The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/) and processors.yaml.',
+    text: 'The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml.',
   },
   forces: FORCES,
   requirements: [
@@ -137,12 +140,30 @@ const pack: PackSpec = {
       scenario: { label: 'Guarded everywhere', given: 'the store and the roles with read access to personal tables', when: 'its connection settings and the role reviews are listed', then: 'connections below TLS 1.2 are refused, and every role with access was reviewed in the last 6 months' },
     },
     {
-      id: 'req-breach', label: 'Breaches reported in time', when: PERSONAL, ears_type: 'event-driven',
-      trigger: 'a breach of personal data is detected',
-      action: 'notify the supervisory authority within 72 hours of becoming aware of it, unless it is unlikely to result in a risk to people, tell the people affected without undue delay when the risk is high, and record every breach in the breach register',
-      rationale: 'GDPR Art. 33(1) sets 72 hours for the notification, Art. 34 the duty to tell the people affected, Art. 33(5) the register of all breaches.',
-      scenario: { label: 'Breach reported', given: 'a log export with e-mail addresses found on a public bucket', when: 'it is reported to the on-call team', then: 'the authority is notified within 72 hours and the breach is in the register with its facts, effects and remedy' },
-      unchecked: 'No tool can tell that a breach was detected or that the authority was notified; the data protection officer reconciles the breach register with the security incident tickets every quarter and records the check in the register.',
+      id: 'req-breach', label: 'Breaches notified in time', when: PERSONAL, ears_type: 'event-driven',
+      trigger: 'the organisation becomes aware of a breach of personal data',
+      action: 'assess whether it is unlikely to result in a risk to people and, unless it is, notify the supervisory authority named in the breach runbook without undue delay and within 72 hours of becoming aware of it, or with the reasons for the delay when that is not feasible, describing the nature of the breach with the categories and approximate numbers of people and records, the data protection officer\'s contact, the likely consequences and the measures taken or proposed, and sending what is not yet known in later phases',
+      rationale: 'GDPR Art. 33(1) sets the deadline, its exception for a breach unlikely to result in a risk, and the reasons a later notification must carry; Art. 33(3) the content; Art. 33(4) allows the content in phases without undue further delay.',
+      scenario: { label: 'Breach notified in time', given: 'a log export with the e-mail addresses of 4,000 customers found on a public bucket at 09:00 on Monday and assessed as a risk to people', when: 'the breach lead follows the runbook', then: 'the authority is notified by 09:00 on Thursday with the nature, the numbers, the data protection officer\'s contact, the consequences and the measures, a missing fact follows in a later phase, and the register holds the times' },
+    },
+    {
+      id: 'req-breach-register', label: 'Every breach documented', when: PERSONAL, ears_type: 'ubiquitous',
+      action: 'document every breach of personal data in the breach register, notified or not, with the time of becoming aware of it, the facts, the effects, the remedial action, the risk assessment and the decision on notifying with its reason, and reconcile the register with the security incidents at least every 3 months',
+      rationale: 'GDPR Art. 33(5): the controller documents any breach, with its facts, effects and remedial action, so that the supervisory authority can verify compliance with Art. 33; a breach that was not notified is the one whose reasoning it will ask for.',
+      scenario: { label: 'Unnotified breach documented', given: 'an e-mail with one customer\'s order sent to the wrong customer and assessed as unlikely to result in a risk', when: 'the register is checked', then: 'it holds the breach with its facts, effects, remedy, the assessment and the reason it was not notified, and its last reconciliation is less than 3 months old' },
+    },
+    {
+      id: 'req-breach-people', label: 'People told of a high-risk breach', when: PERSONAL, ears_type: 'event-driven',
+      trigger: 'a breach of personal data is assessed as likely to result in a high risk to people',
+      action: 'tell the people affected without undue delay, in clear and plain language, the nature of the breach, the data protection officer\'s contact, the likely consequences and the measures taken or proposed, and record the time in the breach register, unless the register records the exception of GDPR Art. 34(3) that applies: the data was unintelligible to anyone not authorised, later measures make the high risk no longer likely, or telling each person would take disproportionate effort and a public notice is made instead',
+      rationale: 'GDPR Art. 34(1) and (2) require telling the people affected by a high-risk breach, with the content of Art. 33(3)(b) to (d); Art. 34(3) lists the three exceptions, and Art. 34(4) lets the authority require it later, so the exception relied on is written down.',
+      scenario: { label: 'Customers told', given: 'a breach exposing customers\' passwords hashed with a broken algorithm, assessed as high risk', when: 'the assessment is made', then: 'the affected customers are told by e-mail in plain language what happened, whom to contact, what may follow and what to do, and the register holds the time they were told' },
+    },
+    {
+      id: 'req-breach-processor', label: 'Processors report breaches', when: PERSONAL, ears_type: 'ubiquitous',
+      action: 'bind every processor in the processor register by contract to tell the controller of a breach of personal data within {{PROCESSOR_NOTICE_HOURS}} hours of becoming aware of it, with what it knows of the content of GDPR Art. 33(3), and record that time in the register',
+      rationale: 'A processor must notify the controller without undue delay after becoming aware of a breach (GDPR Art. 33(2)) and assist it with its own notifications (Art. 28(3)(f)); EDPB Guidelines 9/2022 hold the controller aware once its processor has told it, so a fixed time in the contract keeps most of the 72 hours for the controller.',
+      scenario: { label: 'Slow processor found', given: 'the processor register with a mail provider whose contract allows 72 hours to report a breach', when: 'the breach readiness check runs', then: 'it fails and names the mail provider, since its notice exceeds {{PROCESSOR_NOTICE_HOURS}} hours' },
     },
     {
       id: 'req-region-eu', label: 'Kept in the EU/EEA', when: { ...PERSONAL, REGION: ['eu'] }, ears_type: 'ubiquitous',
@@ -207,19 +228,19 @@ const pack: PackSpec = {
   adrs: [
     {
       id: 'adr-delete', label: 'Personal data erased by deletion', when: { ...PERSONAL, ERASURE: ['delete'] },
-      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema (a column comment or a data-catalogue tag in OpenMetadata or DataHub). Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Erasure is deletion: one erasure routine knows every store; it publishes a PersonErased event that each owning service handles by deleting the person\'s rows (ON DELETE CASCADE where the schema allows), replacing them with a tombstone where invoices must stay. Logs carry user ids rather than names or addresses and are kept no longer than {{REQUEST_DAYS}} days in the log store (Loki or OpenSearch retention), so that logs expire before any erasure deadline and need no editing. Backups expire after {{BACKUP_DAYS}} days and a restore replays the erasure ledger before serving. Unused data is erased after {{RETENTION_MONTHS}} months by a daily job. Choose deletion over crypto-shredding when the copies are few and known and backups are short-lived.',
+      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema (a column comment or a data-catalogue tag in OpenMetadata or DataHub). Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Erasure is deletion: one erasure routine knows every store; it publishes a PersonErased event that each owning service handles by deleting the person\'s rows (ON DELETE CASCADE where the schema allows), replacing them with a tombstone where invoices must stay. Logs carry user ids rather than names or addresses and are kept no longer than {{REQUEST_DAYS}} days in the log store (Loki or OpenSearch retention), so that logs expire before any erasure deadline and need no editing. Backups expire after {{BACKUP_DAYS}} days and a restore replays the erasure ledger before serving. Unused data is erased after {{RETENTION_MONTHS}} months by a daily job. Choose deletion over crypto-shredding when the copies are few and known and backups are short-lived. ' + BREACH,
       consequences: '• Erasure is simple to understand and to prove: the rows are gone.\n• Every new store, cache or export must join the erasure routine, or it leaks the people erased.\n• Erased people live on in backups for up to {{BACKUP_DAYS}} days; the erasure ledger is what keeps them from coming back on a restore.\n• Records the business needs later (revenue per month) must be aggregated before the deletion.',
       alternatives: '1. Anonymisation in place: keeps the history for statistics, but anonymisation must hold against re-identification.\n2. Crypto-shredding: reaches backups and streams at once, at the cost of a key per person and a key service on every read.\n3. Handling requests by hand: slow, error-prone and hard to prove.',
     },
     {
       id: 'adr-anonymise', label: 'Personal data erased by anonymisation', when: { ...PERSONAL, ERASURE: ['anonymise'] },
-      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema (a column comment or a data-catalogue tag in OpenMetadata or DataHub). Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Erasure is anonymisation in place: direct identifiers (name, e-mail, phone, address, IP, external ids) are overwritten with random values and no mapping is kept, the row keeps its internal id and an anonymised_at timestamp; quasi-identifiers are generalised (birth date to year, postcode to its first two characters) until every combination occurs at least 5 times, which a dbt test checks; free-text fields are cleared. Logs carry user ids only and are kept no longer than {{REQUEST_DAYS}} days, so that they expire before any erasure deadline and need no editing. Backups expire after {{BACKUP_DAYS}} days and a restore replays the erasure ledger before serving. Unused data is anonymised after {{RETENTION_MONTHS}} months by a daily job. Use ARX or sdcMicro to measure re-identification risk when the quasi-identifiers change. Choose anonymisation when orders, revenue or usage history must outlive the person.',
+      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema (a column comment or a data-catalogue tag in OpenMetadata or DataHub). Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Erasure is anonymisation in place: direct identifiers (name, e-mail, phone, address, IP, external ids) are overwritten with random values and no mapping is kept, the row keeps its internal id and an anonymised_at timestamp; quasi-identifiers are generalised (birth date to year, postcode to its first two characters) until every combination occurs at least 5 times, which a dbt test checks; free-text fields are cleared. Logs carry user ids only and are kept no longer than {{REQUEST_DAYS}} days, so that they expire before any erasure deadline and need no editing. Backups expire after {{BACKUP_DAYS}} days and a restore replays the erasure ledger before serving. Unused data is anonymised after {{RETENTION_MONTHS}} months by a daily job. Use ARX or sdcMicro to measure re-identification risk when the quasi-identifiers change. Choose anonymisation when orders, revenue or usage history must outlive the person. ' + BREACH,
       consequences: '• History stays usable for reporting and accounting without anyone in it.\n• Anonymisation that can be undone is pseudonymisation and still personal data: the k-anonymity check and the removal of free text are not optional.\n• Each new column must be classified as identifier, quasi-identifier or neither, or anonymisation misses it.\n• Backups still hold the original records until they expire after {{BACKUP_DAYS}} days.',
       alternatives: '1. Deletion in every store: simplest to prove, loses the history.\n2. Crypto-shredding: reaches backups at once, but the records become unreadable rather than anonymous.\n3. Pseudonymisation with a kept key: reversible, so it erases nothing (GDPR Art. 4(5)).',
     },
     {
       id: 'adr-crypto', label: 'Personal data erased by crypto-shredding', when: { ...PERSONAL, ERASURE: ['crypto'] },
-      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema. Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Every personal field is encrypted in the application with a data key of its own per person (envelope encryption, AES-256-GCM), the data keys kept wrapped in a key table and wrapped by one key in a key management service: AWS KMS, Google Cloud KMS or Azure Key Vault on that cloud, HashiCorp Vault (Transit) on premises or across clouds; libraries such as AWS Encryption SDK or Google Tink do the envelope work. Erasure deletes the person\'s wrapped data key from the key table within 24 hours, which makes their fields in every store, event, log and backup unreadable; backups of the key table expire after {{BACKUP_DAYS}} days. Unused data is shredded the same way after {{RETENTION_MONTHS}} months. Searchable fields (e-mail for sign-in) are kept as keyed hashes (HMAC) next to the ciphertext.',
+      decision: 'Personal data is kept only in the stores and fields the record of processing names, each field classified in the schema. Lawful basis: {{BASIS}}. Location: {{REGION}}. Special categories: {{SPECIAL}}. Every personal field is encrypted in the application with a data key of its own per person (envelope encryption, AES-256-GCM), the data keys kept wrapped in a key table and wrapped by one key in a key management service: AWS KMS, Google Cloud KMS or Azure Key Vault on that cloud, HashiCorp Vault (Transit) on premises or across clouds; libraries such as AWS Encryption SDK or Google Tink do the envelope work. Erasure deletes the person\'s wrapped data key from the key table within 24 hours, which makes their fields in every store, event, log and backup unreadable; backups of the key table expire after {{BACKUP_DAYS}} days. Unused data is shredded the same way after {{RETENTION_MONTHS}} months. Searchable fields (e-mail for sign-in) are kept as keyed hashes (HMAC) next to the ciphertext. ' + BREACH,
       consequences: '• One key deletion erases a person everywhere, immutable backups and event streams included.\n• Every read of a personal field decrypts: a key cache and the key service\'s availability are on the hot path.\n• Searching, sorting and joining on encrypted fields is not possible; keyed hashes cover exact matches only.\n• A lost key table loses everyone\'s data: it needs its own backup and recovery, and its backups must expire within {{BACKUP_DAYS}} days for the erasure to hold.',
       alternatives: '1. Deletion in every store: no key service, but backups and streams keep the person until they expire.\n2. Anonymisation in place: keeps readable history, but must hold against re-identification.\n3. One key per store (transparent disk encryption): protects against stolen disks, erases no one.',
     },
@@ -446,6 +467,53 @@ $$, 'every role reading personal data was reviewed in the last 6 months');
 
 SELECT * FROM finish();
 ROLLBACK;`,
+    },
+    {
+      id: 'ff-breach-register', label: 'Every breach documented and notified in time', when: PERSONAL, category: 'process', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-register', 'req-breach-people'],
+      threshold: '0 breaches in the register without an awareness time, facts, effects, remedy and a risk assessment; 0 assessed unlikely without the reason not to notify; 0 others not notified 72 hours after awareness, or first notified later without the reasons for the delay, or whose notification phases together lack the nature, the data protection officer\'s contact, the consequences or the measures; 0 high-risk ones without the time people were told or an Art. 34(3) exception; the last reconciliation with the security incidents at most 92 days old',
+      description: 'A daily CI job reads docs/breaches/register.json, the breach register kept in the repository (categories and numbers, never the people\'s data): reconciled_at, and per breach id, aware_at, facts, effects, remedy, risk (unlikely, risk or high), not_notified_reason, notifications (one entry per phase: at, nature, dpo_contact, consequences, measures), delay_reason, people_told_at and art34_exception; times are in UTC (2026-09-07T09:00:00Z). When the breaches are kept as incidents in the incident tool the Incident management pack decides, the job first exports them to this shape. It fails on any gap and prints the breach ids, never their contents.',
+      tool: 'jq 1.7 in a daily CI job (bash)',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# daily CI: docs/breaches/register.json documents every breach and its notification (GDPR Art. 33, 34); times in UTC
+set -euo pipefail
+problems=$(jq -r --argjson now "$(date -u +%s)" '
+  def t: (. // "1970-01-01T00:00:00Z") | sub("\\\\.[0-9]+"; "") | fromdateiso8601;
+  def text(k): (.[k] // "" | tostring | length) > 0;
+  (select($now - (.reconciled_at | t) > 92 * 86400) | "not reconciled with the security incidents for 92 days"),
+  (.breaches[] | .id as $id | (.notifications // []) as $n |
+    (["aware_at", "facts", "effects", "remedy"][] as $k | select(text($k) | not) | "\\($id): no \\($k)"),
+    (select(.risk | IN("unlikely", "risk", "high") | not) | "\\($id): risk is not assessed as unlikely, risk or high"),
+    (select(.risk == "unlikely" and (text("not_notified_reason") | not)) | "\\($id): not notified, and no reason"),
+    (select((.risk == "risk" or .risk == "high") and ($n | length) == 0 and $now - (.aware_at | t) > 72 * 3600) | "\\($id): not notified 72 hours after awareness"),
+    (select(($n | length) > 0 and ($n[0].at | t) - (.aware_at | t) > 72 * 3600 and (text("delay_reason") | not)) | "\\($id): notified after 72 hours without the reasons for the delay"),
+    (select(($n | length) > 0) | ["nature", "dpo_contact", "consequences", "measures"][] as $k | select([$n[] | has($k)] | any | not) | "\\($id): no phase of the notification gives \\($k)"),
+    (select(.risk == "high" and (text("people_told_at") or text("art34_exception") | not)) | "\\($id): high risk, people not told and no Art. 34(3) exception")
+  )' docs/breaches/register.json)
+[ -z "$problems" ] || { echo "$problems"; exit 1; }`,
+    },
+    {
+      id: 'ff-breach-runbook', label: 'Breach runbook and processor notice ready', when: PERSONAL, category: 'structural', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-processor'],
+      threshold: 'docs/breaches/runbook.md has the lines Supervisory authority: (with a link) and Decides:, and names the 72 hours, the nature of the breach, the data protection officer, the likely consequences and the measures; 0 processors in processors.yaml without breach_notice_hours or with more than {{PROCESSOR_NOTICE_HOURS}} hours',
+      description: 'A CI step on every change fails when the breach runbook stops naming the supervisory authority with its notification link, the person who decides whether to notify, the 72 hours or any of the four parts of the notification of GDPR Art. 33(3), or when a processor in processors.yaml, the processor register, has no breach_notice_hours from its contract or a longer one than allowed.',
+      tool: 'bash with grep and yq (mikefarah yq v4) in a CI step',
+      language: 'bash',
+      snippet: `#!/usr/bin/env bash
+# CI, on every change: the breach runbook says whom to notify, by when, with what and who decides; processors report in time
+set -euo pipefail
+f=docs/breaches/runbook.md
+problems=0
+need() { grep -Eqi "$1" "$f" || { echo "$f: $2"; problems=$((problems + 1)); }; }
+need '^Supervisory authority: .*https://' 'no line "Supervisory authority:" with its name and notification link'
+need '^Decides: +[^ ]' 'no line "Decides:" naming who decides whether to notify'
+need '72 hours' 'does not say the authority is notified within 72 hours of becoming aware'
+need 'nature of the breach' 'does not ask for the nature of the breach (categories and numbers of people and records)'
+need 'data protection officer' 'does not give the contact of the data protection officer'
+need 'likely consequences' 'does not ask for the likely consequences'
+need 'measures' 'does not ask for the measures taken or proposed'
+late=$(yq '.processors[] | select((.breach_notice_hours // 1000) > {{PROCESSOR_NOTICE_HOURS}}) | .name' processors.yaml)
+[ -z "$late" ] || { echo "processors.yaml: no breach notice within {{PROCESSOR_NOTICE_HOURS}} hours: $late"; problems=$((problems + 1)); }
+exit $problems`,
     },
     {
       id: 'ff-region', label: 'Deployed in EU regions', when: { ...PERSONAL, REGION: ['eu'] }, category: 'structural', implements: ['adr-region-eu'], checks: ['req-region-eu'],
