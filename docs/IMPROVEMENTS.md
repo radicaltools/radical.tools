@@ -330,6 +330,17 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    incompatible answer pairs across packs, checked by the wizard and by
    `radical check` on the imported ADRs, would catch them.
 
+### Hub answers preview (2026-10-29): next
+
+1. *Add to Studio* opens the concern wizard on the defaults; the answers
+   picked in the Hub's Answers panel could travel with the link
+   (`?hub=<id>&answers=KEY:value,…`) and preselect the wizard.
+2. The canvas keeps the pack's stored positions, so removed elements leave
+   gaps; a quick relayout of the shown variant (or packed positions per
+   variant at build time) would close them.
+3. The answers are not in the page link yet, so a preview cannot be shared
+   with its answers.
+
 ### Flaky e2e (2026-10-29)
 
 `apps/e2e/tests/studio/metamodel-diagram.spec.ts › selecting a type shows its

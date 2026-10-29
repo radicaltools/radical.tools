@@ -75,11 +75,17 @@ for (const view of ['canvas', 'wiki', 'table'] as const) {
     const concept = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
     await page.goto(`/#/c/${CONCEPT}/v/${view}`)
     await studio.until(page.getByText(concept.hub.name, { exact: true }))
+    // A concern pack opens on its default answers: as many elements as the
+    // Answers panel counts.
+    const count = page.locator('.hub-answers-count')
+    await expect(count).toHaveText(new RegExp(`^\\d+ of ${concept.nodes.length} elements$`))
+    const shown = Number((await count.innerText()).split(' ')[0])
+    expect(shown).toBeLessThanOrEqual(concept.nodes.length)
     if (view === 'canvas') {
       await studio.until(studio.nodes)
-      await expect(studio.nodes).toHaveCount(concept.nodes.length)
+      await expect(studio.nodes).toHaveCount(shown)
     }
-    if (view === 'table') await expect(page.locator('tbody tr')).toHaveCount(concept.nodes.length)
+    if (view === 'table') await expect(page.locator('tbody tr')).toHaveCount(shown)
     await studio.settle()
     await expect(page).toHaveScreenshot(`concept-${view}.png`)
   })
@@ -90,6 +96,39 @@ test('a concern pack shows its group', async ({ page, studio }) => {
   await page.goto(`/#/c/${CONCEPT}/v/wiki`)
   await studio.until(page.getByText(pack.hub.name, { exact: true }).first())
   await expect(page.locator('.hub-toolbar-cat')).toHaveText(/Secure by Design/)
+})
+
+test('the answers panel previews what an answer brings in', async ({ page, studio }) => {
+  const pack = await (await page.request.get(`hub/concern/${CONCEPT}.radical`)).json()
+  await page.goto(`/#/c/${CONCEPT}/v/canvas`)
+  const panel = page.getByRole('complementary', { name: 'Answers' })
+  await studio.until(panel)
+  await studio.until(studio.nodes)
+  // Opens on the defaults: the identity provider's decision, not our own store's.
+  const node = (label: string) => studio.nodes.filter({ hasText: label })
+  await expect(node('Users sign in through an identity provider')).toHaveCount(1)
+  await expect(node('Users sign in with our own user store')).toHaveCount(0)
+  const count = panel.locator('.hub-answers-count')
+  await expect(count).toHaveText(new RegExp(`^\\d+ of ${pack.nodes.length} elements$`))
+  const before = await count.innerText()
+  // Each other option says what it would change.
+  const option = panel.locator('label', { hasText: 'our own user store' })
+  await expect(option.locator('.hub-answers-delta')).toHaveText(/\+\d+/)
+
+  await option.getByRole('radio').check()
+  await expect(node('Users sign in with our own user store')).toHaveCount(1)
+  await expect(node('Users sign in through an identity provider')).toHaveCount(0)
+  await expect(count).not.toHaveText(before)
+  await expect(panel.locator('.hub-answers-last')).toHaveText(/^Last answer: \+\d+/)
+  // The elements the answer added are lit, for a moment.
+  await expect(node('Users sign in with our own user store').getByText('NEW', { exact: true })).toBeVisible()
+  await studio.advance(5000)
+  await expect(studio.nodes.getByText('NEW', { exact: true })).toHaveCount(0)
+
+  // All shows every variant again.
+  await panel.getByRole('button', { name: 'All', exact: true }).click()
+  await expect(count).toHaveText(`All ${pack.nodes.length} elements, every variant`)
+  await expect(studio.nodes).toHaveCount(pack.nodes.length)
 })
 
 test('a concept link followed inside the Hub opens that concept', async ({ page, studio }) => {

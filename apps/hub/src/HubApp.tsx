@@ -26,8 +26,11 @@ import {
   type HubSortKey,
 } from '@radical/ui/viewer'
 import {
+  answeredConcept,
   conceptToDiagramData,
+  defaultAnswers,
   defaultViewKind,
+  packQuestions,
   kindForViewId,
   isSyntheticViewId,
   viewIdForKind,
@@ -35,6 +38,7 @@ import {
 } from './conceptToDiagram'
 import { parseHubHash, formatHubHash, studioImportUrl } from './hubRoute'
 import { HubLanding } from './HubLanding'
+import { AnswersPanel } from './AnswersPanel'
 import { SiteNav } from './SiteNav'
 
 const STUDIO_URL = import.meta.env.DEV ? '/' : 'https://studio.radical.tools'
@@ -266,6 +270,21 @@ function HubAppInner(): React.ReactElement {
     [concept, concepts],
   )
   const [conceptError, setConceptError] = useState<string | null>(null)
+  // A concern pack's answers (null: every variant at once), and what the
+  // last answer changed, lit on the canvas for a moment.
+  // Kept per pack, so a pack opens on its defaults from the first frame.
+  const [picked, setPicked] = useState<{ conceptId: string; answers: Record<string, string> | null } | null>(null)
+  const [lastChange, setLastChange] = useState<{ added: number; removed: number } | null>(null)
+  const litTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const questions = useMemo(() => (concept ? packQuestions(concept) : []), [concept])
+  const answers = useMemo(
+    () => (!concept ? null : picked?.conceptId === concept.id ? picked.answers : questions.length ? defaultAnswers(concept) : null),
+    [concept, picked, questions],
+  )
+  const setAnswers = useCallback((next: Record<string, string> | null) => {
+    if (concept) setPicked({ conceptId: concept.id, answers: next })
+  }, [concept])
+  const shown = useMemo(() => (concept && answers ? answeredConcept(concept, answers).nodes.length : concept?.nodes.length ?? 0), [concept, answers])
   const viewKind = kindForViewId(activeViewId, views)
   // The concept's own named views for the current mode ("Containers" or a
   // screen flow on the canvas, "Governance" in the wiki, …); `null` = all
@@ -290,7 +309,10 @@ function HubAppInner(): React.ReactElement {
   // Load the selected concept into the (sandboxed) diagram store.
   useEffect(() => {
     if (!concept) return
-    loadDiagram(conceptToDiagramData(concept))
+    const opening = packQuestions(concept).length ? defaultAnswers(concept) : null
+    setPicked({ conceptId: concept.id, answers: opening })
+    setLastChange(null)
+    loadDiagram(conceptToDiagramData(concept, { answers: opening }))
     const named = pendingNamedView.current
     const namedDef = named ? (concept.views ?? []).find((v) => v.id === named) : undefined
     const namedKind: HubViewKind | undefined = namedDef
@@ -299,7 +321,7 @@ function HubAppInner(): React.ReactElement {
     const kind = namedKind ?? pendingView.current ?? defaultViewKind(concept)
     pendingView.current = undefined
     pendingNamedView.current = undefined
-    if (namedKind === 'canvas') loadDiagram(conceptToDiagramData(concept, { layoutFrom: named }))
+    if (namedKind === 'canvas') loadDiagram(conceptToDiagramData(concept, { layoutFrom: named, answers: opening }))
     setActiveView(namedKind ? named! : viewIdForKind(kind))
     if (kind === 'canvas') return scheduleFit(fitAll)
   }, [concept, loadDiagram, setActiveView, fitAll])
@@ -364,10 +386,32 @@ function HubAppInner(): React.ReactElement {
   // in its default layout) — see conceptToDiagramData's `layoutFrom`.
   const switchCanvasView = useCallback((viewId: string | null) => {
     if (!concept) return
-    loadDiagram(conceptToDiagramData(concept, { layoutFrom: viewId }))
+    loadDiagram(conceptToDiagramData(concept, { layoutFrom: viewId, answers }))
     setActiveView(viewId)
     scheduleFit(fitAll)
-  }, [concept, loadDiagram, setActiveView, fitAll])
+  }, [concept, answers, loadDiagram, setActiveView, fitAll])
+
+  // Show the pack as other answers make it, in the same view, and light up
+  // what they added (the canvas marks it NEW, as a milestone's changes).
+  const applyAnswers = useCallback((next: Record<string, string> | null) => {
+    if (!concept) return
+    const before = new Set(Object.keys(useDiagramStore.getState().c4Nodes))
+    const viewId = useDiagramStore.getState().activeViewId
+    const layoutFrom = viewId && !isSyntheticViewId(viewId) && kindForViewId(viewId, useDiagramStore.getState().views) === 'canvas' ? viewId : null
+    setAnswers(next)
+    loadDiagram(conceptToDiagramData(concept, { layoutFrom, answers: next }))
+    setActiveView(viewId)
+    const after = Object.keys(useDiagramStore.getState().c4Nodes)
+    const added = after.filter((id) => !before.has(id))
+    setLastChange({ added: added.length, removed: [...before].filter((id) => !after.includes(id)).length })
+    clearTimeout(litTimer.current)
+    useDiagramStore.setState({ showDiff: added.length > 0, diffHighlight: Object.fromEntries(added.map((id) => [id, 'new' as const])) })
+    litTimer.current = setTimeout(() => {
+      useDiagramStore.setState({ showDiff: false, diffHighlight: {} })
+      setLastChange(null)
+    }, 4000)
+  }, [concept, setAnswers, loadDiagram, setActiveView])
+  useEffect(() => () => clearTimeout(litTimer.current), [])
   // Any mode + optional named view; canvas goes through the reload above.
   const switchNamedView = useCallback((kind: HubViewKind, viewId: string | null) => {
     if (kind === 'canvas') return switchCanvasView(viewId)
@@ -634,7 +678,7 @@ function HubAppInner(): React.ReactElement {
       {conceptId && (
         <div className="hub-concept-overlay" onMouseDown={onBackdropMouseDown}>
           <div
-            className="hub-concept-panel"
+            className={`hub-concept-panel${concept && questions.length ? ' has-answers' : ''}`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
@@ -689,6 +733,18 @@ function HubAppInner(): React.ReactElement {
                 ✕
               </button>
             </div>
+
+            {concept && questions.length > 0 && (
+              <AnswersPanel
+                concept={concept}
+                answers={answers}
+                shown={shown}
+                lastChange={lastChange}
+                onAnswer={(key, value) => applyAnswers({ ...(answers ?? defaultAnswers(concept)), [key]: value })}
+                onDefaults={() => applyAnswers(defaultAnswers(concept))}
+                onAll={() => applyAnswers(null)}
+              />
+            )}
 
             {/* ── Viewer ────────────────────────────────────────────────────── */}
             {!concept ? (
