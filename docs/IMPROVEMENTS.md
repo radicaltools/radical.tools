@@ -320,6 +320,14 @@ pack standard, amended 2026-10-29). Agreed next, in this order:
    federated models.
 5. The ISO/IEC 25010 characteristics still sit on the groups; with groups by
    standard they belong on each pack.
+6. **Contradictions between packs are not flagged.** The concern wizard checks
+   one pack at a time: *a named release approver for every production
+   deployment* (Definition of Done and change approval) contradicts continuous
+   deployment *without a manual step* (Deployment and rollback), and only the
+   option descriptions say so. The same holds for the API style guide's guide
+   and the casing in Resource design or the format in Errors. A list of
+   incompatible answer pairs across packs, checked by the wizard and by
+   `radical check` on the imported ADRs, would catch them.
 
 ### Dogfooding (2026-10-28): a review and fix round of all Hub concern packs
 

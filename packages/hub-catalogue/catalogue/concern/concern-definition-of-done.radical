@@ -95,7 +95,7 @@
         "title": "Segregation",
         "label": "Can one person put a change into production alone?",
         "hint": "Segregation of duties means that whoever writes a change does not approve it, whoever starts a deployment does not approve it, and nobody can skip the approval. PCI DSS (Requirement 6.5.4) and the technical standard under the EU Digital Operational Resilience Act (Delegated Regulation (EU) 2024/1774, Article 17) ask for it; peer review covers most of it, and the rest is closing the bypasses.",
-        "defaultValue": "enforced",
+        "defaultValue": "none",
         "options": [
           {
             "value": "enforced",

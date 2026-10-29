@@ -43,7 +43,7 @@ const pack: PackSpec = {
     {
       key: 'SEGREGATION', title: 'Segregation', label: 'Can one person put a change into production alone?',
       hint: 'Segregation of duties means that whoever writes a change does not approve it, whoever starts a deployment does not approve it, and nobody can skip the approval. PCI DSS (Requirement 6.5.4) and the technical standard under the EU Digital Operational Resilience Act (Delegated Regulation (EU) 2024/1774, Article 17) ask for it; peer review covers most of it, and the rest is closing the bypasses.',
-      default: 'enforced',
+      default: 'none',
       options: [
         { value: 'enforced', label: 'author, approver and deployer kept apart', description: 'The approver of a change is never its author and never the person who started its deployment; administrators cannot bypass the main branch\'s rulesets or the production environment\'s rules. Pick it for regulated firms (payments, banking, insurance, health, a financial-reporting audit) and for any team whose administrators merge their own changes today.' },
         { value: 'none', label: 'no separation beyond the peer review', description: 'The review the Code review and branching pack requires is the only separation; administrators may bypass the rules, and every bypass is posted to the team the next day. Pick it for an unregulated team small enough that an administrator is often the only person awake during an incident.' },
