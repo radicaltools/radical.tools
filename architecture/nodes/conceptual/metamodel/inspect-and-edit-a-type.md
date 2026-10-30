@@ -8,7 +8,7 @@ gherkin: |
   And the side panel lists "Relations out" with Derives from for the selected Requirement
   And Esc clears the selection and shows Validation while the editor stays open
 given: "the Diagram tab of the metamodel editor shows the governance preset"
-tests: "apps/e2e/tests/studio/metamodel-diagram.spec.ts › selecting a type shows its rules; Edit opens it in the list"
+metrics: "test(apps/e2e/tests/studio/metamodel-diagram.spec.ts › selecting a type shows its rules; Edit opens it in the list) passed"
 then: "the List tab opens with the Requirement card focused"
 when: "the user clicks the Requirement box and then presses Edit type"
 ---

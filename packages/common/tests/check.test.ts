@@ -20,9 +20,9 @@ function complete(): DiagramData {
       node('sys', 'system', 'Shop'),
       node('need', 'need', 'Brief'),
       node('req', 'requirement', 'Pay', { ears_type: 'event-driven', trigger: 'the user pays', action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid', tests: 'tests/pay.test.ts › pays' }),
+      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid', metrics: 'test(tests/pay.test.ts › pays) passed' }),
       node('adr', 'adr', 'Use cards', ACCEPTED_ADR),
-      node('ff', 'fitness-fn', 'Card check', { threshold: 'passes', tests: 'tests/cards.test.ts › only cards' }),
+      node('ff', 'fitness-fn', 'Card check', { metrics: 'test(tests/cards.test.ts › only cards) passed' }),
     ],
     relations: [
       rel('r1', 'derives', 'req', 'need'),
@@ -50,11 +50,11 @@ describe('radical check', () => {
     const data = complete()
     data.relations = []
     data.nodes.push(node('adr2', 'adr', 'Old', { status: 'superseded' }), node('adr3', 'adr', 'Half', { status: 'accepted' }))
-    Object.assign(data.nodes.find((n) => n.id === 'ff')!, { threshold: '' })
+    Object.assign(data.nodes.find((n) => n.id === 'ff')!, { metrics: '' })
     Object.assign(data.nodes.find((n) => n.id === 'req')!, { trigger: '' })
     const result = check(data)
     expect([...new Set(result.findings.map((f) => f.rule))].sort()).toEqual([
-      'adr-incomplete', 'adr-superseded-unlinked', 'adr-without-fitness-fn', 'fitness-fn-unlinked', 'fitness-fn-without-threshold',
+      'adr-incomplete', 'adr-superseded-unlinked', 'adr-without-fitness-fn', 'fitness-fn-unlinked', 'fitness-fn-without-metrics',
       'need-without-requirement', 'requirement-incomplete', 'requirement-unsatisfied', 'requirement-without-origin',
       'requirement-without-scenario', 'scenario-verifies-nothing',
     ])
@@ -64,6 +64,21 @@ describe('radical check', () => {
     expect(result.findings.find((f) => f.rule === 'adr-incomplete')!.message).toContain('has no date, context, decision, consequences')
     // Warnings alone pass.
     expect(result.ok).toBe(true)
+  })
+
+  it('reports scenarios and fitness functions with no metrics', () => {
+    const data = complete()
+    Object.assign(data.nodes.find((n) => n.id === 'sc')!, { metrics: '' })
+    Object.assign(data.nodes.find((n) => n.id === 'ff')!, { metrics: '# to do\n' })
+    const result = check(data)
+    expect(result.findings.filter((f) => f.rule.endsWith('-without-metrics')).map((f) => [f.rule, f.message])).toEqual([
+      ['scenario-without-metrics', 'Scenario "Paying" names no check.'],
+      ['fitness-fn-without-metrics', 'Fitness function "Card check" names no check.'],
+    ])
+    // A check.json from before metrics counts its baselines under the new ids.
+    const old = check(data, { rules: { 'scenario-without-tests': 'error', 'fitness-fn-without-threshold': 'error' } })
+    expect(old.unknownRules).toEqual([])
+    expect(old.rules.find((r) => r.id === 'scenario-without-metrics')).toMatchObject({ severity: 'error', failed: true })
   })
 
   it('reads a state the requirement points at as its precondition', () => {
@@ -342,7 +357,7 @@ describe('radical check: concerns', () => {
     const data = shop()
     data.nodes.push(
       node('adr', 'adr', 'Who signs in', { ...ACCEPTED_ADR, concern: 'authentication' }),
-      node('ff', 'fitness-fn', 'Calls refused', { threshold: '401' }),
+      node('ff', 'fitness-fn', 'Calls refused', { metrics: 'auth.unauthenticated.status == 401' }),
       node('plain', 'adr', 'Use cards', ACCEPTED_ADR),
     )
     data.relations.push(rel('i', 'implements', 'ff', 'adr'))

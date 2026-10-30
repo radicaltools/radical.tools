@@ -2,14 +2,15 @@ import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { serializeTestResults, type TestCase } from '@radical/common/check'
+import { serializeMeasurementStore, serializeTestResults, type TestCase } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { HUB_PORT } from '../../playwright.config'
 
 // The Inspector perspective shows what radical check says about a model
 // kept in a folder: the rules run on the model as it is, the test results
 // come from .radical/test-results.json, which `radical check --report`
-// writes beside the model. Its tabs: Model quality, Implementation (what
+// writes beside the model, and what sensors measured from
+// .radical/measurements.json, which `radical sense` keeps there. Its tabs: Model quality, Implementation (what
 // the tests say) and Settings (the folder's check.json).
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
@@ -22,7 +23,7 @@ const MODEL: DiagramData = {
     node('api', 'container', 'Checkout API', { parentId: 'shop', x: 40, y: 60 }),
     node('need', 'need', 'Pay online', { x: 700, y: 40 }),
     node('req', 'requirement', 'Take card payments', { x: 700, y: 220, ears_type: 'ubiquitous', action: 'take card payments' }),
-    node('sc', 'scenario', 'Paying by card', { x: 700, y: 400, given: 'a cart', when: 'the user pays by card', then: 'the order is paid', tests: 'tests/pay.test.ts › pays by card' }),
+    node('sc', 'scenario', 'Paying by card', { x: 700, y: 400, given: 'a cart', when: 'the user pays by card', then: 'the order is paid', metrics: 'test(tests/pay.test.ts › pays by card) passed' }),
   ],
   relations: [
     { id: 'r1', relationType: 'derives', sourceId: 'req', targetId: 'need' },
@@ -51,7 +52,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   // No report beside the model yet: nothing to inspect.
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await expect(inspector).toBeDisabled()
-  await expect(inspector).toHaveAttribute('title', /no check report beside this model/)
+  await expect(inspector).toHaveAttribute('title', /no check report or measurements beside this model/)
 
   // radical check --report wrote one in which the scenario's test failed.
   await folder.write('.radical/test-results.json', results('failed'))
@@ -106,6 +107,59 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await page.getByRole('tab', { name: /^Implementation/ }).click()
   await expect(page.locator('.insp-tile').first()).toContainText('100% · 1 / 1')
   await expect(page.locator('.insp-tile').first()).toContainText('0 broken')
+})
+
+test('the Inspector shows each condition with its measurement', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  const model: DiagramData = {
+    ...MODEL,
+    nodes: [
+      ...MODEL.nodes,
+      node('adr', 'adr', 'Fast checkout', { x: 40, y: 400, status: 'accepted', date: '2026-10-29', context: 'c', decision: 'd', consequences: 'q' }),
+      node('ff', 'fitness-fn', 'Checkout latency', { x: 40, y: 520, max_age: '7d', metrics: 'checkout.latency.p95{env=staging} <= 300 ms\ncheckout.errors.rate{env=staging} < 1 %' }),
+    ],
+    relations: [...MODEL.relations, { id: 'i', relationType: 'implements', sourceId: 'ff', targetId: 'adr' }],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+
+  // radical sense measured the latency, too slow, two hours ago; nothing
+  // measured the error rate. No test report: the measurements alone open it.
+  const at = new Date(Date.now() - 2 * 3600e3).toISOString()
+  await folder.write('.radical/measurements.json', serializeMeasurementStore([
+    { metric: 'checkout.latency.p95', value: 0.42, unit: 's', labels: { env: 'staging' }, source: 'json', at },
+  ]))
+  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  await expect(inspector).toBeEnabled({ timeout: 10_000 })
+  await inspector.click()
+  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await expect(page.locator('.insp-error')).toContainText('checkout.latency.p95{env=staging} <= 300 ms does not hold (0.42 s from json, 2 h ago).')
+  const item = page.locator('.insp-attn-item').filter({ hasText: 'Checkout latency' })
+  await expect(item).toContainText('a value is off its threshold, nothing measured a value')
+  await item.getByRole('button', { name: /Checkout latency/ }).click()
+
+  const checks = page.getByRole('complementary', { name: 'Element' }).locator('.insp-peek-sec').filter({ hasText: 'Checks (2)' })
+  const lines = checks.locator('.insp-test')
+  await expect(lines.nth(0)).toContainText('checkout.latency.p95{env=staging} <= 300 ms')
+  await expect(lines.nth(0)).toContainText('failed')
+  await expect(lines.nth(0).locator('.insp-measured')).toHaveText('0.42 s · json · 2 h ago')
+  await expect(lines.nth(1)).toContainText('checkout.errors.rate{env=staging} < 1 %')
+  await expect(lines.nth(1)).toContainText('not measured')
+
+  // Measured again, both within their thresholds: the decision is verified.
+  const now = new Date().toISOString()
+  await folder.write('.radical/measurements.json', serializeMeasurementStore([
+    { metric: 'checkout.errors.rate', value: 0.2, unit: '%', labels: { env: 'staging' }, source: 'json', at: now },
+    { metric: 'checkout.latency.p95', value: 210, unit: 'ms', labels: { env: 'staging' }, source: 'json', at: now },
+  ]))
+  await expect(page.locator('.insp-error')).toHaveCount(0, { timeout: 10_000 })
+  await expect(lines.nth(0).locator('.insp-measured')).toHaveText('210 ms · json · 0 min ago')
+  await expect(lines.nth(1)).not.toContainText('not measured')
 })
 
 test('a deep link opens the Inspector at once, and only with all it reads', async ({ page, studio }) => {
@@ -167,7 +221,7 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   // with the ratchet as the diff shows them.
   await page.getByRole('button', { name: '+ Add goal' }).click()
   await page.getByRole('spinbutton', { name: 'Goal for Requirements verified' }).fill('100')
-  await page.getByRole('spinbutton', { name: 'Goal for Scenarios that name a test' }).fill('90')
+  await page.getByRole('spinbutton', { name: 'Goal for Scenarios that name a check' }).fill('90')
   await page.locator('.insp-diff summary').click()
   await expect(page.locator('.insp-diff pre')).toContainText('+   "goals": {')
   await page.getByRole('button', { name: 'Save to check.json' }).click()
@@ -176,7 +230,7 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   const saved = JSON.parse((await folder.files())['check.json'])
   expect(saved).toEqual({
     rules: { 'requirement-without-scenario': { severity: 'error', max: 0 } },
-    goals: { 'requirements-verified': { min: 100 }, 'scenarios-with-tests': { min: 90 } },
+    goals: { 'requirements-verified': { min: 100 }, 'scenarios-with-metrics': { min: 90 } },
   })
   await page.getByRole('tab', { name: /^Model quality/ }).click()
   await expect(page.getByRole('tab', { name: /^Model quality/ })).toContainText('1 / 1 goals')

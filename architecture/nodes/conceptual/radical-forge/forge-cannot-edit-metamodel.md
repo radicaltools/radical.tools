@@ -4,7 +4,7 @@ type: "scenario"
 label: "Forge cannot edit metamodel"
 gherkin: "And the metamodel and presentation tools are not in the request"
 given: "a Forge stage is generating"
-tests: "apps/studio/tests/aiRunner.test.ts › runAIPrompt — tool groups and metamodel changes › leaves excluded groups out of the request and refuses calls to them"
+metrics: "test(apps/studio/tests/aiRunner.test.ts › runAIPrompt — tool groups and metamodel changes › leaves excluded groups out of the request and refuses calls to them) passed"
 then: "the call is refused as an unknown tool and the metamodel is unchanged"
 when: "the model calls a metamodel tool such as upsert_node_type"
 ---

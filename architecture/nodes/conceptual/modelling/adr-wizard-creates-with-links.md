@@ -4,7 +4,7 @@ type: "scenario"
 label: "ADR wizard creates with links"
 gherkin: "And nothing is created while the wizard is open"
 given: "the bookstore model on the Governance metamodel"
-tests: "apps/e2e/tests/studio/wizard.spec.ts › dropping an ADR on the canvas opens its wizard; finishing creates it with its relations"
+metrics: "test(apps/e2e/tests/studio/wizard.spec.ts › dropping an ADR on the canvas opens its wizard; finishing creates it with its relations) passed"
 then: "the ADR appears on the canvas with status proposed and a Constrains relation to Bookstore"
 when: "the user drops an ADR, names it, fills Context, ticks Bookstore under Affected elements and clicks Create"
 ---

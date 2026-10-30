@@ -19,7 +19,7 @@ describe('element summary', () => {
     expect(summary(node('sc', 'scenario', { given: 'a batch', when: 'it is approved twice', then: 'the second is rejected' })))
       .toBe('**The second is rejected** — when it is approved twice')
     expect(summary(node('adr', 'adr', { status: 'accepted', decision: 'Use Postgres.' }))).toBe('**Accepted**: Use Postgres.')
-    expect(summary(node('ff', 'fitness-fn', { description: 'p95 latency of checkout', threshold: '< 300 ms' }))).toBe('p95 latency of checkout — threshold **< 300 ms**')
+    expect(summary(node('ff', 'fitness-fn', { description: 'p95 latency of checkout', metrics: 'test(tests/load.test.ts) passed\ncheckout.latency.p95{env=prod} < 300 ms' }))).toBe('p95 latency of checkout — **checkout.latency.p95{env=prod} < 300 ms**')
     expect(summary(node('m', 'mockup', { screen: '/checkout', description: 'Pay for the basket' }))).toBe('**/checkout** — Pay for the basket')
     expect(summary(svc)).toBe('[Java] Moves money.')
   })

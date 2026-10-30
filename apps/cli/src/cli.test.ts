@@ -121,7 +121,7 @@ describe('radical check', () => {
     const cwd = await workspace({
       nodes: [
         node('req', 'requirement', 'Pay', { action: 'take the payment' }),
-        node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', tests: 'src/pay.test.ts › pays\nsrc/pay.test.ts › refunds' }),
+        node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › pays) passed\ntest(src/pay.test.ts › refunds) passed' }),
       ],
       relations: [{ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'req' }],
     })
@@ -160,6 +160,42 @@ describe('radical check', () => {
     const dir = await run(cwd, 'check', 'model', '--report', 'reports')
     expect(dir.code).toBe(0)
     expect(dir.out).toContain('Test reports: 2 test cases')
+  })
+
+  it('reads measurements given with --metrics, keeps them beside the model, and judges the conditions by them', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('adr', 'adr', 'Fast pay', { status: 'accepted', date: '2026-10-29', context: 'c', decision: 'd', consequences: 'q' }),
+        node('ff', 'fitness-fn', 'Pay latency', { metrics: 'pay.latency.p95{env=staging} <= 300 ms', max_age: '7d' }),
+      ],
+      relations: [{ id: 'i', relationType: 'implements', sourceId: 'ff', targetId: 'adr' }],
+    })
+    const file = (value: number, unit: string) => JSON.stringify({
+      format: 'radical-metrics', version: 1, source: 'json', at: new Date().toISOString(), measurements: [{ metric: 'pay.latency.p95', value, unit, labels: { env: 'staging' } }],
+    })
+    await mkdir(join(cwd, 'metrics'))
+    await writeFile(join(cwd, 'metrics/slow.json'), file(0.42, 's'))
+    const red = await run(cwd, 'check', 'model', '--metrics', 'metrics', '--evidence', 'evidence.json')
+    expect(red.code).toBe(1)
+    expect(red.out).toMatch(/Fitness function "Pay latency": pay\.latency\.p95\{env=staging\} <= 300 ms does not hold \(0\.42 s from json, 0 min ago\)\./)
+    expect(red.out).toContain('measurements: 1')
+    expect(JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8')).nodes.adr.status).toBe('broken')
+    // Kept beside the model: radical check reads it without --metrics too.
+    const store = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    expect(store.measurements).toHaveLength(1)
+    expect((await run(cwd, 'check', 'model')).code).toBe(1)
+    // A later measurement replaces it.
+    await writeFile(join(cwd, 'fast.json'), file(120, 'ms'))
+    expect((await run(cwd, 'check', 'model', '--metrics', 'fast.json')).code).toBe(0)
+    // An old one is stale, which warns and does not pass.
+    await writeFile(join(cwd, 'model/.radical/measurements.json'), JSON.stringify({ version: 1, measurements: [{ ...store.measurements[0], value: 100, unit: 'ms', at: new Date(Date.now() - 9 * 86400e3).toISOString() }] }))
+    const stale = await run(cwd, 'check', 'model', '--format', 'json')
+    expect(JSON.parse(stale.out).findings.map((f: { rule: string }) => f.rule)).toContain('metric-stale')
+    // A file that is no radical-metrics/1 stops the check.
+    await writeFile(join(cwd, 'bad.json'), '{"format":"other"}')
+    const bad = await run(cwd, 'check', 'model', '--metrics', 'bad.json')
+    expect(bad.code).toBe(2)
+    expect(bad.err).toContain('bad.json is no radical-metrics/1 file')
   })
 
   it('exits 2 on a report it cannot read, or evidence without a report', async () => {

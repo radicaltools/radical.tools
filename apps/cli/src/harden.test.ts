@@ -31,8 +31,8 @@ describe('radical harden', () => {
     writeFinding(findings, finding('F-0001'))
     const { code, out } = await run(cwd, 'F-0001', '--scenario', 'Undo is exact')
     expect(code).toBe(0)
-    expect(out).toContain('F-0001 is hardened: its fuzz file replays its steps as\n  packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off\n')
-    expect(out).toContain('Add that line to the Tests of scenario "Undo is exact"')
+    expect(out).toContain('F-0001 is hardened: its fuzz file replays its steps as\n  test(packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off) passed\n')
+    expect(out).toContain('Add that line to the Metrics of scenario "Undo is exact"')
     expect(readFindings(findings)[0]).toMatchObject({
       status: 'hardened',
       scenario: 'Undo is exact',

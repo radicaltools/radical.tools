@@ -4,9 +4,9 @@ type: "scenario"
 label: "Component refused at root"
 gherkin: "# Not covered by an automated test"
 given: "a C4 model is open"
-tests: |
-  packages/common/tests/c4Containment.test.ts › what a group may hold › anything but a group follows its allowed parents alone
-  packages/common/tests/modelFacade.test.ts › createModelFacade › refuses placements the metamodel forbids, with the reason
+metrics: |
+  test(packages/common/tests/c4Containment.test.ts › what a group may hold › anything but a group follows its allowed parents alone) passed
+  test(packages/common/tests/modelFacade.test.ts › createModelFacade › refuses placements the metamodel forbids, with the reason) passed
 then: "no node is created and a message says a Component must be placed inside a Container, Web App or Group"
 when: "the user drops a Component on the empty canvas"
 ---

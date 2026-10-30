@@ -41,6 +41,14 @@ type Step =
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
+
+/** When a pack's fitness function passes: its conditions, else the
+ *  threshold the pack wrote into its description (a pack cannot know the
+ *  project's tests or metric names). */
+const criterion = (f: Record<string, unknown>): string =>
+  typeof f.metrics === 'string' && f.metrics.trim() ? f.metrics.trim().split('\n')[0]
+    : /^Threshold: (.+)$/m.exec(typeof f.description === 'string' ? f.description : '')?.[1] ?? ''
+
 export function ConcernWizard({ concept, suggestions, others, nodes, onImport, onCancel, position, problem }: Props): React.ReactElement {
   const params = concept.templateParams ?? []
   const [answers, setAnswers] = useState<Record<string, string>>(() =>
@@ -118,8 +126,8 @@ export function ConcernWizard({ concept, suggestions, others, nodes, onImport, o
     : step.kind === 'question' ? step.param.hint
     : step.kind === 'details' ? 'They go into the requirements, the decision and its fitness functions.'
     : bound.length
-      ? `The decision and its fitness functions constrain ${bound.length === 1 ? 'it' : 'each of them'}, and ${bound.length === 1 ? 'it satisfies' : 'each satisfies'} the requirements. The scenarios and fitness functions come without tests: the check lists them until you name yours.`
-      : 'Bound to no element: the check reports the decision until it constrains the elements it is about, and the requirements until something satisfies them. The scenarios and fitness functions come without tests.'
+      ? `The decision and its fitness functions constrain ${bound.length === 1 ? 'it' : 'each of them'}, and ${bound.length === 1 ? 'it satisfies' : 'each satisfies'} the requirements. The scenarios and fitness functions come without checks: the check lists them until you name your tests, or the values your sensors measure, in their metrics.`
+      : 'Bound to no element: the check reports the decision until it constrains the elements it is about, and the requirements until something satisfies them. The scenarios and fitness functions come without checks.'
 
   return createPortal(
     <div className="nw-backdrop cw-backdrop" onMouseDown={onCancel}>
@@ -380,14 +388,14 @@ function Review({ picked, fill }: { picked: Array<Record<string, unknown>>; fill
             {checks.map((f) => (
               <li key={String(f.id)}>
                 <span className="cw-dot" style={{ background: NODE_COLORS['fitness-fn'] }} aria-hidden="true" />
-                <span><strong>{fill(f.label)}</strong><span className="cw-muted"> — {fill(f.threshold)}</span></span>
+                <span><strong>{fill(f.label)}</strong>{criterion(f) && <span className="cw-muted"> — {fill(criterion(f))}</span>}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
       <p className="cw-note">
-        Also {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'} and the need they come from. Name the tests of the scenarios and fitness functions to have them verified.
+        Also {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'} and the need they come from. Name the tests or the measured values that check the scenarios and fitness functions in their metrics to have them verified.
       </p>
     </div>
   )

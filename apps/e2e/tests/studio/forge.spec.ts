@@ -73,7 +73,7 @@ const requirement = (i: number): ToolUse => ({
 })
 const fitness = (i: number): ToolUse => ({
   name: 'add_node',
-  input: { tempId: `f${i}`, type: 'fitness-fn', label: `Guardrail ${i}`, properties: { category: 'performance', threshold: `${i} s` } },
+  input: { tempId: `f${i}`, type: 'fitness-fn', label: `Guardrail ${i}`, properties: { category: 'performance', metrics: `guardrail.duration <= ${i} s` } },
 })
 
 interface Doc {

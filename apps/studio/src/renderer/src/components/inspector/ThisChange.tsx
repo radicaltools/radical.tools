@@ -37,15 +37,15 @@ function detail(item: ChangeWorkItem): React.ReactNode {
     case 'failing': return <><code>{first('failed')}</code> failed</>
     case 'test-not-written': {
       const missing = first('not-found')
-      return missing ? <><code>{missing}</code> is not in the report</> : `its ${item.type === 'adr' ? 'fitness function names' : 'scenario names'} no test yet`
+      return missing ? <><code>{missing}</code> is not in the report</> : `its ${item.type === 'adr' ? 'fitness function names' : 'scenario names'} no check yet`
     }
-    case 'not-run': return 'no test report has its tests'
+    case 'not-run': return 'no test report or measurement has its checks yet'
     case 'no-checker': return item.type === 'adr' ? 'no fitness function implements it' : 'no scenario verifies it'
-    case 'no-report': return 'Studio has no test report for this folder'
-    case 'tests-unchanged': return `its tests pass, but no ${item.type === 'adr' ? 'fitness function' : 'scenario'} changed with it`
+    case 'no-report': return 'Studio has no test report or measurements for this folder'
+    case 'tests-unchanged': return `its checks pass, but no ${item.type === 'adr' ? 'fitness function' : 'scenario'} changed with it`
     case 'test-still-runs': return <><code>{item.tests.find((t) => t.outcome !== 'not-found' && t.outcome !== 'not-run')?.id}</code> still runs</>
     case 'removed': return 'removed with what verified it'
-    default: return `${item.tests.length} test${item.tests.length === 1 ? '' : 's'} passed`
+    default: return `${item.tests.length} check${item.tests.length === 1 ? '' : 's'} passed`
   }
 }
 

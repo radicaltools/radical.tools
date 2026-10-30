@@ -52,7 +52,7 @@ export interface CheckMetric {
   dimension: CheckDimension
   /** The rule whose findings mark the elements that miss it, when one does. */
   rule?: string
-  /** Measured only with test reports. */
+  /** Measured only with test reports or measurements. */
   tests?: boolean
   /** How many of how many meet it; null when the model has nothing to count. */
   measure(ctx: MeasureContext): { count: number; total: number } | null
@@ -102,34 +102,33 @@ export const CHECK_METRICS: CheckMetric[] = [
   byRule('elements-valid', 'Elements the metamodel allows', 'Elements no metamodel issue points at.', 'consistency', 'metamodel', (m) => Object.values(m.nodes)),
   byRule('requirements-complete', 'Complete requirements', 'Requirements with an action and every field their EARS type reads.', 'completeness', 'requirement-incomplete', (m) => nodesOf(m, 'requirement')),
   byRule('adrs-complete', 'Complete accepted ADRs', 'Accepted ADRs with a date, context, decision and consequences.', 'completeness', 'adr-incomplete', acceptedAdrs),
-  byRule('fitness-fns-with-threshold', 'Fitness functions with a threshold', 'Fitness functions that state their threshold or success criteria.', 'completeness', 'fitness-fn-without-threshold', (m) => nodesOf(m, 'fitness-fn')),
   byRule('needs-with-requirement', 'Needs with a requirement', 'Needs at least one requirement derives from.', 'traceability', 'need-without-requirement', (m) => nodesOf(m, 'need')),
   byRule('requirements-with-origin', 'Requirements with an origin', 'Requirements that derive from a need or another requirement.', 'traceability', 'requirement-without-origin', (m) => nodesOf(m, 'requirement')),
   byRule('requirements-satisfied', 'Requirements satisfied', 'Requirements an element of the architecture satisfies.', 'traceability', 'requirement-unsatisfied', (m) => nodesOf(m, 'requirement')),
   byRule('requirements-with-scenario', 'Requirements with a scenario', 'Requirements at least one scenario verifies.', 'traceability', 'requirement-without-scenario', (m) => hasType(m, 'scenario') ? nodesOf(m, 'requirement') : null),
   byRule('scenarios-verifying', 'Scenarios that verify something', 'Scenarios that verify a requirement or a state machine.', 'traceability', 'scenario-verifies-nothing', (m) => nodesOf(m, 'scenario')),
-  byRule('scenarios-with-tests', 'Scenarios that name a test', 'Scenarios whose Tests property names the tests that run them.', 'traceability', 'scenario-without-tests', (m) => nodesOf(m, 'scenario')),
+  byRule('scenarios-with-metrics', 'Scenarios that name a check', 'Scenarios whose Metrics property states the tests or measured values that check them.', 'traceability', 'scenario-without-metrics', (m) => nodesOf(m, 'scenario')),
   byRule('adrs-with-fitness-fn', 'Accepted ADRs with a fitness function', 'Accepted ADRs a fitness function implements.', 'decisions', 'adr-without-fitness-fn', (m) => hasType(m, 'fitness-fn') ? acceptedAdrs(m) : null),
   byRule('fitness-fns-linked', 'Fitness functions linked', 'Fitness functions that implement an ADR or constrain an element.', 'decisions', 'fitness-fn-unlinked', (m) => nodesOf(m, 'fitness-fn')),
-  byRule('fitness-fns-with-tests', 'Fitness functions that name a test', 'Fitness functions whose Tests property names the checks that run them.', 'decisions', 'fitness-fn-without-tests', (m) => nodesOf(m, 'fitness-fn')),
+  byRule('fitness-fns-with-metrics', 'Fitness functions that name a check', 'Fitness functions whose Metrics property states the tests or measured values that check them.', 'decisions', 'fitness-fn-without-metrics', (m) => nodesOf(m, 'fitness-fn')),
   {
     id: 'requirements-verified', label: 'Requirements verified', dimension: 'behaviour', tests: true,
-    description: 'Requirements whose scenarios all name tests that passed.',
+    description: 'Requirements whose scenarios all passed their checks.',
     measure: (ctx) => withStatus(nodesOf(ctx.model, 'requirement'), ['verified'], ctx),
   },
   {
     id: 'scenarios-passing', label: 'Scenarios passing', dimension: 'behaviour', tests: true,
-    description: 'Scenarios whose tests all passed.',
+    description: 'Scenarios whose checks passed.',
     measure: (ctx) => withStatus(nodesOf(ctx.model, 'scenario'), ['passed'], ctx),
   },
   {
     id: 'adrs-verified', label: 'Accepted ADRs verified', dimension: 'fitness', tests: true,
-    description: 'Accepted ADRs whose fitness functions all name checks that passed.',
+    description: 'Accepted ADRs whose fitness functions all passed their checks.',
     measure: (ctx) => withStatus(acceptedAdrs(ctx.model), ['verified'], ctx),
   },
   {
     id: 'fitness-fns-passing', label: 'Fitness functions passing', dimension: 'fitness', tests: true,
-    description: 'Fitness functions whose checks all passed.',
+    description: 'Fitness functions whose checks passed.',
     measure: (ctx) => withStatus(nodesOf(ctx.model, 'fitness-fn'), ['passed'], ctx),
   },
   {

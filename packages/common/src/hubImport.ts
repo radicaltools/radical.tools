@@ -5,6 +5,7 @@
 // (hub/importConcept.ts, centred on the viewport); the MCP server's Forge
 // adds it to the folder, beside the existing model.
 
+import { migrateCheckFields } from './formats/checksMigration'
 import type { C4ElementType, C4Node, C4Relation, DiagramData, DiagramSequence, DiagramView } from './c4'
 import { NODE_SIZES, trimStepBackward } from './c4'
 import type { HubConcept, HubImportRecord, TemplateParam } from './hubFormat'
@@ -145,7 +146,10 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
   const offsetY = corner.y - (bounded ? minY : 0)
 
   const nodes: Record<string, C4Node> = {}
-  for (const raw of templated.nodes) {
+  for (const node of templated.nodes) {
+    // A concept from before `metrics` (a test list, a threshold) comes in
+    // as models from then are read.
+    const raw = migrateCheckFields(node as Record<string, unknown>)
     const oldId = raw.id as string
     const id = idMap.get(oldId)!
     const type = ((raw.type as C4ElementType) ?? 'component')
@@ -238,7 +242,7 @@ export function templateRecord(
   for (const origNode of concept.nodes) {
     const id = maps.node.get(origNode.id as string)
     if (!id) continue
-    originalNodes[id] = origNode as Record<string, unknown>
+    originalNodes[id] = migrateCheckFields(origNode as Record<string, unknown>)
     const perNodeParams = origNode.templateParams as TemplateParam[] | undefined
     if (perNodeParams?.length) nodeParamsMap[id] = perNodeParams
   }

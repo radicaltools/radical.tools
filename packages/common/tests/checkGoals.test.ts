@@ -20,13 +20,13 @@ function model(): DiagramData {
       node('sys', 'system', 'Shop'),
       node('need', 'need', 'Brief'),
       req('r1'), req('r2'), req('r3'), req('r4'),
-      node('s1', 'scenario', 'S1', { given: 'g', when: 'w', then: 't', tests: 'tests/a.test.ts › one' }),
-      node('s2', 'scenario', 'S2', { given: 'g', when: 'w', then: 't', tests: 'tests/a.test.ts › two' }),
+      node('s1', 'scenario', 'S1', { given: 'g', when: 'w', then: 't', metrics: 'test(tests/a.test.ts › one) passed' }),
+      node('s2', 'scenario', 'S2', { given: 'g', when: 'w', then: 't', metrics: 'test(tests/a.test.ts › two) passed' }),
       node('s3', 'scenario', 'S3', { given: 'g', when: 'w', then: 't' }),
       node('a1', 'adr', 'A1', ACCEPTED_ADR),
       node('a2', 'adr', 'A2', ACCEPTED_ADR),
       node('a3', 'adr', 'A3', { status: 'proposed' }),
-      node('ff', 'fitness-fn', 'F', { threshold: 'passes', tests: 'tests/f.test.ts › holds' }),
+      node('ff', 'fitness-fn', 'F', { metrics: 'test(tests/f.test.ts › holds) passed' }),
     ],
     relations: [
       ...['r1', 'r2', 'r3', 'r4'].flatMap((r) => [rel(`d-${r}`, 'derives', r, 'need'), rel(`s-${r}`, 'satisfies', 'sys', r)]),
@@ -51,7 +51,7 @@ describe('radical check goals', () => {
   it('measures what share of the model meets each rule', () => {
     const result = checkModel(model())
     expect(metric(result, 'requirements-with-scenario')).toMatchObject({ count: 3, total: 4, percent: 75, met: true })
-    expect(metric(result, 'scenarios-with-tests')).toMatchObject({ count: 2, total: 3, percent: 66 })
+    expect(metric(result, 'scenarios-with-metrics')).toMatchObject({ count: 2, total: 3, percent: 66 })
     // Only accepted ADRs count.
     expect(metric(result, 'adrs-with-fitness-fn')).toMatchObject({ count: 1, total: 2, percent: 50 })
     expect(metric(result, 'requirements-satisfied')).toMatchObject({ count: 4, total: 4, percent: 100 })
@@ -76,20 +76,20 @@ describe('radical check goals', () => {
   })
 
   it('fails a goal below its minimum as goal-unmet, rounding the share down', () => {
-    const result = checkModel(model(), { goals: { 'scenarios-with-tests': { min: 67 }, 'requirements-with-scenario': { min: 75 } } })
-    expect(metric(result, 'scenarios-with-tests')).toMatchObject({ percent: 66, min: 67, met: false })
+    const result = checkModel(model(), { goals: { 'scenarios-with-metrics': { min: 67 }, 'requirements-with-scenario': { min: 75 } } })
+    expect(metric(result, 'scenarios-with-metrics')).toMatchObject({ percent: 66, min: 67, met: false })
     expect(metric(result, 'requirements-with-scenario')).toMatchObject({ min: 75, met: true })
     const unmet = result.findings.filter((f) => f.rule === 'goal-unmet')
     expect(unmet).toHaveLength(1)
-    expect(unmet[0]).toMatchObject({ code: 'scenarios-with-tests', severity: 'error', message: 'Scenarios that name a test: 66% (2 of 3), below the goal of 67%.' })
+    expect(unmet[0]).toMatchObject({ code: 'scenarios-with-metrics', severity: 'error', message: 'Scenarios that name a check: 66% (2 of 3), below the goal of 67%.' })
     expect(result.ok).toBe(false)
     expect(result.rules.find((r) => r.id === 'goal-unmet')).toMatchObject({ count: 1, failed: true })
   })
 
   it('lets the config turn one goal into a warning', () => {
-    const result = checkModel(model(), { goals: { 'scenarios-with-tests': { min: 90 } }, rules: { 'goal-unmet/scenarios-with-tests': 'warning' } })
+    const result = checkModel(model(), { goals: { 'scenarios-with-metrics': { min: 90 } }, rules: { 'goal-unmet/scenarios-with-metrics': 'warning' } })
     expect(result.ok).toBe(true)
-    expect(result.findings.find((f) => f.rule === 'goal-unmet')).toMatchObject({ key: 'goal-unmet/scenarios-with-tests', severity: 'warning' })
+    expect(result.findings.find((f) => f.rule === 'goal-unmet')).toMatchObject({ key: 'goal-unmet/scenarios-with-metrics', severity: 'warning' })
   })
 
   it('names goals for metrics that do not exist', () => {
@@ -97,8 +97,8 @@ describe('radical check goals', () => {
   })
 
   it('prints the goals in the text output', () => {
-    const text = formatCheckText(checkModel(model(), { goals: { 'scenarios-with-tests': { min: 67 } } }), { folder: 'model' })
-    expect(text).toContain('Goals:\n  ✖ scenarios-with-tests  66% (2 of 3, min 67%)')
+    const text = formatCheckText(checkModel(model(), { goals: { 'scenarios-with-metrics': { min: 67 } } }), { folder: 'model' })
+    expect(text).toContain('Goals:\n  ✖ scenarios-with-metrics  66% (2 of 3, min 67%)')
   })
 
   it('reads goals from check.json, and refuses one without a percentage', () => {

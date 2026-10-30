@@ -4,7 +4,7 @@ type: "scenario"
 label: "System Context renders collapsed"
 gherkin: "And the container relations to Payment Provider are drawn from the collapsed Bookstore box"
 given: "the bookstore model whose System Context view lists Customer, Bookstore and Payment Provider but none of Bookstore's containers"
-tests: "apps/e2e/tests/studio/views.spec.ts › System Context (static)"
+metrics: "test(apps/e2e/tests/studio/views.spec.ts › System Context (static)) passed"
 then: "the canvas shows 3 elements and 2 relations under the caption 'Structure: System Context'"
 when: "the user opens the System Context view by deep link"
 ---

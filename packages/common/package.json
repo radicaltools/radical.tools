@@ -29,6 +29,7 @@
     "./wireframe": "./src/wireframe.ts",
     "./formats/structurizrDsl": "./src/formats/structurizrDsl.ts",
     "./formats/mdFolder": "./src/formats/mdFolder.ts",
+    "./formats/checksMigration": "./src/formats/checksMigration.ts",
     "./formats/mdFolderSync": "./src/formats/mdFolderSync.ts",
     "./formats/canvasSelection": "./src/formats/canvasSelection.ts",
     "./formats/forgeRunStatus": "./src/formats/forgeRunStatus.ts",

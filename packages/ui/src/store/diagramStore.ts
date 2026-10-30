@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { migrateChecks } from '@radical/common/formats/checksMigration'
 import { current, isDraft, produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
@@ -3986,9 +3987,10 @@ export const useDiagramStore = create<DiagramStore>()(
 
     // A synchronously readable document (localStorage) shows on first paint.
     // Anything else renders the sample first and the app loads it afterwards.
-    const persisted: DiagramData | null = viewerProfile
+    const opened: DiagramData | null = viewerProfile
       ? null
       : documentBackend()?.openActive(buildSampleData) ?? null
+    const persisted = opened && Array.isArray(opened.nodes) ? migrateChecks(opened) : opened
 
     if (persisted && Array.isArray(persisted.nodes) && Array.isArray(persisted.relations)) {
       initNodes = atDefaultPositions(persisted.nodes, persisted.defaultPositions)
@@ -9204,7 +9206,7 @@ export const useDiagramStore = create<DiagramStore>()(
       loadDiagram(loaded, opts) {
         finishGlide()
         // A Hub concept file opened as a model: its template filled in.
-        const data = conceptFileAsModel(loaded)
+        const data = migrateChecks(conceptFileAsModel(loaded))
         if (!opts?.outsideChange) _modelLoads++
         get().stopLiveLayout()
         // The exploration shown keeps its places through an outside change;

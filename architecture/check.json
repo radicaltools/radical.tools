@@ -10,7 +10,7 @@
     "adr-incomplete": "error",
     "adr-superseded-unlinked": "error",
     "fitness-fn-unlinked": "error",
-    "fitness-fn-without-threshold": "error",
+    "metric-invalid": "error",
     "concern-unbound": "error",
     "requirement-without-scenario": {
       "severity": "error",
@@ -20,13 +20,13 @@
       "severity": "error",
       "max": 2
     },
-    "scenario-without-tests": {
+    "scenario-without-metrics": {
       "severity": "error",
-      "max": 9
+      "max": 7
     },
-    "fitness-fn-without-tests": {
+    "fitness-fn-without-metrics": {
       "severity": "error",
-      "max": 3
+      "max": 2
     },
     "test-unbound": {
       "severity": "warning",

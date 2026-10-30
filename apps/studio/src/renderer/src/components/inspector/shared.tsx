@@ -6,8 +6,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  CHECK_DIMENSIONS, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE,
-  type CheckDimension, type CheckFinding, type CheckMetricResult, type CheckPerspective, type CheckResult, type CheckRuleResult, type EvidenceEntry,
+  CHECK_DIMENSIONS, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, formatAge,
+  type CheckDimension, type ConditionResult, type CheckFinding, type CheckMetricResult, type CheckPerspective, type CheckResult, type CheckRuleResult, type EvidenceEntry,
 } from '@radical/common/check'
 import type { C4Node } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
@@ -31,8 +31,8 @@ export const dimensionOfFinding = (f: CheckFinding): CheckDimension | undefined 
 export const metricOf = (check: CheckResult, id: string): CheckMetricResult | undefined => check.metrics.find((m) => m.id === id)
 
 export const SHORT_TYPE: Record<string, string> = { requirement: 'Req', 'fitness-fn': 'FF', scenario: 'Scenario', adr: 'ADR', need: 'Need', database: 'DB', webapp: 'Web app', component: 'Comp', container: 'Cont', system: 'System' }
-export const MARK: Record<string, string> = { verified: '✓', passed: '✓', broken: '✗', failed: '✗', unverified: '○', 'not-run': '○', 'no-tests': '○', 'not-found': '?', skipped: '–' }
-export const FAILING = new Set(['broken', 'failed', 'not-found'])
+export const MARK: Record<string, string> = { verified: '✓', passed: '✓', broken: '✗', failed: '✗', unverified: '○', 'not-run': '○', 'no-checks': '○', 'not-found': '?', skipped: '–', stale: '◷', invalid: '!' }
+export const FAILING = new Set(['broken', 'failed', 'not-found', 'invalid'])
 export const PASSING = new Set(['verified', 'passed'])
 export const tone = (status: string | undefined): string => !status ? '' : FAILING.has(status) ? 'bad' : PASSING.has(status) ? 'ok' : 'none'
 
@@ -127,6 +127,22 @@ export const tally = (statuses: Array<string | undefined>): Tally => ({
   none: statuses.filter((s) => !s || (!PASSING.has(s) && !FAILING.has(s))).length,
 })
 
+/** One condition of a scenario or fitness function: its line, its outcome
+ *  and, for a measured value, what was measured, by which sensor, how long
+ *  ago. */
+export function ConditionLine({ c }: { c: ConditionResult }): React.ReactElement {
+  const m = c.measurement
+  return (
+    <div className="insp-test">
+      <span className={`insp-mark ${tone(c.outcome)}`}>{MARK[c.outcome]}</span>
+      <code>{c.test ?? c.condition}</code>
+      {c.outcome !== 'passed' && <em>{c.outcome === 'not-run' && !c.test ? 'not measured' : c.outcome}</em>}
+      {m && <span className="insp-sub insp-measured">{m.value}{m.unit ? ` ${m.unit}` : ''} · {m.source} · {formatAge(Date.now() - Date.parse(m.at))} ago</span>}
+      {c.detail && !m && <span className="insp-sub">{c.detail}</span>}
+    </div>
+  )
+}
+
 export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check: CheckResult; onClose: () => void }): React.ReactElement | null {
   const node = ctx.nodes[id]
   if (!node) return null
@@ -142,18 +158,16 @@ export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check:
       <dl className="insp-kv">
         <dt>Type</dt><dd>{ctx.metamodel.nodeTypes[node.type]?.label ?? node.type}</dd>
         {path.length > 0 && <><dt>In</dt><dd>{path.join(' › ')}</dd></>}
-        {ev && <><dt>Tests</dt><dd><span className={`insp-mark ${tone(ev.status)}`}>{MARK[ev.status]}</span> {ev.status}</dd></>}
+        {ev && <><dt>{ev.conditions ? 'Checks' : 'Status'}</dt><dd><span className={`insp-mark ${tone(ev.status)}`}>{MARK[ev.status]}</span> {ev.status}</dd></>}
       </dl>
       <div className="insp-peek-acts">
         <ShowOnCanvas id={id} className="primary" />
         <OpenWikiPage id={id} />
       </div>
-      {ev?.tests && ev.tests.length > 0 && (
+      {ev?.conditions && ev.conditions.length > 0 && (
         <div className="insp-peek-sec">
-          <span className="insp-label">Tests ({ev.tests.length})</span>
-          {ev.tests.map((t) => (
-            <div key={t.id} className="insp-test"><span className={`insp-mark ${tone(t.outcome)}`}>{MARK[t.outcome]}</span><code>{t.id}</code>{t.outcome !== 'passed' && <em>{t.outcome}</em>}</div>
-          ))}
+          <span className="insp-label">Checks ({ev.conditions.length})</span>
+          {ev.conditions.map((c, i) => <ConditionLine key={i} c={c} />)}
         </div>
       )}
       {ev?.by && (

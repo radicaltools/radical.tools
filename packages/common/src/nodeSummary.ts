@@ -33,6 +33,7 @@
 import type { C4Node, C4Relation } from './c4'
 import type { Metamodel } from './metamodel/types'
 import { escapeMarkdown, isMarkdownField, markdownToPlain } from './markdown'
+import { parseConditions } from './check/metrics'
 import { composeEarsSentence, earsSummaryParts, firstParagraph, firstPhrase, refIds, requirementStatePhrase, resolveEarsSubject } from './metamodel'
 
 const C4_SUMMARY = '[\\[{technology}\\] ]{description.sentence}'
@@ -49,7 +50,7 @@ export const DEFAULT_SUMMARIES: Record<string, string> = {
   requirement: '[{obligation.bold}][ — {condition}]',
   scenario: '[{then.phrase.cap.bold}][ — when {when}]',
   adr: '[{status.cap.bold}: ]{decision.sentence}',
-  'fitness-fn': '{description.sentence}[ — threshold {threshold.bold}]',
+  'fitness-fn': '{description.sentence}[ — {conditions.bold}]',
   domain: '[{kind.cap.bold} · ]{description.sentence}',
   'state-machine': '[Lifecycle of {out:lifecycle-of.bold}: ]{description.sentence}',
   state: '{description.sentence|transitions.cap|kind.cap}',
@@ -72,7 +73,8 @@ export function summaryTokens(type: string, metamodel: Metamodel | undefined): s
   const props = (metamodel?.nodeTypes[type]?.properties ?? []).map((p) => p.key)
   const ears = props.includes('action') ? ['ears', 'obligation', 'condition'] : []
   const moves = ['state', 'pseudostate', 'event'].includes(type) ? ['transitions'] : []
-  return [...new Set(['label', 'description', 'technology', ...ears, ...moves, ...props])]
+  const conditions = props.includes('metrics') ? ['conditions'] : []
+  return [...new Set(['label', 'description', 'technology', ...ears, ...moves, ...conditions, ...props])]
 }
 
 /** One line of running text: whitespace and Markdown heading marks folded. */
@@ -155,6 +157,10 @@ function singleTokenValue(token: string, ctx: Ctx): string {
     value = line(p.action) ? line(composeEarsSentence(p, resolveEarsSubject(node.id, relations, nodes), requirementStatePhrase(node, nodes, relations) || undefined).sentence) : ''
   } else if (key === 'obligation' || key === 'condition') {
     value = line(earsSummaryParts(p, resolveEarsSubject(node.id, relations, nodes), requirementStatePhrase(node, nodes, relations) || undefined)[key])
+  } else if (key === 'conditions') {
+    // The values a fitness function or scenario holds itself to, from its
+    // metrics; the tests it names are no threshold to read.
+    value = parseConditions(p.metrics).filter((c) => c.kind === 'metric').map((c) => escapeMarkdown(c.raw)).join('; ')
   } else if (key === 'type') {
     value = escapeMarkdown(metamodel?.nodeTypes[node.type]?.label ?? node.type)
   } else {

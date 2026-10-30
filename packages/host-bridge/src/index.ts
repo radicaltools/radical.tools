@@ -96,10 +96,11 @@ export interface HostCapabilities {
   /** Write the model's base (`.radical/base.json`) in an md-folder, as a
    *  Radical Forge run does where git saved none. */
   writeModelBase?(folderPath: string, content: string): Promise<HostResult>
-  /** Read what `radical check` keeps beside an md-folder model: the test
-   *  results (`.radical/test-results.json`) and the rule settings
+  /** Read what `radical check` and `radical sense` keep beside an md-folder
+   *  model: the test results (`.radical/test-results.json`), the
+   *  measurements (`.radical/measurements.json`) and the rule settings
    *  (`check.json`); each is null when there is none. */
-  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; config?: string | null }>
+  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null }>
   /** Write the rule settings and goals (`check.json`) of an md-folder model,
    *  as the Inspector's Settings save them. */
   writeCheckConfig?(folderPath: string, content: string): Promise<HostResult>

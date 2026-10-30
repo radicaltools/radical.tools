@@ -4,7 +4,8 @@
 // CLI, Studio and CI check alike; it goes into git with the model.
 // .radical/test-results.json holds the test cases of the last run read with
 // --report, for Studio to work out what they say about the model as it is
-// edited; like the rest of .radical/ it stays out of git.
+// edited; .radical/measurements.json holds what sensors measured. Like the
+// rest of .radical/ they stay out of git.
 
 import { SELECTION_DIR } from '../formats/canvasSelection'
 import { stripBom } from '../formats/mdFolder'
@@ -13,6 +14,9 @@ import type { TestCase, TestStatus } from './reports'
 
 export const CHECK_CONFIG_FILE = 'check.json'
 export const TEST_RESULTS_FILE = `${SELECTION_DIR}/test-results.json`
+/** The latest measurement of each metric and labels, as `radical sense`
+ *  and `radical check --metrics` keep them for Studio (metrics.ts). */
+export const MEASUREMENTS_FILE = `${SELECTION_DIR}/measurements.json`
 
 export interface TestResults {
   version: 1

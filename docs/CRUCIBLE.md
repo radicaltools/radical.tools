@@ -127,7 +127,7 @@ fuzz file names its worlds (the models a run starts from, each with the seed
 and the number of runs CI uses), its actions, its rules and its known
 failures. It reports a test case for each world, and one for each rule of each
 world (`undoRestores holds`), so a scenario or a fitness function can name one
-rule in its Tests and `radical check` finds it.
+rule in its Metrics and `radical check` finds it.
 
 | Option | What it does |
 |---|---|
@@ -161,8 +161,8 @@ For a finding of a fuzz file, the test is its own steps:
 `radical harden F-0003 --scenario "Undo is exact"` marks it hardened, and from
 then on the fuzz file replays its shrunk sequence as a test case of its own
 (`F-0003 stays fixed: …`), once, without the known failures, so it fails until
-the bug is fixed. The command prints the test id to add to the scenario's
-Tests; it never changes the model's files. A finding from an exploration has
+the bug is fixed. The command prints the `test(…) passed` line to add to the
+scenario's Metrics; it never changes the model's files. A finding from an exploration has
 no steps to replay: its test is written by hand, then gated.
 
 `radical harden --gate` checks a test before it is bound, the way a fix should

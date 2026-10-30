@@ -4,7 +4,7 @@ type: "scenario"
 label: "Step back to v2 with diff"
 gherkin: "And clicking v1 shows no diff, because the oldest milestone is the baseline"
 given: "a model with milestones v1 and v2"
-tests: "packages/ui/tests/milestones.test.ts › v2 produces a diff against v1 (auto base = previous milestone)"
+metrics: "test(packages/ui/tests/milestones.test.ts › v2 produces a diff against v1 (auto base = previous milestone)) passed"
 then: "the canvas shows the model as of v2, the chip names v2, and elements changed since v1 are coloured"
 when: "the user clicks v2 in the Milestones list and turns on the diff toggle"
 ---

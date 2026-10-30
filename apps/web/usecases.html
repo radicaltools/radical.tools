@@ -237,7 +237,7 @@
           <h3>What you get</h3>
           <ul>
             <li><b>One source of truth for humans and agents.</b> The agent reads the architecture, decisions and requirements through MCP before it writes code, and updates the model when the design changes.</li>
-            <li><b>CI checks the implementation against the model.</b> <code>radical check</code> reads the test reports and verifies that the tests scenarios and fitness functions name exist and pass. A gap above its baseline fails the build.</li>
+            <li><b>CI checks the implementation against the model.</b> <code>radical check</code> reads the test reports and what the sensors measured, and verifies that the tests scenarios and fitness functions name exist and pass and that the measured values meet their thresholds. A gap above its baseline fails the build.</li>
             <li><b>Model health on every change.</b> Consistency, Completeness, Traceability and Decisions as percentages, with goals and baselines; the ratchet only tightens.</li>
             <li><b>Changes on branch.</b> What a pull request changed in the model, with what the tests say about each requirement and decision.</li>
             <li><b>One plane.</b> Need → requirement → component → scenario → test, traced end to end.</li>
@@ -277,7 +277,7 @@
             <li><b>Model first, code second.</b> The agent starts from a map, not a blank repository.</li>
             <li><b>Lower cost.</b> The agent reads the model instead of re-reading the codebase every session. Shorter context, fewer wrong turns, less code thrown away.</li>
             <li><b>Best practices by default.</b> Packs bring the decisions you would forget, such as who is calling, how long personal data is kept and what happens when a partner is down, with their requirements and checks. Each rests on named sources, OWASP ASVS, NIST, the GDPR, Google SRE, and the catalogue refuses a pack without them.</li>
-            <li><b>Guardrails that fail CI.</b> Fitness functions and scenarios name tests, so drift shows up in the build, not in production.</li>
+            <li><b>Guardrails that fail CI.</b> Fitness functions and scenarios name their tests and the values they hold to, so drift shows up in the build, not in production.</li>
             <li><b>You stay in control.</b> Every Forge stage asks first and can be regenerated; proposals are yours to accept.</li>
             <li><b>The model keeps up with the code,</b> so what you have a month later is still written down.</li>
           </ul>

@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestReport, ratchetConfig, runCheck, serializeTestResults, type CheckConfig, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseTestReport, ratchetConfig, runCheck, serializeMeasurementStore, serializeTestResults, type CheckConfig, type Measurement, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -23,8 +23,15 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       for more. The tests that scenarios and fitness functions
                       name are looked up in them. The test cases read are kept
                       in the model folder's .radical/test-results.json for Studio
-  --evidence <file>   with --report: write what the reports say about each
-                      scenario, fitness function, requirement and ADR as JSON
+  --metrics <path>    a radical-metrics/1 file (radical sense --out), or a
+                      directory of them (.json files); repeat for more. They
+                      are added to what radical sense keeps in the model
+                      folder's .radical/measurements.json, which is read
+                      without --metrics too, and the metric conditions of
+                      scenarios and fitness functions are evaluated against
+                      the latest measurement each matches
+  --evidence <file>   with --report or measurements: write what they say about
+                      each scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
                       (the test rules only with --report: without it they
@@ -70,6 +77,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         config: { type: 'string' },
         format: { type: 'string', default: 'text' },
         report: { type: 'string', multiple: true },
+        metrics: { type: 'string', multiple: true },
         evidence: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
@@ -86,10 +94,10 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   if (values['list-rules']) {
     for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
     io.out('\nMetrics for goals (in percent):')
-    for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'reports' : '').padEnd(8)} ${metric.description}`)
+    for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'evidence' : '').padEnd(8)} ${metric.description}`)
     return 0
   }
-  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (values.evidence && !values.report?.length)) {
+  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (values.evidence && !values.report?.length && !values.metrics?.length)) {
     io.err(CHECK_USAGE)
     return 2
   }
@@ -143,7 +151,23 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), concerns: concernPacks() })
+  // What radical sense kept, with the files --metrics names added.
+  const storePath = join(root, MEASUREMENTS_FILE)
+  const stored = await readFile(storePath, 'utf8').then(parseMeasurementStore, () => null)
+  let measurements: Measurement[] | undefined = stored ?? undefined
+  if (values.metrics?.length) {
+    const read: Measurement[] = []
+    try {
+      for (const file of await reportFiles(values.metrics, io.cwd, /\.json$/i, 'measurement')) read.push(...parseMetricsFile(await readFile(resolve(io.cwd, file), 'utf8'), file))
+    } catch (error) {
+      io.err((error as NodeJS.ErrnoException).code === 'ENOENT' ? `Cannot read the measurements ${(error as NodeJS.ErrnoException).path}: no such file.` : (error as Error).message)
+      return 2
+    }
+    measurements = mergeMeasurements(stored ?? [], read)
+    await writeBeside(storePath, serializeMeasurementStore(measurements))
+  }
+
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), concerns: concernPacks() })
   if (tests) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited.
@@ -167,15 +191,15 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
 }
 
 /** The report files `paths` name: a file as it is, a directory's .json and
- *  .xml files. A path that is not there is passed on, and fails to read; a
- *  directory with no report in it throws. */
-async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
+ *  .xml files (or those `pattern` matches). A path that is not there is
+ *  passed on, and fails to read; a directory with no report in it throws. */
+async function reportFiles(paths: string[], cwd: string, pattern = /\.(json|xml)$/i, what = 'report'): Promise<string[]> {
   const files: string[] = []
   for (const path of paths) {
     const isDir = await stat(resolve(cwd, path)).then((s) => s.isDirectory(), () => false)
     if (!isDir) { files.push(path); continue }
-    const names = (await readdir(resolve(cwd, path))).filter((name) => /\.(json|xml)$/i.test(name)).sort()
-    if (!names.length) throw new Error(`The report directory ${path} holds no .json or .xml report.`)
+    const names = (await readdir(resolve(cwd, path))).filter((name) => pattern.test(name)).sort()
+    if (!names.length) throw new Error(what === 'report' ? `The report directory ${path} holds no .json or .xml report.` : `The ${what} directory ${path} holds no .json file.`)
     files.push(...names.map((name) => join(path, name)))
   }
   return files
@@ -184,7 +208,7 @@ async function reportFiles(paths: string[], cwd: string): Promise<string[]> {
 /** Writes a file beside the model, making its directory. In a model
  *  folder's .radical directory, Studio's place for what is not the model, it
  *  also writes the .gitignore that keeps that directory out of version control. */
-async function writeBeside(path: string, content: string): Promise<void> {
+export async function writeBeside(path: string, content: string): Promise<void> {
   const dir = dirname(path)
   await mkdir(dir, { recursive: true })
   if (basename(dir) === SELECTION_DIR) {

@@ -273,7 +273,7 @@ npx @radicaltools/cli setup</code></pre>
           <li><strong>Requirement</strong> — one thing the system shall do, as an EARS sentence. Pick the pattern (ubiquitous, <em>When…</em>, <em>While…</em>, <em>If…, then…</em>, <em>Where…</em>, complex) and fill the slots, or type the whole sentence and let Studio split it. The subject of the sentence is the element that <em>satisfies</em> the requirement. Each requirement <em>derives from</em> a need.</li>
           <li><strong>Scenario</strong> — an acceptance example in Gherkin: <em>Given</em>, <em>When</em>, <em>Then</em>. It <em>verifies</em> a requirement and names the automated tests that run it, one <code>file › title</code> per line, which <code>radical check</code> looks up.</li>
           <li><strong>ADR</strong> — a decision record with status, date, context, decision, consequences and alternatives. It <em>constrains</em> the elements it governs and <em>supersedes</em> the decision it replaces.</li>
-          <li><strong>Fitness function</strong> — an automated check that the architecture keeps a property: category, threshold and tests. It <em>implements</em> an ADR and <em>constrains</em> the elements it guards.</li>
+          <li><strong>Fitness function</strong> — an automated check that the architecture keeps a property: a category and its metrics, the conditions it holds to (a test that has to pass, or a measured value and its threshold). It <em>implements</em> an ADR and <em>constrains</em> the elements it guards.</li>
         </ul>
         <p>Needs with their requirements read best in a <a href="#view-table">table</a> or <a href="#view-wiki">wiki</a> whose filter follows <em>Refined into</em>, as the sample's <em>Requirements Register</em> does.</p>
       </section>
@@ -705,7 +705,7 @@ npx @radicaltools/cli setup</code></pre>
           <figcaption>Implementation: what the last test reports say about the model.</figcaption>
         </figure>
         <div class="doc-tip">
-          <strong>Good to know.</strong> The model rules run live as you edit. What the tests say comes from the last <code>radical check --report</code>, which keeps the results in <code>.radical/test-results.json</code> beside the model. Until a report is there, the Inspector button is greyed out. Settings exist only for a model kept in a folder, since <code>check.json</code> lies beside it. The rules are listed in the <a href="reference.html#rules">Reference</a>.
+          <strong>Good to know.</strong> The model rules run live as you edit. What the tests say comes from the last <code>radical check --report</code>, which keeps the results in <code>.radical/test-results.json</code> beside the model; what sensors measured comes from <code>radical sense</code>, which keeps it in <code>.radical/measurements.json</code>. Until one of them is there, the Inspector button is greyed out. Settings exist only for a model kept in a folder, since <code>check.json</code> lies beside it. The rules are listed in the <a href="reference.html#rules">Reference</a>.
         </div>
       </section>
 
@@ -880,7 +880,8 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
             <tbody>
               <tr><td><code>setup [folder]</code></td><td>Connects your coding agents to the folder, step by step: a new model in an empty folder, the MCP server in each agent's configuration, the git hooks. See <a href="#mcp">MCP server</a>.</td></tr>
               <tr><td><code>setup --status</code></td><td>Changes nothing: checks Node, the folder, each agent's entry, and that each server answers.</td></tr>
-              <tr><td><code>check [folder]</code></td><td>Checks the model with the Inspector's rules, and the tests it names, for CI. Below.</td></tr>
+              <tr><td><code>check [folder]</code></td><td>Checks the model with the Inspector's rules, and the tests and measured values it names, for CI. Below.</td></tr>
+              <tr><td><code>sense &lt;adapter&gt;</code></td><td>Measures with a sensor (a command's exit code, values from a JSON file) for the model's conditions. Below.</td></tr>
               <tr><td><code>diff [folder]</code></td><td>Lists what changed in the model on this branch; <code>--save-base</code> keeps the base for <a href="#changes">Changes on branch</a>.</td></tr>
               <tr><td><code>hooks install [folder]</code></td><td>Adds the git hooks that save that base after a checkout, a commit or a pull.</td></tr>
               <tr><td><code>export confluence</code></td><td>Exports a wiki view as Markdown or HTML, or publishes it to Confluence Cloud.</td></tr>
@@ -893,9 +894,19 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
         <ul>
           <li>It checks the <strong>folder</strong> (files that read, ids, references), the <strong>metamodel</strong> (the Validation list) and <strong>completeness</strong> (requirements without a scenario, ADRs without a check, open concerns).</li>
           <li>With <code>--report</code> it reads test reports (Vitest, Jest, Playwright, JUnit) and looks up the tests that scenarios and fitness functions name. The results are kept beside the model for the Inspector.</li>
+          <li>It compares the values sensors measured with the conditions in the model: what <code>radical sense</code> keeps beside it, and the files <code>--metrics</code> names (from another CI job).</li>
           <li><code>check.json</code> in the model folder sets each rule's severity and a baseline, and goals in percent. <code>--ratchet</code> lowers baselines to what the check finds now, never raises them.</li>
           <li>Exit status 0 means no errors, 1 errors, 2 the check could not run. <code>--format github</code> writes annotations for GitHub Actions.</li>
         </ul>
+        <h3 id="cli-sense">Sensors</h3>
+        <p>A fitness function often rests on more than one tool: a load test, a script, a production metric. Each scenario and fitness function says when it passes in its <strong>Metrics</strong>, one condition per line. A sensor only measures; the condition in the model holds the threshold, so a tool can be swapped without touching the model.</p>
+<pre class="code"><code>test(tests/architecture.test.ts › no cycles) passed
+workspaces.exit_code == 0
+api.latency.p95{env=staging} &lt;= 300 ms</code></pre>
+        <p><code>radical sense</code> runs one adapter and keeps what it measured beside the model, or writes it to a file with <code>--out</code> for the job that runs the check:</p>
+<pre class="code"><code>radical sense command --name workspaces -- node tools/check-workspaces.mjs
+radical sense json k6-summary.json --metric 'api.latency.p95=/metrics/http_req_duration/p(95)@ms' --label env=staging</code></pre>
+        <p>An adapter for another tool is one module in the radicaltools repository; see <code>radical sense --list</code> for the ones there are. The conditions, adapters and file format are in the <a href="reference.html#metrics">Reference</a>.</p>
         <h3 id="cli-launcher">The launcher</h3>
         <p><code>radical.sh</code> (macOS, Linux) and <code>radical.cmd</code> (Windows) run the CLI where Node.js is missing. Download one into the folder from <a href="https://radical.tools/radical.sh">radical.tools/radical.sh</a> or <a href="https://radical.tools/radical.cmd">radical.tools/radical.cmd</a>.</p>
         <ul>

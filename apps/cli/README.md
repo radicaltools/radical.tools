@@ -273,10 +273,11 @@ Checks one model folder and prints what it finds:
 - **completeness**: requirements verified by a scenario, satisfied by an
   element, derived from a need; needs with requirements; accepted ADRs with
   a fitness function and their date, context, decision and consequences;
-  fitness functions linked and with a threshold.
+  fitness functions linked; scenarios and fitness functions that state their
+  checks, in conditions that read.
 
-With test reports it also checks that the tests the model names passed (see
-below). `radical check --list-rules` lists every rule and every metric a goal can
+With test reports it also checks that the tests the model names passed, and
+with measurements that the values it holds to were met (see below). `radical check --list-rules` lists every rule and every metric a goal can
 be set for. It reads the files only and never writes the model.
 
 Exit status: 0 no errors (warnings allowed), 1 errors, 2 the check could not
@@ -343,14 +344,15 @@ describe block, since a fitness function that names a whole file or directory
 
 ### Tests and evidence
 
-A scenario or a fitness function names the tests that run it in its `tests`
-property, one per line, as Vitest and Playwright print them:
+A scenario or a fitness function says what checks it in its `metrics`
+property, one condition per line. A test that has to pass is named as Vitest
+and Playwright print it:
 
 ```
-apps/cli/src/cli.test.ts › radical check › prints the result as JSON
-apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view
-packages/layout/tests/geometry.test.ts › createBatchPlacer
-apps/e2e/tests
+test(apps/cli/src/cli.test.ts › radical check › prints the result as JSON) passed
+test(apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view) passed
+test(packages/layout/tests/geometry.test.ts › createBatchPlacer) passed
+test(apps/e2e/tests) passed
 ```
 
 An id names the test whose title it ends, otherwise every test in the
@@ -377,8 +379,9 @@ is an error; one that was skipped, or whose file no report has, a warning.
 The text output sums up how many requirements, scenarios, ADRs and fitness
 functions the reports verify. `--evidence` writes that status per element
 as JSON (`verified`, `broken`, `unverified` for requirements and ADRs;
-`passed`, `failed`, `not-run`, `no-tests` for scenarios and fitness
-functions); it never writes into the model.
+`passed`, `failed`, `stale`, `not-run`, `no-checks` for scenarios and
+fitness functions, with each condition's outcome); it never writes into the
+model.
 
 With `--report` the command also keeps the test cases it read in the model
 folder's `.radical/test-results.json` (out of git, like the rest of
@@ -387,6 +390,60 @@ folder's `.radical/test-results.json` (out of git, like the rest of
 quality and Implementation show the result by dimension, and Settings edit
 `check.json` (goals, severities, baselines), marking a change that loosens
 the gate.
+
+### Measured values
+
+A condition can also hold a value to a threshold, which a sensor measures:
+
+```
+api.latency.p95{env=staging} <= 300 ms
+workspaces.exit_code == 0
+```
+
+`<metric>{<labels>} <op> <number> [unit]`, with `< <= > >= == !=`. It is
+judged by the latest measurement of the metric whose labels include the
+condition's; units of one kind convert (ms and s, KB and MB). The element's
+`combine` says how its conditions make its status (`all`, the default;
+`any`; `at least N`), and `max_age` (`7d`, `12h`) how old a measurement may
+be: an older one is stale, and never passes.
+
+`radical check` reads the measurements kept in the model folder's
+`.radical/measurements.json`, and with `--metrics <file|dir>` the
+radical-metrics/1 files another job wrote, which it adds there. A condition
+that does not hold is an error (`metric-failed`); a stale one
+(`metric-stale`) or one nothing measured (`metric-not-measured`) a warning;
+a line that reads as no condition, or a unit that does not convert, an error
+(`metric-invalid`).
+
+## radical sense
+
+Measures with a sensor adapter and keeps the values beside the model, for
+the conditions above. A sensor only measures: it takes no threshold and
+exits 0 whatever it measured, 2 when it could not measure.
+
+```sh
+radical sense command --name workspaces -- node tools/check-workspaces.mjs
+radical sense json k6-summary.json --metric 'api.latency.p95=/metrics/http_req_duration/p(95)@ms' --label env=staging
+radical sense json coverage-summary.json --metric 'coverage.lines=total.lines.pct@%' --out reports/metrics/coverage.json
+```
+
+- `command [--name <metric>] -- <command…>`: the command's exit code
+  (`<metric>.exit_code`) and duration in seconds (`<metric>.duration`).
+- `json <file> --metric <metric>=<path>[@<unit>]`: a number from a JSON file,
+  by dotted keys with `[index]` or a JSON pointer starting with `/`.
+- `--folder <dir>`: the model folder (default: the working directory); the
+  values go into its `.radical/measurements.json`, the latest of each metric
+  and labels.
+- `--out <file>`: a radical-metrics/1 file instead, for `radical check
+  --metrics` in another job.
+- `--label k=v` labels every measurement (conditions match labels);
+  `--context k=v` says where it was measured (a commit, a run).
+
+An adapter for another tool is one module in `src/sensors/` with the
+`SensorAdapter` interface, one line in `src/sensors/registry.ts` and a fixture
+of its tool's real output; `src/sensors/contract.test.ts` runs every adapter on
+its fixture and checks that it writes valid radical-metrics/1 and takes no
+threshold. Pull requests welcome.
 
 ## radical fuzz
 
@@ -424,7 +481,7 @@ A fuzz file is written with the engine, `@radical/crucible`, which is not
 published yet: so far the fuzz files are this repository's own
 (`packages/ui/tests/invariants.test.ts`). It reports a test case per world and
 one per world and rule (`on the bookstore model: undoRestores holds`), which a
-scenario or a fitness function can name in its Tests.
+scenario or a fitness function can name in its Metrics.
 
 Exit status: 0 every file passed, 1 one failed, 2 radical fuzz could not run.
 
@@ -441,9 +498,9 @@ radical harden --gate --test "apps/e2e/tests/studio/views.spec.ts › a view kee
 A fuzz finding is hardened by its own steps: the finding is marked `hardened`,
 and its fuzz file replays the shrunk sequence as the test
 `<fuzz file> › F-0003 stays fixed: <title>`, once and without the known
-failures, so it fails until the bug is fixed. The command prints that test id
-for the scenario's Tests and keeps the scenario's name in the finding; it does
-not change the model's files.
+failures, so it fails until the bug is fixed. The command prints that test as a
+`test(…) passed` line for the scenario's Metrics and keeps the scenario's name
+in the finding; it does not change the model's files.
 
 `--gate` checks a test before it is bound: with the source files changed since
 the base (default: the merge base with `origin/main`) set back to it, the test

@@ -151,7 +151,7 @@ export const HUB_INDEX_FILE = 'index.json'
 const PREVIEW_KEYS = ['ears_type', 'priority', 'status', 'category', 'trigger'] as const
 
 /** Node fields that say what a concept is about, for searchText. */
-const SEARCH_KEYS = ['label', 'description', 'trigger', 'action', 'threshold', 'decision'] as const
+const SEARCH_KEYS = ['label', 'description', 'trigger', 'action', 'metrics', 'threshold', 'decision'] as const
 const SEARCH_TEXT_MAX = 600
 
 function searchTextOf(nodes: Array<Record<string, unknown>>): string {

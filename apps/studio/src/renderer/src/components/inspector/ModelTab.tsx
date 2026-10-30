@@ -96,7 +96,7 @@ export function ModelTab({ check, ctx, relations, onSettings }: { check: CheckRe
               <Stop label="Requirements" value={m('requirements-with-scenario')!.total} />
               <Link m={m('requirements-with-scenario')} text="verified by a scenario" onOpen={open} />
             </>}
-            {m('scenarios-with-tests') && <><Stop label="Scenarios" value={m('scenarios-with-tests')!.total} /><Link m={m('scenarios-with-tests')} text="name a test" onOpen={open} /><Stop label="Tests" value="→" /></>}
+            {m('scenarios-with-metrics') && <><Stop label="Scenarios" value={m('scenarios-with-metrics')!.total} /><Link m={m('scenarios-with-metrics')} text="name a check" onOpen={open} /><Stop label="Tests" value="→" /></>}
           </div>
         </section>
       )}

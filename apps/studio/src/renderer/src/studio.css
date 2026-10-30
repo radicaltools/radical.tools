@@ -3617,6 +3617,8 @@ div.milestone-option { cursor: default; }
 .insp-test { display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 6px; font-size: 12px; align-items: baseline; }
 .insp-test code { word-break: break-word; color: var(--text-secondary); }
 .insp-test em { color: var(--danger); font-style: normal; font-size: 11.5px; }
+/* What a sensor measured for a metric condition, on its own line under it. */
+.insp-test .insp-sub { grid-column: 2 / -1; font-size: 11.5px; }
 .insp-peek-finding { font-size: 12.5px; color: var(--text-secondary); border-left: 2px solid var(--warning); padding-left: 8px; }
 .insp-peek-finding.error { border-color: var(--danger); }
 

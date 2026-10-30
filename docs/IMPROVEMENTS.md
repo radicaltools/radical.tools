@@ -351,6 +351,32 @@ flaky; its position assertion likely races the layout settling.
 `apps/e2e/tests/studio/alignment.spec.ts › a collapsed container aligns its
 children, which line up when it is expanded` timed out (1 min) once in a full
 run on feat/hub-answers-preview and passed three times alone in 3.3 s.
+`apps/e2e/tests/studio/files.spec.ts › a model file that does not parse, or is
+gone, is named and left as it is` missed its toast ("model.radical cannot be
+read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
+three times alone in 7.6 s; the change does not touch reading .radical files.
+
+### Dogfooding (2026-10-29): sensors apart from the engine
+
+Moving `tests` and `threshold` into `metrics` on this repository's own model:
+
+- A model in an older format is brought up to date where it is read, but
+  nothing writes the new form until some edit saves the folder: the
+  migration of `architecture/` went through an unrelated `update_node`. A
+  `radical upgrade [folder]` (or `radical check --fix` for format changes)
+  would write it on purpose, in its own commit.
+- `search_model` refuses plain words (`radical check` → "Unsupported query");
+  only `FIND radical check` searches. Reading plain words as FIND would save
+  the first failed call of every session.
+- Two fitness functions still name no check: *Model in step with code* (its
+  check is the very CI job that runs `radical check`) and *Installable MCP
+  package* (a matrix job the Architecture model job does not wait for). The
+  second could write a `radical sense command --out` file per matrix entry if
+  the Architecture model job waited for it.
+- Studio has no editor for a condition: `metrics` is a textarea, and a typo
+  shows only as `metric-invalid` in the Inspector. Completion of metric names
+  from `.radical/measurements.json` and of test ids from the last report
+  would catch it while typing.
 
 ### Dogfooding (2026-10-29): model checks a pack cannot express
 

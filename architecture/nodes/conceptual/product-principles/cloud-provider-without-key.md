@@ -4,7 +4,7 @@ type: "scenario"
 label: "Cloud provider without key"
 gherkin: "And no request is sent to any provider"
 given: "AI is enabled and Anthropic is the active provider with no API key"
-tests: "apps/studio/tests/aiProviders.test.ts › AI providers › OpenAI — real tool-calling › requires key, sends Bearer auth, forwards tools as {type:function,function:{...}}"
+metrics: "test(apps/studio/tests/aiProviders.test.ts › AI providers › OpenAI — real tool-calling › requires key, sends Bearer auth, forwards tools as {type:function,function:{...}}) passed"
 then: "it shows \"Set an API key for Anthropic (Claude) first.\" with a Configure… button and Generate is disabled"
 when: "Radical Forge is opened"
 ---
