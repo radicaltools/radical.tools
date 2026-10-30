@@ -53,8 +53,20 @@ async function arm(page: Page): Promise<void> {
   })
 }
 
+/** What a view shows: elements on a canvas, rows of a table, titles of a
+ *  wiki, heads of a matrix. */
+const SHOWN = '.react-flow__node, .tv-table tbody tr, .wiki-title, .mx-table th'
+
+/** Waits until the view shows at least `least` of its elements. Quiet main
+ *  thread alone does not say a folder is open: a cached open lists the views
+ *  from its index, then lists the folder's files (I/O, no long task) and only
+ *  then reads the model, and on a slow machine settle ended in that gap. */
+async function shown(page: Page, least: number): Promise<void> {
+  await expect.poll(() => page.locator(SHOWN).count(), { timeout: 600_000, intervals: [50] }).toBeGreaterThanOrEqual(least)
+}
+
 async function settle(page: Page, selector?: string): Promise<Stats> {
-  return page.evaluate((sel) => new Promise<Stats>((resolve) => {
+  return page.evaluate(([sel, shownSelector]) => new Promise<Stats>((resolve) => {
     const p = (window as unknown as { __perf: { t0: number; tasks: { start: number; dur: number }[]; frames: number[]; events: { name: string; dur: number }[]; stop: () => void } }).__perf
     const poll = () => {
       const now = performance.now()
@@ -69,12 +81,12 @@ async function settle(page: Page, selector?: string): Promise<Stats> {
           frames: f.length, p95FrameMs: Math.round(f[Math.floor(f.length * 0.95)] ?? 0), maxFrameMs: Math.round(f[f.length - 1] ?? 0),
           inputMaxMs: Math.round(p.events.reduce((m, e) => Math.max(m, e.dur), 0)),
           inputs: Object.entries(p.events.reduce((acc, e) => { (acc[e.name] ??= []).push(Math.round(e.dur)); return acc }, {} as Record<string, number[]>)).map(([k, v]) => `${k}:${v.join('/')}`).join(' '),
-          seen: !!ok, shown: document.querySelectorAll('.react-flow__node, .tv-table tbody tr, .wiki-title, .mx-table th').length,
+          seen: !!ok, shown: document.querySelectorAll(shownSelector).length,
         })
       } else setTimeout(poll, 50)
     }
     setTimeout(poll, 0)
-  }), selector)
+  }), [selector, SHOWN] as const)
 }
 
 test('scale: a large model in Studio', async ({ page, studio }) => {
@@ -144,9 +156,12 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
     await expect(page.locator('.app-layout')).toBeVisible({ timeout: 600_000 })
     // Loaded when the model's views are listed (and the main thread is quiet).
     await expect.poll(() => page.locator('.lp-view-card').count(), { timeout: 600_000, intervals: [50] }).toBeGreaterThan(10)
+    await shown(page, 1)
     const stats = await settle(page)
     return { ...stats, wallMs: Math.round(await page.evaluate(() => performance.now() - (window as unknown as { __perf: { t0: number } }).__perf.t0)) - 1000 }
   }))
+  // Opened again, it is open when it shows as much.
+  const opened = (results['open folder'] as Stats).shown ?? 1
   log('heap: model open', await heap())
   if (process.env.SCALE_REOPEN) {
     // Opened again once Studio has written the folder's cache.
@@ -171,6 +186,7 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
       await page.getByRole('button', { name: 'Folder…' }).click()
       await expect(page.locator('.app-layout')).toBeVisible({ timeout: 600_000 })
       await expect.poll(() => page.locator('.lp-view-card').count(), { timeout: 600_000, intervals: [50] }).toBeGreaterThan(10)
+      await shown(page, opened)
       const stats = await settle(page)
       return { ...stats, wallMs: Math.round(await page.evaluate(() => performance.now() - (window as unknown as { __perf: { t0: number } }).__perf.t0)) - 1000 }
     }))

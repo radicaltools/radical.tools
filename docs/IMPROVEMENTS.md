@@ -358,6 +358,14 @@ three times alone in 7.6 s; the change does not touch reading .radical files.
 
 ### Dogfooding (2026-10-30): fitness functions classified
 
+- The first night with a relative condition gave a false finding (F-0115):
+  the nights before had measured a cached open only until the views were
+  listed (settle waits for 1 s without a long task, and listing the files
+  is I/O). The baseline of the next nights holds those two short values
+  until seven good nights push them out. `radical sense` cannot drop a
+  measurement from the history, and nothing says a measurement was taken in
+  a state the condition did not mean.
+
 - A change to a built-in type (the fitness function's new properties)
   cannot start in the model: `upsert_node_type` forks a built-in metamodel
   into a custom copy, which would stop following the preset. The preset in
