@@ -54,7 +54,10 @@ SCALE_MODEL=$PWD/architecture SCALE_COPIES=14 SCALE_OUT=/tmp/scale npm run e2e -
 `SCALE_VIEWS` lists the views to open, `SCALE_CANVAS` the canvas for zoom and
 clicks, `SCALE_QUERY` what is searched, `SCALE_PROFILE=1` writes a CPU profile
 of each step into `SCALE_OUT` (build with `--minify false` for names),
-`SCALE_HEAP=1` measures the heap after each view, `SCALE_REOPEN=1` opens the
+With `SCALE_OUT` it also writes `metrics.json`, what the nightly workflow
+reads with `radical sense json` for the fitness function *Large model stays
+responsive*: `open_ms`, `open_cached_ms`, `view_switch_ms`, `search_key_ms`
+and `card_key_ms`. `SCALE_HEAP=1` measures the heap after each view, `SCALE_REOPEN=1` opens the
 folder again from the cache Studio wrote (`SCALE_NO_CACHE=1`: with it deleted
 first) and `SCALE_ONLY_OPEN=1` stops after opening.
 

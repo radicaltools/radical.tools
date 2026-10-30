@@ -7,6 +7,11 @@ says the rule, the signature, the fuzz file, world, seed, path and length that
 replay it (`radical fuzz --replay F-0001`), the commit and the day; the body
 lists the steps and what differs.
 
+The nightly workflow (`.github/workflows/nightly.yml`) adds findings of
+source `sense`: a metric condition of the model that the night's
+measurements break, or measure nothing for (`tools/nightly-findings.ts`),
+proposed in a bot pull request.
+
 A finding starts `open`. A test bound to a scenario makes it `hardened`, the
 fix `fixed`, a decision that the behaviour is meant `intended` (written down as
 an ADR or a requirement). The findings before Crucible are items 1 to 284 of

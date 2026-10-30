@@ -284,14 +284,23 @@ interface Folded { text: string; folded: string; at?: number[] | null }
 const FOLD_CACHE_MAX = 250_000
 const folds = new Map<string, Folded>()
 
+let foldsMade = 0
+
 function foldedOf(text: string): Folded {
   let f = folds.get(text)
   if (!f) {
     if (folds.size >= FOLD_CACHE_MAX) folds.clear()
     f = { text, folded: foldText(text) }
     folds.set(text, f)
+    foldsMade++
   }
   return f
+}
+
+/** How many texts the search has folded so far (each once while it keeps
+ *  them), which a test counts instead of timing the search. */
+export function searchFoldCount(): number {
+  return foldsMade
 }
 
 function positionsOf(f: Folded): number[] | null {

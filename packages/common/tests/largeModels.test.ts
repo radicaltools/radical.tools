@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSearch, searchModel, type SearchData } from '../src/search'
+import { parseSearch, searchFoldCount, searchModel, type SearchData } from '../src/search'
 import { addChoices, buildViewIndex, modelStructure, presetViewIndex, viewIndexKey, viewShownNodes } from '../src/viewPipeline'
 import { MdFolderSession, readEach, type MdFolderStorage } from '../src/formats/mdFolderSync'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
@@ -40,31 +40,31 @@ function largeModel(size = 20_000): { nodes: Record<string, C4Node>; relations: 
 
 const MODEL = largeModel()
 
-/** The fastest of three runs, in ms. */
-function bestOf3(run: () => void): number {
-  let best = Infinity
-  for (let i = 0; i < 3; i++) {
-    const t = performance.now()
-    run()
-    best = Math.min(best, performance.now() - t)
-  }
-  return best
+/** `nodes` behind a proxy that counts the walks over them (each asks for
+ *  their keys: Object.values, a spread, a for…in), frozen as they are. */
+function counted(nodes: Record<string, C4Node>): { nodes: Record<string, C4Node>; walks: () => number } {
+  let walks = 0
+  const proxy = new Proxy(nodes, { ownKeys(target) { walks++; return Reflect.ownKeys(target) } })
+  return { nodes: proxy, walks: () => walks }
 }
 
 describe('a model of 20,000 elements', () => {
-  // Under 100 ms on a developer's machine; CI's machines are slower, and
-  // before the texts were folded once it took over a second.
-  it('finds the matches of each letter typed in Quick Search within 250 ms', () => {
+  // How long it takes is measured at night (fitness function Large model
+  // stays responsive); here, the work: each text folded once, not again on
+  // every letter (1.4 s a letter at 21,000 elements before).
+  it('folds each text of the model once, and no text again for the letters typed after', () => {
     const data: SearchData = { metamodel, nodes: MODEL.nodes, relations: MODEL.relations, views: {} }
-    // The first letter folds the model's texts; the ones after reuse them.
+    const before = searchFoldCount()
     searchModel(data, parseSearch('l', data))
+    const first = searchFoldCount() - before
+    expect(first).toBeGreaterThan(Object.keys(MODEL.nodes).length)
     let hits = 0
-    const ms = bestOf3(() => { hits = searchModel(data, parseSearch('layout sta', data)).hits.length })
+    for (const q of ['la', 'lay', 'layout', 'layout s', 'layout sta']) hits = searchModel(data, parseSearch(q, data)).hits.length
     expect(hits).toBeGreaterThan(1000)
-    expect(ms).toBeLessThan(250)
+    expect(searchFoldCount() - before).toBe(first)
   })
 
-  it('works out the + rows of a table of 1,000 rows within 200 ms', () => {
+  it('works out the + rows of a table of 1,000 rows without going through every element for each', () => {
     // As the Traceability table: needs, the requirements derived from them,
     // the scenarios verifying those; a + under each requirement.
     const view: DiagramView = {
@@ -75,12 +75,14 @@ describe('a model of 20,000 elements', () => {
         { ways: [{ types: ['scenario'], via: { direction: 'in', relationType: 'verifies' } }] },
       ] },
     } as DiagramView
-    const ctx = { nodes: MODEL.nodes, relations: MODEL.relations, metamodel }
+    // Every walk over the elements (a copy, a scan) asks for their keys.
+    const { nodes, walks } = counted(MODEL.nodes)
+    const ctx = { nodes, relations: MODEL.relations, metamodel }
     const rows = Object.values(MODEL.nodes).filter((n) => n.type === 'requirement').slice(0, 1000)
-    let offered = 0
-    const ms = bestOf3(() => { offered = rows.filter((node) => addChoices(view, ctx, { node, depth: 1 }).length > 0).length })
+    const offered = rows.filter((node) => addChoices(view, ctx, { node, depth: 1 }).length > 0).length
     expect(offered).toBe(1000)
-    expect(ms).toBeLessThan(200)
+    // A copy of every element for each row was 1,000 walks.
+    expect(walks()).toBeLessThan(10)
   })
 
   it('keeps what a view shows when only the places of its elements changed', () => {

@@ -14,7 +14,9 @@ export interface Finding {
   id: string
   /** What is wrong, as a user would say it. */
   title: string
-  source: 'fuzz' | 'explore'
+  /** fuzz and explore: Crucible's rounds; sense: a metric condition the
+   *  nightly measurements break (tools/nightly-findings.ts). */
+  source: 'fuzz' | 'explore' | 'sense'
   status: FindingStatus
   rule: string
   signature: string
@@ -83,7 +85,7 @@ export function findingFromMarkdown(text: string): Finding {
     ...(values as Partial<Finding>),
     id: String(values.id ?? ''),
     title: String(values.title ?? ''),
-    source: values.source === 'explore' ? 'explore' : 'fuzz',
+    source: values.source === 'explore' || values.source === 'sense' ? values.source : 'fuzz',
     status: (values.status as FindingStatus | undefined) ?? 'open',
     rule: String(values.rule ?? ''),
     signature: String(values.signature ?? ''),
