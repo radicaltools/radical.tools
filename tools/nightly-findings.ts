@@ -3,10 +3,13 @@
 // night measures (--expect: the metrics' prefix) and that does not hold, or
 // that the night measured nothing for, becomes a finding in the findings
 // folder (source sense), unless an open finding already says the same. The
-// conditions are evaluated as radical check evaluates them.
+// conditions are evaluated as radical check evaluates them; one against a
+// baseline compares with the median of the earlier nights (--baseline), and
+// makes no finding while there are none.
 //
 //   tsx tools/nightly-findings.ts <model folder> <findings folder>
-//       --metrics <file|dir> [--metrics …] --expect <prefix> [--commit <sha>] [--run <url>]
+//       --metrics <file|dir> [--metrics …] [--baseline <file|dir> …] --expect <prefix>
+//       [--commit <sha>] [--run <url>]
 //
 // Prints the findings written, one path a line; nothing when there are none.
 
@@ -34,7 +37,7 @@ const OPEN = new Set(['open', 'question'])
 
 /** The findings the night's `measurements` give for `nodes`, not counting
  *  those an open finding in `existing` already says. */
-export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], existing: Finding[], options: NightlyOptions): Finding[] {
+export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], existing: Finding[], options: NightlyOptions, baseline: Measurement[] = []): Finding[] {
   const ids = existing.map((f) => f.id)
   const known = new Set(existing.filter((f) => OPEN.has(f.status)).map((f) => f.signature))
   const day = new Date(options.now).toISOString().slice(0, 10)
@@ -45,8 +48,10 @@ export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], ex
     const maxAge = parseMaxAge(props.max_age) ?? undefined
     for (const condition of parseConditions(props.metrics)) {
       if (condition.kind !== 'metric' || !condition.metric.startsWith(options.expect)) continue
-      const result = evaluateMetric(condition, measurements, maxAge, options.now)
+      const result = evaluateMetric(condition, measurements, maxAge, options.now, baseline)
       if (result.outcome === 'passed') continue
+      // Measured, but no earlier night to compare with yet: nothing wrong.
+      if (result.outcome === 'not-run' && result.measurement) continue
       const signature = `sense|${node.id}|${condition.raw}|${result.outcome === 'failed' ? 'failed' : 'not-measured'}`
       if (known.has(signature)) continue
       known.add(signature)
@@ -55,10 +60,14 @@ export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], ex
       const where = m ? ` (${Object.entries(m.labels).map(([k, v]) => `${k}=${v}`).join(', ')}; ${m.source}, ${m.at}${m.context ? `; ${Object.entries(m.context).map(([k, v]) => `${k}=${v}`).join(', ')}` : ''})` : ''
       const id = nextFindingId(ids)
       ids.push(id)
+      const b = condition.baseline
+      const limit = b
+        ? `the baseline${b.by ? ` ${b.sign < 0 ? '-' : '+'} ${b.by}${b.percent ? '%' : ` ${b.unit}`}` : ''} (${result.detail})`
+        : `${condition.op} ${condition.value}${condition.unit ? ` ${condition.unit}` : ''}`
       out.push({
         id,
         title: result.outcome === 'failed'
-          ? `${node.label}: ${condition.metric} measured ${measured}, beyond ${condition.op} ${condition.value}${condition.unit ? ` ${condition.unit}` : ''}`
+          ? `${node.label}: ${condition.metric} measured ${measured}, beyond ${limit}`
           : `${node.label}: the night measured no ${condition.metric}`,
         source: 'sense',
         status: 'open',
@@ -73,7 +82,7 @@ export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], ex
         ],
         detail: [
           `Expected: ${condition.raw}`,
-          `Actual: ${result.outcome === 'failed' ? `${measured}${where}` : result.outcome === 'stale' ? `only a stale measurement, ${result.detail}` : result.outcome === 'invalid' ? `cannot be evaluated: ${result.detail}` : 'nothing measured'}`,
+          `Actual: ${result.outcome === 'failed' ? `${measured}${where}${result.detail ? `; ${result.detail}` : ''}` : result.outcome === 'stale' ? `only a stale measurement, ${result.detail}` : result.outcome === 'invalid' ? `cannot be evaluated: ${result.detail}` : 'nothing measured'}`,
         ].join('\n'),
       })
     }
@@ -90,14 +99,16 @@ function readMeasurements(paths: string[]): Measurement[] {
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { metrics: { type: 'string', multiple: true }, expect: { type: 'string' }, commit: { type: 'string' }, run: { type: 'string' } },
+    options: { metrics: { type: 'string', multiple: true }, baseline: { type: 'string', multiple: true }, expect: { type: 'string' }, commit: { type: 'string' }, run: { type: 'string' } },
   })
   const [folder, findingsDir] = positionals
   if (!folder || !findingsDir || !values.expect) throw new Error('usage: nightly-findings <model folder> <findings folder> --metrics <file|dir> --expect <prefix>')
   const files = await new MdFolderSession(diskFolderStorage(resolve(folder)), { writeCache: false }).readAll()
   const { data } = deserializeFromMdFolder(files)
-  const measurements = readMeasurements((values.metrics ?? []).filter((p) => { try { statSync(p); return true } catch { return false } }))
-  const found = nightlyFindings(data.nodes, measurements, readFindings(findingsDir), { expect: values.expect, commit: values.commit, run: values.run, now: Date.now() })
+  const there = (p: string): boolean => { try { statSync(p); return true } catch { return false } }
+  const measurements = readMeasurements((values.metrics ?? []).filter(there))
+  const baseline = readMeasurements((values.baseline ?? []).filter(there))
+  const found = nightlyFindings(data.nodes, measurements, readFindings(findingsDir), { expect: values.expect, commit: values.commit, run: values.run, now: Date.now() }, baseline)
   for (const finding of found) console.log(writeFinding(findingsDir, finding))
 }
 

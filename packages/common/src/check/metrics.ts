@@ -121,13 +121,25 @@ export function parseMeasurementStore(text: string): Measurement[] {
 
 export type Comparison = '<' | '<=' | '>' | '>=' | '==' | '!='
 
+/** A condition stated against a baseline: its median, plus or minus a
+ *  margin, in percent or in a unit. */
+export interface BaselineMargin {
+  sign: 1 | -1
+  by: number
+  percent: boolean
+  unit?: string
+}
+
 export type Condition =
   | { kind: 'test'; raw: string; id: TestId }
-  | { kind: 'metric'; raw: string; metric: string; labels: Record<string, string>; op: Comparison; value: number; unit?: string }
+  /** `value` (and `unit`) is the limit; with `baseline`, the limit is the
+   *  baseline's median with that margin, and `value` is NaN. */
+  | { kind: 'metric'; raw: string; metric: string; labels: Record<string, string>; op: Comparison; value: number; unit?: string; baseline?: BaselineMargin }
   | { kind: 'invalid'; raw: string; problem: string }
 
 const TEST_LINE = /^test\((.+)\)(?:\s+passed)?$/
 const METRIC_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\s*(\S+)?$/i
+const BASELINE_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*baseline(?:\s*([+-])\s*(\d+(?:\.\d+)?(?:e-?\d+)?)\s*(%|[^\s%]+)?)?$/i
 
 function parseLabels(text: string): Record<string, string> | string {
   const labels: Record<string, string> = {}
@@ -147,8 +159,18 @@ export function parseCondition(line: string): Condition {
     const [id] = parseTestIds(test[1])
     return id ? { kind: 'test', raw, id } : { kind: 'invalid', raw, problem: 'test() names no test' }
   }
+  const b = BASELINE_LINE.exec(raw)
+  if (b) {
+    const labels = b[2] === undefined ? {} : parseLabels(b[2])
+    if (typeof labels === 'string') return { kind: 'invalid', raw, problem: labels }
+    if (b[4] && !b[6]) return { kind: 'invalid', raw, problem: 'a margin on the baseline needs % or a unit (`baseline + 20%`, `baseline + 500 ms`)' }
+    const baseline: BaselineMargin = b[4]
+      ? { sign: b[4] === '-' ? -1 : 1, by: Number(b[5]), percent: b[6] === '%', ...(b[6] !== '%' ? { unit: b[6] } : {}) }
+      : { sign: 1, by: 0, percent: true }
+    return { kind: 'metric', raw, metric: b[1], labels, op: (b[3] === '=' ? '==' : b[3]) as Comparison, value: Number.NaN, baseline }
+  }
   const m = METRIC_LINE.exec(raw)
-  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed` nor `<metric>{<labels>} <op> <number> [unit]`' }
+  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`' }
   const labels = m[2] === undefined ? {} : parseLabels(m[2])
   if (typeof labels === 'string') return { kind: 'invalid', raw, problem: labels }
   return { kind: 'metric', raw, metric: m[1], labels, op: (m[3] === '=' ? '==' : m[3]) as Comparison, value: Number(m[4]), ...(m[5] ? { unit: m[5] } : {}) }
@@ -233,19 +255,60 @@ const DAY = 86400e3
 export const formatAge = (ms: number): string =>
   ms >= DAY ? `${Math.floor(ms / DAY)} d` : ms >= 3600e3 ? `${Math.floor(ms / 3600e3)} h` : `${Math.max(0, Math.floor(ms / 60e3))} min`
 
+/** How many of the latest baseline measurements a baseline's median is
+ *  taken over: a week of nights (the user's choice, 2026-10-30). */
+export const BASELINE_RUNS = 7
+
+/** The median of the latest BASELINE_RUNS measurements in `baseline` of
+ *  the condition's metric and labels, in `unit` (those that do not convert
+ *  left out); undefined when there are none. */
+export function baselineOf(condition: Extract<Condition, { kind: 'metric' }>, baseline: Measurement[], unit: string | undefined): { median: number; runs: number } | undefined {
+  const values = baseline
+    .filter((m) => m.metric === condition.metric && Object.entries(condition.labels).every(([k, v]) => m.labels[k] === v))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, BASELINE_RUNS)
+    .map((m) => (unit && m.unit ? convertUnit(m.value, m.unit, unit) : m.value))
+    .filter((v): v is number => v !== null && Number.isFinite(v))
+    .sort((a, b) => a - b)
+  if (!values.length) return undefined
+  const mid = Math.floor(values.length / 2)
+  return { median: values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2, runs: values.length }
+}
+
+const round = (n: number): number => Math.round(n * 100) / 100
+
 /** A metric condition against the measurements: not run when none matches,
  *  stale when the latest is older than `maxAge` (whatever it says),
- *  invalid when the units do not convert, else passed or failed. */
-export function evaluateMetric(condition: Extract<Condition, { kind: 'metric' }>, measurements: Measurement[], maxAge: number | undefined, now: number): MetricEvaluation {
+ *  invalid when the units do not convert, else passed or failed. A
+ *  condition against a baseline compares with the median of `baseline`
+ *  (baselineOf), with its margin; not run, saying so, when the baseline
+ *  has nothing to compare with. */
+export function evaluateMetric(condition: Extract<Condition, { kind: 'metric' }>, measurements: Measurement[], maxAge: number | undefined, now: number, baseline: Measurement[] = []): MetricEvaluation {
   const measurement = latestMeasurement(condition, measurements)
   if (!measurement) return { outcome: 'not-run' }
+  const age = now - Date.parse(measurement.at)
+  if (condition.baseline) {
+    if (maxAge !== undefined && age > maxAge) return { outcome: 'stale', measurement, detail: `measured ${formatAge(age)} ago` }
+    const unit = measurement.unit
+    const base = baselineOf(condition, baseline, unit)
+    if (!base) return { outcome: 'not-run', measurement, detail: 'no baseline to compare with' }
+    const { sign, by, percent } = condition.baseline
+    let margin = percent ? (base.median * by) / 100 : by
+    if (!percent && condition.baseline.unit && unit) {
+      const converted = convertUnit(by, condition.baseline.unit, unit)
+      if (converted === null) return { outcome: 'invalid', measurement, detail: `the measurement is in ${unit}, which ${condition.baseline.unit} does not convert to` }
+      margin = converted
+    }
+    const limit = base.median + sign * margin
+    const outcome = COMPARE[condition.op](measurement.value, limit) ? 'passed' : 'failed'
+    return { outcome, measurement, detail: `baseline ${round(base.median)}${unit ? ` ${unit}` : ''}, the median of ${base.runs}; limit ${round(limit)}${unit ? ` ${unit}` : ''}` }
+  }
   let value = measurement.value
   if (condition.unit && measurement.unit) {
     const converted = convertUnit(measurement.value, measurement.unit, condition.unit)
     if (converted === null) return { outcome: 'invalid', measurement, detail: `the measurement is in ${measurement.unit}, which does not convert to ${condition.unit}` }
     value = converted
   }
-  const age = now - Date.parse(measurement.at)
   if (maxAge !== undefined && age > maxAge) return { outcome: 'stale', measurement, detail: `measured ${formatAge(age)} ago` }
   return { outcome: COMPARE[condition.op](value, condition.value) ? 'passed' : 'failed', measurement }
 }

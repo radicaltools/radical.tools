@@ -902,7 +902,9 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
         <p>A fitness function often rests on more than one tool: a load test, a script, a production metric. Each scenario and fitness function says when it passes in its <strong>Metrics</strong>, one condition per line. A sensor only measures; the condition in the model holds the threshold, so a tool can be swapped without touching the model.</p>
 <pre class="code"><code>test(tests/architecture.test.ts › no cycles) passed
 workspaces.exit_code == 0
-api.latency.p95{env=staging} &lt;= 300 ms</code></pre>
+api.latency.p95{env=staging} &lt;= 300 ms
+api.latency.p95{env=staging} &lt;= baseline + 20%</code></pre>
+        <p>A limit can also be stated against earlier measurements: <code>baseline</code> is the median of the latest seven given with <code>radical check --baseline</code> (a nightly run hands on its last seven nights), so one slow run neither fails it nor moves it. Keep an absolute limit beside it, for a slow drift the median follows.</p>
         <p><code>radical sense</code> runs one adapter and keeps what it measured beside the model, or writes it to a file with <code>--out</code> for the job that runs the check:</p>
 <pre class="code"><code>radical sense command --name workspaces -- node tools/check-workspaces.mjs
 radical sense json k6-summary.json --metric 'api.latency.p95=/metrics/http_req_duration/p(95)@ms' --label env=staging</code></pre>

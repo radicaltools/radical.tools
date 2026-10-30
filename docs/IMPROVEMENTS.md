@@ -358,6 +358,11 @@ three times alone in 7.6 s; the change does not touch reading .radical files.
 
 ### Dogfooding (2026-10-30): nightly sensors
 
+- The nightly workflow of #291 ran `gh` inside the Playwright container,
+  which has none; it now measures in the container and proposes the
+  findings from the runner. A workflow cannot be tried before it is on main
+  (`workflow_dispatch` and `schedule` need it there): a first run by hand
+  after the merge is the test.
 - `radical check --metrics` without `--report` counts the goals that read
   evidence (requirements verified, ADRs verified) as 0 %: with only the
   night's measurements they fail with goal-unmet, though no test report was

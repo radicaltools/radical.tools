@@ -42,4 +42,13 @@ describe('nightly findings', () => {
     // Fixed, it is said again when it comes back.
     expect(nightlyFindings([fitness(CONDITIONS)], [measured('studio.open_ms', 12900), measured('studio.search_key_ms', 100)], [{ ...existing[0], status: 'fixed' }], { expect: 'studio.', now: NOW })).toHaveLength(1)
   })
+
+  it('compares a condition against a baseline with the earlier nights, and makes nothing of it while there are none', () => {
+    const relative = fitness('studio.open_ms{model=radical-x14} <= baseline + 20%')
+    const earlier = [5000, 5100, 4900].map((v, i) => ({ ...measured('studio.open_ms', v), at: new Date(NOW - (i + 1) * 86400e3).toISOString() }))
+    expect(nightlyFindings([relative], [measured('studio.open_ms', 5500)], [], { expect: 'studio.', now: NOW }, earlier)).toEqual([])
+    const slow = nightlyFindings([relative], [measured('studio.open_ms', 6500)], [], { expect: 'studio.', now: NOW }, earlier)
+    expect(slow.map((f) => f.title)).toEqual(['Large model stays responsive: studio.open_ms measured 6500 ms, beyond the baseline + 20% (baseline 5000 ms, the median of 3; limit 6000 ms)'])
+    expect(nightlyFindings([relative], [measured('studio.open_ms', 9000)], [], { expect: 'studio.', now: NOW })).toEqual([])
+  })
 })
