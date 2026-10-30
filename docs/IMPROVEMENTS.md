@@ -363,6 +363,13 @@ three times alone in 7.6 s; the change does not touch reading .radical files.
   findings from the runner. A workflow cannot be tried before it is on main
   (`workflow_dispatch` and `schedule` need it there): a first run by hand
   after the merge is the test.
+- The first run by hand (2026-10-30) measured and wrote four findings, then
+  could not open the pull request: the repository does not let GitHub
+  Actions open pull requests, and one opened with its own token would not
+  start the checks main requires. The night now uses a token in the secret
+  `NIGHTLY_TOKEN`; it also lost the night's history, as the hand-on came
+  after the pull request, and now comes before it. Every project that adopts
+  the nightly loop needs the same token: `radical setup` could say so.
 - `radical check --metrics` without `--report` counts the goals that read
   evidence (requirements verified, ADRs verified) as 0 %: with only the
   night's measurements they fail with goal-unmet, though no test report was
