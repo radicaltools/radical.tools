@@ -25,7 +25,7 @@
 
 import { MD_MANIFEST_FILE, deserializeFromMdFolder, isMdFolderModelPath, isOwnedMdFolderFile, isValidMdFolderManifest, keepMdFolderPaths, serializeToMdFolder, staleMdFolderFiles, type FolderFiles } from './mdFolder'
 import { mergeModels, type MergeDrop } from '../modelMerge'
-import { readModelCache, writeModelCache, type ModelCacheFiles } from './modelCache'
+import { modelCacheChangeCount, readModelCache, writeModelCache, writeModelCacheChanges, type ModelCache, type ModelCacheFiles, type ModelCacheName } from './modelCache'
 
 /** Where a session's files live. Paths are POSIX, relative to the folder. */
 export interface MdFolderStorage {
@@ -41,10 +41,10 @@ export interface MdFolderStorage {
    *  `forRead`: only to read the folder whole, which leaves no trace in a
    *  folder nobody writes. */
   lock?(forRead?: boolean): Promise<() => Promise<void>>
-  /** The folder's cache (MODEL_CACHE_FILE), or null when there is none. A
-   *  storage without these keeps no cache. */
-  readCache?(): Promise<string | null>
-  writeCache?(content: string): Promise<void>
+  /** A file of the folder's cache (MODEL_CACHE_DIR), or null when there is
+   *  none. A storage without these keeps no cache. */
+  readCache?(name: ModelCacheName): Promise<string | null>
+  writeCache?(name: ModelCacheName, content: string): Promise<void>
 }
 
 export type MdFolderWriteResult =
@@ -111,10 +111,16 @@ export async function readEach<T>(paths: readonly string[], read: (path: string)
   return out
 }
 
-/** How many files may be out of date in a folder's cache before it is
- *  written again: CACHE_STALE_MAX, or this share of the folder if more. */
+/** How many files may differ from model.json, named in changes.json,
+ *  before model.json is written again: CACHE_STALE_MAX, or this share of
+ *  the folder if more. */
 const CACHE_STALE_MAX = 50
 const CACHE_STALE_SHARE = 0.01
+
+/** A fresh id for model.json, which changes.json names. */
+function newCacheId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
 
 export class MdFolderSession {
   /** Called with the changed paths whenever `poll` or a refused `write`
@@ -129,10 +135,27 @@ export class MdFolderSession {
   private tail: Promise<unknown> = Promise.resolve()
   private running = 0
 
+  /** model.json as last read or written: its id and files, which
+   *  changes.json is made against. */
+  private cache: Pick<ModelCache, 'id' | 'base'> | null = null
+
   /** `writeCache: false`: read the folder's cache when there is one, never
    *  write it (the CLI, which exits as soon as it is done; Studio and the
-   *  MCP server keep it). */
-  constructor(private readonly storage: MdFolderStorage, private readonly options: { writeCache?: boolean } = {}) {}
+   *  MCP server keep it). `openFromCache`: the session's first read takes
+   *  the folder as its cache has it, without listing the files, and lists
+   *  them right after; `verified` says whether they differed (Studio, which
+   *  then loads the folder afresh; never the MCP server, which must see the
+   *  files as they are on every call). */
+  constructor(private readonly storage: MdFolderStorage, private readonly options: { writeCache?: boolean; openFromCache?: boolean } = {}) {}
+
+  /** Whether the files differed from the cache a first read took the folder
+   *  from (`openFromCache`), and which: resolves once they are listed, at
+   *  once for a read that listed them. */
+  verified(): Promise<{ stale: boolean; changed: string[] }> {
+    return this.verification
+  }
+
+  private verification: Promise<{ stale: boolean; changed: string[] }> = Promise.resolve({ stale: false, changed: [] })
 
   /** Read every model file and make that the baseline. */
   readAll(): Promise<FolderFiles> {
@@ -200,6 +223,8 @@ export class MdFolderSession {
       this.baseline.delete(path)
     }
     this.observed = this.baselineStamps()
+    // The cache keeps up with what was written.
+    this.keepCache()
     // What came from the other writer is not on the app's screen yet.
     if (merged) this.onExternalChange?.(merged.changed)
     return merged ? { ok: true, merged } : { ok: true }
@@ -223,45 +248,89 @@ export class MdFolderSession {
   /** `rebuildCache`: write the cache again when it is out of date (not
    *  for a write, which changes the folder at once). */
   private async loadBaseline(rebuildCache = true): Promise<void> {
+    const cached = await this.readCache()
+    if (cached && this.options.openFromCache && !this.loaded && rebuildCache) {
+      // As the cache has it; the files are listed right after, before
+      // anything else the session does.
+      this.baseline = new Map(Object.entries(cached.files).map(([path, { content, stamp }]) => [path, { content, stamp }]))
+      this.observed = this.baselineStamps()
+      this.loaded = true
+      this.cache = cached
+      this.verification = this.verifyLater()
+      return
+    }
     const stamps = await this.storage.list()
     const paths = Object.keys(stamps)
     // Each file whose stamp the cache has comes from it; only the others
     // are read (ADR Model cache beside the model).
-    const cached = this.storage.readCache ? readModelCache(await this.storage.readCache().catch(() => null)) : null
-    const toRead = cached ? paths.filter((path) => cached[path]?.stamp !== stamps[path]) : paths
+    const known = cached?.files
+    const toRead = known ? paths.filter((path) => known[path]?.stamp !== stamps[path]) : paths
     const contents = await readEach(toRead, (path) => this.storage.read(path))
     const read = new Map(toRead.map((path, i) => [path, contents[i]]))
     const baseline = new Map<string, BaselineEntry>()
-    for (const path of paths) baseline.set(path, { content: read.get(path) ?? cached![path].content, stamp: stamps[path] })
+    for (const path of paths) baseline.set(path, { content: read.get(path) ?? known![path].content, stamp: stamps[path] })
     this.baseline = baseline
     this.observed = stamps
     this.loaded = true
-    // Missing, unreadable or well out of date: written again once the
-    // folder is read, after this operation, so the reader does not wait.
-    // A few files out of date are read each time instead: an agent's call
-    // changes some, and rewriting a cache of 21,000 files after each was
-    // most of the call.
-    const gone = cached ? Object.keys(cached).filter((path) => !(path in stamps)).length : 0
-    const stale = !cached || toRead.length + gone > Math.max(CACHE_STALE_MAX, paths.length * CACHE_STALE_SHARE)
-    // Only a model's folder gets one: a folder of other files is left alone.
-    const model = isValidMdFolderManifest(baseline.get(MD_MANIFEST_FILE)?.content)
-    if (stale && rebuildCache && model && this.options.writeCache !== false && this.storage.writeCache) this.cacheWrite = this.writeCacheLater()
+    this.cache = cached
+    // Read as the files are: whatever an open from the cache found is past.
+    this.verification = Promise.resolve({ stale: false, changed: [] })
+    const gone = known ? Object.keys(known).filter((path) => !(path in stamps)).length : 0
+    if (rebuildCache && (!cached || toRead.length + gone > 0)) this.keepCache()
   }
 
-  /** Resolves once the cache a read found out of date is written again. */
-  cacheWritten(): Promise<void> {
-    return this.cacheWrite
+  /** model.json, with changes.json applied when it was made for it. */
+  private async readCache(): Promise<ModelCache | null> {
+    if (!this.storage.readCache) return null
+    const [model, changes] = await Promise.all([
+      this.storage.readCache('model.json').catch(() => null),
+      this.storage.readCache('changes.json').catch(() => null),
+    ])
+    return readModelCache(model, changes)
   }
 
-  private cacheWrite: Promise<void> = Promise.resolve()
+  /** Lists the files after an open from the cache: those that differ are
+   *  read into the baseline's place for them by the next read. */
+  private verifyLater(): Promise<{ stale: boolean; changed: string[] }> {
+    const run = this.tail.then(async () => {
+      this.running++
+      try {
+        const stamps = await this.storage.list()
+        const changed = await this.changedSince(stamps)
+        this.observed = stamps
+        // Touched but the same: the cache takes the new stamps.
+        this.keepCache()
+        return { stale: changed.length > 0, changed }
+      } catch {
+        return { stale: true, changed: [] }
+      } finally {
+        this.running--
+      }
+    })
+    this.tail = run.catch(() => {})
+    return run
+  }
 
-  private writeCacheLater(): Promise<void> {
+  /** Brings the cache up to the baseline: changes.json, or model.json
+   *  again when it is missing or more files differ from it than it can
+   *  stand (written after the operation running, so it waits for neither).
+   *  Only for a model's folder: a folder of other files is left alone. */
+  private keepCache(): void {
+    if (this.options.writeCache === false || !this.storage.writeCache) return
+    if (!isValidMdFolderManifest(this.baseline.get(MD_MANIFEST_FILE)?.content)) return
     const run = this.tail.then(async () => {
       this.running++
       try {
         const files: ModelCacheFiles = {}
         for (const [path, entry] of this.baseline) files[path] = { stamp: entry.stamp, content: entry.content }
-        await this.storage.writeCache!(writeModelCache(files))
+        const cache = this.cache
+        if (cache && modelCacheChangeCount(cache.base, files) <= Math.max(CACHE_STALE_MAX, this.baseline.size * CACHE_STALE_SHARE)) {
+          await this.storage.writeCache!('changes.json', writeModelCacheChanges(cache.id, cache.base, files))
+          return
+        }
+        const id = newCacheId()
+        await this.storage.writeCache!('model.json', writeModelCache(files, id))
+        this.cache = { id, base: files }
       } catch {
         // A folder we may not write (read-only): it opens without a cache.
       } finally {
@@ -269,7 +338,31 @@ export class MdFolderSession {
       }
     })
     this.tail = run
-    return run
+    this.cacheWrite = run
+  }
+
+  /** Resolves once the cache is written as far as the session has gone. */
+  cacheWritten(): Promise<void> {
+    return this.cacheWrite
+  }
+
+  private cacheWrite: Promise<void> = Promise.resolve()
+
+  /** A file of the folder's cache other than its files' (views.json), or
+   *  null. */
+  readCacheFile(name: Exclude<ModelCacheName, 'model.json' | 'changes.json'>): Promise<string | null> {
+    return this.storage.readCache ? this.storage.readCache(name).catch(() => null) : Promise.resolve(null)
+  }
+
+  /** Writes one; false when the folder keeps no cache. */
+  async writeCacheFile(name: Exclude<ModelCacheName, 'model.json' | 'changes.json'>, content: string): Promise<boolean> {
+    if (this.options.writeCache === false || !this.storage.writeCache) return false
+    try {
+      await this.storage.writeCache(name, content)
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** Paths whose content on disk differs from the baseline: added, removed,

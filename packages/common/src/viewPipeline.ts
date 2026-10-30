@@ -17,6 +17,7 @@ import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
 import { newLinkFit, relationMayJoinHolder, relationRefusal } from './relationRules'
 import { relationTypeKeepsAggregates } from './metamodel/domainModel'
+import type { ViewIndex } from './formats/modelCache'
 
 export interface PipelineContext {
   nodes: Record<string, C4Node>
@@ -707,9 +708,126 @@ function compareFor(a: Record<string, C4Node>, b: Record<string, C4Node>, keys: 
   return true
 }
 
+// ─── View index ──────────────────────────────────────────────────────────────
+//
+// What each view's filter gives, kept in the folder's cache (views.json)
+// for one structure of the model, so a model opens without running the
+// filters (ADR Model cache beside the model). Only for views whose filters
+// read nothing but types, parents and relations: a rename or a move keeps
+// the index good.
+
+/** Two 32-bit FNV-1a hashes of `text`, with different seeds. */
+function hash2(text: string): [number, number] {
+  let a = 0x811c9dc5
+  let b = 0x01000193 ^ 0x5bd1e995
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    a = Math.imul(a ^ c, 0x01000193)
+    b = Math.imul(b ^ c, 0x5bd1e995)
+  }
+  return [a >>> 0, b >>> 0]
+}
+
+const structures = new WeakMap<object, WeakMap<object, string>>()
+
+/** The model's structure, whatever order its elements and relations are
+ *  in: each element's type and parent, each relation's ends and type. */
+export function modelStructure(nodes: Record<string, C4Node>, relations: Record<string, C4Relation> | C4Relation[]): string {
+  const known = structures.get(nodes)?.get(relations)
+  if (known) return known
+  let n = 0, a = 0, b = 0, r = 0, c = 0, d = 0
+  for (const node of Object.values(nodes)) {
+    const [x, y] = hash2(`${node.id}\u0001${node.type}\u0001${node.parentId ?? ''}`)
+    a = (a + x) | 0
+    b = (b + y) | 0
+    n++
+  }
+  for (const rel of Array.isArray(relations) ? relations : Object.values(relations)) {
+    const [x, y] = hash2(`${rel.id}\u0001${rel.sourceId}\u0001${rel.targetId}\u0001${rel.relationType ?? ''}`)
+    c = (c + x) | 0
+    d = (d + y) | 0
+    r++
+  }
+  const out = `${n}.${a >>> 0}.${b >>> 0}:${r}.${c >>> 0}.${d >>> 0}`
+  if (Object.isFrozen(nodes) && Object.isFrozen(relations)) {
+    let byRelations = structures.get(nodes)
+    if (!byRelations) structures.set(nodes, byRelations = new WeakMap())
+    byRelations.set(relations, out)
+  }
+  return out
+}
+
+const indexKeys = new WeakMap<object, string | null>()
+
+/** The key a view's elements are kept under in the index, or null for a
+ *  view the index does not keep (no filter chain, a flow, or filters that
+ *  read more than types, parents and relations). */
+export function viewIndexKey(view: DiagramView): string | null {
+  const known = indexKeys.get(view)
+  if (known !== undefined) return known
+  const pipeline = pipelineOf(view)
+  const key = !pipeline?.levels?.length || view.kind === 'dynamic' || chainKeys(view.pipeline) !== BASE_KEYS
+    ? null
+    : hash2(JSON.stringify([view.pipeline, view.kind ?? null, !!view.empty, view.nodeIds])).join('.')
+  indexKeys.set(view, key)
+  return key
+}
+
+/** The index of `views` for the model as it is. */
+export function buildViewIndex(views: DiagramView[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): ViewIndex {
+  const ids = Object.keys(nodes).sort()
+  const at = new Map(ids.map((id, i) => [id, i]))
+  const out: Record<string, number[]> = {}
+  for (const view of views) {
+    const key = viewIndexKey(view)
+    if (!key || key in out) continue
+    const shown = viewShownNodes(view, nodes, relations)
+    if (!shown) continue
+    out[key] = [...shown].map((id) => at.get(id)).filter((i): i is number => i !== undefined)
+  }
+  return { structure: modelStructure(nodes, relations), ids, views: out }
+}
+
+/** The index read with the model being opened, while it fits the model:
+ *  `fits`, the elements and relations it was found to fit. */
+let preset: { index: ViewIndex; fits: { nodes: Record<string, C4Node>; relations: object } | null; off: boolean } | null = null
+
+/** Takes the views' elements from `index` while the model's structure is
+ *  the one it was made for (null: none). */
+export function presetViewIndex(index: ViewIndex | null): void {
+  preset = index ? { index, fits: null, off: false } : null
+}
+
+/** The index given to presetViewIndex: its structure and the views it
+ *  keeps, or null. */
+export function presetViewIndexOf(): { structure: string; keys: string[] } | null {
+  return preset ? { structure: preset.index.structure, keys: Object.keys(preset.index.views) } : null
+}
+
+function fromViewIndex(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
+  if (!preset || preset.off) return undefined
+  const key = viewIndexKey(view)
+  const list = key ? preset.index.views[key] : undefined
+  if (!list) return undefined
+  const fits = preset.fits
+  // Once found to fit, it fits what differs from those elements in
+  // nothing it keeps (a view opened moves elements; a letter typed).
+  if (!(fits && fits.relations === relations && sameForChain(fits.nodes, nodes, BASE_KEYS))) {
+    if (!Object.isFrozen(nodes) || !Object.isFrozen(relations)) return undefined
+    if (modelStructure(nodes, relations) !== preset.index.structure) {
+      // Another structure: the index is of no more use.
+      preset.off = true
+      return undefined
+    }
+    preset.fits = { nodes, relations }
+  }
+  const ids = preset.index.ids
+  return new Set(list.map((i) => ids[i]))
+}
+
 function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (pipelineOf(view)?.levels?.length && view.kind !== 'dynamic') {
-    return new Set(runPipeline(view, { nodes, relations, metamodel: NO_METAMODEL }).nodes.map((n) => n.id))
+    return fromViewIndex(view, nodes, relations) ?? new Set(runPipeline(view, { nodes, relations, metamodel: NO_METAMODEL }).nodes.map((n) => n.id))
   }
   if (viewShowsEveryNode(view)) return undefined
   return new Set(view.nodeIds.filter((id) => id in nodes))

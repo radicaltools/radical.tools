@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseSearch, searchModel, type SearchData } from '../src/search'
-import { addChoices, viewShownNodes } from '../src/viewPipeline'
+import { addChoices, buildViewIndex, modelStructure, presetViewIndex, viewIndexKey, viewShownNodes } from '../src/viewPipeline'
 import { MdFolderSession, readEach, type MdFolderStorage } from '../src/formats/mdFolderSync'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramView } from '../src/c4'
@@ -108,6 +108,49 @@ describe('a model of 20,000 elements', () => {
     const renamed = Object.freeze({ ...MODEL.nodes, 'req0-0': Object.freeze({ ...MODEL.nodes['req0-0'], label: 'Layout moves 0.0' }) })
     expect(viewShownNodes(byType, renamed, MODEL.relations)).toBe(typed)
     expect(viewShownNodes(byText, renamed, MODEL.relations)?.size).toBe(0)
+  })
+})
+
+describe('the view index', () => {
+  const chain = (types: string[], extra: Record<string, unknown> = {}): DiagramView =>
+    ({ id: `v-${types.join('-')}`, name: types.join(', '), nodeIds: Object.freeze([]) as unknown as string[], positions: {}, pipeline: { levels: [{ ways: [{ types }], ...extra }] } }) as DiagramView
+  /** The same view again, as a model opened anew has it: nothing kept for it. */
+  const again = (view: DiagramView): DiagramView => ({ ...view, nodeIds: Object.freeze([...view.nodeIds]) as unknown as string[] })
+
+  it('gives a view of a model of the same structure its elements without running its filter', () => {
+    const view = chain(['requirement'])
+    const index = buildViewIndex([view], MODEL.nodes, MODEL.relations)
+    expect(index.structure).toBe(modelStructure(MODEL.nodes, MODEL.relations))
+    // Taken from the index: one element left out of it is left out of the view.
+    const key = viewIndexKey(view)!
+    const tampered = { ...index, views: { [key]: index.views[key].slice(1) } }
+    const leftOut = index.ids[index.views[key][0]]
+    presetViewIndex(tampered)
+    try {
+      expect(viewShownNodes(again(view), MODEL.nodes, MODEL.relations)?.has(leftOut)).toBe(false)
+      // A rename keeps the structure; the index still answers.
+      const renamed = Object.freeze({ ...MODEL.nodes, 'req9-0': Object.freeze({ ...MODEL.nodes['req9-0'], label: 'Renamed' }) })
+      expect(viewShownNodes(again(view), renamed, MODEL.relations)?.has(leftOut)).toBe(false)
+      // Another structure: the filter runs, and finds what the index left out.
+      const retyped = Object.freeze({ ...MODEL.nodes, 'req9-1': Object.freeze({ ...MODEL.nodes['req9-1'], type: 'scenario' }) })
+      const shown = viewShownNodes(again(view), retyped, MODEL.relations)!
+      expect(shown.has(leftOut)).toBe(true)
+      expect(shown.has('req9-1')).toBe(false)
+    } finally {
+      presetViewIndex(null)
+    }
+  })
+
+  it('keeps no view whose filter reads names or properties', () => {
+    expect(viewIndexKey(chain(['requirement']))).not.toBeNull()
+    expect(viewIndexKey(chain(['requirement'], { filters: [{ kind: 'text', text: 'layout' }] }))).toBeNull()
+    expect(viewIndexKey(chain(['adr'], { filters: [{ kind: 'property', key: 'status', op: 'is', values: ['accepted'] }] }))).toBeNull()
+  })
+
+  it('sees the same structure in elements and relations listed in another order', () => {
+    const reversed = Object.freeze(Object.fromEntries(Object.entries(MODEL.nodes).reverse()))
+    const relations = Object.freeze(Object.fromEntries(Object.entries(MODEL.relations).reverse()))
+    expect(modelStructure(reversed, relations)).toBe(modelStructure(MODEL.nodes, MODEL.relations))
   })
 })
 

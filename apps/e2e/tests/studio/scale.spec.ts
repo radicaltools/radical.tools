@@ -146,13 +146,16 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
   log('heap: model open', await heap())
   if (process.env.SCALE_REOPEN) {
     // Opened again once Studio has written the folder's cache.
-    await expect.poll(() => page.evaluate(async (name) => {
-      try {
-        const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
-        const file = await (await (await root.getDirectoryHandle('.radical')).getDirectoryHandle('cache')).getFileHandle('model.json')
-        return (await file.getFile()).size
-      } catch { return 0 }
-    }, folder.name), { timeout: 600_000, intervals: [500] }).toBeGreaterThan(1000)
+    // Its files and its view index.
+    for (const file of ['model.json', 'views.json']) {
+      await expect.poll(() => page.evaluate(async ([name, file]) => {
+        try {
+          const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
+          const handle = await (await (await root.getDirectoryHandle('.radical')).getDirectoryHandle('cache')).getFileHandle(file)
+          return (await handle.getFile()).size
+        } catch { return 0 }
+      }, [folder.name, file] as const), { timeout: 600_000, intervals: [500] }).toBeGreaterThan(100)
+    }
     if (process.env.SCALE_NO_CACHE) await page.evaluate(async (name) => {
       const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
       await (await root.getDirectoryHandle('.radical')).removeEntry('cache', { recursive: true })

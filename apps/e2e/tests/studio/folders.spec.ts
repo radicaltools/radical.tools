@@ -600,3 +600,38 @@ test('Add or link no longer offers an element an outside edit removed, and links
     .filter((r) => r.sourceId === 'req-dual-approval' || r.targetId === 'req-dual-approval').length
   expect(await dangling()).toBe(0)
 })
+
+// ADR Model cache beside the model: a folder opens as its cache has it and
+// lists its files right after; what changed while Studio was closed (a pull,
+// an agent) is then loaded afresh from them, places and all. The cache keeps
+// up with Studio's saves (changes.json), so its own edits are not "changes".
+test('a folder opened from its cache shows what changed while Studio was closed, places and all', async ({ page, studio }) => {
+  await saveAsFolder(page)
+  await page.reload()
+  await studio.ready()
+  await expect.poll(async () => (await folder.paths()).includes('.radical/cache/model.json'), { timeout: 10_000 }).toBe(true)
+  // A save of Studio's goes into the cache too.
+  await studio.designer()
+  await studio.node('payments').dblclick()
+  await rename(page, 'Payment Provider', 'Card Gateway')
+  await expect.poll(async () => (await folder.files())['nodes/card-gateway/_index.md'] ?? '').toContain('Card Gateway')
+  await expect.poll(async () => (await folder.files())['.radical/cache/changes.json'] ?? '').toContain('Card Gateway')
+  const before = await studio.boxes()
+
+  // Closed (a page of the same origin that is not Studio); meanwhile the
+  // files change: a name, and where Customer stands.
+  await page.goto('/favicon.svg')
+  const files = await folder.files()
+  await folder.write('nodes/card-gateway/_index.md', files['nodes/card-gateway/_index.md'].replace('label: "Card Gateway"', 'label: "Pay Gate"'))
+  const views = JSON.parse(files['views.json']) as Array<{ id: string; positions: Record<string, { x: number; y: number }> }>
+  const context = views.find((v) => v.id === 'v-context')!
+  context.positions.customer.x += 400
+  await folder.write('views.json', JSON.stringify(views, null, 2))
+
+  await page.goto('/#/d/ls%3Ae2e-doc/m/designer/v/v-context')
+  await studio.ready()
+  await expect(studio.node('payments')).toContainText('Pay Gate', { timeout: 10_000 })
+  // Customer stands where the file has it now (the camera may differ).
+  const moved = (b: Record<string, { x: number; width: number }>) => (b.customer.x - b.bookstore.x) / b.bookstore.width
+  await expect.poll(async () => moved(await studio.boxes()) - moved(before), { timeout: 10_000 }).toBeGreaterThan(0.5)
+})

@@ -24,6 +24,8 @@ import {
   type FolderFiles,
 } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
+import { readViewIndex } from '@radical/common/formats/modelCache'
+import { presetViewIndex } from '@radical/common/viewPipeline'
 import type { MergeDrop } from '@radical/common/modelMerge'
 import { agentWritingUntil, parseAgentActivity, type AgentActivity } from '@radical/common/formats/agentActivity'
 import {
@@ -126,7 +128,8 @@ function notifyExternalChange(id: string): void {
 function webSession(id: string, handle: FsDirHandle): MdFolderSession {
   let session = webSessions.get(id)
   if (!session) {
-    session = new MdFolderSession(handleFolderStorage(handle))
+    // Opened as its cache has it, the files listed right after (verifyOpened).
+    session = new MdFolderSession(handleFolderStorage(handle), { openFromCache: true })
     session.onExternalChange = () => notifyExternalChange(id)
     webSessions.set(id, session)
   }
@@ -849,6 +852,12 @@ export interface DocumentsAPI {
   /** Writes the model's base beside a folder model; false when it is no
    *  folder model or the write failed. */
   writeModelBase(id: string, content: string): Promise<boolean>
+  /** For a folder model opened as its cache had it: whether its files
+   *  differed, once they are listed (stale: load it afresh). Not stale for
+   *  any other document. */
+  verifyOpened(id: string): Promise<{ stale: boolean }>
+  /** Writes a folder model's view index (`.radical/cache/views.json`). */
+  writeViewIndex(id: string, content: string): Promise<boolean>
   /** What `radical check` keeps beside an md-folder model (test results,
    *  check.json), each null when it is not there; both null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
@@ -985,9 +994,10 @@ export const documents: DocumentsAPI = {
       return readFileModel(id, handle.name, content)
     }
     if (meta.source === 'md' && meta.folderPath && h.readFolder) {
-      const res = await h.readFolder(meta.folderPath)
+      const [res, index] = await Promise.all([h.readFolder(meta.folderPath), h.readViewIndex?.(meta.folderPath)])
       if (!res.success || !res.files) return null
       if (Object.keys(res.files).length === 0) return null // empty/new folder
+      presetViewIndex(readViewIndex(index?.content))
       return readFolderModel(id, res.files)
     }
     if (meta.source === 'md' && !h.readFolder && webFolderSupported()) {
@@ -996,10 +1006,15 @@ export const documents: DocumentsAPI = {
       if (!(await verifyPermission(handle, 'readwrite', false))) return null // needs reconnect
       connectedWebHandles.add(id)
       let files: FolderFiles
+      let index: string | null
       try {
-        files = await webSession(id, handle).readAll()
+        const session = webSession(id, handle)
+        ;[files, index] = await Promise.all([session.readAll(), session.readCacheFile('views.json')])
       } catch { return null }
       if (Object.keys(files).length === 0) return null // empty/new folder
+      // The views of a model of the structure the index was made for are
+      // taken from it (ADR Model cache beside the model).
+      presetViewIndex(readViewIndex(index))
       return readFolderModel(id, files)
     }
     return null
@@ -1422,6 +1437,24 @@ export const documents: DocumentsAPI = {
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
     return handle ? readModelBaseFromHandle(handle) : null
+  },
+
+  async verifyOpened(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return { stale: false }
+    const h = host()
+    if (meta.folderPath && h.folderVerified) return h.folderVerified(meta.folderPath).catch(() => ({ stale: false }))
+    const session = webSessions.get(id)
+    return session ? session.verified() : { stale: false }
+  },
+
+  async writeViewIndex(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return false
+    const h = host()
+    if (meta.folderPath && h.writeViewIndex) return (await h.writeViewIndex(meta.folderPath, content).catch(() => ({ success: false }))).success
+    const session = webSessions.get(id)
+    return session ? session.writeCacheFile('views.json', content) : false
   },
 
   async writeModelBase(id, content) {

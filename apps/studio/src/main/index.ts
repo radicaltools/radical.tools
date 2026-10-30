@@ -32,7 +32,8 @@ function folderSession(folderPath: string): MdFolderSession {
   const key = resolve(folderPath)
   let session = folderSessions.get(key)
   if (!session) {
-    session = new MdFolderSession(diskFolderStorage(key))
+    // Opened as its cache has it, the files listed right after (folderVerified).
+    session = new MdFolderSession(diskFolderStorage(key), { openFromCache: true })
     session.onExternalChange = (paths) => {
       if (!watchedFolder || resolve(watchedFolder) !== key) return
       for (const win of BrowserWindow.getAllWindows()) {
@@ -269,6 +270,19 @@ app.whenReady().then(() => {
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }
+  })
+
+  // An md-folder opened as its cache had it: whether its files differed
+  // (ADR Model cache beside the model). Its view index, in the cache.
+  ipcMain.handle('folder:verified', async (_event, folderPath: string) => {
+    const { stale } = await folderSession(folderPath).verified()
+    return { stale }
+  })
+  ipcMain.handle('folder:read-view-index', async (_event, folderPath: string) => {
+    return { success: true, content: await folderSession(folderPath).readCacheFile('views.json') }
+  })
+  ipcMain.handle('folder:write-view-index', async (_event, folderPath: string, content: string) => {
+    return { success: await folderSession(folderPath).writeCacheFile('views.json', content) }
   })
 
   // The model as a Forge run starts on it, where git saved no base.
