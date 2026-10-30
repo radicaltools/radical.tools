@@ -356,6 +356,20 @@ gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
 
+### Dogfooding (2026-10-30): nightly sensors
+
+- `radical check --metrics` without `--report` counts the goals that read
+  evidence (requirements verified, ADRs verified) as 0 %: with only the
+  night's measurements they fail with goal-unmet, though no test report was
+  given. They should be "not run" as without either. The nightly workflow
+  logs the check for reading and takes its findings from
+  `tools/nightly-findings.ts`, which evaluates the night's conditions only.
+- Turning broken conditions into findings is a repository script; a
+  `radical check --findings <dir>` (or `radical sense --findings`) would give
+  every project the same nightly loop.
+- A preview server left from an earlier e2e run (another worktree) holds
+  port 4310, and the suite cannot start until it is stopped by hand.
+
 ### Dogfooding (2026-10-30): large models
 
 Making Studio usable on a model of 20,000 elements, on a worktree branch:

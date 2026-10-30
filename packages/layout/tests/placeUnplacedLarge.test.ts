@@ -26,18 +26,20 @@ function largeModel(): { nodes: Record<string, C4Node>; positions: Record<string
 }
 
 describe('placing what has no place yet in a model of 20,000 elements', () => {
-  it('places them within 300 ms', () => {
-    let best = Infinity
-    for (let run = 0; run < 3; run++) {
-      const { nodes, positions } = largeModel()
-      const missing = Object.keys(nodes).filter((id) => !positions[id]).length
-      expect(Object.keys(nodes).length).toBeGreaterThan(20_000)
-      expect(missing).toBeGreaterThan(50)
-      const t = performance.now()
-      const placed = placeUnplaced(nodes, positions)
-      best = Math.min(best, performance.now() - t)
-      expect(placed.length).toBe(missing)
-    }
-    expect(best).toBeLessThan(300)
+  it('places them without going through every element for each one placed', () => {
+    const { nodes, positions } = largeModel()
+    const missing = Object.keys(nodes).filter((id) => !positions[id]).length
+    expect(Object.keys(nodes).length).toBeGreaterThan(20_000)
+    expect(missing).toBeGreaterThan(50)
+    // Every walk over the elements asks for their keys. How long placing
+    // takes is measured at night (fitness function Large model stays
+    // responsive); here, the work.
+    let walks = 0
+    const counted = new Proxy(nodes, { ownKeys(target) { walks++; return Reflect.ownKeys(target) } })
+    const placed = placeUnplaced(counted, positions)
+    expect(placed.length).toBe(missing)
+    // Scanning for siblings and children was a walk per element placed and
+    // per step (thousands for 84 elements).
+    expect(walks).toBeLessThan(20)
   })
 })

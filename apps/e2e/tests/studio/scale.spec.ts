@@ -16,7 +16,8 @@ import { repeatModel } from '../../support/repeatModel'
 //   SCALE_REOPEN  open the folder again from the cache Studio wrote
 //                 (SCALE_NO_CACHE=1: with the cache deleted first)
 //   SCALE_HEAP    the heap after each view; SCALE_ONLY_OPEN stops after opening
-//   SCALE_OUT     a folder for the results (and CPU profiles with SCALE_PROFILE=1)
+//   SCALE_OUT     a folder for the results: results.json, metrics.json (what the
+//                 nightly workflow senses) and CPU profiles with SCALE_PROFILE=1
 
 const MODEL = process.env.SCALE_MODEL
 const VIEWS = (process.env.SCALE_VIEWS ?? 'All elements,Domain model,Components,System context,Traceability,Specification,Container dependencies,Decisions,CLI').split(',')
@@ -274,5 +275,20 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
     await shot('dragged')
   }
   log('heap: end', await heap())
-  if (OUT) { mkdirSync(OUT, { recursive: true }); writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1)) }
+  if (OUT) {
+    mkdirSync(OUT, { recursive: true })
+    writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1))
+    // What the fitness function Large model stays responsive reads, through
+    // radical sense json (the nightly workflow): what a user waits for.
+    const step = (name: string) => results[name] as Partial<Stats & { wallMs: number }> | undefined
+    const views = Object.entries(results).filter(([k, v]) => k.startsWith('view ') && typeof v === 'object').map(([, v]) => (v as Stats).ms)
+    const metrics = {
+      open_ms: step('open folder')?.wallMs,
+      open_cached_ms: step('open folder from its cache')?.wallMs,
+      view_switch_ms: views.length ? Math.max(...views) : undefined,
+      search_key_ms: step('search typing')?.inputMaxMs,
+      card_key_ms: step('rename typing')?.inputMaxMs,
+    }
+    writeFileSync(`${OUT}/metrics.json`, JSON.stringify(metrics, null, 1))
+  }
 })

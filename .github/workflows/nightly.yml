@@ -1,0 +1,104 @@
+name: Nightly
+
+# The sensors whose results vary from run to run, measured at night instead
+# of in the pull-request gate (ADR Studio's speed is measured nightly). Each
+# writes radical-metrics/1 files into reports/metrics; tools/nightly-findings.ts
+# evaluates the model's conditions on them as radical check does, and each
+# that does not hold (or that nothing measured) becomes a finding in
+# crucible/findings/, proposed in a bot pull request. The findings go neither
+# into the model nor into Studio.
+#
+# Sensors:
+#   - Large model in Studio: apps/e2e/tests/studio/scale.spec.ts on
+#     radical.tools' own model repeated 14 times, for the fitness function
+#     Large model stays responsive (metrics studio.*, label model=radical-x14).
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sensors:
+    name: Nightly sensors
+    runs-on: ubuntu-latest
+    # The same image as the E2E suite (e2e.yml): browsers and fonts.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:web && npm run build:hub
+      - run: npm run build -w @radicaltools/cli
+
+      - name: Large model in Studio
+        # A run that fails measures nothing: the fitness function's conditions
+        # then become findings that say so.
+        continue-on-error: true
+        env:
+          SCALE_MODEL: ${{ github.workspace }}/architecture
+          SCALE_COPIES: '14'
+          SCALE_REOPEN: '1'
+          SCALE_OUT: ${{ github.workspace }}/reports/scale
+        run: npm run e2e -w @radical/e2e -- tests/studio/scale.spec.ts --project=studio
+      - name: Measure the large model
+        if: ${{ hashFiles('reports/scale/metrics.json') != '' }}
+        run: >-
+          node apps/cli/dist/index.js sense json reports/scale/metrics.json
+          --metric studio.open_ms=open_ms@ms
+          --metric studio.open_cached_ms=open_cached_ms@ms
+          --metric studio.view_switch_ms=view_switch_ms@ms
+          --metric studio.search_key_ms=search_key_ms@ms
+          --metric studio.card_key_ms=card_key_ms@ms
+          --label model=radical-x14
+          --context commit=${{ github.sha }}
+          --out reports/metrics/scale.json
+
+      - name: Check
+        # What the conditions say, for the run's log and artifacts; the
+        # findings come from the next step.
+        run: node apps/cli/dist/index.js check architecture --metrics reports/metrics --format github || true
+      - name: Findings
+        run: >-
+          npx tsx tools/nightly-findings.ts architecture crucible/findings
+          --metrics reports/metrics --expect studio.
+          --commit ${{ github.sha }}
+          --run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          | tee reports/nightly-findings.txt
+
+      - name: Propose the findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ -z "$(git status --porcelain crucible/findings)" ]; then echo "No new findings."; exit 0; fi
+          branch="bot/nightly-findings-$(date -u +%Y-%m-%d)-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add crucible/findings
+          git commit -m "Nightly findings $(date -u +%Y-%m-%d)"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Nightly findings $(date -u +%Y-%m-%d)" \
+            --body "The nightly sensors broke conditions of the model (run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Each finding is a file in crucible/findings/; merged, it starts the next change: a fix, or a decision that the condition is wrong."
+
+      - name: Upload what the night measured
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reports
+          path: reports/
+          retention-days: 30
