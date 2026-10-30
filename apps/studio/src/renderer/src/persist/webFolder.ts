@@ -17,7 +17,8 @@
 
 import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
-import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
+import { MODEL_CACHE_FILE } from '@radical/common/formats/modelCache'
+import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
@@ -160,24 +161,58 @@ export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
     for (const part of parts) dir = await dir.getDirectoryHandle(part, { create })
     return dir
   }
+  // The files as the last listing found them: a read goes straight to the
+  // file instead of through each of its folders again.
+  let listed = new Map<string, FsFileHandle>()
+  const [cacheDir, cacheName] = [MODEL_CACHE_FILE.split('/').slice(1, -1), MODEL_CACHE_FILE.split('/').pop()!]
   return {
+    async readCache() {
+      try {
+        let dir = await root.getDirectoryHandle(SELECTION_DIR)
+        for (const part of cacheDir) dir = await dir.getDirectoryHandle(part)
+        return await (await (await dir.getFileHandle(cacheName)).getFile()).text()
+      } catch {
+        return null
+      }
+    },
+    async writeCache(content) {
+      const state = await editorStateDirOf(root)
+      let dir = state
+      for (const part of cacheDir) dir = await dir.getDirectoryHandle(part, { create: true })
+      // The browser writes beside the file and swaps it in on close: a
+      // reader never finds half a cache.
+      await writeText(dir, cacheName, content)
+    },
     async list() {
-      const stamps: Record<string, string> = {}
+      const files = new Map<string, FsFileHandle>()
       const walk = async (dir: FsDirHandle, rel: string): Promise<void> => {
+        const dirs: Promise<void>[] = []
         for await (const [name, entry] of dir.entries()) {
           if (name.startsWith('.')) continue
           const child = rel ? `${rel}/${name}` : name
           if (entry.kind === 'directory') {
-            if (rel || name === 'nodes') await walk(entry as FsDirHandle, child)
+            if (rel || name === 'nodes') dirs.push(walk(entry as FsDirHandle, child))
           } else if (isMdFolderModelPath(child)) {
-            try { stamps[child] = await stampOf(entry as FsFileHandle) } catch { /* gone meanwhile */ }
+            files.set(child, entry as FsFileHandle)
           }
         }
+        await Promise.all(dirs)
       }
       await walk(root, '')
+      const paths = [...files.keys()].sort()
+      const found = await readEach(paths, (path) => stampOf(files.get(path)!).catch(() => undefined))
+      const stamps: Record<string, string> = {}
+      paths.forEach((path, i) => { if (found[i] !== undefined) stamps[path] = found[i] }) // else gone meanwhile
+      listed = files
       return stamps
     },
-    read: (rel) => readOneFileFromHandle(root, rel),
+    async read(rel) {
+      const file = listed.get(rel)
+      if (file) {
+        try { return await (await file.getFile()).text() } catch { /* moved or gone since: look it up */ }
+      }
+      return readOneFileFromHandle(root, rel)
+    },
     async write(rel, content) {
       const parts = rel.split('/')
       const dir = await dirFor(parts.slice(0, -1), true)
@@ -217,11 +252,17 @@ export async function writeModelBaseToHandle(root: FsDirHandle, content: string)
   await writeEditorStateToHandle(root, 'base.json', content)
 }
 
-async function writeEditorStateToHandle(root: FsDirHandle, name: string, content: string): Promise<void> {
+/** The model folder's `.radical/`, made when missing, with the
+ *  `.gitignore` that keeps it out of version control. */
+async function editorStateDirOf(root: FsDirHandle): Promise<FsDirHandle> {
   const dir = await root.getDirectoryHandle(SELECTION_DIR, { create: true })
   try { await dir.getFileHandle('.gitignore') }
   catch { await writeText(dir, '.gitignore', SELECTION_GITIGNORE_CONTENT) }
-  await writeText(dir, name, content)
+  return dir
+}
+
+async function writeEditorStateToHandle(root: FsDirHandle, name: string, content: string): Promise<void> {
+  await writeText(await editorStateDirOf(root), name, content)
 }
 
 /** The Forge run status file (see forgeRunStatus) under the model folder's

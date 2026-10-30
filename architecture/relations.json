@@ -1221,6 +1221,12 @@
     "targetId": "53a770a9-ce40-4708-aea8-7d5ef717d8f3"
   },
   {
+    "id": "12ba0d03-1ffc-4c3e-ac89-45b22d1de4b6",
+    "relationType": "satisfies",
+    "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
+    "targetId": "7f5a39b1-b58e-4e58-90e2-1b1fe9323d19"
+  },
+  {
     "id": "12cea1b1-339a-4901-a4f5-7e767726afe1",
     "label": "implements the host contract of",
     "relationType": "interacts",
@@ -1797,6 +1803,12 @@
     "relationType": "derives",
     "sourceId": "7eff976f-5f58-4211-a0e8-fa7d66309f3a",
     "targetId": "9d82c358-fb01-4cc3-a632-72500811e9f0"
+  },
+  {
+    "id": "1bd7db0e-4f5a-44a9-ab8b-1629dc1c35da",
+    "relationType": "verifies",
+    "sourceId": "381d78fb-87b0-4428-8034-2e2323500c59",
+    "targetId": "7f5a39b1-b58e-4e58-90e2-1b1fe9323d19"
   },
   {
     "id": "1c0441fb-36c6-41f8-9026-e543aff7eb07",
@@ -2768,6 +2780,12 @@
     "targetId": "681b9604-2215-4597-9f21-7a6081aa017b"
   },
   {
+    "id": "2b178f5e-c856-416a-81f2-f7f98b1fad1a",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "10e5d2fc-c37a-48f9-afb5-fad88a5392b9"
+  },
+  {
     "id": "2b17d114-5ab4-4589-9bc4-46baa382e13f",
     "relationType": "verifies",
     "sourceId": "7759f831-f353-4832-ace7-71eff83ccecd",
@@ -3668,6 +3686,12 @@
     "targetId": "28b5fd94-c9ee-4441-a5f4-2a2576cb9a0f"
   },
   {
+    "id": "384a642b-0d44-46d5-a7f0-b263ab8b4dda",
+    "relationType": "constrains",
+    "sourceId": "5eab149c-520e-4e36-83c6-39e642ba65d0",
+    "targetId": "45c95a3b-968d-4b77-8fc3-94af06de5087"
+  },
+  {
     "id": "385a5746-8872-4c42-9173-ae40e0f8e9d3",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -4510,6 +4534,12 @@
     "targetId": "552a8c1f-a9cf-44d1-b918-513fa212e106"
   },
   {
+    "id": "4310e472-b064-4179-b833-3dd02121d551",
+    "relationType": "verifies",
+    "sourceId": "ae65aad2-e11a-4c6e-a8c6-8cad714d817a",
+    "targetId": "b4d521cd-b383-46a0-9e70-79b00acc9c74"
+  },
+  {
     "id": "4330dd46-5833-4af6-bf6b-c71ee3f47ccf",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -5267,6 +5297,12 @@
     "targetId": "3b58e5d4-8d5c-4626-934d-6fbf154105fa"
   },
   {
+    "id": "4e48c10b-02bd-4126-9c6b-4cb584c2786b",
+    "relationType": "satisfies",
+    "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
+    "targetId": "b4d521cd-b383-46a0-9e70-79b00acc9c74"
+  },
+  {
     "id": "4e568636-2b99-493f-b66e-e903b4c78d74",
     "relationType": "constrains",
     "sourceId": "342ffb40-823b-443c-9d1d-8655a5604dba",
@@ -5464,6 +5500,12 @@
     "relationType": "constrains",
     "sourceId": "80ad0d61-7922-49d8-919a-0cbdd58f0092",
     "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
+    "id": "514a640c-4669-4069-a8f0-ca0c70b2198e",
+    "relationType": "derives",
+    "sourceId": "c64bf701-cd48-45c4-a7f9-4988d10610f1",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
   },
   {
     "id": "51598e74-a16e-4e2b-964c-07c9ff84c673",
@@ -6589,6 +6631,12 @@
     "targetId": "0f45402b-f686-4fe7-82e3-951587e20eba"
   },
   {
+    "id": "62188fa3-33cf-464b-9dab-1910a30ac03c",
+    "relationType": "verifies",
+    "sourceId": "785cc9bd-7281-4baf-a53c-537a8514103d",
+    "targetId": "4e2ace09-537e-4b2d-8739-844f096b98f2"
+  },
+  {
     "id": "6218f1ee-62f0-4eae-9c2e-39a63a8b4e43",
     "relationType": "satisfies",
     "sourceId": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9",
@@ -6849,6 +6897,12 @@
     "relationType": "interacts",
     "sourceId": "88f411d4-5ba5-4620-a32b-933cc622a5a0",
     "targetId": "f53d7ad3-d926-404d-9341-9cb61722979d"
+  },
+  {
+    "id": "65e31ae2-e707-43a2-8f13-5e8eeedc1482",
+    "relationType": "derives",
+    "sourceId": "66e31ca1-6161-4254-9e67-179a62b9a399",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
   },
   {
     "id": "65f6596a-101b-4490-84a5-ea23ab5cf855",
@@ -7267,6 +7321,12 @@
     "targetId": "e32b7ec0-3949-40dd-bbeb-f89bfd9b2954"
   },
   {
+    "id": "6ccc7df7-15c8-4b64-b79c-b480fbecbe81",
+    "relationType": "derives",
+    "sourceId": "7f5a39b1-b58e-4e58-90e2-1b1fe9323d19",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
+  },
+  {
     "id": "6ce3b866-c0be-4dcf-bb15-521a1b62a2ce",
     "relationType": "derives",
     "sourceId": "f3190c2b-5608-40ce-8aa2-b65c4107fac1",
@@ -7316,6 +7376,12 @@
     "relationType": "verifies",
     "sourceId": "c726cead-d627-4003-847d-5135db126279",
     "targetId": "bdcc2573-2424-464e-b160-508cfdc24124"
+  },
+  {
+    "id": "6e023166-f91d-4c7e-8b73-155cdb0c303d",
+    "relationType": "derives",
+    "sourceId": "4e2ace09-537e-4b2d-8739-844f096b98f2",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
   },
   {
     "id": "6e0f7239-fd6a-4eb8-a5b8-a3c1984f9a74",
@@ -7564,6 +7630,12 @@
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
     "targetId": "88b133fe-0642-471d-b6aa-dc3a8fdd45f0"
+  },
+  {
+    "id": "71138779-4701-4999-a107-4c27a6c7ebfd",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "b4d521cd-b383-46a0-9e70-79b00acc9c74"
   },
   {
     "id": "711aebb6-cde3-4b3f-b988-96e4015530ee",
@@ -8184,6 +8256,12 @@
     "relationType": "derives",
     "sourceId": "137f776c-7acb-476a-9e3a-ab06151cac4b",
     "targetId": "adf2f053-6d47-4e04-83df-a7722b3e726b"
+  },
+  {
+    "id": "7949727c-1abb-4d54-ab5e-69884e200948",
+    "relationType": "constrains",
+    "sourceId": "5eab149c-520e-4e36-83c6-39e642ba65d0",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
     "id": "794c2199-b458-414c-a761-48270524ae89",
@@ -8868,6 +8946,12 @@
     "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
+    "id": "82dea440-4e8c-4622-82e5-bb9e1f063721",
+    "relationType": "verifies",
+    "sourceId": "386f0c8b-8d0b-420c-82d7-910ed3e7e162",
+    "targetId": "4e2ace09-537e-4b2d-8739-844f096b98f2"
+  },
+  {
     "id": "82ed9ad2-30cf-48b6-9408-a0f646f9832e",
     "relationType": "derives",
     "sourceId": "65a85fe1-4737-4e69-9ecd-ce9a900caed8",
@@ -9541,6 +9625,12 @@
     "targetId": "0f125eb5-6f65-4523-a583-3b4a0bec44b7"
   },
   {
+    "id": "8cfa368e-7a9f-4ab1-a149-11e74c4d16f4",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "7f5a39b1-b58e-4e58-90e2-1b1fe9323d19"
+  },
+  {
     "id": "8d006c09-6617-4c7a-a8bd-0abff3f46b98",
     "label": "reads and edits the model",
     "relationType": "interacts",
@@ -9816,6 +9906,12 @@
     "relationType": "derives",
     "sourceId": "54d62487-7310-4272-817f-f7c5ef747543",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "90681a03-2895-4236-9332-3a58f0eadbbc",
+    "relationType": "constrains",
+    "sourceId": "5eab149c-520e-4e36-83c6-39e642ba65d0",
+    "targetId": "55cd24b4-b12b-4508-994b-de05fd43ce69"
   },
   {
     "id": "908cc6fc-8f4f-4db5-a21b-d119fac14dd9",
@@ -10454,6 +10550,12 @@
     "relationType": "verifies",
     "sourceId": "62c5e5d0-69af-434c-8618-5c7e1651836b",
     "targetId": "ace11c09-df3f-4452-aa9f-0ee884c5c02a"
+  },
+  {
+    "id": "99e47415-5a66-43d2-b96c-d533315e4d79",
+    "relationType": "satisfies",
+    "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
+    "targetId": "4e2ace09-537e-4b2d-8739-844f096b98f2"
   },
   {
     "id": "99ecf6d5-3e6b-4233-918c-c85daac9a5ff",
@@ -11133,6 +11235,12 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "a51b61f6-e311-4aec-b83b-8ac4f964b383",
+    "relationType": "verifies",
+    "sourceId": "488145bd-3bea-435d-87b1-be72425cee08",
+    "targetId": "10e5d2fc-c37a-48f9-afb5-fad88a5392b9"
+  },
+  {
     "id": "a51cec37-d7e3-4805-8c99-af23bd115445",
     "relationType": "derives",
     "sourceId": "bcde343d-1b42-45bb-b0a8-b9241d458fea",
@@ -11180,6 +11288,12 @@
     "relationType": "interacts",
     "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
     "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  {
+    "id": "a6374edc-8441-4fd6-aaa5-321de439d59c",
+    "relationType": "verifies",
+    "sourceId": "55916a7c-c16b-44ed-ba45-a12bfb8bc811",
+    "targetId": "66e31ca1-6161-4254-9e67-179a62b9a399"
   },
   {
     "id": "a6576973-c20c-486b-805d-717a32b77f95",
@@ -11952,6 +12066,12 @@
     "targetId": "13cb9717-6aee-4dbd-8f65-27fecf0fe0e1"
   },
   {
+    "id": "b06f01e4-6306-462f-8885-5b898dc54cff",
+    "relationType": "verifies",
+    "sourceId": "2b57eecd-f114-4aee-b385-e5aae10b6075",
+    "targetId": "10e5d2fc-c37a-48f9-afb5-fad88a5392b9"
+  },
+  {
     "id": "b08e80c9-c4f3-473c-ab49-3b1ba8a150b1",
     "relationType": "satisfies",
     "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
@@ -12164,6 +12284,12 @@
     "relationType": "verifies",
     "sourceId": "6978d003-7ad0-4676-b2ec-98bcdb8a3bb5",
     "targetId": "6f84875d-7998-4d7f-a676-b2aa41dab92c"
+  },
+  {
+    "id": "b4185154-7796-44a0-96d0-3b9be5f50bf6",
+    "relationType": "satisfies",
+    "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+    "targetId": "4e2ace09-537e-4b2d-8739-844f096b98f2"
   },
   {
     "id": "b45349d8-411a-4216-b379-833de4536183",
@@ -13598,6 +13724,12 @@
     "targetId": "45c9af0c-6806-4082-a68b-32e92d66e9e9"
   },
   {
+    "id": "c8e48410-3947-40e9-b5fe-b07a901881b4",
+    "relationType": "satisfies",
+    "sourceId": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086",
+    "targetId": "66e31ca1-6161-4254-9e67-179a62b9a399"
+  },
+  {
     "id": "c8e62e8d-592a-4232-b6e7-49e4d5215c51",
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
@@ -13686,6 +13818,12 @@
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
     "targetId": "03641e2c-07be-43a6-a3a4-92e14d4b983f"
+  },
+  {
+    "id": "c9d1d92f-10a1-4946-8613-9a4f59174b60",
+    "relationType": "satisfies",
+    "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
+    "targetId": "10e5d2fc-c37a-48f9-afb5-fad88a5392b9"
   },
   {
     "id": "c9d789b4-9eed-45cc-a706-fe709e3f2665",
@@ -13926,6 +14064,12 @@
     "targetId": "b88cec32-1d57-464a-ae51-a1d5399b08bd"
   },
   {
+    "id": "cd795246-5908-49bb-8edd-fe5e8eebe6fe",
+    "relationType": "constrains",
+    "sourceId": "d517e522-37fe-40d1-bd4b-3754a1d75366",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
     "id": "cd86ae06-2a39-41e0-bfce-b14a85fd02ea",
     "relationType": "implements",
     "sourceId": "a4d8d593-831c-4d4d-afe1-e2dd3984633c",
@@ -14003,6 +14147,12 @@
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "0df91f39-96fa-45b0-8a41-4f1a859e4212"
+  },
+  {
+    "id": "ce163d3b-4530-41cf-980f-18a293b9dff1",
+    "relationType": "implements",
+    "sourceId": "d517e522-37fe-40d1-bd4b-3754a1d75366",
+    "targetId": "5eab149c-520e-4e36-83c6-39e642ba65d0"
   },
   {
     "id": "ce16732e-0e61-471a-870b-a0698c0d22e5",
@@ -14119,6 +14269,12 @@
     "relationType": "derives",
     "sourceId": "f36ce8d2-42f3-4637-959d-43c6313d5af7",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "cf84b1d5-4280-4b5c-bd84-8c9aa72ae615",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "66e31ca1-6161-4254-9e67-179a62b9a399"
   },
   {
     "id": "cfbf8838-573e-4db2-9e08-10467e2afb8d",
@@ -14319,6 +14475,12 @@
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "22cdc4c2-842e-445e-a736-5fe055b53897"
+  },
+  {
+    "id": "d2ca3dd2-8ce3-4b31-ad33-29f13907e334",
+    "relationType": "derives",
+    "sourceId": "b4d521cd-b383-46a0-9e70-79b00acc9c74",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
   },
   {
     "id": "d2e0c022-4abc-40ff-8ce8-4cb169deba4f",
@@ -16097,6 +16259,12 @@
     "targetId": "20fa41e0-ed05-4b48-8359-579315041be2"
   },
   {
+    "id": "ef550e69-afa7-453d-9cc2-a5930f47787c",
+    "relationType": "verifies",
+    "sourceId": "eb6c6cfa-6891-4a27-b3ea-19817dff3a6d",
+    "targetId": "c64bf701-cd48-45c4-a7f9-4988d10610f1"
+  },
+  {
     "description": "Studio on the web carries the product version, shown with its commit between releases; About Radical Studio shows it.",
     "id": "ef738b0e-14ce-4ec6-aa26-5cd0c86e0bdb",
     "relationType": "constrains",
@@ -16309,6 +16477,12 @@
     "targetId": "d9b85644-ed67-4cbb-b578-1e134d7eb706"
   },
   {
+    "id": "f28bacc7-582e-4807-b29c-22977ff0e2ca",
+    "relationType": "satisfies",
+    "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
+    "targetId": "c64bf701-cd48-45c4-a7f9-4988d10610f1"
+  },
+  {
     "id": "f2b60993-b1c4-4dd4-82b0-7adf1d58f875",
     "relationType": "derives",
     "sourceId": "1099eea0-6d6c-4baf-b60c-a1af3ad091c9",
@@ -16519,6 +16693,12 @@
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
     "targetId": "dce41433-b08d-4718-ad42-4a875140d626"
+  },
+  {
+    "id": "f5e711a0-db26-49ab-8501-4c523a83d0f6",
+    "relationType": "derives",
+    "sourceId": "10e5d2fc-c37a-48f9-afb5-fad88a5392b9",
+    "targetId": "726e994c-9395-4d58-8530-2ff2aa2c3014"
   },
   {
     "id": "f5e7f394-bd17-4528-ab54-9ee02d343784",
@@ -16923,6 +17103,12 @@
     "relationType": "satisfies",
     "sourceId": "67072b4e-8c08-43f1-a10b-98fb314dccb5",
     "targetId": "e4c1bbcb-b278-48b8-9a1f-68a1b7085e10"
+  },
+  {
+    "id": "fb7bcae2-93c1-41a9-8da5-263fb736f241",
+    "relationType": "traces-to",
+    "sourceId": "b4d521cd-b383-46a0-9e70-79b00acc9c74",
+    "targetId": "5eab149c-520e-4e36-83c6-39e642ba65d0"
   },
   {
     "id": "fb922af7-32b9-45b8-9824-636ecb7de489",

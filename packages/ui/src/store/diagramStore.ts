@@ -101,7 +101,7 @@ import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
 import { viewCameras } from './viewCameras'
-import { type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -1533,6 +1533,25 @@ function showCanvasPositions(
   live?: Record<string, C4Node>,
   wrap?: { ids: ReadonlySet<string>; wrapped: string[] },
 ): string[] {
+  // Placing reads every element many times over, and on the store's drafts
+  // each read went through immer's proxies: 84 elements placed in a model
+  // of 21,000 took 7 s. It works on plain copies, and only the places that
+  // changed go back into the drafts.
+  if (isDraft(nodes)) {
+    const base = current(nodes) as Record<string, C4Node>
+    const work: Record<string, C4Node> = {}
+    for (const id in base) work[id] = { ...base[id] }
+    const plain = <T,>(x: T): T => (x && isDraft(x) ? current(x) : x)
+    const placed = showCanvasPositions(work, plain(positions), plain(view), plain(relations), plain(live), wrap)
+    for (const id in work) {
+      const w = work[id]
+      const b = base[id]
+      if (w.x === b.x && w.y === b.y && w.width === b.width && w.height === b.height) continue
+      const n = nodes[id]
+      n.x = w.x; n.y = w.y; n.width = w.width; n.height = w.height
+    }
+    return placed
+  }
   // Only the view's own places are the live layout's (All elements', which
   // a view never laid out opens on, are the milestone's own).
   const own = view && live && positions === view.positions ? ownPlacesInMilestone(positions, view, nodes, live) : []
@@ -3684,6 +3703,17 @@ let _continuousKicked = false
 const _continuousHeld = new Set<string>()
 
 /** The shape of the canvas shown, or null when it does not keep itself tidied. */
+/** The canvas view shown and how many elements it shows, when that is
+ *  more than a canvas draws (CANVAS_MAX_ELEMENTS): it is neither drawn nor
+ *  laid out. A view's filter grows with the model, so a view drawn once may
+ *  be too large now. Null for any other view. */
+export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>): { view: DiagramView; count: number } | null {
+  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
+  if (!view || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
+  const count = viewShownNodes(view, s.c4Nodes, s.c4Relations)?.size ?? Object.keys(s.c4Nodes).length
+  return count > CANVAS_MAX_ELEMENTS ? { view, count } : null
+}
+
 function continuousShape(s: DiagramStore): string | null {
   if (s.appMode === 'metamodel' || s.presentationActive) return null
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
@@ -4444,16 +4474,20 @@ export const useDiagramStore = create<DiagramStore>()(
           state.exploreMore = more
           state.exploreFoldable = foldables
           if (!xActive) state.exploreMenuFor = null
-          const view = viewById(state as DiagramStore, state.activeViewId)
+          // Read from the store as it stands (s0), not from the drafts:
+          // nothing below changes it, and through immer's proxies each
+          // edit of a model of 21,000 elements took seconds here, with
+          // none of the frozen-data caches the chains keep.
+          const view = viewById(s0, s0.activeViewId)
           // Merge diff ghosts (items removed in the active milestone but
           // present in the diff base) so the user can see what's gone.
           // The ghosts are kept in a separate map so they never end up in
           // the real c4Nodes / c4Relations on save.
-          const ghostNodes = state.diffGhostNodes as Record<string, C4Node>
-          const ghostRels = state.diffGhostRelations as Record<string, C4Relation>
-          const hasGhosts = state.showDiff && (Object.keys(ghostNodes).length > 0 || Object.keys(ghostRels).length > 0)
-          const liveNodes = state.c4Nodes as Record<string, C4Node>
-          const liveRels = state.c4Relations as Record<string, C4Relation>
+          const ghostNodes = s0.diffGhostNodes as Record<string, C4Node>
+          const ghostRels = s0.diffGhostRelations as Record<string, C4Relation>
+          const hasGhosts = s0.showDiff && (Object.keys(ghostNodes).length > 0 || Object.keys(ghostRels).length > 0)
+          const liveNodes = s0.c4Nodes
+          const liveRels = s0.c4Relations
           const mergedNodes: Record<string, C4Node> = xNodes ?? (hasGhosts ? { ...ghostNodes, ...liveNodes } : liveNodes)
           const mergedRels: Record<string, C4Relation> = xRels ?? (hasGhosts ? { ...ghostRels, ...liveRels } : liveRels)
           // A canvas view with a chain in its steps draws what the chain
@@ -7184,6 +7218,12 @@ export const useDiagramStore = create<DiagramStore>()(
           if (firstOpen) _firstLayoutOf = null
           return
         }
+        // A view with more elements than a canvas draws is not drawn, and
+        // not laid out either.
+        if (oversizedCanvas(get())) {
+          if (firstOpen) _firstLayoutOf = null
+          return
+        }
         // Per-view layout-mode override: views configured for the
         // hierarchical nested-tree strategy delegate here. Default is
         // unchanged (ensemble Smart Layout).
@@ -9329,7 +9369,14 @@ export const useDiagramStore = create<DiagramStore>()(
         for (const r of data.relations) relations[r.id] = r
         // Older documents kept every node's position in each view.
         // A view of type Explore with what a file left out of it filled in.
-        if (data.views) for (const v of withCanvasPositions(data.views.map(withExploreState), nodes, (view) => viewDrawnIds(view, nodes, relations))) views[v.id] = v
+        // Frozen now, as the store keeps them: what each view shows, worked
+        // out here to trim its positions, is then kept for the view counts,
+        // Quick Search and the canvas instead of worked out again (about
+        // 1 s for a model of 21,000 elements).
+        Object.freeze(nodes)
+        Object.freeze(relations)
+        const viewsRead = (data.views ?? []).map(withExploreState).map((v) => (Object.isFrozen(v.nodeIds) ? v : { ...v, nodeIds: Object.freeze([...v.nodeIds]) as string[] }))
+        if (data.views) for (const v of withCanvasPositions(viewsRead, nodes, (view) => viewDrawnIds(view, nodes, relations))) views[v.id] = v
         _viewerExplorations.clear()
         if (data.sequences) for (const s of data.sequences) sequences[s.id] = s
 

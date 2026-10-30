@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { runAIPrompt } from '../ai/runner'
@@ -38,6 +38,8 @@ import { openFindInView } from './FindInView'
  * Lives outside the canvas so it is always reachable, no matter which mode
  * (designer / viewer / presenter) the user is in.
  */
+const NO_VIEW_SETS: Record<string, Set<string>> = {}
+
 export function QuickSearch(): React.ReactElement | null {
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
@@ -256,7 +258,11 @@ export function QuickSearch(): React.ReactElement | null {
   // ancestors), so we can answer "which views contain node X?" and
   // pick a sensible fallback view when jumping to a node that isn't in the
   // currently-active one.
-  const viewNodeSets = useMemo(() => viewNodeSetsOf(views, c4Nodes, c4Relations, metamodel), [views, c4Nodes, c4Relations, metamodel])
+  // Only while the search is open: the bar is always there, and on a model
+  // of 21,000 elements asking every view after each change (the live
+  // layout moves elements every frame) held the canvas for seconds.
+  const searching = focused || aiMode || !!aiLast || q !== ''
+  const viewNodeSets = useMemo(() => (searching ? viewNodeSetsOf(views, c4Nodes, c4Relations, metamodel) : NO_VIEW_SETS), [searching, views, c4Nodes, c4Relations, metamodel])
 
   // Pick a stable view to switch into when the user jumps to a node that
   // isn't visible in the active view: the active view if it already
@@ -283,8 +289,11 @@ export function QuickSearch(): React.ReactElement | null {
     },
   }), [c4Nodes, c4Relations, views, sequences, presentations, snapshots, metamodel, viewNodeSets, activeViewId])
 
-  const parsed = useMemo(() => parseSearch(q, searchData), [q, searchData])
-  const suggestions = useMemo(() => (aiMode ? [] : searchSuggestions(q, searchData)), [aiMode, q, searchData])
+  // The letters typed show at once; the results follow when they are found
+  // (a model of 20,000 elements takes a moment), and are for those letters.
+  const shownQ = useDeferredValue(q)
+  const parsed = useMemo(() => parseSearch(shownQ, searchData), [shownQ, searchData])
+  const suggestions = useMemo(() => (aiMode ? [] : searchSuggestions(shownQ, searchData)), [aiMode, shownQ, searchData])
 
   const sections = useMemo<Section[]>(() => {
     if (aiMode) return []
@@ -296,7 +305,7 @@ export function QuickSearch(): React.ReactElement | null {
       })
       return [{ id: 'command', title: 'Commands', count: list.length, items: list.map((command) => ({ key: `cmd:${command.id}`, type: 'command' as const, command })) }]
     }
-    if (!q.trim()) {
+    if (!shownQ.trim()) {
       // The places visited last, newest first, the one shown left out.
       const seen = new Set<string>()
       const items: Item[] = []
@@ -327,18 +336,27 @@ export function QuickSearch(): React.ReactElement | null {
       const items: Item[] = list.slice(0, limit).map((hit) => ({ key: `${kind}:${hit.id}`, type: 'hit', hit }))
       if (list.length > limit && !narrowed) {
         const prefix = KIND_PREFIXES.find((p) => p.kinds.includes(kind))!.prefix
-        items.push({ key: `more:${kind}`, type: 'more', label: `List all ${list.length} ${SECTION_TITLES[kind].toLowerCase()}`, query: `${prefix} ${q.trim()}` })
+        items.push({ key: `more:${kind}`, type: 'more', label: `List all ${list.length} ${SECTION_TITLES[kind].toLowerCase()}`, query: `${prefix} ${shownQ.trim()}` })
       }
       if (kind === 'element' && list.length >= 2) items.push({ key: 'table', type: 'table', count: list.length })
       out.push({ id: kind, title: SECTION_TITLES[kind], count: list.length, items, best: scored(list[0]) })
     }
     return out.sort((a, b) => b.best - a.best)
-  }, [aiMode, parsed, q, searchData, navEntries, navIndex, activeViewId, viewNodeSets, commandOwners]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aiMode, parsed, shownQ, searchData, navEntries, navIndex, activeViewId, viewNodeSets, commandOwners]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const items = useMemo(() => sections.flatMap((sec) => sec.items), [sections])
 
   // Reset hover when the result list shape changes.
   useEffect(() => { setHover(0) }, [q])
+  const pendingEnter = useRef<{ shift: boolean } | null>(null)
+  useEffect(() => {
+    const enter = pendingEnter.current
+    if (!enter || shownQ !== q) return
+    pendingEnter.current = null
+    const r = items[0]
+    if (r) pickItem(r, enter.shift ? null : undefined, enter.shift)
+    else if (q.trim() && !parsed.command && aiConfigured) void runAI(q)
+  }, [shownQ, q, items]) // eslint-disable-line react-hooks/exhaustive-deps
   // The highlighted result stays in sight: ↓ moved it under the list's
   // bottom, and Enter opened a result never seen.
   useEffect(() => {
@@ -540,13 +558,16 @@ export function QuickSearch(): React.ReactElement | null {
         if (q.trim()) void runAI(q)
         return
       }
+      // Enter before the results for the letters typed: it picks from them.
+      if (shownQ !== q) { pendingEnter.current = { shift: e.shiftKey }; return }
       const r = items[hover]
       if (r) pickItem(r, e.shiftKey ? null : undefined, e.shiftKey)
       else if (q.trim() && !parsed.command && aiConfigured) void runAI(q)
-    } else if (e.key === 'Tab' && !e.shiftKey && suggestions.length > 0) {
-      // Tab takes the first suggestion: a prefix, a view, a type, a value.
+    } else if (e.key === 'Tab' && !e.shiftKey && (shownQ === q ? suggestions : searchSuggestions(q, searchData)).length > 0) {
+      // Tab takes the first suggestion: a prefix, a view, a type, a value;
+      // for the letters typed, also before their results are shown.
       e.preventDefault()
-      setQ(suggestions[0].query)
+      setQ((shownQ === q ? suggestions : searchSuggestions(q, searchData))[0].query)
     } else if (e.key === 'Tab' && !e.shiftKey && q.trim() === '' && aiConfigured) {
       // Quick-toggle into AI mode when the input is empty.
       e.preventDefault()

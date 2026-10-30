@@ -35,7 +35,8 @@
       ],
       "exclude": [
         "**/known-issues.spec.ts",
-        "**/bench.spec.ts"
+        "**/bench.spec.ts",
+        "**/scale.spec.ts"
       ]
     }
   },

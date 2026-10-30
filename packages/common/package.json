@@ -31,6 +31,7 @@
     "./formats/mdFolder": "./src/formats/mdFolder.ts",
     "./formats/checksMigration": "./src/formats/checksMigration.ts",
     "./formats/mdFolderSync": "./src/formats/mdFolderSync.ts",
+    "./formats/modelCache": "./src/formats/modelCache.ts",
     "./formats/canvasSelection": "./src/formats/canvasSelection.ts",
     "./formats/forgeRunStatus": "./src/formats/forgeRunStatus.ts",
     "./formats/agentActivity": "./src/formats/agentActivity.ts",

@@ -137,11 +137,21 @@ export interface LinkEnd { id?: string; type: string; label?: string; parentId?:
  *  element of the model or, without an id, one about to be made of its
  *  type in `parentId` (a wizard's relation step before Create), with the
  *  values it is given. */
+/** `nodes` with `node` in place of the one of its id. The rules only look
+ *  elements up by id, so it lies over the model's rather than in a copy of
+ *  them: a table asked this for each row, and copied every element each
+ *  time. */
+function withNode(nodes: Record<string, C4Node>, node: C4Node): Record<string, C4Node> {
+  const out = Object.create(nodes) as Record<string, C4Node>
+  out[node.id] = node
+  return out
+}
+
 export function linkRefusal(ctx: RelationContext, self: LinkEnd, link: WizardLink): string | null {
   const id = self.id && ctx.nodes[self.id] ? self.id : NEW_ELEMENT
   const nodes = id === NEW_ELEMENT
-    ? { ...ctx.nodes, [id]: { ...self.properties, id, type: self.type, label: self.label ?? typeLabel(ctx.metamodel, self.type), parentId: self.parentId } as C4Node }
-    : self.properties ? { ...ctx.nodes, [id]: { ...ctx.nodes[id], ...self.properties } as C4Node } : ctx.nodes
+    ? withNode(ctx.nodes, { ...self.properties, id, type: self.type, label: self.label ?? typeLabel(ctx.metamodel, self.type), parentId: self.parentId } as C4Node)
+    : self.properties ? withNode(ctx.nodes, { ...ctx.nodes[id], ...self.properties } as C4Node) : ctx.nodes
   const rel = link.direction === 'out'
     ? { sourceId: id, targetId: link.otherId, relationType: link.relationType }
     : { sourceId: link.otherId, targetId: id, relationType: link.relationType }

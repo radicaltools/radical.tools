@@ -15,7 +15,9 @@ async function selectionDir(root: string, create: boolean): Promise<string | nul
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     if (!create) return null
-    await mkdir(dir)
+    // Another writer (the folder's cache, written in the background) may
+    // make it first.
+    await mkdir(dir).catch((e: NodeJS.ErrnoException) => { if (e.code !== 'EEXIST') throw e })
   }
   return dir
 }

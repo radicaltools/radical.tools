@@ -145,7 +145,7 @@ export async function exportCommand(args: string[], io: Io): Promise<number> {
     if (values['parent-id'] && !values['space-id'] && !values['page-id']) throw new Error('--parent-id requires --space-id or --page-id.')
     if (!values.publish && (values['space-id'] || values['page-id'] || values['parent-id'] || values.url)) throw new Error('Add --publish to use a Confluence destination, or omit destination options for a local export.')
     const root = await realpath(resolve(io.cwd, positionals[0] ?? '.'))
-    const files = await new MdFolderSession(diskFolderStorage(root)).readAll()
+    const files = await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()
     if (!isValidMdFolderManifest(files['radical.md'])) throw new Error('Not a Radical Markdown model folder: missing or invalid radical.md.')
     const data = deserializeFromMdFolder(files).data
     const views = (data.views ?? []).filter((v) => v.kind === 'wiki')

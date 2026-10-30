@@ -51,7 +51,7 @@ describe('diskFolderStorage', () => {
       expect(names).toEqual(expect.arrayContaining([`A ${round}`, `B ${round}`]))
     }
     // The turn is not kept once the writes are done.
-    expect(await readdir(join(dir, '.radical'))).toEqual(['.gitignore'])
+    expect(await readdir(join(dir, '.radical'))).not.toContain('write.lock')
   })
 
   it('takes over a turn left by a process that is gone', async () => {
@@ -94,5 +94,36 @@ describe('diskFolderStorage', () => {
       await chmod(dir, 0o755)
       await chmod(join(dir, '.radical'), 0o755)
     }
+  })
+  it('keeps the folder in .radical/cache/model.json, opens from it, and writes it again when it is gone', async () => {
+    dir = await mkdtemp(join(tmpdir(), 'radical-cache-'))
+    const data: DiagramData = { nodes: [{ id: 'a', type: 'system', label: 'Shop', x: 0, y: 0, width: 240, height: 140, collapsed: false }], relations: [] }
+    const files = serializeToMdFolder(data, 'Shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(join(dir, path, '..'), { recursive: true })
+      await writeFile(join(dir, path), content)
+    }
+    const open = async () => {
+      const session = new MdFolderSession(diskFolderStorage(dir!))
+      const read = await session.readAll()
+      await session.cacheWritten()
+      return read
+    }
+    expect(await open()).toEqual(files)
+    const cacheFile = join(dir, '.radical', 'cache', 'model.json')
+    const cache = JSON.parse(await readFile(cacheFile, 'utf-8'))
+    expect(Object.keys(cache.files).sort()).toEqual(Object.keys(files).sort())
+    expect(await readdir(join(dir, '.radical', 'cache'))).toEqual(['model.json'])
+
+    // A file whose stamp the cache has comes from the cache, not the disk.
+    const path = Object.keys(files).find((p) => p.startsWith('nodes/'))!
+    cache.files[path].content = 'from the cache'
+    await writeFile(cacheFile, JSON.stringify(cache))
+    expect((await open())[path]).toBe('from the cache')
+
+    // Gone: the folder is read whole, and the cache written again.
+    await rm(join(dir, '.radical', 'cache'), { recursive: true })
+    expect(await open()).toEqual(files)
+    expect(JSON.parse(await readFile(cacheFile, 'utf-8')).files[path].content).toBe(files[path])
   })
 })

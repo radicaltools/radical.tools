@@ -356,6 +356,38 @@ gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
 
+### Dogfooding (2026-10-30): large models
+
+Making Studio usable on a model of 20,000 elements, on a worktree branch:
+
+- The project's MCP server (`radical-architecture`) is bound to the main
+  checkout's `architecture/`, so a worktree branch's model changes went
+  through a stdio script talking to the worktree's own server. A
+  `radical mcp --folder` per worktree in `.mcp.json`, or a tool argument
+  naming the folder, would let an agent edit the branch's model directly.
+- `search_model` has no query for "the scenarios naming tests in this file";
+  finding the test-reference format meant reading another scenario.
+
+Still open after it (measured on radical.tools' own model ×14, see
+`apps/e2e/tests/studio/scale.spec.ts`):
+
+- Placing elements without a place: `makeRoomAround` compares each sibling
+  with every other, so a level with a thousand siblings stays slow
+  (0.3 s for 100 elements under 1,250 root systems).
+- Opening still works out every view's shown elements to trim positions
+  (`withCanvasPositions`, about 1 s once): the cache could keep them.
+- A save serializes the whole model and works out every file's path (about
+  0.4 s at 20,000); a save that serializes only the elements that changed
+  would not.
+- Quick Search: the first letter folds every text (0.4 s); an idle warm-up
+  after opening would hide it.
+- Opening straight from the cache, before listing the files, would save
+  another second at 20,000 files, but is not safe as it stands: Studio's own
+  saves leave the cache behind, and reloading what the poll then finds
+  changed keeps the open canvas's places, so the old places were shown and
+  saved again (it broke `folders.spec.ts`'s drag-during-outside-write test).
+  It needs saves to keep the cache current and a stale open to load afresh.
+
 ### Dogfooding (2026-10-29): sensors apart from the engine
 
 Moving `tests` and `threshold` into `metrics` on this repository's own model:

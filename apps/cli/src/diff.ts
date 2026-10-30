@@ -55,7 +55,7 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
   try {
     const root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
-    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(root)).readAll()).data
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()).data
     const changes = await modelChangesSince(root, data, values.since, { saveBase: values['save-base'] })
     if (values.quiet && values['save-base']) return 0
     if (values['save-base']) io.err(`Saved the base (${changes.base.commit.slice(0, 7)}) to ${folder}/.radical/base.json.`)

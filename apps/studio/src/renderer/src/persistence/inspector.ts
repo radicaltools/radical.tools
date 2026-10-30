@@ -14,6 +14,7 @@ import { checkModel, parseCheckConfig, parseMeasurementStore, parseTestResults, 
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
+import { samePlacesAside } from '@radical/common/model'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
 
@@ -154,7 +155,8 @@ if (typeof window !== 'undefined') {
 
   let timer: ReturnType<typeof setTimeout> | undefined
   useDiagramStore.subscribe((s, prev) => {
-    if (s.c4Nodes === prev.c4Nodes && s.c4Relations === prev.c4Relations && s.views === prev.views
+    // Elements moved (the live layout, every frame) change nothing it checks.
+    if (samePlacesAside(prev.c4Nodes, s.c4Nodes) && s.c4Relations === prev.c4Relations && s.views === prev.views
       && s.sequences === prev.sequences && s.presentations === prev.presentations && s.metamodel === prev.metamodel
       && s.liveBackup === prev.liveBackup) return
     clearTimeout(timer)
@@ -162,7 +164,9 @@ if (typeof window !== 'undefined') {
   })
   // The model of the active document is in, and its folder can be read:
   // read the files beside it now rather than at the next poll.
-  onDocumentLoaded((id) => { if (id === documents.getActiveId()) { recheck(); void poll() } })
+  // The check waits a moment, as after an edit: a model of 21,000 elements
+  // took 0.8 s to check, and the model opened that much later.
+  onDocumentLoaded((id) => { if (id === documents.getActiveId()) { clearTimeout(timer); timer = setTimeout(recheck, RECHECK_MS); void poll() } })
 
 
   setInterval(() => { void poll() }, POLL_MS)

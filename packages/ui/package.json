@@ -14,6 +14,7 @@
     "./store/viewCameras": "./src/store/viewCameras.ts",
     "./store/showInView": "./src/store/showInView.ts",
     "./components/Canvas": "./src/components/Canvas.tsx",
+    "./components/LargeCanvasNotice": "./src/components/LargeCanvasNotice.tsx",
     "./components/WikiView": "./src/components/WikiView.tsx",
     "./components/TableView": "./src/components/TableView.tsx",
     "./components/WarnierView": "./src/components/WarnierView.tsx",

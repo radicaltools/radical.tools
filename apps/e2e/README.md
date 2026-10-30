@@ -35,6 +35,29 @@ folder for the samples and a CPU profile of the last run (open it in Chrome
 DevTools › Performance; build with `npx vite build --config
 vite.web.config.ts --minify false` in `apps/studio` for readable names).
 
+## Benchmark: a large model
+
+`studio/scale` measures what a user waits for on a large model: opening the
+folder (and again from its cache with `SCALE_REOPEN=1`), switching views,
+zoom and pan, each letter typed in Quick Search and in the card, a pick, a
+click and a drag. For each step it reports the long tasks, the frame gaps and
+the input delay of each keystroke and click (Event Timing, as INP measures
+it). It is skipped unless `SCALE_MODEL` names a Markdown model folder;
+`SCALE_COPIES` repeats its elements and relations that many times under fresh
+ids (radical.tools' own model ×14 is 21,000 elements and 40,000 relations).
+
+```bash
+npm run build:web -w radical-model
+SCALE_MODEL=$PWD/architecture SCALE_COPIES=14 SCALE_OUT=/tmp/scale npm run e2e -w @radical/e2e -- tests/studio/scale.spec.ts --project=studio
+```
+
+`SCALE_VIEWS` lists the views to open, `SCALE_CANVAS` the canvas for zoom and
+clicks, `SCALE_QUERY` what is searched, `SCALE_PROFILE=1` writes a CPU profile
+of each step into `SCALE_OUT` (build with `--minify false` for names),
+`SCALE_HEAP=1` measures the heap after each view, `SCALE_REOPEN=1` opens the
+folder again from the cache Studio wrote (`SCALE_NO_CACHE=1`: with it deleted
+first) and `SCALE_ONLY_OPEN=1` stops after opening.
+
 ## What it covers
 
 | Spec | |

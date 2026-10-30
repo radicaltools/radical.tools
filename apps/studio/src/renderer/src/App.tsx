@@ -3,6 +3,7 @@ import { ReactFlowProvider } from 'reactflow'
 import { host } from './platform/host'
 import { Toolbar } from './components/Toolbar'
 import { Canvas } from '@radical/ui/components/Canvas'
+import { LargeCanvasNotice, useOversizedCanvas } from '@radical/ui/components/LargeCanvasNotice'
 import { TreemapView } from './components/TreemapView'
 import { SequenceView } from './components/SequenceView'
 import { TableView } from '@radical/ui/components/TableView'
@@ -71,6 +72,8 @@ function AppInner(): React.ReactElement {
   const isWikiView     = activeViewKind === 'wiki'
   const isWarnierView  = activeViewKind === 'warnier'
   const isCanvasView   = !isTreemapView && !isSequenceView && !isTableView && !isMatrixView && !isWikiView && !isWarnierView
+  // A canvas with more elements than a canvas draws says so instead.
+  const oversized = useOversizedCanvas()
 
   const isPresenting = presentationActive
   const nodeDiscussions = useNodeDiscussions(isPresenting ? undefined : discussionDocumentId)
@@ -145,7 +148,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
       {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
+      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : oversized ? <LargeCanvasNotice view={oversized.view} count={oversized.count} readOnly={!isDesigner} /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (

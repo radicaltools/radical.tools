@@ -76,10 +76,13 @@ export function computeViewCollapsedSet(
   const result = new Set<string>()
   if (!viewFilter) return result
 
-  // Which parents have at least one child in the view?
+  // Which parents have at least one child in the view, and in the model?
   const parentHasViewChild = new Set<string>()
+  const parents = new Set<string>()
   for (const n of Object.values(allNodes)) {
-    if (n.parentId && viewFilter.has(n.id)) parentHasViewChild.add(n.parentId)
+    if (!n.parentId) continue
+    parents.add(n.parentId)
+    if (viewFilter.has(n.id)) parentHasViewChild.add(n.parentId)
   }
 
   for (const [id, n] of Object.entries(allNodes)) {
@@ -89,8 +92,7 @@ export function computeViewCollapsedSet(
     if (parentHasViewChild.has(id)) continue // has visible children
 
     // Check it actually has children in the full model
-    const hasChildInModel = Object.values(allNodes).some(c => c.parentId === id)
-    if (hasChildInModel) result.add(id)
+    if (parents.has(id)) result.add(id)
   }
   return result
 }
