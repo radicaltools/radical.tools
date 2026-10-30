@@ -273,7 +273,7 @@ npx @radicaltools/cli setup</code></pre>
           <li><strong>Requirement</strong> — one thing the system shall do, as an EARS sentence. Pick the pattern (ubiquitous, <em>When…</em>, <em>While…</em>, <em>If…, then…</em>, <em>Where…</em>, complex) and fill the slots, or type the whole sentence and let Studio split it. The subject of the sentence is the element that <em>satisfies</em> the requirement. Each requirement <em>derives from</em> a need.</li>
           <li><strong>Scenario</strong> — an acceptance example in Gherkin: <em>Given</em>, <em>When</em>, <em>Then</em>. It <em>verifies</em> a requirement and names the automated tests that run it, one <code>file › title</code> per line, which <code>radical check</code> looks up.</li>
           <li><strong>ADR</strong> — a decision record with status, date, context, decision, consequences and alternatives. It <em>constrains</em> the elements it governs and <em>supersedes</em> the decision it replaces.</li>
-          <li><strong>Fitness function</strong> — an automated check that the architecture keeps a property: a category and its metrics, the conditions it holds to (a test that has to pass, or a measured value and its threshold). It <em>implements</em> an ADR and <em>constrains</em> the elements it guards.</li>
+          <li><strong>Fitness function</strong> — a check that the architecture keeps a property, classified as <em>Building Evolutionary Architectures</em> does: the characteristic it protects, its scope (atomic or holistic), when it runs (on a pull request, every night, continually, every 90 days), whether a sensor or a person runs it, what to measure, and its metrics, the conditions it holds to (a test that has to pass, or a measured value and its threshold). It <em>implements</em> an ADR and <em>constrains</em> the elements it guards.</li>
         </ul>
         <p>Needs with their requirements read best in a <a href="#view-table">table</a> or <a href="#view-wiki">wiki</a> whose filter follows <em>Refined into</em>, as the sample's <em>Requirements Register</em> does.</p>
       </section>
@@ -908,6 +908,11 @@ api.latency.p95{env=staging} &lt;= baseline + 20%</code></pre>
         <p><code>radical sense</code> runs one adapter and keeps what it measured beside the model, or writes it to a file with <code>--out</code> for the job that runs the check:</p>
 <pre class="code"><code>radical sense command --name workspaces -- node tools/check-workspaces.mjs
 radical sense json k6-summary.json --metric 'api.latency.p95=/metrics/http_req_duration/p(95)@ms' --label env=staging</code></pre>
+        <p>What to run belongs to the fitness function: its <strong>Measure</strong> holds such lines, and its <strong>Cadence</strong> says when. A workflow then only says when it runs, and runs what the model measures:</p>
+<pre class="code"><code>radical sense run --trigger nightly --folder architecture --out reports/metrics
+radical check architecture --metrics reports/metrics --trigger pull-request</code></pre>
+        <p>A fitness function added with a sensor <code>radical sense</code> has is run the next night, with no change to the workflow; <code>--trigger</code> keeps the gate from asking for what runs at night. A manual one is a review a person records, kept in git beside the model:</p>
+<pre class="code"><code>radical sense review "Security review" --passed --by jane --note "threat model of 2.4"</code></pre>
         <p>An adapter for another tool is one module in the radicaltools repository; see <code>radical sense --list</code> for the ones there are. The conditions, adapters and file format are in the <a href="reference.html#metrics">Reference</a>.</p>
         <h3 id="cli-launcher">The launcher</h3>
         <p><code>radical.sh</code> (macOS, Linux) and <code>radical.cmd</code> (Windows) run the CLI where Node.js is missing. Download one into the folder from <a href="https://radical.tools/radical.sh">radical.tools/radical.sh</a> or <a href="https://radical.tools/radical.cmd">radical.tools/radical.cmd</a>.</p>

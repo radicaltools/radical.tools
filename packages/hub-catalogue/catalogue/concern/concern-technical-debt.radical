@@ -734,7 +734,11 @@
       "label": "Every TODO names a key",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script run in lint greps the tracked source files for TODO-like comments and fails on any that does not carry a key in the agreed form, with or without a sunset in brackets before it: TODO (KEY-123): text, or TODO [2027-01-31] (KEY-123): text. A semgrep pattern-regex rule does the same inside semgrep ci.\n\nThreshold: 0 TODO, FIXME, HACK or XXX comments without a register key of the form KEY-123\n\nTool: git grep in a lint step (or semgrep pattern-regex)\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-todos.sh: every TODO/FIXME names a register key, e.g. TODO (SHOP-123): ...\nset -euo pipefail\nbad=$(git grep -nE '\\b(TODO|FIXME|HACK|XXX)\\b' -- ':!node_modules' ':!*.md' ':!scripts/check-todos.sh' \\\n  | grep -vE '\\b(TODO|FIXME|HACK|XXX)\\b( *\\[[^]]+\\])? *\\(([A-Z]+-[0-9]+)\\)' || true)\nif [ -n \"$bad\" ]; then\n  printf 'TODO without a register key (use TODO (KEY-123): text):\\n%s\\n' \"$bad\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "REGISTRY": [
@@ -749,7 +753,11 @@
       "label": "No TODO points at a closed item",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step collects every key from TODO comments and asks the register for the item's state: a DEBT-NNNN key is looked up as docs/debt/NNNN-*.md and its front-matter status must not be repaid; any other key is an issue of the repository (SHOP-123 is issue 123) read with gh and must be open. For Jira, the issue lookup is GET /rest/api/3/issue/KEY?fields=status with curl, as the commented line shows.\n\nThreshold: 0 TODO comments whose issue is closed or whose debt record is marked repaid; the build fails on the first\n\nTool: gh api and grep in a CI step; curl for Jira\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-todo-items.sh: a TODO (SHOP-123) points at an open issue; a TODO (DEBT-0042) at a record not yet repaid\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-acme/shop}\nstale=0\nfor key in $(git grep -ohE '\\b(TODO|FIXME|HACK|XXX)\\b[^(]*\\(([A-Z]+-[0-9]+)\\)' -- ':!node_modules' | grep -oE '[A-Z]+-[0-9]+' | sort -u); do\n  case \"$key\" in\n    DEBT-*)\n      record=$(ls docs/debt/\"${key#DEBT-}\"-*.md 2>/dev/null | head -1)\n      if [ -z \"$record\" ]; then echo \"TODO ($key): no record docs/debt/${key#DEBT-}-*.md\"; stale=1\n      elif grep -qE '^status: *repaid' \"$record\"; then echo \"TODO ($key): record is repaid\"; stale=1; fi;;\n    *)\n      state=$(gh api \"repos/$REPO/issues/${key##*-}\" --jq .state 2>/dev/null || echo missing)\n      # Jira: state=$(curl -sf -u \"$JIRA_USER:$JIRA_TOKEN\" \"$JIRA_URL/rest/api/3/issue/$key?fields=status\" | jq -r .fields.status.statusCategory.key)  # \"done\" = closed\n      if [ \"$state\" != \"open\" ]; then echo \"TODO ($key): issue is $state\"; stale=1; fi;;\n  esac\ndone\nexit $stale\n```",
       "hubWhen": {
         "REGISTRY": [
@@ -764,7 +772,11 @@
       "label": "Debt issues are complete",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job lists the open issues labelled tech-debt and fails on one without an assignee or whose body lacks the Cost or Consequence heading that the issue form writes; the form itself (.github/ISSUE_TEMPLATE/tech-debt.yml with required fields) keeps a new item from being opened without them. With Jira the same is a JQL filter on labels = tech-debt AND assignee is EMPTY, plus the required custom fields.\n\nThreshold: 0 open issues labelled tech-debt without an assignee, a Cost section or a Consequence section\n\nTool: gh issue list in a scheduled job; a JQL filter for Jira\n\n```bash\n#!/usr/bin/env bash\n# scripts/debt-issues.sh: weekly; every open debt item has an owner, a cost and a consequence\nset -euo pipefail\nbad=$(gh issue list --label tech-debt --state open --limit 500 --json number,assignees,body --jq '\n  .[] | select((.assignees | length) == 0 or (.body | test(\"### Cost\") | not) or (.body | test(\"### Consequence\") | not))\n      | \"#\\(.number)\"')\n[ -z \"$bad\" ] || { echo \"debt items without owner, cost or consequence:\"; echo \"$bad\"; exit 1; }\n# .github/ISSUE_TEMPLATE/tech-debt.yml: labels: [tech-debt]; body: textarea \"Cost\" (required), textarea \"Consequence\" (required)\n```",
       "hubWhen": {
         "REGISTRY": [
@@ -778,7 +790,11 @@
       "label": "Debt records are complete and not past sunset",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test in the unit suite parses the front matter of every record in docs/debt (copied from the template there) and fails on a missing owner, date or status, a cost of 0 or none, a missing Consequences heading, or a record not marked repaid whose sunset date has passed. An unquoted date is parsed by gray-matter as a Date object, so the test normalises it.\n\nThreshold: 0 records in docs/debt without owner, cost_days, date, status and a Consequences section; 0 records not marked repaid with a sunset in the past\n\nTool: Vitest with gray-matter; pytest with python-frontmatter for Python\n\n```ts\nimport { readFileSync, readdirSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst files = readdirSync('docs/debt').filter((f) => /^\\d{4}-.*\\.md$/.test(f))\nconst iso = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? ''))\n\nit.each(files)('%s has an owner, a cost, a date, a status, consequences and a live sunset', (file) => {\n  const { data, content } = matter(readFileSync(`docs/debt/${file}`, 'utf8'))\n  expect(data.owner, 'owner').toBeTruthy()\n  expect(Number(data.cost_days), 'cost_days').toBeGreaterThan(0)\n  expect(iso(data.date), 'date').toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)\n  expect(['open', 'accepted', 'repaid'], 'status').toContain(data.status)\n  expect(content).toMatch(/^## Consequences/m)\n  if (data.status !== 'repaid' && data.sunset) expect(Date.parse(iso(data.sunset)), 'sunset has passed').toBeGreaterThan(Date.now())\n})\n```",
       "hubWhen": {
         "REGISTRY": [
@@ -792,7 +808,11 @@
       "label": "Debt ratio in the quality gate, every issue owned",
       "x": 1040,
       "y": 520,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The project's quality gate carries the conditions new_sqale_debt_ratio > {{MAX_DEBT_RATIO_PCT}} and new_maintainability_rating > 1 (worse than A) as errors, added once through the API (or in the gate's settings page), and the pipeline waits for the gate with sonar.qualitygate.wait=true so that a failed gate fails the build. A weekly job asks the issues API for open, unresolved issues without an assignee and fails when there are any.\n\nThreshold: Technical debt ratio on new code at most {{MAX_DEBT_RATIO_PCT}}% and maintainability rating A on new code as quality-gate conditions; 0 open issues without an assignee in the weekly check\n\nTool: SonarQube web API (api/qualitygates, api/issues) with curl and jq\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n# once, for the gate the project uses (gateId from api/qualitygates/list; SonarCloud: the same API under sonarcloud.io with organization=)\ncurl -sf -u \"$SONAR_TOKEN:\" -X POST \"$SONAR_URL/api/qualitygates/create_condition\" \\\n  -d gateId=\"$GATE_ID\" -d metric=new_sqale_debt_ratio -d op=GT -d error={{MAX_DEBT_RATIO_PCT}}\ncurl -sf -u \"$SONAR_TOKEN:\" -X POST \"$SONAR_URL/api/qualitygates/create_condition\" \\\n  -d gateId=\"$GATE_ID\" -d metric=new_maintainability_rating -d op=GT -d error=1   # worse than A fails\n# sonar-project.properties, so that the pipeline fails when the gate does:\n#   sonar.newCode.referenceBranch=main\n#   sonar.qualitygate.wait=true\n# weekly: every open issue has an owner\nunassigned=$(curl -sf -u \"$SONAR_TOKEN:\" \"$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&resolved=false&assigned=false&ps=1\" | jq '.total')\n[ \"$unassigned\" -eq 0 ] || { echo \"$unassigned open issues without an owner\"; exit 1; }\n```",
       "hubWhen": {
         "REGISTRY": [
@@ -806,7 +826,11 @@
       "label": "Repayment share reported",
       "x": 1040,
       "y": 650,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "14d",
+      "invocation": "automated",
       "description": "A scheduled job at the end of each iteration counts the pull requests merged since the iteration started and those among them labelled tech-debt (the label every register variant puts on a repayment), prints the share with the number of open items (issues labelled tech-debt, open records in docs/debt, or unresolved Sonar issues, one line each), and, where a fixed share is agreed, fails below it so that the retrospective sees it. With Jira as the tracker the open count comes from JQL: labels = tech-debt AND resolution = Unresolved.\n\nThreshold: The share of pull requests merged in the iteration that carry the label tech-debt is reported with the register's size; with a fixed share, it is at least {{DEBT_SHARE_PCT}}%\n\nTool: gh pr list in a scheduled job (plus the register's own count)\n\n```bash\n#!/usr/bin/env bash\n# scripts/debt-share.sh [iteration-start YYYY-MM-DD]\nset -euo pipefail\nSINCE=${1:-$(date -d '14 days ago' +%F 2>/dev/null || date -v-14d +%F)}\nMIN=\"${DEBT_SHARE_PCT:-0}\"   # with a fixed share the job sets DEBT_SHARE_PCT={{DEBT_SHARE_PCT}}; 0 = report only\nall=$(gh pr list --state merged --search \"merged:>=$SINCE\" --limit 500 --json number --jq length)\ndebt=$(gh pr list --state merged --label tech-debt --search \"merged:>=$SINCE\" --limit 500 --json number --jq length)\nopen=$(gh issue list --state open --label tech-debt --limit 500 --json number --jq length)   # issues as the register\n# open=$(grep -L '^status: *repaid' docs/debt/[0-9]*.md | wc -l)                                 # records as the register\n# open=$(curl -sf -u \"$SONAR_TOKEN:\" \"$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&resolved=false&ps=1\" | jq .total)   # Sonar\nshare=$(( debt * 100 / (all > 0 ? all : 1) ))\necho \"since $SINCE: $debt of $all merged pull requests repaid debt ($share%), $open debt items open\"\n[ \"$share\" -ge \"$MIN\" ] || { echo \"below the agreed $MIN%\"; exit 1; }\n```"
     },
     {
@@ -815,7 +839,11 @@
       "label": "Repayment windows scheduled and kept",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test in the unit suite reads debt-windows.json ([{ \"quarter\": \"2026-Q4\", \"start\": \"2026-11-16\", \"end\": \"2026-11-20\", \"pickedOn\": \"2026-10-30\", \"items\": [\"SHOP-123\", \"DEBT-0042\"] }]) and fails when the current quarter has no window, the window is shorter than {{WINDOW_DAYS_PER_QUARTER}} working days, or its items were picked fewer than 14 days before it; a scheduled job on the day after each window lists the pull requests merged during it and fails on one without the tech-debt label.\n\nThreshold: debt-windows.json holds for the current quarter a window of at least {{WINDOW_DAYS_PER_QUARTER}} working days with its items picked at least 14 days before it starts; 0 pull requests merged during a window without the tech-debt label\n\nTool: Vitest (a test over debt-windows.json) with a gh pr list step\n\n```ts\n// test/debt-windows.test.ts\nimport { expect, it } from 'vitest'\nimport windows from '../debt-windows.json'\n\nconst MIN_DAYS = {{WINDOW_DAYS_PER_QUARTER}}\nconst now = new Date()\nconst quarter = `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`\nconst workingDays = (from: string, to: string): number => {\n  let n = 0\n  for (const d = new Date(from); d <= new Date(to); d.setDate(d.getDate() + 1)) if (d.getDay() >= 1 && d.getDay() <= 5) n++\n  return n\n}\n\nit(`${quarter} has a repayment window of at least ${MIN_DAYS} working days, picked 14 days ahead`, () => {\n  const w = windows.find((x) => x.quarter === quarter)\n  expect(w, `no window for ${quarter} in debt-windows.json`).toBeTruthy()\n  expect(workingDays(w!.start, w!.end), 'window too short').toBeGreaterThanOrEqual(MIN_DAYS)\n  expect((Date.parse(w!.start) - Date.parse(w!.pickedOn)) / 86_400_000, 'items picked too late').toBeGreaterThanOrEqual(14)\n  expect(w!.items.length, 'no items picked').toBeGreaterThan(0)\n})\n// the day after a window: gh pr list --state merged --search \"merged:$START..$END -label:tech-debt\" --json number --jq 'length == 0' || exit 1\n```",
       "hubWhen": {
         "BUDGET": [
@@ -829,7 +857,11 @@
       "label": "Touched files do not get worse",
       "x": 1040,
       "y": 910,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A pull-request step lints the modified files on the head and, in a temporary worktree, on the base branch, and fails when the count of findings grew; new files are covered by the quality gate's own conditions. ESLint exits 1 whenever a file has an error-level finding, so each run ends in || true and the JSON (complete on exit 1) is counted. With SonarQube the same is a gate condition on new code; this script needs no platform.\n\nThreshold: In every pull request the lint findings (errors and warnings) of the files it modifies are at most what they were on the base branch\n\nTool: ESLint in a pull-request step (git worktree); ruff --output-format json for Python\n\n```bash\n#!/usr/bin/env bash\n# scripts/findings-do-not-grow.sh: lint findings in modified files, head vs base (checkout with fetch-depth: 0)\nset -euo pipefail\nBASE=${BASE_REF:-origin/main}\nfiles=$(git diff --name-only --diff-filter=M \"$BASE...HEAD\" -- '*.ts' '*.tsx')\n[ -z \"$files\" ] && exit 0\ncount() { (npx eslint --no-error-on-unmatched-pattern --format json $files || true) | jq '[.[] | .errorCount + .warningCount] | add // 0'; }\nafter=$(count)\ngit worktree add -q \"$RUNNER_TEMP/base\" \"$BASE\"\nbefore=$(cd \"$RUNNER_TEMP/base\" && npm ci --silent && count)\ngit worktree remove --force \"$RUNNER_TEMP/base\"\necho \"findings in touched files: $before -> $after\"\n[ \"$after\" -le \"$before\" ] || { echo 'touched files got worse; leave them at least as clean'; exit 1; }\n```",
       "hubWhen": {
         "BUDGET": [
@@ -843,7 +875,11 @@
       "label": "Every deprecation names a replacement and a key",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script run in lint greps the tracked source files for deprecation markers and fails on one whose text (the rest of the line) does not name a register key and a replacement (\"use OrdersV2Client\"); endpoints are covered by the Deprecation header test of the sunset variant and by the handler that writes it.\n\nThreshold: 0 @deprecated, [Obsolete( or warnings.deprecated( markers whose text lacks a register key (KEY-123) or the word \"use\" naming the replacement\n\nTool: git grep in a lint step\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-deprecations.sh: @deprecated use <replacement>: <reason> (KEY-123)\nset -euo pipefail\nbad=$(git grep -nE '@deprecated|\\[Obsolete\\(|warnings\\.deprecated\\(' -- ':!node_modules' ':!*.md' ':!scripts/check-deprecations.sh' \\\n  | grep -vE '\\(([A-Z]+-[0-9]+)\\)' ; git grep -nE '@deprecated|\\[Obsolete\\(|warnings\\.deprecated\\(' -- ':!node_modules' ':!*.md' ':!scripts/check-deprecations.sh' \\\n  | grep -viE '\\buse [A-Za-z_.]' ; true)\nif [ -n \"$bad\" ]; then\n  printf 'deprecation markers without a register key or a replacement (\"use X\"):\\n%s\\n' \"$bad\"\n  exit 1\nfi\n```"
     },
     {
@@ -852,7 +888,11 @@
       "label": "Dated TODOs expire in the lint",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Deprecated code carries its sunset as a dated TODO beside the @deprecated marker, TODO [2027-01-31] (KEY-123): remove, and unicorn/expiring-todo-comments turns the comment into a lint error the day after the date; allowWarningComments stays true so that an undated, keyed TODO is not an error here (the key rule governs it). For other languages the sunset script of this pack catches the same expired dates by grep.\n\nThreshold: 0 TODO comments with a date in brackets whose date has passed; a TODO without a date is left to the key rule\n\nTool: ESLint with eslint-plugin-unicorn (expiring-todo-comments); the sunset grep script elsewhere\n\n```js\n// eslint.config.js\nimport unicorn from 'eslint-plugin-unicorn'\n\nexport default [{\n  plugins: { unicorn },\n  rules: {\n    'unicorn/expiring-todo-comments': ['error', {\n      allowWarningComments: true,      // a TODO without a date is the key rule's business, not an error here\n      checkDatesOnPullRequests: true,  // dates fail on pull requests too\n      terms: ['todo', 'fixme'],\n    }],\n  },\n}]\n// in the code:\n// /** @deprecated use OrdersV2Client: v1 has no idempotency keys (SHOP-123). TODO [2027-01-31] (SHOP-123): remove v1 */\n```",
       "hubWhen": {
         "DEPRECATION": [
@@ -866,7 +906,11 @@
       "label": "Sunsets give notice and are kept",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A pull-request script greps every TODO [YYYY-MM-DD] in the tracked files (any language) and fails on one whose date has passed, then reads the lines the pull request added and fails on a new dated TODO whose date is inside the grace period, so a sunset cannot be set too close to be noticed.\n\nThreshold: 0 dated TODOs in the tree whose date has passed; 0 dated TODOs added by the pull request with a date fewer than {{SUNSET_GRACE_DAYS}} days ahead\n\nTool: git grep and git diff in a pull-request step (GNU date)\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-sunsets.sh: expired sunsets fail; a new sunset gives at least the grace period (checkout with fetch-depth: 0)\nset -euo pipefail\nGRACE={{SUNSET_GRACE_DAYS}}\ntoday=$(date -u +%F); soonest=$(date -u -d \"$GRACE days\" +%F); bad=0\nwhile IFS= read -r line; do\n  d=$(grep -oE '\\[[0-9]{4}-[0-9]{2}-[0-9]{2}\\]' <<< \"$line\" | tr -d '[]')\n  if [ \"$d\" \\< \"$today\" ]; then echo \"sunset passed: $line\"; bad=1; fi\ndone < <(git grep -nE '\\b(TODO|FIXME)\\b *\\[[0-9]{4}-[0-9]{2}-[0-9]{2}\\]' -- ':!node_modules' ':!*.md' || true)\nwhile IFS= read -r line; do\n  d=$(grep -oE '\\[[0-9]{4}-[0-9]{2}-[0-9]{2}\\]' <<< \"$line\" | tr -d '[]')\n  if [ \"$d\" \\< \"$soonest\" ]; then echo \"sunset inside the $GRACE-day grace period: $line\"; bad=1; fi\ndone < <(git diff \"origin/${GITHUB_BASE_REF:-main}...HEAD\" -- . ':!*.md' | grep -E '^\\+' | grep -E '\\b(TODO|FIXME)\\b *\\[[0-9]{4}-[0-9]{2}-[0-9]{2}\\]' || true)\nexit $bad\n```",
       "hubWhen": {
         "DEPRECATION": [
@@ -880,7 +924,11 @@
       "label": "Deprecated endpoints announce their sunset",
       "x": 1040,
       "y": 1430,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The edge keeps the deprecated routes in one list (path, deprecated-since, sunset) from which the handler writes the Deprecation (RFC 9745) and Sunset (RFC 8594) headers; an integration test calls each listed route and asserts both headers, that the sunset has not passed, and that it gives at least {{SUNSET_GRACE_DAYS}} days from the deprecation date.\n\nThreshold: Every route in the deprecated-routes list answers with a Deprecation header and a Sunset header whose date is in the future and at least {{SUNSET_GRACE_DAYS}} days after the deprecation date\n\nTool: Vitest with supertest; the same test with httpx under pytest for Python\n\n```ts\n// test/http/sunset-headers.test.ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\nimport { DEPRECATED_ROUTES } from '../../src/http/deprecated-routes'   // [{ path: '/v1/orders', since: '2026-10-01', sunset: '2027-01-31', key: 'SHOP-123' }]\n\nconst GRACE = {{SUNSET_GRACE_DAYS}}\n\nit.each(DEPRECATED_ROUTES)('$path announces its deprecation and sunset', async (route) => {\n  const res = await request(app).get(route.path)\n  expect(res.headers['deprecation'], 'Deprecation header').toBeTruthy()\n  const sunset = Date.parse(res.headers['sunset'])\n  expect(sunset, 'Sunset header is a date').not.toBeNaN()\n  expect(sunset, `${route.path} is past its sunset: remove it (${route.key})`).toBeGreaterThan(Date.now())\n  expect((sunset - Date.parse(route.since)) / 86_400_000, 'sunset gives the grace period').toBeGreaterThanOrEqual(GRACE)\n})\n```",
       "hubWhen": {
         "DEPRECATION": [
@@ -894,7 +942,11 @@
       "label": "No new calls to deprecated code",
       "x": 1040,
       "y": 1560,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Lint fails on a call to or import of anything marked @deprecated, using type information so that re-exports and overloads count too; an existing call is tolerated only with a line disable whose description names the register key (the Code quality gate's require-description rule makes the description mandatory). On the JVM the same is javac -Xlint:deprecation -Werror; in .NET, CS0618 as an error in the project file.\n\nThreshold: 0 calls to code marked @deprecated without a line-level disable naming a register key\n\nTool: typescript-eslint (@typescript-eslint/no-deprecated); javac -Xlint:deprecation for the JVM\n\n```js\n// eslint.config.js\nimport tseslint from 'typescript-eslint'\n\nexport default tseslint.config({\n  files: ['src/**/*.ts', 'src/**/*.tsx'],\n  languageOptions: { parserOptions: { projectService: true } },\n  rules: { '@typescript-eslint/no-deprecated': 'error' },\n})\n// a tolerated existing call names its debt item:\n// // eslint-disable-next-line @typescript-eslint/no-deprecated -- SHOP-123, goes with the v1 sunset\n```"
     },
     {
@@ -903,7 +955,11 @@
       "label": "Legacy reached only through the facade",
       "x": 1040,
       "y": 1690,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A dependency rule fails the build when any module outside the legacy code and the facade imports the legacy code directly, so that new code grows only on the new side and the old module can be deleted piece by piece. On the JVM an ArchUnit rule noClasses().that().resideOutsideOfPackages(\"..legacy..\", \"..facade..\").should().dependOnClassesThat().resideInAPackage(\"..legacy..\") does the same.\n\nThreshold: 0 imports of src/legacy from outside src/legacy and src/facade\n\nTool: dependency-cruiser; ArchUnit for the JVM\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'legacy-only-through-facade',\n    comment: 'ADR Strangler fig: new code calls the facade; the legacy module is reached only through it',\n    severity: 'error',\n    from: { pathNot: '^src/(legacy|facade)/' },\n    to: { path: '^src/legacy/' },\n  }],\n  options: { tsConfig: { fileName: 'tsconfig.json' } },\n}\n```",
       "hubWhen": {
         "REWRITE": [
@@ -917,7 +973,11 @@
       "label": "A rewrite has an accepted case",
       "x": 1040,
       "y": 1820,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Rewrite cases are ADRs with kind: rewrite in their front matter. A test in the unit suite fails on a rewrite ADR that is not accepted by at least two owners or lacks one of the required sections; a pull-request step on a pull request labelled rewrite reads the docs/adr path from its description and fails unless that file has kind rewrite and status accepted.\n\nThreshold: Every ADR of kind rewrite has status accepted, at least 2 names in accepted_by and the sections Cost, Risks, Parity criteria and Cut-over; 0 pull requests labelled rewrite whose description links no such ADR\n\nTool: Vitest with gray-matter (plus a gh pr view step)\n\n```ts\nimport { readFileSync, readdirSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst SECTIONS = ['## Cost', '## Risks', '## Parity criteria', '## Cut-over']\nconst rewrites = readdirSync('docs/adr').filter((f) => f.endsWith('.md'))\n  .map((f) => ({ f, ...matter(readFileSync(`docs/adr/${f}`, 'utf8')) }))\n  .filter(({ data }) => data.kind === 'rewrite')\n\nit.each(rewrites)('$f is an accepted rewrite case', ({ data, content }) => {\n  expect(data.status).toBe('accepted')\n  expect(data.accepted_by?.length ?? 0, 'owners who accepted it').toBeGreaterThanOrEqual(2)\n  for (const s of SECTIONS) expect(content, s).toContain(s)\n})\n// pull-request step, when the pull request carries the label rewrite:\n//   adr=$(gh pr view \"$PR\" --json body --jq .body | grep -oE 'docs/adr/[0-9]{4}-[a-z0-9-]+\\.md' | head -1)\n//   [ -n \"$adr\" ] && grep -qE '^kind: *rewrite' \"$adr\" && grep -qE '^status: *accepted' \"$adr\" || { echo \"link an accepted rewrite ADR\"; exit 1; }\n```",
       "hubWhen": {
         "REWRITE": [
@@ -931,7 +991,11 @@
       "label": "Old debt issues are escalated",
       "x": 1040,
       "y": 1950,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job lists open debt issues older than {{MAX_DEBT_AGE_DAYS}} days that carry neither escalated nor accepted-debt and fails naming them, so that the run shows red until each is escalated, scheduled or closed as accepted. With Jira the same is JQL: labels = tech-debt AND created <= -{{MAX_DEBT_AGE_DAYS}}d AND labels not in (escalated, accepted-debt) AND resolution = Unresolved.\n\nThreshold: 0 open issues labelled tech-debt older than {{MAX_DEBT_AGE_DAYS}} days without the label escalated or accepted-debt\n\nTool: gh issue list in a scheduled job; a JQL filter for Jira\n\n```bash\n#!/usr/bin/env bash\n# scripts/debt-age.sh: weekly\nset -euo pipefail\nexport MAX={{MAX_DEBT_AGE_DAYS}}\nold=$(gh issue list --label tech-debt --state open --limit 500 --json number,title,createdAt,labels --jq '\n  .[] | select((now - (.createdAt | fromdateiso8601)) > (env.MAX | tonumber) * 86400)\n      | select(any(.labels[].name; . == \"escalated\" or . == \"accepted-debt\") | not)\n      | \"#\\(.number) \\(.title) (opened \\(.createdAt[:10]))\"')\nif [ -n \"$old\" ]; then\n  printf 'debt items older than %s days without a decision:\\n%s\\n' \"$MAX\" \"$old\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "AGE": [
@@ -948,7 +1012,11 @@
       "label": "Old debt records are escalated",
       "x": 1040,
       "y": 2080,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test in the unit suite reads the front matter of every record in docs/debt and fails on one still open (not accepted, not repaid) whose date is older than {{MAX_DEBT_AGE_DAYS}} days and which is not marked escalated: true; marking it accepted with the reason in the record, or repaid, is the way out.\n\nThreshold: 0 records in docs/debt with status open and a date older than {{MAX_DEBT_AGE_DAYS}} days without escalated: true in the front matter\n\nTool: Vitest with gray-matter; pytest with python-frontmatter for Python\n\n```ts\nimport { readFileSync, readdirSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst MAX_DAYS = {{MAX_DEBT_AGE_DAYS}}\nconst files = readdirSync('docs/debt').filter((f) => /^\\d{4}-.*\\.md$/.test(f))\nconst iso = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? ''))\n\nit.each(files)('%s is repaid, accepted, escalated or young', (file) => {\n  const { data } = matter(readFileSync(`docs/debt/${file}`, 'utf8'))\n  if (data.status !== 'open' || data.escalated === true) return\n  const age = (Date.now() - Date.parse(iso(data.date))) / 86_400_000\n  expect(age, `${file} (owner ${data.owner}) is ${Math.floor(age)} days old: escalate, schedule or accept it`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
       "hubWhen": {
         "AGE": [
@@ -965,7 +1033,11 @@
       "label": "Old Sonar issues are escalated",
       "x": 1040,
       "y": 2210,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job asks the issues API for unresolved issues created before the limit and fails on those without the tag escalated or accepted-debt (tags are set on the issue in the platform); accepting an issue as won't fix with a reason resolves it and takes it out of the list.\n\nThreshold: 0 unresolved issues created more than {{MAX_DEBT_AGE_DAYS}} days ago without the tag escalated or accepted-debt\n\nTool: SonarQube web API (api/issues/search) with curl and jq\n\n```bash\n#!/usr/bin/env bash\n# weekly: unresolved issues older than the limit carry an escalation or acceptance tag\nset -euo pipefail\nbefore=$(date -u -d '{{MAX_DEBT_AGE_DAYS}} days ago' +%F 2>/dev/null || date -u -v-{{MAX_DEBT_AGE_DAYS}}d +%F)\nold=$(curl -sf -u \"$SONAR_TOKEN:\" \"$SONAR_URL/api/issues/search?componentKeys=$PROJECT_KEY&resolved=false&createdBefore=$before&ps=500\" \\\n  | jq -r '.issues[] | select((.tags | index(\"escalated\") == null) and (.tags | index(\"accepted-debt\") == null)) | \"\\(.key) \\(.creationDate[:10]) \\(.message)\"')\n[ -z \"$old\" ] || { echo \"issues older than {{MAX_DEBT_AGE_DAYS}} days without a decision:\"; echo \"$old\"; exit 1; }\n```",
       "hubWhen": {
         "AGE": [

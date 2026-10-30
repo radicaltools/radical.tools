@@ -774,7 +774,11 @@
       "label": "SAMM assessment current and on target",
       "x": 1040,
       "y": 0,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "A scheduled job, and every pull request that changes security/samm/, reads the assessment copied from the SAMM Toolbox's Scorecard and fails on a stale date, a missing practice, a target below the floor, or a practice below its target after its date. The file is a format of this pack: the Toolbox is a workbook with no machine-readable export, so the Scorecard's practice scores are copied into it after each assessment.\n\nThreshold: The assessment is at most {{ASSESSMENT_MONTHS}} months old; all 15 practices have a score from 0 to 3 and a target from {{SAMM_FLOOR}} to 3; 0 practices below target after their date\n\nTool: Node.js with js-yaml (scripts/security/samm-check.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/samm-check.mjs; security/samm/assessment.yaml looks like:\n//   assessed: 2026-09-15\n//   practices: { G-SM: { score: 1.5, target: 2, by: 2027-06-30 }, G-PC: { ... }, ... }\nimport { readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst PRACTICES = ['G-SM', 'G-PC', 'G-EG', 'D-TA', 'D-SR', 'D-SA', 'I-SB', 'I-SD', 'I-DM', 'V-AA', 'V-RT', 'V-ST', 'O-IM', 'O-EM', 'O-OM']\nconst MONTHS = {{ASSESSMENT_MONTHS}}, FLOOR = {{SAMM_FLOOR}}\nconst a = yaml.load(readFileSync('security/samm/assessment.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst oldest = new Date(); oldest.setMonth(oldest.getMonth() - MONTHS)\nconst errors = []\nif (!(new Date(a.assessed) >= oldest)) errors.push(`assessment of ${a.assessed} is older than ${MONTHS} months`)\nfor (const id of PRACTICES) {\n  const p = a.practices?.[id]\n  if (!p) { errors.push(`${id}: no score`); continue }\n  if (!(p.score >= 0 && p.score <= 3)) errors.push(`${id}: score ${p.score} is not from 0 to 3`)\n  if (!(p.target >= FLOOR && p.target <= 3)) errors.push(`${id}: target ${p.target} is not from ${FLOOR} to 3`)\n  if (p.score < p.target && !(new Date(p.by) > new Date())) errors.push(`${id}: ${p.score} is below its target ${p.target}, due ${p.by ?? 'on no date'}`)\n}\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "FRAMEWORK": [
@@ -788,7 +792,11 @@
       "label": "SSDF evidence map complete",
       "x": 1040,
       "y": 130,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A scheduled job, and every pull request, reads security/ssdf/evidence.yaml and fails on a missing practice id, a practice with neither evidence nor a reason, a repository path that no longer exists (a renamed workflow), or a stale review date. Links outside the repository must be https links; whether they still show what they claim is the reviewer's part. When SSDF 1.2 is final, PO.6 and PW.10 are added to the list.\n\nThreshold: All 19 SSDF 1.1 practice ids have at least one piece of evidence or a reason; 0 repository paths in the map missing; the map reviewed within {{ASSESSMENT_MONTHS}} months\n\nTool: Node.js with js-yaml (scripts/security/ssdf-check.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/ssdf-check.mjs; security/ssdf/evidence.yaml looks like:\n//   reviewed: 2026-09-20\n//   practices: { PO.1: [docs/security/requirements.md], PO.2: [security/champions.yaml], PW.6: { na: \"interpreted code, no compiler\" } }\nimport { existsSync, readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst IDS = ['PO.1', 'PO.2', 'PO.3', 'PO.4', 'PO.5', 'PS.1', 'PS.2', 'PS.3', 'PW.1', 'PW.2', 'PW.4', 'PW.5', 'PW.6', 'PW.7', 'PW.8', 'PW.9', 'RV.1', 'RV.2', 'RV.3']\nconst MONTHS = {{ASSESSMENT_MONTHS}}\nconst map = yaml.load(readFileSync('security/ssdf/evidence.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst oldest = new Date(); oldest.setMonth(oldest.getMonth() - MONTHS)\nconst errors = []\nif (!(new Date(map.reviewed) >= oldest)) errors.push(`evidence map last reviewed ${map.reviewed}, more than ${MONTHS} months ago`)\nfor (const id of IDS) {\n  const e = map.practices?.[id]\n  if (e?.na) continue\n  if (!Array.isArray(e) || !e.length) { errors.push(`${id}: no evidence and no reason`); continue }\n  for (const link of e) {\n    if (/^https?:/.test(link) ? !link.startsWith('https://') : !existsSync(link)) errors.push(`${id}: ${link} does not exist or is not https`)\n  }\n}\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "FRAMEWORK": [
@@ -802,7 +810,11 @@
       "label": "SDL checklist complete and reviewed",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "A scheduled job, and every pull request, reads security/sdl/checklist.yaml, whose keys are this pack's short names for the ten practices on Microsoft's SDL page in the page's order, and fails on a missing practice, an unsupported status or a stale review date.\n\nThreshold: All 10 SDL practices present; each done or partial item has evidence, each partial item says what is missing, each not-applicable item a reason; reviewed within {{ASSESSMENT_MONTHS}} months\n\nTool: Node.js with js-yaml (scripts/security/sdl-check.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/sdl-check.mjs; security/sdl/checklist.yaml looks like:\n//   reviewed: 2026-09-20\n//   practices: { threat-modeling: { status: partial, evidence: [docs/threat-model.md], missing: \"the admin UI\" }, ... }\nimport { existsSync, readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst PRACTICES = ['standards-governance', 'proven-features', 'threat-modeling', 'cryptography', 'supply-chain',\n  'engineering-environment', 'security-testing', 'platform-security', 'monitoring-response', 'training']\nconst MONTHS = {{ASSESSMENT_MONTHS}}\nconst list = yaml.load(readFileSync('security/sdl/checklist.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst oldest = new Date(); oldest.setMonth(oldest.getMonth() - MONTHS)\nconst errors = []\nif (!(new Date(list.reviewed) >= oldest)) errors.push(`checklist last reviewed ${list.reviewed}`)\nfor (const id of PRACTICES) {\n  const p = list.practices?.[id] ?? {}\n  if (p.status === 'not-applicable') { if (!p.reason) errors.push(`${id}: not applicable without a reason`); continue }\n  if (!['done', 'partial'].includes(p.status)) { errors.push(`${id}: status is ${p.status}`); continue }\n  if (!p.evidence?.length || p.evidence.some((e) => !e.startsWith('https://') && !existsSync(e))) errors.push(`${id}: evidence missing`)\n  if (p.status === 'partial' && !p.missing) errors.push(`${id}: partial without saying what is missing`)\n}\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "FRAMEWORK": [
@@ -816,7 +828,11 @@
       "label": "A champion named for each team",
       "x": 1040,
       "y": 390,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job reads security/champions.yaml and the teams named in .github/CODEOWNERS, asks GitHub for the members of each team and of the champions' team, and fails naming a team without a champion, a champion who has left their team or the champions' team, or one with fewer hours than decided. With collective ownership (no CODEOWNERS), the teams listed in the file are checked.\n\nThreshold: 0 teams in CODEOWNERS without a champion in security/champions.yaml; every champion a member of their team and of {{SECURITY_TEAM}}, with at least {{CHAMPION_HOURS}} hours a week\n\nTool: Node.js with js-yaml and the GitHub CLI (gh api orgs/{org}/teams/{team_slug}/members, a token with read access to the organisation's members)\n\n```js\n// scripts/security/champions-check.mjs; security/champions.yaml: { teams: { order-team: { champion: alice, hours: 4 } } }\nimport { execFileSync } from 'node:child_process'\nimport { existsSync, readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst ORG = process.env.GITHUB_REPOSITORY_OWNER, HOURS = {{CHAMPION_HOURS}}\nconst { teams = {} } = yaml.load(readFileSync('security/champions.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst members = (team) => JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', `orgs/${ORG}/teams/${team}/members`], { encoding: 'utf8' })).flat().map((m) => m.login)\nconst owners = existsSync('.github/CODEOWNERS')\n  ? [...readFileSync('.github/CODEOWNERS', 'utf8').matchAll(new RegExp(`@${ORG}/([\\\\w.-]+)`, 'gi'))].map((m) => m[1]) : []\nconst errors = []\nfor (const team of new Set(owners)) if (!teams[team]) errors.push(`${team} owns code but has no champion`)\nconst reviewers = members('{{SECURITY_TEAM}}')\nfor (const [team, c] of Object.entries(teams)) {\n  if (!c?.champion) { errors.push(`${team}: no champion named`); continue }\n  if (!members(team).includes(c.champion)) errors.push(`${team}: ${c.champion} is not in the team`)\n  if (!reviewers.includes(c.champion)) errors.push(`${team}: ${c.champion} is not in {{SECURITY_TEAM}}`)\n  if (!(c.hours >= HOURS)) errors.push(`${team}: ${c.hours ?? 0} hours a week, fewer than ${HOURS}`)\n}\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "CHAMPIONS": [
@@ -830,7 +846,11 @@
       "label": "Labelled changes need a security approval",
       "x": 1040,
       "y": 520,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "manual",
       "description": "A workflow runs on every change to a pull request's labels, commits and reviews; when the security-review label is set, it fails unless the latest review of some member of {{SECURITY_TEAM}} other than the author is an approval. The job is a required check of main, in the ruleset the Code review and branching pack keeps. GITHUB_TOKEN cannot list team members, so the workflow uses a token with read access to the organisation's members (a GitHub App installation token or a fine-grained token) stored as ORG_READ_TOKEN.\n\nThreshold: 0 pull requests with the security-review label merged without an approval, still standing, from a member of {{SECURITY_TEAM}} who is not the author\n\nTool: GitHub Actions with the GitHub CLI (pulls/{pull_number}/reviews and orgs/{org}/teams/{team_slug}/members)\n\n```yaml\n# .github/workflows/security-review.yml\nname: security-review\non:\n  pull_request:\n    types: [opened, reopened, synchronize, labeled, unlabeled]\n  pull_request_review:\n    types: [submitted, dismissed]\njobs:\n  security-review:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Approved by a security reviewer\n        if: contains(github.event.pull_request.labels.*.name, 'security-review')\n        env:\n          GH_TOKEN: ${{ secrets.ORG_READ_TOKEN }}\n          PR: ${{ github.event.pull_request.number }}\n          AUTHOR: ${{ github.event.pull_request.user.login }}\n        run: |\n          team=$(gh api --paginate \"orgs/$GITHUB_REPOSITORY_OWNER/teams/{{SECURITY_TEAM}}/members\" --jq '.[].login')\n          approvers=$(gh api --paginate \"repos/$GITHUB_REPOSITORY/pulls/$PR/reviews\" --jq '.[] | select(.state != \"COMMENTED\") | \"\\(.user.login) \\(.state)\"' \\\n            | awk '{ last[$1] = $2 } END { for (u in last) if (last[u] == \"APPROVED\") print u }')\n          for u in $approvers; do\n            if [ \"$u\" != \"$AUTHOR\" ] && grep -qxF \"$u\" <<< \"$team\"; then exit 0; fi\n          done\n          echo \"the security-review label needs an approval from {{SECURITY_TEAM}}\"; exit 1\n```",
       "hubWhen": {
         "CHAMPIONS": [
@@ -845,7 +865,11 @@
       "label": "One team owns the code",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A check on every pull request counts the distinct teams that .github/CODEOWNERS names (written @org/team) and fails above one, so that a second team cannot own code while the decision that nobody has security as a role stands. Without a CODEOWNERS file (collective ownership) it passes.\n\nThreshold: At most 1 distinct team named in .github/CODEOWNERS\n\nTool: grep in a GitHub Actions step\n\n```bash\n# a step of the pull request workflow\nset -euo pipefail\n[ -f .github/CODEOWNERS ] || exit 0\nteams=$(grep -v '^[[:space:]]*#' .github/CODEOWNERS | grep -oE '@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+' | tr '[:upper:]' '[:lower:]' | sort -u)\ncount=$(printf '%s' \"$teams\" | grep -c . || true)\nif [ \"$count\" -gt 1 ]; then\n  echo \"CODEOWNERS names $count teams; supersede the decision that nobody has security as a role:\"\n  echo \"$teams\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "CHAMPIONS": [
@@ -859,7 +883,11 @@
       "label": "Security reviews given in time",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A daily job lists the open pull requests with the security-review label, skips those a member of {{SECURITY_TEAM}} has approved, finds when the label was last added from the issue's events, and fails naming each one that has waited longer than the deadline, so the wait shows up before the team learns to avoid the label.\n\nThreshold: 0 open pull requests labelled security-review for more than {{APPSEC_REVIEW_DAYS}} days without an approval from {{SECURITY_TEAM}}\n\nTool: GitHub CLI (gh pr list, gh pr view --json latestReviews, gh api issues/{issue_number}/events) in a scheduled GitHub Actions job\n\n```bash\n# scheduled daily, with GH_TOKEN able to read the organisation's teams\nset -euo pipefail\nteam=$(gh api --paginate \"orgs/{owner}/teams/{{SECURITY_TEAM}}/members\" --jq '.[].login')\nlate=0\nfor pr in $(gh pr list --label security-review --state open --json number --jq '.[].number'); do\n  approved=$(gh pr view \"$pr\" --json latestReviews --jq '.latestReviews[] | select(.state == \"APPROVED\") | .author.login' \\\n    | grep -cxF -f <(printf '%s\\n' \"$team\") || true)\n  [ \"$approved\" -gt 0 ] && continue\n  since=$(gh api --paginate \"repos/{owner}/{repo}/issues/$pr/events\" \\\n    --jq '.[] | select(.event == \"labeled\" and .label.name == \"security-review\") | .created_at' | tail -1)\n  days=$(( ( $(date +%s) - $(date -d \"$since\" +%s) ) / 86400 ))\n  if [ \"$days\" -gt {{APPSEC_REVIEW_DAYS}} ]; then echo \"#$pr has waited $days days for a security review\"; late=1; fi\ndone\nexit \"$late\"\n```",
       "hubWhen": {
         "CHAMPIONS": [
@@ -873,7 +901,11 @@
       "label": "Penetration test not older than the limit",
       "x": 1040,
       "y": 910,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "A scheduled job reads the dates of the tests recorded in security/pentests.yaml and fails when the newest is older than the limit, a month before which the next test should already be booked.\n\nThreshold: The newest penetration test in security/pentests.yaml is at most {{PENTEST_MONTHS}} months old\n\nTool: Node.js with js-yaml (scripts/security/pentest-age.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/pentest-age.mjs\nimport { readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst MONTHS = {{PENTEST_MONTHS}}\nconst { tests = [] } = yaml.load(readFileSync('security/pentests.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst newest = tests.map((t) => new Date(t.date)).sort((a, b) => b - a)[0]\nconst oldest = new Date(); oldest.setMonth(oldest.getMonth() - MONTHS)\nif (!(newest >= oldest)) {\n  console.error(`no penetration test in the last ${MONTHS} months (newest: ${newest?.toISOString().slice(0, 10) ?? 'none'})`)\n  process.exit(1)\n}\n```",
       "hubWhen": {
         "PENTEST": [
@@ -887,7 +919,11 @@
       "label": "Tests recorded, findings filed, major releases tested",
       "x": 1040,
       "y": 1040,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "A job on every pushed tag, and weekly, reads security/pentests.yaml and the repository's tags, and fails on a test without its tester, scope or report link, findings filed late, or a major release tag with no test, or only one dated after the tag. Tags created before the date in adopted: are not checked.\n\nThreshold: Every recorded test names its tester, scope and report and had its findings filed within {{PENTEST_TRIAGE_DAYS}} days; every tag matching {{MAJOR_TAGS}} since the decision has a test for it dated no later than the tag\n\nTool: Node.js with js-yaml and git for-each-ref (scripts/security/pentest-record.mjs) in GitHub Actions\n\n```js\n// scripts/security/pentest-record.mjs; security/pentests.yaml looks like:\n//   adopted: 2026-11-01\n//   tests: [{ date: 2027-03-10, tester: Example Security Ltd, scope: Order API and Storefront, release: v3.0.0, report: https://..., findings_filed: 2027-03-14 }]\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst MAJOR = /{{MAJOR_TAGS}}/, TRIAGE_DAYS = {{PENTEST_TRIAGE_DAYS}}\nconst { adopted, tests = [] } = yaml.load(readFileSync('security/pentests.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst errors = []\nfor (const t of tests) {\n  if (!t.tester || !t.scope || !t.report) errors.push(`test of ${t.date}: tester, scope and report are required`)\n  if (!((new Date(t.findings_filed) - new Date(t.date)) / 86_400_000 <= TRIAGE_DAYS)) errors.push(`test of ${t.date}: findings not filed within ${TRIAGE_DAYS} days`)\n}\nconst tags = execFileSync('git', ['for-each-ref', 'refs/tags', '--format=%(refname:short) %(creatordate:short)'], { encoding: 'utf8' })\n  .split('\\n').filter(Boolean).map((line) => line.split(' '))\nfor (const [tag, date] of tags.filter(([tag, date]) => MAJOR.test(tag) && new Date(date) >= new Date(adopted))) {\n  const t = tests.find((x) => x.release === tag)\n  if (!t || new Date(t.date) > new Date(date)) errors.push(`${tag} (${date}): no penetration test before the release`)\n}\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "PENTEST": [
@@ -902,7 +938,11 @@
       "label": "No-test record current",
       "x": 1040,
       "y": 1170,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "A scheduled job reads the waiver in security/pentests.yaml and fails when it has no reason, names nothing that replaces the test, or was last reviewed too long ago.\n\nThreshold: security/pentests.yaml holds a waiver with a reason and a replacement, reviewed within {{ASSESSMENT_MONTHS}} months\n\nTool: Node.js with js-yaml (scripts/security/pentest-waiver.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/pentest-waiver.mjs; security/pentests.yaml looks like:\n//   waiver: { reason: internal tool, no personal data, replaced_by: [ZAP baseline scan per deploy (Secure coding)], reviewed: 2026-10-01 }\nimport { readFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst MONTHS = {{ASSESSMENT_MONTHS}}\nconst { waiver } = yaml.load(readFileSync('security/pentests.yaml', 'utf8'), { schema: yaml.JSON_SCHEMA })\nconst oldest = new Date(); oldest.setMonth(oldest.getMonth() - MONTHS)\nconst errors = []\nif (!waiver?.reason) errors.push('the waiver gives no reason')\nif (!waiver?.replaced_by?.length) errors.push('the waiver names nothing that replaces the test')\nif (!(new Date(waiver?.reviewed) >= oldest)) errors.push(`the waiver was last reviewed ${waiver?.reviewed}, more than ${MONTHS} months ago`)\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "PENTEST": [
@@ -916,7 +956,11 @@
       "label": "New committers trained",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job downloads the completions from the learning platform (its export or API, reduced to email,course,completed_on in training.csv and never committed), takes each author's first commit date from git log, and fails naming everyone who committed recently and is past the onboarding window without a completion. Commits must use the work address the learning platform knows; bots are skipped.\n\nThreshold: 0 people who committed in the last 90 days, first committed more than {{ONBOARDING_DAYS}} days ago, and have no completion of {{TRAINING_COURSE}}\n\nTool: Node.js and git log (scripts/security/training-onboarding.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/training-onboarding.mjs; training.csv: email,course,completed_on (downloaded by the job, never committed)\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\n\nconst COURSE = '{{TRAINING_COURSE}}', DAYS = {{ONBOARDING_DAYS}}\nconst trained = new Set(readFileSync('training.csv', 'utf8').trim().split('\\n').slice(1)\n  .map((l) => l.split(',')).filter(([, course]) => course === COURSE).map(([email]) => email.toLowerCase()))\nconst git = (...args) => execFileSync('git', ['log', '--no-merges', ...args], { encoding: 'utf8' }).split('\\n').filter(Boolean)\nconst first = new Map()\nfor (const line of git('--reverse', '--format=%ae %as')) {\n  const [email, date] = line.split(' ')\n  if (!first.has(email.toLowerCase())) first.set(email.toLowerCase(), new Date(date))\n}\nconst recent = new Set(git('--since=90 days ago', '--format=%ae').map((e) => e.toLowerCase()).filter((e) => !/\\[bot\\]/.test(e)))\nconst due = (email) => (Date.now() - first.get(email)) / 86_400_000 > DAYS\nconst missing = [...recent].filter((email) => due(email) && !trained.has(email))\nif (missing.length) { console.error(`no completion of ${COURSE}:\\n${missing.join('\\n')}`); process.exit(1) }\n```"
     },
     {
@@ -925,7 +969,11 @@
       "label": "Committers trained in the last 12 months",
       "x": 1040,
       "y": 1430,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "The same weekly job compares each recent author's latest completion of the course with today, and fails naming everyone whose latest completion is older than 12 months.\n\nThreshold: 0 people who committed in the last 90 days without a completion of {{TRAINING_COURSE}} in the last 12 months\n\nTool: Node.js and git log (scripts/security/training-yearly.mjs) in a scheduled GitHub Actions job\n\n```js\n// scripts/security/training-yearly.mjs; training.csv: email,course,completed_on (downloaded by the job, never committed)\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\n\nconst COURSE = '{{TRAINING_COURSE}}'\nconst latest = new Map()\nfor (const [email, course, on] of readFileSync('training.csv', 'utf8').trim().split('\\n').slice(1).map((l) => l.split(','))) {\n  const key = email.toLowerCase()\n  if (course === COURSE && !(latest.get(key) > new Date(on))) latest.set(key, new Date(on))\n}\nconst year = new Date(); year.setFullYear(year.getFullYear() - 1)\nconst recent = new Set(execFileSync('git', ['log', '--no-merges', '--since=90 days ago', '--format=%ae'], { encoding: 'utf8' })\n  .split('\\n').filter((e) => e && !/\\[bot\\]/.test(e)).map((e) => e.toLowerCase()))\nconst lapsed = [...recent].filter((email) => !(latest.get(email) >= year))\nif (lapsed.length) { console.error(`${COURSE} not completed in the last 12 months:\\n${lapsed.join('\\n')}`); process.exit(1) }\n```",
       "hubWhen": {
         "TRAINING": [

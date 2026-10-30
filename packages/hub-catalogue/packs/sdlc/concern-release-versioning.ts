@@ -226,7 +226,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-version-endpoint', label: 'Deploy confirms the running version', category: 'operational', implements: SCHEMES, checks: ['req-version-visible'],
+      id: 'ff-version-endpoint', label: 'Deploy confirms the running version', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: SCHEMES, checks: ['req-version-visible'],
       threshold: 'Within 90 seconds of every deploy, GET /version answers with the deployed version and commit; otherwise the deploy job fails',
       description: 'The last step of every deploy job polls the element\'s version endpoint and fails the deploy unless it answers with the version the job deployed (the tag, or the commit SHA where builds carry no version number) and the commit SHA of the workflow run. The element fills both from build arguments baked into the image (or into /version.json for a web app), never from its environment at run time.',
       tool: 'curl and jq in the deploy job (GitHub Actions)',
@@ -245,7 +245,7 @@ done
 echo "expected $EXPECTED_VERSION at $GITHUB_SHA, the element answers: \${body:-nothing}"; exit 1`,
     },
     {
-      id: 'ff-semver-release', label: 'Semantic versions follow their notes', when: { SCHEME: ['semver'] }, category: 'process', implements: ['adr-semver'], checks: ['req-semver', 'req-semver-bump', 'req-immutable'],
+      id: 'ff-semver-release', label: 'Semantic versions follow their notes', when: { SCHEME: ['semver'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-semver'], checks: ['req-semver', 'req-semver-bump', 'req-immutable'],
       threshold: '0 release tags that are not v and a valid semantic version and 0 versions released twice; for releases published since the rules were adopted, 0 mutable releases and 0 numbers other than the one their notes call for',
       description: 'A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against the regular expression semver.org publishes, refuses a version released twice, and requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable. Then it sorts the final releases by version and, for each, reads its notes: a breaking or Removed heading or a **BREAKING:** entry calls for MAJOR (MINOR while MAJOR is 0), a Features, Added or Deprecated heading for MINOR, anything else for PATCH, one step from the version before; the move from 0.y.z to 1.0.0 is declared, not computed. The headings are the ones release-please, semantic-release, the .github/release.yml of the label decision and Keep a Changelog write.',
       tool: 'Node.js with the GitHub CLI (gh release list, gh release view)',
@@ -275,7 +275,7 @@ for (let i = 1; i < final.length; i++) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-calver-release', label: 'Calendar versions follow the rule', when: { SCHEME: ['calver'] }, category: 'process', implements: ['adr-calver'], checks: ['req-calver', 'req-immutable'],
+      id: 'ff-calver-release', label: 'Calendar versions follow the rule', when: { SCHEME: ['calver'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-calver'], checks: ['req-calver', 'req-immutable'],
       threshold: '0 release tags outside vYYYY.M.MICRO, 0 lines whose first release was published outside their month, 0 gaps in a line\'s MICRO numbers; for releases published since the rules were adopted, 0 mutable releases and 0 fix releases whose notes bring new functionality, a deprecation or a breaking change',
       description: 'A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against vYYYY.M.MICRO with no leading zero on the month, compares each line\'s first release with the UTC month it was published in, requires each line\'s MICRO numbers to count 0, 1, 2 without gaps, requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable, and reads the notes of every fix release for headings only a new line may carry.',
       tool: 'Node.js with the GitHub CLI (gh release list, gh release view)',
@@ -305,7 +305,7 @@ for (const [line, micros] of lines) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-build-id', label: 'Builds deployed by their commit', when: { SCHEME: ['none'] }, category: 'structural', implements: ['adr-build-id'], checks: ['req-build-id'],
+      id: 'ff-build-id', label: 'Builds deployed by their commit', when: { SCHEME: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-build-id'], checks: ['req-build-id'],
       threshold: '0 image references in deploy/ without a full commit SHA or a sha256 digest, 0 of the last 30 production deployments of a commit not on main, 0 version tags',
       description: 'A step on every pull request and after every deploy reads the manifests the pipeline applies, refuses any image referenced by a mutable tag, checks with the GitHub API that the recent production deployments are of commits on main, and fails when a version tag appears, which would mean releases started without their decision.',
       tool: 'grep and the GitHub CLI (gh api repos/{owner}/{repo}/deployments) in a GitHub Actions step',
@@ -325,7 +325,7 @@ done
 [ -z "$(git tag --list 'v[0-9]*')" ] || { echo "version tags exist; supersede the decision before numbering releases"; exit 1; }`,
     },
     {
-      id: 'ff-notes-complete', label: 'Notes list every typed commit', when: { ...NUMBERED, CHANGELOG: ['commits'] }, category: 'process', implements: ['adr-notes-commits'], checks: ['req-notes-commits'],
+      id: 'ff-notes-complete', label: 'Notes list every typed commit', when: { ...NUMBERED, CHANGELOG: ['commits'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-notes-commits'], checks: ['req-notes-commits'],
       threshold: '0 feat, fix or perf commits between the previous and the latest release missing from the latest release\'s notes',
       description: 'After each release the release workflow lists the commits between the two latest releases and looks for each feat, fix and perf commit in the new release\'s notes, by the pull request number its squash subject ends with, or else by its short SHA (release-please, semantic-release and the git-cliff template all link both).',
       tool: 'Node.js with git and the GitHub CLI (gh release list, gh release view)',
@@ -350,7 +350,7 @@ if (missing.length) {
 }`,
     },
     {
-      id: 'ff-changelog-entry', label: 'Changelog line with each change', when: { ...NUMBERED, CHANGELOG: ['keepachangelog'] }, category: 'process', implements: ['adr-notes-keepachangelog'], checks: ['req-changelog-entry'],
+      id: 'ff-changelog-entry', label: 'Changelog line with each change', when: { ...NUMBERED, CHANGELOG: ['keepachangelog'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-notes-keepachangelog'], checks: ['req-changelog-entry'],
       threshold: 'Every pull request that changes src/ adds an entry under ## [Unreleased] or carries skip-changelog; 0 headings under Unreleased outside the six categories; 0 release headings other than ## [version] - YYYY-MM-DD',
       description: 'A required check on every pull request compares it with its base: when code under src/ changed and the pull request is not labelled skip-changelog, the lines it adds to CHANGELOG.md must be entries inside the Unreleased section, that section may hold only the six Keep a Changelog categories, and every release heading must read ## [version] - YYYY-MM-DD, optionally followed by [YANKED].',
       tool: 'git, awk and jq in a GitHub Actions step on pull_request',
@@ -372,7 +372,7 @@ heads=$(grep -E '^## ' CHANGELOG.md | grep -Evx '## \\[(Unreleased|[0-9][0-9A-Za
 [ -z "$heads" ] || { echo "release headings must read ## [version] - YYYY-MM-DD: $heads"; exit 1; }`,
     },
     {
-      id: 'ff-pr-labels', label: 'Exactly one release label', when: { ...NUMBERED, CHANGELOG: ['labels'] }, category: 'process', implements: ['adr-notes-labels'], checks: ['req-pr-labels'],
+      id: 'ff-pr-labels', label: 'Exactly one release label', when: { ...NUMBERED, CHANGELOG: ['labels'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-notes-labels'], checks: ['req-pr-labels'],
       threshold: 'Every pull request carries exactly 1 of the 5 release labels before it can merge',
       description: 'A workflow that the main branch\'s ruleset lists as a required check runs whenever a pull request is opened, edited, synchronised or relabelled, and fails unless exactly one of the labels that .github/release.yml groups the notes by is set.',
       tool: 'GitHub Actions with jq; GitHub\'s generated release notes (.github/release.yml)',
@@ -406,7 +406,7 @@ jobs:
           [ "$n" -eq 1 ] || { echo "label the pull request with exactly one of breaking-change, feature, deprecation, fix, internal (it has $n)"; exit 1; }`,
     },
     {
-      id: 'ff-support-latest', label: 'Only the newest line supported', when: { ...NUMBERED, SUPPORT: ['latest'] }, category: 'process', implements: ['adr-support-latest'], checks: ['req-latest-only'],
+      id: 'ff-support-latest', label: 'Only the newest line supported', when: { ...NUMBERED, SUPPORT: ['latest'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-support-latest'], checks: ['req-latest-only'],
       threshold: 'SECURITY.md lists exactly the newest line as supported; 0 releases on an older line published after a newer line\'s first release',
       description: 'A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest line, and fails on any release published on a line after the next newer line started.',
       tool: 'Node.js with the GitHub CLI (gh release list)',
@@ -432,7 +432,7 @@ lines.slice(1).forEach((line, i) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-support-lts', label: 'Supported lines match the policy', when: { ...NUMBERED, SUPPORT: ['lts'] }, category: 'process', implements: ['adr-support-lts'], checks: ['req-lts-policy'],
+      id: 'ff-support-lts', label: 'Supported lines match the policy', when: { ...NUMBERED, SUPPORT: ['lts'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-support-lts'], checks: ['req-lts-policy'],
       threshold: 'SECURITY.md lists exactly the newest {{LTS_LINES}} lines as supported; 1 maintenance branch release/<line>.x per older supported line; 0 releases on a line published after it left support',
       description: 'A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest {{LTS_LINES}} lines, checks that each older supported line has its maintenance branch on origin, and fails on any release published on a line after the line {{LTS_LINES}} places newer started.',
       tool: 'Node.js with git and the GitHub CLI (gh release list)',
@@ -463,7 +463,7 @@ lines.forEach((line, i) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-backports', label: 'Security fixes back-ported in time', when: { ...NUMBERED, SUPPORT: ['lts'] }, category: 'process', implements: ['adr-support-lts'], checks: ['req-backport'],
+      id: 'ff-backports', label: 'Security fixes back-ported in time', when: { ...NUMBERED, SUPPORT: ['lts'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-support-lts'], checks: ['req-backport'],
       threshold: '0 security fixes merged to main more than {{BACKPORT_DAYS}} days ago without a cherry-picked commit in a released tag on every older supported line',
       description: 'A nightly job lists the pull requests labelled security that were merged to main more than {{BACKPORT_DAYS}} days ago, and for each older line SECURITY.md supports, looks on release/<line>.x for the commit git cherry-pick -x made from the fix (its "cherry picked from commit" line) and for a release tag containing it. A line cut after the fix already contains it and is skipped.',
       tool: 'git and the GitHub CLI (gh pr list) in a scheduled GitHub Actions job',
@@ -488,7 +488,7 @@ done
 exit "$late"`,
     },
     {
-      id: 'ff-release-approval', label: 'Releases wait for the release owner', when: { ...NUMBERED, APPROVAL: ['owner'] }, category: 'process', implements: VERSIONED, checks: ['req-owner-approves'],
+      id: 'ff-release-approval', label: 'Releases wait for the release owner', when: { ...NUMBERED, APPROVAL: ['owner'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: VERSIONED, checks: ['req-owner-approves'],
       threshold: 'The environment release requires a review by the team {{RELEASE_OWNER}} alone, with self-review prevented; every workflow that publishes releases runs in it; 0 of the last 100 releases published by anyone but the release workflow',
       description: 'A weekly job, and one on every change under .github/, reads the protection rules of the environment release through the GitHub API, checks that every workflow file that publishes releases (gh release, release-please or semantic-release) declares environment: release, and lists the published releases whose author is not github-actions[bot], which means someone published one by hand.',
       tool: 'the GitHub CLI (gh api repos/{owner}/{repo}/environments/release and /releases) with jq',
@@ -509,7 +509,7 @@ by_hand=$(gh api "repos/$REPO/releases?per_page=100" --jq '.[] | select(.draft |
 [ -z "$by_hand" ] || { echo "releases not published by the release workflow: $by_hand"; exit 1; }`,
     },
     {
-      id: 'ff-auto-release', label: 'No merge waits for its release', when: { ...NUMBERED, APPROVAL: ['auto'] }, category: 'process', implements: VERSIONED, checks: ['req-auto-release'],
+      id: 'ff-auto-release', label: 'No merge waits for its release', when: { ...NUMBERED, APPROVAL: ['auto'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: VERSIONED, checks: ['req-auto-release'],
       threshold: '0 commits changing src/ (tests excluded) merged to main more than {{RELEASE_HOURS}} hours ago and not in a release; release.yml runs on pushes to main and waits in no environment',
       description: 'An hourly job finds the latest release tag on main and lists the first-parent commits after it that change code under src/, test files excluded; any older than {{RELEASE_HOURS}} hours fails the job. It also checks that the release workflow starts on pushes to main and declares no environment, where it would wait for a reviewer. A commit typed docs or test that touches src/ is reported too: type it so that it releases, or keep it out of src/.',
       tool: 'git in a scheduled GitHub Actions job',

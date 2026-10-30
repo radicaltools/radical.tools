@@ -603,7 +603,11 @@
       "label": "One formatter configuration, at the root",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step lists the tracked formatter configuration files outside the root (Prettier, Biome, Ruff, .editorconfig, a [tool.ruff] table in a nested pyproject.toml) and greps the places that run a formatter for formatting flags; either fails the step. A monorepo that needs a package of its own configuration lists it here as an exception, in the same pull request.\n\nThreshold: 0 formatter configuration files below the repository root and 0 formatting options on a formatter's command line in package.json, Makefile, shell scripts, workflows and .pre-commit-config.yaml\n\nTool: git ls-files and git grep in a CI step (the same over build.gradle.kts for ktlint and Spotless, or Directory.Build.props for dotnet format)\n\n```bash\n#!/usr/bin/env bash\n# CI step: each formatter's settings live in one file at the repository root\nset -euo pipefail\nnested=$(git ls-files -- '*/.prettierrc*' '*/prettier.config.*' '*/biome.json' '*/biome.jsonc' '*/ruff.toml' '*/.ruff.toml' '*/.editorconfig'\n  git grep -l -e '^\\[tool\\.ruff' -- '*/pyproject.toml' || true)\n[ -z \"$nested\" ] || { echo \"formatter settings below the root; move them to the root file:\"; echo \"$nested\"; exit 1; }\nflags=$(git grep -nE -e '(prettier|biome format|ruff format|black)[^|;&]*--(print-width|tab-width|use-tabs|single-quote|no-semi|trailing-comma|line-width|indent-width|indent-style|line-length|skip-string-normalization)' \\\n  -- package.json Makefile '*.sh' '.github/workflows/*' .pre-commit-config.yaml || true)\n[ -z \"$flags\" ] || { echo \"formatting options on a command line; put them in the root file:\"; echo \"$flags\"; exit 1; }\necho \"formatter settings: one file per language, at the root\"\n```"
     },
     {
@@ -612,7 +616,11 @@
       "label": "One exact formatter version",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step reads the formatter versions from package.json and compares the rev of the ruff-pre-commit hook with the version pyproject.toml pins. On the Node side the hook (lint-staged) and the editor (the Prettier and Biome extensions use the project's installed copy first) run the version in node_modules, so an exact pin is enough; on the Python side pre-commit installs a copy of its own, which this keeps equal, and the Ruff extension finds Ruff in the environment first (ruff.importStrategy fromEnvironment, its default).\n\nThreshold: Prettier and Biome pinned without a range in package.json; the ruff-pre-commit rev equal to the ruff==x.y.z pinned in pyproject.toml; the step fails on any difference\n\nTool: jq, grep and sed in a CI step (for Kotlin and Java: the ktlint or Spotless version in libs.versions.toml; for C#: the SDK version in global.json)\n\n```bash\n#!/usr/bin/env bash\n# CI step: one exact formatter version, for the commit hook, CI and the editor alike\nset -euo pipefail\nfail=0\nfor tool in prettier @biomejs/biome; do\n  v=$(jq -r --arg t \"$tool\" '(.devDependencies // {})[$t] // empty' package.json 2>/dev/null || true)\n  [ -z \"$v\" ] || [[ \"$v\" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || { echo \"package.json: $tool is $v; pin it exactly (npm i -D -E $tool)\"; fail=1; }\ndone\nif [ -f .pre-commit-config.yaml ] && grep -q 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml; then\n  hook=$(grep -A2 'astral-sh/ruff-pre-commit' .pre-commit-config.yaml | sed -n 's/^ *rev: *v\\{0,1\\}\\([0-9.]*\\).*/\\1/p')\n  pinned=$(grep -oE '\"ruff==[0-9.]+\"' pyproject.toml | grep -oE '[0-9.]*[0-9]' || true)\n  [ \"$hook\" = \"$pinned\" ] || { echo \"pre-commit runs ruff $hook, pyproject.toml pins ruff==$pinned; make them equal\"; fail=1; }\nfi\nexit $fail\n```"
     },
     {
@@ -621,7 +629,11 @@
       "label": "Reformatting commits listed for blame",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A daily job on main lists every commit whose diff changes a formatter version or a formatting setting in package.json, pyproject.toml, the formatter configuration or .editorconfig, and looks for its full SHA in .git-blame-ignore-revs. Listing a version bump that reformatted nothing is harmless: blame skips only the lines that commit changed. Each developer runs git config blame.ignoreRevsFile .git-blame-ignore-revs once (or the repository's setup script does); GitHub reads the file by itself.\n\nThreshold: 0 commits older than {{BLAME_DAYS}} days that changed a formatter's settings or version and are missing from .git-blame-ignore-revs; younger ones are reported as warnings\n\nTool: git log -G in a scheduled GitHub Actions job (actions/checkout with fetch-depth: 0)\n\n```bash\n#!/usr/bin/env bash\n# run daily on main by .github/workflows/blame-ignore.yml (actions/checkout with fetch-depth: 0)\nset -euo pipefail\n# changed lines that mean \"a formatter's settings or version changed\"\nSETTINGS='\"(prettier|@biomejs/biome)\": \"|ruff==|black==|printWidth|tabWidth|useTabs|lineWidth|indentWidth|indentStyle|line-length|quote-style|indent-style|indent_size|indent_style|max_line_length'\ncutoff=$(( $(date +%s) - {{BLAME_DAYS}} * 86400 ))\nlate=0\nwhile read -r sha committed; do\n  grep -qx \"$sha\" .git-blame-ignore-revs 2>/dev/null && continue\n  if [ \"$committed\" -lt \"$cutoff\" ]; then\n    echo \"::error::$sha changed a formatter's settings or version and is not in .git-blame-ignore-revs\"; late=1\n  else\n    echo \"::warning::$sha changed a formatter's settings or version; list it in .git-blame-ignore-revs\"\n  fi\ndone < <(git log --format='%H %ct' -G \"$SETTINGS\" HEAD -- package.json pyproject.toml .prettierrc.json .prettierrc.yaml biome.json .editorconfig)\nexit $late\n```"
     },
     {
@@ -630,7 +642,11 @@
       "label": "Every file follows .editorconfig",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The root .editorconfig carries what every editor and every file must agree on; editorconfig-checker runs over the tracked files on every pull request and fails on any file that breaks it, which covers the files no formatter touches. Its line-length check is off, because the formatters decide where lines break and leave long strings and URLs whole.\n\nThreshold: 0 tracked text files that break the root .editorconfig (charset, line endings, final newline, trailing whitespace, indentation); line length is left to the formatters\n\nTool: editorconfig-checker (npm package editorconfig-checker, or its Docker image) in a CI step\n\n```ini\n# .editorconfig, at the repository root\nroot = true\n\n[*]\ncharset = utf-8\nend_of_line = lf\ninsert_final_newline = true\ntrim_trailing_whitespace = true\nindent_style = space\nindent_size = 2\nmax_line_length = {{LINE_WIDTH}}\n\n[*.py]\nindent_size = 4\n\n[{*.go,Makefile}]\nindent_style = tab\n\n[*.md]\ntrim_trailing_whitespace = false\n\n# CI step: npx --yes editorconfig-checker@7.0.0 -format github-actions -disable-max-line-length\n```"
     },
     {
@@ -639,7 +655,11 @@
       "label": ".editorconfig agrees with the formatters",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script reads .editorconfig (with a section added for its preamble, so Python's configparser accepts it), checks the [*] section, refuses Prettier settings that .editorconfig already carries (Prettier reads them from it, so a second value could only disagree), and compares Ruff's line-length, which does not read .editorconfig, with the width set for Python files. For ktlint and dotnet format nothing needs comparing: they read their settings from .editorconfig itself.\n\nThreshold: .editorconfig has root = true and its [*] section sets charset utf-8, end_of_line lf, insert_final_newline, trim_trailing_whitespace and max_line_length {{LINE_WIDTH}}; .prettierrc.json sets none of printWidth, tabWidth, useTabs, endOfLine; Ruff's line-length equals the .editorconfig width for Python\n\nTool: Python 3.11 or later (configparser, tomllib) in a CI step\n\n```python\n# scripts/check_editorconfig.py (CI: python3 scripts/check_editorconfig.py): .editorconfig and the formatters agree\nimport configparser, json, pathlib, sys, tomllib\n\nec = configparser.ConfigParser(interpolation=None)\nec.read_string(\"[preamble]\\n\" + pathlib.Path(\".editorconfig\").read_text())\nstar = ec[\"*\"] if ec.has_section(\"*\") else {}\nproblems = [] if ec.get(\"preamble\", \"root\", fallback=\"\") == \"true\" else [\".editorconfig: no root = true before the first section\"]\nfor key, value in {\"charset\": \"utf-8\", \"end_of_line\": \"lf\", \"insert_final_newline\": \"true\", \"trim_trailing_whitespace\": \"true\", \"max_line_length\": \"{{LINE_WIDTH}}\"}.items():\n    if star.get(key) != value:\n        problems.append(f\".editorconfig [*]: {key} is {star.get(key)}, should be {value}\")\nprettier = pathlib.Path(\".prettierrc.json\")\nfor key in json.loads(prettier.read_text()) if prettier.exists() else []:\n    if key in (\"printWidth\", \"tabWidth\", \"useTabs\", \"endOfLine\"):\n        problems.append(f\".prettierrc.json sets {key}; set it once in .editorconfig, which Prettier reads\")\npyproject = pathlib.Path(\"pyproject.toml\")\nruff = tomllib.loads(pyproject.read_text()).get(\"tool\", {}).get(\"ruff\", {}) if pyproject.exists() else {}\npy_width = ec.get(\"*.py\", \"max_line_length\", fallback=star.get(\"max_line_length\"))\nif ruff and str(ruff.get(\"line-length\", 88)) != py_width:\n    problems.append(f\"pyproject.toml [tool.ruff] line-length is {ruff.get('line-length', 88)}, .editorconfig says {py_width} for *.py\")\nprint(\"\\n\".join(problems) or \".editorconfig agrees with the formatters\")\nsys.exit(1 if problems else 0)\n```"
     },
     {
@@ -648,7 +668,11 @@
       "label": "Formatters stay on their defaults",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step counts the formatting options each configuration file sets, leaving out what is not a style choice ($schema, enabled, the files a formatter includes or ignores), and fails when one sets more than the decision allows. Settings read from .editorconfig are not counted: they are the shared ones. For ktlint the same count applies to the ktlint_ properties in .editorconfig; gofmt and google-java-format have no options to count.\n\nThreshold: At most {{MAX_FORMAT_OPTIONS}} formatting options in .prettierrc.json (overrides included), in biome.json's formatter sections, and in pyproject.toml's [tool.ruff] line-length and [tool.ruff.format]; the step fails above it\n\nTool: jq and Python (tomllib) in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: each formatter runs on its defaults\nset -euo pipefail\nMAX={{MAX_FORMAT_OPTIONS}}\nfail=0\ncheck() { echo \"$2: $1 formatting option(s)\"; [ \"$1\" -le \"$MAX\" ] || { echo \"  more than $MAX: remove options or supersede the decision\"; fail=1; }; }\n[ ! -f .prettierrc.json ] || check \"$(jq '(del(.\"$schema\", .overrides) | length) + ([.overrides[]?.options | length] | add // 0)' .prettierrc.json)\" .prettierrc.json\n[ ! -f biome.json ] || check \"$(jq '[(.formatter // {} | del(.enabled, .includes)), .javascript.formatter, .json.formatter, .css.formatter] | map(. // {} | length) | add' biome.json)\" biome.json\n[ ! -f pyproject.toml ] || check \"$(python3 -c 'import tomllib; r = tomllib.load(open(\"pyproject.toml\", \"rb\")).get(\"tool\", {}).get(\"ruff\", {}); print(len(r.get(\"format\", {})) + (\"line-length\" in r))')\" \"pyproject.toml [tool.ruff]\"\nexit $fail\n```",
       "hubWhen": {
         "FORMATTER": [
@@ -662,7 +686,11 @@
       "label": "Every formatter option has its reason",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step walks the formatter configuration files and fails on an option whose line above is not a comment; the comment names the convention of the existing code that the option keeps. A pull request that changes an option is also a reformat of the whole tree, which the Code quality gate's formatter check over the whole tree enforces.\n\nThreshold: 0 formatter options in .prettierrc.yaml, pyproject.toml's [tool.ruff] line-length and [tool.ruff.format], and the [*.{kt,kts}] ktlint properties of .editorconfig without a comment on the line above\n\nTool: awk in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: every formatter option is preceded by a comment naming the convention it keeps\nset -euo pipefail\nstatus=0\nreasons() {   # file, the section whose options need a reason ('' = the whole file), the option names to check\n  awk -v f=\"$1\" -v section=\"$2\" -v keys=\"$3\" '\n    /^\\[/ { inside = ($0 == section) }\n    (section == \"\" || inside) && $0 ~ (\"^(\" keys \")[ ]*[:=]\") && prev !~ /^[ ]*#/ { print f \":\" NR \": \" $1 \" has no comment above it naming the convention it keeps\"; bad = 1 }\n    { prev = $0 }\n    END { exit bad }' \"$1\" || status=1\n}\n[ ! -f .prettierrc.yaml ] || reasons .prettierrc.yaml '' '[A-Za-z]+'\n[ ! -f pyproject.toml ] || reasons pyproject.toml '[tool.ruff]' 'line-length|indent-width'\n[ ! -f pyproject.toml ] || reasons pyproject.toml '[tool.ruff.format]' '[a-z-]+'\n[ ! -f .editorconfig ] || reasons .editorconfig '[*.{kt,kts}]' 'ktlint_[a-z_-]+'\nexit $status\n```",
       "hubWhen": {
         "FORMATTER": [
@@ -676,7 +704,11 @@
       "label": "Published guides linked, none amended",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step looks for the files of each language, expects the link to its guide in CONTRIBUTING.md, and fails when a guide of the team's own appears, which would amend the published ones without a decision. For Go the link is Go Code Review Comments, the maintained companion of Effective Go.\n\nThreshold: CONTRIBUTING.md links the published guide of every language with tracked files in the repository, and no docs/STYLE.md exists\n\nTool: git ls-files and grep in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: CONTRIBUTING.md links the published guide of every language in the repository, and nothing amends them\nset -euo pipefail\nmissing=0\nwhile read -r ext guide; do\n  [ \"$(git ls-files -- \"*.$ext\" | wc -l)\" -gt 0 ] || continue\n  grep -qF \"$guide\" CONTRIBUTING.md || { echo \"CONTRIBUTING.md does not link the .$ext style guide: $guide\"; missing=1; }\ndone <<'GUIDES'\npy https://peps.python.org/pep-0008/\nts https://google.github.io/styleguide/tsguide.html\njava https://google.github.io/styleguide/javaguide.html\nkt https://kotlinlang.org/docs/coding-conventions.html\ngo https://go.dev/wiki/CodeReviewComments\ncs https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions\nGUIDES\n[ ! -e docs/STYLE.md ] || { echo \"docs/STYLE.md amends the published guides: supersede the decision first\"; missing=1; }\nexit $missing\n```",
       "hubWhen": {
         "GUIDE": [
@@ -690,7 +722,11 @@
       "label": "Our guide stays short and sourced",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step reads docs/STYLE.md, where every rule is a heading \"### S<n>. <rule>\" followed by its \"Based on:\" and \"Checked by:\" lines, counts the rules and fails on a rule without either line, on more rules than the decision allows, or when CONTRIBUTING.md does not link the guide.\n\nThreshold: docs/STYLE.md holds between 1 and {{MAX_GUIDE_RULES}} rules, every rule has a \"Based on:\" and a \"Checked by:\" line, and CONTRIBUTING.md links it\n\nTool: awk and grep in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: docs/STYLE.md stays short, and every rule says where it comes from and who checks it\nset -euo pipefail\ngrep -qF 'docs/STYLE.md' CONTRIBUTING.md || { echo \"CONTRIBUTING.md does not link docs/STYLE.md\"; exit 1; }\nawk -v max={{MAX_GUIDE_RULES}} '\n  function close_rule() { if (rule != \"\" && (!based || !checked)) { print \"docs/STYLE.md: \" rule \" lacks a Based on: or Checked by: line\"; bad = 1 } }\n  /^### S[0-9]+\\./ { close_rule(); rule = $0; based = 0; checked = 0; n++ }\n  /^Based on: ./ { based = 1 }\n  /^Checked by: ./ { checked = 1 }\n  END {\n    close_rule()\n    if (n == 0 || n > max) { print \"docs/STYLE.md holds \" n \" rules; it must hold 1 to \" max; bad = 1 }\n    exit bad\n  }' docs/STYLE.md\n```",
       "hubWhen": {
         "GUIDE": [
@@ -704,7 +740,11 @@
       "label": "Naming rules at error severity",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The naming rules of the guide are added to the shared ESLint configuration at error severity; object and type properties are left free because they follow wire formats. A CI step asks ESLint for the configuration it resolves for a source file, so a rule turned off or down to a warning in some later block is noticed, and pipes a wrongly named Python function through Ruff with the project's configuration. For Kotlin, ktlint's standard:class-naming, function-naming and property-naming run unless disabled in .editorconfig; for C#, dotnet_diagnostic.IDE1006.severity = error; for Go, staticcheck's ST1003, which is off by default and has to be listed.\n\nThreshold: @typescript-eslint/naming-convention at severity 2 (error) in the configuration ESLint resolves for src; Ruff reports N802 on a probe with a wrongly named function; the step fails otherwise\n\nTool: ESLint with typescript-eslint (naming-convention); Ruff (pep8-naming, N); ktlint, IDE1006 and staticcheck ST1003 for Kotlin, C# and Go\n\n```js\n// eslint.config.js: the naming rules of the style guide, at error (merged into the shared configuration)\nimport { defineConfig } from 'eslint/config'\nimport tseslint from 'typescript-eslint'\n\nexport default defineConfig({\n  files: ['src/**/*.{ts,tsx}'],\n  languageOptions: { parser: tseslint.parser },\n  plugins: { '@typescript-eslint': tseslint.plugin },\n  rules: {\n    '@typescript-eslint/naming-convention': ['error',\n      { selector: 'default', format: ['camelCase'], leadingUnderscore: 'allow' },\n      { selector: 'variable', modifiers: ['const'], format: ['camelCase', 'UPPER_CASE'] },\n      { selector: 'typeLike', format: ['PascalCase'] },\n      { selector: 'enumMember', format: ['PascalCase'] },\n      { selector: 'import', format: ['camelCase', 'PascalCase'] },\n      { selector: ['objectLiteralProperty', 'typeProperty'], format: null },   // keys follow the wire format\n    ],\n  },\n})\n// CI step:\n//   npx eslint --print-config src/index.ts | jq -e '.rules[\"@typescript-eslint/naming-convention\"][0] == 2'\n//   printf 'def GetOrder():\\n    pass\\n' | ruff check --stdin-filename src/naming_probe.py - | grep -q N802   # pyproject.toml: [tool.ruff.lint] extend-select = [\"N\"]\n```",
       "hubWhen": {
         "NAMING": [
@@ -718,7 +758,11 @@
       "label": "Editor settings format on save",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step reads the committed editor settings, kept as plain JSON without comments so jq can read them, and fails when format on save is off, a language in the repository has no default formatter, or that formatter's extension is not recommended. The Prettier extension (esbenp.prettier-vscode), Biome's (biomejs.biome) and Ruff's (charliermarsh.ruff) use the project's installed formatter before their bundled one. JetBrains IDEs read .editorconfig and need their Prettier or Ruff on-save setting turned on once per developer.\n\nThreshold: .vscode/settings.json has editor.formatOnSave true and a default formatter for every language with tracked files; .vscode/extensions.json recommends each of those formatters\n\nTool: jq in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: the committed editor settings format on save with the project's formatter\nset -euo pipefail\ns=.vscode/settings.json; x=.vscode/extensions.json\njq -e '.\"editor.formatOnSave\" == true' \"$s\" >/dev/null || { echo \"$s: editor.formatOnSave is not true\"; exit 1; }\nwhile read -r lang pattern; do\n  [ \"$(git ls-files -- \"$pattern\" | wc -l)\" -gt 0 ] || continue\n  ext=$(jq -r --arg l \"[$lang]\" '.[$l][\"editor.defaultFormatter\"] // .[\"editor.defaultFormatter\"] // empty' \"$s\")\n  [ -n \"$ext\" ] || { echo \"$s: no default formatter for $lang\"; exit 1; }\n  jq -e --arg e \"$ext\" '.recommendations | index($e)' \"$x\" >/dev/null || { echo \"$x: $ext is not recommended\"; exit 1; }\ndone <<'LANGUAGES'\ntypescript *.ts\ntypescriptreact *.tsx\njavascript *.js\npython *.py\nLANGUAGES\necho \"editors format on save with the project's formatters\"\n```",
       "hubWhen": {
         "EDITOR": [
@@ -732,7 +776,11 @@
       "label": "Only .editorconfig is shared",
       "x": 1040,
       "y": 1430,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step lists the tracked editor-specific settings files and fails on any, so a personal setting committed by mistake is caught in the pull request; .editorconfig must exist, being the one configuration every editor shares. Recommending extensions in .vscode/extensions.json is not a setting and stays allowed.\n\nThreshold: 0 tracked editor-specific settings files (.vscode/settings.json, .idea/, *.code-workspace, .zed/, .fleet/); .editorconfig present\n\nTool: git ls-files in a CI step\n\n```bash\n#!/usr/bin/env bash\n# CI step: .editorconfig is the only editor configuration in the repository\nset -euo pipefail\ntracked=$(git ls-files -- '.vscode/settings.json' '.idea/*' '*.code-workspace' '.zed/*' '.fleet/*')\n[ -z \"$tracked\" ] || { echo \"editor-specific settings are committed; keep them out of the repository (.gitignore):\"; echo \"$tracked\"; exit 1; }\n[ -f .editorconfig ] || { echo \".editorconfig is missing\"; exit 1; }\necho \"only .editorconfig is shared\"\n```",
       "hubWhen": {
         "EDITOR": [

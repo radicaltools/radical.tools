@@ -1,21 +1,22 @@
 name: Nightly
 
-# The sensors whose results vary from run to run, measured at night instead
-# of in the pull-request gate (ADR Studio's speed is measured nightly). Each
-# writes radical-metrics/1 files into reports/metrics; tools/nightly-findings.ts
-# evaluates the model's conditions on them as radical check does, and each
-# that does not hold (or that nothing measured) becomes a finding in
-# crucible/findings/, proposed in a bot pull request. The findings go neither
-# into the model nor into Studio.
+# What the model measures at night (ADR Studio's speed is measured nightly;
+# ADR Fitness functions classified as the book does): radical sense run
+# --trigger nightly runs the measure of every automated fitness function
+# triggered on nightly, each line with its sensor, into radical-metrics/1
+# files in reports/metrics. Nothing here names a test or a metric: a fitness
+# function added to the model with a sensor radical sense has is run the next
+# night. tools/nightly-findings.ts evaluates those fitness functions'
+# conditions as radical check does, and each that does not hold (or that
+# nothing measured) becomes a finding in crucible/findings/, proposed in a
+# bot pull request. The findings go neither into the model nor into Studio.
 #
 # A condition against a baseline (`<= baseline + 20%`) compares with the
 # median of the last seven nights: their measurements are handed on from
 # night to night as the artifact nightly-history, outside git.
 #
-# Sensors:
-#   - Large model in Studio: apps/e2e/tests/studio/scale.spec.ts on
-#     radical.tools' own model repeated 14 times, for the fitness function
-#     Large model stays responsive (metrics studio.*, label model=radical-x14).
+# The worker gives the sensors what they need: the Playwright image (browsers
+# and fonts) and the web builds the playwright sensor's specs open.
 
 on:
   schedule:
@@ -48,28 +49,14 @@ jobs:
       - run: npm run build:web && npm run build:hub
       - run: npm run build -w @radicaltools/cli
 
-      - name: Large model in Studio
-        # A run that fails measures nothing: the fitness function's conditions
-        # then become findings that say so.
+      - name: What the model measures at night
+        # A line that cannot be measured measures nothing: its fitness
+        # function's conditions then become findings that say so.
         continue-on-error: true
-        env:
-          SCALE_MODEL: ${{ github.workspace }}/architecture
-          SCALE_COPIES: '14'
-          SCALE_REOPEN: '1'
-          SCALE_OUT: ${{ github.workspace }}/reports/scale
-        run: npm run e2e -w @radical/e2e -- tests/studio/scale.spec.ts --project=studio
-      - name: Measure the large model
-        if: ${{ hashFiles('reports/scale/metrics.json') != '' }}
         run: >-
-          node apps/cli/dist/index.js sense json reports/scale/metrics.json
-          --metric studio.open_ms=open_ms@ms
-          --metric studio.open_cached_ms=open_cached_ms@ms
-          --metric studio.view_switch_ms=view_switch_ms@ms
-          --metric studio.search_key_ms=search_key_ms@ms
-          --metric studio.card_key_ms=card_key_ms@ms
-          --label model=radical-x14
+          node apps/cli/dist/index.js sense run --trigger nightly
+          --folder architecture --out reports/metrics
           --context commit=${{ github.sha }}
-          --out reports/metrics/scale.json
 
       - name: Upload what the night measured
         if: ${{ !cancelled() }}
@@ -129,18 +116,20 @@ jobs:
           baseline=""
           if ls history/*.json >/dev/null 2>&1; then baseline="--baseline history"; fi
           npx tsx tools/nightly-findings.ts architecture crucible/findings \
-            --metrics reports/metrics $baseline --expect studio. \
+            --metrics reports/metrics $baseline --trigger nightly \
             --commit ${{ github.sha }} \
             --run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} \
             | tee nightly-findings.txt
 
       - name: Hand on the last seven nights
-        # Tonight's measurements join the history, which keeps the seven
-        # latest; a night that measured nothing adds nothing. Before the
-        # findings are proposed, so a night whose pull request fails counts.
+        # Tonight's measurements join the history (<night>_<file>.json), which
+        # keeps the seven latest nights; a night that measured nothing adds
+        # nothing. Before the findings are proposed, so a night whose pull
+        # request fails counts.
         run: |
-          if [ -f reports/metrics/scale.json ]; then cp reports/metrics/scale.json "history/$(date -u +%Y-%m-%dT%H%M)-${{ github.run_id }}.json"; fi
-          ls history/*.json 2>/dev/null | sort | head -n -7 | xargs -r rm --
+          night="$(date -u +%Y-%m-%dT%H%M)-${{ github.run_id }}"
+          for f in reports/metrics/*.json; do [ -f "$f" ] && cp "$f" "history/${night}_$(basename "$f")"; done
+          ls history | sed 's/_.*//; s/\.json$//' | sort -u | head -n -7 | while read -r old; do rm -f "history/${old}"_* "history/${old}.json"; done
           ls history
       - uses: actions/upload-artifact@v4
         with:

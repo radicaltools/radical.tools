@@ -191,7 +191,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-spectral-cursor', label: 'Every list documents page tokens and a page-size cap', when: CURSOR, category: 'structural', implements: ['adr-cursor'], checks: ['req-paged'],
+      id: 'ff-spectral-cursor', label: 'Every list documents page tokens and a page-size cap', when: CURSOR, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cursor'], checks: ['req-paged'],
       threshold: '0 Spectral errors: every list operation in api/openapi.yaml takes page_token and page_size with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and answers an object with items and next_page_token',
       description: 'Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then enforces the range at run time.',
       tool: 'Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error',
@@ -222,7 +222,7 @@ rules:
     then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_page_token] } } } } }`,
     },
     {
-      id: 'ff-spectral-offset', label: 'Every list documents limit and a capped offset', when: { PAGING: ['offset'] }, category: 'structural', implements: ['adr-offset'], checks: ['req-paged', 'req-offset-cap'],
+      id: 'ff-spectral-offset', label: 'Every list documents limit and a capped offset', when: { PAGING: ['offset'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-offset'], checks: ['req-paged', 'req-offset-cap'],
       threshold: '0 Spectral errors: every list operation in api/openapi.yaml takes limit with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and offset with minimum 0 and maximum at most {{MAX_OFFSET}}, and answers an object with items and next_offset',
       description: 'Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then refuses a limit or offset out of range with 400.',
       tool: 'Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error',
@@ -253,7 +253,7 @@ rules:
     then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_offset] } } } } }`,
     },
     {
-      id: 'ff-page-size', label: 'Page size held to its range', when: PAGED, category: 'structural', implements: ['adr-cursor', 'adr-offset'], checks: ['req-paged', 'req-offset-cap'],
+      id: 'ff-page-size', label: 'Page size held to its range', when: PAGED, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cursor', 'adr-offset'], checks: ['req-paged', 'req-offset-cap'],
       threshold: 'No page size returns {{DEFAULT_PAGE_SIZE}} items, {{MAX_PAGE_SIZE}} returns {{MAX_PAGE_SIZE}}; {{MAX_PAGE_SIZE}} + 1, 0, -1 and a word are refused with 400; with offsets, offset {{MAX_OFFSET}} is answered and {{MAX_OFFSET}} + 1 refused with 400 naming {{MAX_OFFSET}}',
       description: 'An HTTP test against the application calls the orders list with each page size at and around the limits, and with offset and limit also with the offsets at and past the cap. The fixture names the page-size parameter of the decision (page_size with page tokens, limit with offsets).',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)',
@@ -284,7 +284,7 @@ it.runIf(PAGED_BY === 'offset')('refuses an offset past the cap, naming it', asy
 })`,
     },
     {
-      id: 'ff-cursor-tokens', label: 'Page tokens sealed and checked', when: CURSOR, category: 'structural', implements: ['adr-cursor'], checks: ['req-token-opaque', 'req-token-refused'],
+      id: 'ff-cursor-tokens', label: 'Page tokens sealed and checked', when: CURSOR, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cursor'], checks: ['req-token-opaque', 'req-token-refused'],
       threshold: 'The last item\'s id appears 0 times in the decoded token; an altered token, a token sent to another list and a token older than {{TOKEN_HOURS}} hours are each refused with 400',
       description: 'An HTTP test reads the first page, decodes its token to show it holds no readable id, then sends the token back with one character changed, to the customers list, and resealed with an issue time {{TOKEN_HOURS}} hours and one more in the past, using the same sealing module the list operations use.',
       tool: 'Vitest with supertest, the token module of the application (Node crypto, AES-256-GCM)',
@@ -312,7 +312,7 @@ it('issues tokens that reveal nothing, and refuses altered, foreign and expired 
 })`,
     },
     {
-      id: 'ff-cursor-walk', label: 'A read survives concurrent changes', when: CURSOR, category: 'structural', implements: ['adr-cursor'], checks: ['req-cursor-consistent'],
+      id: 'ff-cursor-walk', label: 'A read survives concurrent changes', when: CURSOR, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cursor'], checks: ['req-cursor-consistent'],
       threshold: 'While 5 items are added and 5 not yet read are removed during a read of 5 pages, every other item is read exactly once and 0 items twice',
       description: 'An HTTP test reads the orders list page by page with page tokens; after the second page it adds five orders and removes the last five of the list, which have not been read yet, then checks what the read returned against the ids the database held before.',
       tool: 'Vitest with supertest, with fixtures that write to the test database',
@@ -340,7 +340,7 @@ it('reads every surviving item once while items are added and removed', async ()
 })`,
     },
     {
-      id: 'ff-order', label: 'Lists read in a total order', category: 'structural', implements: MAIN, checks: ['req-order'],
+      id: 'ff-order', label: 'Lists read in a total order', characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-order'],
       threshold: 'Reading every page of the orders list in the default order returns each seeded item exactly once, and every item comes strictly after its neighbour in the order {{DEFAULT_ORDER}}',
       description: 'An HTTP test seeds orders of which twenty share one creation time, reads every page with the walk helper (which follows the pagination of the decision: page tokens, offsets, or the one response of a bounded list), and checks that no item is missing or repeated and that each item comes strictly after the one before it in the default order, so ties are broken.',
       tool: 'Vitest with supertest, through the walk helper in tests/collections',
@@ -369,7 +369,7 @@ it('reads each item once, in the default order, with every tie broken', async ()
 })`,
     },
     {
-      id: 'ff-bounded', label: 'Bounded lists refuse to grow', when: { PAGING: ['bounded'] }, category: 'structural', implements: ['adr-bounded'], checks: ['req-bounded'],
+      id: 'ff-bounded', label: 'Bounded lists refuse to grow', when: { PAGING: ['bounded'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-bounded'], checks: ['req-bounded'],
       threshold: 'A list holding {{MAX_ITEMS}} items refuses one more with 409 and returns all {{MAX_ITEMS}} in one response without a page token; one test per bounded list',
       description: 'An HTTP test per bounded list fills it to the cap through the API, adds one more and reads the list back. The example is a customer\'s addresses.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -393,7 +393,7 @@ it('serves a customer\\'s addresses whole and refuses to grow them past the cap'
 })`,
     },
     {
-      id: 'ff-unknown', label: 'Unknown parameters refused', category: 'structural', implements: MAIN, checks: ['req-unknown'],
+      id: 'ff-unknown', label: 'Unknown parameters refused', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-unknown'],
       threshold: 'An undocumented parameter, an order_by field off the allow-list, a filter on an unknown field and an unknown field in fields are each refused with 400, the error naming the parameter or field',
       description: 'An HTTP test calls the orders list four times with something it does not know. The same four calls hold for every answer: where the pack decided no order_by, filter or fields parameter, the parameter itself is the unknown one.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -414,7 +414,7 @@ it.each([
 })`,
     },
     {
-      id: 'ff-filter', label: 'Filters apply before paging', when: { FILTER: ['params', 'expression'] }, category: 'structural', implements: [...MAIN, 'adr-filter-expression'], checks: ['req-filter'],
+      id: 'ff-filter', label: 'Filters apply before paging', when: { FILTER: ['params', 'expression'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MAIN, 'adr-filter-expression'], checks: ['req-filter'],
       threshold: 'For each filterable field, the filtered read across every page returns exactly the matching items of the unfiltered read, in the same order; a value of the wrong type is refused with 400',
       description: 'An HTTP test per filterable field reads the whole list, then the list with the filter, and compares the ids; a second call sends a value that does not fit the field. The cases live in the fixtures, one per filterable field of the OpenAPI document, written as the decision filters (a parameter per field, or an AIP-160 expression).',
       tool: 'Vitest with supertest, through the walk helper in tests/collections',
@@ -440,7 +440,7 @@ describe.each(FILTER_CASES)('filter on $field', ({ query, invalid, matches }) =>
 })`,
     },
     {
-      id: 'ff-sort', label: 'Every allowed order holds across pages', when: { SORT: ['allowlist'] }, category: 'structural', implements: MAIN, checks: ['req-sort'],
+      id: 'ff-sort', label: 'Every allowed order holds across pages', when: { SORT: ['allowlist'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-sort'],
       threshold: 'For each field on the order_by allow-list, ascending and descending, every item read across all pages comes after its neighbour by the field, ties by id in the same direction',
       description: 'An HTTP test reads the orders list page by page once per allowed field and direction, with twenty orders sharing one creation time so ties occur, and checks each neighbouring pair. The allow-list comes from the fixtures, which read it from the OpenAPI document.',
       tool: 'Vitest with supertest, through the walk helper in tests/collections',
@@ -463,7 +463,7 @@ describe.each(cases)('order_by $field $direction', ({ field, direction }) => {
 })`,
     },
     {
-      id: 'ff-fields', label: 'Partial items hold only what was asked', when: { FIELDS: ['partial'] }, category: 'structural', implements: MAIN, checks: ['req-fields'],
+      id: 'ff-fields', label: 'Partial items hold only what was asked', when: { FIELDS: ['partial'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-fields'],
       threshold: 'With fields=status,total,customer.name, every item on every page holds exactly id, status, total and a customer with only its name',
       description: 'An HTTP test reads every page of the orders list with a fields parameter that names two top-level fields and one nested field, and checks the keys of each item.',
       tool: 'Vitest with supertest, through the walk helper in tests/collections',
@@ -483,7 +483,7 @@ it('returns only the named fields and the id, on every page', async () => {
 })`,
     },
     {
-      id: 'ff-latency', label: 'Deep pages answered in time', when: PAGED, category: 'operational', implements: ['adr-cursor', 'adr-offset'], checks: ['req-latency'],
+      id: 'ff-latency', label: 'Deep pages answered in time', when: PAGED, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-cursor', 'adr-offset'], checks: ['req-latency'],
       threshold: 'p95 of http_req_duration for the deep page below {{LIST_P95_MS}} ms over 2 minutes with 10 virtual users',
       description: 'A k6 script run nightly against a test environment with a production-sized collection: its setup finds a page a hundred pages deep by following page tokens (with offsets it takes the largest offset accepted), then ten virtual users request that page for two minutes; the threshold fails the run when the 95th percentile is too slow. Only the deep-page requests are tagged, so the setup does not count.',
       tool: 'k6 (k6 run tests/load/deep-pages.js with BASE_URL and PAGED_BY=token or offset)',

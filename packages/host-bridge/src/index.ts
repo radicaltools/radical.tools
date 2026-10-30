@@ -107,7 +107,7 @@ export interface HostCapabilities {
    *  model: the test results (`.radical/test-results.json`), the
    *  measurements (`.radical/measurements.json`) and the rule settings
    *  (`check.json`); each is null when there is none. */
-  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null }>
+  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null; reviews?: string | null }>
   /** Write the rule settings and goals (`check.json`) of an md-folder model,
    *  as the Inspector's Settings save them. */
   writeCheckConfig?(folderPath: string, content: string): Promise<HostResult>

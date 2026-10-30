@@ -2,10 +2,14 @@
 id: "43e82eec-94cf-4c90-951b-36d6132b97eb"
 type: "fitness-fn"
 label: "Direct AI provider calls"
-category: "structural"
+cadence: "triggered"
+characteristic: "maintainability"
+invocation: "automated"
 metrics: |
   test(apps/studio/tests/aiProviders.test.ts › AI providers) passed
   test(apps/studio/tests/aiSettings.test.ts › aiReady) passed
+scope: "atomic"
+trigger: "pull-request"
 ---
 
 apps/studio/tests/aiProviders.test.ts checks that each of the four adapters (OpenAI, Anthropic, Gemini, Ollama) sends its request straight to the vendor URL with the key the user entered (Bearer, x-api-key, ?key=), with no proxy in between; apps/studio/tests/aiSettings.test.ts › aiReady checks that a cloud provider needs a key and Ollama none.

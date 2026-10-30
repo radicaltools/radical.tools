@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseTestReport, ratchetConfig, runCheck, serializeMeasurementStore, serializeTestResults, type CheckConfig, type Measurement, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, type CheckConfig, type Measurement, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -29,12 +29,18 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       folder's .radical/measurements.json, which is read
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
-                      the latest measurement each matches
+                      the latest measurement each matches. The reviews
+                      radical sense review keeps in the model folder's
+                      reviews.json are read as measurements too
   --baseline <path>   earlier radical-metrics/1 files (a file, or a directory of
                       them; repeat for more) that a condition stated against a
                       baseline (<metric> <= baseline + 20%) compares with: the
                       median of the latest seven measurements of its metric
                       and labels. Read only, never kept beside the model
+  --trigger <event>   the event the check runs on (pull-request in the gate): a
+                      metric condition of a fitness function that runs on
+                      another event, or continually, is not reported when
+                      nothing measured it
   --evidence <file>   with --report or measurements: write what they say about
                       each scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
@@ -84,6 +90,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         report: { type: 'string', multiple: true },
         metrics: { type: 'string', multiple: true },
         baseline: { type: 'string', multiple: true },
+        trigger: { type: 'string' },
         evidence: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
@@ -173,6 +180,17 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     await writeBeside(storePath, serializeMeasurementStore(measurements))
   }
 
+  // The reviews of manual fitness functions, kept in git beside the model.
+  const reviewsText = await readFile(join(root, REVIEWS_FILE), 'utf8').catch(() => null)
+  if (reviewsText !== null) {
+    try {
+      measurements = [...(measurements ?? []), ...reviewMeasurements(parseReviewsFile(reviewsText))]
+    } catch (error) {
+      io.err(`Cannot read ${REVIEWS_FILE}: ${(error as Error).message}`)
+      return 2
+    }
+  }
+
   // Earlier measurements, for conditions against a baseline; not kept.
   let baseline: Measurement[] | undefined
   if (values.baseline?.length) {
@@ -185,7 +203,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), concerns: concernPacks() })
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks() })
   if (tests) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited.

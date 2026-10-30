@@ -43,11 +43,12 @@ jobs:
       - run: npm run typecheck
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
-      # The same boundary check as a sensor, for the model: radical sense
-      # measures its exit code, and the fitness function Workspace boundaries
-      # states the condition (job Architecture model reads reports/metrics).
+      # What the model measures on a pull request: the measure of every
+      # automated fitness function triggered on pull-request (Workspace
+      # boundaries: the command sensor on tools/check-workspaces.mjs), into
+      # reports/metrics, which the job Architecture model reads.
       - run: npm run build -w @radicaltools/cli
-      - run: node apps/cli/dist/index.js sense command --name workspaces --out reports/metrics/workspaces.json --context commit=${{ github.sha }} -- node tools/check-workspaces.mjs
+      - run: node apps/cli/dist/index.js sense run --trigger pull-request --folder architecture --out reports/metrics --context commit=${{ github.sha }}
       - name: Upload test reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -161,7 +162,7 @@ jobs:
       - name: radical check
         run: |
           if [ -f e2e-report/reports/e2e.json ]; then cp e2e-report/reports/e2e.json reports/; fi
-          node apps/cli/dist/index.js check architecture --report reports --metrics reports/metrics --format github
+          node apps/cli/dist/index.js check architecture --report reports --metrics reports/metrics --trigger pull-request --format github
 
   mcp-package:
     name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})

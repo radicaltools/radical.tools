@@ -212,7 +212,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-dod-required', label: 'Definition of Done checks are required on main', category: 'structural', implements: APPROVALS, checks: ['req-dod-items'],
+      id: 'ff-dod-required', label: 'Definition of Done checks are required on main', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: APPROVALS, checks: ['req-dod-items'],
       threshold: 'Every item of the Definition of Done written "(check: name)" is a required status check on main; 0 missing',
       description: 'A scheduled job, and every pull request that changes the Definition of Done, reads the items written "(check: <status check name>)" and the required status checks in force on main through the GitHub rulesets API, and fails naming each item the rulesets do not require. The checks belong to their owners: test (Test strategy), quality-gate (Code quality gate), the security scan (Secure coding) and the docs build (Code documentation); definition-of-done and ticket-id come from this pack; the reviews are the rulesets\' pull_request rule (Code review and branching), and the rollout is the deploy job (Deployment and rollback). Set DOD_FILE to docs/definition-of-done.md for a written team agreement.',
       tool: 'GitHub CLI (gh api) and jq in a scheduled GitHub Actions job',
@@ -231,7 +231,7 @@ missing=$(comm -23 <(echo "$wanted") <(echo "$required"))
 echo "every checkable item of the Definition of Done is required on main"`,
     },
     {
-      id: 'ff-dod-checklist', label: 'Checklist complete before merge', when: { DOD: ['template'] }, category: 'process', implements: APPROVALS, checks: ['req-dod-template'],
+      id: 'ff-dod-checklist', label: 'Checklist complete before merge', when: { DOD: ['template'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: APPROVALS, checks: ['req-dod-template'],
       threshold: '0 items in the "## Definition of Done" section of the pull request description that are unticked and not marked "N/A: " with a reason of at least 10 characters; the check fails when the section is missing',
       description: 'A workflow runs on every change to the pull request, its description included, reads the "## Definition of Done" section copied from .github/pull_request_template.md and fails on any item that is open and not marked N/A with a reason. It is the required check definition-of-done on main, so an open item blocks the merge; ticking an item is the author\'s statement, and the reviewer sees it.',
       tool: 'GitHub Actions (pull_request, the edited type included) with jq',
@@ -256,7 +256,7 @@ jobs:
           [ -z "$open" ] || { echo "::error::unticked Definition of Done items:"; echo "$open"; exit 1; }`,
     },
     {
-      id: 'ff-dod-reviewed', label: 'Team agreement reviewed on time', when: { DOD: ['agreement'] }, category: 'process', implements: APPROVALS, checks: ['req-dod-agreement'],
+      id: 'ff-dod-reviewed', label: 'Team agreement reviewed on time', when: { DOD: ['agreement'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '{{DOD_REVIEW_DAYS}}d', invocation: 'manual', implements: APPROVALS, checks: ['req-dod-agreement'],
       threshold: 'The "Last reviewed:" date in docs/definition-of-done.md is at most {{DOD_REVIEW_DAYS}} days old, and the page names at least 1 required check',
       description: 'A weekly job reads the review date that the team moves forward at each review (in its retrospective, through a pull request like any change) and fails when it is older than the limit, so a forgotten agreement shows as a red job rather than as drift.',
       tool: 'Bash with GNU date in a scheduled GitHub Actions job',
@@ -273,7 +273,7 @@ grep -qE '\\(check: [^)]+\\)' "$page" || { echo "$page names no required check";
 echo "Definition of Done reviewed $age days ago"`,
     },
     {
-      id: 'ff-change-record', label: 'Every deployment traces to an approved change', category: 'process', implements: APPROVALS, checks: ['req-change-record', 'req-segregation'],
+      id: 'ff-change-record', label: 'Every deployment traces to an approved change', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: APPROVALS, checks: ['req-change-record', 'req-segregation'],
       threshold: 'Every deployment to {{PROD_ENV}} of the last 30 days and older than {{BREAK_GLASS_HOURS}} hours belongs to a merged pull request with at least 1 approving review by someone other than its author; 0 without',
       description: 'A daily job lists the deployments to {{PROD_ENV}} through the deployments API (GitHub Actions creates one for every job that names the environment), finds the merged pull request of each deployed commit and its reviews, and fails naming every deployment without an approval from someone other than the author. Deployments younger than {{BREAK_GLASS_HOURS}} hours are left to a later run, so that a break-glass change has its time to be reviewed and merged. The deployment, its run and its pull request together are the change record.',
       tool: 'GitHub CLI (gh api) and jq in a scheduled GitHub Actions job (GNU date)',
@@ -297,7 +297,7 @@ done
 exit $failed`,
     },
     {
-      id: 'ff-no-manual-gate', label: 'No sign-off after the review', when: { APPROVAL: ['peer-review'] }, category: 'structural', implements: ['adr-peer-approval'], checks: ['req-peer-approval'],
+      id: 'ff-no-manual-gate', label: 'No sign-off after the review', when: { APPROVAL: ['peer-review'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-peer-approval'], checks: ['req-peer-approval'],
       threshold: 'The {{PROD_ENV}} environment has 0 required reviewers and no wait timer',
       description: 'A daily job reads the protection rules of the {{PROD_ENV}} environment and fails when someone adds required reviewers or a wait timer, which would put a manual approval back between a reviewed change and production without superseding the decision.',
       tool: 'GitHub CLI (gh api) and jq in a scheduled GitHub Actions job',
@@ -313,7 +313,7 @@ jq -e 'map(select((.wait_timer // 0) > 0)) | length == 0' <<< "$rules" > /dev/nu
 echo "{{PROD_ENV}} deploys on the review and the green pipeline alone"`,
     },
     {
-      id: 'ff-high-risk', label: 'High-risk changes wait for the board', when: { APPROVAL: ['cab'] }, category: 'structural', implements: ['adr-cab'], checks: ['req-cab'],
+      id: 'ff-high-risk', label: 'High-risk changes wait for the board', when: { APPROVAL: ['cab'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'manual', implements: ['adr-cab'], checks: ['req-cab'],
       threshold: 'Every merged change touching {{HIGH_RISK_PATHS}} is labelled change:high-risk and deploys through {{PROD_ENV}}-high-risk; every other change deploys through {{PROD_ENV}}',
       description: 'The deploy workflow, .github/workflows/deploy.yml, classifies the merged pull request by the paths it changed, labels it, and picks the environment of the deployment job with an expression over the needs context, which GitHub Actions allows for a job\'s environment; the board\'s environment holds the job until a board member approves.',
       tool: 'GitHub Actions (the environment chosen by an expression) with the GitHub CLI',
@@ -345,7 +345,7 @@ jobs:
       - run: ./scripts/deploy.sh   # the rollout decided in the Deployment and rollback pack`,
     },
     {
-      id: 'ff-approvers-set', label: 'Approvers named in the environment', when: { APPROVAL: ['cab', 'release-approver'] }, category: 'structural', implements: ['adr-cab', 'adr-release-approver'], checks: ['req-cab', 'req-release-approver'],
+      id: 'ff-approvers-set', label: 'Approvers named in the environment', when: { APPROVAL: ['cab', 'release-approver'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-cab', 'adr-release-approver'], checks: ['req-cab', 'req-release-approver'],
       threshold: 'The approving environment ({{PROD_ENV}} for a release approver, {{PROD_ENV}}-high-risk for the board) has a required_reviewers rule with at least 1 reviewer',
       description: 'A daily job reads the protection rules of the approving environment and fails when it has no required reviewers, which would let deployments through without the approval the decision names; it prints the approvers, so a change to the list shows in the job log.',
       tool: 'GitHub CLI (gh api) and jq in a scheduled GitHub Actions job',
@@ -361,7 +361,7 @@ echo "$env waits for one of:"
 jq -r '.[] | select(.type == "required_reviewers") | .reviewers[] | "  \\(.type) \\(.reviewer.login // .reviewer.slug)"' <<< "$rules"`,
     },
     {
-      id: 'ff-segregation', label: 'No bypass and no self-approval', when: { SEGREGATION: ['enforced'] }, category: 'structural', implements: ['adr-segregation'], checks: ['req-segregation'],
+      id: 'ff-segregation', label: 'No bypass and no self-approval', when: { SEGREGATION: ['enforced'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-segregation'], checks: ['req-segregation'],
       threshold: 'Administrator bypass off and self-review prevented on {{PROD_ENV}}; 0 bypass actors on every active branch ruleset',
       description: 'A daily job reads the {{PROD_ENV}} environment and every active branch ruleset, and fails when administrators can bypass the environment, when a required-reviewers rule lets a person approve a deployment they started, or when a ruleset lists a bypass actor. The API returns bypass actors only to a token with write access to the ruleset, so the job runs with a GitHub App token that has it, and fails rather than passes when they are missing.',
       tool: 'GitHub CLI (gh api) and jq, with a GitHub App token',
@@ -383,7 +383,7 @@ done
 echo "no one can bypass the rulesets or {{PROD_ENV}}, and no one approves their own deployment"`,
     },
     {
-      id: 'ff-bypass-report', label: 'Bypasses posted to the team', when: { SEGREGATION: ['none'] }, category: 'process', implements: APPROVALS, checks: ['req-bypass-reported'],
+      id: 'ff-bypass-report', label: 'Bypasses posted to the team', when: { SEGREGATION: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: APPROVALS, checks: ['req-bypass-reported'],
       threshold: 'Every rule suite on main with the result bypass in the last day is posted to the team channel by the daily run',
       description: 'A daily job reads the rule-suite history of main through the rule suites API, filtered to bypasses, and posts each one (when, who, the commits) to the team\'s channel through an incoming webhook. Nobody is blocked, and nobody bypasses unseen.',
       tool: 'GitHub CLI (gh api), jq and curl in a scheduled GitHub Actions job',
@@ -400,7 +400,7 @@ curl -fsS -X POST -H 'Content-Type: application/json' \\
 echo "$bypasses"`,
     },
     {
-      id: 'ff-main-only', label: 'Production deploys from main only', when: { EMERGENCY: ['same-path'] }, category: 'structural', implements: APPROVALS, checks: ['req-emergency-path'],
+      id: 'ff-main-only', label: 'Production deploys from main only', when: { EMERGENCY: ['same-path'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: APPROVALS, checks: ['req-emergency-path'],
       threshold: 'The deployment branch policy of {{PROD_ENV}} is custom and allows exactly the branch main',
       description: 'A daily job reads the deployment branch policy of the {{PROD_ENV}} environment and fails when it allows any branch but main, so a fix has no way into production that skips the pull request, the reviews and the approval. The emergency label itself is a convention for the reviewer on call.',
       tool: 'GitHub CLI (gh api) and jq in a scheduled GitHub Actions job',
@@ -418,7 +418,7 @@ names=$(gh api "repos/$repo/environments/{{PROD_ENV}}/deployment-branch-policies
 echo "{{PROD_ENV}} deploys from main only"`,
     },
     {
-      id: 'ff-break-glass', label: 'Break-glass reviewed in time', when: { EMERGENCY: ['break-glass'] }, category: 'process', implements: ['adr-break-glass'], checks: ['req-break-glass'],
+      id: 'ff-break-glass', label: 'Break-glass reviewed in time', when: { EMERGENCY: ['break-glass'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-break-glass'], checks: ['req-break-glass'],
       threshold: '0 open break-glass-review issues older than {{BREAK_GLASS_HOURS}} hours; every deployment to {{PROD_ENV}}-break-glass has a break-glass-review issue naming its commit',
       description: 'An hourly job lists the open break-glass-review issues and fails on any older than the limit, and checks that each deployment to the break-glass environment has an issue naming its commit, so a break-glass deployment can stay neither unrecorded nor unreviewed.',
       tool: 'GitHub CLI (gh issue list, gh api) and jq in a scheduled GitHub Actions job (GNU date)',
@@ -438,7 +438,7 @@ done
 echo "every break-glass deployment is recorded, and none is overdue"`,
     },
     {
-      id: 'ff-ticket-id', label: 'Every pull request names its ticket', when: { TRACE: ['ticket'] }, category: 'process', implements: APPROVALS, checks: ['req-ticket'],
+      id: 'ff-ticket-id', label: 'Every pull request names its ticket', when: { TRACE: ['ticket'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: APPROVALS, checks: ['req-ticket'],
       threshold: 'The required check ticket-id fails on every pull request opened by a person whose title names no id matching {{TICKET_PATTERN}}',
       description: 'A workflow checks the title on every change to the pull request and fails without an id; as the required check ticket-id on main, and an item of the Definition of Done, it blocks the merge. The title becomes the subject of the squash commit, so the id reaches main, and git log between two release tags lists the ids a release delivers. Updates opened by Dependabot or Renovate are skipped.',
       tool: 'GitHub Actions (pull_request, the edited type included) with jq and grep',

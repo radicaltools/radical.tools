@@ -216,7 +216,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-gate-job', label: 'Static checks in time, required for merge', category: 'process', implements: GATES,
+      id: 'ff-gate-job', label: 'Static checks in time, required for merge', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-gate-on-pr'],
       threshold: 'The static-check job finishes within {{LINT_MINUTES}} minutes (its timeout) and "quality / static" is a required status check in the branch rules of main',
       description: 'The job that runs the formatter check, the linter and the type check has a hard timeout of {{LINT_MINUTES}} minutes, so a slow gate fails instead of being waited for; concurrency cancels the run of a superseded push. A weekly job reads the rules in force on main through the GitHub API and fails when the job is not among the required status checks, so a check switched off in the web UI is noticed within a week.',
@@ -256,7 +256,7 @@ jobs:
             || { echo "::error::quality / static is not a required status check on main"; exit 1; }`,
     },
     {
-      id: 'ff-pre-commit', label: 'Formatted on commit', category: 'process', implements: GATES,
+      id: 'ff-pre-commit', label: 'Formatted on commit', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-formatted'],
       threshold: '0 files in a pull request differ from the formatter\'s output (prettier --check exits 0 in CI); the formatter runs on every staged file at commit',
       description: 'husky installs a pre-commit hook that runs lint-staged, which formats and (where a linter is enforced) lints only the staged files in the versions pinned in package.json; CI runs the same formatter check over the whole tree, so a commit made with --no-verify still fails there. On Python the pre-commit framework with ruff-pre-commit does the same. The file is package.json; .husky/pre-commit holds the one line npx lint-staged.',
@@ -275,7 +275,7 @@ jobs:
 }`,
     },
     {
-      id: 'ff-eslint-config', label: 'Recommended rules, every one an error', when: { STATIC: ['linter'] }, category: 'structural', implements: ['adr-linter'],
+      id: 'ff-eslint-config', label: 'Recommended rules, every one an error', when: { STATIC: ['linter'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-linter'],
       checks: ['req-lint-rules'],
       threshold: '0 rules at warning severity; an unused disable directive is an error; a disable directive without a description is an error; eslint exits non-zero on any finding',
       description: 'The flat config enables the recommended and type-checked rule sets, turns unused disable directives into errors, requires a description on every disable directive (eslint-comments/require-description) and keeps no rule at "warn"; CI runs eslint with --max-warnings 0 so a rule accidentally set to warn still fails. On Python the equivalent is ruff with select = ["E", "F", "B", "UP", "C90"] in pyproject.toml and ruff\'s PGH004 for a blanket noqa; on Go, golangci-lint with the default linters enabled and nolintlint requiring an explanation.',
@@ -303,7 +303,7 @@ export default tseslint.config(
 )`,
     },
     {
-      id: 'ff-sonar-gate', label: 'Quality gate on new code holds', when: { STATIC: ['sonar'] }, category: 'process', implements: ['adr-sonar'],
+      id: 'ff-sonar-gate', label: 'Quality gate on new code holds', when: { STATIC: ['sonar'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-sonar'],
       checks: ['req-sonar-gate', 'req-zero-new'],
       threshold: '0 new bugs, 0 new vulnerabilities, 100% of new hotspots reviewed, maintainability rating A on new code; the pipeline fails when the gate fails',
       description: 'The scanner runs on every pull request with new code defined against the main branch and waits for the gate; the gate in SonarQube holds conditions on new code only (Reliability rating A, Security rating A, Security hotspots reviewed 100%, Maintainability rating A, and Duplicated lines on new code where duplication is blocked). Where the findings rule is "no new findings", this gate is what carries it for the platform\'s findings. Coverage conditions from the Test strategy decision live in the same gate.',
@@ -328,7 +328,7 @@ sonar.qualitygate.timeout=300
 #   Duplicated lines (%) on new code > {{DUPLICATION_PCT}} -> failed   (when duplication is blocked)`,
     },
     {
-      id: 'ff-size-watch', label: 'Growth is counted monthly', when: { STATIC: ['format-only'] }, category: 'holistic', implements: ['adr-format-only'],
+      id: 'ff-size-watch', label: 'Growth is counted monthly', when: { STATIC: ['format-only'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: ['adr-format-only'],
       checks: ['req-format-only-revisit'],
       threshold: 'Source lines below 5,000 and regular contributors (5 or more commits in 90 days) below 3; the monthly job opens an issue and fails otherwise',
       description: 'A scheduled job counts source lines with cloc and contributors with 5 or more commits in the last 90 days from git; when either passes the limit it opens an issue to introduce a linter (once, linking this decision) and fails, and keeps failing every month until the decision is superseded, so the schedule stays red for as long as the element has outgrown this decision.',
@@ -348,7 +348,7 @@ if [ "$lines" -ge 5000 ] || [ "$people" -ge 3 ]; then
 fi`,
     },
     {
-      id: 'ff-strict-types', label: 'Strict type check passes', when: { TYPES: ['strict'] }, category: 'structural', implements: GATES,
+      id: 'ff-strict-types', label: 'Strict type check passes', when: { TYPES: ['strict'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-strict-types'],
       threshold: '0 type errors with strict on for the whole element; 0 @ts-ignore or @ts-expect-error comments without an issue id (KEY-123)',
       description: 'tsconfig turns on strict and the checks strict leaves out, and the type check runs on every pull request; a grep in the same CI step refuses a suppression comment that does not name an issue (the ban-ts-comment lint rule does the same where a linter is enforced). On Python the equivalent is mypy --strict in pyproject.toml and a grep for "type: ignore" without an issue id; on C#, <Nullable>enable</Nullable> with <TreatWarningsAsErrors>true</TreatWarningsAsErrors>.',
@@ -374,7 +374,7 @@ fi`,
 // pyproject.toml equivalent: [tool.mypy] strict = true;  ! git grep -nE 'type: ignore' -- src | grep -vE '# [A-Z]+-[0-9]+'`,
     },
     {
-      id: 'ff-type-ratchet', label: 'Non-strict files only decrease', when: { TYPES: ['ratchet'] }, category: 'structural', implements: GATES,
+      id: 'ff-type-ratchet', label: 'Non-strict files only decrease', when: { TYPES: ['ratchet'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-type-ratchet'],
       threshold: 'Every file not marked @ts-strict-ignore passes strict checking (tsc-strict); the set of marked files equals the committed baseline list, so a file added to it fails; a marked file with 0 errors under tsc --strict fails until it is unmarked',
       description: 'typescript-strict-plugin checks every file in strict mode except those with a // @ts-strict-ignore comment at the top; tsc-strict runs in CI. A test compares the marked files with the committed list in strict-baseline.json: a file marked but not listed fails (the baseline cannot grow), a file listed but no longer marked fails until the list is shortened; then it runs tsc --strict over the whole project once and fails on a marked file that produced no error, which can be unmarked. On Python, mypy per-module overrides in pyproject.toml with strict = false for the listed modules play the same role.',
@@ -403,7 +403,7 @@ it('a marked file that passes strict is unmarked', () => {
 })`,
     },
     {
-      id: 'ff-boundary-types', label: 'Exported functions declare their types', when: { TYPES: ['loose'] }, category: 'structural', implements: GATES,
+      id: 'ff-boundary-types', label: 'Exported functions declare their types', when: { TYPES: ['loose'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-boundary-types'],
       threshold: '0 exported functions or public methods without explicit parameter and return types; untyped code inside modules is not reported',
       description: 'One ESLint rule, explicit-module-boundary-types, runs on src (even where only a formatter is enforced, this one rule is the whole lint run) and fails on an exported function or public method without explicit parameter or return types; code that is not exported is not checked. For Python, ruff\'s ANN001 and ANN201 with per-file-ignores on private modules do the same.',
@@ -421,7 +421,7 @@ export default tseslint.config({
 //   [tool.ruff.lint.per-file-ignores] "src/**/_*.py" = ["ANN"]   # private modules stay untyped`,
     },
     {
-      id: 'ff-complexity-rules', label: 'Complexity and length limits enforced', when: { COMPLEXITY: ['limits'] }, category: 'structural', implements: GATES,
+      id: 'ff-complexity-rules', label: 'Complexity and length limits enforced', when: { COMPLEXITY: ['limits'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-complexity-limits'],
       threshold: 'Cyclomatic complexity per function at most {{MAX_COMPLEXITY}}, functions at most {{MAX_FUNCTION_LINES}} lines, files at most {{MAX_FILE_LINES}} lines, nesting at most 4; each fails the check',
       description: 'ESLint\'s core complexity, max-lines-per-function, max-lines and max-depth rules fail the check on a function or file over the limit; blank lines and comments are not counted. On Python, ruff\'s C901 (mccabe) with max-complexity and PLR0915 do the same; on Go, gocyclo in golangci-lint; in SonarQube the rules S1541 "Functions should not be too complex" (cyclomatic) and "Files should not have too many lines" carry the same limits. Where only a formatter is enforced and there is no linter to carry the rules, the language-independent lizard runs in the same CI step instead and exits non-zero on a function over either limit.',
@@ -445,7 +445,7 @@ export default tseslint.config(
 // no linter: pipx run lizard src --CCN {{MAX_COMPLEXITY}} --length {{MAX_FUNCTION_LINES}} --warnings_only`,
     },
     {
-      id: 'ff-complexity-advisory', label: 'Complexity annotated, not blocking', when: { COMPLEXITY: ['advisory'] }, category: 'process', implements: GATES,
+      id: 'ff-complexity-advisory', label: 'Complexity annotated, not blocking', when: { COMPLEXITY: ['advisory'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-complexity-shown'],
       threshold: 'Every changed function over {{MAX_COMPLEXITY}} complexity or {{MAX_FUNCTION_LINES}} lines gets a review annotation on the pull request; the step exits 0',
       description: 'lizard measures every function in src and prints a warning line per function over the limits; reviewdog reads those lines with an errorformat, keeps the ones on lines the pull request added or changed, posts them as review comments and exits 0 (fail-level none), so the numbers are in front of the reviewer without blocking. Where a linter is enforced, the same step can read ESLint\'s complexity rules set to warn through -f=sarif instead; lizard works for every language without one.',
@@ -463,7 +463,7 @@ export default tseslint.config(
     reviewdog -efm='%f:%l: warning: %m' -name=lizard -reporter=github-pr-review -filter-mode=added -fail-level=none < lizard.txt`,
     },
     {
-      id: 'ff-new-findings', label: 'No findings on changed lines', when: { DEBT: ['zero-new'], STATIC: ['linter'] }, category: 'process', implements: ['adr-linter'],
+      id: 'ff-new-findings', label: 'No findings on changed lines', when: { DEBT: ['zero-new'], STATIC: ['linter'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-linter'],
       checks: ['req-zero-new'],
       threshold: '0 linter findings on lines added or changed by the pull request; findings on other lines are reported, not blocking',
       description: 'reviewdog takes the linter\'s SARIF output, keeps only the findings that fall on lines the pull request added (filter-mode added), posts them as review comments and fails the job on any; findings elsewhere in a changed file are shown with filter-mode diff_context in a second non-blocking step. With the platform variant the Sonar gate on new code carries this rule, so this check is not imported there.',
@@ -484,7 +484,7 @@ export default tseslint.config(
   run: reviewdog -f=sarif -name=eslint-context -reporter=github-pr-check -filter-mode=diff_context -fail-level=none < eslint.sarif`,
     },
     {
-      id: 'ff-ratchet', label: 'Findings count only goes down', when: { DEBT: ['ratchet'], ...WITH_LINTER }, category: 'process', implements: ['adr-linter', 'adr-sonar'],
+      id: 'ff-ratchet', label: 'Findings count only goes down', when: { DEBT: ['ratchet'], ...WITH_LINTER }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-linter', 'adr-sonar'],
       checks: ['req-ratchet'],
       threshold: 'The number of linter findings is at most the committed baseline; a lower number fails until the baseline is lowered to it',
       description: 'A test runs the linter in JSON mode, counts the findings, and compares the count with lint-baseline.json: more fails with the difference, fewer fails with the instruction to lower the baseline, so the file in git always shows the current debt and its history shows the trend. The baseline may only be edited in the same pull request that lowers the count. On Python the same test reads ruff check --output-format json.',
@@ -503,7 +503,7 @@ it('the number of lint findings only goes down', () => {
 })`,
     },
     {
-      id: 'ff-fix-all', label: 'Zero findings, no baseline file', when: { DEBT: ['fix-all'], ...WITH_LINTER }, category: 'structural', implements: ['adr-linter', 'adr-sonar'],
+      id: 'ff-fix-all', label: 'Zero findings, no baseline file', when: { DEBT: ['fix-all'], ...WITH_LINTER }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-linter', 'adr-sonar'],
       checks: ['req-fix-all'],
       threshold: '0 linter findings on the main branch and in every pull request; no findings baseline file (lint-baseline.json, .eslint-baseline.json) in the repository',
       description: 'The CI step runs the linter with --max-warnings 0 (ruff check with no per-file-ignores), and a test asserts that no findings baseline file exists, so a baseline cannot be introduced without superseding the decision. The types decision keeps its own baseline (strict-baseline.json) where strictness is ratcheted; that file is not a findings baseline and is not listed here.',
@@ -522,7 +522,7 @@ it('every finding is fixed, none is baselined', () => {
 })`,
     },
     {
-      id: 'ff-duplication', label: 'Duplication under the threshold', when: { DUPLICATION: ['block'] }, category: 'structural', implements: GATES,
+      id: 'ff-duplication', label: 'Duplication under the threshold', when: { DUPLICATION: ['block'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-duplication'],
       threshold: 'Duplicated lines at most {{DUPLICATION_PCT}}% of the source tree jscpd scans, blocks of 10 or more lines; the check fails above it and names both copies',
       description: 'jscpd runs over the source tree in CI with a minimum block of 10 lines and the threshold, exits 1 above it and prints both locations of every clone; the number is the whole tree\'s, so the threshold is set at the level found when this decision is adopted and lowered as clones are removed. With the platform variant the condition "Duplicated lines on new code" in the Sonar gate measures only the pull request\'s new lines instead. The HTML report is kept as a build artifact for the reviewer. The file is .jscpd.json; CI runs npx jscpd src, which exits 1 when duplication is above the threshold.',
@@ -540,7 +540,7 @@ it('every finding is fixed, none is baselined', () => {
 }`,
     },
     {
-      id: 'ff-duplication-report', label: 'Clones posted on the pull request', when: { DUPLICATION: ['report'] }, category: 'process', implements: GATES,
+      id: 'ff-duplication-report', label: 'Clones posted on the pull request', when: { DUPLICATION: ['report'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GATES,
       checks: ['req-duplication-reported'],
       threshold: 'Every pull request gets a comment with jscpd\'s clone list (both locations per clone) when clones exist; the step exits 0',
       description: 'jscpd runs over the source tree with the markdown reporter and no threshold, so it exits 0; the step posts the report file as a comment on the pull request (replacing its previous comment) when it lists any clone, and the reviewer decides. With the platform variant the pull request\'s duplication is also on the Sonar summary.',

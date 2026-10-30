@@ -170,7 +170,7 @@ describe('Radical Forge over MCP', () => {
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
       await call(client, 'forge_generate', { stage: 'fitness' })
-      await call(client, 'add_node', { tempId: 'f1', type: 'fitness-fn', label: 'Ready within 2 h', properties: { category: 'performance', metrics: 'ready.duration <= 2 h' } })
+      await call(client, 'add_node', { tempId: 'f1', type: 'fitness-fn', label: 'Ready within 2 h', properties: { characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', metrics: 'ready.duration <= 2 h' } })
       const fitness = await call(client, 'forge_complete_stage', { stage: 'fitness', summary: 'Pick-up time.' })
       expect(fitness).not.toContain('row, a column or a grid')
       expect(fitness).toContain('Run Smart Layout on Governance?')

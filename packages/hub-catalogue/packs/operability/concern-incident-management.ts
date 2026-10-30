@@ -236,7 +236,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-severity-defined', label: 'Severity levels defined in the runbook', category: 'structural', implements: LEVELS, checks: ['req-classify'],
+      id: 'ff-severity-defined', label: 'Severity levels defined in the runbook', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: LEVELS, checks: ['req-classify'],
       threshold: 'docs/incidents/severity.md has at least 3 levels, each with Impact, Examples, Response and Review lines, and the sections Levels, Top severities, DORA major incidents and Security incidents',
       description: 'A CI step runs on every change to the repository and fails when the severity definitions lose a level, a level loses its impact, examples, response or review, or the sections on the top severities, DORA major incidents and security incidents are missing. Each level is a ### heading under ## Levels.',
       tool: 'bash with awk and grep in a CI step',
@@ -258,7 +258,7 @@ for section in '## Levels' '## Top severities' '## DORA major incidents' '## Sec
 done`,
     },
     {
-      id: 'ff-declared', label: 'Incidents declared completely', category: 'operational', implements: LEVELS, checks: ['req-classify', 'req-declare', 'req-dora', 'req-security'],
+      id: 'ff-declared', label: 'Incidents declared completely', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: LEVELS, checks: ['req-classify', 'req-declare', 'req-dora', 'req-security'],
       threshold: '0 incidents of the last 90 days without a level or a channel; 0 marked DORA major incident below the highest level; 0 of type Security that are not private',
       description: 'A daily CI job reads the incidents of the last 90 days from the incident.io API (declined, merged and canceled ones left out) and fails on an incident without a severity or a Slack or Teams channel, a DORA major incident below the highest severity rank, or a Security incident whose visibility is not private. The first file is the small API module the other incident checks import; the two highest severity ranks of /v1/severities are the top severities, whichever scheme was chosen.',
       tool: 'Node 20 over the incident.io API (GET /v2/incidents, /v1/severities); for PagerDuty, GET /incidents with priority and the incident\'s custom fields',
@@ -290,7 +290,7 @@ for (const i of await incidents()) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-lead', label: 'Top-severity incidents have a lead', category: 'process', implements: [...LEVELS, 'adr-commander', 'adr-oncall-lead'], checks: ['req-commander', 'req-oncall-lead'],
+      id: 'ff-lead', label: 'Top-severity incidents have a lead', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [...LEVELS, 'adr-commander', 'adr-oncall-lead'], checks: ['req-commander', 'req-oncall-lead'],
       threshold: '0 incidents of the last 90 days on the two highest levels without an assignee in the lead role',
       description: 'A daily CI job reads the incidents on the two highest levels and fails on any whose lead role (incident.io\'s role of type lead, named Incident Commander or Incident Lead as decided) has no assignee.',
       tool: 'Node 20 over the incident.io API (incident_role_assignments of GET /v2/incidents); for PagerDuty, the incident\'s responders and roles',
@@ -305,7 +305,7 @@ if (leaderless.length) {
 }`,
     },
     {
-      id: 'ff-status-page', label: 'Status page in time and kept current', when: { COMMS: ['statuspage'] }, category: 'operational', implements: ['adr-statuspage'], checks: ['req-status-page'],
+      id: 'ff-status-page', label: 'Status page in time and kept current', when: { COMMS: ['statuspage'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-statuspage'], checks: ['req-status-page'],
       threshold: '0 customer-facing incidents of the last 90 days without a linked status page incident, published later than {{STATUS_MINUTES}} minutes after the declaration, or with more than {{UPDATE_MINUTES}} minutes between two status page updates before it was resolved',
       description: 'A daily CI job reads the incidents marked Customer facing, follows each one\'s field Status page incident to the Statuspage incident, and compares its created_at with the declaration and the times of its incident_updates up to resolved_at (or now, while it is open).',
       tool: 'Node 20 over the incident.io API and the Atlassian Statuspage REST API (GET /v1/pages/{page_id}/incidents/{incident_id}); for incident.io Status Pages, GET /v2/status_page_incidents',
@@ -328,7 +328,7 @@ for (const i of await incidents()) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-customers-told', label: 'Affected customers told in time', when: { COMMS: ['direct'] }, category: 'process', implements: ['adr-direct'], checks: ['req-direct'],
+      id: 'ff-customers-told', label: 'Affected customers told in time', when: { COMMS: ['direct'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-direct'], checks: ['req-direct'],
       threshold: '0 customer-facing incidents of the last 90 days whose timestamp Customers notified at is more than {{STATUS_MINUTES}} minutes after the declaration, or unset once that time has passed',
       description: 'A daily CI job reads the incidents marked Customer facing and compares the manual timestamp Customers notified at with the time the incident was declared.',
       tool: 'Node 20 over the incident.io API (incident_timestamp_values of GET /v2/incidents)',
@@ -348,7 +348,7 @@ if (late.length) {
 }`,
     },
     {
-      id: 'ff-updates', label: 'Updates on a cadence', category: 'process', implements: [...LEVELS, 'adr-statuspage', 'adr-direct'], checks: ['req-stakeholders'],
+      id: 'ff-updates', label: 'Updates on a cadence', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [...LEVELS, 'adr-statuspage', 'adr-direct'], checks: ['req-stakeholders'],
       threshold: '0 incidents of the last 90 days on the two highest levels with more than {{UPDATE_MINUTES}} minutes between two updates, counted from the declaration to Resolved at (or now)',
       description: 'A daily CI job lists the incident updates of each incident on the two highest levels and fails when the longest gap between the declaration, the updates and the resolution exceeds the cadence.',
       tool: 'Node 20 over the incident.io API (GET /v2/incident_updates); for PagerDuty, GET /incidents/{id}/status_updates',
@@ -367,7 +367,7 @@ for (const i of (await incidents()).filter(top)) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-deploy-marked', label: 'Deployments that caused incidents marked failed', category: 'holistic', implements: LEVELS, checks: ['req-deploy-failure'],
+      id: 'ff-deploy-marked', label: 'Deployments that caused incidents marked failed', characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: LEVELS, checks: ['req-deploy-failure'],
       threshold: '0 incidents resolved more than 3 days ago (1 working day, a weekend included) whose field Caused by deployment names a deployment without a failure status',
       description: 'A daily CI job reads the incidents whose field Caused by deployment is set and that were resolved more than 3 days ago, and fails when that GitHub deployment carries no failure status: the record the Delivery metrics pack counts failed deployments and recovery from.',
       tool: 'Node 20 over the incident.io API and the GitHub REST API (GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses)',
@@ -388,7 +388,7 @@ for (const i of await incidents()) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-postmortem', label: 'Postmortems completed in time', when: { POSTMORTEM: ['blameless'] }, category: 'process', implements: ['adr-blameless'], checks: ['req-postmortem'],
+      id: 'ff-postmortem', label: 'Postmortems completed in time', when: { POSTMORTEM: ['blameless'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-blameless'], checks: ['req-postmortem'],
       threshold: '0 incidents on the two highest levels resolved more than {{POSTMORTEM_DAYS}} days ago without a post-mortem document in status completed',
       description: 'A daily CI job reads the incidents on the two highest levels whose Resolved at is more than {{POSTMORTEM_DAYS}} days ago and lists their post-mortem documents; one in status completed is required.',
       tool: 'Node 20 over the incident.io API (GET /v1/postmortem_documents?incident_id=…); for PagerDuty, the postmortem linked from the incident',
@@ -406,7 +406,7 @@ for (const i of (await incidents()).filter(top)) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-review', label: 'Incidents closed after the review', when: { POSTMORTEM: ['retro'] }, category: 'process', implements: ['adr-retro'], checks: ['req-retro'],
+      id: 'ff-review', label: 'Incidents closed after the review', when: { POSTMORTEM: ['retro'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-retro'], checks: ['req-retro'],
       threshold: '0 incidents on the two highest levels resolved more than {{RETRO_DAYS}} days ago that are not closed',
       description: 'A daily CI job reads the incidents on the two highest levels whose Resolved at is more than {{RETRO_DAYS}} days ago and fails on any whose status is not in the closed category, which the team sets after the retrospective has reviewed it.',
       tool: 'Node 20 over the incident.io API (incident_status.category of GET /v2/incidents)',
@@ -424,7 +424,7 @@ if (open.length) {
 }`,
     },
     {
-      id: 'ff-actions', label: 'Actions done in time', category: 'process', implements: [...LEVELS, 'adr-blameless', 'adr-retro'], checks: ['req-actions'],
+      id: 'ff-actions', label: 'Actions done in time', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [...LEVELS, 'adr-blameless', 'adr-retro'], checks: ['req-actions'],
       threshold: '0 outstanding follow-ups created more than {{ACTION_DAYS}} days ago; 0 outstanding follow-ups without an assignee or team',
       description: 'A daily CI job lists the follow-ups of the last year and fails on an outstanding one older than the deadline or without an owner. A follow-up marked not doing counts as closed; the reason is in its description.',
       tool: 'Node 20 over the incident.io API (GET /v3/follow_ups); for Jira, a JQL search on the postmortem action issues',

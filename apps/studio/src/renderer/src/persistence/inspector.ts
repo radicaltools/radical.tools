@@ -5,12 +5,14 @@
 // from @radical/common, the code the CLI runs). What the tests say comes
 // from the last `radical check --report`: the CLI keeps the test cases in
 // the model folder's .radical/test-results.json, and the project's rule
-// settings are the folder's check.json. Both are polled for the active
+// settings are the folder's check.json. The reviews of its manual fitness
+// functions (reviews.json, `radical sense review`) are measurements too.
+// They are polled for the active
 // md-folder document, as agentForge.ts polls the Forge run status. The
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseTestResults, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -25,8 +27,8 @@ const RECHECK_MS = 400
 interface InspectorState {
   /** The test results kept beside the model, when there are any. */
   results: TestResults | null
-  /** What `radical sense` measured, kept beside the model, when there is a
-   *  store of it. */
+  /** What `radical sense` measured, kept beside the model, and the reviews
+   *  in the model's reviews.json, when there is either. */
   measurements: Measurement[] | null
   config: CheckConfig
   /** Why check.json could not be read, when it could not. */
@@ -61,6 +63,20 @@ export function setSettingsDraft(next: CheckConfig | null | ((draft: CheckConfig
     else delete settingsDrafts[id]
     return { settingsDrafts }
   })
+}
+
+/** The measurements the Inspector evaluates: the store `radical sense`
+ *  keeps beside the model and the reviews of reviews.json, each as its text
+ *  (empty when there is none); null when there is neither. A reviews.json
+ *  that does not parse is left out, as `radical check` would refuse it. */
+export function inspectorMeasurements(storeText: string, reviewsText: string): Measurement[] | null {
+  let reviews: Measurement[] = []
+  if (reviewsText) {
+    try { reviews = reviewMeasurements(parseReviewsFile(reviewsText)) } catch { reviews = [] }
+  }
+  const stored = storeText ? parseMeasurementStore(storeText) : null
+  if (!stored && !reviews.length) return null
+  return [...(stored ?? []), ...reviews]
 }
 
 /** check.json as Settings write it. */
@@ -117,13 +133,14 @@ if (typeof window !== 'undefined') {
   let polledFor: string | null = null
   let lastResults = ''
   let lastMeasurements = ''
+  let lastReviews = ''
 
   const poll = async (): Promise<void> => {
     const id = documents.getActiveId()
     if (id !== polledFor) {
       polledFor = id
       filesReadFor = null
-      lastResults = lastConfig = lastMeasurements = ''
+      lastResults = lastConfig = lastMeasurements = lastReviews = ''
       useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '' })
     }
     if (!id) return
@@ -134,22 +151,24 @@ if (typeof window !== 'undefined') {
     const resultsText = files.results ?? ''
     const configText = files.config ?? ''
     const measurementsText = files.measurements ?? ''
-    if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements) return
+    const reviewsText = files.reviews ?? ''
+    if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements && reviewsText === lastReviews) return
     filesReadFor = id
     // The concern packs, once, for a model that has a check report or
     // settings beside it: the one the Inspector is for.
-    if ((resultsText || configText || measurementsText) && !packsLoading) {
+    if ((resultsText || configText || measurementsText || reviewsText) && !packsLoading) {
       packsLoading = loadBundledConcepts().then((concepts) => { packs = concernPacks(concepts); recheck() })
     }
     lastResults = resultsText
     lastConfig = configText
     lastMeasurements = measurementsText
+    lastReviews = reviewsText
     let config: CheckConfig = {}
     let configError: string | null = null
     if (configText) {
       try { config = parseCheckConfig(configText) } catch (error) { configError = `check.json: ${(error as Error).message}` }
     }
-    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, measurements: measurementsText ? parseMeasurementStore(measurementsText) : null, config, configError, configText })
+    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, measurements: inspectorMeasurements(measurementsText, reviewsText), config, configError, configText })
     recheck()
   }
 

@@ -211,7 +211,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-radar-generate', label: 'Radar generated from the ADRs', category: 'structural', implements: MAIN, checks: ['req-radar-from-adrs', 'req-overrides-valid'],
+      id: 'ff-radar-generate', label: 'Radar generated from the ADRs', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-radar-from-adrs', 'req-overrides-valid'],
       threshold: 'radar/radar.json holds one entry per technology named by an ADR that is not superseded, its ring and quadrant derived as decided; 0 overrides naming a missing ADR or a ring or quadrant outside the four',
       description: 'A Node script reads the front matter of every Markdown file under architecture/nodes (type, label, status, date and concern, the keys the model\'s ADRs carry) and radar/overrides.json, and writes radar/radar.json: name, ring, quadrant, isNew and description as Build Your Own Radar reads them from JSON, plus adr and adrStatus (the ADR\'s label and status; not status, which Build Your Own Radar reads as the movement of a blip), all as strings. It exits with an error, writing nothing, when an override names no ADR or a ring or quadrant outside the four. Other packs that choose a named tool (a broker, a linter) come onto the radar by giving their ADR a technology name in the overrides.',
       tool: 'Node.js 20 or later with js-yaml (npm i -D js-yaml)',
@@ -242,7 +242,7 @@ if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }
 writeFileSync('radar/radar.json', \`\${JSON.stringify([...radar.values()].sort((a, b) => a.name.localeCompare(b.name)), null, 2)}\\n\`)`,
     },
     {
-      id: 'ff-radar-current', label: 'Committed radar matches the model', category: 'process', implements: MAIN, checks: ['req-radar-current'],
+      id: 'ff-radar-current', label: 'Committed radar matches the model', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-radar-current'],
       threshold: '0 differences between the committed radar/radar.json and what scripts/radar.mjs generates, on every pull request',
       description: 'The radar workflow runs on every pull request and every Monday: it regenerates the radar and fails when the committed file differs, then runs the Hold and Trial checks over it. It is a required check of the main branch, in the ruleset the Code review and branching pack keeps.',
       tool: 'GitHub Actions with Node.js',
@@ -268,7 +268,7 @@ jobs:
       - run: node scripts/radar-trials.mjs`,
     },
     {
-      id: 'ff-hold-uses', label: 'No new use of a technology on Hold', category: 'structural', implements: [...MAIN, 'adr-hold-migrate', 'adr-hold-freeze'], checks: ['req-hold-no-new-use', 'req-hold-instead'],
+      id: 'ff-hold-uses', label: 'No new use of a technology on Hold', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MAIN, 'adr-hold-migrate', 'adr-hold-freeze'], checks: ['req-hold-no-new-use', 'req-hold-instead'],
       threshold: '0 package manifests, lockfiles or container image files using a package of a technology on Hold outside its known uses; 0 technologies on Hold without packages and a replacement in the overrides',
       description: 'A Node script lists the repository\'s manifests, lockfiles and Dockerfiles with git ls-files, and for each technology in Hold searches them for the package names its entry in radar/overrides.json gives (as whole names, so moment does not match moment-timezone or @types/moment, and a transitive use is found in the lockfile); a file that uses one and is not among the entry\'s uses fails the check. Package names should be distinctive: a runtime such as node is better held by the version policy of its stack pack than by a name search.',
       tool: 'Node.js 20 or later (a step of the radar workflow)',
@@ -296,7 +296,7 @@ for (const blip of radar.filter((b) => b.ring === 'Hold')) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-hold-migration', label: 'Uses of Hold migrated by the deadline', when: { HOLD: ['migrate'] }, category: 'process', implements: ['adr-hold-migrate'], checks: ['req-hold-migrated'],
+      id: 'ff-hold-migration', label: 'Uses of Hold migrated by the deadline', when: { HOLD: ['migrate'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-hold-migrate'], checks: ['req-hold-migrated'],
       threshold: '0 known uses of a technology on Hold past holdSince plus {{HOLD_MONTHS}} months; every known use has an open GitHub issue',
       description: 'A weekly step of the radar workflow reads the uses of every technology in Hold from radar/overrides.json, fails when the deadline (holdSince plus {{HOLD_MONTHS}} months) has passed for any, and asks GitHub whether each use\'s migration issue is still open: a closed issue with its use still listed means the use was migrated without removing its line, or the issue closed without the migration.',
       tool: 'jq, GNU date and the gh CLI (GH_TOKEN with read access to issues)',
@@ -318,7 +318,7 @@ done < <(jq -r --slurpfile radar radar/radar.json '.entries | to_entries[]
 exit $fail`,
     },
     {
-      id: 'ff-trial-entries', label: 'Trials recorded', category: 'process', implements: [...MAIN, 'adr-trial-timebox', 'adr-trial-open'], checks: ['req-trial-recorded'],
+      id: 'ff-trial-entries', label: 'Trials recorded', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MAIN, 'adr-trial-timebox', 'adr-trial-open'], checks: ['req-trial-recorded'],
       threshold: 'Every technology in Trial has systems, an owner and a start date in radar/overrides.json, and its ADR is proposed',
       description: 'A Node script over the generated radar and the overrides fails for a technology in Trial whose record lacks its systems, owner or start date, or whose ADR is no longer proposed (the decision was taken and the Trial ring left behind).',
       tool: 'Node.js 20 or later (a step of the radar workflow)',
@@ -339,7 +339,7 @@ for (const blip of radar.filter((b) => b.ring === 'Trial')) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-trial-timebox', label: 'Trials end with a decision', when: { TRIAL: ['timebox'] }, category: 'process', implements: ['adr-trial-timebox'], checks: ['req-trial-timebox'],
+      id: 'ff-trial-timebox', label: 'Trials end with a decision', when: { TRIAL: ['timebox'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-trial-timebox'], checks: ['req-trial-timebox'],
       threshold: 'Every trial runs in 1 system, has exit criteria, and started no more than {{TRIAL_MONTHS}} months ago',
       description: 'A Node script, run weekly and on every pull request after scripts/radar-trials.mjs, fails for a trial in more than one system, without exit criteria, or past its time box while its ADR is still proposed.',
       tool: 'Node.js 20 or later (a step of the radar workflow)',
@@ -363,7 +363,7 @@ for (const blip of radar.filter((b) => b.ring === 'Trial')) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-review-cadence', label: 'Radar reviewed on a cadence', category: 'process', implements: MAIN, checks: ['req-review'],
+      id: 'ff-review-cadence', label: 'Radar reviewed on a cadence', characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '180d', invocation: 'manual', implements: MAIN, checks: ['req-review'],
       threshold: 'The reviewed date in radar/overrides.json is no more than {{REVIEW_MONTHS}} months old',
       description: 'A weekly step of the radar workflow reads the date of the last review from the overrides and fails once the next review is overdue, so the red build is the reminder. The review itself is a pull request that moves what it decides and sets reviewed.',
       tool: 'jq and GNU date (a step of the radar workflow)',
@@ -380,7 +380,7 @@ fi
 echo "radar reviewed on $reviewed; next review due by $due"`,
     },
     {
-      id: 'ff-ring-approval', label: 'Ring moves approved', when: APPROVED, category: 'process', implements: ['adr-board', 'adr-rfc'], checks: ['req-ring-approval'],
+      id: 'ff-ring-approval', label: 'Ring moves approved', when: APPROVED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: ['adr-board', 'adr-rfc'], checks: ['req-ring-approval'],
       threshold: 'A pull request that changes any technology\'s ring, or adds or removes one, carries the label radar and has at least {{RING_APPROVALS}} approvals from the approvers listed on main',
       description: 'A workflow on pull_request and pull_request_review regenerates the radar, compares each technology\'s ring with the radar on main, and when anything moved labels the pull request radar and counts the latest approving reviews by the approvers listed in radar/overrides.json as main has it. The job is a required check of the main branch, so the merge waits for the approvals.',
       tool: 'GitHub Actions with jq and the gh CLI (checkout with fetch-depth: 0; GH_TOKEN with pull-requests: write; PR set to the pull request number)',
@@ -399,7 +399,7 @@ got=$(gh pr view "$PR" --json latestReviews \\
 [ "$got" -ge {{RING_APPROVALS}} ] || { echo "$got of {{RING_APPROVALS}} approvals from the radar's approvers"; exit 1; }`,
     },
     {
-      id: 'ff-rfc-answered', label: 'Proposals answered in time', when: { BOARD: ['rfc'] }, category: 'process', implements: ['adr-rfc'], checks: ['req-rfc-answered'],
+      id: 'ff-rfc-answered', label: 'Proposals answered in time', when: { BOARD: ['rfc'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-rfc'], checks: ['req-rfc-answered'],
       threshold: '0 open pull requests labelled radar older than {{RFC_DAYS}} days',
       description: 'A weekly step of the radar workflow lists the open pull requests labelled radar and fails for any opened more than {{RFC_DAYS}} days ago, naming them.',
       tool: 'gh CLI and jq, GNU date (GH_TOKEN with read access to pull requests)',
@@ -415,7 +415,7 @@ if [ -n "$stale" ]; then
 fi`,
     },
     {
-      id: 'ff-team-owned', label: 'Each ADR has an owning team', when: { BOARD: ['teams'] }, category: 'structural', implements: ['adr-teams'], checks: ['req-team-owned'],
+      id: 'ff-team-owned', label: 'Each ADR has an owning team', when: { BOARD: ['teams'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-teams'], checks: ['req-team-owned'],
       threshold: '0 ADR files under architecture/nodes without a code owner; the main branch requires a code owner\'s review',
       description: 'A step of the radar workflow finds the ADR files by their front matter, asks the codeowners CLI which of them no CODEOWNERS pattern matches, and reads the main branch\'s rules from GitHub to check that a pull_request rule requires a code owner\'s review. With classic branch protection instead of rulesets, read required_pull_request_reviews.require_code_owner_reviews from the branch protection endpoint.',
       tool: 'codeowners CLI (github.com/hmarr/codeowners) and the gh CLI',
@@ -429,7 +429,7 @@ required=$(gh api "repos/{owner}/{repo}/rules/branches/main" \\
 [ "$required" = true ] || { echo "main does not require a code owner's review"; exit 1; }`,
     },
     {
-      id: 'ff-byor-publish', label: 'Radar picture published', when: { PUBLISH: ['byor'] }, category: 'operational', implements: MAIN, checks: ['req-published'],
+      id: 'ff-byor-publish', label: 'Radar picture published', when: { PUBLISH: ['byor'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-published'],
       threshold: 'Every push to main that changes architecture/ or radar/ pushes a radar image tagged with its commit',
       description: 'On every push to main that touches the model or the overrides, a job regenerates the radar and builds an image from the Build Your Own Radar image with radar/radar.json copied into the folder it serves as /files; people open the app and give it /files/radar.json. Deploying the image to the internal host is the platform\'s usual deployment. The app shows the ring Hold under the name Thoughtworks now gives it, Caution. Build Your Own Radar is AGPL-3.0: running it unmodified inside the organisation is fine; a modified copy offered to others must offer its source.',
       tool: 'GitHub Actions, Docker, the wwwthoughtworks/build-your-own-radar image, GitHub Container Registry',

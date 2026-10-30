@@ -859,10 +859,11 @@ export interface DocumentsAPI {
   /** Writes a folder model's view index (`.radical/cache/views.json`). */
   writeViewIndex(id: string, content: string): Promise<boolean>
   /** What `radical check` keeps beside an md-folder model (test results,
-   *  check.json), each null when it is not there; both null for a document
+   *  measurements, check.json, reviews.json), each null when it is not there;
+   *  all null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
    *  folder before its access is back). */
-  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null } | null>
+  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null } | null>
   /** Writes check.json beside an md-folder model; throws when the document
    *  is no folder or its folder cannot be written. */
   writeCheckConfig(id: string, content: string): Promise<void>
@@ -1475,11 +1476,11 @@ export const documents: DocumentsAPI = {
 
   async readCheckFiles(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return { results: null, measurements: null, config: null }
+    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null }
     const h = host()
     if (meta.folderPath && h.readCheckFiles) {
       const res = await h.readCheckFiles(meta.folderPath)
-      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null } : null
+      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null } : null
     }
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)

@@ -301,8 +301,8 @@ export async function readModelBaseFromHandle(root: FsDirHandle): Promise<string
 
 /** What `radical check` and `radical sense` keep beside the model:
  *  `.radical/test-results.json`, `.radical/measurements.json` and the
- *  model's check.json; each null when there is none. */
-export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; measurements: string | null; config: string | null }> {
+ *  model's check.json and reviews.json; each null when there is none. */
+export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null }> {
   const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
     try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
   }
@@ -310,7 +310,7 @@ export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ res
   try { dir = await root.getDirectoryHandle(SELECTION_DIR) } catch { dir = null }
   const results = dir ? await text(dir, 'test-results.json') : null
   const measurements = dir ? await text(dir, 'measurements.json') : null
-  return { results, measurements, config: await text(root, 'check.json') }
+  return { results, measurements, config: await text(root, 'check.json'), reviews: await text(root, 'reviews.json') }
 }
 
 /** Writes the model's check.json, as the Inspector's Settings save it. */

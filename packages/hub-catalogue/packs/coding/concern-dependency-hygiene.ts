@@ -212,7 +212,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-renovate-rules', label: 'Renovate automerges only safe updates', when: { UPDATES: ['automerge-patch'] }, category: 'process', implements: ['adr-automerge'],
+      id: 'ff-renovate-rules', label: 'Renovate automerges only safe updates', when: { UPDATES: ['automerge-patch'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-automerge'],
       checks: ['req-automerge'],
       threshold: 'renovate.json validates; its rules automerge patch and minor updates of packages at 1.0.0 or above after a 3-day minimum release age and label major and 0.x updates for a person; 0 other automerge rules',
       description: 'The repository\'s renovate.json is validated in CI with renovate-config-validator, and its package rules are what decide the gate: automerge for patch and minor updates of stable packages, a minimum release age of 3 days, majors and 0.x packages labelled for a person. A test over the file (jq in the same step) fails on an automerge rule outside those. The file is renovate.json; CI runs `npx --package renovate renovate-config-validator renovate.json` and then `jq -e \'[.packageRules[] | select(.automerge == true)] | all(.matchUpdateTypes == ["patch", "minor"] and .matchCurrentVersion == "!/^0/")\' renovate.json`, which fails when any automerge rule reaches past patch and minor updates of stable packages.',
@@ -233,7 +233,7 @@ const pack: PackSpec = {
 }`,
     },
     {
-      id: 'ff-weekly-groups', label: 'Updates grouped weekly', when: { UPDATES: ['weekly-batch'] }, category: 'process', implements: ['adr-weekly-batch'],
+      id: 'ff-weekly-groups', label: 'Updates grouped weekly', when: { UPDATES: ['weekly-batch'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-weekly-batch'],
       checks: ['req-weekly-batch'],
       threshold: 'dependabot.yml groups patch and minor updates into one weekly pull request on {{UPDATE_DAY}}; 0 update pull requests open longer than 7 days',
       description: 'Dependabot groups every patch and minor update into one weekly pull request and keeps majors separate; a daily job lists the open pull requests labelled dependencies and fails when one is older than 7 days. With Renovate, the same is one packageRule with groupName "weekly updates" and schedule ["before 6am on {{UPDATE_DAY}}"].',
@@ -255,7 +255,7 @@ updates:
 #   | jq -e '[.[] | select((now - (.createdAt | fromdateiso8601)) > 7 * 86400)] | length == 0'`,
     },
     {
-      id: 'ff-outdated-report', label: 'Outdated report on schedule', when: { UPDATES: ['manual'] }, category: 'process', implements: ['adr-manual'],
+      id: 'ff-outdated-report', label: 'Outdated report on schedule', when: { UPDATES: ['manual'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '{{MANUAL_CADENCE_DAYS}}d', invocation: 'manual', implements: ['adr-manual'],
       checks: ['req-manual-cadence'],
       threshold: 'A report issue labelled dependencies is opened every {{MANUAL_CADENCE_DAYS}} days; 0 report issues still open when the next one is due',
       description: 'A scheduled workflow runs npm outdated --json, turns it into a table and opens an issue labelled dependencies; before opening it fails when the previous report is still open, which is the signal that the update did not happen. Python: pip list --outdated --format=json; Go: go list -m -u -json all; JVM: mvn versions:display-dependency-updates; .NET: dotnet list package --outdated.',
@@ -274,7 +274,7 @@ npm outdated --json > outdated.json || true           # exits 1 when something i
 gh issue create --title "Dependency update $(date +%F)" --label dependencies --body-file report.md`,
     },
     {
-      id: 'ff-updates-checked', label: 'Updates merged only with green checks', category: 'process', implements: UPDATES,
+      id: 'ff-updates-checked', label: 'Updates merged only with green checks', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: UPDATES,
       checks: ['req-same-checks'],
       threshold: '0 pull requests labelled dependencies merged in the last 30 days with a status check that did not conclude success or skipped',
       description: 'A weekly job lists the pull requests labelled dependencies merged in the last 30 days (Renovate and Dependabot label theirs; a manual update is labelled by its author) and reads each one\'s status checks; a merged update with a failed, cancelled or missing check fails the job, which means a bypass or a check that is not required and belongs in the branch rules.',
@@ -289,7 +289,7 @@ bad=$(gh pr list --state merged --label dependencies --search "merged:>=$since" 
 [ -z "$bad" ] || { echo "dependency updates merged without green checks:"; echo "$bad"; exit 1; }`,
     },
     {
-      id: 'ff-lockfile-frozen', label: 'Install refuses lockfile drift', when: LOCKED, category: 'structural', implements: UPDATES,
+      id: 'ff-lockfile-frozen', label: 'Install refuses lockfile drift', when: LOCKED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-lockfile-install'],
       threshold: '0 builds in which the install changes the lockfile or a manifest has no lockfile beside it',
       description: 'CI installs with the frozen-lockfile command of each package manager and fails when the lockfile would change or is missing. Elsewhere: pnpm install --frozen-lockfile, uv sync --locked, poetry check --lock, go mod tidy -diff, mvn with the dependency lock plugin\'s check, dotnet restore --locked-mode. The lockfile\'s integrity hashes and where packages come from are the Software supply chain concern.',
@@ -305,7 +305,7 @@ npm ci --ignore-scripts                     # fails when package.json and the lo
 git diff --exit-code -- '*package-lock.json' # and nothing may have rewritten it`,
     },
     {
-      id: 'ff-exact-versions', label: 'Manifest holds exact versions', when: { PINNING: ['exact'] }, category: 'structural', implements: UPDATES,
+      id: 'ff-exact-versions', label: 'Manifest holds exact versions', when: { PINNING: ['exact'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-exact-versions'],
       threshold: '0 dependencies declared with anything but one exact version (a workspace: or npm: alias resolving to one version counts as exact); save-exact is set so new installs stay exact',
       description: 'A unit test reads the manifest and fails on any dependency whose version is not exactly one semver version: caret, tilde, wildcard, comparison and hyphen ranges, dist-tags such as next, and aliases without a version all fail; workspace:* and npm:pkg@1.2.3 pass, as a monorepo needs. .npmrc sets save-exact so that npm install writes exact versions. Python: pin with == in pyproject; Go modules are exact by construction.',
@@ -325,7 +325,7 @@ it('every dependency is declared with one exact version', () => {
 // .npmrc: save-exact=true`,
     },
     {
-      id: 'ff-range-matrix', label: 'Ranges tested at both ends', when: { PINNING: ['floating'] }, category: 'process', implements: UPDATES,
+      id: 'ff-range-matrix', label: 'Ranges tested at both ends', when: { PINNING: ['floating'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-floating-range'],
       threshold: 'The tests pass with the lowest-direct and with the highest resolution of the declared ranges; 0 lockfiles tracked in the repository',
       description: 'A pull-request job fails when a lockfile is tracked, then installs the library twice, once resolving every direct dependency to the lowest version its range allows and once to the highest, and runs the tests on each. For a JavaScript library the same is pnpm install --config.resolution-mode=lowest-direct against the default.',
@@ -346,7 +346,7 @@ jobs:
       - run: pytest`,
     },
     {
-      id: 'ff-knip', label: 'Unused and unlisted dependencies fail', when: { UNUSED: ['forbidden'] }, category: 'structural', implements: UPDATES,
+      id: 'ff-knip', label: 'Unused and unlisted dependencies fail', when: { UNUSED: ['forbidden'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-unused-fails'],
       threshold: '0 unused dependencies, 0 unlisted imports, 0 unresolved imports on every pull request',
       description: 'knip runs as a required check with dependency findings as errors; files and exports stay warnings until the backlog is clean. Python: deptry . with DEP001 to DEP004 in pyproject [tool.deptry]; Go: go mod tidy -diff fails when go.mod would change; JVM: the dependency:analyze goal of the Maven dependency plugin with failOnWarning. The file is knip.json; CI runs npx knip --reporter compact.',
@@ -367,7 +367,7 @@ jobs:
 }`,
     },
     {
-      id: 'ff-unused-review', label: 'Unused report is acted on', when: { UNUSED: ['reviewed'] }, category: 'process', implements: UPDATES,
+      id: 'ff-unused-review', label: 'Unused report is acted on', when: { UNUSED: ['reviewed'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '{{REVIEW_CADENCE_DAYS}}d', invocation: 'manual', implements: UPDATES,
       checks: ['req-unused-review'],
       threshold: 'A report issue every {{REVIEW_CADENCE_DAYS}} days; 0 packages named in two consecutive reports without a reason in dependency-exceptions.json',
       description: 'A scheduled workflow runs knip in report mode, opens the report as an issue, and fails when a package named in the previous report is named again without an entry in dependency-exceptions.json ([{ "package": "left-pad", "reason": "loaded by name in plugins/", "issue": 123 }]).',
@@ -386,7 +386,7 @@ gh issue create --title "Unused dependencies $(date +%F)" --label unused-depende
 test ! -s repeat.txt || { echo "named twice without a reason:"; cat repeat.txt; exit 1; }`,
     },
     {
-      id: 'ff-licence-allowlist', label: 'Licences on the allowlist', when: { LICENCES: ['allowlist'] }, category: 'structural', implements: UPDATES,
+      id: 'ff-licence-allowlist', label: 'Licences on the allowlist', when: { LICENCES: ['allowlist'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-licence-allowlist'],
       threshold: '100 % of production dependencies carry one of {{ALLOWED_LICENCES}} or are excused by package and version in dependency-exceptions.json; the build fails on the first that does not',
       description: 'The licence checker of each ecosystem runs on every pull request with the allowlist and exits non-zero on the first package outside it, unknown licences included; packages excused in dependency-exceptions.json (package and version, with a reason) are excluded by name and version. pip-licenses matches the classifier names packages declare, so its list is kept in those names next to the SPDX one.',
@@ -404,7 +404,7 @@ go-licenses check ./... --allowed_licenses="\${ALLOWED// /}"
 pip-licenses --from=classifier --allow-only "MIT License;Apache Software License;BSD License;ISC License (ISCL)"`,
     },
     {
-      id: 'ff-licence-denylist', label: 'Forbidden licences refused', when: { LICENCES: ['denylist'] }, category: 'structural', implements: UPDATES,
+      id: 'ff-licence-denylist', label: 'Forbidden licences refused', when: { LICENCES: ['denylist'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-licence-denylist'],
       threshold: '0 production dependencies carrying one of {{DENIED_LICENCES}}; every other licence listed in the build report',
       description: 'The licence checker runs on every pull request with the denylist, fails on the first match and writes the full licence list as a build artefact for the record. go-licenses classifies GPL and LGPL as restricted and only AGPL and the like as forbidden, so both types are disallowed there.',
@@ -421,7 +421,7 @@ go-licenses check ./... --disallowed_types=forbidden,restricted
 pip-licenses --from=classifier --fail-on "GNU General Public License v3 (GPLv3);GNU Affero General Public License v3"`,
     },
     {
-      id: 'ff-no-external-publish', label: 'Nothing published outside the organisation', when: { LICENCES: ['none'] }, category: 'structural', implements: UPDATES,
+      id: 'ff-no-external-publish', label: 'Nothing published outside the organisation', when: { LICENCES: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-internal-only'],
       threshold: 'package.json is private; 0 publish or push commands in the pipelines (npm publish, docker push, twine upload, gh release upload, dotnet nuget push) that do not name {{INTERNAL_REGISTRY}}',
       description: 'A CI step checks that the manifest is private and greps every workflow file for the commands that publish a package, image or binary; each found line must name the internal registry host, so the first line that would publish elsewhere fails the build and raises the licence question before the artefact leaves.',
@@ -436,7 +436,7 @@ external=$(git grep -nE 'npm publish|docker push|twine upload|gh release upload|
 [ -z "$external" ] || { echo "publishes outside $REGISTRY (decide licences first):"; echo "$external"; exit 1; }`,
     },
     {
-      id: 'ff-libyear', label: 'Freshness within bounds', when: { AGE: ['max-age'] }, category: 'operational', implements: UPDATES,
+      id: 'ff-libyear', label: 'Freshness within bounds', when: { AGE: ['max-age'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: UPDATES,
       checks: ['req-freshness'],
       threshold: 'Direct dependencies at most {{MAX_LIBYEARS}} libyears behind in total; no single one more than {{MAX_MONTHS_BEHIND}} months behind',
       description: 'libyear runs on every pull request and fails when the collective drift or any dependency\'s own drift crosses the bound (its limit flags), naming the dependencies behind. Python: the libyear package prints "Your system is N libyears behind" per requirements file; the job reads the number and compares the total (that tool has no per-dependency limit).',
@@ -453,7 +453,7 @@ total=$(libyear -r requirements.txt | awk '/libyears behind/ { print $(NF-2) }')
 awk -v t="$total" 'BEGIN { exit (t > {{MAX_LIBYEARS}}) }' || { echo "$total libyears behind, limit {{MAX_LIBYEARS}}"; exit 1; }`,
     },
     {
-      id: 'ff-abandoned', label: 'No deprecated or dormant dependency', category: 'operational', implements: UPDATES,
+      id: 'ff-abandoned', label: 'No deprecated or dormant dependency', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: UPDATES,
       checks: ['req-abandoned'],
       threshold: '0 direct dependencies marked deprecated on the registry or whose latest version was released more than 24 months ago, unless listed with an issue in dependency-exceptions.json',
       description: 'A daily job asks the registry about every direct dependency and fails on one that is deprecated or whose latest version (dist-tags.latest, not the metadata\'s modified date, which moves on any change) was released more than 24 months ago; each hit gets an issue and a deadline of {{REPLACE_DAYS}} days, recorded in dependency-exceptions.json while the replacement is under way. Python: the PyPI JSON API (releases and yanked flags); Go: go list -m -u -json for the latest version\'s time; .NET: dotnet list package --deprecated.',

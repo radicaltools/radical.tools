@@ -210,7 +210,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-noisy', label: 'Noisy caller contained', category: 'operational', implements: WHERE, checks: ['req-limit'],
+      id: 'ff-noisy', label: 'Noisy caller contained', characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: WHERE, checks: ['req-limit'],
       threshold: 'With one caller at 10 times {{LIMIT_PER_MIN}} requests a minute, other callers\' 95th percentile stays within 10 % of the baseline and at least 99 % of the flood\'s excess gets 429 with Retry-After',
       description: 'A load test in the staging environment runs normal traffic from several callers and a flood from one, and compares the others\' response times with a baseline run without the flood; 90 % of the flood is excess, so 99 % of the excess is 89 % of the flood.',
       tool: 'Grafana k6',
@@ -238,7 +238,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-body', label: 'Oversized bodies refused', category: 'structural', implements: WHERE, checks: ['req-size'],
+      id: 'ff-body', label: 'Oversized bodies refused', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WHERE, checks: ['req-size'],
       threshold: 'A body of 100 times {{MAX_BODY_KB}} KB is answered with 413 on 100 % of the router\'s write operations',
       description: 'A test lists the write operations from the router (not from a list kept by hand), sends an oversized body to each and expects 413, which fails when a new route or a proxy change drops the size limit.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -257,7 +257,7 @@ describe.each(routes.filter((r) => ['POST', 'PUT', 'PATCH'].includes(r.method)))
 })`,
     },
     {
-      id: 'ff-pages', label: 'Pages capped', category: 'structural', implements: WHERE, checks: ['req-pages'],
+      id: 'ff-pages', label: 'Pages capped', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WHERE, checks: ['req-pages'],
       threshold: 'Every paginated operation refuses a page size of 10 000 with 400 and returns at most {{MAX_PAGE_ITEMS}} items without a size; 0 exceptions',
       description: 'A test lists the paginated operations from the router (routes flagged paginated), asks each for an oversized page and for a default one, and checks the refusal and the count.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -274,7 +274,7 @@ describe.each(routes.filter((r) => r.paginated))('GET %s', (route) => {
 })`,
     },
     {
-      id: 'ff-bucket', label: 'Bucket admits a burst, keeps the rate', when: { ALGORITHM: ['token-bucket'] }, category: 'operational', implements: WHERE, checks: ['req-token-bucket'],
+      id: 'ff-bucket', label: 'Bucket admits a burst, keeps the rate', when: { ALGORITHM: ['token-bucket'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-token-bucket'],
       threshold: 'After a minute idle, {{BURST}} requests at once are all accepted; of twice {{LIMIT_PER_MIN}} requests spread over the next minute, at most {{LIMIT_PER_MIN}} plus 10 % are accepted and the rest get 429',
       description: 'A black-box test against the staging deployment lets the bucket fill, sends the burst in parallel, then sends at twice the rate for a minute and counts what was accepted.',
       tool: 'Vitest with fetch against $BASE_URL (or the test runner of your stack)',
@@ -299,7 +299,7 @@ it('admits a burst, then holds the rate', async () => {
 }, 200_000)`,
     },
     {
-      id: 'ff-sliding', label: 'Window edges hold', when: { ALGORITHM: ['sliding-window'] }, category: 'operational', implements: WHERE, checks: ['req-sliding-window'],
+      id: 'ff-sliding', label: 'Window edges hold', when: { ALGORITHM: ['sliding-window'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-sliding-window'],
       threshold: '{{LIMIT_PER_MIN}} requests in the last second of a minute are accepted and {{LIMIT_PER_MIN}} in the first second of the next all get 429',
       description: 'A black-box test against the staging deployment waits for second 59, sends the limit at once, waits two seconds past the minute boundary and sends the limit again.',
       tool: 'Vitest with fetch against $BASE_URL (or the test runner of your stack)',
@@ -319,7 +319,7 @@ it('refuses a burst that straddles the minute boundary', async () => {
 }, 120_000)`,
     },
     {
-      id: 'ff-fixed', label: 'Quota headers present', when: { ALGORITHM: ['fixed-window'] }, category: 'structural', implements: WHERE, checks: ['req-fixed-window'],
+      id: 'ff-fixed', label: 'Quota headers present', when: { ALGORITHM: ['fixed-window'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-fixed-window'],
       threshold: 'After 10 requests in a minute, the 11th answer carries the limit {{LIMIT_PER_MIN}}, {{LIMIT_PER_MIN}} minus 11 remaining and a reset of at most 60 seconds',
       description: 'A black-box test against the staging deployment makes eleven requests at the start of a minute and reads the RateLimit header fields of the last answer.',
       tool: 'Vitest with fetch against $BASE_URL (or the test runner of your stack)',
@@ -339,7 +339,7 @@ it('shows the quota with every answer', async () => {
 }, 120_000)`,
     },
     {
-      id: 'ff-key-account', label: 'Anonymous limit apart', when: { KEY: ['account'] }, category: 'operational', implements: WHERE, checks: ['req-key-account'],
+      id: 'ff-key-account', label: 'Anonymous limit apart', when: { KEY: ['account'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-key-account'],
       threshold: 'From one address without a credential, {{ANON_LIMIT_PER_MIN}} requests are accepted and the next 10 get 429; a signed-in user\'s request from the same address is accepted',
       description: 'A black-box test against the staging deployment floods a public route from one address without a credential, then calls with a user\'s token from the same address.',
       tool: 'Vitest with fetch against $BASE_URL (or the test runner of your stack)',
@@ -357,7 +357,7 @@ it('limits anonymous addresses lower and apart from signed-in callers', async ()
 }, 120_000)`,
     },
     {
-      id: 'ff-key-apikey', label: 'Invalid keys do not count', when: { KEY: ['apikey'] }, category: 'operational', implements: WHERE, checks: ['req-key-apikey'],
+      id: 'ff-key-apikey', label: 'Invalid keys do not count', when: { KEY: ['apikey'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-key-apikey'],
       threshold: 'With one request of a partner\'s limit left, {{ANON_LIMIT_PER_MIN}} requests naming its key with a wrong secret get 401 and the next 10 get 429; the partner\'s request is then accepted',
       description: 'A black-box test against the staging deployment uses up a partner\'s limit but one, floods with a forged key from another address, and checks that the partner\'s last request still passes.',
       tool: 'Vitest with fetch against $BASE_URL (or the test runner of your stack)',
@@ -378,7 +378,7 @@ it('refuses invalid keys before counting, and limits them per address', async ()
 }, 300_000)`,
     },
     {
-      id: 'ff-key-ip', label: 'Addresses counted fairly', when: { KEY: ['ip'] }, category: 'operational', implements: WHERE, checks: ['req-key-ip'],
+      id: 'ff-key-ip', label: 'Addresses counted fairly', when: { KEY: ['ip'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: WHERE, checks: ['req-key-ip'],
       threshold: 'A forged X-Forwarded-For from outside does not reset a caller\'s count; two addresses in one IPv6 /64 share one count; an address in another /64 has its own',
       description: 'A black-box test against the staging deployment floods from the runner\'s address and then forges the header; a second test, from a runner on the trusted-proxy list, presents addresses as the proxy would and checks the /64 grouping.',
       tool: 'Vitest with fetch against $BASE_URL and, for the proxy path, from a runner on the trusted-proxy list (or the test runner of your stack)',
@@ -399,7 +399,7 @@ it('counts an IPv6 /64 as one caller', async () => {
 }, 120_000)`,
     },
     {
-      id: 'ff-gateway', label: 'Every route limited', when: { WHERE: ['gateway'] }, category: 'structural', implements: ['adr-gateway'], checks: ['req-limit'],
+      id: 'ff-gateway', label: 'Every route limited', when: { WHERE: ['gateway'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-gateway'], checks: ['req-limit'],
       threshold: '0 gateway services without a rate-limiting plugin on the service, one of its routes, or globally; 0 per-minute limits above {{LIMIT_PER_MIN}} without an exception tag naming its ticket',
       description: 'A Conftest policy over the gateway\'s declarative configuration (Kong decK file) fails the pull request when a service has no rate limit at any level, or one higher than agreed that carries no limit-exception tag; both rate-limiting (config.minute) and rate-limiting-advanced (the limit for the 60-second window) are read.',
       tool: 'Conftest (Open Policy Agent) over the Kong decK configuration',
@@ -438,7 +438,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-waf', label: 'Edge rate rule present', when: { WHERE: ['waf'] }, category: 'structural', implements: ['adr-waf'], checks: ['req-limit'],
+      id: 'ff-waf', label: 'Edge rate rule present', when: { WHERE: ['waf'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-waf'], checks: ['req-limit'],
       threshold: 'Every web ACL in front of the element holds a rate-based rule in blocking mode; 0 plan changes that remove it',
       description: 'A Conftest policy over the Terraform plan fails when a WAF web ACL has no rate-based rule that blocks, so the edge limit cannot disappear in a refactoring.',
       tool: 'Conftest (Open Policy Agent) over terraform show -json (AWS WAF; for Cloudflare: the cloudflare_ruleset resource with phase http_ratelimit, checked the same way)',
@@ -463,7 +463,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-app', label: 'Limit holds across instances', when: { WHERE: ['app'] }, category: 'structural', implements: ['adr-app'], checks: ['req-shared-counters'],
+      id: 'ff-app', label: 'Limit holds across instances', when: { WHERE: ['app'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-app'], checks: ['req-shared-counters'],
       threshold: 'Two instances sharing Redis accept no more from one caller in a minute than one instance alone plus 10 %, and no more than {{LIMIT_PER_MIN}} + {{BURST}}; another caller is still accepted; with Redis stopped, one instance still refuses past its own limit',
       description: 'An integration test starts two instances of the element with a Redis container, measures what one instance alone accepts from a flood (the single-instance allowance, whatever the algorithm), then spreads the same flood over both and compares; a last run stops Redis and expects the per-instance fallback to refuse.',
       tool: 'Vitest with supertest and Testcontainers (Redis) (or the test runner of your stack)',
@@ -494,7 +494,7 @@ it('still limits per instance when Redis is unreachable', async () => {
 }, 300_000)`,
     },
     {
-      id: 'ff-bots-challenge', label: 'Repeated costly calls challenged', when: { BOTS: ['challenge'] }, category: 'structural', implements: WHERE, checks: ['req-bots-challenge'],
+      id: 'ff-bots-challenge', label: 'Repeated costly calls challenged', when: { BOTS: ['challenge'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WHERE, checks: ['req-bots-challenge'],
       threshold: 'The 1st attempt at a costly operation from a fresh source shows no challenge; the 11th within 10 minutes shows one',
       description: 'An end-to-end test uses the password reset (one of the costly operations, with no lockout of its own) from one browser context: the first attempt must show no challenge widget, the eleventh must; the locator covers Turnstile, hCaptcha and reCAPTCHA.',
       tool: 'Playwright',
@@ -515,7 +515,7 @@ test('a repeated costly operation is challenged, a first attempt never', async (
 })`,
     },
     {
-      id: 'ff-bots-managed', label: 'Bot control enabled', when: { BOTS: ['managed'] }, category: 'structural', implements: WHERE, checks: ['req-bots-managed'],
+      id: 'ff-bots-managed', label: 'Bot control enabled', when: { BOTS: ['managed'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WHERE, checks: ['req-bots-managed'],
       threshold: 'The web ACL in front of the element holds the managed bot rule group, not in count-only mode',
       description: 'A Conftest policy over the Terraform plan fails when the edge\'s managed bot rule group is missing or overridden to count, which would let bots through silently.',
       tool: 'Conftest (Open Policy Agent) over terraform show -json, for AWS WAF Bot Control (for Cloudflare: the cloudflare_bot_management resource; for Akamai: the akamai_botman_* resources; each checked the same way for presence and a blocking action)',
@@ -541,7 +541,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-bots-none', label: 'Costly operations behind identity', when: { BOTS: ['none'] }, category: 'structural', implements: WHERE, checks: ['req-bots-none'],
+      id: 'ff-bots-none', label: 'Costly operations behind identity', when: { BOTS: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WHERE, checks: ['req-bots-none'],
       threshold: 'Every route the router marks costly answers 401 without a credential; 0 exceptions',
       description: 'A test lists the routes flagged costly from the router (not from a list kept by hand) and calls each without a credential, expecting 401; a new costly route fails the test until it is protected or flagged.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -556,7 +556,7 @@ describe.each(routes.filter((r) => r.costly))('%s %s', (route) => {
 })`,
     },
     {
-      id: 'ff-origin', label: 'Origin closed to the internet', when: { EXPOSURE: ['internet'] }, category: 'operational', implements: WHERE, checks: ['req-internet'],
+      id: 'ff-origin', label: 'Origin closed to the internet', when: { EXPOSURE: ['internet'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: WHERE, checks: ['req-internet'],
       threshold: '0 of the origin addresses answer a connection from the internet; every one is refused or times out',
       description: 'A scheduled job on a runner outside the provider\'s network tries each origin address directly over HTTPS and fails when any answers, which would mean the edge and its limits can be bypassed.',
       tool: 'curl in a scheduled job on a runner outside the edge',
@@ -571,7 +571,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-partner-alert', label: 'Partner near its limit', when: { EXPOSURE: ['partners'] }, category: 'operational', implements: WHERE, checks: ['req-partners'],
+      id: 'ff-partner-alert', label: 'Partner near its limit', when: { EXPOSURE: ['partners'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: WHERE, checks: ['req-partners'],
       threshold: 'An alert names every partner whose request rate has been above 80 % of its limit for 15 minutes',
       description: 'A Prometheus rule over the gateway\'s per-consumer request counter alerts the partner\'s owner; a partner whose limit was raised by agreement gets a rule of its own with its figure.',
       tool: 'Prometheus alerting rules over Kong\'s prometheus plugin (per_consumer and status_code_metrics on; for the application: its own http_requests_total by caller)',

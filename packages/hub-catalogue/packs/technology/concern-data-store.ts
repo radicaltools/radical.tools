@@ -6,7 +6,7 @@ const FORCES = 'This element keeps the system\'s data, and the store chosen for 
 /** The engine's version against endoflife.date, one variant per self-hosted engine. */
 function engineCurrent(model: string, adr: string, product: string, engine: string, versionCmd: string, cycleFields: number, tool: string): FitnessSpec {
   return {
-    id: `ff-engine-current-${model}`, label: `${engine} on latest minor`, when: { HOSTING: ['self'], MODEL: [model] }, category: 'operational', implements: [adr], checks: ['req-engine-patch'],
+    id: `ff-engine-current-${model}`, label: `${engine} on latest minor`, when: { HOSTING: ['self'], MODEL: [model] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [adr], checks: ['req-engine-patch'],
     threshold: `Every ${engine} node runs the latest release of its ${product} cycle on endoflife.date, or one published less than 30 days ago; 0 cycles past end of support`,
     description: `A scheduled job asks each node its version, looks its cycle up on endoflife.date (${product}) and fails when the newest release of the cycle has been out for more than 30 days without being applied, or the cycle has reached end of support. Runs on Linux (GNU date).`,
     tool,
@@ -201,7 +201,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-flyway', label: 'Migrations apply cleanly', when: { MIGRATIONS: ['tool'], MODEL: ['relational'] }, category: 'process', implements: ['adr-relational'], checks: ['req-versioned'],
+      id: 'ff-flyway', label: 'Migrations apply cleanly', when: { MIGRATIONS: ['tool'], MODEL: ['relational'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-relational'], checks: ['req-versioned'],
       threshold: 'Every migration applies to an empty database of the production engine and version; 0 checksum mismatches against applied migrations',
       description: 'On every pull request the pipeline starts the production engine and version, applies all migrations from empty, and validates them; the deploy runs migrate and validate against each environment, so a schema changed by hand shows up as a validation failure. With Liquibase the same is `liquibase update` followed by `liquibase validate`.',
       tool: 'Flyway (PostgreSQL shown; MySQL: the mysql service image and a jdbc:mysql URL)',
@@ -224,7 +224,7 @@ jobs:
             -validateMigrationNaming=true migrate validate`,
     },
     {
-      id: 'ff-liquibase-mongo', label: 'Changesets apply cleanly', when: { MIGRATIONS: ['tool'], MODEL: ['document'] }, category: 'process', implements: ['adr-document'], checks: ['req-versioned-doc'],
+      id: 'ff-liquibase-mongo', label: 'Changesets apply cleanly', when: { MIGRATIONS: ['tool'], MODEL: ['document'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-document'], checks: ['req-versioned-doc'],
       threshold: 'Every changeset applies to an empty MongoDB of the production version; after the update the changelog reports nothing pending',
       description: 'On every pull request the pipeline starts the production MongoDB version, applies the changelog from empty with Liquibase and its MongoDB extension (the extension and MongoDB driver jars are kept in db/lib and mounted into /liquibase/lib), and checks that status reports the database up to date; the deploy runs the same update against each environment.',
       tool: 'Liquibase with the liquibase-mongodb extension',
@@ -246,7 +246,7 @@ jobs:
           lb status --verbose | grep -q 'is up to date'`,
     },
     {
-      id: 'ff-orm-drift', label: 'Model and migrations agree', when: { MIGRATIONS: ['orm'], MODEL: ['relational'] }, category: 'process', implements: ['adr-relational'], checks: ['req-versioned'],
+      id: 'ff-orm-drift', label: 'Model and migrations agree', when: { MIGRATIONS: ['orm'], MODEL: ['relational'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-relational'], checks: ['req-versioned'],
       threshold: '0 differences between the model in code and the committed migrations',
       description: 'The build fails when the model in code changed without a migration, so every schema change is a committed, versioned migration.',
       tool: 'Prisma Migrate (prisma migrate diff); EF Core: dotnet ef migrations has-pending-model-changes; Alembic: alembic check; Django: manage.py makemigrations --check --dry-run',
@@ -259,7 +259,7 @@ npx prisma migrate diff \\
   --exit-code`,
     },
     {
-      id: 'ff-schema-versions', label: 'No document far behind', when: { MIGRATIONS: ['lazy'], MODEL: ['document'] }, category: 'operational', implements: ['adr-document'], checks: ['req-lazy'],
+      id: 'ff-schema-versions', label: 'No document far behind', when: { MIGRATIONS: ['lazy'], MODEL: ['document'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-document'], checks: ['req-lazy'],
       threshold: '0 documents more than 2 schema versions behind the current one, documents without a version field included',
       description: 'A scheduled job counts the documents per collection that are more than two versions behind the version the code writes, or carry no schema version at all (the oldest of all), and fails when any exist; the backfill job then runs.',
       tool: 'mongosh (scheduled job)',
@@ -277,7 +277,7 @@ for (const [name, version] of Object.entries(CURRENT)) {
 if (behind > 0) quit(1)`,
     },
     {
-      id: 'ff-schema-versions-kv', label: 'No item far behind', when: { MIGRATIONS: ['lazy'], MODEL: ['keyvalue'] }, category: 'operational', implements: ['adr-keyvalue'], checks: ['req-lazy'],
+      id: 'ff-schema-versions-kv', label: 'No item far behind', when: { MIGRATIONS: ['lazy'], MODEL: ['keyvalue'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-keyvalue'], checks: ['req-lazy'],
       threshold: '0 items more than 2 schema versions behind the current one, items without a version attribute included',
       description: 'A scheduled batch job (the one place a Scan is allowed) counts the items more than two versions behind the version the code writes, or without a schema version at all, and fails when any exist; the backfill job then runs. The CLI pages the scan and sums the count.',
       tool: 'AWS CLI (DynamoDB); Redis: a SCAN over the key space in a job, reading the version field of each value',
@@ -292,7 +292,7 @@ behind=$(aws dynamodb scan --table-name "$TABLE" --select COUNT \\
 [ "$behind" -eq 0 ] || { echo "$behind items more than 2 schema versions behind"; exit 1; }`,
     },
     {
-      id: 'ff-seq-scan', label: 'No sequential scan on request paths', when: { MODEL: ['relational'] }, category: 'structural', implements: ['adr-relational'], checks: ['req-indexed-reads'],
+      id: 'ff-seq-scan', label: 'No sequential scan on request paths', when: { MODEL: ['relational'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-relational'], checks: ['req-indexed-reads'],
       threshold: '0 sequential scans over a table above 10,000 rows during the request-path test suite',
       description: 'The integration pipeline loads a database with production-sized data, resets the statistics, runs the request-path test suite, then reads pg_stat_user_tables: a table above 10,000 rows with a sequential scan since the reset fails the job.',
       tool: 'psql (PostgreSQL); MySQL: sys.schema_tables_with_full_table_scans after the same suite',
@@ -307,7 +307,7 @@ WHERE n_live_tup > 10000 AND seq_scan > 0
 ORDER BY seq_scan DESC;`,
     },
     {
-      id: 'ff-collscan', label: 'No collection scan on request paths', when: { MODEL: ['document'] }, category: 'structural', implements: ['adr-document'], checks: ['req-indexed-reads'],
+      id: 'ff-collscan', label: 'No collection scan on request paths', when: { MODEL: ['document'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-document'], checks: ['req-indexed-reads'],
       threshold: '0 COLLSCAN operations over a collection above 10,000 documents during the request-path test suite',
       description: 'The integration pipeline loads a database with production-sized data, turns the profiler on for every operation, runs the request-path test suite, then reads system.profile: an operation whose plan was a collection scan over a collection above 10,000 documents fails the job.',
       tool: 'mongosh',
@@ -324,7 +324,7 @@ if (scans.length) {
 }`,
     },
     {
-      id: 'ff-integrity', label: 'Keys and foreign keys present', when: { MODEL: ['relational'] }, category: 'structural', implements: ['adr-relational'], checks: ['req-integrity'],
+      id: 'ff-integrity', label: 'Keys and foreign keys present', when: { MODEL: ['relational'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-relational'], checks: ['req-integrity'],
       threshold: '100% of tables have a primary key; 0 columns named *_id without a foreign key',
       description: 'A test migrates a fresh database in a container and queries the catalogue for tables without a primary key and reference columns without a foreign key; both lists must be empty.',
       tool: 'Testcontainers with a SQL query on information_schema (PostgreSQL)',
@@ -344,7 +344,7 @@ WHERE k.table_schema = 'public' AND k.column_name LIKE '%\\_id'
                     AND u.table_name = k.table_name AND u.column_name = k.column_name);`,
     },
     {
-      id: 'ff-validators', label: 'Collections validate writes', when: { MODEL: ['document'] }, category: 'structural', implements: ['adr-document'], checks: ['req-documents'],
+      id: 'ff-validators', label: 'Collections validate writes', when: { MODEL: ['document'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-document'], checks: ['req-documents'],
       threshold: '100% of collections have a $jsonSchema validator with validationLevel strict and validationAction error',
       description: 'A check run after each deploy lists the collections and fails when one has no JSON Schema validator, or one that only warns.',
       tool: 'mongosh',
@@ -359,7 +359,7 @@ const missing = db.getCollectionInfos({ type: 'collection' })
 if (missing.length) { print('Collections without a strict validator: ' + missing.join(', ')); quit(1) }`,
     },
     {
-      id: 'ff-no-scan', label: 'No Scan in request code', when: { MODEL: ['keyvalue'] }, category: 'structural', implements: ['adr-keyvalue'], checks: ['req-access-patterns'],
+      id: 'ff-no-scan', label: 'No Scan in request code', when: { MODEL: ['keyvalue'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-keyvalue'], checks: ['req-access-patterns'],
       threshold: '0 uses of the DynamoDB Scan command or the Redis KEYS command outside src/jobs',
       description: 'A lint rule forbids importing the DynamoDB Scan command and calling keys() on a client in request-handling code; batch jobs under src/jobs are exempt.',
       tool: 'ESLint (Node.js); other runtimes: a Semgrep rule on the same call names',
@@ -385,7 +385,7 @@ export default [
 ]`,
     },
     {
-      id: 'ff-kv-latency', label: 'Key lookups within target', when: { MODEL: ['keyvalue'] }, category: 'operational', implements: ['adr-keyvalue'], checks: ['req-kv-latency'],
+      id: 'ff-kv-latency', label: 'Key lookups within target', when: { MODEL: ['keyvalue'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-keyvalue'], checks: ['req-kv-latency'],
       threshold: '99th percentile of the store\'s request latency for GetItem and PutItem at most {{P99_MS}} ms in every hour of the last 24 hours',
       description: 'A daily job reads the store\'s own latency percentile per operation from CloudWatch (SuccessfulRequestLatency, p99, hourly) and fails when any hour exceeds the budget. Runs on Linux (GNU date).',
       tool: 'AWS CLI with CloudWatch SuccessfulRequestLatency (DynamoDB); Redis: redis-benchmark -t get,set against the production-sized store, reading its p99 line',
@@ -404,7 +404,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-atomic', label: 'Failed operation leaves nothing', when: { CONSISTENCY: ['strong'] }, category: 'structural', implements: MODELS, checks: ['req-transactions'],
+      id: 'ff-atomic', label: 'Failed operation leaves nothing', when: { CONSISTENCY: ['strong'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MODELS, checks: ['req-transactions'],
       threshold: 'For every business operation that writes several records: a fault after its second write leaves 0 records changed',
       description: 'An integration test against the real engine (Testcontainers) injects a fault after the second write of an operation through the repository\'s test hook and asserts that none of its records exists afterwards; one such test per multi-record operation.',
       tool: 'Vitest (or your stack\'s test runner) with Testcontainers',
@@ -423,7 +423,7 @@ it('a failure after the second write leaves nothing of the operation', async () 
 })`,
     },
     {
-      id: 'ff-replica-lag', label: 'Replica lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['relational'] }, category: 'operational', implements: ['adr-relational'], checks: ['req-staleness'],
+      id: 'ff-replica-lag', label: 'Replica lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['relational'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-relational'], checks: ['req-staleness'],
       threshold: 'Replica lag at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it',
       description: 'An alert on postgres_exporter\'s replication-lag metric pages when a replica falls further behind than the bound.',
       tool: 'Prometheus with postgres_exporter (PostgreSQL); MySQL: mysqld_exporter\'s mysql_slave_status_seconds_behind_master',
@@ -439,7 +439,7 @@ it('a failure after the second write leaves nothing of the operation', async () 
           summary: "Replica {{ $labels.instance }} lags {{ $value }}s behind the primary"`,
     },
     {
-      id: 'ff-replica-lag-document', label: 'Secondary lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['document'] }, category: 'operational', implements: ['adr-document'], checks: ['req-staleness'],
+      id: 'ff-replica-lag-document', label: 'Secondary lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['document'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-document'], checks: ['req-staleness'],
       threshold: 'Replica set member lag at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it',
       description: 'An alert on the MongoDB exporter\'s member replication lag (compatible-mode metric from replSetGetStatus) pages when a secondary falls further behind than the bound.',
       tool: 'Prometheus with the Percona mongodb_exporter (--compatible-mode)',
@@ -455,7 +455,7 @@ it('a failure after the second write leaves nothing of the operation', async () 
           summary: "{{ $labels.name }} in {{ $labels.set }} lags {{ $value }}s behind the primary"`,
     },
     {
-      id: 'ff-replica-lag-kv', label: 'Replication lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['keyvalue'] }, category: 'operational', implements: ['adr-keyvalue'], checks: ['req-staleness'],
+      id: 'ff-replica-lag-kv', label: 'Replication lag within bound', when: { CONSISTENCY: ['eventual'], MODEL: ['keyvalue'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-keyvalue'], checks: ['req-staleness'],
       threshold: 'Redis replica lag, or DynamoDB global table replication latency, at most {{STALE_SECONDS}} seconds; an alert fires after 2 minutes above it',
       description: 'Two alert rules: the Redis exporter\'s replica lag, and DynamoDB\'s ReplicationLatency (milliseconds, per receiving region) brought into Prometheus by the CloudWatch exporter; either pages when a replica falls further behind than the bound.',
       tool: 'Prometheus with redis_exporter and the CloudWatch exporter (aws_dynamodb_replication_latency_maximum)',
@@ -477,7 +477,7 @@ it('a failure after the second write leaves nothing of the operation', async () 
           summary: "{{ $labels.table_name }} replicates to {{ $labels.receiving_region }} with {{ $value }}s latency"`,
     },
     {
-      id: 'ff-export', label: 'Export is fresh', when: { HOSTING: ['managed'] }, category: 'operational', implements: MODELS, checks: ['req-exit'],
+      id: 'ff-export', label: 'Export is fresh', when: { HOSTING: ['managed'] }, characteristic: 'flexibility', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: MODELS, checks: ['req-exit'],
       threshold: 'The newest export in storage the organisation controls is less than 26 hours old',
       description: 'A scheduled check lists the export location through rclone (S3, Azure Blob Storage, Google Cloud Storage and others alike), takes the newest object\'s modification time and fails when it is older than 26 hours (a daily export with two hours of slack). Runs on Linux (GNU date).',
       tool: 'rclone with jq (scheduled check)',

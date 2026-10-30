@@ -16,8 +16,11 @@ import { repeatModel } from '../../support/repeatModel'
 //   SCALE_REOPEN  open the folder again from the cache Studio wrote
 //                 (SCALE_NO_CACHE=1: with the cache deleted first)
 //   SCALE_HEAP    the heap after each view; SCALE_ONLY_OPEN stops after opening
-//   SCALE_OUT     a folder for the results: results.json, metrics.json (what the
-//                 nightly workflow senses) and CPU profiles with SCALE_PROFILE=1
+//   SCALE_OUT     a folder for the results: results.json, metrics.json and CPU
+//                 profiles with SCALE_PROFILE=1
+//   RADICAL_METRICS_DIR  set by radical sense playwright: what a user waits for,
+//                 as the radical-metrics/1 file the fitness function Large model
+//                 stays responsive reads (metrics studio.*)
 
 const MODEL = process.env.SCALE_MODEL
 const VIEWS = (process.env.SCALE_VIEWS ?? 'All elements,Domain model,Components,System context,Traceability,Specification,Container dependencies,Decisions,CLI').split(',')
@@ -275,20 +278,29 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
     await shot('dragged')
   }
   log('heap: end', await heap())
+  // What a user waits for.
+  const stats = (name: string) => results[name] as Partial<Stats & { wallMs: number }> | undefined
+  const views = Object.entries(results).filter(([k, v]) => k.startsWith('view ') && typeof v === 'object').map(([, v]) => (v as Stats).ms)
+  const metrics: Record<string, number | undefined> = {
+    open_ms: stats('open folder')?.wallMs,
+    open_cached_ms: stats('open folder from its cache')?.wallMs,
+    view_switch_ms: views.length ? Math.max(...views) : undefined,
+    search_key_ms: stats('search typing')?.inputMaxMs,
+    card_key_ms: stats('rename typing')?.inputMaxMs,
+  }
   if (OUT) {
     mkdirSync(OUT, { recursive: true })
     writeFileSync(`${OUT}/results.json`, JSON.stringify(results, null, 1))
-    // What the fitness function Large model stays responsive reads, through
-    // radical sense json (the nightly workflow): what a user waits for.
-    const step = (name: string) => results[name] as Partial<Stats & { wallMs: number }> | undefined
-    const views = Object.entries(results).filter(([k, v]) => k.startsWith('view ') && typeof v === 'object').map(([, v]) => (v as Stats).ms)
-    const metrics = {
-      open_ms: step('open folder')?.wallMs,
-      open_cached_ms: step('open folder from its cache')?.wallMs,
-      view_switch_ms: views.length ? Math.max(...views) : undefined,
-      search_key_ms: step('search typing')?.inputMaxMs,
-      card_key_ms: step('rename typing')?.inputMaxMs,
-    }
     writeFileSync(`${OUT}/metrics.json`, JSON.stringify(metrics, null, 1))
+  }
+  // For the fitness function Large model stays responsive, whose measure
+  // runs this spec with radical sense playwright.
+  const sensed = process.env.RADICAL_METRICS_DIR
+  if (sensed) {
+    writeFileSync(`${sensed}/scale.json`, JSON.stringify({
+      format: 'radical-metrics', version: 1, source: 'scale.spec.ts', at: new Date().toISOString(),
+      measurements: Object.entries(metrics).filter(([, value]) => typeof value === 'number')
+        .map(([key, value]) => ({ metric: `studio.${key}`, value, unit: 'ms' })),
+    }, null, 1))
   }
 })

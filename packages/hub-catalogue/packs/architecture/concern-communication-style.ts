@@ -24,7 +24,7 @@ const orchestrationAdr = (id: string, label: string, when: When, lead: string): 
 })
 
 const workflowCheck = (id: string, when: When, adr: string, req: string): FitnessSpec => ({
-  id, label: 'Workflows compensate', when, category: 'structural', implements: [adr], checks: [req],
+  id, label: 'Workflows compensate', when, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [adr], checks: [req],
   threshold: 'Every workflow has a test in which each step that changes data fails once and the earlier steps are compensated',
   description: 'Workflow tests run in Temporal\'s time-skipping test environment with the activities mocked; for each step the test makes it fail with a non-retryable failure and verifies the compensations of the earlier steps ran.',
   tool: 'Temporal TypeScript SDK (@temporalio/testing) with Vitest; for the JVM: Temporal\'s TestWorkflowExtension with JUnit 5',
@@ -291,7 +291,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-depth', label: 'Call chains within depth', category: 'holistic', implements: DEFAULT_ADRS, checks: ['req-depth'],
+      id: 'ff-depth', label: 'Call chains within depth', characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DEFAULT_ADRS, checks: ['req-depth'],
       threshold: '0 traces of the end-to-end journeys with more than {{MAX_DEPTH}} nested synchronous calls between parts, and 0 in which a part is reached again through its own calls',
       description: 'The parts started for the end-to-end suite export their spans over OTLP to a Jaeger container; each journey is run with a traceparent header the test generates, the trace is fetched from Jaeger\'s query API by that id, and the test follows each span\'s parents counting nested HTTP and gRPC client spans that another part continues with a server span (database calls and calls to systems outside are not counted), and fails when one part serves twice in a line of nested calls (a cycle). The HTTP method is read under the stable name http.request.method and the old http.method, so SDKs on either semantic convention are counted. A new call that deepens a chain fails the test. The helper test/e2e/traces.ts is shared with the other trace-based checks of this pack.',
       tool: 'Vitest with Jaeger (jaegertracing/jaeger, OTLP in on 4318, query API on 16686; the /api/traces endpoint is Jaeger\'s internal JSON API); for the JVM: the same test with JUnit 5 and RestClient',
@@ -363,7 +363,7 @@ it.each(journeys)('$name goes at most {{MAX_DEPTH}} calls deep, without cycles',
 })`,
     },
     {
-      id: 'ff-budget', label: 'Calls within budget', category: 'holistic', implements: DEFAULT_ADRS, checks: ['req-deadline'],
+      id: 'ff-budget', label: 'Calls within budget', characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DEFAULT_ADRS, checks: ['req-deadline'],
       threshold: '99th percentile over the traces of the end-to-end journeys of the time a request spends in calls between parts at most {{CALL_BUDGET_MS}} ms',
       description: 'The same traces as the depth check: for each journey run, the test finds the server span the request entered and sums the durations of its outgoing client spans (nested calls run inside them); the 99th percentile over all runs must stay within the budget. Under production load the same number is read from the traces in Jaeger or Tempo with the same arithmetic.',
       tool: 'Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5',
@@ -388,7 +388,7 @@ it('a request spends at most {{CALL_BUDGET_MS}} ms in calls between parts (p99 o
 }, 600_000)`,
     },
     {
-      id: 'ff-deadline', label: 'Expired deadline stops the call', when: { SYNC_API: ['rest'] }, category: 'structural', implements: ['adr-rest'], checks: ['req-deadline'],
+      id: 'ff-deadline', label: 'Expired deadline stops the call', when: { SYNC_API: ['rest'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rest'], checks: ['req-deadline'],
       threshold: 'A request whose deadline passes during a call to another part is answered with 504 within {{CALL_BUDGET_MS}} ms and the called part is not called again',
       description: 'A test starts a stand-in for the called part that answers after 500 ms, points the part under test at it, sends a request whose X-Request-Deadline is 50 ms away and expects a 504 well within the budget and a single downstream call.',
       tool: 'Vitest with a Node http server as the slow part; for the JVM: the same test with JUnit 5 and WireMock\'s fixed delay',
@@ -414,7 +414,7 @@ it('gives up when the deadline has passed', async () => {
 })`,
     },
     {
-      id: 'ff-deadline-grpc', label: 'Expired gRPC deadline stops the call', when: { SYNC_API: ['grpc'] }, category: 'structural', implements: ['adr-grpc'], checks: ['req-deadline'],
+      id: 'ff-deadline-grpc', label: 'Expired gRPC deadline stops the call', when: { SYNC_API: ['grpc'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-grpc'], checks: ['req-deadline'],
       threshold: 'A call whose deadline is 50 ms away ends with DEADLINE_EXCEEDED within {{CALL_BUDGET_MS}} ms, the called part receives the same deadline, and it is called once',
       description: 'A test starts a stand-in for the called part as a gRPC server that answers after 500 ms, points the part under test at it, calls the part under test with a deadline 50 ms away and expects DEADLINE_EXCEEDED within the budget. The stand-in records the deadline it was given: it must be set and no later than the caller\'s (the part passed it on rather than starting a fresh one), and it is called once (no retry past the deadline). Both sides use pass-through serializers with empty messages, so no generated code is needed; an empty message is a valid Protocol Buffers message whose fields all hold their defaults.',
       tool: 'Vitest with @grpc/grpc-js; for the JVM: the same test with JUnit 5, grpc-java\'s in-process server and Context.current().getDeadline()',
@@ -458,7 +458,7 @@ it('gives up when the deadline has passed and passes the deadline on', async () 
 })`,
     },
     {
-      id: 'ff-command-reply', label: 'Commands accepted and answered', when: { DEFAULT: ['commands'] }, category: 'structural', implements: ['adr-commands'], checks: ['req-commands'],
+      id: 'ff-command-reply', label: 'Commands accepted and answered', when: { DEFAULT: ['commands'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-commands'], checks: ['req-commands'],
       threshold: 'A command\'s outcome reply arrives within {{PROPAGATION_SECONDS}} seconds while the receiver is up; a command sent while the receiver is down is answered within {{PROPAGATION_SECONDS}} seconds of its restart',
       description: 'An integration test starts RabbitMQ in a container and the receiving part against it, sends a command to the receiver\'s queue and waits for the correlated reply on the sender\'s reply queue; a second test stops the receiver, sends, restarts it and expects the reply.',
       tool: 'Vitest with Testcontainers (@testcontainers/rabbitmq) and amqplib; for the JVM: Testcontainers with Spring AMQP and Awaitility',
@@ -508,7 +508,7 @@ it('answers a command sent while the receiver was down, once it is back', async 
 })`,
     },
     {
-      id: 'ff-asyncapi', label: 'Message contracts valid', when: PUBLISHED, category: 'structural', implements: ['adr-events', 'adr-streams'], checks: ['req-contracts'],
+      id: 'ff-asyncapi', label: 'Message contracts valid', when: PUBLISHED, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-events', 'adr-streams'], checks: ['req-contracts'],
       threshold: '0 AsyncAPI validation errors, 0 Spectral warnings, and every topic declared for the broker described in an AsyncAPI document',
       description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the topics declared for the broker: Strimzi KafkaTopic manifests under platform/kafka/topics, and the topics of a managed broker (aws_sns_topic, google_pubsub_topic, azurerm_servicebus_topic, confluent_kafka_topic) read from the Terraform state under infra/ with the job\'s read access to it. A topic no document describes fails the job, and so does finding no topic at all.',
       tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions',
@@ -543,7 +543,7 @@ jobs:
           [ ! -s undescribed.txt ]`,
     },
     {
-      id: 'ff-asyncapi-queues', label: 'Command contracts valid', when: { DEFAULT: ['commands'] }, category: 'structural', implements: ['adr-commands'], checks: ['req-contracts'],
+      id: 'ff-asyncapi-queues', label: 'Command contracts valid', when: { DEFAULT: ['commands'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-commands'], checks: ['req-contracts'],
       threshold: '0 AsyncAPI validation errors, 0 Spectral warnings, and every queue declared for the broker described in an AsyncAPI document',
       description: 'CI validates and lints every part\'s AsyncAPI document and compares the channel addresses in the documents with the queues declared for the broker: the RabbitMQ definitions file the broker is loaded with, and the queues of a managed broker (aws_sqs_queue, azurerm_servicebus_queue) read from the Terraform state under infra/. A queue no document describes fails the job, and so does finding no queue at all.',
       tool: 'AsyncAPI CLI and Spectral (spectral:asyncapi) with yq, jq and terraform show -json in GitHub Actions',
@@ -576,7 +576,7 @@ jobs:
           [ ! -s undescribed.txt ]`,
     },
     {
-      id: 'ff-no-sync-calls', label: 'No undecided synchronous call', when: PUBLISHED, category: 'holistic', implements: ['adr-events', 'adr-streams'], checks: ['req-events'],
+      id: 'ff-no-sync-calls', label: 'No undecided synchronous call', when: PUBLISHED, characteristic: 'maintainability', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-events', 'adr-streams'], checks: ['req-events'],
       threshold: '0 synchronous calls between back-end parts in the traces of the end-to-end journeys outside the recorded exceptions',
       description: 'From the same traces as the depth check, the test pairs each client span with the server span it produced in another part and checks the pair against the list of recorded exceptions (caller, callee, ADR); a call to a system outside has no server span and is not counted, and the suite\'s own requests to the back end are not spans.',
       tool: 'Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5',
@@ -599,7 +599,7 @@ it.each(journeys)('$name makes no synchronous call between back-end parts outsid
 })`,
     },
     {
-      id: 'ff-propagation', label: 'Events applied in time', when: PUBLISHED, category: 'operational', implements: ['adr-events', 'adr-streams'], checks: ['req-propagation'],
+      id: 'ff-propagation', label: 'Events applied in time', when: PUBLISHED, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: ['adr-events', 'adr-streams'], checks: ['req-propagation'],
       threshold: '99th percentile of the time from publishing an event to its being applied by each subscriber at most {{PROPAGATION_SECONDS}} seconds over 10 minutes',
       description: 'Each subscriber records, for every event it applies, the seconds since the event\'s time attribute as a histogram event_applied_delay_seconds labelled with the subscriber; an alert fires when the 99th percentile passes the limit.',
       tool: 'Prometheus alerting rule (the histogram is exported by the subscribers with the OpenTelemetry metrics SDK or Micrometer)',
@@ -616,7 +616,7 @@ it.each(journeys)('$name makes no synchronous call between back-end parts outsid
           summary: "{{ $labels.subscriber }} applies events later than {{PROPAGATION_SECONDS}} s"`,
     },
     {
-      id: 'ff-retention', label: 'Log keeps events', when: { DEFAULT: ['streams'] }, category: 'structural', implements: ['adr-streams'], checks: ['req-replay'],
+      id: 'ff-retention', label: 'Log keeps events', when: { DEFAULT: ['streams'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-streams'], checks: ['req-replay'],
       threshold: '0 deleting topics (cleanup.policy delete or compact,delete) retaining events for less than {{RETENTION_DAYS}} days',
       description: 'Topics are declared as Strimzi KafkaTopic manifests under platform/kafka/topics; a policy run in CI over the manifests refuses a topic whose cleanup policy deletes and whose retention is shorter than the limit (a purely compacted topic keeps the latest state per key and passes).',
       tool: 'Conftest (Open Policy Agent, rego.v1) over the KafkaTopic manifests; for a managed Kafka declared in Terraform: the same rule over the config of confluent_kafka_topic resources in terraform show -json',
@@ -637,7 +637,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-openapi', label: 'Call contracts linted', when: { SYNC_API: ['rest'] }, category: 'structural', implements: ['adr-rest'], checks: ['req-contracts'],
+      id: 'ff-openapi', label: 'Call contracts linted', when: { SYNC_API: ['rest'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rest'], checks: ['req-contracts'],
       threshold: '0 errors or warnings from the house ruleset on every OpenAPI document',
       description: 'Spectral lints every part\'s OpenAPI document with the built-in OpenAPI ruleset plus the house rules (operation ids, problem+json errors) and fails the build on a warning.',
       tool: 'Spectral (spectral:oas); for Buf-generated OpenAPI from .proto files the same ruleset applies',
@@ -653,7 +653,7 @@ rules:
     severity: error`,
     },
     {
-      id: 'ff-buf', label: 'Proto contracts checked', when: { SYNC_API: ['grpc'] }, category: 'structural', implements: ['adr-grpc'], checks: ['req-contracts'],
+      id: 'ff-buf', label: 'Proto contracts checked', when: { SYNC_API: ['grpc'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-grpc'], checks: ['req-contracts'],
       threshold: '0 buf lint errors and 0 breaking changes against the main branch in the .proto files',
       description: 'Buf lints every .proto file with its STANDARD rules and compares them with the main branch, failing on a field number reused, a field removed or a type changed. Deadlines are set by the house client wrapper, not by the contract.',
       tool: 'Buf (buf lint, buf breaking)',
@@ -671,7 +671,7 @@ breaking:
 #   buf breaking --against '.git#branch=main'`,
     },
     {
-      id: 'ff-breaking', label: 'No breaking contract change', when: { CONTRACTS: ['spec'] }, category: 'structural', implements: ['adr-contract-diffs'], checks: ['req-contract-diff'],
+      id: 'ff-breaking', label: 'No breaking contract change', when: { CONTRACTS: ['spec'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-contract-diffs'], checks: ['req-contract-diff'],
       threshold: '0 breaking changes against the main branch in OpenAPI and AsyncAPI documents',
       description: 'For each changed contract, CI compares the new version with the one on main: oasdiff for OpenAPI, the AsyncAPI CLI\'s diff for AsyncAPI (Buf covers .proto files, see Proto contracts checked). A breaking change fails the build.',
       tool: 'oasdiff (breaking --fail-on ERR) and AsyncAPI CLI (diff, which exits with an error on a breaking change)',
@@ -687,7 +687,7 @@ for doc in services/*/asyncapi.yaml; do
 done`,
     },
     {
-      id: 'ff-pact', label: 'Consumers\' pacts pass', when: { CONTRACTS: ['pact'] }, category: 'process', implements: ['adr-consumer-contracts'], checks: ['req-pacts'],
+      id: 'ff-pact', label: 'Consumers\' pacts pass', when: { CONTRACTS: ['pact'] }, characteristic: 'compatibility', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-consumer-contracts'], checks: ['req-pacts'],
       threshold: '100% of the pacts of consumer versions on main or deployed verified in every provider build; 0 deploys without a passing can-i-deploy answer',
       description: 'Every provider build verifies the pacts of its consumers (HTTP interactions with the Verifier, messages with MessageProviderPact) and publishes the result to the Pact Broker; the deploy job runs can-i-deploy first and records the deployment after.',
       tool: 'Pact (pact-js Verifier and MessageProviderPact; for gRPC the pact-protobuf-plugin through pact-js\'s plugin API, PactV4) and the Pact Broker CLI from @pact-foundation/pact-cli; for the JVM: pact-jvm\'s @PactBroker provider tests with the same CLI',
@@ -718,7 +718,7 @@ it('honours every consumer\\'s pact', () =>
     workflowCheck('ff-workflow', { FLOWS: ['orchestration'] }, 'adr-orchestration', 'req-orchestrated'),
     workflowCheck('ff-workflow-fallback', ORCHESTRATED_FALLBACK, 'adr-orchestration-fallback', 'req-orchestrated-fallback'),
     {
-      id: 'ff-stuck-flows', label: 'Stuck flows alerted', when: CHOREOGRAPHY, category: 'operational', implements: ['adr-choreography'], checks: ['req-choreographed'],
+      id: 'ff-stuck-flows', label: 'Stuck flows alerted', when: CHOREOGRAPHY, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: ['adr-choreography'], checks: ['req-choreographed'],
       threshold: '0 flow instances open longer than {{FLOW_MINUTES}} minutes without an alert',
       description: 'A process monitor subscribes to the start and end events of each documented flow, correlated by id, and exports the age of the oldest open instance per flow as flow_oldest_open_instance_seconds; the alert names the flow and goes to the owner of the step expected next.',
       tool: 'Prometheus alerting rule (the gauge is exported by the process monitor)',
@@ -733,7 +733,7 @@ it('honours every consumer\\'s pact', () =>
           summary: "A {{ $labels.flow }} flow has been open for more than {{FLOW_MINUTES}} minutes"`,
     },
     {
-      id: 'ff-local-flows', label: 'No write crosses a part', when: { FLOWS: ['local'] }, category: 'holistic', implements: ['adr-local-flows'], checks: ['req-local-flows'],
+      id: 'ff-local-flows', label: 'No write crosses a part', when: { FLOWS: ['local'] }, characteristic: 'maintainability', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-local-flows'], checks: ['req-local-flows'],
       threshold: '0 client spans with a mutating method (POST, PUT, PATCH, DELETE) between parts in the traces of the journeys that change data',
       description: 'From the same traces as the depth check, the test lists the HTTP client spans of each data-changing journey and fails on one whose method changes data in another part; reads between parts pass. For gRPC the mutating methods are named in a list instead of taken from the HTTP method.',
       tool: 'Vitest with Jaeger (test/e2e/traces.ts); for the JVM: the same test with JUnit 5',

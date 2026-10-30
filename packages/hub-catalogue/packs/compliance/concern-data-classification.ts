@@ -178,7 +178,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-inventory', label: 'Every store in the inventory', category: 'structural', implements: SCHEMES, checks: ['req-classified', 'req-handling'],
+      id: 'ff-inventory', label: 'Every store in the inventory', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SCHEMES, checks: ['req-classified', 'req-handling'],
       threshold: '0 databases or queues of the model (not external) without an entry with a level of the scheme, an owner, what it holds and a review date; 0 entries naming no store of the model; 0 levels without handling rules',
       description: 'A Node script in CI reads the front matter of every node file under architecture/nodes, takes the databases and queues not marked external, and checks each against data-inventory.json by its label; it also fails on an entry whose store is gone from the model and on a level whose handling rules are empty.',
       tool: 'Node 20 with js-yaml, a step of the pull-request workflow',
@@ -206,7 +206,7 @@ for (const entry of inventory.stores)
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-review', label: 'Levels reviewed in time', category: 'process', implements: SCHEMES, checks: ['req-review'],
+      id: 'ff-review', label: 'Levels reviewed in time', characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: SCHEMES, checks: ['req-review'],
       threshold: '0 inventory entries whose review date is more than {{REVIEW_MONTHS}} months old',
       description: 'A nightly job compares each entry\'s reviewed date with today minus {{REVIEW_MONTHS}} months and fails, listing each overdue store with its owner, so the owner confirms or changes the level and what the store holds and updates the date in a pull request.',
       tool: 'bash with jq and GNU date in a scheduled GitHub Actions job',
@@ -220,7 +220,7 @@ overdue=$(jq -r --arg cutoff "$cutoff" \\
 [ -z "$overdue" ] || { echo "classification reviews overdue:"; echo "$overdue"; exit 1; }`,
     },
     {
-      id: 'ff-approval', label: 'Inventory owned by the approvers', category: 'process', implements: SCHEMES, checks: ['req-approval'],
+      id: 'ff-approval', label: 'Inventory owned by the approvers', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SCHEMES, checks: ['req-approval'],
       threshold: 'CODEOWNERS gives /data-inventory.json to {{APPROVERS}}, has 0 errors, and a ruleset on main requires a code owner\'s review',
       description: 'A job reads CODEOWNERS for the inventory\'s line, asks GitHub whether CODEOWNERS has errors (an unknown team makes the line silently void), and checks that the rules on main include a pull_request rule with require_code_owner_review. The rest of the ruleset is the Code review and branching pack\'s.',
       tool: 'GitHub CLI (gh api: codeowners/errors and rules/branches/main)',
@@ -237,7 +237,7 @@ grep -Eq '^/data-inventory\\.json[[:space:]]+.*{{APPROVERS}}' .github/CODEOWNERS
   || { echo "no ruleset on main requires a code owner's review"; exit 1; }`,
     },
     {
-      id: 'ff-flow-never', label: 'No path from the highest level outside', when: { FLOW: ['never'] }, category: 'structural', implements: ['adr-flow-never'], checks: ['req-flow-never'],
+      id: 'ff-flow-never', label: 'No path from the highest level outside', when: { FLOW: ['never'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-flow-never'], checks: ['req-flow-never'],
       threshold: '0 interacts relations between an external element and a store of the highest level, an element containing it, or an element reading or writing it, unless listed in the inventory with "data": "none"',
       description: `A Node script in the pull-request build reads architecture/nodes (front matter: id, type, label, external; a node's children are in its folder), architecture/relations.json and data-inventory.json. ${FLOW_CHECK} Each such relation fails the build unless the inventory's flows list it with "data": "none", and the message names the store, the external element and the relation.`,
       tool: 'Node 20 with js-yaml, a step of the pull-request workflow (beside radical check, if the model is checked there too)',
@@ -268,7 +268,7 @@ for (const entry of inventory.stores.filter((e) => e.level === top)) {
 }`,
     },
     {
-      id: 'ff-flow-agreement', label: 'Every path outside under a live agreement', when: { FLOW: ['agreement'] }, category: 'structural', implements: ['adr-flow-agreement'], checks: ['req-flow-agreement'],
+      id: 'ff-flow-agreement', label: 'Every path outside under a live agreement', when: { FLOW: ['agreement'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-flow-agreement'], checks: ['req-flow-agreement'],
       threshold: '0 interacts relations between an external element and a store of the highest level, an element containing it, or an element reading or writing it, without a listed flow that carries no data or names an agreement, an end date after today and a channel',
       description: `A Node script in the pull-request build, and nightly so that an agreement ending turns it red, reads architecture/nodes (front matter: id, type, label, external; a node's children are in its folder), architecture/relations.json and data-inventory.json. ${FLOW_CHECK} Each such relation fails unless the inventory's flows list it with "data": "none", or with an agreement, an until date in the future and a channel; the message names the store, the external element and the relation.`,
       tool: 'Node 20 with js-yaml, a step of the pull-request workflow and of a nightly job',
@@ -300,7 +300,7 @@ for (const entry of inventory.stores.filter((e) => e.level === top)) {
 }`,
     },
     {
-      id: 'ff-categories', label: 'Categories at or above their floor', when: { SCHEME: ['regulated'] }, category: 'structural', implements: ['adr-regulated'], checks: ['req-categories'],
+      id: 'ff-categories', label: 'Categories at or above their floor', when: { SCHEME: ['regulated'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-regulated'], checks: ['req-categories'],
       threshold: '0 entries without a categories list; 0 unknown categories; 0 stores below the floor of a category they hold (special-category, health, cardholder: restricted; personal: confidential)',
       description: 'A Node script in CI reads data-inventory.json and fails on an entry with no categories list, a category outside the four, or a level below the lowest its categories allow.',
       tool: 'Node 20, a step of the pull-request workflow',
@@ -318,7 +318,7 @@ const problems = inventory.stores.flatMap((s) => !Array.isArray(s.categories)
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-catalogue', label: 'Catalogue level equals the inventory', when: { RECORD: ['catalogue'] }, category: 'operational', implements: SCHEMES, checks: ['req-catalogue'],
+      id: 'ff-catalogue', label: 'Catalogue level equals the inventory', when: { RECORD: ['catalogue'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: SCHEMES, checks: ['req-catalogue'],
       threshold: '0 stores whose database or topic in OpenMetadata lacks the DataClassification tag of the inventory\'s level or carries another one',
       description: 'A nightly job reads each store\'s catalogue entity and fully qualified name from the inventory (catalogue.entity is databases or topics), fetches it from the OpenMetadata API with its tags, and compares the tags of the DataClassification classification (one tag per level, named as the level) with the inventory. With DataHub, Microsoft Purview or Collibra, the same comparison runs against their APIs.',
       tool: 'bash with curl and jq against the OpenMetadata REST API (GET /api/v1/databases/name/{fqn} and /api/v1/topics/name/{fqn} with fields=tags)',
@@ -336,7 +336,7 @@ done < <(jq -r '.stores[] | [.element, .level, .catalogue.entity, .catalogue.fqn
 exit $fail`,
     },
     {
-      id: 'ff-tags-required', label: 'Store resources carry the tag', when: { RECORD: ['tags'] }, category: 'operational', implements: SCHEMES, checks: ['req-tags'],
+      id: 'ff-tags-required', label: 'Store resources carry the tag', when: { RECORD: ['tags'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: SCHEMES, checks: ['req-tags'],
       threshold: '0 NON_COMPLIANT resources for the data-classification-tag Config rule (RDS instances, DynamoDB tables, S3 buckets, Redshift clusters)',
       description: 'An AWS Config managed rule (REQUIRED_TAGS) evaluates every RDS instance, DynamoDB table, S3 bucket and Redshift cluster for a data-classification tag when it changes, and a nightly job fails while any is non-compliant. The rule reports and does not block creation. Queues and streams (SQS, Kinesis, MSK) are outside the rule\'s resource types and are covered by the nightly comparison with the inventory. On Azure the built-in Require a tag on resources policy does this job.',
       tool: 'Terraform (aws_config_config_rule) and the AWS CLI (configservice get-compliance-details-by-config-rule)',
@@ -361,7 +361,7 @@ resource "aws_config_config_rule" "data_classification_tag" {
 #   [ -z "$missing" ] || { echo "resources without a data-classification tag:"; echo "$missing"; exit 1; }`,
     },
     {
-      id: 'ff-tags-match', label: 'Tags equal the inventory', when: { RECORD: ['tags'] }, category: 'operational', implements: SCHEMES, checks: ['req-tags'],
+      id: 'ff-tags-match', label: 'Tags equal the inventory', when: { RECORD: ['tags'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: SCHEMES, checks: ['req-tags'],
       threshold: '0 resources listed in the inventory whose data-classification tag is missing or differs from the store\'s level',
       description: 'A nightly job takes every resource ARN the inventory lists for a store (resources: database instances, buckets, tables, queues, streams) and reads its tags with the Resource Groups Tagging API; a resource that has never been tagged is not returned at all, so it reports as None. The API is regional: the job runs once per region the stores live in.',
       tool: 'bash with jq and the AWS CLI (resourcegroupstaggingapi get-resources --resource-arn-list)',
@@ -378,7 +378,7 @@ done < <(jq -r '.stores[] | .element as $e | .level as $l | .resources[]? | [$e,
 exit $fail`,
     },
     {
-      id: 'ff-discovery', label: 'No sensitive data in low-level stores', when: { DISCOVERY: ['scanner'] }, category: 'operational', implements: SCHEMES, checks: ['req-discovery'],
+      id: 'ff-discovery', label: 'No sensitive data in low-level stores', when: { DISCOVERY: ['scanner'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: SCHEMES, checks: ['req-discovery'],
       threshold: '0 Macie sensitive-data findings created in the last 24 hours in an S3 bucket of a store classified public or internal',
       description: 'Macie\'s automated sensitive data discovery runs over the S3 buckets; database contents reach it as RDS or Aurora snapshot exports (Parquet) and DynamoDB table exports in buckets the inventory lists under the store\'s resources. A daily job asks Macie for sensitive-data findings (category CLASSIFICATION) of the last day in the buckets of stores classified public or internal, prints bucket, finding type and object, and fails, so the owner is told the same day. On Google Cloud the job reads Sensitive Data Protection data profiles instead, on Azure the classifications of Purview Data Map scans.',
       tool: 'bash with jq and the AWS CLI (macie2 list-findings and get-findings)',

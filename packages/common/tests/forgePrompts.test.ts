@@ -97,6 +97,30 @@ describe('buildForgeStagePrompt — domain model stage', () => {
   })
 })
 
+describe('buildForgeStagePrompt — fitness functions stage', () => {
+  it('asks for the characteristic, scope, cadence, invocation and measure of each fitness function', () => {
+    const prompt = buildForgeStagePrompt('fitness', 'A web shop.')
+    for (const key of ['characteristic', 'scope', 'cadence', 'trigger', 'every', 'invocation', 'measure', 'metrics']) {
+      expect(prompt).toContain(`\`${key}\``)
+    }
+    expect(prompt).toContain('ISO/IEC 25010')
+    expect(prompt).toContain('performance-efficiency')
+    expect(prompt).toContain('`atomic`')
+    expect(prompt).toContain('`holistic`')
+    expect(prompt).toContain('`triggered`')
+    expect(prompt).toContain('`continual`')
+    expect(prompt).toContain('`temporal`')
+    expect(prompt).toContain('nightly')
+    expect(prompt).toContain('`manual`')
+    expect(prompt).toContain('review(<name>) passed')
+    // A measure only with a sensor radical sense has.
+    expect(prompt).toContain('`playwright`')
+    expect(prompt).toContain('`command`')
+    expect(prompt).toContain('otherwise\nleave it empty')
+    expect(prompt).not.toContain('category')
+  })
+})
+
 describe('buildForgeStagePrompt — state machines stage', () => {
   it('runs between the scenarios and the mockups, creating the statechart types', () => {
     const ids = FORGE_STAGES.map((s) => s.id)

@@ -113,6 +113,21 @@ describe('shared wiki document', () => {
     expect(page.bylineFacts.find((f) => f.key === 'approved')).toMatchObject({ label: '', text: 'approved' })
   })
 
+  it('shows a fitness function\'s result, static or dynamic, as a fact read from its metrics', () => {
+    const wiki = createWikiDocument(view(), context([
+      node('limit', 'fitness-fn', { characteristic: 'performance-efficiency', metrics: 'checkout.latency.p95{env=prod} <= 300 ms' }),
+      node('trend', 'fitness-fn', { metrics: 'studio.open.ms <= baseline + 20%\ntest(tests/a.test.ts) passed' }),
+      node('tests', 'fitness-fn', { metrics: 'test(tests/a.test.ts) passed\nreview(audit) passed' }),
+    ]))
+    expect(wiki.page('limit').derivedFacts).toEqual([{ key: 'result', title: 'Result', text: 'static' }])
+    expect(wiki.page('trend').derivedFacts).toEqual([{ key: 'result', title: 'Result', text: 'dynamic' }])
+    expect(wiki.page('tests').derivedFacts).toEqual([])
+    // A fact, not a property: nothing edits it.
+    expect(wiki.page('limit').facts.map((f) => f.definition.key)).not.toContain('result')
+    expect(wiki.page('limit').facts.map((f) => [f.definition.key, f.text])).toContainEqual(['characteristic', 'performance-efficiency'])
+    expect(wiki.page('limit').bylineFacts.find((f) => f.key === 'result')).toMatchObject({ label: 'result', text: 'static' })
+  })
+
   it('resolves requirement subject and state from the full model outside the wiki scope', () => {
     const ctx = context([
       node('r', 'requirement', { ears_type: 'state-driven', action: 'send a receipt', precondition_state: 'confirmed' }),

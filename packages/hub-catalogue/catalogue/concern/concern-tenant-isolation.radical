@@ -830,7 +830,11 @@
       "label": "Cross-tenant calls return nothing",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test sets up two tenants with data of every kind (UUID ids, so a substring match is safe), then calls every operation as a user of the first with the second's ids and a forged tenant header and body field, expecting 404 or nothing of the second back, the second's data unchanged, and a security event per attempt. The operations come from the router, so a new one is tested without anyone adding it.\n\nThreshold: 0 records of another tenant returned or changed, over every operation, with forged tenant headers included; every cross-tenant attempt leaves 1 security event\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'\nimport { securityEvents } from '../src/security/events'\nimport { seedTwoTenants } from './tenants'\n\nconst { a, b } = await seedTwoTenants() // users, tokens and UUID record ids of each\n\ndescribe.each(routes)('$method $path', (route) => {\n  it('never shows or changes tenant B to tenant A', async () => {\n    const before = await securityEvents.count({ tenant: a.tenantId, kind: 'cross-tenant' })\n    const res = await request(app)[route.method.toLowerCase()](route.withIds(b.ids))\n      .set('Authorization', `Bearer ${a.token}`)\n      .set('X-Tenant-Id', b.tenantId)                 // forged: must be ignored\n      .send({ ...route.exampleBody, tenantId: b.tenantId })\n    expect(JSON.stringify(res.body)).not.toContain(b.tenantId)\n    for (const id of Object.values(b.ids)) expect(JSON.stringify(res.body)).not.toContain(id)\n    expect(await b.snapshot()).toEqual(b.before)\n    if (route.path.includes(':id')) {\n      expect(res.status).toBe(404)\n      expect(await securityEvents.count({ tenant: a.tenantId, kind: 'cross-tenant' })).toBe(before + 1)\n    }\n  })\n})\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -846,7 +850,11 @@
       "label": "Tenant carried everywhere",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test runs every operation once as a user of tenant A against a fresh cache, object store, queue and log capture, then reads back every cache key, object key, message and log line written and expects each to carry the tenant.\n\nThreshold: After one request per operation as tenant A, 100% of cache keys, object keys, messages and log lines written carry tenant A; 0 without\n\nTool: Vitest with supertest and Testcontainers (Redis, the object store and the broker of the deployment), logs captured by a test transport\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'\nimport { cache, objects, queue, logs } from './tenants/capture'   // fresh per run; each returns what was written\nimport { seedTwoTenants } from './tenants'\n\nconst { a } = await seedTwoTenants()\n\nit('carries the tenant to every cache key, object key, message and log line', async () => {\n  for (const route of routes) await request(app)[route.method.toLowerCase()](route.withIds(a.ids)).set('Authorization', `Bearer ${a.token}`)\n  for (const key of await cache.keys()) expect(key).toContain(a.tenantId)\n  for (const key of await objects.keys()) expect(key.startsWith(`${a.tenantId}/`)).toBe(true)\n  for (const message of await queue.messages()) expect(message.headers.tenant).toBe(a.tenantId)\n  for (const line of await logs.lines()) expect(line.tenant).toBe(a.tenantId)\n})\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -862,7 +870,10 @@
       "label": "Boundary probing alerted",
       "x": 1040,
       "y": 260,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "The application counts cross-tenant attempts per tenant (security_events_total with kind=\"cross-tenant\"); an alerting rule pages when a tenant crosses 10 in an hour.\n\nThreshold: An alert within 5 minutes when one tenant produces more than 10 cross-tenant security events in an hour\n\nTool: Prometheus alerting rules\n\n```yaml\ngroups:\n  - name: tenant-isolation\n    rules:\n      - alert: TenantProbingBoundary\n        expr: sum by (tenant) (increase(security_events_total{kind=\"cross-tenant\"}[1h])) > 10\n        for: 5m\n        labels: { severity: page }\n        annotations:\n          summary: \"Tenant {{ $labels.tenant }} made more than 10 cross-tenant attempts in an hour\"\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -878,7 +889,11 @@
       "label": "Row-level security on every table",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A database test runs after the migrations in CI and fails on any table holding tenant data without forced row-level security, or when the application role can bypass it.\n\nThreshold: 0 tables with a tenant_id column without row-level security enabled and forced; the application role has no BYPASSRLS\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(2);\n\nSELECT is_empty($$\n  SELECT c.relname\n  FROM pg_class c\n  JOIN pg_namespace n ON n.oid = c.relnamespace\n  WHERE c.relkind = 'r' AND n.nspname = 'public'\n    AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id')\n    AND NOT (c.relrowsecurity AND c.relforcerowsecurity)\n$$, 'every table with tenant_id has forced row-level security');\n\nSELECT ok(NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'app'), 'the app role cannot bypass RLS');\n\nSELECT * FROM finish();\nROLLBACK;\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -892,7 +907,11 @@
       "label": "Tenant roles see one schema",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A database test runs after onboarding two tenants in CI: as the first tenant's role it names a table of the second's schema and expects a permission error, and it lists the privileges of every tenant role outside its own schema.\n\nThreshold: Every tenant role is refused with 42501 on a table of another tenant's schema; 0 tenant roles with a privilege outside their own schema\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(2);\n\nSET ROLE tenant_a;\nSELECT throws_ok(\n  $$ SELECT * FROM tenant_b.orders $$,\n  '42501', NULL, 'tenant A''s role cannot read tenant B''s schema'\n);\nRESET ROLE;\n\nSELECT is_empty($$\n  SELECT grantee, table_schema, table_name\n  FROM information_schema.role_table_grants\n  WHERE grantee LIKE 'tenant\\_%' AND table_schema <> grantee\n$$, 'no tenant role has a privilege outside its own schema');\n\nSELECT * FROM finish();\nROLLBACK;\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -906,7 +925,11 @@
       "label": "Credentials open one database",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test onboards two tenants, tries the first tenant's credentials against the second's database and expects a refusal, then makes a request as the first tenant and checks pg_stat_activity of the second's database for connections from the application.\n\nThreshold: A tenant's credentials open only that tenant's database; a request of tenant A opens 0 connections to tenant B's database\n\nTool: Vitest with Testcontainers (PostgreSQL) and the node-postgres client\n\n```ts\nimport { Client } from 'pg'\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { catalogue } from '../src/tenants/catalogue'\nimport { onboard, seedTwoTenants } from './tenants'\n\nit('routes a tenant to its own database and nowhere else', async () => {\n  const { a, b } = await seedTwoTenants()\n  const crossed = new Client({ ...(await catalogue.connectionOf(b.tenantId)), ...(await catalogue.credentialsOf(a.tenantId)) })\n  await expect(crossed.connect()).rejects.toMatchObject({ code: expect.stringMatching(/^(28P01|28000|3D000)$/) })\n  await request(app).get('/orders').set('Authorization', `Bearer ${a.token}`).expect(200)\n  const admin = new Client(await catalogue.adminConnectionOf(b.tenantId))\n  await admin.connect()\n  const { rows } = await admin.query(\"select count(*)::int as n from pg_stat_activity where datname = current_database() and application_name = 'order-api'\")\n  expect(rows[0].n).toBe(0)\n  await admin.end()\n})\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -920,7 +943,11 @@
       "label": "No tenant left behind",
       "x": 1040,
       "y": 780,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A scheduled job reads the schema version of every tenant from the tenant catalogue and fails, naming them, when any tenant is behind the latest migration once 24 hours have passed since the release that brought it (the release time comes from the pipeline, in RELEASED_AT); while the wave is still rolling, the job reports and passes.\n\nThreshold: 0 tenants on an older schema version 24 hours after a release\n\nTool: Flyway (flyway info per tenant schema or database) with psql and jq in a scheduled CI job; with Liquibase: liquibase status per target\n\n```bash\n#!/usr/bin/env bash\n# RELEASED_AT: epoch seconds of the release that carried the newest migration, written by the pipeline\nset -euo pipefail\nlatest=$(ls db/migration | grep -E '^V[0-9_.]+__' | sed -E 's/^V([0-9_.]+)__.*/\\1/' | tr _ . | sort -V | tail -1)\nsettled=$(( $(date +%s) - RELEASED_AT >= 86400 )) || true\nbehind=0\nfor tenant in $(psql \"$CATALOGUE_URL\" -Atc \"select id from tenants where active\"); do\n  v=$(flyway -configFiles=\"tenants/$tenant.conf\" info -outputType=json | jq -r '.schemaVersion')\n  if [ \"$v\" != \"$latest\" ]; then echo \"tenant $tenant on $v, latest $latest\"; behind=$((behind+1)); fi\ndone\nif [ \"$behind\" -gt 0 ] && [ \"$settled\" -eq 1 ]; then echo \"$behind tenants behind 24 hours after the release\"; exit 1; fi\necho \"$behind tenants behind, release $(( ($(date +%s) - RELEASED_AT) / 3600 )) hours old\"\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -935,7 +962,11 @@
       "label": "Stacks share nothing",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A policy runs over every tenant stack's Terraform plan in CI and refuses any resource or policy that names an account other than the tenant's own or the shared tooling account.\n\nThreshold: 0 resources or access policies in a tenant stack that reference another tenant's account or resources\n\nTool: Conftest on the Terraform plan (AWS account ids; for Azure match subscription ids in resource ids, for Google Cloud project ids)\n\n```rego\npackage main\n\nimport rego.v1\n\nallowed_accounts := {input.variables.tenant_account_id.value, input.variables.tooling_account_id.value}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\tsome account in regex.find_n(\"arn:aws:[a-z0-9-]+:[a-z0-9-]*:([0-9]{12})\", json.marshal(r.change.after), -1)\n\tid := substring(account, count(account) - 12, 12)\n\tnot allowed_accounts[id]\n\tmsg := sprintf(\"%s references account %s outside this tenant's stack\", [r.address, id])\n}\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -949,7 +980,11 @@
       "label": "Bursts stay contained",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A load test in a staging environment runs a steady load for a quiet tenant and a burst at ten times the quota for a noisy one, and checks the quiet tenant's latency against its baseline and the share of the noisy tenant's requests that were throttled (above 50%, since 9 of 10 are over quota).\n\nThreshold: With one tenant at 10 × {{TENANT_RPS}} requests per second, the other tenants' p95 latency rises by less than 10% and more than half of the noisy tenant's requests get 429\n\nTool: k6\n\n```js\nimport http from 'k6/http'\nimport { Rate } from 'k6/metrics'\n\nconst throttled = new Rate('noisy_throttled')\n\nexport const options = {\n  scenarios: {\n    quiet: { executor: 'constant-arrival-rate', rate: 20, timeUnit: '1s', duration: '5m', preAllocatedVUs: 20, exec: 'quiet' },\n    noisy: { executor: 'constant-arrival-rate', rate: 10 * {{TENANT_RPS}}, timeUnit: '1s', duration: '5m', preAllocatedVUs: 200, exec: 'noisy' },\n  },\n  thresholds: {\n    'http_req_duration{scenario:quiet}': [`p(95)<${1.1 * __ENV.BASELINE_P95_MS}`],  // BASELINE_P95_MS: the quiet tenant's p95 without the burst\n    noisy_throttled: ['rate>0.5'],\n  },\n}\n\nexport function quiet() { http.get(`${__ENV.BASE}/orders`, { headers: { Authorization: `Bearer ${__ENV.QUIET_TOKEN}` } }) }\nexport function noisy() {\n  const res = http.get(`${__ENV.BASE}/orders`, { headers: { Authorization: `Bearer ${__ENV.NOISY_TOKEN}` } })\n  throttled.add(res.status === 429 && res.headers['Retry-After'] !== undefined)\n}\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -965,7 +1000,10 @@
       "label": "Tenant share watched",
       "x": 1040,
       "y": 1170,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "An alerting rule over the per-tenant database time the application emits (db_query_seconds_total, a counter with tenant and pool labels, as the decision requires; no exporter provides it) raises a ticket for the tenant to be moved to dedicated capacity.\n\nThreshold: An alert within 1 hour of any tenant using more than 20% of a shared pool's capacity for 7 days\n\nTool: Prometheus alerting rules\n\n```yaml\ngroups:\n  - name: tenant-capacity\n    rules:\n      - alert: TenantOutgrowsSharedPool\n        expr: |\n          sum by (tenant, pool) (rate(db_query_seconds_total{pool=~\"shared-.*\"}[7d]))\n            / ignoring(tenant) group_left sum by (pool) (rate(db_query_seconds_total{pool=~\"shared-.*\"}[7d]))\n            > 0.20\n        for: 1h\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Tenant {{ $labels.tenant }} uses over 20% of {{ $labels.pool }}: propose dedicated capacity\"\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -984,7 +1022,11 @@
       "label": "Keys open one tenant",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test goes through the application's envelope layer, not the key service directly: it writes a record for tenant A, reads the stored ciphertext and checks its encryption context names A, tries to decrypt it as tenant B, then schedules A's key for deletion and tries to decrypt A's copy again (a local key service honours a disabled or pending-deletion key at once).\n\nThreshold: 0 successful decryptions of a tenant's data through another tenant's key or context, 0 stored ciphertexts whose encryption context names another tenant, and 0 successful decryptions after the tenant's key is deleted\n\nTool: Vitest with LocalStack (KMS) behind the application's envelope layer; with Vault Transit or Azure Key Vault emulators the same test, the key service swapped\n\n```ts\nimport { KMSClient, ScheduleKeyDeletionCommand } from '@aws-sdk/client-kms'\nimport { envelope } from '../src/crypto/envelope'       // the application's layer: encryptFor(tenant, ...), decryptFor(tenant, ...)\nimport { orders } from '../src/stores/orders'\nimport { seedTwoTenants } from './tenants'\n\nconst kms = new KMSClient({ endpoint: 'http://localhost:4566', region: 'eu-central-1' })\n\nit('decrypts a tenant\\'s data for that tenant only, and not after its key is gone', async () => {\n  const { a, b } = await seedTwoTenants()\n  const id = await orders.create(a.tenantId, { customer: 'secret of A' })\n  const raw = await orders.rawRow(id)                       // ciphertext and its encryption context, as a backup would hold them\n  expect(raw.encryptionContext).toEqual({ tenant: a.tenantId })\n  await expect(envelope.decryptFor(b.tenantId, raw.ciphertext)).rejects.toThrow()\n  expect((await envelope.decryptFor(a.tenantId, raw.ciphertext)).customer).toBe('secret of A')\n  await kms.send(new ScheduleKeyDeletionCommand({ KeyId: a.keyId, PendingWindowInDays: 7 }))\n  envelope.dropCachedKeys()\n  await expect(envelope.decryptFor(a.tenantId, raw.ciphertext)).rejects.toThrow()\n})\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -1005,7 +1047,11 @@
       "label": "Revoked key stops access",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test disables a tenant's key in a local key management service, polls a read and a write of its data until they fail (failing itself past 5 minutes), and checks the notification outbox.\n\nThreshold: Reads and writes of a tenant's data fail within 5 minutes of its key being disabled, and the tenant's administrators get 1 notification\n\nTool: Vitest with LocalStack (KMS), the notification sender captured by the test harness\n\n```ts\nimport { KMSClient, DisableKeyCommand } from '@aws-sdk/client-kms'\nimport { api, notifications, seedCustomerKeyTenant } from './tenants'\n\nconst kms = new KMSClient({ endpoint: 'http://localhost:4566', region: 'eu-central-1' })\n\nit('stops serving a tenant within 5 minutes of its key being disabled', async () => {\n  const tenant = await seedCustomerKeyTenant()              // its key lives in the local key service\n  const orderId = await api.as(tenant).createOrder({ customer: 'x' })\n  await kms.send(new DisableKeyCommand({ KeyId: tenant.keyId }))\n  const started = Date.now()\n  while ((await api.as(tenant).readOrder(orderId)).ok || (await api.as(tenant).createOrder({ customer: 'y' }).catch(() => ({ ok: false }))).ok) {\n    expect(Date.now() - started).toBeLessThan(5 * 60_000)\n    await new Promise((r) => setTimeout(r, 10_000))\n  }\n  expect(await notifications.sentTo(tenant.adminEmail, 'key-revoked')).toHaveLength(1)\n}, 6 * 60_000)\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -1025,7 +1071,11 @@
       "label": "Offboarded tenant gone",
       "x": 1040,
       "y": 1560,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test onboards a tenant, seeds data in every store the deployment has, runs the offboarding routine with the export period set to zero for the test, searches every store, cache and index for the tenant id, and reads the certificate; where a key per tenant is used, it also expects the key to be pending deletion.\n\nThreshold: After the offboarding routine, 0 of the tenant's records in any live store, cache or search index, 1 deletion certificate issued that states when the last backup copy is gone\n\nTool: Vitest with Testcontainers (the stores, cache and search index of the deployment)\n\n```ts\nimport { offboarding } from '../src/tenants/offboarding'\nimport { stores } from './tenants/stores'           // every store, cache and index of the deployment, each with anyOf(tenantId)\nimport { onboard, seedEverywhere } from './tenants'\n\nit('leaves nothing of a tenant in the live stores and certifies when the copies are gone', async () => {\n  const tenant = await onboard({ name: 'leaving' })\n  await seedEverywhere(tenant)\n  const certificate = await offboarding.run(tenant.id, { exportPeriodDays: 0 })\n  for (const store of stores) expect(await store.anyOf(tenant.id)).toBe(false)\n  expect(certificate).toMatchObject({ tenantId: tenant.id, liveStoresErasedAt: expect.any(Date), lastCopyGoneBy: expect.any(Date) })\n  expect(certificate.lastCopyGoneBy.getTime()).toBeGreaterThanOrEqual(certificate.liveStoresErasedAt.getTime())\n})\n```",
       "hubWhen": {
         "ISOLATION": [
@@ -1042,7 +1092,11 @@
       "label": "Exactly one organisation",
       "x": 1040,
       "y": 1690,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A database test runs after the migrations in CI: it counts the organisations and tries to insert a second one, which the check constraint on the single-row table must refuse with a check violation, not any other error.\n\nThreshold: Exactly 1 organisation in the database, and inserting a second violates the single-row constraint (SQLSTATE 23514)\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(2);\n\nSELECT is((SELECT count(*) FROM organisation), 1::bigint, 'exactly one organisation');\n\n-- organisation has CHECK (singleton) on a column singleton boolean DEFAULT true with UNIQUE (singleton)\n-- ... or, as here, CHECK (id = 1) on the only row\nSELECT throws_ok(\n  $$ INSERT INTO organisation (id, name) VALUES (2, 'Second') $$,\n  '23514', NULL, 'a second organisation is refused by the check constraint'\n);\n\nSELECT * FROM finish();\nROLLBACK;\n```",
       "hubWhen": {
         "ISOLATION": [

@@ -220,7 +220,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-adr-lint', label: 'Decision records are well-formed', when: { DECISIONS: ['adr-repo'] }, category: 'structural', implements: ['adr-adr-repo'],
+      id: 'ff-adr-lint', label: 'Decision records are well-formed', when: { DECISIONS: ['adr-repo'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-adr-repo'],
       checks: ['req-adr-recorded', 'req-adr-supersede'],
       threshold: 'Every file in {{ADR_DIR}} has a status from the list, a date and the Context, Decision Outcome and Consequences sections; every superseded record names an existing record in superseded-by; 0 records in status proposed older than {{ADR_DAYS}} days',
       description: 'A test reads the front matter and the headings of every record in {{ADR_DIR}}, checks the required fields and sections and that each superseded-by link points at an existing record, and fails on a record left in proposed past the deadline. An unquoted date in YAML front matter is parsed by gray-matter as a Date object, so the test normalises it before matching. The same test in Python is a pytest over python-frontmatter.',
@@ -247,7 +247,7 @@ it.each(files)('%s is a well-formed decision record', (file) => {
 })`,
     },
     {
-      id: 'ff-radical-check', label: 'Architecture model checked in CI', when: { DECISIONS: ['model'] }, category: 'structural', implements: ['adr-model'],
+      id: 'ff-radical-check', label: 'Architecture model checked in CI', when: { DECISIONS: ['model'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-model'],
       checks: ['req-adr-recorded', 'req-adr-supersede', 'req-adr-linked'],
       threshold: '`radical check {{MODEL_DIR}}` reports 0 errors on every pull request with adr-incomplete, adr-superseded-unlinked and concern-unbound raised to errors in check.json; 0 decisions in status proposed older than {{ADR_DAYS}} days',
       description: 'The CI job runs the model check against the test reports of the same run: an accepted decision without date, context, decision or consequences (adr-incomplete), a superseded decision nothing supersedes (adr-superseded-unlinked), a decision marked with a concern that constrains no element (concern-unbound), and a fitness function naming a test that did not run each fail the pull request once check.json sets those rules to error. A second step reads the decision files of the Markdown folder and fails one left proposed past {{ADR_DAYS}} days. With Structurizr, the CLI\'s validate command on the workspace plays the role of the model check.',
@@ -277,7 +277,7 @@ jobs:
           [ -z "$stale" ] || { echo "decisions proposed for more than {{ADR_DAYS}} days:"; echo "$stale"; exit 1; }`,
     },
     {
-      id: 'ff-wiki-log', label: 'Decision log complete in the wiki', when: { DECISIONS: ['wiki'] }, category: 'process', implements: ['adr-wiki'],
+      id: 'ff-wiki-log', label: 'Decision log complete in the wiki', when: { DECISIONS: ['wiki'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-wiki'],
       checks: ['req-adr-recorded', 'req-adr-supersede', 'req-adr-wiki-index'],
       threshold: '0 decision pages without a status and a date property; 0 superseded pages without a superseded-by property; 0 pages in status proposed older than {{ADR_DAYS}} days; 0 decision pages not linked from the index page; the README links the space',
       description: 'A weekly job lists the pages labelled decision in the space through the Confluence REST API with their content properties (expand=metadata.properties), fails on a page missing a status or date, a superseded page without superseded-by, or a page left proposed past the deadline, then reads the index page\'s storage body and fails on a decision page it does not link (Confluence stores a page link as ri:content-title="<title>"). The job fails on the first gap; what it prints is the list to fix.',
@@ -305,7 +305,7 @@ grep -qF "$CONFLUENCE_URL/wiki/spaces/$SPACE" README.md || { echo "README does n
 exit $bad`,
     },
     {
-      id: 'ff-readme-sections', label: 'Every module has its README sections', when: { READMES: ['per-module'] }, category: 'structural', implements: DECISIONS,
+      id: 'ff-readme-sections', label: 'Every module has its README sections', when: { READMES: ['per-module'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-readme-per-module'],
       threshold: 'Every workspace or module directory holds README.md with the headings {{README_SECTIONS}}; 0 directories without',
       description: 'A test lists the module directories from the workspace configuration (package.json workspaces, or the services folder), not from a list kept by hand, and expects a README.md with every required heading in each; a new module fails the test until it has one. The same test in Python walks the packages with pathlib under pytest.',
@@ -326,7 +326,7 @@ it.each(dirs)('%s has a README with the required sections', (dir) => {
 })`,
     },
     {
-      id: 'ff-readme-table', label: 'Root README lists every module', when: { READMES: ['root-only'] }, category: 'structural', implements: DECISIONS,
+      id: 'ff-readme-table', label: 'Root README lists every module', when: { READMES: ['root-only'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-readme-root'],
       threshold: 'Every module directory under src has a row in the root README\'s module table with purpose and owner; 0 rows naming a directory that no longer exists',
       description: 'A test reads the module table of the root README (one row per directory: | `src/name` | purpose | owner |) and compares it with the module directories of the repository both ways: a directory without a row and a row without a directory each fail it.',
@@ -349,7 +349,7 @@ it('no row names a module that is gone', () => {
 })`,
     },
     {
-      id: 'ff-doc-comments', label: 'Doc comments on the exported symbols', category: 'structural', implements: DECISIONS,
+      id: 'ff-doc-comments', label: 'Doc comments on the exported symbols', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-doc-comments'],
       threshold: 'At least {{DOC_COMMENT_COVERAGE_PCT}}% of the exported functions, classes, interfaces, type aliases and variables under src carry a doc comment; the test lists the ones that do not',
       description: 'A test opens the TypeScript program from tsconfig.json, walks the exported declarations of every file under src, counts the ones with a JSDoc comment and fails below the threshold, printing the undocumented symbols with their file. For Python, interrogate measures docstring coverage of the public API and fails under the same number; for Java, the javadoc doclint run of the build reports undocumented public members. Where the Code quality gate decision enforces a linter, eslint-plugin-jsdoc\'s require-jsdoc rule also refuses a new export without a comment on the changed lines.',
@@ -384,7 +384,7 @@ it(\`at least \${MIN_PCT}% of the exported symbols carry a doc comment\`, () => 
 // Python: interrogate --fail-under {{DOC_COMMENT_COVERAGE_PCT}} src`,
     },
     {
-      id: 'ff-reference-build', label: 'API reference builds without warnings', when: { API_DOCS: ['reference'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-reference-build', label: 'API reference builds without warnings', when: { API_DOCS: ['reference'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-reference-built'],
       threshold: 'The reference builds on every pull request with 0 warnings (an unresolved link or an undocumented export is a warning) and is published with each release under its version',
       description: 'TypeDoc runs with warnings treated as errors, so a broken {@link} or an export without a comment fails the pull request; Sphinx does the same with `sphinx-build -W --keep-going`. The release job runs the same command and publishes the output under the release version (includeVersion puts it in the site). The file is typedoc.json; package.json holds the script "docs:api": "typedoc", which CI runs on every pull request and the release job runs to publish docs/api. Python: sphinx-build -W --keep-going -b html docs docs/_build.',
@@ -401,7 +401,7 @@ it(\`at least \${MIN_PCT}% of the exported symbols carry a doc comment\`, () => 
 }`,
     },
     {
-      id: 'ff-contract-drift', label: 'Contract and code agree', when: { API_DOCS: ['generated'] }, category: 'structural', implements: DECISIONS,
+      id: 'ff-contract-drift', label: 'Contract and code agree', when: { API_DOCS: ['generated'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-api-regenerated'],
       threshold: '0 differences in paths, operations, parameters, schemas or responses between the OpenAPI contract in the repository and the specification the running code serves, on every pull request',
       description: 'The pipeline starts the element, fetches the specification it generates from its routes and compares it with the contract file in the repository with oasdiff; any difference outside descriptions, examples and titles fails the build, so the contract, the reference rendered from it and the code cannot drift apart. Whether a difference may be released at all is the API evolution concern\'s decision; this check only keeps the documentation true.',
@@ -419,7 +419,7 @@ oasdiff diff openapi.yaml generated.json --fail-on-diff --exclude-elements descr
 oasdiff breaking openapi.yaml generated.json --fail-on ERR`,
     },
     {
-      id: 'ff-doctest', label: 'Examples in the guide run', when: { API_DOCS: ['written'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-doctest', label: 'Examples in the guide run', when: { API_DOCS: ['written'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-examples-run'],
       threshold: 'Every code example in the API guide is executed on each pull request; 0 examples throwing, and for Python 0 examples whose output differs from the guide',
       description: 'markdown-doctest executes every fenced js and es6 block of the guide with the package imported and fails on an exception; it does not compare output, so an example states what it expects with assert. For Python, `pytest --doctest-modules --doctest-glob="docs/*.md"` runs the doctests in docstrings and Markdown and does compare the output. Examples that need a server run against a test instance started by the job; an example that cannot run is marked <!-- skip-example --> and reviewed as such.',
@@ -438,7 +438,7 @@ module.exports = {
 // Python: pytest --doctest-modules --doctest-glob="docs/*.md" src docs`,
     },
     {
-      id: 'ff-docs-build', label: 'Docs build strictly with links checked', when: { DOCS_SITE: ['docs-as-code'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-docs-build', label: 'Docs build strictly with links checked', when: { DOCS_SITE: ['docs-as-code'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-links'],
       threshold: 'The documentation builds in strict mode with 0 warnings and lychee finds 0 broken links or anchors, within {{LINK_CHECK_MINUTES}} minutes, on every pull request',
       description: 'The docs job builds the site with warnings as errors (`mkdocs build --strict`, or Docusaurus with onBrokenLinks: "throw") and runs lychee over the Markdown and the built HTML with fragments checked; the job has a timeout of {{LINK_CHECK_MINUTES}} minutes and is a required check.',
@@ -462,7 +462,7 @@ jobs:
           fail: true`,
     },
     {
-      id: 'ff-stale-pages', label: 'No page without owner or past review', when: { DOCS_SITE: ['docs-as-code'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-stale-pages', label: 'No page without owner or past review', when: { DOCS_SITE: ['docs-as-code'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '{{MAX_DOC_AGE_DAYS}}d', invocation: 'manual', implements: DECISIONS,
       checks: ['req-doc-owner'],
       threshold: 'Every page under docs has owner and reviewed in its front matter; 0 pages with a reviewed date older than {{MAX_DOC_AGE_DAYS}} days',
       description: 'A test over the docs folder reads each page\'s front matter and fails on a page without an owner or review date, or with a review date older than {{MAX_DOC_AGE_DAYS}} days, naming the page and its owner. An unquoted date is parsed by gray-matter as a Date object, so the test normalises it before matching. Run on every pull request and weekly on the main branch, so a page goes stale on a schedule, not unnoticed.',
@@ -485,7 +485,7 @@ it.each(pages)('%s has an owner and a recent review date', (page) => {
 })`,
     },
     {
-      id: 'ff-external-pages', label: 'External pages name release, owner and review date', when: { DOCS_SITE: ['external'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-external-pages', label: 'External pages name release, owner and review date', when: { DOCS_SITE: ['external'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: DECISIONS,
       checks: ['req-external-versioned', 'req-doc-owner'],
       threshold: 'Every page of the documentation space has the content properties release, owner and reviewed; 0 pages with reviewed older than {{MAX_DOC_AGE_DAYS}} days; the README links the space',
       description: 'A weekly job lists the pages of the documentation space through the Confluence REST API with their content properties (expand=metadata.properties) and fails on a page without release, owner or reviewed, or reviewed older than {{MAX_DOC_AGE_DAYS}} days, naming the page and its owner; it also fails when the README does not link the space. Notion and GitBook have the same shape through their APIs (database properties, page metadata).',
@@ -506,7 +506,7 @@ grep -qF "$CONFLUENCE_URL/wiki/spaces/$SPACE" README.md || { echo "README does n
 exit $bad`,
     },
     {
-      id: 'ff-diagram-drift', label: 'Structural change touches the model', when: { DIAGRAMS: ['model'] }, category: 'process', implements: DECISIONS,
+      id: 'ff-diagram-drift', label: 'Structural change touches the model', when: { DIAGRAMS: ['model'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-diagram-same-pr'],
       threshold: '0 pull requests that add or remove a dependency, service client or data store under a diagrammed module without a change in {{MODEL_DIR}}',
       description: 'A CI step lists the files a pull request changes; when a dependency manifest, a client of another service or a data-store configuration under a diagrammed module changed and nothing under {{MODEL_DIR}} did, the step fails with the list, and the author either updates the model or explains in the pull request why the structure did not change. With Structurizr or PlantUML the diagram source folder takes the model folder\'s place. The checkout needs the base branch (fetch-depth: 0, as the quality gate\'s job does) for merge-base.',
@@ -527,7 +527,7 @@ if [ -n "$structural" ] && ! grep -q "^$MODEL/" <<< "$changed"; then
 fi`,
     },
     {
-      id: 'ff-diagram-images', label: 'Image diagrams have a source and a dated caption', when: { DIAGRAMS: ['images'] }, category: 'structural', implements: DECISIONS,
+      id: 'ff-diagram-images', label: 'Image diagrams have a source and a dated caption', when: { DIAGRAMS: ['images'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DECISIONS,
       checks: ['req-diagram-dated'],
       threshold: 'Every image under docs/diagrams has a sibling .drawio or .excalidraw file and a caption "Drawn YYYY-MM-DD by <author>" on the line after the page that embeds it; 0 captions older than {{MAX_DOC_AGE_DAYS}} days',
       description: 'A test lists the images under docs/diagrams, expects the editable source next to each, finds the Markdown page that embeds the image and reads the caption on the line after the embed (*Drawn 2026-10-01 by A. Nowak*), and fails on a missing source, a missing or malformed caption, or a date older than {{MAX_DOC_AGE_DAYS}} days.',

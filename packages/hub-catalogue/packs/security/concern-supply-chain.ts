@@ -219,7 +219,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-scorecard', label: 'OpenSSF Scorecard', category: 'process', implements: [...BUILD, ...DEPS],
+      id: 'ff-scorecard', label: 'OpenSSF Scorecard', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: [...BUILD, ...DEPS],
       checks: ['req-review'],
       threshold: 'Code-Review, Dangerous-Workflow and Token-Permissions each score 10 and Branch-Protection at least 8 (one required reviewer, no force pushes, a required status check); overall score at least 7.0',
       description: 'OpenSSF Scorecard runs weekly and on every push to the default branch; a step fails the job when an enforced check scores below its threshold. Branch-Protection scores 8 with one required approving reviewer, which is what the review requirement asks; 9 and 10 need two reviewers and code-owner review.',
@@ -246,7 +246,7 @@ jobs:
             and ([.checks[] | select(.name == "Branch-Protection") | select(.score < 8)] | length == 0)' results.json`,
     },
     {
-      id: 'ff-vuln-gate', label: 'Vulnerable dependency check', when: { SCA: ['gate'] }, category: 'structural', implements: ['adr-deps-gate'],
+      id: 'ff-vuln-gate', label: 'Vulnerable dependency check', when: { SCA: ['gate'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-deps-gate'],
       checks: ['req-vuln-gate'],
       threshold: '0 high or critical vulnerabilities with a fixed version added by a pull request; the check is required for merging; lower findings and findings without a fix warn',
       description: 'GitHub\'s dependency review action compares the pull request\'s dependencies with the base branch and fails on a newly added high or critical advisory; OSV-Scanner covers lockfiles the dependency graph does not, and its JSON output is filtered so that only high or critical findings that have a fixed version fail the step (OSV-Scanner itself exits 1 on any finding).',
@@ -278,7 +278,7 @@ jobs:
                  | if length > 0 then ("blocking: " + join(", ") | halt_error(1)) else true end' osv.json`,
     },
     {
-      id: 'ff-vuln-report', label: 'Findings commented, alerts tracked', when: { SCA: ['sla'] }, category: 'process', implements: ['adr-deps-sla'],
+      id: 'ff-vuln-report', label: 'Findings commented, alerts tracked', when: { SCA: ['sla'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-deps-sla'],
       checks: ['req-vuln-report'],
       threshold: 'Every pull request that changes dependencies gets a dependency review comment and no failed check from it; Dependabot alerts are enabled on the repository',
       description: 'GitHub\'s dependency review action runs in warn-only mode and always comments its summary on the pull request, so the finding is visible where the change is made; a step checks that Dependabot alerts are enabled, since they are the tracked record the deadline job reads.',
@@ -303,7 +303,7 @@ jobs:
         run: gh api "repos/\${{ github.repository }}/vulnerability-alerts" --silent   # 204 when enabled, 404 otherwise`,
     },
     {
-      id: 'ff-vuln-age', label: 'No finding past its deadline', category: 'operational', implements: DEPS,
+      id: 'ff-vuln-age', label: 'No finding past its deadline', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: DEPS,
       checks: ['req-vuln-sla'],
       threshold: '0 open critical alerts older than {{CRITICAL_DAYS}} days and 0 open high alerts older than {{HIGH_DAYS}} days',
       description: 'A daily job reads the repository\'s open Dependabot alerts and fails on any past its deadline, naming the package and the advisory. A reviewed not-affected statement dismisses the alert with a reason, which takes it out of the open set.',
@@ -317,7 +317,7 @@ jobs:
   | if length > 0 then (map("\\(.pkg) \\(.ghsa) \\(.sev)") | join("\\n") | halt_error(1)) else true end'`,
     },
     {
-      id: 'ff-pin-hash', label: 'Actions, images and downloads pinned', when: { PINNING: ['hash'] }, category: 'structural', implements: DEPS,
+      id: 'ff-pin-hash', label: 'Actions, images and downloads pinned', when: { PINNING: ['hash'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DEPS,
       checks: ['req-pin-hash'],
       threshold: '0 workflow actions not pinned to a full commit SHA; 0 FROM lines (stage aliases and scratch aside) without a sha256 digest; 0 RUN lines that download with curl or wget without a sha256sum check',
       description: 'zizmor audits the workflows and fails on an action used by tag or branch; a Conftest policy over the Dockerfiles fails on a FROM without a digest, resolving stage aliases so that FROM build is not flagged, and on a download that is not checked against a checksum in the same step. Both run on every pull request.',
@@ -372,7 +372,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-pin-proxy', label: 'Packages only from the proxy', when: { PINNING: ['proxy'] }, category: 'structural', implements: DEPS,
+      id: 'ff-pin-proxy', label: 'Packages only from the proxy', when: { PINNING: ['proxy'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DEPS,
       checks: ['req-pin-proxy'],
       threshold: '0 lockfile entries resolved from anywhere but the internal registry (npm, pip, Go); the build runner cannot reach a public registry',
       description: 'A step in the build job fails when any npm package was resolved from a public registry, when a Python requirements file names a public index, or when the Go proxy is not the internal one, which would mean the proxy was bypassed; a last line fails when the runner can reach the public npm registry at all.',
@@ -395,7 +395,7 @@ fi
 ! curl -sSf --max-time 5 https://registry.npmjs.org/ -o /dev/null || { echo "the build runner can reach registry.npmjs.org"; exit 1; }`,
     },
     {
-      id: 'ff-proxy-quarantine', label: 'Fresh releases held back', when: { PINNING: ['proxy'] }, category: 'operational', implements: DEPS,
+      id: 'ff-proxy-quarantine', label: 'Fresh releases held back', when: { PINNING: ['proxy'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: DEPS,
       checks: ['req-pin-proxy'],
       threshold: 'A package version younger than 7 days is refused by the proxy; one older than 7 days is served',
       description: 'A daily job on a runner with internet access (not a build runner) takes the newest version of a frequently released package from the public registry, computes its age from the registry\'s publish time, and asks the proxy for it: a version younger than 7 days must be refused, an older one served. It fails when the proxy serves a fresh one.',
@@ -418,7 +418,7 @@ else
 fi`,
     },
     {
-      id: 'ff-provenance-l1', label: 'Images carry provenance', when: { SLSA: ['l1'] }, category: 'structural', implements: ['adr-slsa-l1'],
+      id: 'ff-provenance-l1', label: 'Images carry provenance', when: { SLSA: ['l1'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-slsa-l1'],
       checks: ['req-provenance-l1'],
       threshold: '100 % of released images carry a SLSA provenance statement per platform, each naming the builder and the commit it was built from',
       description: 'After each release build, the pipeline inspects the pushed image and fails when it carries no SLSA provenance, or one without a builder id or the source commit. BuildKit keys the provenance by platform for multi-platform images and records the commit under its own metadata key when the build context is a git checkout, which the filter reads.',
@@ -433,7 +433,7 @@ jq -e '[.. | objects | select(has("SLSA")) | .SLSA]
   || { echo "no SLSA provenance naming the builder and the commit"; exit 1; }`,
     },
     {
-      id: 'ff-provenance-l2', label: 'Provenance verified on deploy', when: { SLSA: ['l2'] }, category: 'structural', implements: ['adr-slsa-l2'],
+      id: 'ff-provenance-l2', label: 'Provenance verified on deploy', when: { SLSA: ['l2'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-slsa-l2'],
       checks: ['req-provenance-l2'],
       threshold: '0 deployments of an artifact whose signed provenance does not verify for this repository and its main branch',
       description: 'The build attests provenance with GitHub artifact attestations under the image\'s lower-case name; the deploy job verifies, before anything is rolled out, that the attestation was made for this repository from refs/heads/main.',
@@ -451,7 +451,7 @@ jq -e '[.. | objects | select(has("SLSA")) | .SLSA]
   env: { GH_TOKEN: "\${{ github.token }}" }`,
     },
     {
-      id: 'ff-provenance-l3', label: 'Admission verifies provenance', when: { SLSA: ['l3'] }, category: 'structural', implements: ['adr-slsa-l3'],
+      id: 'ff-provenance-l3', label: 'Admission verifies provenance', when: { SLSA: ['l3'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-slsa-l3'],
       checks: ['req-provenance-l3'],
       threshold: '0 pods admitted from our registry without SLSA provenance signed by the isolated generator workflow for this repository',
       description: 'A Kyverno policy in enforce mode verifies, for every pod from our registry, that the image has an SLSA provenance attestation signed keylessly by the slsa-github-generator workflow and that the provenance names our repository\'s main branch as its source.',
@@ -483,7 +483,7 @@ spec:
                       value: "git+https://github.com/our-org/shop@refs/heads/main"`,
     },
     {
-      id: 'ff-sbom-track', label: 'SBOM of every deployed version', when: { SBOM: ['internal'] }, category: 'operational', implements: BUILD,
+      id: 'ff-sbom-track', label: 'SBOM of every deployed version', when: { SBOM: ['internal'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: BUILD,
       checks: ['req-sbom-internal'],
       threshold: 'Every release uploads its CycloneDX SBOM to Dependency-Track under the element and version; 0 violations of a FAIL-state policy for the version in production, checked daily',
       description: 'The release pipeline generates a CycloneDX SBOM of the image with Syft and uploads it to OWASP Dependency-Track under the element and version, where new advisories are matched against it continuously. A daily job looks the production version up and fails on any violation of a policy whose state is FAIL (the blocking policies, such as a critical vulnerability past its deadline).',
@@ -502,7 +502,7 @@ curl -sf "$DTRACK_URL/api/v1/violation/project/$uuid" -H "X-Api-Key: $DTRACK_API
            | if length > 0 then (map(.policyCondition.policy.name + ": " + .component.name) | join("\\n") | halt_error(1)) else true end'`,
     },
     {
-      id: 'ff-sbom-release', label: 'Releases carry a signed SBOM and VEX', when: { SBOM: ['shipped'] }, category: 'structural', implements: BUILD,
+      id: 'ff-sbom-release', label: 'Releases carry a signed SBOM and VEX', when: { SBOM: ['shipped'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: BUILD,
       checks: ['req-sbom-shipped'],
       threshold: '100 % of releases carry an SBOM that validates against its schema with a version and package URL on 100 % of components, its Sigstore signature bundle, and an OpenVEX document',
       description: 'The release job generates the SBOM, validates it against the CycloneDX schema, checks that every component has a version and purl, attests it to the image with cosign, signs the SBOM file keylessly (the bundle is the signature customers verify with cosign verify-blob), writes the VEX statements from the reviewed list of not-affected vulnerabilities, and attaches all three to the release.',
@@ -522,7 +522,7 @@ vexctl merge vex-*.json > vex.openvex.json
 gh release upload "$TAG" sbom.cdx.json sbom.cdx.json.sigstore.json vex.openvex.json`,
     },
     {
-      id: 'ff-base-minimal', label: 'Final stage on a minimal base', when: { BASE: ['minimal'] }, category: 'structural', implements: BUILD,
+      id: 'ff-base-minimal', label: 'Final stage on a minimal base', when: { BASE: ['minimal'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: BUILD,
       checks: ['req-base-minimal'],
       threshold: '0 Dockerfiles whose final stage is not on gcr.io/distroless or cgr.dev/chainguard, or runs as root',
       description: 'A Conftest policy over each Dockerfile resolves the final stage\'s base through stage aliases and fails when it is not a minimal image, or when the final stage runs as root: no USER and a base whose tag is not a nonroot one (distroless :nonroot, Chainguard images default to a non-root user).',
@@ -573,7 +573,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-base-official', label: 'Fresh, patched images', when: { BASE: ['official'] }, category: 'operational', implements: BUILD,
+      id: 'ff-base-official', label: 'Fresh, patched images', when: { BASE: ['official'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: BUILD,
       checks: ['req-base-official'],
       threshold: '0 fixable high or critical OS vulnerabilities in released images; 0 production images older than {{REBUILD_DAYS}} days',
       description: 'A scheduled pipeline rebuilds each image on its current base, scans it with Trivy and fails on fixable high or critical findings; a check fails when a running image was built more than {{REBUILD_DAYS}} days ago.',
@@ -586,7 +586,7 @@ age_days=$(( ( $(date +%s) - $(date -d "$created" +%s) ) / 86400 ))
 [ "$age_days" -le {{REBUILD_DAYS}} ] || { echo "running image is $age_days days old"; exit 1; }`,
     },
     {
-      id: 'ff-base-golden-build', label: 'Builds start from golden images', when: { BASE: ['golden'] }, category: 'structural', implements: BUILD,
+      id: 'ff-base-golden-build', label: 'Builds start from golden images', when: { BASE: ['golden'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: BUILD,
       checks: ['req-base-golden'],
       threshold: '0 FROM lines (stage aliases aside) whose image is outside the internal registry',
       description: 'A Conftest policy over each Dockerfile fails the build when any stage starts from an image outside the internal registry, where only golden-image-based images are published; stage aliases are resolved so that FROM build passes.',
@@ -628,7 +628,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-base-golden', label: 'Only golden images run', when: { BASE: ['golden'] }, category: 'structural', implements: BUILD,
+      id: 'ff-base-golden', label: 'Only golden images run', when: { BASE: ['golden'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: BUILD,
       checks: ['req-base-golden'],
       threshold: '0 pods admitted with an image outside the internal registry, init and ephemeral containers included',
       description: 'A Kyverno policy in enforce mode refuses pods whose containers, init containers or ephemeral containers come from anywhere but the internal registry, where only golden-image-based builds are published.',

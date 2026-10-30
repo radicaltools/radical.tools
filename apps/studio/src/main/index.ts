@@ -295,8 +295,8 @@ app.whenReady().then(() => {
     }
   })
 
-  // What radical check keeps beside the model (test results, check.json),
-  // for the Inspector.
+  // What radical check keeps beside the model (test results, measurements,
+  // check.json, reviews.json), for the Inspector.
   ipcMain.handle('folder:read-check-files', async (_event, folderPath: string) => {
     try {
       return { success: true, ...(await readCheckFiles(folderPath)) }

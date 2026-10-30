@@ -22,7 +22,7 @@ function complete(): DiagramData {
       node('req', 'requirement', 'Pay', { ears_type: 'event-driven', trigger: 'the user pays', action: 'take the payment' }),
       node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid', metrics: 'test(tests/pay.test.ts › pays) passed' }),
       node('adr', 'adr', 'Use cards', ACCEPTED_ADR),
-      node('ff', 'fitness-fn', 'Card check', { metrics: 'test(tests/cards.test.ts › only cards) passed' }),
+      node('ff', 'fitness-fn', 'Card check', { characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', metrics: 'test(tests/cards.test.ts › only cards) passed' }),
     ],
     relations: [
       rel('r1', 'derives', 'req', 'need'),

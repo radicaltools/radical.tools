@@ -852,7 +852,11 @@
       "label": "Deploy confirms the running version",
       "x": 1040,
       "y": 0,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "deploy",
+      "invocation": "automated",
       "description": "The last step of every deploy job polls the element's version endpoint and fails the deploy unless it answers with the version the job deployed (the tag, or the commit SHA where builds carry no version number) and the commit SHA of the workflow run. The element fills both from build arguments baked into the image (or into /version.json for a web app), never from its environment at run time.\n\nThreshold: Within 90 seconds of every deploy, GET /version answers with the deployed version and commit; otherwise the deploy job fails\n\nTool: curl and jq in the deploy job (GitHub Actions)\n\n```bash\n# the last step of every deploy job; APP_URL is the environment's address, EXPECTED_VERSION the tag deployed\n# (or the commit SHA, where builds carry no version number)\nset -euo pipefail\nfor attempt in 1 2 3 4 5 6; do                               # 6 tries, 90 seconds at most\n  body=$(curl -fsS --max-time 5 \"$APP_URL/version\" || true)   # /version.json for a web app\n  if echo \"$body\" | jq -e --arg version \"$EXPECTED_VERSION\" --arg commit \"$GITHUB_SHA\" \\\n      '.version == $version and .commit == $commit' >/dev/null 2>&1; then\n    echo \"running $EXPECTED_VERSION at $GITHUB_SHA\"; exit 0\n  fi\n  sleep 10\ndone\necho \"expected $EXPECTED_VERSION at $GITHUB_SHA, the element answers: ${body:-nothing}\"; exit 1\n```"
     },
     {
@@ -861,7 +865,11 @@
       "label": "Semantic versions follow their notes",
       "x": 1040,
       "y": 130,
-      "category": "process",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against the regular expression semver.org publishes, refuses a version released twice, and requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable. Then it sorts the final releases by version and, for each, reads its notes: a breaking or Removed heading or a **BREAKING:** entry calls for MAJOR (MINOR while MAJOR is 0), a Features, Added or Deprecated heading for MINOR, anything else for PATCH, one step from the version before; the move from 0.y.z to 1.0.0 is declared, not computed. The headings are the ones release-please, semantic-release, the .github/release.yml of the label decision and Keep a Changelog write.\n\nThreshold: 0 release tags that are not v and a valid semantic version and 0 versions released twice; for releases published since the rules were adopted, 0 mutable releases and 0 numbers other than the one their notes call for\n\nTool: Node.js with the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-semver.mjs — tags are semantic versions, each released once and immutable, each bump what its notes call for\nimport { execFileSync } from 'node:child_process'\nconst gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))\nconst SINCE = process.env.SINCE ?? '1970-01-01'   // the day these rules and immutable releases were adopted; older releases are not judged\nconst SEMVER = /^v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$/\nconst BREAKING = /^#{2,4} .*(breaking|removed)|^[-*] \\*\\*BREAKING/im   // headings of release-please, semantic-release, .github/release.yml, Keep a Changelog\nconst MINOR = /^#{2,4} .*(features|added|deprecat)/im\nconst releases = gh('release', 'list', '--exclude-drafts', '--limit', '1000', '--json', 'tagName,publishedAt,isImmutable')\nconst core = (tag) => tag.replace(/\\+.*$/, '')\nconst problems = releases.filter((r) => !SEMVER.test(r.tagName)).map((r) => `${r.tagName}: not v + a semantic version`)\nproblems.push(...releases.filter((r) => !r.isImmutable && r.publishedAt > SINCE).map((r) => `${r.tagName}: not an immutable release`))\nproblems.push(...releases.map((r) => core(r.tagName)).filter((v, i, all) => all.indexOf(v) !== i).map((v) => `${v}: released twice`))\nconst final = releases.map((r) => [r, r.tagName.match(SEMVER)]).filter(([, m]) => m && !m[4]).map(([r, m]) => [r, ...m.slice(1, 4).map(Number)])\n  .sort((a, b) => a[1] - b[1] || a[2] - b[2] || a[3] - b[3])\nfor (let i = 1; i < final.length; i++) {\n  const [[prev, ma, mi, pa], [cur]] = [final[i - 1], final[i]]\n  if (cur.publishedAt <= SINCE || (ma === 0 && core(cur.tagName) === 'v1.0.0')) continue   // 0.y.z to 1.0.0 is declared, not computed\n  const body = gh('release', 'view', cur.tagName, '--json', 'body').body\n  const level = BREAKING.test(body) ? (ma === 0 ? 'minor' : 'major') : MINOR.test(body) ? 'minor' : 'patch'\n  const expected = level === 'major' ? `v${ma + 1}.0.0` : level === 'minor' ? `v${ma}.${mi + 1}.0` : `v${ma}.${mi}.${pa + 1}`\n  if (core(cur.tagName) !== expected) problems.push(`${cur.tagName}: its notes call for a ${level} release after ${prev.tagName}, so ${expected}`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -875,7 +883,11 @@
       "label": "Calendar versions follow the rule",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "A script runs in the release workflow after each release and nightly. It lists the releases with the GitHub CLI, checks every tag against vYYYY.M.MICRO with no leading zero on the month, compares each line's first release with the UTC month it was published in, requires each line's MICRO numbers to count 0, 1, 2 without gaps, requires every release since SINCE (the day these rules and immutable releases were adopted) to be immutable, and reads the notes of every fix release for headings only a new line may carry.\n\nThreshold: 0 release tags outside vYYYY.M.MICRO, 0 lines whose first release was published outside their month, 0 gaps in a line's MICRO numbers; for releases published since the rules were adopted, 0 mutable releases and 0 fix releases whose notes bring new functionality, a deprecation or a breaking change\n\nTool: Node.js with the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-calver.mjs — tags are vYYYY.M.MICRO, lines dated by their first release, MICRO counting fixes, releases immutable\nimport { execFileSync } from 'node:child_process'\nconst gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))\nconst SINCE = process.env.SINCE ?? '1970-01-01'   // the day these rules and immutable releases were adopted; older releases are not judged\nconst CALVER = /^v(\\d{4})\\.([1-9]|1[0-2])\\.(0|[1-9]\\d*)$/\nconst NEW_LINE = /^#{2,4} .*(breaking|removed|features|added|deprecat)|^[-*] \\*\\*BREAKING/im   // what only a new line may bring\nconst problems = []\nconst lines = new Map()\nfor (const { tagName, publishedAt, isImmutable } of gh('release', 'list', '--exclude-drafts', '--limit', '1000', '--json', 'tagName,publishedAt,isImmutable')) {\n  const m = tagName.match(CALVER)\n  if (!m) { problems.push(`${tagName}: not vYYYY.M.MICRO`); continue }\n  if (!isImmutable && publishedAt > SINCE) problems.push(`${tagName}: not immutable`)\n  const [, year, month, micro] = m.map(Number)\n  const at = new Date(publishedAt)\n  if (micro === 0 && (year !== at.getUTCFullYear() || month !== at.getUTCMonth() + 1)) problems.push(`${tagName}: first release of its line published ${publishedAt.slice(0, 10)}`)\n  if (micro > 0 && publishedAt > SINCE && NEW_LINE.test(gh('release', 'view', tagName, '--json', 'body').body)) problems.push(`${tagName}: new functionality in a fix release; start a new line`)\n  lines.set(`${year}.${month}`, [...(lines.get(`${year}.${month}`) ?? []), micro])\n}\nfor (const [line, micros] of lines) {\n  micros.sort((a, b) => a - b)\n  if (micros.some((n, i) => n !== i)) problems.push(`v${line}: MICRO ${micros.join(', ')} does not count 0, 1, 2, …`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -889,7 +901,11 @@
       "label": "Builds deployed by their commit",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A step on every pull request and after every deploy reads the manifests the pipeline applies, refuses any image referenced by a mutable tag, checks with the GitHub API that the recent production deployments are of commits on main, and fails when a version tag appears, which would mean releases started without their decision.\n\nThreshold: 0 image references in deploy/ without a full commit SHA or a sha256 digest, 0 of the last 30 production deployments of a commit not on main, 0 version tags\n\nTool: grep and the GitHub CLI (gh api repos/{owner}/{repo}/deployments) in a GitHub Actions step\n\n```bash\n# on every pull request and after every deploy; deploy/ holds the manifests the pipeline applies (render Helm or Kustomize into it first)\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\nimages=$(grep -rhoE '^[[:space:]-]*image:[[:space:]]*[\"'\\'']?[^\"'\\''[:space:]]+' deploy/ | sed -E 's/.*image:[[:space:]]*[\"'\\'']?//')\nmutable=$(echo \"$images\" | grep -Ev '(@sha256:[0-9a-f]{64}|:[0-9a-f]{40})$' || true)\n[ -z \"$mutable\" ] || { echo \"images not referenced by a full commit SHA or a digest:\"; echo \"$mutable\"; exit 1; }\n# every production deploy is recorded with a commit of main\ngit fetch --quiet origin main\nfor sha in $(gh api \"repos/$REPO/deployments?environment=production&per_page=30\" --jq '.[].sha'); do\n  git merge-base --is-ancestor \"$sha\" origin/main || { echo \"production deployment of $sha, which is not on main\"; exit 1; }\ndone\n# no version numbers: the decision is a commit SHA per build\n[ -z \"$(git tag --list 'v[0-9]*')\" ] || { echo \"version tags exist; supersede the decision before numbering releases\"; exit 1; }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -903,7 +919,11 @@
       "label": "Notes list every typed commit",
       "x": 1040,
       "y": 520,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "After each release the release workflow lists the commits between the two latest releases and looks for each feat, fix and perf commit in the new release's notes, by the pull request number its squash subject ends with, or else by its short SHA (release-please, semantic-release and the git-cliff template all link both).\n\nThreshold: 0 feat, fix or perf commits between the previous and the latest release missing from the latest release's notes\n\nTool: Node.js with git and the GitHub CLI (gh release list, gh release view)\n\n```js\n// scripts/check-release-notes.mjs — every feat, fix and perf commit of the latest release is in its notes\nimport { execFileSync } from 'node:child_process'\nconst run = (cmd, ...args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim()\nconst [latest, previous] = JSON.parse(run('gh', 'release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '2', '--json', 'tagName'))\n  .map((r) => r.tagName)\nconst body = JSON.parse(run('gh', 'release', 'view', latest, '--json', 'body')).body\nconst range = previous ? `${previous}..${latest}` : latest\nconst missing = run('git', 'log', '--format=%H%x09%s', range).split('\\n').filter(Boolean)\n  .map((line) => line.split('\\t'))\n  .filter(([, subject]) => /^(feat|fix|perf)(\\([^)]*\\))?!?: /.test(subject))\n  .filter(([sha, subject]) => {\n    const pr = subject.match(/\\(#(\\d+)\\)$/)\n    return !(pr ? new RegExp(`#${pr[1]}\\\\b`).test(body) : body.includes(sha.slice(0, 7)))\n  })\nif (missing.length) {\n  console.error(`${latest}: commits missing from the release notes:\\n${missing.map(([sha, s]) => `${sha.slice(0, 7)} ${s}`).join('\\n')}`)\n  process.exit(1)\n}\n```",
       "hubWhen": {
         "SCHEME": [
@@ -921,7 +941,11 @@
       "label": "Changelog line with each change",
       "x": 1040,
       "y": 650,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A required check on every pull request compares it with its base: when code under src/ changed and the pull request is not labelled skip-changelog, the lines it adds to CHANGELOG.md must be entries inside the Unreleased section, that section may hold only the six Keep a Changelog categories, and every release heading must read ## [version] - YYYY-MM-DD, optionally followed by [YANKED].\n\nThreshold: Every pull request that changes src/ adds an entry under ## [Unreleased] or carries skip-changelog; 0 headings under Unreleased outside the six categories; 0 release headings other than ## [version] - YYYY-MM-DD\n\nTool: git, awk and jq in a GitHub Actions step on pull_request\n\n```bash\n# CI on every pull request (fetch-depth: 0); LABELS is toJSON(github.event.pull_request.labels.*.name)\nset -euo pipefail\nbase=\"origin/${GITHUB_BASE_REF:-main}\"\nif git diff --quiet \"$base\"...HEAD -- src/; then exit 0; fi                   # no shipped code changed\nif echo \"$LABELS\" | jq -e 'index(\"skip-changelog\")' >/dev/null; then exit 0; fi  # nothing a user can notice\nunreleased=$(awk '/^## \\[Unreleased\\]/ { on = 1; next } /^## \\[/ { on = 0 } on' CHANGELOG.md)\nadded=$(git diff -U0 \"$base\"...HEAD -- ./CHANGELOG.md | sed -n 's/^+\\(- .*\\)$/\\1/p')\n[ -n \"$added\" ] || { echo \"src/ changed: add an entry under ## [Unreleased] in CHANGELOG.md, or label the pull request skip-changelog\"; exit 1; }\nwhile IFS= read -r entry; do\n  grep -Fxq -- \"$entry\" <<<\"$unreleased\" || { echo \"entry outside ## [Unreleased]: $entry\"; exit 1; }\ndone <<<\"$added\"\nbad=$(grep -E '^### ' <<<\"$unreleased\" | grep -Evx '### (Added|Changed|Deprecated|Removed|Fixed|Security)' || true)\n[ -z \"$bad\" ] || { echo \"not a Keep a Changelog category: $bad\"; exit 1; }\nheads=$(grep -E '^## ' CHANGELOG.md | grep -Evx '## \\[(Unreleased|[0-9][0-9A-Za-z.+-]*)\\]( - [0-9]{4}-[0-9]{2}-[0-9]{2}( \\[YANKED\\])?)?' || true)\n[ -z \"$heads\" ] || { echo \"release headings must read ## [version] - YYYY-MM-DD: $heads\"; exit 1; }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -939,7 +963,11 @@
       "label": "Exactly one release label",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A workflow that the main branch's ruleset lists as a required check runs whenever a pull request is opened, edited, synchronised or relabelled, and fails unless exactly one of the labels that .github/release.yml groups the notes by is set.\n\nThreshold: Every pull request carries exactly 1 of the 5 release labels before it can merge\n\nTool: GitHub Actions with jq; GitHub's generated release notes (.github/release.yml)\n\n```yaml\n# .github/workflows/release-label.yml, a required check. The notes' categories, in .github/release.yml:\n#   changelog:\n#     categories:\n#       - title: ⚠ Breaking changes\n#         labels: [breaking-change]\n#       - title: Features\n#         labels: [feature]\n#       - title: Deprecations\n#         labels: [deprecation]\n#       - title: Fixes\n#         labels: [fix]\n#       - title: Other changes\n#         labels: [internal]\nname: release-label\non:\n  pull_request:\n    types: [opened, reopened, edited, labeled, unlabeled, synchronize]\njobs:\n  label:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Exactly one release-notes label\n        env:\n          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}\n        run: |\n          n=$(echo \"$LABELS\" | jq '[.[] | select(IN(\"breaking-change\", \"feature\", \"deprecation\", \"fix\", \"internal\"))] | length')\n          [ \"$n\" -eq 1 ] || { echo \"label the pull request with exactly one of breaking-change, feature, deprecation, fix, internal (it has $n)\"; exit 1; }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -957,7 +985,11 @@
       "label": "Only the newest line supported",
       "x": 1040,
       "y": 910,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest line, and fails on any release published on a line after the next newer line started.\n\nThreshold: SECURITY.md lists exactly the newest line as supported; 0 releases on an older line published after a newer line's first release\n\nTool: Node.js with the GitHub CLI (gh release list)\n\n```js\n// scripts/check-support.mjs — SECURITY.md supports the newest line only, and no older line gets a release once a newer one has started\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\nconst releases = JSON.parse(execFileSync('gh', ['release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '1000', '--json', 'tagName,publishedAt'], { encoding: 'utf8' }))\n  .filter((r) => /^v\\d+\\.\\d+\\.\\d+$/.test(r.tagName)).map((r) => ({ tag: r.tagName, v: r.tagName.slice(1).split('.').map(Number), at: r.publishedAt }))\nconst lineOf = (v) => (v[0] >= 1000 ? v.slice(0, 2) : v.slice(0, 1)).join('.')   // YYYY.M under calendar versions, MAJOR under semantic ones\nconst starts = new Map()   // line -> when its first release was published\nfor (const { v, at } of releases) if (!starts.has(lineOf(v)) || at < starts.get(lineOf(v))) starts.set(lineOf(v), at)\nconst num = (line) => line.split('.').map(Number)\nconst lines = [...starts.keys()].sort((a, b) => num(b)[0] - num(a)[0] || (num(b)[1] ?? 0) - (num(a)[1] ?? 0))   // newest first\nconst supported = readFileSync('SECURITY.md', 'utf8').split('\\n')\n  .map((row) => row.match(/^\\|\\s*v?(\\d+(?:\\.\\d+)?)\\.x\\s*\\|\\s*(?:✅|:white_check_mark:)/)).filter(Boolean).map((m) => m[1])\nconst problems = []\nif (supported.join() !== lines.slice(0, 1).join()) problems.push(`SECURITY.md supports ${supported.join(', ') || 'nothing'}; only the newest line, ${lines[0]}, is`)\nlines.slice(1).forEach((line, i) => {\n  const leftAt = starts.get(lines[i])   // the next newer line's first release ends this one's support\n  for (const r of releases) if (lineOf(r.v) === line && r.at > leftAt) problems.push(`${r.tag}: released on ${line} after ${lines[i]} started`)\n})\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -975,7 +1007,11 @@
       "label": "Supported lines match the policy",
       "x": 1040,
       "y": 1040,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A nightly script groups the final releases into lines (MAJOR under semantic versions, YYYY.M under calendar versions, told apart by a four-digit first number), compares the supported rows of SECURITY.md with the newest {{LTS_LINES}} lines, checks that each older supported line has its maintenance branch on origin, and fails on any release published on a line after the line {{LTS_LINES}} places newer started.\n\nThreshold: SECURITY.md lists exactly the newest {{LTS_LINES}} lines as supported; 1 maintenance branch release/<line>.x per older supported line; 0 releases on a line published after it left support\n\nTool: Node.js with git and the GitHub CLI (gh release list)\n\n```js\n// scripts/check-support.mjs — SECURITY.md supports the newest {{LTS_LINES}} lines, each older one has its branch, none is released on after it left support\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\nconst SUPPORTED_LINES = {{LTS_LINES}}\nconst run = (cmd, ...args) => execFileSync(cmd, args, { encoding: 'utf8' })\nconst releases = JSON.parse(run('gh', 'release', 'list', '--exclude-drafts', '--exclude-pre-releases', '--limit', '1000', '--json', 'tagName,publishedAt'))\n  .filter((r) => /^v\\d+\\.\\d+\\.\\d+$/.test(r.tagName)).map((r) => ({ tag: r.tagName, v: r.tagName.slice(1).split('.').map(Number), at: r.publishedAt }))\nconst lineOf = (v) => (v[0] >= 1000 ? v.slice(0, 2) : v.slice(0, 1)).join('.')   // YYYY.M under calendar versions, MAJOR under semantic ones\nconst starts = new Map()   // line -> when its first release was published\nfor (const { v, at } of releases) if (!starts.has(lineOf(v)) || at < starts.get(lineOf(v))) starts.set(lineOf(v), at)\nconst num = (line) => line.split('.').map(Number)\nconst lines = [...starts.keys()].sort((a, b) => num(b)[0] - num(a)[0] || (num(b)[1] ?? 0) - (num(a)[1] ?? 0))   // newest first\nconst supported = readFileSync('SECURITY.md', 'utf8').split('\\n')\n  .map((row) => row.match(/^\\|\\s*v?(\\d+(?:\\.\\d+)?)\\.x\\s*\\|\\s*(?:✅|:white_check_mark:)/)).filter(Boolean).map((m) => m[1])\nconst expected = lines.slice(0, SUPPORTED_LINES)\nconst problems = []\nif ([...supported].sort().join() !== [...expected].sort().join()) problems.push(`SECURITY.md supports ${supported.join(', ') || 'nothing'}, the decision ${expected.join(', ')}`)\nfor (const line of expected.slice(1)) if (!run('git', 'ls-remote', '--heads', 'origin', `release/${line}.x`).trim()) problems.push(`release/${line}.x: no maintenance branch`)\nlines.forEach((line, i) => {\n  if (i < SUPPORTED_LINES) return\n  const leftAt = starts.get(lines[i - SUPPORTED_LINES])   // a line leaves support when the line SUPPORTED_LINES places newer starts\n  for (const r of releases) if (lineOf(r.v) === line && r.at > leftAt) problems.push(`${r.tag}: released after line ${line} left support`)\n})\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -993,7 +1029,11 @@
       "label": "Security fixes back-ported in time",
       "x": 1040,
       "y": 1170,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A nightly job lists the pull requests labelled security that were merged to main more than {{BACKPORT_DAYS}} days ago, and for each older line SECURITY.md supports, looks on release/<line>.x for the commit git cherry-pick -x made from the fix (its \"cherry picked from commit\" line) and for a release tag containing it. A line cut after the fix already contains it and is skipped.\n\nThreshold: 0 security fixes merged to main more than {{BACKPORT_DAYS}} days ago without a cherry-picked commit in a released tag on every older supported line\n\nTool: git and the GitHub CLI (gh pr list) in a scheduled GitHub Actions job\n\n```bash\n# nightly, in a full clone; SECURITY.md lists the supported lines newest first (| 2.x | ✅ |), the newest released from main\nset -euo pipefail\ngit fetch --quiet --tags origin '+refs/heads/release/*:refs/remotes/origin/release/*'\nolder=$(grep -E '^\\|' SECURITY.md | grep -E '✅|:white_check_mark:' | awk -F'|' '{ gsub(/[ v]/, \"\", $2); print $2 }' | tail -n +2)\nfixes=$(gh pr list --base main --state merged --label security --limit 200 --json mergeCommit,mergedAt \\\n  --jq '.[] | select(now - (.mergedAt | fromdateiso8601) > {{BACKPORT_DAYS}} * 86400) | .mergeCommit.oid')\nlate=0\nfor fix in $fixes; do\n  for line in $older; do\n    branch=\"origin/release/$line\"                                          # release/2.x\n    git merge-base --is-ancestor \"$fix\" \"$branch\" && continue               # the line was cut after the fix\n    pick=$(git log \"$branch\" --format=%H -n 1 --grep \"cherry picked from commit $fix\")\n    if [ -z \"$pick\" ] || [ -z \"$(git tag --list 'v*' --contains \"$pick\")\" ]; then\n      echo \"security fix $fix is not released on $line within {{BACKPORT_DAYS}} days\"; late=1\n    fi\n  done\ndone\nexit \"$late\"\n```",
       "hubWhen": {
         "SCHEME": [
@@ -1011,7 +1051,11 @@
       "label": "Releases wait for the release owner",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job, and one on every change under .github/, reads the protection rules of the environment release through the GitHub API, checks that every workflow file that publishes releases (gh release, release-please or semantic-release) declares environment: release, and lists the published releases whose author is not github-actions[bot], which means someone published one by hand.\n\nThreshold: The environment release requires a review by the team {{RELEASE_OWNER}} alone, with self-review prevented; every workflow that publishes releases runs in it; 0 of the last 100 releases published by anyone but the release workflow\n\nTool: the GitHub CLI (gh api repos/{owner}/{repo}/environments/release and /releases) with jq\n\n```bash\n# weekly and on changes to .github/; GH_TOKEN may read the repository's environments and releases\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\ngh api \"repos/$REPO/environments/release\" --jq '.protection_rules' | jq -e --arg team '{{RELEASE_OWNER}}' '\n  map(select(.type == \"required_reviewers\")) | length == 1 and .[0].prevent_self_review == true\n  and (.[0].reviewers | length == 1 and .[0].type == \"Team\" and .[0].reviewer.slug == $team)' >/dev/null \\\n  || { echo \"environment release must wait for a review by the team {{RELEASE_OWNER}} alone, with self-review prevented\"; exit 1; }\n# every job that publishes a release runs in that environment\nfor wf in $(grep -lE 'gh release (create|edit)|release-please-action|semantic-release' .github/workflows/*.yml); do\n  grep -qE '^\\s+environment:\\s*release\\s*$' \"$wf\" || { echo \"$wf publishes releases outside the environment release\"; exit 1; }\ndone\n# and nobody publishes one by hand\nby_hand=$(gh api \"repos/$REPO/releases?per_page=100\" --jq '.[] | select(.draft | not) | select(.author.login != \"github-actions[bot]\") | .tag_name')\n[ -z \"$by_hand\" ] || { echo \"releases not published by the release workflow: $by_hand\"; exit 1; }\n```",
       "hubWhen": {
         "SCHEME": [
@@ -1029,7 +1073,10 @@
       "label": "No merge waits for its release",
       "x": 1040,
       "y": 1430,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "An hourly job finds the latest release tag on main and lists the first-parent commits after it that change code under src/, test files excluded; any older than {{RELEASE_HOURS}} hours fails the job. It also checks that the release workflow starts on pushes to main and declares no environment, where it would wait for a reviewer. A commit typed docs or test that touches src/ is reported too: type it so that it releases, or keep it out of src/.\n\nThreshold: 0 commits changing src/ (tests excluded) merged to main more than {{RELEASE_HOURS}} hours ago and not in a release; release.yml runs on pushes to main and waits in no environment\n\nTool: git in a scheduled GitHub Actions job\n\n```bash\n# hourly, in a full clone: no change to shipped code waits on main longer than {{RELEASE_HOURS}} hours for its release\nset -euo pipefail\ngit fetch --quiet --tags origin main\nlatest=$(git describe --tags --abbrev=0 --match 'v*' origin/main)\ncutoff=$(( $(date +%s) - {{RELEASE_HOURS}} * 3600 ))\nwaiting=$(git log \"$latest..origin/main\" --first-parent --format='%h %ct %s' -- src/ ':(glob,exclude)src/**/*.test.*' | awk -v c=\"$cutoff\" '$2 < c')\n[ -z \"$waiting\" ] || { echo \"merged more than {{RELEASE_HOURS}} hours ago and in no release after $latest:\"; echo \"$waiting\"; exit 1; }\n# and no release waits for a person: the release workflow starts on every push to main, in no environment with reviewers\ngrep -qE '^\\s+branches:\\s*\\[\\s*main\\s*\\]' .github/workflows/release.yml || { echo \"release.yml does not run on pushes to main\"; exit 1; }\n! grep -qE '^\\s+environment:' .github/workflows/release.yml || { echo \"release.yml waits in an environment; automatic releases do not\"; exit 1; }\n```",
       "hubWhen": {
         "SCHEME": [

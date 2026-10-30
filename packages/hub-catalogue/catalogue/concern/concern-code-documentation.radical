@@ -742,7 +742,11 @@
       "label": "Decision records are well-formed",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads the front matter and the headings of every record in {{ADR_DIR}}, checks the required fields and sections and that each superseded-by link points at an existing record, and fails on a record left in proposed past the deadline. An unquoted date in YAML front matter is parsed by gray-matter as a Date object, so the test normalises it before matching. The same test in Python is a pytest over python-frontmatter.\n\nThreshold: Every file in {{ADR_DIR}} has a status from the list, a date and the Context, Decision Outcome and Consequences sections; every superseded record names an existing record in superseded-by; 0 records in status proposed older than {{ADR_DAYS}} days\n\nTool: Vitest with gray-matter (a test over the ADR folder); pytest with python-frontmatter for Python\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst DIR = '{{ADR_DIR}}'\nconst DAYS = {{ADR_DAYS}}\nconst SECTIONS = ['## Context', '## Decision Outcome', '## Consequences']\nconst files = readdirSync(DIR).filter((f) => /^\\d{4}-.+\\.md$/.test(f))\n// gray-matter turns an unquoted \"date: 2026-10-01\" into a Date; keep YYYY-MM-DD either way\nconst iso = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? ''))\n\nit.each(files)('%s is a well-formed decision record', (file) => {\n  const { data, content } = matter(readFileSync(`${DIR}/${file}`, 'utf8'))\n  expect(['proposed', 'accepted', 'rejected', 'superseded', 'deprecated'], `${file}: status`).toContain(data.status)\n  expect(iso(data.date), `${file}: date`).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)\n  for (const s of SECTIONS) expect(content, `${file} lacks \"${s}\"`).toContain(s)\n  if (data.status === 'superseded') expect(files, `${file}: superseded-by`).toContain(String(data['superseded-by']))\n  if (data.status === 'proposed') expect((Date.now() - Date.parse(iso(data.date))) / 86_400_000, `${file} is proposed too long`).toBeLessThanOrEqual(DAYS)\n})\n```",
       "hubWhen": {
         "DECISIONS": [
@@ -756,7 +760,11 @@
       "label": "Architecture model checked in CI",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The CI job runs the model check against the test reports of the same run: an accepted decision without date, context, decision or consequences (adr-incomplete), a superseded decision nothing supersedes (adr-superseded-unlinked), a decision marked with a concern that constrains no element (concern-unbound), and a fitness function naming a test that did not run each fail the pull request once check.json sets those rules to error. A second step reads the decision files of the Markdown folder and fails one left proposed past {{ADR_DAYS}} days. With Structurizr, the CLI's validate command on the workspace plays the role of the model check.\n\nThreshold: `radical check {{MODEL_DIR}}` reports 0 errors on every pull request with adr-incomplete, adr-superseded-unlinked and concern-unbound raised to errors in check.json; 0 decisions in status proposed older than {{ADR_DAYS}} days\n\nTool: radical CLI in GitHub Actions\n\n```yaml\n# .github/workflows/architecture.yml\nname: architecture model\non: [pull_request, push]\njobs:\n  check:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@v4.2.2        # pin by commit SHA in your repository\n      - uses: actions/setup-node@v4.1.0      # pin by commit SHA in your repository\n        with: { node-version-file: .nvmrc, cache: npm }\n      - run: npm ci\n      - run: npm test -- --reporter=junit --outputFile=reports/junit.xml\n      # check.json in the model folder: \"rules\": { \"adr-incomplete\": \"error\", \"adr-superseded-unlinked\": \"error\", \"concern-unbound\": \"error\" }\n      - run: npx radical check {{MODEL_DIR}} --report reports\n      - name: no decision left proposed for more than {{ADR_DAYS}} days\n        run: |\n          limit=$(date -u -d '{{ADR_DAYS}} days ago' +%F)\n          stale=$(grep -rlE '^status: *\"?proposed\"?' {{MODEL_DIR}}/nodes --include='*.md' | while read -r f; do   # the folder quotes its values\n            d=$(grep -m1 -oE '^date: *\"?[0-9]{4}-[0-9]{2}-[0-9]{2}' \"$f\" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')\n            if [ -n \"$d\" ] && [ \"$d\" \\< \"$limit\" ]; then echo \"$f (proposed since $d)\"; fi; done)\n          [ -z \"$stale\" ] || { echo \"decisions proposed for more than {{ADR_DAYS}} days:\"; echo \"$stale\"; exit 1; }\n```",
       "hubWhen": {
         "DECISIONS": [
@@ -770,7 +778,11 @@
       "label": "Decision log complete in the wiki",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job lists the pages labelled decision in the space through the Confluence REST API with their content properties (expand=metadata.properties), fails on a page missing a status or date, a superseded page without superseded-by, or a page left proposed past the deadline, then reads the index page's storage body and fails on a decision page it does not link (Confluence stores a page link as ri:content-title=\"<title>\"). The job fails on the first gap; what it prints is the list to fix.\n\nThreshold: 0 decision pages without a status and a date property; 0 superseded pages without a superseded-by property; 0 pages in status proposed older than {{ADR_DAYS}} days; 0 decision pages not linked from the index page; the README links the space\n\nTool: Confluence REST API with curl and jq (scheduled job on a GNU/Linux runner, for date -d)\n\n```bash\n#!/usr/bin/env bash\n# weekly: decision pages with their status, date and superseded-by properties\nset -euo pipefail\nSPACE=ARCH; INDEX_PAGE_ID=123456789; DAYS={{ADR_DAYS}}\nauth=(-u \"$CONFLUENCE_USER:$CONFLUENCE_TOKEN\")\ncurl -sf \"${auth[@]}\" \"$CONFLUENCE_URL/wiki/rest/api/content/search?cql=space=$SPACE+and+label=decision&expand=metadata.properties&limit=200\" \\\n  | jq -r '.results[] | [.id, .title, (.metadata.properties.status.value // \"MISSING\"), (.metadata.properties.date.value // \"MISSING\"), (.metadata.properties[\"superseded-by\"].value // \"\")] | @tsv' > decisions.tsv\nlimit=$(date -u -d \"$DAYS days ago\" +%F); bad=0\nwhile IFS=$'\\t' read -r id title status date by; do\n  if [ \"$status\" = MISSING ] || [ \"$date\" = MISSING ]; then echo \"no status or date: $title\"; bad=1; fi\n  if [ \"$status\" = superseded ] && [ -z \"$by\" ]; then echo \"superseded without superseded-by: $title\"; bad=1; fi\n  if [ \"$status\" = proposed ] && [ \"$date\" \\< \"$limit\" ]; then echo \"proposed since $date: $title\"; bad=1; fi\ndone < decisions.tsv\n# every decision page is linked from the index page, and the README links the space\nindex=$(curl -sf \"${auth[@]}\" \"$CONFLUENCE_URL/wiki/rest/api/content/$INDEX_PAGE_ID?expand=body.storage\" | jq -r .body.storage.value)\nwhile IFS=$'\\t' read -r id title rest; do\n  grep -qF \"ri:content-title=\\\"$title\\\"\" <<< \"$index\" || { echo \"not on the index: $title\"; bad=1; }\ndone < decisions.tsv\ngrep -qF \"$CONFLUENCE_URL/wiki/spaces/$SPACE\" README.md || { echo \"README does not link the decision space\"; bad=1; }\nexit $bad\n```",
       "hubWhen": {
         "DECISIONS": [
@@ -784,7 +796,11 @@
       "label": "Every module has its README sections",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the module directories from the workspace configuration (package.json workspaces, or the services folder), not from a list kept by hand, and expects a README.md with every required heading in each; a new module fails the test until it has one. The same test in Python walks the packages with pathlib under pytest.\n\nThreshold: Every workspace or module directory holds README.md with the headings {{README_SECTIONS}}; 0 directories without\n\nTool: Vitest (a test over the workspaces); pytest with pathlib for Python\n\n```ts\nimport { existsSync, globSync, readFileSync } from 'node:fs'   // globSync: Node 22 or later (tinyglobby before that)\nimport { expect, it } from 'vitest'\n\nconst SECTIONS = '{{README_SECTIONS}}'.split(/,\\s*/)\nconst workspaces: string[] = JSON.parse(readFileSync('package.json', 'utf8')).workspaces\nconst dirs = workspaces.flatMap((w) => globSync(w))\n\nit.each(dirs)('%s has a README with the required sections', (dir) => {\n  const file = `${dir}/README.md`\n  expect(existsSync(file), `${file} is missing`).toBe(true)\n  const headings = readFileSync(file, 'utf8').match(/^#{1,3} .+$/gm) ?? []\n  for (const s of SECTIONS) expect(headings.some((h) => h.toLowerCase().includes(s.toLowerCase())), `${file} lacks \"${s}\"`).toBe(true)\n})\n```",
       "hubWhen": {
         "READMES": [
@@ -798,7 +814,11 @@
       "label": "Root README lists every module",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads the module table of the root README (one row per directory: | `src/name` | purpose | owner |) and compares it with the module directories of the repository both ways: a directory without a row and a row without a directory each fail it.\n\nThreshold: Every module directory under src has a row in the root README's module table with purpose and owner; 0 rows naming a directory that no longer exists\n\nTool: Vitest (a test over README.md); pytest with pathlib for Python\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { expect, it } from 'vitest'\n\nconst readme = readFileSync('README.md', 'utf8')\nconst rows = [...readme.matchAll(/^\\| `?(src\\/[\\w-]+)`? \\| (.+?) \\| (.+?) \\|$/gm)]   // | dir | purpose | owner |\nconst listed = new Map(rows.map((r) => [r[1], { purpose: r[2].trim(), owner: r[3].trim() }]))\nconst dirs = readdirSync('src', { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `src/${d.name}`)\n\nit('every module is in the table, with purpose and owner', () => {\n  expect(dirs.filter((d) => !listed.has(d))).toEqual([])\n  for (const [dir, row] of listed) expect(row.purpose && row.owner, `${dir} lacks purpose or owner`).toBeTruthy()\n})\nit('no row names a module that is gone', () => {\n  expect([...listed.keys()].filter((d) => !dirs.includes(d))).toEqual([])\n})\n```",
       "hubWhen": {
         "READMES": [
@@ -812,7 +832,11 @@
       "label": "Doc comments on the exported symbols",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test opens the TypeScript program from tsconfig.json, walks the exported declarations of every file under src, counts the ones with a JSDoc comment and fails below the threshold, printing the undocumented symbols with their file. For Python, interrogate measures docstring coverage of the public API and fails under the same number; for Java, the javadoc doclint run of the build reports undocumented public members. Where the Code quality gate decision enforces a linter, eslint-plugin-jsdoc's require-jsdoc rule also refuses a new export without a comment on the changed lines.\n\nThreshold: At least {{DOC_COMMENT_COVERAGE_PCT}}% of the exported functions, classes, interfaces, type aliases and variables under src carry a doc comment; the test lists the ones that do not\n\nTool: Vitest with the TypeScript compiler API; interrogate for Python; javadoc -Xdoclint for Java\n\n```ts\n// test/doc-comments.test.ts\nimport ts from 'typescript'\nimport { expect, it } from 'vitest'\n\nconst MIN_PCT = {{DOC_COMMENT_COVERAGE_PCT}}\nconst { config } = ts.readConfigFile('tsconfig.json', ts.sys.readFile)\nconst { fileNames, options } = ts.parseJsonConfigFileContent(config, ts.sys, '.')\nconst program = ts.createProgram(fileNames.filter((f) => f.startsWith('src/') || f.includes('/src/')), options)\nconst checker = program.getTypeChecker()\n\nit(`at least ${MIN_PCT}% of the exported symbols carry a doc comment`, () => {\n  const missing: string[] = []\n  let total = 0\n  for (const file of program.getSourceFiles()) {\n    if (file.isDeclarationFile || !program.getRootFileNames().includes(file.fileName)) continue\n    const module = checker.getSymbolAtLocation(file)\n    for (const symbol of module ? checker.getExportsOfModule(module) : []) {\n      const decl = symbol.declarations?.[0]\n      if (!decl) continue\n      total++\n      if (!ts.getJSDocCommentsAndTags(decl).length) missing.push(`${file.fileName}: ${symbol.name}`)\n    }\n  }\n  const pct = total ? ((total - missing.length) * 100) / total : 100\n  expect(pct, `${pct.toFixed(1)}% documented; without a comment:\\n${missing.join('\\n')}`).toBeGreaterThanOrEqual(MIN_PCT)\n})\n// Python: interrogate --fail-under {{DOC_COMMENT_COVERAGE_PCT}} src\n```"
     },
     {
@@ -821,7 +845,11 @@
       "label": "API reference builds without warnings",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "TypeDoc runs with warnings treated as errors, so a broken {@link} or an export without a comment fails the pull request; Sphinx does the same with `sphinx-build -W --keep-going`. The release job runs the same command and publishes the output under the release version (includeVersion puts it in the site). The file is typedoc.json; package.json holds the script \"docs:api\": \"typedoc\", which CI runs on every pull request and the release job runs to publish docs/api. Python: sphinx-build -W --keep-going -b html docs docs/_build.\n\nThreshold: The reference builds on every pull request with 0 warnings (an unresolved link or an undocumented export is a warning) and is published with each release under its version\n\nTool: TypeDoc; Sphinx for Python\n\n```json\n{\n  \"$schema\": \"https://typedoc.org/schema.json\",\n  \"entryPoints\": [\"src/index.ts\"],\n  \"out\": \"docs/api\",\n  \"treatWarningsAsErrors\": true,\n  \"validation\": { \"notExported\": true, \"invalidLink\": true, \"notDocumented\": true },\n  \"requiredToBeDocumented\": [\"Function\", \"Class\", \"Interface\", \"TypeAlias\", \"Method\"],\n  \"includeVersion\": true\n}\n```",
       "hubWhen": {
         "API_DOCS": [
@@ -835,7 +863,11 @@
       "label": "Contract and code agree",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The pipeline starts the element, fetches the specification it generates from its routes and compares it with the contract file in the repository with oasdiff; any difference outside descriptions, examples and titles fails the build, so the contract, the reference rendered from it and the code cannot drift apart. Whether a difference may be released at all is the API evolution concern's decision; this check only keeps the documentation true.\n\nThreshold: 0 differences in paths, operations, parameters, schemas or responses between the OpenAPI contract in the repository and the specification the running code serves, on every pull request\n\nTool: oasdiff\n\n```bash\n#!/usr/bin/env bash\n# CI step: the contract in the repository is what the code serves\nset -euo pipefail\nnpm start & PID=$!\nuntil curl -sf http://localhost:3000/openapi.json > generated.json; do sleep 1; done\nkill $PID\n# any difference in paths, parameters, schemas or responses fails\noasdiff diff openapi.yaml generated.json --fail-on-diff --exclude-elements description,examples,title\n# and a breaking change is reported on its own for the API evolution review\noasdiff breaking openapi.yaml generated.json --fail-on ERR\n```",
       "hubWhen": {
         "API_DOCS": [
@@ -849,7 +881,11 @@
       "label": "Examples in the guide run",
       "x": 1040,
       "y": 1040,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "markdown-doctest executes every fenced js and es6 block of the guide with the package imported and fails on an exception; it does not compare output, so an example states what it expects with assert. For Python, `pytest --doctest-modules --doctest-glob=\"docs/*.md\"` runs the doctests in docstrings and Markdown and does compare the output. Examples that need a server run against a test instance started by the job; an example that cannot run is marked <!-- skip-example --> and reviewed as such.\n\nThreshold: Every code example in the API guide is executed on each pull request; 0 examples throwing, and for Python 0 examples whose output differs from the guide\n\nTool: markdown-doctest; pytest --doctest-modules for Python\n\n```js\n// .markdown-doctest-setup.js\nconst assert = require('node:assert')\nconst sdk = require('./dist')\nmodule.exports = {\n  require: { '@shop/sdk': sdk, assert },                        // what the examples import\n  globals: { client: sdk.createClient({ baseUrl: process.env.API_URL }) },\n  regexRequire: { '^@shop/sdk/(.+)$': (m, sub) => require(`./dist/${sub}`) },\n}\n// package.json: \"test:docs\": \"markdown-doctest docs/api/*.md README.md\"\n// an example that states its result:  const order = await client.orders.get('o-1'); assert.equal(order.status, 'paid')\n// Python: pytest --doctest-modules --doctest-glob=\"docs/*.md\" src docs\n```",
       "hubWhen": {
         "API_DOCS": [
@@ -863,7 +899,11 @@
       "label": "Docs build strictly with links checked",
       "x": 1040,
       "y": 1170,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The docs job builds the site with warnings as errors (`mkdocs build --strict`, or Docusaurus with onBrokenLinks: \"throw\") and runs lychee over the Markdown and the built HTML with fragments checked; the job has a timeout of {{LINK_CHECK_MINUTES}} minutes and is a required check.\n\nThreshold: The documentation builds in strict mode with 0 warnings and lychee finds 0 broken links or anchors, within {{LINK_CHECK_MINUTES}} minutes, on every pull request\n\nTool: MkDocs (--strict) with lychee in GitHub Actions\n\n```yaml\n# .github/workflows/docs.yml\nname: docs\non: [pull_request]\njobs:\n  docs:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{LINK_CHECK_MINUTES}}\n    steps:\n      - uses: actions/checkout@v4.2.2          # pin by commit SHA in your repository\n      - uses: actions/setup-python@v5.3.0      # pin by commit SHA in your repository\n        with: { python-version: '3.12' }\n      - run: pip install mkdocs-material && mkdocs build --strict   # Docusaurus: onBrokenLinks: 'throw'\n      - uses: lycheeverse/lychee-action@v2.0.2  # pin by commit SHA in your repository\n        with:\n          args: --no-progress --include-fragments --exclude-path site/assets 'docs/**/*.md' 'site/**/*.html'\n          fail: true\n```",
       "hubWhen": {
         "DOCS_SITE": [
@@ -877,7 +917,11 @@
       "label": "No page without owner or past review",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "{{MAX_DOC_AGE_DAYS}}d",
+      "invocation": "manual",
       "description": "A test over the docs folder reads each page's front matter and fails on a page without an owner or review date, or with a review date older than {{MAX_DOC_AGE_DAYS}} days, naming the page and its owner. An unquoted date is parsed by gray-matter as a Date object, so the test normalises it before matching. Run on every pull request and weekly on the main branch, so a page goes stale on a schedule, not unnoticed.\n\nThreshold: Every page under docs has owner and reviewed in its front matter; 0 pages with a reviewed date older than {{MAX_DOC_AGE_DAYS}} days\n\nTool: Vitest with gray-matter (a test over the docs folder); pytest with python-frontmatter for Python\n\n```ts\nimport { globSync, readFileSync } from 'node:fs'   // globSync: Node 22 or later (tinyglobby before that)\nimport matter from 'gray-matter'\nimport { expect, it } from 'vitest'\n\nconst MAX_DAYS = {{MAX_DOC_AGE_DAYS}}\nconst pages = globSync('docs/**/*.md')\nconst iso = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? ''))\n\nit.each(pages)('%s has an owner and a recent review date', (page) => {\n  const { data } = matter(readFileSync(page, 'utf8'))   // --- owner: team-orders  reviewed: 2026-10-01 ---\n  expect(data.owner, `${page} has no owner`).toBeTruthy()\n  const reviewed = iso(data.reviewed)\n  expect(reviewed, `${page} has no review date`).toMatch(/^\\d{4}-\\d{2}-\\d{2}$/)\n  expect((Date.now() - Date.parse(reviewed)) / 86_400_000, `${page} (owner ${data.owner}) was last reviewed on ${reviewed}`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
       "hubWhen": {
         "DOCS_SITE": [
@@ -891,7 +935,11 @@
       "label": "External pages name release, owner and review date",
       "x": 1040,
       "y": 1430,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job lists the pages of the documentation space through the Confluence REST API with their content properties (expand=metadata.properties) and fails on a page without release, owner or reviewed, or reviewed older than {{MAX_DOC_AGE_DAYS}} days, naming the page and its owner; it also fails when the README does not link the space. Notion and GitBook have the same shape through their APIs (database properties, page metadata).\n\nThreshold: Every page of the documentation space has the content properties release, owner and reviewed; 0 pages with reviewed older than {{MAX_DOC_AGE_DAYS}} days; the README links the space\n\nTool: Confluence REST API with curl and jq (scheduled job on a GNU/Linux runner, for date -d)\n\n```bash\n#!/usr/bin/env bash\n# weekly: every documentation page names its release, owner and review date\nset -euo pipefail\nSPACE=DOCS; MAX_DAYS={{MAX_DOC_AGE_DAYS}}\nlimit=$(date -u -d \"$MAX_DAYS days ago\" +%F); bad=0\nwhile IFS=$'\\t' read -r title release owner reviewed; do\n  if [ \"$release\" = MISSING ] || [ \"$owner\" = MISSING ] || [ \"$reviewed\" = MISSING ]; then echo \"missing release, owner or reviewed: $title\"; bad=1; fi\n  if [ \"$reviewed\" != MISSING ] && [ \"$reviewed\" \\< \"$limit\" ]; then echo \"stale since $reviewed (owner $owner): $title\"; bad=1; fi\ndone < <(curl -sf -u \"$CONFLUENCE_USER:$CONFLUENCE_TOKEN\" \\\n  \"$CONFLUENCE_URL/wiki/rest/api/content/search?cql=space=$SPACE+and+type=page&expand=metadata.properties&limit=200\" \\\n  | jq -r '.results[] | [.title, (.metadata.properties.release.value // \"MISSING\"), (.metadata.properties.owner.value // \"MISSING\"), (.metadata.properties.reviewed.value // \"MISSING\")] | @tsv')\ngrep -qF \"$CONFLUENCE_URL/wiki/spaces/$SPACE\" README.md || { echo \"README does not link the documentation space\"; bad=1; }\nexit $bad\n```",
       "hubWhen": {
         "DOCS_SITE": [
@@ -905,7 +953,11 @@
       "label": "Structural change touches the model",
       "x": 1040,
       "y": 1560,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step lists the files a pull request changes; when a dependency manifest, a client of another service or a data-store configuration under a diagrammed module changed and nothing under {{MODEL_DIR}} did, the step fails with the list, and the author either updates the model or explains in the pull request why the structure did not change. With Structurizr or PlantUML the diagram source folder takes the model folder's place. The checkout needs the base branch (fetch-depth: 0, as the quality gate's job does) for merge-base.\n\nThreshold: 0 pull requests that add or remove a dependency, service client or data store under a diagrammed module without a change in {{MODEL_DIR}}\n\nTool: git diff --name-only (CI script)\n\n```bash\n#!/usr/bin/env bash\n# CI: a change to the structure of a diagrammed module changes the model too (checkout with fetch-depth: 0)\nset -euo pipefail\nMODEL='{{MODEL_DIR}}'\nBASE=$(git merge-base \"origin/${GITHUB_BASE_REF:-main}\" HEAD)\nchanged=$(git diff --name-only \"$BASE\"...HEAD)\n# files that change the structure: dependency manifests, service clients, data-store config\nstructural=$(grep -E '^(apps|packages|services)/[^/]+/(package\\.json|pom\\.xml|go\\.mod|requirements\\.txt|src/(clients|adapters|infra)/.*|src/.*(Client|Repository|Gateway)\\.[a-z]+)$' <<< \"$changed\" || true)\nif [ -n \"$structural\" ] && ! grep -q \"^$MODEL/\" <<< \"$changed\"; then\n  echo \"These files change the structure of a diagrammed module, but $MODEL/ did not change:\"; echo \"$structural\"\n  echo \"Update the model in this pull request (radical check lists what is missing) or explain why the structure is the same.\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "DIAGRAMS": [
@@ -919,7 +971,11 @@
       "label": "Image diagrams have a source and a dated caption",
       "x": 1040,
       "y": 1690,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the images under docs/diagrams, expects the editable source next to each, finds the Markdown page that embeds the image and reads the caption on the line after the embed (*Drawn 2026-10-01 by A. Nowak*), and fails on a missing source, a missing or malformed caption, or a date older than {{MAX_DOC_AGE_DAYS}} days.\n\nThreshold: Every image under docs/diagrams has a sibling .drawio or .excalidraw file and a caption \"Drawn YYYY-MM-DD by <author>\" on the line after the page that embeds it; 0 captions older than {{MAX_DOC_AGE_DAYS}} days\n\nTool: Vitest (a test over docs/diagrams); pytest with pathlib for Python\n\n```ts\nimport { existsSync, globSync, readFileSync } from 'node:fs'   // globSync: Node 22 or later (tinyglobby before that)\nimport { basename } from 'node:path'\nimport { expect, it } from 'vitest'\n\nconst MAX_DAYS = {{MAX_DOC_AGE_DAYS}}\nconst images = globSync('docs/diagrams/*.{png,svg}')\nconst pages = globSync('docs/**/*.md').map((p) => readFileSync(p, 'utf8').split('\\n'))\nconst CAPTION = /^\\*?(Drawn|Updated) (\\d{4}-\\d{2}-\\d{2}) by .+/\n\nit.each(images)('%s has an editable source and a dated caption', (image) => {\n  const stem = image.replace(/\\.(png|svg)$/, '')\n  expect(existsSync(`${stem}.drawio`) || existsSync(`${stem}.excalidraw`), `${image} has no .drawio or .excalidraw next to it`).toBe(true)\n  const caption = pages.flatMap((lines) => lines.flatMap((l, i) => (l.includes(`](`) && l.includes(basename(image)) ? [lines[i + 1] ?? ''] : [])))\n    .map((l) => l.match(CAPTION)).find(Boolean)\n  expect(caption, `${image}: no page embeds it with a caption \"Drawn YYYY-MM-DD by <author>\" on the next line`).toBeTruthy()\n  expect((Date.now() - Date.parse(caption![2])) / 86_400_000, `${image} was drawn on ${caption![2]}: review or remove it`).toBeLessThanOrEqual(MAX_DAYS)\n})\n```",
       "hubWhen": {
         "DIAGRAMS": [

@@ -5,7 +5,7 @@ import { builtInGovernanceMetamodel } from './governance'
 
 export { builtInC4Metamodel } from './c4'
 export { builtInDddC4Metamodel } from './ddd'
-export { builtInGovernanceMetamodel } from './governance'
+export { builtInGovernanceMetamodel, FITNESS_CHARACTERISTICS, FITNESS_TRIGGERS, FITNESS_CLASSIFICATION_PROPERTIES } from './governance'
 
 /** The metamodels a new model can start from: Radical (the default) and
  *  plain C4. (The C4 + DDD preset that used to be offered is part of Radical;

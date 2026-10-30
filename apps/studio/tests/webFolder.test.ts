@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { inspectorMeasurements } from '../src/renderer/src/persistence/inspector'
 import {
   handleFolderStorage,
+  readCheckFilesFromHandle,
   writeSelectionToHandle,
   type FsDirHandle,
   type FsFileHandle,
@@ -132,5 +134,29 @@ describe('webFolder read/write', () => {
     expect((dir.children.get('selection.json') as FakeFile).data).toBe('{"nodeIds":["b"]}')
     expect((dir.children.get('.gitignore') as FakeFile).data).toBe('*\n')
     expect(await s.poll()).toEqual([])
+  })
+})
+
+describe('the files beside the model, for the Inspector', () => {
+  const REVIEWS = JSON.stringify({ format: 'radical-reviews', version: 1, reviews: [{ name: 'threat-model', result: 'passed', by: 'ana', at: '2026-10-30T10:00:00Z' }] })
+
+  it('reads the model\'s reviews.json beside check.json, and the Inspector evaluates its reviews as measurements', async () => {
+    const root = new FakeDir('model')
+    root.children.set('check.json', new FakeFile('{}'))
+    root.children.set('reviews.json', new FakeFile(REVIEWS))
+    const files = await readCheckFilesFromHandle(root)
+    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS })
+    expect(inspectorMeasurements(files.measurements ?? '', files.reviews ?? '')).toEqual([
+      { metric: 'review', value: 1, labels: { name: 'threat-model' }, source: 'review', at: '2026-10-30T10:00:00.000Z', context: { by: 'ana' } },
+    ])
+  })
+
+  it('has no reviews without reviews.json, and leaves out one that does not parse', async () => {
+    expect((await readCheckFilesFromHandle(new FakeDir('model'))).reviews).toBeNull()
+    expect(inspectorMeasurements('', '')).toBeNull()
+    expect(inspectorMeasurements('', '{ not json')).toBeNull()
+    const store = JSON.stringify({ version: 1, measurements: [{ metric: 'deps.cycles', value: 0, labels: {}, source: 'json', at: '2026-10-30T09:00:00Z' }] })
+    expect(inspectorMeasurements(store, '{ not json')!.map((m) => m.metric)).toEqual(['deps.cycles'])
+    expect(inspectorMeasurements(store, REVIEWS)!.map((m) => m.metric)).toEqual(['deps.cycles', 'review'])
   })
 })

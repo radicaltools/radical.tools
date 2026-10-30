@@ -206,7 +206,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-scan-push', label: 'Push protection on', when: { SCANNING: ['push'] }, category: 'process', implements: ADRS, checks: ['req-scan-push'],
+      id: 'ff-scan-push', label: 'Push protection on', when: { SCANNING: ['push'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ADRS, checks: ['req-scan-push'],
       threshold: '100 % of the organisation\'s repositories have secret scanning and push protection enabled; 0 open alerts created by a bypass more than 1 day ago',
       description: 'A scheduled job lists the organisation\'s repositories through the GitHub API and fails when one has secret scanning or push protection turned off; it then lists the open secret scanning alerts that came from a bypass and fails on one older than a day, which is a bypass nobody has reviewed and resolved.',
       tool: 'GitHub CLI against the GitHub REST API (for GitLab: the secret push protection setting and its audit events, read from its API the same way)',
@@ -226,7 +226,7 @@ gh api --paginate "/orgs/$ORG/secret-scanning/alerts?state=open&is_bypassed=true
 test ! -s unreviewed.txt || { echo "bypasses older than a day, not reviewed:"; cat unreviewed.txt; exit 1; }`,
     },
     {
-      id: 'ff-scan-ci', label: 'Secret scan in CI', when: { SCANNING: ['push', 'ci'] }, category: 'structural', implements: ADRS, checks: ['req-scan-ci', 'req-no-repo'],
+      id: 'ff-scan-ci', label: 'Secret scan in CI', when: { SCANNING: ['push', 'ci'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-scan-ci', 'req-no-repo'],
       threshold: '0 secrets found in the commits of a pull request; the check is required for merging',
       description: 'Gitleaks scans every commit of each pull request and is a required status check, so a pull request that adds a secret, even one removed in a later commit, cannot merge.',
       tool: 'Gitleaks',
@@ -246,7 +246,7 @@ jobs:
             git /repo --log-opts="origin/\${{ github.base_ref }}..HEAD" --redact --exit-code 1`,
     },
     {
-      id: 'ff-scan-history', label: 'Nightly history, logs and images', when: { SCANNING: ['scheduled'] }, category: 'process', implements: ADRS, checks: ['req-scan-scheduled', 'req-no-repo'],
+      id: 'ff-scan-history', label: 'Nightly history, logs and images', when: { SCANNING: ['scheduled'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ADRS, checks: ['req-scan-scheduled', 'req-no-repo'],
       threshold: 'The nightly job fails on every finding in the git history, the previous day\'s CI logs or the built images that is not yet closed; a finding is closed by revoking the secret and recording its fingerprint with the review, so none stays open past the next run',
       description: 'A nightly job scans the full git history and the previous day\'s CI logs with Gitleaks and the latest built images with TruffleHog; a finding is closed by revoking the credential and adding its fingerprint to .gitleaksignore (a false positive, likewise), so the job keeps failing, and the owner keeps being told, until that happens.',
       tool: 'Gitleaks and TruffleHog with the GitHub CLI',
@@ -275,7 +275,7 @@ jobs:
         run: docker run --rm trufflesecurity/trufflehog:3.99.7 docker --image "$IMAGE" --only-verified --fail`,
     },
     {
-      id: 'ff-age-manager', label: 'No secret past its rotation period', when: STORED, category: 'operational', implements: ['adr-manager', 'adr-identity'], checks: ['req-rotate-runbook'],
+      id: 'ff-age-manager', label: 'No secret past its rotation period', when: STORED, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-manager', 'adr-identity'], checks: ['req-rotate-runbook'],
       threshold: '0 secrets in the secrets manager last rotated more than {{ROTATE_DAYS}} days ago',
       description: 'AWS Config evaluates every secret in AWS Secrets Manager and reports one not rotated within {{ROTATE_DAYS}} days, whether the store or a person rotates it; the non-compliant list is the daily alert to the owners.',
       tool: 'AWS Config managed rule SECRETSMANAGER_SECRET_PERIODIC_ROTATION (for Vault: a scheduled job over the secrets\' metadata updated_time; for Key Vault: the secrets\' attributes.updated)',
@@ -290,7 +290,7 @@ jobs:
 }`,
     },
     {
-      id: 'ff-rotation-enabled', label: 'Rotation is on', when: { STORE: ['manager', 'identity'], ROTATION: ['automatic'] }, category: 'operational', implements: ['adr-manager', 'adr-identity'], checks: ['req-rotate-auto'],
+      id: 'ff-rotation-enabled', label: 'Rotation is on', when: { STORE: ['manager', 'identity'], ROTATION: ['automatic'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-manager', 'adr-identity'], checks: ['req-rotate-auto'],
       threshold: '0 secrets in the secrets manager without automatic rotation configured',
       description: 'AWS Config reports every secret in AWS Secrets Manager that has no rotation configured, which with automatic rotation decided means a secret that will never be rotated.',
       tool: 'AWS Config managed rule SECRETSMANAGER_ROTATION_ENABLED_CHECK (for Vault: a scheduled job over the database secrets engine roles; for Key Vault: az keyvault secret show, the rotation policy)',
@@ -304,7 +304,7 @@ jobs:
 }`,
     },
     {
-      id: 'ff-refresh', label: 'Rotation without a restart', when: { STORE: ['manager'] }, category: 'operational', implements: ['adr-manager'], checks: ['req-manager', 'req-rotate-auto'],
+      id: 'ff-refresh', label: 'Rotation without a restart', when: { STORE: ['manager'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-manager'], checks: ['req-manager', 'req-rotate-auto'],
       threshold: 'With traffic flowing, a new secret version put in the manager is in use before the old credential is revoked; 0 failed requests and 0 restarts; nothing on the element\'s disk holds either value',
       description: 'An integration test runs the element against a database and a secrets manager in containers, keeps requests flowing, puts a new credential version (the alternate database user, as a rotation does), waits one lease, revokes the old credential and counts failures; it then searches the container\'s file system for both values.',
       tool: 'Vitest with Testcontainers (PostgreSQL, LocalStack Secrets Manager) (or the test runner of your stack)',
@@ -325,7 +325,7 @@ it('picks up a rotated credential without a restart or a failed request', async 
 })`,
     },
     {
-      id: 'ff-no-static', label: 'No stored database secrets', when: { STORE: ['identity'] }, category: 'structural', implements: ['adr-identity'], checks: ['req-workload'],
+      id: 'ff-no-static', label: 'No stored database secrets', when: { STORE: ['identity'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-identity'], checks: ['req-workload'],
       threshold: '0 workloads (Deployments, StatefulSets, DaemonSets, Jobs, CronJobs) that take a credential from a Kubernetes Secret through env, envFrom or a volume, outside the allow-list of outside-system keys',
       description: 'A Conftest policy over the rendered manifests fails when a workload reads an environment variable, an environment block or a volume from a Secret that is not on the allow-list, which would mean a stored credential came back.',
       tool: 'Conftest (Open Policy Agent)',
@@ -357,7 +357,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-age-env', label: 'Deployment secrets rotated', when: { STORE: ['env'] }, category: 'operational', implements: ['adr-env'], checks: ['req-rotate-auto', 'req-rotate-runbook'],
+      id: 'ff-age-env', label: 'Deployment secrets rotated', when: { STORE: ['env'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-env'], checks: ['req-rotate-auto', 'req-rotate-runbook'],
       threshold: '0 Secrets in the production namespace rotated (or, never rotated, created) more than {{ROTATE_DAYS}} days ago',
       description: 'A scheduled job lists the Kubernetes Secrets the elements read and fails on any whose rotation annotation (written by the rotation runbook or pipeline on every rotation; the creation time counts when there is none) is older than {{ROTATE_DAYS}} days; the list is the daily alert to the owners.',
       tool: 'kubectl and jq',
@@ -374,7 +374,7 @@ kubectl get secrets -n production -l app.kubernetes.io/part-of=shop -o json \\
 test ! -s stale.txt || { echo "Secrets past rotation:"; cat stale.txt; exit 1; }`,
     },
     {
-      id: 'ff-human-reads', label: 'Human reads alerted', when: { ACCESS: ['breakglass', 'jit'] }, category: 'operational', implements: ADRS, checks: ['req-audit', 'req-breakglass', 'req-jit'],
+      id: 'ff-human-reads', label: 'Human reads alerted', when: { ACCESS: ['breakglass', 'jit'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ADRS, checks: ['req-audit', 'req-breakglass', 'req-jit'],
       threshold: '100 % of reads of a production secret by a person raise an alert within 5 minutes to the security channel, where each is matched with its approval; the trail that records them is kept for 400 days',
       description: 'A CloudWatch Logs metric filter on the CloudTrail log group counts GetSecretValue calls by anything but the workloads\' roles (an IAM user, or an assumed role not named workload-*; read-only events never reach EventBridge, so the log group is the source) and an alarm with a one-minute period pages the security channel; the log group keeps 400 days. On Vault, the audit device feeds the same alert.',
       tool: 'AWS CloudTrail delivered to CloudWatch Logs, a metric filter and an alarm (Terraform); for Vault: the audit device and the same alert in your log system',
@@ -409,7 +409,7 @@ resource "aws_cloudwatch_metric_alarm" "human_secret_read" {
 }`,
     },
     {
-      id: 'ff-read-log', label: 'Team reads logged and reported', when: { ACCESS: ['team'] }, category: 'operational', implements: ADRS, checks: ['req-audit'],
+      id: 'ff-read-log', label: 'Team reads logged and reported', when: { ACCESS: ['team'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ADRS, checks: ['req-audit'],
       threshold: 'Every read of a production secret by a person is in the trail with who, when and which secret; the trail is kept for 400 days; the owning team gets the day\'s reads every morning',
       description: 'A CloudWatch Logs metric filter on the CloudTrail log group counts GetSecretValue calls by people (an IAM user, or an assumed role not named workload-*), a daily alarm reports them to the team\'s channel, and the log group keeps 400 days. On Vault, the audit device feeds the same report.',
       tool: 'AWS CloudTrail delivered to CloudWatch Logs, a metric filter and a daily alarm (Terraform); for Vault: the audit device and a daily query in your log system',
@@ -444,7 +444,7 @@ resource "aws_cloudwatch_metric_alarm" "daily_secret_reads" {
 }`,
     },
     {
-      id: 'ff-own-manager', label: 'No secret shared between workloads', when: STORED, category: 'structural', implements: ['adr-manager', 'adr-identity'], checks: ['req-own'],
+      id: 'ff-own-manager', label: 'No secret shared between workloads', when: STORED, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-manager', 'adr-identity'], checks: ['req-own'],
       threshold: '0 secrets readable by two IAM policies in the plan; 0 policies that may read secrets by wildcard',
       description: 'A Conftest policy over the Terraform plan parses every IAM policy document, collects the secret ARNs each may GetSecretValue on, and fails when one ARN appears in two policies (two workloads sharing a credential) or when a policy reads by wildcard.',
       tool: 'Conftest (Open Policy Agent) over terraform show -json (AWS; for Vault: the policies\' path grants, for Key Vault: RBAC assignments, checked the same way)',
@@ -486,7 +486,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-own-env', label: 'No Secret shared between workloads', when: { STORE: ['env'] }, category: 'structural', implements: ['adr-env'], checks: ['req-own'],
+      id: 'ff-own-env', label: 'No Secret shared between workloads', when: { STORE: ['env'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-env'], checks: ['req-own'],
       threshold: '0 Kubernetes Secrets referenced (env, envFrom or volume) by two workloads in the rendered manifests',
       description: 'A Conftest policy over all rendered manifests at once collects the Secrets each workload references and fails when two workloads reference the same one, which is a credential shared between elements.',
       tool: 'Conftest (Open Policy Agent)',
@@ -519,7 +519,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-env-masked', label: 'Variables masked', when: { STORE: ['env'] }, category: 'structural', implements: ['adr-env'], checks: ['req-env'],
+      id: 'ff-env-masked', label: 'Variables masked', when: { STORE: ['env'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-env'], checks: ['req-env'],
       threshold: 'The configuration endpoint, a crash report and the captured logs contain 0 occurrences of a credential\'s value',
       description: 'A test runs the element with a known password in its environment, reads the configuration endpoint, provokes a crash report and searches both and the captured logs for the value.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -537,7 +537,7 @@ it('shows no credential in the configuration endpoint, crash reports or logs', a
 })`,
     },
     {
-      id: 'ff-env-encrypted', label: 'Deployment store encrypted', when: { STORE: ['env'] }, category: 'structural', implements: ['adr-env'], checks: ['req-env-store'],
+      id: 'ff-env-encrypted', label: 'Deployment store encrypted', when: { STORE: ['env'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-env'], checks: ['req-env-store'],
       threshold: 'The production cluster lists secrets among the resources encrypted with a KMS key; the check fails otherwise',
       description: 'A scheduled job reads the cluster\'s encryption configuration and fails when Kubernetes Secrets are not envelope-encrypted with a KMS key.',
       tool: 'AWS CLI for EKS (for GKE: gcloud container clusters describe, databaseEncryption.state must be ENCRYPTED; for AKS: az aks show, securityProfile.azureKeyVaultKms.enabled; for Sealed Secrets or SOPS: the plain Secret never exists in git, which the secret scan checks)',

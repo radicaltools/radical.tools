@@ -228,7 +228,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-fresh-change', label: 'Threat model newer than the last boundary change', when: { WHEN: ['change'] }, category: 'process', implements: ['adr-on-change'], checks: ['req-redo-change'],
+      id: 'ff-fresh-change', label: 'Threat model newer than the last boundary change', when: { WHEN: ['change'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-on-change'], checks: ['req-redo-change'],
       threshold: 'The last commit to threat-model/ is no older than the last commit to {{BOUNDARY_PATHS}}; a pull request that changes threat-model/ carries the security-review label',
       description: 'A pull-request check compares git dates: the last commit that touched a file defining a trust boundary against the last commit that touched threat-model/. A boundary change without a model change fails; so does a change to the model without the security-review label, which the Secure development process pack\'s check then turns into a required security approval. Run it on opened, synchronize, labeled and unlabeled, with the full history checked out.',
       tool: 'git and jq in a GitHub Actions step (bash)',
@@ -251,7 +251,7 @@ fi
 echo "the threat model is newer than every change to a trust boundary"`,
     },
     {
-      id: 'ff-fresh-release', label: 'Threat model reviewed since the previous release', when: { WHEN: ['release'] }, category: 'process', implements: ['adr-per-release'], checks: ['req-redo-release'],
+      id: 'ff-fresh-release', label: 'Threat model reviewed since the previous release', when: { WHEN: ['release'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'manual', implements: ['adr-per-release'], checks: ['req-redo-release'],
       threshold: 'threat-model/ has at least 1 commit after the previous release tag',
       description: 'The release job, running on the new tag before anything is published, finds the previous tag and fails when threat-model/ has no commit after it. The first release passes: the model made before it is checked by the other functions.',
       tool: 'git in a GitHub Actions release job (bash)',
@@ -268,7 +268,7 @@ fi
 echo "threat model reviewed on $(git log -1 --format=%cs HEAD -- threat-model/), after $previous"`,
     },
     {
-      id: 'ff-fresh-yearly', label: 'Every threat model reviewed within a year', when: { WHEN: ['yearly'] }, category: 'process', implements: ['adr-yearly'], checks: ['req-redo-yearly'],
+      id: 'ff-fresh-yearly', label: 'Every threat model reviewed within a year', when: { WHEN: ['yearly'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: ['adr-yearly'], checks: ['req-redo-yearly'],
       threshold: '0 systems under threat-model/ whose last commit is more than 365 days old',
       description: 'A scheduled job runs monthly over each system\'s model (a folder threat-model/<system>/ or a file threat-model/<system>.json) and fails naming every one whose last commit is more than 365 days old, with the date of that commit.',
       tool: 'git in a scheduled GitHub Actions job (bash)',
@@ -288,7 +288,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-dragon', label: 'Threat Dragon models read into one list', when: { WHERE: ['dragon'] }, category: 'structural', implements: ['adr-dragon'], checks: ['req-in-repo'],
+      id: 'ff-dragon', label: 'Threat Dragon models read into one list', when: { WHERE: ['dragon'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-dragon'], checks: ['req-in-repo'],
       threshold: 'Every threat-model/*.json is a Threat Dragon 2 model and every threat on it is written to reports/threats.json, joined with its entry in threat-model/risk-decisions.yaml',
       description: 'A Node script reads each Threat Dragon model (version 2.x), takes every threat from the cells of every diagram with its element (a flow as source -> target: name), category, severity, status and mitigation, joins the acceptances and transfers from risk-decisions.yaml by threat id, and writes reports/threats.json for the other checks. It runs on every pull request; a file that is not a Threat Dragon 2 model fails it.',
       tool: 'Node 20 with js-yaml, reading the Threat Dragon 2 JSON format',
@@ -319,7 +319,7 @@ writeFileSync('reports/threats.json', JSON.stringify(threats, null, 2))
 console.log(\`\${threats.length} threats from \${new Set(threats.map((t) => t.system)).size} Threat Dragon models\`)`,
     },
     {
-      id: 'ff-register', label: 'Threat registers read into one list, pytm findings triaged', when: REGISTER, category: 'structural', implements: ['adr-pytm', 'adr-register'], checks: ['req-in-repo', 'req-pytm-triaged'],
+      id: 'ff-register', label: 'Threat registers read into one list, pytm findings triaged', when: REGISTER, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-pytm', 'adr-register'], checks: ['req-in-repo', 'req-pytm-triaged'],
       threshold: 'Every threat-model/<system>/threats.yaml is written to reports/threats.json; 0 pytm findings missing from their register; 0 hand-written registers without a Mermaid flowchart in README.md',
       description: 'A Python script reads every register into reports/threats.json. Where a system has a tm.py, it runs pytm with --json and fails on every finding (threat id and element) the register does not list; where it has none, it fails when README.md holds no Mermaid flowchart. It runs on every pull request.',
       tool: 'Python 3 with PyYAML, and OWASP pytm 1.4 (python3 tm.py --json) where a system has a tm.py',
@@ -348,7 +348,7 @@ if problems:
     sys.exit("\\n".join(problems))`,
     },
     {
-      id: 'ff-threat-status', label: 'Every threat ends somewhere', category: 'process', implements: CADENCE, checks: ['req-statuses', 'req-acceptance', 'req-expired'],
+      id: 'ff-threat-status', label: 'Every threat ends somewhere', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: CADENCE, checks: ['req-statuses', 'req-acceptance', 'req-expired'],
       threshold: '100% of threats in reports/threats.json have a rated severity and a status with what it needs: a reference for mitigated and open, a reason for not applicable, a party and a contract for transferred, a named owner, a reason and an unexpired acceptance of at most {{ACCEPT_DAYS}} days for accepted',
       description: 'A Node script over reports/threats.json, run on every pull request and nightly on the main branch, so an acceptance that expires fails the build on the day after. A reference is a ticket key (SHOP-123), an issue number (#123), an ADR id (adr-…) or a test file (….test.ts).',
       tool: 'Node 20 (no dependencies)',
@@ -378,7 +378,7 @@ if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }
 console.log('every threat has a status that ends it')`,
     },
     {
-      id: 'ff-release-gate', label: 'Release waits for high threats', when: { UNMITIGATED: ['release-block'] }, category: 'process', implements: ['adr-release-block'], checks: ['req-high-blocks'],
+      id: 'ff-release-gate', label: 'Release waits for high threats', when: { UNMITIGATED: ['release-block'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-release-block'], checks: ['req-high-blocks'],
       threshold: '0 threats of high or critical severity with the status open or accepted when a release is built',
       description: 'A step in the release job, after the reader of the threat model has written reports/threats.json, selects the high and critical threats that are open or accepted and fails the release naming them.',
       tool: 'jq in a GitHub Actions release job (bash)',
@@ -396,7 +396,7 @@ fi
 echo "no open or accepted high or critical threat"`,
     },
     {
-      id: 'ff-external-callers', label: 'Threat model names every outside caller', category: 'structural', implements: CADENCE, checks: ['req-external-callers'],
+      id: 'ff-external-callers', label: 'Threat model names every outside caller', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: CADENCE, checks: ['req-external-callers'],
       threshold: '0 persons or external systems that the architecture model shows calling an element of the system and that no file under threat-model/ names',
       description: 'A Node script reads the architecture model folder: the front matter of every node under architecture/nodes and the interacts relations in relations.json. It collects the label of every person or external element that calls an element that is not external, and fails for each label that appears nowhere under threat-model/ (case and spacing ignored). It runs on every pull request, so a caller added to the architecture model waits for the threat model.',
       tool: 'Node 20 with js-yaml, over the architecture model\'s Markdown folder',
@@ -422,7 +422,7 @@ console.log(\`\${callers.size} outside callers in the architecture model, \${mis
 if (missing.length) { console.error(missing.map((m) => \`  \${m}\`).join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-categories', label: 'Threats under the method\'s categories', when: STRIDE, category: 'structural', implements: ['adr-stride', 'adr-stride-linddun'], checks: ['req-stride', 'req-linddun'],
+      id: 'ff-categories', label: 'Threats under the method\'s categories', when: STRIDE, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-stride', 'adr-stride-linddun'], checks: ['req-stride', 'req-linddun'],
       threshold: '100% of threats carry a STRIDE category (or, with LINDDUN, a STRIDE or LINDDUN category); with LINDDUN, all 7 LINDDUN categories appear in each system\'s threat model',
       description: 'A Node script over reports/threats.json checks each threat\'s category against the method\'s list, reading Threat Dragon\'s older LINDDUN names as the current ones, and with LINDDUN fails for each system where a category appears nowhere, as a threat or as a not-applicable entry.',
       tool: 'Node 20 (no dependencies)',
@@ -447,7 +447,7 @@ if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }
 console.log(\`\${threats.length} threats, each under a category of the method\`)`,
     },
     {
-      id: 'ff-pasta', label: 'Threats scored, objectives written', when: { METHOD: ['pasta'] }, category: 'structural', implements: ['adr-pasta'], checks: ['req-pasta'],
+      id: 'ff-pasta', label: 'Threats scored, objectives written', when: { METHOD: ['pasta'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-pasta'], checks: ['req-pasta'],
       threshold: '100% of threats carry a whole risk score from 1 to 25 and the severity that score gives; every system has threat-model/objectives/<system>.md with the sections Business objectives and Attack scenarios',
       description: 'A Node script over reports/threats.json checks each threat\'s score (the score field of a Threat Dragon threat or of a register entry) and the severity it gives, and that each system has its objectives file with the two sections of PASTA stages 1 and 6.',
       tool: 'Node 20 (no dependencies)',

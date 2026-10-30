@@ -170,7 +170,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-cycles', label: 'No dependency cycles', category: 'structural', implements: RULE_ADRS, checks: ['req-cycles'],
+      id: 'ff-cycles', label: 'No dependency cycles', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: RULE_ADRS, checks: ['req-cycles'],
       threshold: '0 cycles that run through more than one part on the main branch',
       description: 'A dependency rule fails on any cycle that leaves a part\'s folder (a cycle among the files of one part is not counted); it is one of the rules in .dependency-cruiser.cjs that npm run check:deps runs. On the JVM the same is ArchUnit\'s slices().matching("..(*)..").should().beFreeOfCycles(); for Python, import-linter\'s independence contract.',
       tool: 'dependency-cruiser; for the JVM: ArchUnit slices; for Python: import-linter; for .NET: NetArchTest',
@@ -186,7 +186,7 @@ module.exports = { forbidden: [{
 // package.json: "check:deps": "depcruise src --config .dependency-cruiser.cjs"`,
     },
     {
-      id: 'ff-public-api', label: 'Only public APIs used', category: 'structural', implements: RULE_ADRS, checks: ['req-public-api'],
+      id: 'ff-public-api', label: 'Only public APIs used', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: RULE_ADRS, checks: ['req-public-api'],
       threshold: '0 imports from one part into another part\'s files other than its index.ts',
       description: 'A dependency rule allows a part to import another only through its index (the published API); a deep import into another part\'s folder fails the build. Spring Modulith\'s verify() (named interfaces such as customer::api are its published packages) and Nx\'s module boundaries do the same in their stacks.',
       tool: 'dependency-cruiser; for Spring Boot: Spring Modulith verify(); for an Nx workspace: @nx/enforce-module-boundaries; for .NET: NetArchTest',
@@ -201,7 +201,7 @@ module.exports = { forbidden: [{
 }] }`,
     },
     {
-      id: 'ff-allowlist', label: 'Only declared dependencies', when: { RULES: ['allowlist'] }, category: 'structural', implements: ['adr-allowlist'], checks: ['req-allowlist'],
+      id: 'ff-allowlist', label: 'Only declared dependencies', when: { RULES: ['allowlist'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-allowlist'], checks: ['req-allowlist'],
       threshold: '0 dependencies from a part on a part its module.json does not list',
       description: 'Each part declares what it may use in src/modules/<name>/module.json; the configuration reads the files and generates one forbidden rule per part that allows imports only of the declared parts\' index files. A new dependency means a one-line change to module.json, visible in review.',
       tool: 'dependency-cruiser; for Spring Boot: Spring Modulith @ApplicationModule(allowedDependencies) with ApplicationModules.verify(); for Python: import-linter forbidden contracts',
@@ -223,7 +223,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-levels', label: 'Dependencies point down levels', when: { RULES: ['levels'] }, category: 'structural', implements: ['adr-levels'], checks: ['req-levels'],
+      id: 'ff-levels', label: 'Dependencies point down levels', when: { RULES: ['levels'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-levels'], checks: ['req-levels'],
       threshold: '0 dependencies from a part on a part of the same or a higher level',
       description: 'Each part declares its level in src/modules/<name>/module.json; the configuration generates one forbidden rule per part that refuses imports from parts of the same or a higher level. In an Nx workspace the same is the type tags of @nx/enforce-module-boundaries.',
       tool: 'dependency-cruiser; for an Nx workspace: @nx/enforce-module-boundaries with depConstraints on type tags; for the JVM: ArchUnit layeredArchitecture(); for Python: import-linter layers contract',
@@ -246,7 +246,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-fail', label: 'Violations fail the pull request', when: { ENFORCE: ['fail'] }, category: 'process', implements: ['adr-fail'], checks: ['req-fail'],
+      id: 'ff-fail', label: 'Violations fail the pull request', when: { ENFORCE: ['fail'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-fail'], checks: ['req-fail'],
       threshold: 'The dependency check runs on every pull request and its job fails on any violation, naming the rule and both files',
       description: 'A workflow runs npm run check:deps on every pull request; dependency-cruiser\'s default err reporter exits non-zero on an error-severity violation and prints the rule with the from and to files. The job is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.',
       tool: 'dependency-cruiser in GitHub Actions; for the JVM: the ArchUnit tests in the build\'s test job',
@@ -265,7 +265,7 @@ jobs:
       - run: npm run check:deps   # depcruise src --config .dependency-cruiser.cjs; exits non-zero on a violation`,
     },
     {
-      id: 'ff-ratchet', label: 'Known violations frozen and shrinking', when: { ENFORCE: ['ratchet'] }, category: 'structural', implements: ['adr-ratchet'], checks: ['req-ratchet'],
+      id: 'ff-ratchet', label: 'Known violations frozen and shrinking', when: { ENFORCE: ['ratchet'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-ratchet'], checks: ['req-ratchet'],
       threshold: '0 violations outside the baseline on every pull request; the baseline holds at least {{RATCHET_PERCENT}}% fewer entries than at the previous quarter\'s tag',
       description: 'The dependency check runs with --ignore-known, so only violations not in the committed baseline fail; the baseline was written once with --baseline. A second step counts the baseline\'s entries against the file at the previous quarter\'s tag and fails when it has not shrunk enough. With ArchUnit the same is FreezingArchRule with its store committed and counted the same way.',
       tool: 'dependency-cruiser (--baseline, --ignore-known) with jq and git in a shell step; for the JVM: ArchUnit FreezingArchRule with the archunit_store directory',
@@ -282,7 +282,7 @@ echo "known violations: $then at $previous_tag, $now now"
 [ "$((now * 100))" -le "$((then * (100 - {{RATCHET_PERCENT}})))" ] || { echo "the baseline has not shrunk by {{RATCHET_PERCENT}}% since $previous_tag"; exit 1; }`,
     },
     {
-      id: 'ff-kernel', label: 'Shared kernel stays small', when: { SHARED: ['kernel'] }, category: 'structural', implements: ['adr-shared-kernel'], checks: ['req-kernel'],
+      id: 'ff-kernel', label: 'Shared kernel stays small', when: { SHARED: ['kernel'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-shared-kernel'], checks: ['req-kernel'],
       threshold: 'The shared kernel imports no part and no third-party package outside its allowlist, and holds at most {{KERNEL_PERCENT}}% of the source lines',
       description: 'A dependency rule keeps the kernel free of the parts and of every package in node_modules except the pure ones on its allowlist (so a database driver, HTTP client or framework cannot slip in); a second step in the same job compares the kernel\'s line count with the whole and fails above the limit.',
       tool: 'dependency-cruiser and cloc with jq in a shell step; for the JVM: an ArchUnit rule over the kernel package and JaCoCo\'s line counts',
@@ -300,7 +300,7 @@ module.exports = { forbidden: [{
 //   [ $((kernel * 100 / all)) -le {{KERNEL_PERCENT}} ]`,
     },
     {
-      id: 'ff-library', label: 'No consumer left behind', when: { SHARED: ['library'] }, category: 'process', implements: ['adr-shared-libraries'], checks: ['req-library'],
+      id: 'ff-library', label: 'No consumer left behind', when: { SHARED: ['library'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-shared-libraries'], checks: ['req-library'],
       threshold: '0 internal libraries on which a consumer is a major version behind for more than 90 days after the newer major\'s release',
       description: 'A weekly job in every consumer lists its outdated packages, and for each internal library whose latest major is newer than the installed one reads the release date of that version from the registry; a lag over 90 days fails the job naming the library.',
       tool: 'npm (outdated, view) in a TypeScript script run with tsx from a scheduled GitHub Actions job; for Maven: versions:display-dependency-updates with the release dates from the repository index',
@@ -325,7 +325,7 @@ for (const [name, info] of Object.entries(outdated)) {
 if (late.length) { console.error('internal libraries a major behind for over 90 days:\\n' + late.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-no-shared', label: 'No code shared between parts', when: { SHARED: ['none'] }, category: 'structural', implements: ['adr-share-nothing'], checks: ['req-no-shared'],
+      id: 'ff-no-shared', label: 'No code shared between parts', when: { SHARED: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-share-nothing'], checks: ['req-no-shared'],
       threshold: '0 imports from one part\'s folder into another\'s',
       description: 'A dependency rule forbids any import from one part into another; generated API clients live in each consumer and are generated from the provider\'s published contract.',
       tool: 'dependency-cruiser; for the JVM: ArchUnit slices().should().notDependOnEachOther(); for .NET: NetArchTest',

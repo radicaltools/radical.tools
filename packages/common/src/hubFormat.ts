@@ -148,7 +148,7 @@ export interface HubImportRecord {
 
 export const HUB_INDEX_FILE = 'index.json'
 
-const PREVIEW_KEYS = ['ears_type', 'priority', 'status', 'category', 'trigger'] as const
+const PREVIEW_KEYS = ['ears_type', 'priority', 'status', 'characteristic', 'trigger'] as const
 
 /** Node fields that say what a concept is about, for searchText. */
 const SEARCH_KEYS = ['label', 'description', 'trigger', 'action', 'metrics', 'threshold', 'decision'] as const

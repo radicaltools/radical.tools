@@ -162,7 +162,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-reject', label: 'Unauthenticated calls refused', when: SIGN_IN, category: 'structural', implements: ['adr-idp', 'adr-own'], checks: ['req-reject'],
+      id: 'ff-reject', label: 'Unauthenticated calls refused', when: SIGN_IN, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-idp', 'adr-own'], checks: ['req-reject'],
       threshold: 'Every operation not on the public list answers 401 without a credential, with an expired one and with a revoked one; 0 operations outside the public list answer anything else',
       description: 'A test lists the element\'s operations from its router (not from a list kept by hand), calls each without a credential, with an expired token and with a token of a session revoked in the test, and expects 401 from every one that is not on the public list. A new operation fails the test until it is protected or added to the public list, which shows up in the pull request.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory, RSpec request specs)',
@@ -188,7 +188,7 @@ describe.each(routes.filter((r) => !PUBLIC.has(\`\${r.method} \${r.path}\`)))('$
 })`,
     },
     {
-      id: 'ff-session', label: 'Session limits hold', when: SIGN_IN, category: 'operational', implements: ['adr-idp', 'adr-own', 'adr-no-stepup'], checks: ['req-idle', 'req-revoke'],
+      id: 'ff-session', label: 'Session limits hold', when: SIGN_IN, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-idp', 'adr-own', 'adr-no-stepup'], checks: ['req-idle', 'req-revoke'],
       threshold: 'An idle session ends after {{SESSION_MINUTES}} minutes; a revoked one is refused within {{REVOKE_SECONDS}} seconds on every instance',
       description: 'An integration test signs in on two instances, revokes the session on one and polls the other until it refuses, failing past {{REVOKE_SECONDS}} seconds. A second test runs against instances started with the idle timeout set to 5 seconds (the same setting that is {{SESSION_MINUTES}} minutes in production, read from the environment), waits 6 seconds and expects the next request to be refused; fake timers cannot move the server\'s clock, so the limit itself is made short for the drill. Where the session alone is enough, these two limits are the whole control, so this test is what keeps that decision honest.',
       tool: 'Vitest against two instances started by Testcontainers or docker compose with SESSION_IDLE_SECONDS=5 (or the equivalent of your stack)',
@@ -214,7 +214,7 @@ it('an idle session ends after the idle limit', async () => {
 })`,
     },
     {
-      id: 'ff-audit', label: 'Sign-in events recorded, credentials not', when: SIGN_IN, category: 'structural', implements: ['adr-idp', 'adr-own'], checks: ['req-audit'],
+      id: 'ff-audit', label: 'Sign-in events recorded, credentials not', when: SIGN_IN, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-idp', 'adr-own'], checks: ['req-audit'],
       threshold: 'Each of sign-in, failed sign-in, sign-out and revocation produces 1 audit record naming the account as its target, with time, client and source address; 0 occurrences of the password or token in the audit trail and the application log',
       description: 'An integration test performs the four events for one account with a password and token of a known random value, reads back the audit records whose target is the account and checks their fields (action, at, source.client and source.address, as in the Audit trail pack\'s record format), then searches them and the captured application log for the credential values.',
       tool: 'Vitest with supertest, the logs captured to a file by the test harness',
@@ -240,7 +240,7 @@ it('audits the four sign-in events without the credential', async () => {
 })`,
     },
     {
-      id: 'ff-lockout', label: 'Guessing slowed', when: { IDENTITY: ['own'] }, category: 'structural', implements: ['adr-own'], checks: ['req-lockout'],
+      id: 'ff-lockout', label: 'Guessing slowed', when: { IDENTITY: ['own'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-own'], checks: ['req-lockout'],
       threshold: 'After 5 failed sign-ins within 15 minutes the 6th attempt on that account is refused or delayed by at least 1 second, and 1 notification to the account\'s owner is sent',
       description: 'An integration test fails five sign-ins for one account, measures the sixth (a 429 or a response at least 1 second slower than the first failure counts as delayed), and checks the outbox for the owner\'s notification.',
       tool: 'Vitest with supertest, with the mail or notification sender captured by the test harness',
@@ -264,7 +264,7 @@ it('slows the sixth attempt and tells the owner', async () => {
 })`,
     },
     {
-      id: 'ff-passwords', label: 'Passwords hashed and checked', when: { IDENTITY: ['own'] }, category: 'structural', implements: ['adr-own'], checks: ['req-passwords'],
+      id: 'ff-passwords', label: 'Passwords hashed and checked', when: { IDENTITY: ['own'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-own'], checks: ['req-passwords'],
       threshold: '100% of stored password hashes start with $argon2id$v=19$m=19456,t=2,p=1$ (or stronger parameters); a breached password and one of 7 or 65 characters are refused; one of 8 and one of 64 are accepted',
       description: 'An integration test sets passwords through the sign-up operation (a breached one from the Pwned Passwords range API, too short, too long, and two valid ones) and reads the stored hashes to check the algorithm and its parameters.',
       tool: 'Vitest with supertest and a direct database read',
@@ -286,7 +286,7 @@ it('refuses breached and mis-sized passwords, stores the rest as Argon2id', asyn
 })`,
     },
     {
-      id: 'ff-stepup', label: 'Risky operations ask for a second factor', when: { ...SIGN_IN, STEP_UP: ['yes'] }, category: 'structural', implements: ['adr-stepup'], checks: ['req-stepup'],
+      id: 'ff-stepup', label: 'Risky operations ask for a second factor', when: { ...SIGN_IN, STEP_UP: ['yes'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-stepup'], checks: ['req-stepup'],
       threshold: 'Every operation on the step-up list refuses a session whose second factor is older than 5 minutes (401 or 403) and runs after a fresh confirmation; 0 listed operations run without one',
       description: 'A test reads the step-up list from the code, calls each listed operation with a session whose last second-factor confirmation is set to 6 minutes ago, expects a refusal, confirms the second factor and expects the operation to run.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -308,7 +308,7 @@ describe.each([...STEP_UP_OPERATIONS])('$method $path', (op) => {
 })`,
     },
     {
-      id: 'ff-machine', label: 'Calling systems known and limited', when: MACHINES, category: 'structural', implements: ['adr-idp', 'adr-own', 'adr-none'], checks: ['req-machine'],
+      id: 'ff-machine', label: 'Calling systems known and limited', when: MACHINES, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-idp', 'adr-own', 'adr-none'], checks: ['req-machine'],
       threshold: 'A call without a system credential and a call with one to an operation off the caller\'s list are refused (401 or 403); 0 system credentials older than 90 days in the credential registry',
       description: 'An integration test calls as a registered system (OAuth client, client certificate or API key, whichever the decision names) an operation on its list, one off it, and once without authenticating, and checks the registry of system credentials for any issued or rotated more than 90 days ago.',
       tool: 'Vitest with supertest, the system credential issued by the test fixture (an OAuth client, a client certificate or an API key, as decided)',
@@ -331,7 +331,7 @@ it('has no system credential older than 90 days', async () => {
 })`,
     },
     {
-      id: 'ff-none', label: 'Nothing to sign in to', when: { IDENTITY: ['none'] }, category: 'structural', implements: ['adr-none'], checks: ['req-public'],
+      id: 'ff-none', label: 'Nothing to sign in to', when: { IDENTITY: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-none'], checks: ['req-public'],
       threshold: 'No operation signs a person in, starts a session or reads a person\'s credential, and no sign-in or session library is a dependency',
       description: 'A dependency rule fails the build when a sign-in or session library is added, which would mean a sign-in arrived without its decision. Token validation libraries (jose, jsonwebtoken) stay allowed: calling systems authenticate as decided under Other systems.',
       tool: 'dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest, a RuboCop custom cop)',

@@ -210,7 +210,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-casing-camel', label: 'Fields camelCase, formats declared', when: { CASING: ['camel'] }, category: 'structural', implements: ['adr-camel'], checks: ['req-casing', 'req-formats'],
+      id: 'ff-casing-camel', label: 'Fields camelCase, formats declared', when: { CASING: ['camel'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-camel'], checks: ['req-casing', 'req-formats'],
       threshold: '0 properties or query parameters outside camelCase, 0 identifiers not typed string, 0 timestamp properties without format date-time, and 0 date-time examples outside UTC in api/openapi.yaml',
       description: 'Spectral lints the OpenAPI document in the pull-request build and fails on any error. Identifiers are the properties named id or ending in Id; timestamps those ending in At or Time.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -240,7 +240,7 @@ rules:
     then: { function: pattern, functionOptions: { match: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$' } }`,
     },
     {
-      id: 'ff-casing-snake', label: 'Fields snake_case, formats declared', when: { CASING: ['snake'] }, category: 'structural', implements: ['adr-snake'], checks: ['req-casing', 'req-formats'],
+      id: 'ff-casing-snake', label: 'Fields snake_case, formats declared', when: { CASING: ['snake'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-snake'], checks: ['req-casing', 'req-formats'],
       threshold: '0 properties or query parameters outside snake_case, 0 identifiers not typed string, 0 timestamp properties without format date-time, and 0 date-time examples outside UTC in api/openapi.yaml',
       description: 'Spectral lints the OpenAPI document in the pull-request build and fails on any error. Identifiers are the properties named id or ending in _id; timestamps those ending in _at or _time.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -270,7 +270,7 @@ rules:
     then: { function: pattern, functionOptions: { match: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$' } }`,
     },
     {
-      id: 'ff-paths-kebab', label: 'Paths kebab-case, plural, shallow', when: { PATHS: ['kebab'] }, category: 'structural', implements: MAIN, checks: ['req-paths'],
+      id: 'ff-paths-kebab', label: 'Paths kebab-case, plural, shallow', when: { PATHS: ['kebab'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-paths'],
       threshold: '0 paths in api/openapi.yaml with a segment outside kebab-case, a trailing slash, a collection that is not plural, or more than {{MAX_LEVELS}} collections',
       description: 'Spectral checks every path of the OpenAPI document: segments are kebab-case words or {parameters}, collections end in s or are on the list of irregular plurals and singletons in the rule, and no path is deeper than the limit. A custom method\'s :verb at the end is let through here; the actions check decides whether it is allowed.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -294,7 +294,7 @@ rules:
     then: { function: pattern, functionOptions: { notMatch: '^(/[^/{]+(/\\{[^}]+\\})?){{{MAX_LEVELS}}}/[^/{]' } }`,
     },
     {
-      id: 'ff-paths-camel', label: 'Paths camelCase, plural, shallow', when: { PATHS: ['camel'] }, category: 'structural', implements: MAIN, checks: ['req-paths'],
+      id: 'ff-paths-camel', label: 'Paths camelCase, plural, shallow', when: { PATHS: ['camel'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-paths'],
       threshold: '0 paths in api/openapi.yaml with a segment outside camelCase, a trailing slash, a collection that is not plural, or more than {{MAX_LEVELS}} collections',
       description: 'Spectral checks every path of the OpenAPI document: segments are camelCase words or {parameters}, collections end in s or are on the list of irregular plurals and singletons in the rule, and no path is deeper than the limit. A custom method\'s :verb at the end is let through here; the actions check decides whether it is allowed.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -318,7 +318,7 @@ rules:
     then: { function: pattern, functionOptions: { notMatch: '^(/[^/{]+(/\\{[^}]+\\})?){{{MAX_LEVELS}}}/[^/{]' } }`,
     },
     {
-      id: 'ff-contract', label: 'Contract follows HTTP semantics', category: 'structural', implements: MAIN, checks: ['req-methods', 'req-create', 'req-paths'],
+      id: 'ff-contract', label: 'Contract follows HTTP semantics', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-methods', 'req-create', 'req-paths'],
       threshold: '0 GET, HEAD or DELETE operations with a request body, 0 responses 201 without a Location header, 0 DELETE operations without a 204 or 202 response, 0 reads of one resource without a 404 response, and 0 paths with a verb as a segment in api/openapi.yaml',
       description: 'Spectral checks the methods and status codes the OpenAPI document declares against RFC 9110. The verb list is a start; add the verbs of your domain.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -348,7 +348,7 @@ rules:
     then: { function: pattern, functionOptions: { notMatch: '/(cancel|approve|reject|submit|send|activate|deactivate|archive|restore|publish|retry|start|stop|run|execute)(/|$)' } }`,
     },
     {
-      id: 'ff-http', label: 'Running API keeps HTTP semantics', category: 'structural', implements: MAIN, checks: ['req-methods', 'req-create', 'req-unsupported', 'req-formats'],
+      id: 'ff-http', label: 'Running API keeps HTTP semantics', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-methods', 'req-create', 'req-unsupported', 'req-formats'],
       threshold: 'POST /orders answers 201 with the order and a Location whose GET returns the same order; two GETs and two PUTs of it return the same state; its timestamps end in Z and its id is a string; DELETE answers 204 without a body and the next GET 404 or 410; PATCH /orders answers 405 with Allow naming GET and POST; a text/plain POST answers 415',
       description: 'An HTTP test (test/api/semantics.test.ts) runs one resource through its life against the application and checks the status codes, headers and formats RFC 9110 and RFC 3339 prescribe. Timestamps are left out of the comparison of the two PUTs, since an update time may move.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)',
@@ -380,7 +380,7 @@ it('refuses an unsupported method with 405 and Allow, a media type it does not a
 })`,
     },
     {
-      id: 'ff-custom-methods', label: 'Custom methods well-formed', when: { ACTIONS: ['custom'] }, category: 'structural', implements: ['adr-actions-custom'], checks: ['req-actions-custom'],
+      id: 'ff-custom-methods', label: 'Custom methods well-formed', when: { ACTIONS: ['custom'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-actions-custom'], checks: ['req-actions-custom'],
       threshold: '0 paths in api/openapi.yaml with a colon that offer PUT, PATCH or DELETE, and 0 custom-method verbs outside camelCase',
       description: 'Spectral checks that a path ending in :verb is only called with POST or GET and that the verb is camelCase; the contract check already refuses a verb as a path segment.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -401,7 +401,7 @@ rules:
     then: { function: pattern, functionOptions: { match: '^[^:]*(:[a-z][A-Za-z]*)?$' } }`,
     },
     {
-      id: 'ff-action-paths', label: 'No action paths', when: { ACTIONS: ['resource', 'patch'] }, category: 'structural', implements: ['adr-actions-resource', 'adr-actions-patch'], checks: ['req-actions-resource', 'req-actions-patch', 'req-create'],
+      id: 'ff-action-paths', label: 'No action paths', when: { ACTIONS: ['resource', 'patch'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-actions-resource', 'adr-actions-patch'], checks: ['req-actions-resource', 'req-actions-patch', 'req-create'],
       threshold: '0 paths in api/openapi.yaml with a colon, and 0 POST operations on a collection without a 201 or 202 response',
       description: 'Spectral refuses custom methods, so an action is either a resource created by POST on its collection or a PATCH of the status field; the contract check already refuses a verb as a path segment.',
       tool: 'Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)',
@@ -419,7 +419,7 @@ rules:
     then: { function: or, functionOptions: { properties: ['201', '202'] } }`,
     },
     {
-      id: 'ff-transitions', label: 'Forbidden transitions refused', when: { ACTIONS: ['patch'] }, category: 'structural', implements: ['adr-actions-patch'], checks: ['req-actions-patch'],
+      id: 'ff-transitions', label: 'Forbidden transitions refused', when: { ACTIONS: ['patch'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-actions-patch'], checks: ['req-actions-patch'],
       threshold: 'Every transition the lifecycle table allows answers 200; every other one answers 409 and leaves the status as it was',
       description: 'An HTTP test (test/api/transitions.test.ts) reads the transition table from the code, so a new status or transition is tested without editing the test, and tries every pair of statuses with a Merge Patch of the status field.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -443,7 +443,7 @@ it.each(pairs)('$from → $to (allowed: $allowed)', async ({ from, to, allowed }
 })`,
     },
     {
-      id: 'ff-operation-poll', label: 'Long work polled to the end', when: { LRO: ['operation'] }, category: 'structural', implements: ['adr-lro-operation'], checks: ['req-lro-operation'],
+      id: 'ff-operation-poll', label: 'Long work polled to the end', when: { LRO: ['operation'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-lro-operation'], checks: ['req-lro-operation'],
       threshold: 'A long request answers 202 with an Operation-Location under /operations; every poll shows one of the five statuses, with Retry-After until the end; the work ends within 60 polls; an operation that ended {{OPERATION_DAYS}} days ago less one hour is still readable',
       description: 'An HTTP test (test/api/operations.test.ts) starts the slowest operation the API has, follows Operation-Location at the pace Retry-After sets, and reads an operation the fixtures stored as ended just inside the retention period.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -475,7 +475,7 @@ it('keeps a finished operation readable for {{OPERATION_DAYS}} days', async () =
 })`,
     },
     {
-      id: 'ff-callback', label: 'Callbacks signed and retried', when: { LRO: ['callback'] }, category: 'structural', implements: ['adr-lro-callback'], checks: ['req-lro-callback'],
+      id: 'ff-callback', label: 'Callbacks signed and retried', when: { LRO: ['callback'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-lro-callback'], checks: ['req-lro-callback'],
       threshold: 'A long request answers 202; a delivery the receiver refuses with 500 is retried with the same webhook-id; every delivery carries a valid v1 HMAC-SHA256 signature; the retry schedule spans at least {{CALLBACK_HOURS}} hours',
       description: 'An HTTP test (test/api/callbacks.test.ts) registers a local receiver that refuses the first delivery, starts a long operation, and verifies each delivery\'s signature as the Standard Webhooks specification computes it (HMAC-SHA256 over id.timestamp.body with the base64 secret after whsec_). The test allows a plain-http loopback receiver; production registers https URLs only.',
       tool: 'Vitest with supertest and node:http (or the test runner and HTTP client of your stack)',
@@ -507,7 +507,7 @@ it('posts the outcome signed, and retries a refused delivery with the same id', 
 })`,
     },
     {
-      id: 'ff-latency', label: 'Slow routes alerted', category: 'operational', implements: [...MAIN, 'adr-lro-none'], checks: ['req-sync'],
+      id: 'ff-latency', label: 'Slow routes alerted', characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: [...MAIN, 'adr-lro-none'], checks: ['req-sync'],
       threshold: 'An alert fires for any route where more than 1% of requests took longer than {{SYNC_SECONDS}} seconds over 5 minutes, sustained for 15 minutes',
       description: 'A Prometheus alerting rule over the OpenTelemetry HTTP server duration histogram computes, per route, the share of requests slower than the limit. The limit must be a bucket boundary of the histogram (the OpenTelemetry default boundaries end at 10 seconds); le is matched with and without .0, since Prometheus 3 may write bucket bounds as floats.',
       tool: 'Prometheus alerting rules (promtool check rules), on the http.server.request.duration metric of OpenTelemetry',

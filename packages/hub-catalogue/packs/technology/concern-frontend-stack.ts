@@ -18,7 +18,7 @@ const PACKAGES: Record<string, string[]> = {
 function oneFramework(value: string, adr: string, name: string): FitnessSpec {
   const others = Object.entries(PACKAGES).filter(([k]) => k !== value).flatMap(([, p]) => p)
   return {
-    id: `ff-one-framework-${value}`, label: `Only ${name}`, when: { FRAMEWORK: [value] }, category: 'structural', implements: [adr], checks: ['req-one-framework'],
+    id: `ff-one-framework-${value}`, label: `Only ${name}`, when: { FRAMEWORK: [value] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [adr], checks: ['req-one-framework'],
     threshold: `0 package.json files in the repository declare ${others.join(', ')}`,
     description: `A job in every build reads the dependencies and devDependencies of every package.json in the repository and fails when one names another UI framework's package; a second framework then arrives only with the decision record that allows it and a change to this check. Runs on Linux (git, jq, GNU xargs and grep).`,
     tool: 'git with jq and grep (CI job)',
@@ -246,7 +246,7 @@ const pack: PackSpec = {
     oneFramework('svelte', 'adr-svelte', 'Svelte'),
     oneFramework('htmx', 'adr-htmx', 'htmx'),
     {
-      id: 'ff-lighthouse', label: 'Lab budget holds', category: 'operational', implements: FRAMEWORKS, checks: ['req-bundle'],
+      id: 'ff-lighthouse', label: 'Lab budget holds', characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-bundle'],
       threshold: 'On every pull request, for each main page: script transfer size at most {{JS_KB}} KB, LCP within {{LCP_MS}} ms, CLS at most {{CLS}}, Total Blocking Time within 200 ms (the lab stand-in for INP), accessibility score at least 0.95',
       description: 'Lighthouse CI starts the preview build, runs three times per main page on its mobile profile and asserts the budget; the median run counts. The script size is the transfer size of every script the page loads, whatever the framework\'s output paths. INP needs real interactions, so it is checked in the field (see Field vitals). Pages behind sign-in need a puppeteerScript that signs in before the runs.',
       tool: 'Lighthouse CI',
@@ -274,7 +274,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-field-vitals', label: 'Field vitals within budget', category: 'operational', implements: FRAMEWORKS, checks: ['req-vitals'],
+      id: 'ff-field-vitals', label: 'Field vitals within budget', characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-vitals'],
       threshold: '75th percentile over 28 days per page group: LCP within {{LCP_MS}} ms, INP within {{INP_MS}} ms, CLS at most {{CLS}}; the daily query returns 0 rows',
       description: 'The page reports LCP, INP and CLS from real users with the web-vitals library (navigator.sendBeacon to /rum, which stores name, value and page group in rum_events). A daily job runs the query below, which computes the 75th percentile per metric and page group over the last 28 days and returns every row over budget; any row fails the job and alerts the team.',
       tool: 'web-vitals (Google Chrome) in the page; a scheduled SQL query over the RUM table (PostgreSQL syntax)',
@@ -294,7 +294,7 @@ WHERE (name = 'LCP' AND p75 > {{LCP_MS}})
 ORDER BY name, page_group;`,
     },
     {
-      id: 'ff-axe', label: 'No accessibility violations', category: 'structural', implements: FRAMEWORKS, checks: ['req-a11y'],
+      id: 'ff-axe', label: 'No accessibility violations', characteristic: 'interaction-capability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-a11y'],
       threshold: '0 serious or critical axe violations against the WCAG 2.0 and 2.1 A and AA rules and the 2.2 AA rules on every page of the main journeys',
       description: 'A Playwright test opens each page of the main journeys, including open dialogs and error states, and runs axe-core with the WCAG A and AA tags; any serious or critical violation fails it.',
       tool: 'axe-core with Playwright (@axe-core/playwright)',
@@ -313,7 +313,7 @@ for (const path of ['/', '/search', '/checkout']) {
 }`,
     },
     {
-      id: 'ff-keyboard', label: 'Main journey by keyboard', category: 'structural', implements: FRAMEWORKS, checks: ['req-a11y'],
+      id: 'ff-keyboard', label: 'Main journey by keyboard', characteristic: 'interaction-capability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-a11y'],
       threshold: 'The main journey completes with Tab, Shift+Tab, Enter, Space and the arrow keys only, and focus is visible at every step',
       description: 'A Playwright test walks the main journey without the mouse: it tabs to each control by its accessible name, activates it with Enter or Space, and asserts the focused element is visible after every move; a control that cannot be reached within 200 tabs fails the test.',
       tool: 'Playwright',
@@ -339,7 +339,7 @@ test('checkout completes with the keyboard alone', async ({ page }) => {
 })`,
     },
     {
-      id: 'ff-compat', label: 'Features match browser list', category: 'structural', implements: FRAMEWORKS, checks: ['req-browsers'],
+      id: 'ff-compat', label: 'Features match browser list', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-browsers'],
       threshold: '0 uses of web features missing from a browser on the list without a configured polyfill',
       description: 'The browser list lives in package.json and drives the build\'s transpilation; eslint-plugin-compat fails on a web API one of the listed browsers lacks. Playwright runs the journeys in Chromium, Firefox and WebKit.',
       tool: 'browserslist with eslint-plugin-compat',
@@ -356,7 +356,7 @@ export default [
 ]`,
     },
     {
-      id: 'ff-eol', label: 'Framework still supported', when: { FRAMEWORK: BUILT }, category: 'operational', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-supported'],
+      id: 'ff-eol', label: 'Framework still supported', when: { FRAMEWORK: BUILT }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-supported'],
       threshold: '0 framework or build-tool majors within {{EOL_DAYS}} days of their end of support',
       description: 'A scheduled job and every build look up each product and cycle listed in versions.txt on endoflife.date (angular, nextjs, nuxt, vue, svelte, nodejs for the build) and fail when end of support is less than {{EOL_DAYS}} days away; versions.txt changes in the same pull request as package.json. The same script serves the Backend stack pack. Runs on Linux (GNU date).',
       tool: 'endoflife.date API (curl and jq)',
@@ -376,7 +376,7 @@ done < versions.txt
 exit $fail`,
     },
     {
-      id: 'ff-cache-headers', label: 'Cache headers right', when: { RENDERING: ['spa'], FRAMEWORK: BUILT }, category: 'operational', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-spa-cache'],
+      id: 'ff-cache-headers', label: 'Cache headers right', when: { RENDERING: ['spa'], FRAMEWORK: BUILT }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-spa-cache'],
       threshold: '100% of the scripts and stylesheets the HTML references are served with max-age=31536000, immutable; the HTML with no-cache',
       description: 'After each deploy a check fetches the HTML, takes every script src and stylesheet href from it (absolute, root-relative or relative, whatever the framework emits) and verifies the Cache-Control header of each; a page that references no script or stylesheet fails too, so an empty loop cannot pass.',
       tool: 'curl (post-deploy check)',
@@ -394,7 +394,7 @@ for asset in $assets; do
 done`,
     },
     {
-      id: 'ff-ttfb', label: 'Server answers quickly', when: { RENDERING: ['ssr'] }, category: 'operational', implements: FRAMEWORKS, checks: ['req-ssr'],
+      id: 'ff-ttfb', label: 'Server answers quickly', when: { RENDERING: ['ssr'] }, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-ssr'],
       threshold: 'Time to First Byte within 800 ms at the 75th percentile at the peak rate decided in the Capacity and scaling pack, with the main content in the HTML',
       description: 'A k6 test requests the main server-rendered pages at the peak rate (PEAK_RPS from the Capacity and scaling pack\'s decision, passed in the environment) and checks the time to first byte (http_req_waiting) and that the HTML holds the main content.',
       tool: 'Grafana k6',
@@ -415,7 +415,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-static-served', label: 'Pages served from the edge', when: { RENDERING: ['static'], FRAMEWORK: BUILT }, category: 'operational', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-static'],
+      id: 'ff-static-served', label: 'Pages served from the edge', when: { RENDERING: ['static'], FRAMEWORK: BUILT }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-static'],
       threshold: '100% of the pages in the sitemap answer from the CDN cache on the second request; the last publish run took at most 15 minutes from trigger to completion',
       description: 'After each publish a check requests every page in the sitemap twice and reads the CDN\'s cache header of the second response (x-cache for CloudFront, cf-cache-status for Cloudflare, x-vercel-cache for Vercel, cache-status for others); a page not served from the cache fails. It then reads the duration of the last successful publish workflow run. Runs on Linux (GNU date).',
       tool: 'curl with the GitHub CLI (post-deploy check)',
@@ -434,7 +434,7 @@ took=$(( $(date -d "$(jq -r .updatedAt <<<"$run")" +%s) - $(date -d "$(jq -r .cr
 exit $fail`,
     },
     {
-      id: 'ff-tokens', label: 'Only design tokens', when: { DESIGN: ['own'] }, category: 'structural', implements: FRAMEWORKS, checks: ['req-design-own'],
+      id: 'ff-tokens', label: 'Only design tokens', when: { DESIGN: ['own'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-design-own'],
       threshold: '0 hard-coded colours, font sizes or spacing in stylesheets outside the token files',
       description: 'Stylelint requires design-token variables for colour, font size and spacing properties; the token files themselves are exempt.',
       tool: 'Stylelint (stylelint-declaration-strict-value)',
@@ -452,7 +452,7 @@ exit $fail`,
 }`,
     },
     {
-      id: 'ff-no-overrides', label: 'No library internals styled', when: { DESIGN: ['library'] }, category: 'structural', implements: FRAMEWORKS, checks: ['req-design-library'],
+      id: 'ff-no-overrides', label: 'No library internals styled', when: { DESIGN: ['library'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-design-library'],
       threshold: '0 selectors targeting the component library\'s internal class names',
       description: 'Stylelint refuses selectors with the library\'s internal class prefixes, so styling goes through the theme. Adjust the patterns to the library used (MUI: .Mui, Angular Material: .mat-mdc / .mdc-, PrimeNG: .p-, Bootstrap with htmx: its component classes stay, only its internal state classes are listed).',
       tool: 'Stylelint (selector-disallowed-list)',
@@ -467,7 +467,7 @@ exit $fail`,
 }`,
     },
     {
-      id: 'ff-tailwind', label: 'No arbitrary utility values', when: { DESIGN: ['utility'], FRAMEWORK: BUILT }, category: 'structural', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-design-utility'],
+      id: 'ff-tailwind', label: 'No arbitrary utility values', when: { DESIGN: ['utility'], FRAMEWORK: BUILT }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte'], checks: ['req-design-utility'],
       threshold: '0 arbitrary values (such as bg-[#1da1f2]) in class names of components',
       description: 'The Tailwind ESLint plugin refuses arbitrary values in class names of JS, TS, JSX, Vue and Svelte files, so colours, spacing and type sizes come from the theme\'s tokens. Pin the plugin to the Tailwind major: eslint-plugin-tailwindcss 4.x for Tailwind CSS 4 (what shadcn/ui targets), 3.x for Tailwind CSS 3.',
       tool: 'ESLint (eslint-plugin-tailwindcss)',
@@ -480,7 +480,7 @@ export default [
 ]`,
     },
     {
-      id: 'ff-tailwind-templates', label: 'No arbitrary utility values in templates', when: { DESIGN: ['utility'], FRAMEWORK: ['htmx'] }, category: 'structural', implements: ['adr-htmx'], checks: ['req-design-utility'],
+      id: 'ff-tailwind-templates', label: 'No arbitrary utility values in templates', when: { DESIGN: ['utility'], FRAMEWORK: ['htmx'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-htmx'], checks: ['req-design-utility'],
       threshold: '0 arbitrary values (such as bg-[#1da1f2]) in class attributes of server templates',
       description: 'ESLint never sees server templates, so a grep over the template files fails the build on a utility class with a bracketed arbitrary value; colours, spacing and type sizes come from the theme\'s tokens. Runs on Linux (GNU grep).',
       tool: 'grep (CI job)',
@@ -493,7 +493,7 @@ hits=$(grep -rnE 'class="[^"]*[a-z0-9:-]+-\\[[^]]+\\]' \\
 [ -z "$hits" ] || { echo "$hits"; echo "arbitrary utility values: take colours, spacing and sizes from the theme (ADR Frontend stack)"; exit 1; }`,
     },
     {
-      id: 'ff-browser-notice', label: 'Old browsers get the notice', when: { BROWSERS: ['modern'] }, category: 'structural', implements: FRAMEWORKS, checks: ['req-unsupported'],
+      id: 'ff-browser-notice', label: 'Old browsers get the notice', when: { BROWSERS: ['modern'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-unsupported'],
       threshold: 'The support detection returns false for a browser lacking a feature every listed browser has and true for a current one; the notice renders on false',
       description: 'The page runs a small feature detection before the application (a plain script, so it runs in old browsers too) and renders the notice with the supported browsers when a feature every browser on the list has is missing. A unit test checks the detection both ways, so a change to the browser list is paired with a change to the detection.',
       tool: 'Vitest',

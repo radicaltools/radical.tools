@@ -178,7 +178,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-oasdiff', label: 'OpenAPI break check', when: { FORMAT: ['openapi'] }, category: 'structural', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
+      id: 'ff-oasdiff', label: 'OpenAPI break check', when: { FORMAT: ['openapi'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
       threshold: '0 breaking changes (oasdiff level ERR) between each version\'s document at the last release tag and the pull request, a removal after its x-sunset date and {{SUNSET_MONTHS}} months of deprecation not counting; after a deployment, 0 differences between the stable URL and the release\'s document',
       description: 'In every pull request, oasdiff compares each contract document with the same document at the last release tag and fails on any change it rates as breaking (removed or renamed operations and fields, new required inputs, narrowed types, removed enum values); a deprecated operation must carry x-sunset at least {{SUNSET_MONTHS}} months away, and once that date has passed its removal is not breaking (whether anybody still calls it is checked by the usage alert). A new version is a new document with nothing to diff against. After each deployment the same tool compares the stable URL with the release\'s document.',
       tool: 'oasdiff',
@@ -202,7 +202,7 @@ const pack: PackSpec = {
     done`,
     },
     {
-      id: 'ff-graphql-inspector', label: 'GraphQL break check', when: { FORMAT: ['graphql'] }, category: 'structural', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
+      id: 'ff-graphql-inspector', label: 'GraphQL break check', when: { FORMAT: ['graphql'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
       threshold: '0 breaking changes between the schema at the last release tag and the pull request, the removal of a deprecated field unused for {{USAGE_DAYS}} days not counting; after a deployment, 0 differences between the served schema and the release\'s',
       description: 'In every pull request, graphql-inspector diffs the schema with the one at the last release tag and fails on a breaking change (a removed field or type, a changed argument, a nullable field made non-null on input). Removing a deprecated field is allowed when the usage module, asked per field, reports no call in the last {{USAGE_DAYS}} days (the dates in the reason are checked by the sunset test). After each deployment the served schema is introspected and must equal the release\'s.',
       tool: 'graphql-inspector',
@@ -222,7 +222,7 @@ const pack: PackSpec = {
     npx @graphql-inspector/cli diff schema.graphql /tmp/served.graphql | grep -q 'No changes detected'`,
     },
     {
-      id: 'ff-buf', label: 'Protobuf break check', when: { FORMAT: ['protobuf'] }, category: 'structural', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
+      id: 'ff-buf', label: 'Protobuf break check', when: { FORMAT: ['protobuf'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-contract', 'req-compat', 'req-versionless'],
       threshold: '0 breaking changes against the last release tag, a deleted field whose number and name are reserved not counting; 0 lint findings, PACKAGE_VERSION_SUFFIX included; after a deployment, the services the server reflects equal the contract\'s',
       description: 'buf lint requires a version suffix on every package, and buf breaking compares the .proto files with the last release tag, failing on a renumbered field, a changed type, a removed RPC, or a field deleted without reserving its number and name (which is how a field past its sunset goes). After each deployment the services the server reflects are compared with the services of the release\'s descriptors.',
       tool: 'buf breaking, grpcurl',
@@ -241,7 +241,7 @@ breaking:
 #   diff <(grpcurl -protoset /tmp/release.binpb list | sort) <(grpcurl -plaintext "$GRPC_ADDRESS" list | grep -v '^grpc\\.' | sort)`,
     },
     {
-      id: 'ff-sunset', label: 'Deprecations carry a sunset', when: { FORMAT: ['openapi'] }, category: 'structural', implements: ADRS, checks: ['req-sunset'],
+      id: 'ff-sunset', label: 'Deprecations carry a sunset', when: { FORMAT: ['openapi'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-sunset'],
       threshold: 'Every operation marked deprecated in the contract carries x-sunset and answers with a Deprecation header and a Sunset date equal to it and at least {{SUNSET_MONTHS}} months after the deprecation; 0 without',
       description: 'A test reads the operations marked deprecated from the contract documents (not from a list kept by hand), calls each and checks the Deprecation (RFC 9745) and Sunset (RFC 8594) headers against the contract\'s x-sunset.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -272,7 +272,7 @@ describe.each(deprecated)('$method $path', ({ method, path, sunset }) => {
 })`,
     },
     {
-      id: 'ff-sunset-graphql', label: 'Deprecated fields carry their dates', when: { FORMAT: ['graphql'] }, category: 'structural', implements: ADRS, checks: ['req-sunset-graphql'],
+      id: 'ff-sunset-graphql', label: 'Deprecated fields carry their dates', when: { FORMAT: ['graphql'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-sunset-graphql'],
       threshold: 'Every @deprecated field, argument and enum value has a reason ending in "deprecated YYYY-MM-DD, sunset YYYY-MM-DD" with the sunset at least {{SUNSET_MONTHS}} months after the deprecation; 0 without',
       description: 'A test builds the schema from schema.graphql, walks every type for deprecated fields, arguments and enum values, and checks the two dates in each reason.',
       tool: 'Vitest with the graphql package (or the test runner of your stack)',
@@ -304,7 +304,7 @@ describe.each(deprecated)('$where', ({ reason }) => {
 })`,
     },
     {
-      id: 'ff-sunset-protobuf', label: 'Deprecated fields carry their dates', when: { FORMAT: ['protobuf'] }, category: 'structural', implements: ADRS, checks: ['req-sunset-protobuf'],
+      id: 'ff-sunset-protobuf', label: 'Deprecated fields carry their dates', when: { FORMAT: ['protobuf'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-sunset-protobuf'],
       threshold: 'Every [deprecated = true] field, RPC and enum value has a comment "Deprecated: YYYY-MM-DD, sunset: YYYY-MM-DD" on the line above with the sunset at least {{SUNSET_MONTHS}} months after the deprecation; 0 without',
       description: 'A CI step greps the .proto files for deprecated elements and checks the dated comment above each; reserving the number and name on removal is checked by buf breaking.',
       tool: 'grep and GNU date in the CI job',
@@ -323,7 +323,7 @@ done < <(grep -rn 'deprecated = true' api/ --include='*.proto')
 exit $fail`,
     },
     {
-      id: 'ff-usage', label: 'Deprecated usage counted and alerted', category: 'operational', implements: ADRS, checks: ['req-usage'],
+      id: 'ff-usage', label: 'Deprecated usage counted and alerted', characteristic: 'compatibility', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ADRS, checks: ['req-usage'],
       threshold: 'The counter api_deprecated_calls_total{caller, operation} is scraped (an alert fires while it is absent); an alert names every caller that called an element whose sunset is under 30 days away in the last 7 days',
       description: 'The element exports api_deprecated_calls_total{caller, operation} and api_sunset_timestamp_seconds{operation} (from the dates in the contract); Prometheus rules alert when the counter is missing and when a deprecated element close to its sunset is still called.',
       tool: 'Prometheus alerting rules',
@@ -344,7 +344,7 @@ exit $fail`,
     annotations: { summary: "{{ $labels.caller }} still calls {{ $labels.operation }}, whose sunset is under 30 days away" }`,
     },
     {
-      id: 'ff-two-paths', label: 'Two major versions at most', when: { VERSIONING: ['path'] }, category: 'structural', implements: ['adr-version-path'], checks: ['req-path'],
+      id: 'ff-two-paths', label: 'Two major versions at most', when: { VERSIONING: ['path'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-version-path'], checks: ['req-path'],
       threshold: 'The router serves at most 2 distinct major version prefixes; a third fails the test',
       description: 'A test lists the routes from the router (not from a list kept by hand), collects their /vN/ prefixes (for gRPC, the .vN package suffixes of the registered services) and fails when there are more than two.',
       tool: 'Vitest (or the test runner of your stack)',
@@ -357,7 +357,7 @@ it('serves at most two major versions', () => {
 })`,
     },
     {
-      id: 'ff-header-versions', label: 'Version header required and echoed', when: { VERSIONING: ['header'] }, category: 'structural', implements: ['adr-version-header'], checks: ['req-header', 'req-header-echo'],
+      id: 'ff-header-versions', label: 'Version header required and echoed', when: { VERSIONING: ['header'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-version-header'], checks: ['req-header', 'req-header-echo'],
       threshold: 'A request without Api-Version, and one naming an unserved version, get 400 with the served versions; a request naming a served version is answered with that version echoed; at most 2 versions are served',
       description: 'A test calls the API without the header, with an unknown version and with each served version, and checks the status, the list in the 400 body and the echoed header.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -378,7 +378,7 @@ it('requires the version header, echoes it, and serves two versions at most', as
 })`,
     },
     {
-      id: 'ff-pact', label: 'Caller contracts verified', when: { CONTRACT_TESTS: ['pact'] }, category: 'process', implements: ADRS, checks: ['req-pact'],
+      id: 'ff-pact', label: 'Caller contracts verified', when: { CONTRACT_TESTS: ['pact'] }, characteristic: 'compatibility', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-pact'],
       threshold: '100 % of the callers\' pacts for the main branch and every deployed version verify on each build; can-i-deploy answers yes before every deployment',
       description: 'Every build of the API fetches the pacts of its callers from the Pact Broker and replays them against the running API, publishing the result; the deployment step asks can-i-deploy and stops on no.',
       tool: 'Pact (pact-js Verifier, Pact Broker can-i-deploy)',
@@ -399,7 +399,7 @@ it('honours every caller\\'s pact', () =>
 //   npx --package=@pact-foundation/pact-cli pact-broker can-i-deploy --pacticipant order-api --version "$GIT_SHA" --to-environment production`,
     },
     {
-      id: 'ff-conformance', label: 'API conforms to contract', when: { CONTRACT_TESTS: ['conformance'], FORMAT: ['openapi', 'graphql'] }, category: 'structural', implements: ADRS, checks: ['req-conformance'],
+      id: 'ff-conformance', label: 'API conforms to contract', when: { CONTRACT_TESTS: ['conformance'], FORMAT: ['openapi', 'graphql'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-conformance'],
       threshold: '0 answers whose status code, headers or body the contract does not describe, and 0 server errors, over every operation, on each build',
       description: 'On every build, Schemathesis generates calls for each operation of the published contract (OpenAPI or GraphQL), runs them against a running instance and fails on an answer the contract does not allow or on a server error.',
       tool: 'Schemathesis',
@@ -409,7 +409,7 @@ pip install 'schemathesis>=4'
 st run "$API_URL/openapi.json" --checks all      # for a GraphQL schema: st run "$API_URL/graphql" --checks all`,
     },
     {
-      id: 'ff-conformance-grpc', label: 'Server conforms to contract', when: { CONTRACT_TESTS: ['conformance'], FORMAT: ['protobuf'] }, category: 'structural', implements: ADRS, checks: ['req-conformance-grpc'],
+      id: 'ff-conformance-grpc', label: 'Server conforms to contract', when: { CONTRACT_TESTS: ['conformance'], FORMAT: ['protobuf'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ADRS, checks: ['req-conformance-grpc'],
       threshold: 'The services the running server reflects equal the services of the contract; 0 RPCs answer Unknown or Internal to an empty request',
       description: 'On every build, the services the server reflects are compared with those of the contract\'s descriptors, and every RPC is called with an empty request; a crash (Unknown, Internal) fails the build, an InvalidArgument does not.',
       tool: 'buf and grpcurl',

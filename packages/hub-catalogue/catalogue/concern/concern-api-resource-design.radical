@@ -643,7 +643,11 @@
       "label": "Fields camelCase, formats declared",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral lints the OpenAPI document in the pull-request build and fails on any error. Identifiers are the properties named id or ending in Id; timestamps those ending in At or Time.\n\nThreshold: 0 properties or query parameters outside camelCase, 0 identifiers not typed string, 0 timestamp properties without format date-time, and 0 date-time examples outside UTC in api/openapi.yaml\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the path and contract rules beside these\nformats: [oas3]\nrules:\n  field-names-camel-case:\n    severity: error\n    given: '$..properties[*]~'\n    then: { function: casing, functionOptions: { type: camel } }\n  query-parameters-camel-case:\n    severity: error\n    given: \"$..parameters[?(@.in == 'query')].name\"\n    then: { function: casing, functionOptions: { type: camel } }\n  ids-are-strings:\n    severity: error\n    given: '$..properties[?(@property.match(/^id$|Id$/))]'\n    then: { field: type, function: enumeration, functionOptions: { values: [string] } }\n  timestamps-are-date-time:\n    severity: error\n    given: '$..properties[?(@property.match(/(At|Time)$/))]'\n    then: { function: schema, functionOptions: { schema: { required: [format], properties: { format: { const: date-time } } } } }\n  timestamp-examples-in-utc:\n    severity: error\n    given: \"$..properties[?(@.format == 'date-time')].example\"\n    then: { function: pattern, functionOptions: { match: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$' } }\n```",
       "hubWhen": {
         "CASING": [
@@ -657,7 +661,11 @@
       "label": "Fields snake_case, formats declared",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral lints the OpenAPI document in the pull-request build and fails on any error. Identifiers are the properties named id or ending in _id; timestamps those ending in _at or _time.\n\nThreshold: 0 properties or query parameters outside snake_case, 0 identifiers not typed string, 0 timestamp properties without format date-time, and 0 date-time examples outside UTC in api/openapi.yaml\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the path and contract rules beside these\nformats: [oas3]\nrules:\n  field-names-snake-case:\n    severity: error\n    given: '$..properties[*]~'\n    then: { function: casing, functionOptions: { type: snake } }\n  query-parameters-snake-case:\n    severity: error\n    given: \"$..parameters[?(@.in == 'query')].name\"\n    then: { function: casing, functionOptions: { type: snake } }\n  ids-are-strings:\n    severity: error\n    given: '$..properties[?(@property.match(/^id$|_id$/))]'\n    then: { field: type, function: enumeration, functionOptions: { values: [string] } }\n  timestamps-are-date-time:\n    severity: error\n    given: '$..properties[?(@property.match(/(_at|_time)$/))]'\n    then: { function: schema, functionOptions: { schema: { required: [format], properties: { format: { const: date-time } } } } }\n  timestamp-examples-in-utc:\n    severity: error\n    given: \"$..properties[?(@.format == 'date-time')].example\"\n    then: { function: pattern, functionOptions: { match: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$' } }\n```",
       "hubWhen": {
         "CASING": [
@@ -671,7 +679,11 @@
       "label": "Paths kebab-case, plural, shallow",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral checks every path of the OpenAPI document: segments are kebab-case words or {parameters}, collections end in s or are on the list of irregular plurals and singletons in the rule, and no path is deeper than the limit. A custom method's :verb at the end is let through here; the actions check decides whether it is allowed.\n\nThreshold: 0 paths in api/openapi.yaml with a segment outside kebab-case, a trailing slash, a collection that is not plural, or more than {{MAX_LEVELS}} collections\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the casing and contract rules beside these\nformats: [oas3]\nrules:\n  path-segments-kebab-case:\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { match: '^(/([a-z][a-z0-9]*(-[a-z0-9]+)*|\\{[a-z][A-Za-z0-9_]*\\}))+(:[a-z][A-Za-z]*)?$' } }\n  path-collections-plural:\n    message: '{{property}}: a collection is not a plural noun (add irregular plurals and singletons to the list)'\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { match: '^(/([a-z0-9-]*s|people|children|data|media|me|\\{[^}]+\\}))+(:[A-Za-z]+)?$' } }\n  path-nesting-depth:\n    message: '{{property}} is more than {{MAX_LEVELS}} collections deep'\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { notMatch: '^(/[^/{]+(/\\{[^}]+\\})?){{{MAX_LEVELS}}}/[^/{]' } }\n```",
       "hubWhen": {
         "PATHS": [
@@ -685,7 +697,11 @@
       "label": "Paths camelCase, plural, shallow",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral checks every path of the OpenAPI document: segments are camelCase words or {parameters}, collections end in s or are on the list of irregular plurals and singletons in the rule, and no path is deeper than the limit. A custom method's :verb at the end is let through here; the actions check decides whether it is allowed.\n\nThreshold: 0 paths in api/openapi.yaml with a segment outside camelCase, a trailing slash, a collection that is not plural, or more than {{MAX_LEVELS}} collections\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the casing and contract rules beside these\nformats: [oas3]\nrules:\n  path-segments-camel-case:\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { match: '^(/([a-z][a-zA-Z0-9]*|\\{[a-z][A-Za-z0-9_]*\\}))+(:[a-z][A-Za-z]*)?$' } }\n  path-collections-plural:\n    message: '{{property}}: a collection is not a plural noun (add irregular plurals and singletons to the list)'\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { match: '^(/([a-zA-Z0-9]*s|people|children|data|media|me|\\{[^}]+\\}))+(:[A-Za-z]+)?$' } }\n  path-nesting-depth:\n    message: '{{property}} is more than {{MAX_LEVELS}} collections deep'\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { notMatch: '^(/[^/{]+(/\\{[^}]+\\})?){{{MAX_LEVELS}}}/[^/{]' } }\n```",
       "hubWhen": {
         "PATHS": [
@@ -699,7 +715,11 @@
       "label": "Contract follows HTTP semantics",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral checks the methods and status codes the OpenAPI document declares against RFC 9110. The verb list is a start; add the verbs of your domain.\n\nThreshold: 0 GET, HEAD or DELETE operations with a request body, 0 responses 201 without a Location header, 0 DELETE operations without a 204 or 202 response, 0 reads of one resource without a 404 response, and 0 paths with a verb as a segment in api/openapi.yaml\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the casing and path rules beside these\nformats: [oas3]\nrules:\n  no-body-on-get-head-delete:\n    severity: error\n    given: '$.paths[*][get,head,delete]'\n    then: { field: requestBody, function: falsy }\n  created-names-location:\n    severity: error\n    given: \"$.paths[*][post,put].responses['201']\"\n    then: { field: headers.Location, function: truthy }\n  delete-answers-204:\n    severity: error\n    given: '$.paths[*].delete.responses'\n    then: { function: or, functionOptions: { properties: ['204', '202'] } }\n  read-declares-404:\n    severity: error\n    given: '$.paths[?(@property.match(/\\}$/))].get.responses'\n    then: { field: '404', function: truthy }\n  no-verb-segments:\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { notMatch: '/(cancel|approve|reject|submit|send|activate|deactivate|archive|restore|publish|retry|start|stop|run|execute)(/|$)' } }\n```"
     },
     {
@@ -708,7 +728,11 @@
       "label": "Running API keeps HTTP semantics",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test (test/api/semantics.test.ts) runs one resource through its life against the application and checks the status codes, headers and formats RFC 9110 and RFC 3339 prescribe. Timestamps are left out of the comparison of the two PUTs, since an update time may move.\n\nThreshold: POST /orders answers 201 with the order and a Location whose GET returns the same order; two GETs and two PUTs of it return the same state; its timestamps end in Z and its id is a string; DELETE answers 204 without a body and the next GET 404 or 410; PATCH /orders answers 405 with Allow naming GET and POST; a text/plain POST answers 415\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\nimport { newOrder } from './fixtures'   // a valid body for POST /orders\n\nconst TIME = /(At|_at|Time|_time)$/\nconst untimed = (body: object) => Object.fromEntries(Object.entries(body).filter(([name]) => !TIME.test(name)))\nit('creates, reads, replaces and deletes as RFC 9110 says', async () => {\n  const { headers: { location: url }, body: posted } = await request(app).post('/orders').send(newOrder()).expect(201)\n  const read = (await request(app).get(url).expect(200)).body\n  expect(read).toEqual(posted)\n  expect(typeof read.id).toBe('string')\n  for (const [name, value] of Object.entries(read)) if (TIME.test(name)) expect(value, name).toMatch(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$/)\n  expect((await request(app).get(url)).body).toEqual(read)\n  const once = (await request(app).put(url).send(read).expect(200)).body\n  expect(untimed((await request(app).put(url).send(read).expect(200)).body)).toEqual(untimed(once))\n  expect((await request(app).delete(url).expect(204)).text).toBe('')\n  expect([404, 410]).toContain((await request(app).get(url)).status)\n})\n\nit('refuses an unsupported method with 405 and Allow, a media type it does not accept with 415', async () => {\n  const wrong = await request(app).patch('/orders').send({}).expect(405)\n  expect(wrong.headers.allow.split(/,\\s*/)).toEqual(expect.arrayContaining(['GET', 'POST']))\n  await request(app).post('/orders').set('Content-Type', 'text/plain').send('id=1').expect(415)\n})\n```"
     },
     {
@@ -717,7 +741,11 @@
       "label": "Custom methods well-formed",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral checks that a path ending in :verb is only called with POST or GET and that the verb is camelCase; the contract check already refuses a verb as a path segment.\n\nThreshold: 0 paths in api/openapi.yaml with a colon that offer PUT, PATCH or DELETE, and 0 custom-method verbs outside camelCase\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the casing, path and contract rules beside these\nformats: [oas3]\nrules:\n  custom-method-post-or-get:\n    severity: error\n    given: '$.paths[?(@property.match(/:/))]'\n    then:\n      - { field: put, function: falsy }\n      - { field: patch, function: falsy }\n      - { field: delete, function: falsy }\n  custom-method-verb-camel-case:\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { match: '^[^:]*(:[a-z][A-Za-z]*)?$' } }\n```",
       "hubWhen": {
         "ACTIONS": [
@@ -731,7 +759,11 @@
       "label": "No action paths",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral refuses custom methods, so an action is either a resource created by POST on its collection or a PATCH of the status field; the contract check already refuses a verb as a path segment.\n\nThreshold: 0 paths in api/openapi.yaml with a colon, and 0 POST operations on a collection without a 201 or 202 response\n\nTool: Spectral CLI (spectral lint api/openapi.yaml --fail-severity=error)\n\n```yaml\n# .spectral.yaml, with the casing, path and contract rules beside these\nformats: [oas3]\nrules:\n  no-custom-methods:\n    severity: error\n    given: '$.paths[*]~'\n    then: { function: pattern, functionOptions: { notMatch: ':' } }\n  post-on-collection-creates:\n    severity: error\n    given: '$.paths[?(!@property.match(/\\}$/))].post.responses'\n    then: { function: or, functionOptions: { properties: ['201', '202'] } }\n```",
       "hubWhen": {
         "ACTIONS": [
@@ -746,7 +778,11 @@
       "label": "Forbidden transitions refused",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test (test/api/transitions.test.ts) reads the transition table from the code, so a new status or transition is tested without editing the test, and tries every pair of statuses with a Merge Patch of the status field.\n\nThreshold: Every transition the lifecycle table allows answers 200; every other one answers 409 and leaves the status as it was\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\nimport { TRANSITIONS } from '../../src/orders/lifecycle'   // { placed: ['paid', 'cancelled'], paid: ['shipped', 'cancelled'], ... }\nimport { orderIn } from './fixtures'                        // creates an order in a status and returns its URL\n\nconst statuses = Object.keys(TRANSITIONS)\nconst pairs = statuses.flatMap((from) => statuses.filter((to) => to !== from).map((to) => ({ from, to, allowed: TRANSITIONS[from].includes(to) })))\nconst patch = (url: string, status: string) =>\n  request(app).patch(url).set('Content-Type', 'application/merge-patch+json').send(JSON.stringify({ status }))\n\nit.each(pairs)('$from → $to (allowed: $allowed)', async ({ from, to, allowed }) => {\n  const url = await orderIn(from)\n  const res = await patch(url, to)\n  expect(res.status).toBe(allowed ? 200 : 409)\n  expect((await request(app).get(url)).body.status).toBe(allowed ? to : from)\n})\n```",
       "hubWhen": {
         "ACTIONS": [
@@ -760,7 +796,11 @@
       "label": "Long work polled to the end",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test (test/api/operations.test.ts) starts the slowest operation the API has, follows Operation-Location at the pace Retry-After sets, and reads an operation the fixtures stored as ended just inside the retention period.\n\nThreshold: A long request answers 202 with an Operation-Location under /operations; every poll shows one of the five statuses, with Retry-After until the end; the work ends within 60 polls; an operation that ended {{OPERATION_DAYS}} days ago less one hour is still readable\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\nimport { operationEndedHoursAgo, startLongRunning } from './fixtures'   // e.g. POST /reports; a stored, finished operation\n\nconst ENDED = ['Succeeded', 'Failed', 'Canceled']\nit('answers 202 and an operation that can be polled to its end', async () => {\n  const started = await startLongRunning(request(app)).expect(202)\n  const monitor = new URL(started.headers['operation-location']).pathname\n  expect(monitor).toMatch(/^\\/operations\\/[^/]+$/)\n  for (let poll = 0; poll < 60; poll++) {\n    const res = await request(app).get(monitor).expect(200)\n    expect([...ENDED, 'NotStarted', 'Running']).toContain(res.body.status)\n    if (res.body.status === 'Failed') expect(res.body.error).toBeDefined()\n    if (ENDED.includes(res.body.status)) return\n    expect(Number(res.headers['retry-after'])).toBeGreaterThan(0)\n    await new Promise((resolve) => setTimeout(resolve, Number(res.headers['retry-after']) * 1000))\n  }\n  throw new Error('the operation did not end within 60 polls')\n})\n\nit('keeps a finished operation readable for {{OPERATION_DAYS}} days', async () => {\n  const id = await operationEndedHoursAgo({{OPERATION_DAYS}} * 24 - 1)\n  await request(app).get('/operations/' + id).expect(200)\n})\n```",
       "hubWhen": {
         "LRO": [
@@ -774,7 +814,11 @@
       "label": "Callbacks signed and retried",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test (test/api/callbacks.test.ts) registers a local receiver that refuses the first delivery, starts a long operation, and verifies each delivery's signature as the Standard Webhooks specification computes it (HMAC-SHA256 over id.timestamp.body with the base64 secret after whsec_). The test allows a plain-http loopback receiver; production registers https URLs only.\n\nThreshold: A long request answers 202; a delivery the receiver refuses with 500 is retried with the same webhook-id; every delivery carries a valid v1 HMAC-SHA256 signature; the retry schedule spans at least {{CALLBACK_HOURS}} hours\n\nTool: Vitest with supertest and node:http (or the test runner and HTTP client of your stack)\n\n```ts\nimport { createHmac } from 'node:crypto'\nimport { createServer, type IncomingHttpHeaders } from 'node:http'\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'\nimport { RETRY_DELAYS_SECONDS } from '../../src/callbacks'      // the delivery schedule of the decision\nimport { registerCallback, startLongRunning } from './fixtures'   // registers the receiver's URL and secret for the test client\nit('posts the outcome signed, and retries a refused delivery with the same id', async () => {\n  const secret = 'whsec_' + Buffer.from('a secret for the test client').toString('base64')\n  const got: Array<{ headers: IncomingHttpHeaders; body: string }> = []\n  const receiver = createServer((req, res) => {\n    let body = ''\n    req.on('data', (chunk) => (body += chunk)).on('end', () => { got.push({ headers: req.headers, body }); res.writeHead(got.length === 1 ? 500 : 204).end() })\n  }).listen(0)\n  await registerCallback('http://127.0.0.1:' + (receiver.address() as { port: number }).port + '/done', secret)\n  await startLongRunning(request(app)).expect(202)\n  await expect.poll(() => got.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(2)\n  for (const { headers, body } of got) {\n    const signed = createHmac('sha256', Buffer.from(secret.slice('whsec_'.length), 'base64')).update(headers['webhook-id'] + '.' + headers['webhook-timestamp'] + '.' + body).digest('base64')\n    expect(String(headers['webhook-signature']).split(' ')).toContain('v1,' + signed)\n  }\n  expect(got[1].headers['webhook-id']).toBe(got[0].headers['webhook-id'])\n  expect(RETRY_DELAYS_SECONDS.reduce((sum, s) => sum + s, 0)).toBeGreaterThanOrEqual({{CALLBACK_HOURS}} * 3600)\n  receiver.close()\n})\n```",
       "hubWhen": {
         "LRO": [
@@ -788,7 +832,10 @@
       "label": "Slow routes alerted",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A Prometheus alerting rule over the OpenTelemetry HTTP server duration histogram computes, per route, the share of requests slower than the limit. The limit must be a bucket boundary of the histogram (the OpenTelemetry default boundaries end at 10 seconds); le is matched with and without .0, since Prometheus 3 may write bucket bounds as floats.\n\nThreshold: An alert fires for any route where more than 1% of requests took longer than {{SYNC_SECONDS}} seconds over 5 minutes, sustained for 15 minutes\n\nTool: Prometheus alerting rules (promtool check rules), on the http.server.request.duration metric of OpenTelemetry\n\n```yaml\n# prometheus/rules/api-resource-design.yml\ngroups:\n  - name: api-resource-design\n    rules:\n      - alert: RequestsSlowerThanTheLimit\n        expr: |\n          1 - (\n            sum by (http_route) (rate(http_server_request_duration_seconds_bucket{job=\"order-api\", le=~\"{{SYNC_SECONDS}}|{{SYNC_SECONDS}}.0\"}[5m]))\n            / sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"order-api\"}[5m]))\n          ) > 0.01\n        for: 15m\n        labels:\n          severity: ticket\n        annotations:\n          summary: 'More than 1% of {{ $labels.http_route }} takes over {{SYNC_SECONDS}} s: make it faster or a long-running operation'\n```"
     }
   ],

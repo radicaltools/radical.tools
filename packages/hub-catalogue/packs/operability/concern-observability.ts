@@ -176,7 +176,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-sli-request', label: 'Request indicator recorded', when: { SLI: ['request'] }, category: 'operational', implements: SIGNAL_ADRS,
+      id: 'ff-sli-request', label: 'Request indicator recorded', when: { SLI: ['request'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SIGNAL_ADRS,
       checks: ['req-sli-request'],
       threshold: 'The good and total request rates are recorded from the edge metrics; a unit test over the rules counts a 200 as good, a 500 as bad and a 404 as invalid',
       description: 'Recording rules in the repository compute the good and total request rates from the server\'s request histogram, leaving 4xx answers out; promtool runs a unit test over them in the pipeline with synthetic series, so a change that counts a 500 as good or a 404 as a request fails the build. The Availability pack\'s SLO spec uses the same queries. The metric is the OpenTelemetry HTTP server metric as Prometheus names it; for Micrometer, read http_server_requests_seconds_count with the label status instead, in the rules and the test alike.',
@@ -213,7 +213,7 @@ tests:
             value: 0.75`,
     },
     {
-      id: 'ff-probe', label: 'Probes measure availability', when: { SLI: ['probes'] }, category: 'operational', implements: SIGNAL_ADRS,
+      id: 'ff-probe', label: 'Probes measure availability', when: { SLI: ['probes'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: SIGNAL_ADRS,
       checks: ['req-sli-probe'],
       threshold: 'A probe every 60 s from at least 2 locations outside the network, scraped by one Prometheus; a minute is recorded as down when 2 or more locations fail it',
       description: 'A Blackbox exporter runs in each of at least two locations outside the element\'s network and probes a real read path every minute; one central Prometheus scrapes both exporters with a location label per target, so the recording rule sees every location in one evaluation and marks a minute down when two or more fail. The recorded series is the raw indicator the Availability pack\'s SLO spec reads.',
@@ -259,7 +259,7 @@ groups:
 #   sli: { raw: { error_ratio_query: 1 - avg_over_time(order_api:probe_up:minute[{{.window}}]) } }`,
     },
     {
-      id: 'ff-paging', label: 'Pages reach on-call', when: { ONCALL: ['oncall'] }, category: 'process', implements: ['adr-oncall'],
+      id: 'ff-paging', label: 'Pages reach on-call', when: { ONCALL: ['oncall'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-oncall'],
       checks: ['req-alert'],
       threshold: 'Every alert with severity page routes to the on-call receiver; 0 cause alerts (severity ticket) do; the configuration is valid',
       description: 'A pipeline step tests the Alertmanager routing tree whenever its configuration changes: page alerts must reach the on-call receiver (PagerDuty), ticket alerts must not.',
@@ -285,7 +285,7 @@ receivers:
     amtool config routes test --config.file=alertmanager.yml --verify.receivers=tickets severity=ticket service=order-api`,
     },
     {
-      id: 'ff-escalation', label: 'Escalation policy as code', when: { ONCALL: ['oncall'] }, category: 'process', implements: ['adr-oncall'],
+      id: 'ff-escalation', label: 'Escalation policy as code', when: { ONCALL: ['oncall'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-oncall'],
       checks: ['req-escalate'],
       threshold: 'The escalation policy in Terraform escalates after 5 minutes to the secondary and after 10 more to the team lead; terraform plan reports no drift from it',
       description: 'The PagerDuty escalation policy is kept in Terraform with the delays the decision names; the pipeline validates it on every change and a nightly plan fails on drift, so a delay changed by hand in the console is caught. incident.io On-call (the incident-io/incident provider), Grafana IRM (the grafana/grafana provider\'s grafana_oncall_* resources) and Jira Service Management (the atlassian/atlassian-operations provider) have Terraform providers with the same shape; Opsgenie is left out because Atlassian ends its support on 5 April 2027.',
@@ -320,7 +320,7 @@ receivers:
 # CI: terraform validate; nightly: terraform plan -detailed-exitcode (2 = drift, fails the job)`,
     },
     {
-      id: 'ff-hours-routing', label: 'Night alerts become tickets, the status page knows', when: { ONCALL: ['hours'] }, category: 'process', implements: ['adr-hours'],
+      id: 'ff-hours-routing', label: 'Night alerts become tickets, the status page knows', when: { ONCALL: ['hours'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-hours'],
       checks: ['req-alert', 'req-hours'],
       threshold: 'Page alerts match the status-page, team-channel and tickets receivers in the routing tree, in that order; the status-page route sets group_wait to at most 1 minute; the configuration is valid',
       description: 'The Alertmanager routing sends page alerts to the status page\'s webhook within a minute, to the team channel during the working-hours time interval and to tickets outside it; a pipeline step validates the configuration and the receivers with amtool whenever it changes, and reads the status-page route\'s group_wait with yq. --verify.receivers compares the receivers comma-joined in route order, so the list follows the order of the routes. amtool does not evaluate time intervals, so the channel-or-ticket split is confirmed once after a change by adding a test alert (amtool alert add severity=page) outside hours and seeing the ticket.',
@@ -364,7 +364,7 @@ receivers:
     [[ "$wait" =~ ^([0-9]|[1-5][0-9]|60)s$|^1m$ ]] || { echo "status-page route waits $wait, more than 1 minute"; exit 1; }`,
     },
     {
-      id: 'ff-retention', label: 'Log retention enforced', category: 'structural', implements: SIGNAL_ADRS,
+      id: 'ff-retention', label: 'Log retention enforced', characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: SIGNAL_ADRS,
       checks: ['req-retention'],
       threshold: 'Retention set to {{LOG_DAYS}} days in the log store; a monthly query for lines older than {{LOG_DAYS}} days plus 1 returns 0 lines',
       description: 'The log store\'s retention is in the repository and reviewed; a monthly job queries the day before the retention boundary (one day of slack for the compactor\'s delete delay) and fails when any line comes back. CloudWatch Logs and Elasticsearch ILM take the same number; the query step uses their CLI instead of logcli.',
@@ -394,7 +394,7 @@ jobs:
           test "$lines" -eq 0 || { echo "::error::log lines older than {{LOG_DAYS}} days are still kept"; exit 1; }`,
     },
     {
-      id: 'ff-trace-propagation', label: 'Traces stay whole', when: OTEL, category: 'structural', implements: ['adr-otel'],
+      id: 'ff-trace-propagation', label: 'Traces stay whole', when: OTEL, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-otel'],
       checks: ['req-trace'],
       threshold: 'A request through the element and its outgoing calls yields exactly 1 trace id, with as many client spans as outgoing calls, each carrying the traceparent',
       description: 'An integration test registers the HTTP instrumentation before the app is loaded, serves the app on a port of its own, sends it a request with a known traceparent, lets the element make its outgoing calls to a stub, and checks that every finished span carries that trace id, that there is a client span per call, and that the stub received the traceparent header on each. The instrumentation patches http in the test process too, so the test\'s own request to the app is excluded by its port (ignoreOutgoingRequestHook): otherwise it would get a client span in a fresh trace and its traceparent would be overwritten. Under Vitest the modules are ES modules, which the instrumentation does not see being loaded; requiring node:http once after registering applies the patch to the module object the app shares (an app that imports named functions from node:http needs the instrumentation\'s ESM hook, node --import with @opentelemetry/instrumentation/hook.mjs, instead).',
@@ -438,7 +438,7 @@ it('keeps one trace across the element and its outgoing calls', async () => {
 })`,
     },
     {
-      id: 'ff-head-sampling', label: 'SDK samples at the root', when: { SIGNALS: ['otel'], SAMPLING: ['head'] }, category: 'structural', implements: ['adr-otel'],
+      id: 'ff-head-sampling', label: 'SDK samples at the root', when: { SIGNALS: ['otel'], SAMPLING: ['head'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-otel'],
       checks: ['req-sample-head'],
       threshold: 'Every container of the element\'s Deployments, StatefulSets and DaemonSets sets OTEL_TRACES_SAMPLER=parentbased_traceidratio and OTEL_TRACES_SAMPLER_ARG to {{SAMPLE_PERCENT}} / 100, directly or from a ConfigMap in the same manifests',
       description: 'A policy over all the rendered manifests at once fails the pipeline when a container does not configure the SDK\'s parent-based trace-id-ratio sampler with the agreed share; parent-based means only the first element decides and the others follow. A value is read from env (value, or valueFrom.configMapKeyRef) or from a ConfigMap the container takes whole with envFrom, so the ConfigMaps must be among the manifests checked; an unset ratio counts as the SDK\'s default of 1. On other platforms the same two variables go in the service\'s environment and the same check reads it.',
@@ -491,7 +491,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-tail-sampling', label: 'Error traces always kept', when: { SIGNALS: ['otel'], SAMPLING: ['tail'] }, category: 'operational', implements: ['adr-otel'],
+      id: 'ff-tail-sampling', label: 'Error traces always kept', when: { SIGNALS: ['otel'], SAMPLING: ['tail'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-otel'],
       checks: ['req-sample-tail'],
       threshold: 'The Collector\'s tail sampling policy keeps traces with an error status or slower than {{SLOW_TRACE_MS}} ms and {{SAMPLE_PERCENT}} % of the rest; the configuration validates',
       description: 'The Collector\'s configuration, with its tail sampling policy, is kept in the repository whole (receivers, processors, exporters and the traces pipeline) and validated with the Collector\'s own validate command in the pipeline, so a mistyped field or a component the pipeline names but nobody defines fails the build before it runs; reviewing the policy against the threshold is part of the change.',
@@ -530,7 +530,7 @@ service:
       exporters: [otlp]`,
     },
     {
-      id: 'ff-keep-all', label: 'Nothing sampled, kept 7 days', when: { SIGNALS: ['otel'], SAMPLING: ['all'] }, category: 'structural', implements: ['adr-otel'],
+      id: 'ff-keep-all', label: 'Nothing sampled, kept 7 days', when: { SIGNALS: ['otel'], SAMPLING: ['all'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-otel'],
       checks: ['req-sample-all'],
       threshold: 'Every container of the element (at least one) sets the SDK sampler to always_on, the Collector\'s traces pipeline has no sampling processor, and the trace store keeps blocks for at least 168 h',
       description: 'A pipeline step reads the element\'s manifest, the Collector configuration and the trace store\'s configuration from the repository and fails when any of the three would drop or expire traces early. For a hosted backend, the retention check reads the backend\'s settings API instead.',
@@ -545,7 +545,7 @@ yq -e '[.service.pipelines.traces.processors[] | select(test("sampl"))] | length
 yq -e '.compactor.compaction.block_retention | sub("h", "") | tonumber >= 168' tempo.yaml`,
     },
     {
-      id: 'ff-health', label: 'Probes declared', category: 'structural', implements: SIGNAL_ADRS,
+      id: 'ff-health', label: 'Probes declared', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SIGNAL_ADRS,
       checks: ['req-health'],
       threshold: '0 deployed containers without a liveness and a readiness probe',
       description: 'A policy over the Kubernetes manifests fails the pipeline when a container of the element has no liveness or no readiness probe. On a managed runtime, the health check path of the service is set in its configuration and the same policy reads that.',

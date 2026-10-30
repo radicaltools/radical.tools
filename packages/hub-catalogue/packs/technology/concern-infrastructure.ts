@@ -20,7 +20,7 @@ const COMMON = 'The infrastructure is code, written and checked as the infrastru
 /** The budget-exists check, one per public cloud. */
 function budget(cloud: string, label: string, tool: string, snippet: string): FitnessSpec {
   return {
-    id: `ff-budget-${cloud}`, label: `Budget alert in place (${label})`, when: { CLOUD: [cloud] }, category: 'operational', implements: ['adr-budget'], checks: ['req-budget'],
+    id: `ff-budget-${cloud}`, label: `Budget alert in place (${label})`, when: { CLOUD: [cloud] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-budget'], checks: ['req-budget'],
     threshold: `A monthly cost budget of {{BUDGET_MONTHLY}} with a forecast alert at {{BUDGET_ALERT_PERCENT}}% or lower exists in the account the element runs in`,
     description: `A scheduled job reads the account's budgets through the cloud's CLI and fails when none is a monthly cost budget of {{BUDGET_MONTHLY}} with an enabled forecast notification at {{BUDGET_ALERT_PERCENT}}% or lower; the budget itself is part of the infrastructure code. One budget per account: bind this pack's budget details once per account, not per element.`,
     tool,
@@ -32,7 +32,7 @@ function budget(cloud: string, label: string, tool: string, snippet: string): Fi
 /** The minimum-instances and autoscaling check of a managed container platform, one per public cloud. */
 function paas(cloud: string, platform: string, tool: string, snippet: string): FitnessSpec {
   return {
-    id: `ff-paas-${cloud}`, label: `Scaled on ${platform}`, when: { HOSTING: ['paas'], CLOUD: [cloud] }, category: 'operational', implements: ['adr-paas'], checks: ['req-paas'],
+    id: `ff-paas-${cloud}`, label: `Scaled on ${platform}`, when: { HOSTING: ['paas'], CLOUD: [cloud] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-paas'], checks: ['req-paas'],
     threshold: `The production service runs at least 2 instances and autoscales above that minimum`,
     description: `A check after each deploy reads the production service's scaling settings from ${platform} and fails when fewer than 2 instances are kept or no autoscaling range exists above them.`,
     tool,
@@ -44,7 +44,7 @@ function paas(cloud: string, platform: string, tool: string, snippet: string): F
 /** The functions-bounded check, one per public cloud. */
 function functions(cloud: string, platform: string, threshold: string, description: string, tool: string, snippet: string): FitnessSpec {
   return {
-    id: `ff-functions-${cloud}`, label: `${platform} functions bounded`, when: { HOSTING: ['serverless'], CLOUD: [cloud] }, category: 'structural', implements: ['adr-serverless'], checks: ['req-functions'],
+    id: `ff-functions-${cloud}`, label: `${platform} functions bounded`, when: { HOSTING: ['serverless'], CLOUD: [cloud] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-serverless'], checks: ['req-functions'],
     threshold, description, tool, language: 'bash', snippet,
   }
 }
@@ -53,7 +53,7 @@ function functions(cloud: string, platform: string, threshold: string, descripti
  *  (and per answer that picks the tool). */
 function ephemeral(iac: string, whens: Array<{ suffix: string; when: When }>, label: string, description: string, tool: string, snippet: string): FitnessSpec[] {
   return whens.map(({ suffix, when }) => ({
-    id: `ff-ephemeral-${iac}${suffix}`, label: `No forgotten environments (${label})`, when: { ENVIRONMENTS: ['ephemeral'], HOSTING: NOT_K8S, ...when }, category: 'operational', implements: ['adr-paas', 'adr-serverless', 'adr-vms', 'adr-cdn', 'adr-onprem-platform'], checks: ['req-ephemeral'],
+    id: `ff-ephemeral-${iac}${suffix}`, label: `No forgotten environments (${label})`, when: { ENVIRONMENTS: ['ephemeral'], HOSTING: NOT_K8S, ...when }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-paas', 'adr-serverless', 'adr-vms', 'adr-cdn', 'adr-onprem-platform'], checks: ['req-ephemeral'],
     threshold: '0 ephemeral environments alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours',
     description: `${description} Runs on Linux (GNU date).`,
     tool, language: 'bash', snippet,
@@ -85,7 +85,7 @@ const k8sRequirement = (id: string, when: When): RequirementSpec => ({
 })
 
 const checkov = ({ suffix, when, adr }: (typeof TERRAFORM)[number]): FitnessSpec => ({
-  id: `ff-checkov${suffix}`, label: 'Plans pass policy', when, category: 'structural', implements: [adr], checks: ['req-policy'],
+  id: `ff-checkov${suffix}`, label: 'Plans pass policy', when, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [adr], checks: ['req-policy'],
   threshold: '0 failed Checkov checks of the baseline (encryption, public access, open admin ports) and 0 taggable resources without owner, environment and cost-centre tags (labels on Google Cloud) in the plan of every pull request',
   description: 'Checkov scans the Terraform plan in every pull request with its built-in checks and a custom tagging policy over every taggable resource type of every provider (AWS and Azure resources carry tags, Google Cloud resources labels), and fails on any finding. Rules of your own go into Conftest policies over the same plan JSON.',
   tool: 'Checkov',
@@ -111,7 +111,7 @@ definition:
 })
 
 const terraformDrift = ({ suffix, when, adr }: (typeof TERRAFORM)[number]): FitnessSpec => ({
-  id: `ff-drift-terraform${suffix}`, label: 'Drift detected', when, category: 'operational', implements: [adr], checks: ['req-drift', 'req-iac'],
+  id: `ff-drift-terraform${suffix}`, label: 'Drift detected', when, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [adr], checks: ['req-drift', 'req-iac'],
   threshold: 'A drift check every {{DRIFT_HOURS}} hours per environment; 0 unexplained differences between code and infrastructure',
   description: 'A scheduled pipeline runs a refresh-only plan in each environment\'s root; exit code 2 means the infrastructure differs from the code, and the job opens an issue for the owning team.',
   tool: 'Terraform (plan -detailed-exitcode) with the GitHub CLI',
@@ -129,7 +129,7 @@ esac`,
 })
 
 const infracost = (id: string, when: When, req: string): FitnessSpec => ({
-  id, label: 'Cost change in review', when, category: 'process', implements: ['adr-budget'], checks: [req],
+  id, label: 'Cost change in review', when, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: ['adr-budget'], checks: [req],
   threshold: '100% of infrastructure pull requests show the monthly cost change; above {{COST_STEP}} a month the check fails until the pull request carries the label budget-approved',
   description: 'Infracost compares the cost of the pull request\'s Terraform with the main branch and comments the difference; the step then fails above the limit unless the budget owner has added the label budget-approved, which only they may add (a CODEOWNERS-protected label rule or a workflow that checks who added it).',
   tool: 'Infracost with the GitHub CLI',
@@ -145,7 +145,7 @@ approved=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' | grep -cx 
 })
 
 const kubeScore = (id: string, when: When, adr: string, req: string): FitnessSpec => ({
-  id, label: 'Manifests well specified', when, category: 'structural', implements: [adr], checks: [req],
+  id, label: 'Manifests well specified', when, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [adr], checks: [req],
   threshold: '0 critical kube-score findings in the rendered manifests (CPU and memory requests, memory limit, probes, replicas, PodDisruptionBudget, non-root user and group, read-only root file system, and kube-score\'s correctness checks), with the default checks the requirement does not ask for switched off',
   description: 'The rendered manifests of every chart or overlay are scored in each pull request; a critical finding fails the build. The chart renders its PodDisruptionBudget with the Deployment, so the deployment-has-poddisruptionbudget check sees both; the user-and-group and read-only-root-file-system checks are on by default in current kube-score. The defaults that ask for more than the requirement (a CPU limit, ephemeral-storage requests and limits, pull policy Always, a NetworkPolicy per pod, host anti-affinity) are switched off; network reachability is not decided in this pack.',
   tool: 'kube-score',
@@ -392,7 +392,7 @@ const pack: PackSpec = {
   fitness: [
     ...TERRAFORM.map(checkov),
     {
-      id: 'ff-checkov-native', label: 'Templates pass policy', when: NATIVE, category: 'structural', implements: ['adr-iac-native'], checks: ['req-policy'],
+      id: 'ff-checkov-native', label: 'Templates pass policy', when: NATIVE, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-iac-native'], checks: ['req-policy'],
       threshold: '0 failed Checkov checks of the baseline (encryption, public access, open admin ports) in the CloudFormation or Bicep templates of every pull request',
       description: 'Checkov scans the CloudFormation (synthesised from the CDK with cdk synth) or Bicep templates under infra/ in every pull request with its built-in checks and fails on any finding. Tags are enforced at deploy time by the cloud (AWS Organizations tag policies, Azure Policy "Require a tag on resources"), not by this check.',
       tool: 'Checkov',
@@ -403,7 +403,7 @@ set -euo pipefail
 checkov --directory infra --framework cloudformation,bicep --compact`,
     },
     {
-      id: 'ff-crossguard', label: 'Previews pass policy', when: { IAC: ['pulumi'] }, category: 'structural', implements: ['adr-iac-pulumi'], checks: ['req-policy'],
+      id: 'ff-crossguard', label: 'Previews pass policy', when: { IAC: ['pulumi'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-iac-pulumi'], checks: ['req-policy'],
       threshold: '0 mandatory policy violations in the preview of every pull request: missing owner, environment or cost-centre tags on the listed resource types, public storage',
       description: 'A Pulumi CrossGuard policy pack runs with every preview and update and stops on a mandatory violation. The tag rule covers the listed resource types of AWS, Azure and Google Cloud (labels there); the public-storage rule knows each cloud\'s bucket setting. Extend the lists with the resource types the stacks use.',
       tool: 'Pulumi CrossGuard (@pulumi/policy)',
@@ -446,7 +446,7 @@ new PolicyPack('baseline', {
     },
     ...TERRAFORM.map(terraformDrift),
     {
-      id: 'ff-drift-pulumi', label: 'Drift detected', when: { IAC: ['pulumi'] }, category: 'operational', implements: ['adr-iac-pulumi'], checks: ['req-drift', 'req-iac'],
+      id: 'ff-drift-pulumi', label: 'Drift detected', when: { IAC: ['pulumi'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-iac-pulumi'], checks: ['req-drift', 'req-iac'],
       threshold: 'A drift check every {{DRIFT_HOURS}} hours per stack; 0 unexplained differences between code and infrastructure',
       description: 'A scheduled pipeline refreshes each stack in preview and fails when anything changed outside the code; Pulumi Deployments can run the same as a scheduled drift detection.',
       tool: 'Pulumi (preview --refresh --expect-no-changes)',
@@ -458,7 +458,7 @@ pulumi stack select "$STACK"
 pulumi preview --refresh --expect-no-changes --diff --non-interactive`,
     },
     {
-      id: 'ff-drift-native', label: 'Drift detected', when: NATIVE, category: 'operational', implements: ['adr-iac-native'], checks: ['req-drift', 'req-iac'],
+      id: 'ff-drift-native', label: 'Drift detected', when: NATIVE, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-iac-native'], checks: ['req-drift', 'req-iac'],
       threshold: 'A drift check every {{DRIFT_HOURS}} hours; 0 CloudFormation stacks in DRIFTED state, 0 resources a Bicep what-if would change',
       description: 'A scheduled job runs the part for the cloud in use (the CLOUD variable of the pipeline): on AWS it starts CloudFormation drift detection on every stack and fails when one is DRIFTED; on Azure it runs a what-if of the deployed Bicep template against the resource group and fails on any change other than NoChange or Ignore.',
       tool: 'AWS CloudFormation drift detection (AWS CLI); Azure: az deployment group what-if',
@@ -578,7 +578,7 @@ while IFS=, read -r name max trigger retry; do
 done < <(gcloud functions list --v2 --format='csv[no-heading](name, serviceConfig.maxInstanceCount, eventTrigger.trigger, eventTrigger.retryPolicy)')
 exit $fail`),
     {
-      id: 'ff-image-age', label: 'No machine on an old image', when: { HOSTING: ['vms'] }, category: 'operational', implements: ['adr-vms'], checks: ['req-images'],
+      id: 'ff-image-age', label: 'No machine on an old image', when: { HOSTING: ['vms'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-vms'], checks: ['req-images'],
       threshold: '0 machines whose image was built more than 30 days ago; the alert opens a ticket after 1 hour',
       description: 'Packer bakes the build time into /etc/image-release; at boot, cloud-init writes it as a node_exporter textfile metric, and a Prometheus rule fires for any machine whose image is older than 30 days, in every cloud and on premises alike.',
       tool: 'Prometheus with node_exporter (textfile collector)',
@@ -596,7 +596,7 @@ groups:
           summary: "{{ $labels.instance }} runs an image built {{ $value | humanizeDuration }} ago; replace it from the current image"`,
     },
     {
-      id: 'ff-cdn-origin', label: 'Only through the CDN', when: { HOSTING: ['cdn'] }, category: 'operational', implements: ['adr-cdn'], checks: ['req-cdn'],
+      id: 'ff-cdn-origin', label: 'Only through the CDN', when: { HOSTING: ['cdn'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-cdn'], checks: ['req-cdn'],
       threshold: 'The site answers over TLS with an HSTS header; its page with Cache-Control no-cache (or max-age=0 with must-revalidate) and a content-hashed asset with max-age=31536000; the origin answers a direct request for the page with 403, 404 or 409',
       description: 'A check after each deploy fetches the page and one content-hashed asset of the build through the CDN and reads their headers against adr-cdn\'s caching rule (hashed assets cached for a year, the page revalidated), then requests the page directly from the origin bucket\'s URL and expects it refused: 403 or 404 from S3 and Cloud Storage, 409 (PublicAccessNotPermitted) from Azure Blob Storage with public access off.',
       tool: 'curl (post-deploy check)',
@@ -618,7 +618,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$ORIGIN_URL/index.html")
   || { echo "origin $ORIGIN_URL answers $code to a direct request (must refuse)"; exit 1; }`,
     },
     {
-      id: 'ff-ephemeral-k8s', label: 'No forgotten environments (namespaces)', when: { ENVIRONMENTS: ['ephemeral'], HOSTING: ['kubernetes'] }, category: 'operational', implements: ['adr-kubernetes'], checks: ['req-ephemeral'],
+      id: 'ff-ephemeral-k8s', label: 'No forgotten environments (namespaces)', when: { ENVIRONMENTS: ['ephemeral'], HOSTING: ['kubernetes'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-kubernetes'], checks: ['req-ephemeral'],
       threshold: '0 ephemeral namespaces alive after their pull request closed or idle for more than {{EPHEMERAL_HOURS}} hours',
       description: 'A scheduled job lists the namespaces labelled as ephemeral, deletes those whose pull request is closed or whose last deploy (an annotation the deploy writes) is past the limit, and reports what it removed. Runs on Linux (GNU date).',
       tool: 'kubectl with the GitHub CLI (scheduled job)',
@@ -685,7 +685,7 @@ case "$CLOUD" in
     done ;;
 esac`),
     {
-      id: 'ff-parity', label: 'Environments share their code', category: 'structural', implements: HOSTINGS, checks: ['req-parity'],
+      id: 'ff-parity', label: 'Environments share their code', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: HOSTINGS, checks: ['req-parity'],
       threshold: 'The test environment\'s and production\'s folders under envs/ differ only in their variable files',
       description: 'A check in every pull request compares the test environment\'s root with production\'s, ignoring the variable files of the tool in use (tfvars, Pulumi stack configuration, Bicep or CloudFormation parameter files); any other difference, a module version or an extra resource, fails it.',
       tool: 'diff (CI job)',
@@ -699,7 +699,7 @@ diff -rq "envs/\${TEST_ENV:-staging}" envs/production \\
   || { echo "the environments differ beyond their variable files (above)"; exit 1; }`,
     },
     {
-      id: 'ff-promote', label: 'Only the tested digest reaches production', when: { ENVIRONMENTS: ['staged', 'ephemeral'] }, category: 'process', implements: HOSTINGS, checks: ['req-staging'],
+      id: 'ff-promote', label: 'Only the tested digest reaches production', when: { ENVIRONMENTS: ['staged', 'ephemeral'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: HOSTINGS, checks: ['req-staging'],
       threshold: 'The digest the production deploy job deploys equals the digest recorded by the latest staging deployment; any other digest fails the job',
       description: 'The staging deploy job records the image digest in the payload of the GitHub deployment it creates; the production deploy job reads the latest staging deployment\'s payload and refuses to continue with any other digest, so production never gets a rebuild or a newer image than staging tested.',
       tool: 'GitHub CLI (deployments API) in the deploy pipeline',

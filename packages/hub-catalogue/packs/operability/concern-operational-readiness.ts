@@ -217,7 +217,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-prr-gate', label: 'Production deployment waits for an approved review', when: REVIEWED, category: 'process', implements: REVIEW_ADRS, checks: ['req-prr-gate', 'req-prr-gaps'],
+      id: 'ff-prr-gate', label: 'Production deployment waits for an approved review', when: REVIEWED, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'manual', implements: REVIEW_ADRS, checks: ['req-prr-gate', 'req-prr-gaps'],
       threshold: 'The newest record under docs/operations/prr is approved, names a reviewer and is at most {{PRR_MONTHS}} months old, and every gap in it has a ticket and a due date within {{GAP_DAYS}} days of the review; otherwise the production deployment stops',
       description: 'The production deployment job runs this script before its deploy step (needs: in GitHub Actions, a stage before deploy in GitLab CI), so the first production deployment waits for an approved review and a stale one stops the next. Each record is docs/operations/prr/YYYY-MM-DD.md with YAML front matter: result (approved or not-approved), reviewer, dependencies (labels of the elements it calls, as in the architecture model) and gaps (item, ticket, due).',
       tool: 'Node.js script with js-yaml, run by the production deployment job',
@@ -247,7 +247,7 @@ for (const gap of record.gaps ?? []) {
 console.log(\`readiness review \${file}: approved by \${record.reviewer}\`)`,
     },
     {
-      id: 'ff-prr-signoff', label: 'Review records need the signing team', when: { PRR: ['sre'] }, category: 'structural', implements: ['adr-prr-sre'], checks: ['req-prr-signoff'],
+      id: 'ff-prr-signoff', label: 'Review records need the signing team', when: { PRR: ['sre'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-prr-sre'], checks: ['req-prr-signoff'],
       threshold: 'The last line of .github/CODEOWNERS gives /docs/operations/prr/ to {{PRR_TEAM}}, and the rules of the main branch include a pull_request rule with require_code_owner_review true',
       description: 'A pull request adding a review record can only merge with an approval from a code owner of the records, and GitHub does not let authors approve their own pull requests, so the approval of a {{PRR_TEAM}} member is the signature. The step checks both halves on every change to CODEOWNERS and nightly, since the ruleset can be changed in the settings. In CODEOWNERS the last matching pattern wins, so the line must come last.',
       tool: 'GitHub CODEOWNERS and repository rulesets, checked with grep and gh api (GET /repos/{owner}/{repo}/rules/branches/{branch})',
@@ -264,7 +264,7 @@ gh api 'repos/{owner}/{repo}/rules/branches/main' \\
   | grep -qx true || { echo "main does not require a code owner's review"; exit 1; }`,
     },
     {
-      id: 'ff-prr-checklist', label: 'Checklist complete and linked', when: REVIEWED, category: 'structural', implements: REVIEW_ADRS, checks: ['req-prr-checklist'],
+      id: 'ff-prr-checklist', label: 'Checklist complete and linked', when: REVIEWED, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REVIEW_ADRS, checks: ['req-prr-checklist'],
       threshold: 'docs/operations/prr-checklist.md has the 10 sections, and every second-level section holds at least one Markdown link',
       description: 'A CI step on every change to the checklist checks that its ten sections are there and that each links to the decision or the latest record it rests on (the availability objective, the alert rules, the last load test, the last restore and rollback drills, the incident process), so the checklist points to the neighbouring packs\' records instead of copying their numbers.',
       tool: 'grep and awk in a CI step',
@@ -282,7 +282,7 @@ unlinked=$(awk '/^## /{ if (s && !l) print s; s = $0; l = 0; next } /\\]\\(/{ l 
 exit $status`,
     },
     {
-      id: 'ff-prr-dependencies', label: 'Review covers every dependency in the model', when: REVIEWED, category: 'structural', implements: REVIEW_ADRS, checks: ['req-prr-major'],
+      id: 'ff-prr-dependencies', label: 'Review covers every dependency in the model', when: REVIEWED, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REVIEW_ADRS, checks: ['req-prr-major'],
       threshold: '0 elements the model shows the element calling (interacts relations from it) that the newest review record does not list under dependencies',
       description: 'On every pull request that changes architecture/ or the review records, a script reads the architecture model (the front matter of each element under architecture/nodes and architecture/relations.json), lists the elements the element calls, and fails when the newest review does not list one of them: a new dependency in the model asks for a new review in the same pull request. A new region, a higher target or a new owner is not visible this way; the decision names them, and the age limit of the gate catches what is missed.',
       tool: 'Node.js script with js-yaml over the Radical Markdown folder',
@@ -311,7 +311,7 @@ if (unreviewed.length) {
 }`,
     },
     {
-      id: 'ff-runbook-links', label: 'Every alert links a runbook that resolves', category: 'structural', implements: MAIN_ADRS, checks: ['req-runbook-alert', 'req-runbook-element'],
+      id: 'ff-runbook-links', label: 'Every alert links a runbook that resolves', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN_ADRS, checks: ['req-runbook-alert', 'req-runbook-element'],
       threshold: '0 alerting rules under monitoring/rules without a runbook_url, with one outside docs/runbooks or to a missing file or heading, or with one another alert uses',
       description: 'A CI step on every change to the rules or the runbooks reads every Prometheus rule file (groups at the top) and PrometheusRule manifest (groups under spec), and resolves each alert\'s runbook_url annotation to a file in the repository and, when it has an anchor, to a heading in that file (GitHub\'s heading anchors: lower case, punctuation dropped, spaces as dashes). Alerts of the same name at two severities may share a runbook. Alert rules that Sloth generates take the annotation from the SLO\'s alerting annotations. promtool check rules still validates the files themselves; runbook_url is an annotation by convention, which Prometheus passes on but does not check.',
       tool: 'Node.js script with js-yaml, beside promtool check rules',
@@ -341,7 +341,7 @@ for (const file of readdirSync('monitoring/rules').filter((f) => /\\.ya?ml$/.tes
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-runbook-review', label: 'Runbooks reviewed on time', category: 'process', implements: [...MAIN_ADRS, 'adr-no-practice'], checks: ['req-runbook-review'],
+      id: 'ff-runbook-review', label: 'Runbooks reviewed on time', characteristic: 'reliability', scope: 'atomic', cadence: 'temporal', every: '{{RUNBOOK_DAYS}}d', invocation: 'manual', implements: [...MAIN_ADRS, 'adr-no-practice'], checks: ['req-runbook-review'],
       threshold: '0 runbooks under docs/runbooks whose last_reviewed is missing or older than {{RUNBOOK_DAYS}} days, and 0 without a diagnosis, a mitigation and an escalation heading',
       description: 'A daily scheduled job reads the last_reviewed date from each runbook\'s front matter and checks that it has headings for diagnosis, mitigation and escalation; a failure notifies the owning team. Reviewing a runbook after an incident means updating the date in the same pull request as the correction.',
       tool: 'Node.js script with js-yaml in a scheduled CI job',
@@ -364,7 +364,7 @@ for (const file of readdirSync('docs/runbooks').filter((f) => f.endsWith('.md'))
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-gameday', label: 'Game days on record', when: { PRACTICE: ['gameday'] }, category: 'process', implements: ['adr-gamedays'], checks: ['req-gameday'],
+      id: 'ff-gameday', label: 'Game days on record', when: { PRACTICE: ['gameday'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'temporal', every: '{{GAMEDAY_DAYS}}d', invocation: 'manual', implements: ['adr-gamedays'], checks: ['req-gameday'],
       threshold: 'The newest record under docs/gamedays is at most {{GAMEDAY_DAYS}} days old; every record has a scenario, a hypothesis, an outcome and at least 2 participants, and every finding a ticket',
       description: 'Each game day is recorded as docs/gamedays/YYYY-MM-DD.md with YAML front matter: scenario, hypothesis, participants, outcome and findings (text, ticket). A daily scheduled job fails, and notifies the owning team, when the newest record is too old or a record is incomplete.',
       tool: 'Node.js script with js-yaml in a scheduled CI job',
@@ -387,7 +387,7 @@ for (const file of records) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-chaos-guarded', label: 'Every experiment has a stop condition', when: { PRACTICE: ['chaos'] }, category: 'structural', implements: ['adr-chaos'], checks: ['req-chaos-abort'],
+      id: 'ff-chaos-guarded', label: 'Every experiment has a stop condition', when: { PRACTICE: ['chaos'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-chaos'], checks: ['req-chaos-abort'],
       threshold: 'At least 1 Fault Injection Service experiment template tagged service=order-api, and 0 such templates without a stop condition whose source is aws:cloudwatch:alarm',
       description: 'A nightly job lists the experiment templates tagged for the element and reads each one\'s stop conditions; a template without a CloudWatch alarm stop condition (source none) fails it. The alarm is the one on the steady state: the service level indicator the hypothesis names. On Kubernetes with Chaos Mesh, the same check reads each Workflow for a StatusCheck node with abortWithStatusCheck set (kubectl get workflows.chaos-mesh.org -o json).',
       tool: 'AWS CLI (aws fis list-experiment-templates, aws fis get-experiment-template) with jq',
@@ -406,7 +406,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-chaos-recent', label: 'Every experiment completed a run recently', when: { PRACTICE: ['chaos'] }, category: 'operational', implements: ['adr-chaos'], checks: ['req-chaos'],
+      id: 'ff-chaos-recent', label: 'Every experiment completed a run recently', when: { PRACTICE: ['chaos'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-chaos'], checks: ['req-chaos'],
       threshold: 'Every Fault Injection Service experiment template tagged service=order-api has a run in state completed created within the last {{CHAOS_DAYS}} days',
       description: 'A daily job lists the runs of each experiment template of the element and fails when the newest completed one is too old: the schedule stopped, the experiment failed, or it stopped on its condition and nobody fixed the cause. Runs that stopped or failed do not count. On Kubernetes with Chaos Mesh, the Schedule\'s status.time holds the time of its last scheduled run (kubectl get schedules.chaos-mesh.org -o json).',
       tool: 'AWS CLI (aws fis list-experiments --experiment-template-id) with jq',
@@ -426,7 +426,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-catalog-owner', label: 'Catalogue entry names a real owner and escalation', when: { OWNERSHIP: ['catalog'] }, category: 'structural', implements: MAIN_ADRS, checks: ['req-owner-catalog'],
+      id: 'ff-catalog-owner', label: 'Catalogue entry names a real owner and escalation', when: { OWNERSHIP: ['catalog'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN_ADRS, checks: ['req-owner-catalog'],
       threshold: 'catalog-info.yaml is a Component with spec.lifecycle experimental, production or deprecated and a pagerduty.com/service-id annotation, and its spec.owner is a group the catalogue returns with at least 1 hasMember relation',
       description: 'A CI step on every change to catalog-info.yaml, and nightly, parses the file and asks the Backstage catalogue API (GET /api/catalog/entities/by-name/group/<namespace>/<name>) for the owning group, so an owner renamed or dissolved in the catalogue is caught too. The pagerduty.com/service-id annotation is the PagerDuty plugin\'s; with another paging tool, use its plugin\'s annotation instead.',
       tool: 'Node.js script with js-yaml and the Backstage catalogue API',
@@ -450,7 +450,7 @@ else if (!(group.relations ?? []).some((r) => r.type === 'hasMember')) problems.
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-readme-owner', label: 'README names a real owner and escalation', when: { OWNERSHIP: ['readme'] }, category: 'structural', implements: MAIN_ADRS, checks: ['req-owner-readme'],
+      id: 'ff-readme-owner', label: 'README names a real owner and escalation', when: { OWNERSHIP: ['readme'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN_ADRS, checks: ['req-owner-readme'],
       threshold: 'README.md has an Ownership section with Team, Channel and Escalation lines, and the GitHub team named has at least 1 member',
       description: 'A CI step on every change to README.md, and nightly, reads the Ownership section and asks GitHub for the members of the team it names (GET /orgs/{org}/teams/{team_slug}/members); the job needs a token that may read the organisation\'s teams (read:org), which the default GITHUB_TOKEN may not.',
       tool: 'awk, sed and gh api in a CI step',

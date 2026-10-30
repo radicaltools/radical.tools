@@ -60,6 +60,8 @@
 // also lists the gaps radical check's rules find for the stages done. The
 // Review stage comes last: with every part there, it makes them agree.
 
+import { SENSOR_NAMES } from '../../check/sensors'
+import { FITNESS_CHARACTERISTICS, FITNESS_TRIGGERS } from '../../metamodel/presets/governance'
 
 export type ForgeStageId = 'requirements' | 'domain' | 'fitness' | 'scenarios' | 'states' | 'processes' | 'c4' | 'mockups' | 'review'
 
@@ -392,7 +394,18 @@ function stageTask(stageId: ForgeStageId, descBlock: string, need: ForgeNeedRef 
         'Task: propose fitness functions (`fitness-fn` nodes) that constrain the',
         'requirements already in the model — measurable guardrails for things like',
         'latency, availability, coupling, security posture, or delivery flow implied',
-        'by the description. Set `category` for each, and in `metrics` one condition',
+        'by the description. Classify each: `characteristic`, the ISO/IEC 25010',
+        `quality it protects (${FITNESS_CHARACTERISTICS.join(', ')}); \`scope\`,`,
+        '`atomic` (one part in one context: a unit test, a linter rule) or `holistic`',
+        '(several parts together: latency under load); `cadence`, `triggered` with the',
+        `\`trigger\` it runs on (${FITNESS_TRIGGERS.join(', ')}), \`continual\` (measured`,
+        'all the time, in production) or `temporal` with `every` (when it falls due,',
+        'e.g. `90d`); and `invocation`, `automated` or `manual` (a person reviews it;',
+        'its metrics line is then `review(<name>) passed`). For an automated one, set',
+        '`measure` only when you know which sensor of radical sense measures it',
+        `(${SENSOR_NAMES.map((n) => `\`${n}\``).join(', ')}): one line per measurement, the sensor and its`,
+        'arguments (`playwright tests/load.spec.ts --label env=staging`); otherwise',
+        'leave it empty. In `metrics` put one condition',
         'per line that says when it passes: a measured value and its threshold, with',
         'the metric named as a sensor would report it',
         '(`checkout.latency.p95{env=prod} <= 300 ms`, `deps.cycles == 0`), or a test',

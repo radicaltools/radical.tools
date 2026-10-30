@@ -5,7 +5,7 @@ import {
   parseSelection, type CanvasSelection,
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 
 /** Refuses a symlinked `.radical`, which could redirect the write elsewhere. */
 async function selectionDir(root: string, create: boolean): Promise<string | null> {
@@ -73,18 +73,25 @@ export async function readForgeRunFile(root: string): Promise<ForgeRunStatus | n
   return text === null ? null : parseForgeRun(text)
 }
 
+/** A file of the model folder itself (not under `.radical/`); null when it
+ *  is not there or is a symlink, which could point anywhere. */
+async function readModelFile(root: string, name: string): Promise<string | null> {
+  const path = join(resolve(root), name)
+  try {
+    return (await lstat(path)).isSymbolicLink() ? null : await readFile(path, 'utf-8')
+  } catch { return null }
+}
+
 /** What `radical check` and `radical sense` keep beside a model for Studio:
- *  the test results and the measurements under `.radical/` and the model's
- *  own check.json; null for one that is not there. */
-export async function readCheckFiles(root: string): Promise<{ results: string | null; measurements: string | null; config: string | null }> {
+ *  the test results and the measurements under `.radical/`, and the model's
+ *  own check.json and reviews.json (the reviews of its manual fitness
+ *  functions, kept in git); null for one that is not there. */
+export async function readCheckFiles(root: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null }> {
   const results = await readEditorStateFile(root, TEST_RESULTS_FILE)
   const measurements = await readEditorStateFile(root, MEASUREMENTS_FILE)
-  const configPath = join(resolve(root), CHECK_CONFIG_FILE)
-  let config: string | null = null
-  try {
-    if (!(await lstat(configPath)).isSymbolicLink()) config = await readFile(configPath, 'utf-8')
-  } catch { config = null }
-  return { results, measurements, config }
+  const config = await readModelFile(root, CHECK_CONFIG_FILE)
+  const reviews = await readModelFile(root, REVIEWS_FILE)
+  return { results, measurements, config, reviews }
 }
 
 /** Writes the model's check.json (the Inspector's settings). Refuses a

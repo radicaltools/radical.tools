@@ -993,7 +993,11 @@
       "label": "Permission matrix enforced",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the operations from the router (not from a list kept by hand), fails on any operation the expected matrix does not name, calls each as a caller of every role or rule case, and compares allowed or refused with the matrix; it also calls each operation that takes an id with the id of a record of another user, and checks that a refusal left a log entry with caller, operation and record.\n\nThreshold: Every operation called as every role or rule case gives the expected answer, and with another user's record ids returns 403 or 404; 0 mismatches and 0 operations without an entry in the expected matrix\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory, RSpec request specs)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\nimport { EXPECTED } from './authz/expected'       // \"METHOD path\" -> roles allowed\nimport { CASES, tokenFor, otherUsersRecord, refusalsLogged } from './authz/fixtures'\n\ndescribe.each(routes)('$method $path', (route) => {\n  const key = `${route.method} ${route.path}`\n  it('is in the expected matrix', () => {\n    expect(EXPECTED).toHaveProperty(key)\n  })\n  it.each(CASES)('as %s gives the expected answer', async (who) => {\n    const res = await request(app)[route.method.toLowerCase()](route.example)\n      .set('Authorization', `Bearer ${await tokenFor(who)}`)\n    const allowed = EXPECTED[key]?.includes(who) ?? false\n    expect([403, 404].includes(res.status)).toBe(!allowed)\n    if (!allowed) expect(await refusalsLogged({ caller: who, operation: key })).toBeGreaterThan(0)\n  })\n  it.runIf(route.path.includes(':id'))('refuses another user\\'s record', async () => {\n    const res = await request(app)[route.method.toLowerCase()](route.path.replace(':id', await otherUsersRecord()))\n      .set('Authorization', `Bearer ${await tokenFor('owner')}`)\n    expect([403, 404]).toContain(res.status)\n  })\n})\n```",
       "hubWhen": {
         "MODEL": [
@@ -1009,7 +1013,11 @@
       "label": "Every route guarded",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A static rule runs on every pull request and fails on a route registered without going through the authorization module, so a check cannot be forgotten in a handler. The rule below is the Express-style form ($ROUTER limited to app, router and *Router, so map.get or axios.get do not match); routes mounted with router.use are checked where they are defined.\n\nThreshold: 0 routes registered without the authorize middleware\n\nTool: Semgrep (Express-style routers); for Spring: ArchUnit methods().that().areAnnotatedWith(RequestMapping.class).should().beAnnotatedWith(PreAuthorize.class); for ASP.NET Core: a Roslyn analyzer over [Authorize]; for Rails: a RuboCop cop over verify_authorized\n\n```yaml\nrules:\n  - id: route-without-authorize\n    languages: [typescript, javascript]\n    severity: ERROR\n    message: Every route goes through authorize(); ADR \"Permissions decided in code\"\n    patterns:\n      - pattern-either:\n          - pattern: $ROUTER.$METHOD($PATH, ...)\n          - pattern: $ROUTER.route($PATH).$METHOD(...)\n      - metavariable-regex:\n          metavariable: $ROUTER\n          regex: ^(app|router|[A-Za-z]+Router)$\n      - metavariable-regex:\n          metavariable: $METHOD\n          regex: ^(get|post|put|patch|delete|all)$\n      - pattern-not: $ROUTER.$METHOD($PATH, ..., authorize(...), ...)\n      - pattern-not: $ROUTER.route($PATH).$METHOD(..., authorize(...), ...)\n```",
       "hubWhen": {
         "MODEL": [
@@ -1028,7 +1036,11 @@
       "label": "Policies tested",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Every policy has unit tests next to it, including the default deny and a missing attribute; CI runs them with coverage and refuses to publish the bundle below the threshold.\n\nThreshold: 0 failing policy tests and at least 90% policy coverage before a bundle is released\n\nTool: Open Policy Agent (opa test --coverage --threshold 90); with Cedar: cedar validate and the Cedar test suite of Amazon Verified Permissions in CI\n\n```rego\npackage authz_test\n\nimport rego.v1\n\nimport data.authz\n\ntest_clerk_cannot_delete_order if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"clerk\"]}, \"action\": \"order:delete\", \"resource\": {\"type\": \"order\", \"region\": \"eu\"}}\n}\n\ntest_other_region_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"manager\"], \"region\": \"eu\"}, \"action\": \"order:read\", \"resource\": {\"type\": \"order\", \"region\": \"us\"}}\n}\n\ntest_missing_region_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"manager\"]}, \"action\": \"order:read\", \"resource\": {\"type\": \"order\", \"region\": \"eu\"}}\n}\n\ntest_unknown_action_denied if {\n\tnot authz.allow with input as {\"user\": {\"roles\": [\"admin\"]}, \"action\": \"order:unknown\", \"resource\": {\"type\": \"order\"}}\n}\n```",
       "hubWhen": {
         "MODEL": [
@@ -1046,7 +1058,11 @@
       "label": "Policy bundle reaches every decision point",
       "x": 1040,
       "y": 390,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "After the bundle is published, the release pipeline polls the status API of every decision point until each reports the new revision, failing after 5 minutes, then reads a sample of the decision log and fails on an entry without the bundles.<name>.revision field.\n\nThreshold: Every decision point reports the released bundle revision within 5 minutes of the release; 0 decision log entries without a bundle revision\n\nTool: bash with curl and jq in the release pipeline (OPA status API; for Cedar or OpenFGA, the equivalent version endpoint of the engine)\n\n```bash\n#!/usr/bin/env bash\n# PDPS: the decision points' base URLs; REVISION: the revision just published; BUNDLE: its name\nset -euo pipefail\ndeadline=$(( $(date +%s) + 300 ))\nfor pdp in $PDPS; do\n  until [ \"$(curl -sf \"$pdp/v1/status\" | jq -r \".result.bundles[\\\"$BUNDLE\\\"].active_revision\")\" = \"$REVISION\" ]; do\n    [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"$pdp did not load $REVISION within 5 minutes\"; exit 1; }\n    sleep 5\n  done\ndone\n# a sample of the decision log, one JSON event per line\nmissing=$(tail -n 100 \"$DECISION_LOG\" | jq -c \"select(.bundles[\\\"$BUNDLE\\\"].revision == null)\" | wc -l)\n[ \"$missing\" -eq 0 ] || { echo \"$missing decision log entries carry no policy version\"; exit 1; }\n```",
       "hubWhen": {
         "MODEL": [
@@ -1065,7 +1081,11 @@
       "label": "Relationship model tested",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The authorization model has a test file with tuples and expected checks, owners, team members and strangers included; CI runs it on every change to the model.\n\nThreshold: 0 failing assertions over the authorization model, run on every change of the model\n\nTool: OpenFGA CLI (fga model test); with SpiceDB: zed validate over a validation file\n\n```yaml\nname: Order sharing\nmodel_file: ./model.fga\ntuples:\n  - user: user:anne\n    relation: owner\n    object: order:1\n  - user: team:sales#member\n    relation: viewer\n    object: order:1\n  - user: user:bob\n    relation: member\n    object: team:sales\ntests:\n  - name: owner edits, team views, strangers see nothing\n    check:\n      - user: user:anne\n        object: order:1\n        assertions: { can_edit: true }\n      - user: user:bob\n        object: order:1\n        assertions: { can_view: true, can_edit: false }\n      - user: user:eve\n        object: order:1\n        assertions: { can_view: false }\n```",
       "hubWhen": {
         "MODEL": [
@@ -1082,7 +1102,11 @@
       "label": "Conflicting roles refused",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads the separation-of-duties pairs from the code, grants the first role of each pair to a fresh account, tries to grant the second, and expects a refusal and a recorded attempt.\n\nThreshold: Every pair on the separation-of-duties list is refused when granted to one account, and the attempt is recorded; 0 pairs granted\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { SEPARATION_OF_DUTIES } from '../src/authz/roles'   // [['payee-creator', 'payment-approver'], ...]\nimport { tokenFor, createAccount, grantAttempts } from './authz/fixtures'\n\ndescribe.each(SEPARATION_OF_DUTIES)('%s and %s', (first, second) => {\n  it('cannot both be held by one account', async () => {\n    const account = await createAccount({ roles: [first] })\n    const res = await request(app).post(`/accounts/${account.id}/roles`).send({ role: second })\n      .set('Authorization', `Bearer ${await tokenFor('administrator')}`)\n    expect(res.status).toBe(409)\n    expect(await grantAttempts({ account: account.id, role: second, refused: true })).toHaveLength(1)\n  })\n})\n```",
       "hubWhen": {
         "MODEL": [
@@ -1096,7 +1120,11 @@
       "label": "Unsharing takes effect in time",
       "x": 1040,
       "y": 780,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test shares a document with a user through a team, removes the user from the team, polls the document until it is refused (failing past 10 seconds), and checks that a request carrying the consistency token of the removal is refused on the first try.\n\nThreshold: A record is refused within 10 seconds of the relationship that granted it being removed; a check made with the write's consistency token is refused at once\n\nTool: Vitest with supertest against the service and its relationship store (OpenFGA, SpiceDB or the relationship table)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { seedTeamShare, tokenFor, sleep } from './authz/fixtures'\n\nit('closes a document within 10 seconds of the member being removed', async () => {\n  const { doc, member, team, admin } = await seedTeamShare()\n  const removal = await request(app).delete(`/teams/${team.id}/members/${member.id}`).set('Authorization', `Bearer ${await tokenFor(admin)}`)\n  expect(removal.status).toBe(204)\n  const token = removal.headers['x-consistency-token']           // the write's token, from the relationship store\n  const atOnce = await request(app).get(`/documents/${doc.id}`).set('Authorization', `Bearer ${await tokenFor(member)}`).set('X-Consistency-Token', token)\n  expect([403, 404]).toContain(atOnce.status)\n  const started = Date.now()\n  while ((await request(app).get(`/documents/${doc.id}`).set('Authorization', `Bearer ${await tokenFor(member)}`)).status === 200) {\n    expect(Date.now() - started).toBeLessThan(10_000)\n    await sleep(500)\n  }\n})\n```",
       "hubWhen": {
         "MODEL": [
@@ -1110,7 +1138,11 @@
       "label": "Missing attributes deny",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test creates a user without a region, and one whose region was last refreshed 16 minutes ago, asks for a record each and expects 403 with a log entry naming the attribute.\n\nThreshold: A request from a user without an attribute the policy reads, or with one refreshed more than 15 minutes ago, is refused and the log names the attribute; 0 such requests allowed\n\nTool: Vitest with supertest, the attribute source seeded by the test (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { userWithAttributes, tokenFor, decisionLog } from './authz/fixtures'\n\nit.each([\n  ['no region', {}],\n  ['a stale region', { region: 'eu', refreshedAt: new Date(Date.now() - 16 * 60_000) }],\n])('refuses a user with %s and names the attribute', async (_, attributes) => {\n  const user = await userWithAttributes(attributes)\n  const res = await request(app).get('/orders/1').set('Authorization', `Bearer ${await tokenFor(user)}`)\n  expect(res.status).toBe(403)\n  expect(await decisionLog.last({ user: user.id })).toMatchObject({ decision: 'deny', attribute: 'region' })\n})\n```",
       "hubWhen": {
         "MODEL": [
@@ -1124,7 +1156,11 @@
       "label": "Engine outage refuses",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts the service with its decision point, times 200 allowed calls and checks the p99, then stops the decision point and calls protected operations as a caller with every permission, expecting each to be refused.\n\nThreshold: 100% of protected calls refused while the decision point is down; p99 decision time under 10 ms over 200 calls while it is up\n\nTool: Testcontainers with Vitest\n\n```ts\nimport { GenericContainer } from 'testcontainers'\nimport { startService, protectedRoutes } from './authz/service'\n\nit('answers fast while the engine is up and refuses everything while it is down', async () => {\n  const pdp = await new GenericContainer('openpolicyagent/opa:latest') // pin a version in your repository\n    .withExposedPorts(8181).withCommand(['run', '--server', '--addr', ':8181']).start()\n  const app = await startService({ pdpUrl: `http://${pdp.getHost()}:${pdp.getMappedPort(8181)}` })\n  const times: number[] = []\n  for (let i = 0; i < 200; i++) {\n    const started = performance.now()\n    expect((await app.call(protectedRoutes[0], { as: 'superuser' })).status).toBe(200)\n    times.push(performance.now() - started)\n  }\n  times.sort((a, b) => a - b)\n  expect(times[Math.floor(times.length * 0.99)]).toBeLessThan(10)\n  await pdp.stop()\n  for (const route of protectedRoutes) {\n    const res = await app.call(route, { as: 'superuser' })\n    expect([403, 503]).toContain(res.status)\n  }\n})\n```",
       "hubWhen": {
         "MODEL": [
@@ -1143,7 +1179,11 @@
       "label": "No overdue grants",
       "x": 1040,
       "y": 1170,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A scheduled CI job runs a query over the grants every day and fails, printing the rows and opening a ticket for the owner, when a grant is overdue for review or belongs to a person who has left.\n\nThreshold: 0 grants unreviewed for more than {{REVIEW_DAYS}} + 14 days; 0 grants of leavers older than 24 hours\n\nTool: psql in a scheduled CI job (bash)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\noverdue=$(psql \"$DATABASE_URL\" -Atc \"\n  select g.account_id || ' ' || g.permission || ' reviewed ' || coalesce(g.last_reviewed_at::text, 'never') || ' left ' || coalesce(p.left_at::text, '-')\n  from grants g\n  join people p on p.account_id = g.account_id\n  where g.last_reviewed_at < now() - interval '{{REVIEW_DAYS}} days' - interval '14 days'\n     or (p.left_at is not null and p.left_at < now() - interval '24 hours')\")\n[ -z \"$overdue\" ] || { echo \"$overdue\"; exit 1; }\n```",
       "hubWhen": {
         "MODEL": [
@@ -1162,7 +1202,10 @@
       "label": "Grants match the directory",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A scheduled job compares the grants with the directory's groups every hour and fails, printing the rows, on any grant that no group explains, or that belongs to an account the directory has disabled.\n\nThreshold: 0 grants without a directory group behind them; 0 grants of disabled accounts older than 60 minutes\n\nTool: psql in a scheduled CI job (bash); the directory_* tables are filled by the SCIM endpoint\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nstray=$(psql \"$DATABASE_URL\" -Atc \"\n  select g.account_id || ' ' || g.permission\n  from grants g\n  left join directory_group_members m on m.account_id = g.account_id and m.group_name = g.source_group\n  left join directory_accounts a on a.account_id = g.account_id\n  where m.account_id is null\n     or (a.disabled_at is not null and a.disabled_at < now() - interval '60 minutes')\")\n[ -z \"$stray\" ] || { echo \"$stray\"; exit 1; }\n```",
       "hubWhen": {
         "MODEL": [
@@ -1181,7 +1224,11 @@
       "label": "No standing admins",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A scheduled query over the cloud account lists IAM users with an administrator policy attached directly, through a group or inline, and IAM Identity Center assignments of administrator permission sets to a person or group; every row is compared with the elevation tool's active requests, and any without one is a standing right that bypasses elevation. Use the equivalent tables for Azure (azuread_user, azure_role_assignment) or Google Cloud (gcp_iam_policy).\n\nThreshold: 0 people holding administrator rights outside an active, approved elevation\n\nTool: Steampipe (AWS plugin), in a scheduled CI job that fails when the query returns a row not matched by an active elevation\n\n```sql\n-- every row is a standing administrator right unless the elevation tool lists it as active\nwith admin_policies as (\n  select unnest(array['arn:aws:iam::aws:policy/AdministratorAccess', 'arn:aws:iam::aws:policy/PowerUserAccess']) as arn\n),\nadmin_sets as (\n  select mpa.permission_set_arn\n  from aws_ssoadmin_managed_policy_attachment mpa\n  join aws_ssoadmin_permission_set ps on ps.arn = mpa.permission_set_arn\n  where mpa.managed_policy_arn in (select arn from admin_policies)\n)\nselect 'iam user ' || u.name as holder\nfrom aws_iam_user u\nwhere exists (select 1 from admin_policies p where u.attached_policy_arns ? p.arn)\n   or exists (select 1 from jsonb_array_elements(u.inline_policies) ip\n              where ip -> 'PolicyDocument' -> 'Statement' @> '[{\"Effect\": \"Allow\", \"Action\": \"*\"}]')\nunion all\nselect 'iam group ' || g.name || ' member ' || (m ->> 'UserName')\nfrom aws_iam_group g, jsonb_array_elements(g.users) m\nwhere exists (select 1 from admin_policies p where g.attached_policy_arns ? p.arn)\nunion all\nselect 'identity center ' || a.principal_type || ' ' || a.principal_id || ' in account ' || a.target_account_id\nfrom aws_ssoadmin_account_assignment a\nwhere a.permission_set_arn in (select permission_set_arn from admin_sets)\n  and a.target_account_id = '123456789012';   -- the production account\n```",
       "hubWhen": {
         "ADMIN": [
@@ -1195,7 +1242,10 @@
       "label": "Break-glass use alerts",
       "x": 1040,
       "y": 1560,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "An EventBridge rule matches console sign-ins by the break-glass user from CloudTrail and sends them to the paging topic; a quarterly drill signs in with the account in a non-production environment and times the page. The same scheduled job that counts administrators compares the account's password_last_used with its password last changed date.\n\nThreshold: A sign-in with the break-glass account raises a page to the security owner within 5 minutes; the credential's last rotation is at most 24 hours after its last use\n\nTool: Terraform (aws_cloudwatch_event_rule on CloudTrail sign-in events, SNS to the pager); on Azure: an Entra ID sign-in log alert rule for the account; on Google Cloud: a log-based alert on the service account\n\n```hcl\nresource \"aws_cloudwatch_event_rule\" \"break_glass_used\" {\n  name        = \"break-glass-used\"\n  description = \"ADR Just-in-time privileged access: page on any use of the sealed account\"\n  event_pattern = jsonencode({\n    source        = [\"aws.signin\"]\n    \"detail-type\" = [\"AWS Console Sign In via CloudTrail\"]\n    detail = {\n      eventName    = [\"ConsoleLogin\"]\n      userIdentity = { userName = [var.break_glass_user_name] }\n    }\n  })\n}\n\nresource \"aws_cloudwatch_event_target\" \"break_glass_page\" {\n  rule = aws_cloudwatch_event_rule.break_glass_used.name\n  arn  = var.security_pager_topic_arn   # SNS topic wired to the on-call tool\n}\n```",
       "hubWhen": {
         "ADMIN": [
@@ -1209,7 +1259,11 @@
       "label": "Admins few and strong",
       "x": 1040,
       "y": 1690,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A scheduled query counts the people with administrator rights and lists those without a FIDO security key among their MFA devices (serial numbers of security keys are :u2f/ ARNs); the job fails above 5 accounts or on any without one. A passkey registered as a FIDO key appears the same way; a virtual MFA device does not count.\n\nThreshold: At most 5 administrator accounts, 0 of them without a FIDO security key registered\n\nTool: Steampipe (AWS plugin), in a scheduled CI job; for Azure: azuread_user with authentication methods, for Google Workspace: the users report with isEnforcedIn2Sv and security keys\n\n```sql\nselect\n  count(*) as admins,\n  count(*) filter (where not exists (\n    select 1 from jsonb_array_elements(coalesce(mfa_devices, '[]'::jsonb)) d\n    where d ->> 'SerialNumber' like '%:u2f/%'\n  )) as without_security_key\nfrom aws_iam_user\nwhere attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess';\n-- the job fails when admins > 5 or without_security_key > 0\n```",
       "hubWhen": {
         "ADMIN": [
@@ -1223,7 +1277,11 @@
       "label": "Audit log cannot be changed",
       "x": 1040,
       "y": 1820,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A policy over the Terraform plan in CI fails when the CloudTrail trail has no log file validation, or its bucket has no Object Lock configuration in compliance mode with a default retention (in days or years) of at least 365 days, so that no administrator can delete or edit an entry within the retention. 365 days is only a floor: the retention itself is the one the Audit trail pack decides, and the bucket is set to it.\n\nThreshold: The CloudTrail trail has log file validation on and writes to a bucket with Object Lock in compliance mode for at least 365 days, a floor below the audit trail's retention; 0 trails without both\n\nTool: Conftest on the Terraform plan (AWS form; on Azure check the storage account's immutability policy, on Google Cloud the bucket's retention policy with locked = true)\n\n```rego\npackage main\n\nimport rego.v1\n\ntrails := [r | some r in input.resource_changes; r.type == \"aws_cloudtrail\"]\nlocks := [r | some r in input.resource_changes; r.type == \"aws_s3_bucket_object_lock_configuration\"]\n\ndeny contains \"no CloudTrail trail in the plan\" if count(trails) == 0\n\ndeny contains msg if {\n\tsome t in trails\n\tnot t.change.after.enable_log_file_validation\n\tmsg := sprintf(\"%s has no log file validation\", [t.address])\n}\n\ndeny contains \"no Object Lock configuration on the audit bucket\" if count(locks) == 0\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tnot retention.mode == \"COMPLIANCE\"\n\tmsg := sprintf(\"%s is not in compliance mode\", [l.address])\n}\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tnumber_or_zero(retention.years) * 365 + number_or_zero(retention.days) < 365\n\tmsg := sprintf(\"%s keeps the audit log for fewer than 365 days, the floor below the audit trail's retention\", [l.address])\n}\n\nnumber_or_zero(x) := x if is_number(x)\n\nnumber_or_zero(x) := 0 if not is_number(x)\n```",
       "hubWhen": {
         "ADMIN": [
@@ -1238,7 +1296,11 @@
       "label": "No person reaches data",
       "x": 1040,
       "y": 1950,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A policy runs over every Terraform plan in CI and refuses a change that gives a user or group data-store actions or a wildcard inline, or attaches an administrator or data-store managed policy to a user or group; service roles are not touched.\n\nThreshold: 0 infrastructure changes that give a person access to a production data store\n\nTool: Conftest on the Terraform plan (AWS form; for Azure check azurerm_role_assignment with a user principal, for Google Cloud google_project_iam_member with user: or group: members)\n\n```rego\npackage main\n\nimport rego.v1\n\nhuman_inline := {\"aws_iam_user_policy\", \"aws_iam_group_policy\"}\nhuman_attachment := {\"aws_iam_user_policy_attachment\", \"aws_iam_group_policy_attachment\"}\ndata_policies := {\n\t\"arn:aws:iam::aws:policy/AdministratorAccess\", \"arn:aws:iam::aws:policy/PowerUserAccess\",\n\t\"arn:aws:iam::aws:policy/AmazonRDSFullAccess\", \"arn:aws:iam::aws:policy/AmazonS3FullAccess\",\n\t\"arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess\", \"arn:aws:iam::aws:policy/SecretsManagerReadWrite\",\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\thuman_inline[r.type]\n\tsome s in json.unmarshal(r.change.after.policy).Statement\n\tsome a in actions(s)\n\tregex.match(\"^(\\\\*|rds[a-z-]*:|dynamodb:|s3:|secretsmanager:)\", a)\n\tmsg := sprintf(\"%s gives a person direct access to production data (%s)\", [r.address, a])\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\thuman_attachment[r.type]\n\tdata_policies[r.change.after.policy_arn]\n\tmsg := sprintf(\"%s attaches %s to a person or group\", [r.address, r.change.after.policy_arn])\n}\n\ndeny contains msg if {\n\tsome r in input.resource_changes\n\tr.type == \"aws_iam_policy_attachment\"\n\tcount(array.concat(object.get(r.change.after, \"users\", []), object.get(r.change.after, \"groups\", []))) > 0\n\tmsg := sprintf(\"%s attaches a policy to users or groups\", [r.address])\n}\n\nactions(s) := s.Action if is_array(s.Action)\n\nactions(s) := [s.Action] if is_string(s.Action)\n```",
       "hubWhen": {
         "ADMIN": [
@@ -1252,7 +1314,11 @@
       "label": "No permission checks creep in",
       "x": 1040,
       "y": 2080,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A dependency rule fails the build when the code imports an authorization library, which would mean a restricted feature arrived without its decision.\n\nThreshold: 0 imports of an authorization library or role check in the application code\n\nTool: dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest, a RuboCop custom cop)\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-authorization',\n    comment: 'ADR One level of access: supersede it before adding permissions',\n    severity: 'error',\n    from: {},\n    to: { path: 'node_modules/(@casl/|casbin|accesscontrol|@openfga/|@permitio/|@cerbos/)' },\n  }],\n}\n```",
       "hubWhen": {
         "MODEL": [

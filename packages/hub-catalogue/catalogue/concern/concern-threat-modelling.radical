@@ -719,7 +719,11 @@
       "label": "Threat model newer than the last boundary change",
       "x": 1040,
       "y": 0,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A pull-request check compares git dates: the last commit that touched a file defining a trust boundary against the last commit that touched threat-model/. A boundary change without a model change fails; so does a change to the model without the security-review label, which the Secure development process pack's check then turns into a required security approval. Run it on opened, synchronize, labeled and unlabeled, with the full history checked out.\n\nThreshold: The last commit to threat-model/ is no older than the last commit to {{BOUNDARY_PATHS}}; a pull request that changes threat-model/ carries the security-review label\n\nTool: git and jq in a GitHub Actions step (bash)\n\n```bash\n# pull-request check (on: pull_request, types opened, synchronize, labeled, unlabeled; actions/checkout with fetch-depth: 0)\nset -euo pipefail\nboundary=$(git log -1 --format=%ct HEAD -- {{BOUNDARY_PATHS}})\nmodel=$(git log -1 --format=%ct HEAD -- threat-model/)\nif [ -n \"$boundary\" ] && [ \"${model:-0}\" -lt \"$boundary\" ]; then\n  echo \"A trust boundary changed after the threat model did:\"\n  git log -1 --format='  %h %cs %s' HEAD -- {{BOUNDARY_PATHS}}\n  echo \"Change threat-model/ in this pull request.\"\n  exit 1\nfi\nif [ -n \"$(git diff --name-only \"origin/$GITHUB_BASE_REF...HEAD\" -- threat-model/)\" ] &&\n   ! jq -e '.pull_request.labels | any(.name == \"security-review\")' \"$GITHUB_EVENT_PATH\" > /dev/null; then\n  echo \"threat-model/ changed: add the security-review label, so the change gets its security review before the merge\"\n  exit 1\nfi\necho \"the threat model is newer than every change to a trust boundary\"\n```",
       "hubWhen": {
         "WHEN": [
@@ -733,7 +737,11 @@
       "label": "Threat model reviewed since the previous release",
       "x": 1040,
       "y": 130,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "manual",
       "description": "The release job, running on the new tag before anything is published, finds the previous tag and fails when threat-model/ has no commit after it. The first release passes: the model made before it is checked by the other functions.\n\nThreshold: threat-model/ has at least 1 commit after the previous release tag\n\nTool: git in a GitHub Actions release job (bash)\n\n```bash\n# release job, run on the new tag (actions/checkout with fetch-depth: 0): the threat model was reviewed since the previous release\nset -euo pipefail\nprevious=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null) || { echo \"first release: nothing to compare\"; exit 0; }\nsince=$(git log -1 --format=%ct \"$previous\")\nmodel=$(git log -1 --format=%ct HEAD -- threat-model/)\nif [ \"${model:-0}\" -le \"$since\" ]; then\n  echo \"threat-model/ has no commit since $previous: review the threat model and commit the review before this release\"\n  exit 1\nfi\necho \"threat model reviewed on $(git log -1 --format=%cs HEAD -- threat-model/), after $previous\"\n```",
       "hubWhen": {
         "WHEN": [
@@ -747,7 +755,11 @@
       "label": "Every threat model reviewed within a year",
       "x": 1040,
       "y": 260,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "365d",
+      "invocation": "manual",
       "description": "A scheduled job runs monthly over each system's model (a folder threat-model/<system>/ or a file threat-model/<system>.json) and fails naming every one whose last commit is more than 365 days old, with the date of that commit.\n\nThreshold: 0 systems under threat-model/ whose last commit is more than 365 days old\n\nTool: git in a scheduled GitHub Actions job (bash)\n\n```bash\n# scheduled job, monthly (actions/checkout with fetch-depth: 0): every system's threat model reviewed within a year\nset -euo pipefail\nlimit=$(( $(date +%s) - 365 * 86400 ))\nstatus=0\nfor model in threat-model/*/ threat-model/*.json; do\n  [ -e \"$model\" ] || continue\n  last=$(git log -1 --format=%ct HEAD -- \"$model\")\n  if [ \"${last:-0}\" -lt \"$limit\" ]; then\n    echo \"$model: last reviewed $(git log -1 --format=%cs HEAD -- \"$model\" | grep . || echo never), over a year ago\"\n    status=1\n  fi\ndone\nexit $status\n```",
       "hubWhen": {
         "WHEN": [
@@ -761,7 +773,11 @@
       "label": "Threat Dragon models read into one list",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Node script reads each Threat Dragon model (version 2.x), takes every threat from the cells of every diagram with its element (a flow as source -> target: name), category, severity, status and mitigation, joins the acceptances and transfers from risk-decisions.yaml by threat id, and writes reports/threats.json for the other checks. It runs on every pull request; a file that is not a Threat Dragon 2 model fails it.\n\nThreshold: Every threat-model/*.json is a Threat Dragon 2 model and every threat on it is written to reports/threats.json, joined with its entry in threat-model/risk-decisions.yaml\n\nTool: Node 20 with js-yaml, reading the Threat Dragon 2 JSON format\n\n```js\n// scripts/threats-dragon.mjs: the Threat Dragon models and threat-model/risk-decisions.yaml into reports/threats.json\nimport { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'\nimport yaml from 'js-yaml'\n\nconst decisionsFile = 'threat-model/risk-decisions.yaml'   // [{ threat, decision: accepted | transferred, owner, reason, accepted, expires, to, reference }]\nconst decisions = existsSync(decisionsFile) ? yaml.load(readFileSync(decisionsFile, 'utf8')) ?? [] : []\nconst STATUS = { Mitigated: 'mitigated', Avoided: 'mitigated', Eliminated: 'mitigated', NotApplicable: 'not-applicable', Accepted: 'accepted', Transferred: 'transferred' }\nconst threats = []\nfor (const file of readdirSync('threat-model').filter((f) => f.endsWith('.json'))) {\n  const model = JSON.parse(readFileSync(`threat-model/${file}`, 'utf8'))\n  if (!/^2\\./.test(model.version ?? '')) throw new Error(`${file}: not a Threat Dragon 2 model (version ${model.version})`)\n  for (const diagram of model.detail.diagrams) {\n    const name = Object.fromEntries(diagram.cells.map((c) => [c.id, String(c.data?.name ?? '').replace(/\\s+/g, ' ')]))\n    for (const cell of diagram.cells) for (const t of cell.data?.threats ?? []) {\n      const element = cell.shape === 'flow' ? `${name[cell.source?.cell] ?? 'outside'} -> ${name[cell.target?.cell] ?? 'outside'}: ${name[cell.id]}` : name[cell.id]\n      const decision = decisions.find((d) => d.threat === t.id) ?? {}\n      threats.push({ system: file.replace(/\\.json$/, ''), id: t.id, element, category: t.type, severity: String(t.severity ?? '').toLowerCase(),\n        mitigation: t.mitigation ?? '', score: t.score, ...decision, status: decision.decision ?? STATUS[t.status] ?? 'open' })\n    }\n  }\n}\nmkdirSync('reports', { recursive: true })\nwriteFileSync('reports/threats.json', JSON.stringify(threats, null, 2))\nconsole.log(`${threats.length} threats from ${new Set(threats.map((t) => t.system)).size} Threat Dragon models`)\n```",
       "hubWhen": {
         "WHERE": [
@@ -775,7 +791,11 @@
       "label": "Threat registers read into one list, pytm findings triaged",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Python script reads every register into reports/threats.json. Where a system has a tm.py, it runs pytm with --json and fails on every finding (threat id and element) the register does not list; where it has none, it fails when README.md holds no Mermaid flowchart. It runs on every pull request.\n\nThreshold: Every threat-model/<system>/threats.yaml is written to reports/threats.json; 0 pytm findings missing from their register; 0 hand-written registers without a Mermaid flowchart in README.md\n\nTool: Python 3 with PyYAML, and OWASP pytm 1.4 (python3 tm.py --json) where a system has a tm.py\n\n```python\n# scripts/threats_register.py: each threat-model/<system>/threats.yaml into reports/threats.json; with pytm, every finding of tm.py triaged there\nimport json, pathlib, subprocess, sys\nimport yaml\n\nthreats, problems = [], []\npathlib.Path(\"reports\").mkdir(exist_ok=True)\nfor register in sorted(pathlib.Path(\"threat-model\").glob(\"*/threats.yaml\")):\n    system = register.parent\n    entries = yaml.safe_load(register.read_text()) or []\n    threats += [{**t, \"system\": system.name, \"severity\": str(t.get(\"severity\", \"\")).lower()} for t in entries]\n    if (system / \"tm.py\").exists():   # pytm: the findings it generates, each triaged by finding id and element\n        found = pathlib.Path(f\"reports/pytm-{system.name}.json\").resolve()\n        subprocess.run([sys.executable, \"tm.py\", \"--json\", str(found)], cwd=system, check=True)\n        triaged = {(t.get(\"finding\"), t.get(\"element\")) for t in entries}\n        problems += [f\"{system.name}: pytm finding {f['threat_id']} on {f['target']} is not triaged in threats.yaml\"\n                     for f in json.loads(found.read_text())[\"findings\"] if (f[\"threat_id\"], f[\"target\"]) not in triaged]\n    elif \"flowchart\" not in ((system / \"README.md\").read_text() if (system / \"README.md\").exists() else \"\"):\n        problems.append(f\"{system.name}: no README.md with the data-flow diagram as a Mermaid flowchart\")\npathlib.Path(\"reports/threats.json\").write_text(json.dumps(threats, indent=2, default=str))\nprint(f\"{len(threats)} threats from {len(set(t['system'] for t in threats))} registers\")\nif problems:\n    sys.exit(\"\\n\".join(problems))\n```",
       "hubWhen": {
         "WHERE": [
@@ -790,7 +810,11 @@
       "label": "Every threat ends somewhere",
       "x": 1040,
       "y": 650,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Node script over reports/threats.json, run on every pull request and nightly on the main branch, so an acceptance that expires fails the build on the day after. A reference is a ticket key (SHOP-123), an issue number (#123), an ADR id (adr-…) or a test file (….test.ts).\n\nThreshold: 100% of threats in reports/threats.json have a rated severity and a status with what it needs: a reference for mitigated and open, a reason for not applicable, a party and a contract for transferred, a named owner, a reason and an unexpired acceptance of at most {{ACCEPT_DAYS}} days for accepted\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-threats.mjs: every threat in reports/threats.json ends mitigated, transferred, accepted until a date, not applicable, or open with a ticket\nimport { readFileSync } from 'node:fs'\n\nconst MAX_DAYS = {{ACCEPT_DAYS}}\nconst REF = /\\b[A-Z][A-Z0-9]+-\\d+\\b|#\\d+\\b|\\badr-[\\w-]+|[\\w./-]+\\.(test|spec)\\.\\w+/   // a ticket, an ADR or a test file\nconst DAY = 86_400_000\nconst problems = []\nfor (const t of JSON.parse(readFileSync('reports/threats.json', 'utf8'))) {\n  const at = `${t.system} ${t.id} (${t.element})`\n  if (!['low', 'medium', 'high', 'critical'].includes(t.severity)) problems.push(`${at}: severity \"${t.severity}\" is not rated`)\n  if (t.status === 'mitigated' && !REF.test(t.mitigation ?? '')) problems.push(`${at}: mitigated, but names no test, ADR or ticket`)\n  else if (t.status === 'open' && !REF.test(t.mitigation ?? '')) problems.push(`${at}: open without the ticket that will close it`)\n  else if (t.status === 'not-applicable' && !String(t.mitigation ?? '').trim()) problems.push(`${at}: not applicable without a reason`)\n  else if (t.status === 'transferred' && !(t.to && t.reference)) problems.push(`${at}: transferred without the party and the contract or policy`)\n  else if (t.status === 'accepted') {\n    const accepted = Date.parse(t.accepted), expires = Date.parse(t.expires)\n    if (!t.owner || String(t.owner).startsWith('@') || !t.reason) problems.push(`${at}: accepted without a named owner and a reason`)\n    else if (!(expires > Date.now())) problems.push(`${at}: the acceptance by ${t.owner} expired on ${t.expires}`)\n    else if (!(expires - accepted <= MAX_DAYS * DAY)) problems.push(`${at}: the acceptance runs past ${MAX_DAYS} days`)\n  } else if (!['mitigated', 'open', 'not-applicable', 'transferred'].includes(t.status)) problems.push(`${at}: status \"${t.status}\" is not one of the five`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log('every threat has a status that ends it')\n```"
     },
     {
@@ -799,7 +823,11 @@
       "label": "Release waits for high threats",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "description": "A step in the release job, after the reader of the threat model has written reports/threats.json, selects the high and critical threats that are open or accepted and fails the release naming them.\n\nThreshold: 0 threats of high or critical severity with the status open or accepted when a release is built\n\nTool: jq in a GitHub Actions release job (bash)\n\n```bash\n# release job, after the reader of the threat model wrote reports/threats.json\nset -euo pipefail\nblocking=$(jq -r '.[]\n  | select((.severity == \"high\" or .severity == \"critical\") and (.status == \"open\" or .status == \"accepted\"))\n  | \"\\(.system) \\(.id) \\(.severity) \\(.status): \\(.element)\"' reports/threats.json)\nif [ -n \"$blocking\" ]; then\n  echo \"High or critical threats neither mitigated nor transferred; the release stops:\"\n  echo \"$blocking\"\n  exit 1\nfi\necho \"no open or accepted high or critical threat\"\n```",
       "hubWhen": {
         "UNMITIGATED": [
@@ -813,7 +841,11 @@
       "label": "Threat model names every outside caller",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Node script reads the architecture model folder: the front matter of every node under architecture/nodes and the interacts relations in relations.json. It collects the label of every person or external element that calls an element that is not external, and fails for each label that appears nowhere under threat-model/ (case and spacing ignored). It runs on every pull request, so a caller added to the architecture model waits for the threat model.\n\nThreshold: 0 persons or external systems that the architecture model shows calling an element of the system and that no file under threat-model/ names\n\nTool: Node 20 with js-yaml, over the architecture model's Markdown folder\n\n```js\n// scripts/check-callers.mjs: the threat model names every person and external system the architecture model shows calling the system\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { join } from 'node:path'\nimport yaml from 'js-yaml'\n\nconst walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))\nconst nodes = {}\nfor (const file of walk('architecture/nodes').filter((f) => f.endsWith('.md'))) {\n  const front = yaml.load(readFileSync(file, 'utf8').split(/^---\\s*$/m)[1] ?? '') ?? {}\n  if (front.id) nodes[front.id] = front\n}\nconst outside = (n) => n.type === 'person' || n.external === true\nconst callers = new Set(JSON.parse(readFileSync('architecture/relations.json', 'utf8'))\n  .filter((r) => r.relationType === 'interacts' && nodes[r.sourceId] && nodes[r.targetId] && outside(nodes[r.sourceId]) && !outside(nodes[r.targetId]))\n  .map((r) => nodes[r.sourceId].label))\nconst model = walk('threat-model').map((f) => readFileSync(f, 'utf8')).join('\\n').toLowerCase().replace(/\\s+/g, ' ')\nconst missing = [...callers].filter((label) => !model.includes(label.toLowerCase().replace(/\\s+/g, ' ')))\nconsole.log(`${callers.size} outside callers in the architecture model, ${missing.length} not named in threat-model/`)\nif (missing.length) { console.error(missing.map((m) => `  ${m}`).join('\\n')); process.exit(1) }\n```"
     },
     {
@@ -822,7 +854,11 @@
       "label": "Threats under the method's categories",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Node script over reports/threats.json checks each threat's category against the method's list, reading Threat Dragon's older LINDDUN names as the current ones, and with LINDDUN fails for each system where a category appears nowhere, as a threat or as a not-applicable entry.\n\nThreshold: 100% of threats carry a STRIDE category (or, with LINDDUN, a STRIDE or LINDDUN category); with LINDDUN, all 7 LINDDUN categories appear in each system's threat model\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-categories.mjs: every threat in reports/threats.json under a category of the method: {{METHOD}}\nimport { readFileSync } from 'node:fs'\n\nconst STRIDE = ['spoofing', 'tampering', 'repudiation', 'information disclosure', 'denial of service', 'elevation of privilege']\nconst LINDDUN = ['linking', 'identifying', 'non-repudiation', 'detecting', 'data disclosure', 'unawareness & unintervenability', 'non-compliance']\nconst OLDER = { linkability: 'linking', identifiability: 'identifying', detectability: 'detecting', 'disclosure of information': 'data disclosure', unawareness: 'unawareness & unintervenability' }   // Threat Dragon's names\nconst withLinddun = '{{METHOD}}'.includes('LINDDUN')\nconst allowed = withLinddun ? [...STRIDE, ...LINDDUN] : STRIDE\nconst category = (t) => { const c = String(t.category ?? '').trim().toLowerCase(); return OLDER[c] ?? c }\nconst threats = JSON.parse(readFileSync('reports/threats.json', 'utf8'))\nconst problems = threats.filter((t) => !allowed.includes(category(t)))\n  .map((t) => `${t.system} ${t.id}: category \"${t.category ?? ''}\" is none of ${withLinddun ? 'STRIDE and LINDDUN' : 'STRIDE'}`)\nif (withLinddun) for (const system of new Set(threats.map((t) => t.system))) {\n  const seen = new Set(threats.filter((t) => t.system === system).map(category))\n  for (const c of LINDDUN.filter((c) => !seen.has(c))) problems.push(`${system}: LINDDUN \"${c}\" considered nowhere (a threat, or a not-applicable entry with its reason)`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log(`${threats.length} threats, each under a category of the method`)\n```",
       "hubWhen": {
         "METHOD": [
@@ -837,7 +873,11 @@
       "label": "Threats scored, objectives written",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Node script over reports/threats.json checks each threat's score (the score field of a Threat Dragon threat or of a register entry) and the severity it gives, and that each system has its objectives file with the two sections of PASTA stages 1 and 6.\n\nThreshold: 100% of threats carry a whole risk score from 1 to 25 and the severity that score gives; every system has threat-model/objectives/<system>.md with the sections Business objectives and Attack scenarios\n\nTool: Node 20 (no dependencies)\n\n```js\n// scripts/check-pasta.mjs: every threat scored and rated by its score; every system with its objectives and attack scenarios\nimport { existsSync, readFileSync } from 'node:fs'\n\nconst rating = (score) => (score >= 20 ? 'critical' : score >= 12 ? 'high' : score >= 6 ? 'medium' : 'low')\nconst threats = JSON.parse(readFileSync('reports/threats.json', 'utf8'))\nconst problems = []\nfor (const t of threats) {\n  const score = Number(t.score)   // likelihood (1-5) x impact (1-5)\n  if (!Number.isInteger(score) || score < 1 || score > 25) problems.push(`${t.system} ${t.id}: risk score \"${t.score ?? ''}\" is not likelihood x impact (1 to 25)`)\n  else if (t.severity !== rating(score)) problems.push(`${t.system} ${t.id}: severity ${t.severity}, but a score of ${score} is ${rating(score)}`)\n}\nfor (const system of new Set(threats.map((t) => t.system))) {\n  const file = `threat-model/objectives/${system}.md`\n  const text = existsSync(file) ? readFileSync(file, 'utf8') : ''\n  for (const heading of ['## Business objectives', '## Attack scenarios'])\n    if (!text.includes(heading)) problems.push(`${file}: no \"${heading}\" section (PASTA stages 1 and 6)`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\nconsole.log(`${threats.length} threats scored, objectives and attack scenarios for every system`)\n```",
       "hubWhen": {
         "METHOD": [

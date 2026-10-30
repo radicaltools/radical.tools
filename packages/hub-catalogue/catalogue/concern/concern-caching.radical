@@ -759,7 +759,11 @@
       "label": "Cache headers right on every route",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the GET routes from the router's table (not from a list kept by hand), calls each as a signed-in user and reads its Cache-Control. A route on the personal list must be private or no-store; a response marked for shared caches (public or s-maxage) must carry an ETag and a lifetime, s-maxage (or max-age) plus stale-while-revalidate, within the TTL, and a second request with its ETag must get 304. A new route without a policy fails the test in its pull request.\n\nThreshold: 100% of GET routes answer with Cache-Control; personal routes private or no-store and never public; every response a shared cache may keep has an ETag, a lifetime of at most {{TTL_SECONDS}} seconds and answers If-None-Match with 304\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'               // routes: the router's table, each with an example path\nimport { PERSONAL } from '../src/http/cachePolicy'     // the GET routes whose answers carry personal data or depend on the caller\nimport { signIn } from './cache/fixtures'\n\nconst TTL_SECONDS = {{TTL_SECONDS}}\nconst token = await signIn()\nconst seconds = (cc: string, name: string) => Number(cc.split(',').map((d) => d.trim()).find((d) => d.startsWith(`${name}=`))?.slice(name.length + 1) ?? NaN)\n\ndescribe.each(routes.filter((r) => r.method === 'GET'))('GET $path', (route) => {\n  it('says who may keep the answer, and for how long', async () => {\n    const res = await request(app).get(route.example).set('Authorization', `Bearer ${token}`).expect(200)\n    const cc = String(res.headers['cache-control'] ?? '')\n    expect(cc, 'an explicit Cache-Control').not.toBe('')\n    if (PERSONAL.has(route.path)) {\n      expect(cc).toMatch(/\\b(private|no-store)\\b/)\n      return expect(cc).not.toMatch(/\\bpublic\\b|s-maxage/)\n    }\n    if (!/\\bpublic\\b|s-maxage/.test(cc)) return       // not for shared caches\n    const fresh = Number.isNaN(seconds(cc, 's-maxage')) ? seconds(cc, 'max-age') : seconds(cc, 's-maxage')\n    expect(fresh + (seconds(cc, 'stale-while-revalidate') || 0)).toBeLessThanOrEqual(TTL_SECONDS)\n    expect(res.headers.etag, 'an ETag to revalidate with').toBeTruthy()\n    await request(app).get(route.example).set('Authorization', `Bearer ${token}`).set('If-None-Match', res.headers.etag).expect(304)\n  })\n})\n```"
     },
     {
@@ -768,7 +772,11 @@
       "label": "No cache arrives unannounced",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A dependency rule fails the build when code under src imports a Redis, Valkey or Memcached client or an in-process cache library, which would mean a cache arrived without its decision. The modules that keep idempotency keys, rate-limit counters or sessions in a Redis by other decisions are left out by path.\n\nThreshold: 0 modules under src, outside the modules other decisions give a Redis of their own, import a cache client or an in-process cache library\n\nTool: dependency-cruiser (or the equivalent for your stack: an ArchUnit rule forbidding com.github.benmanes.caffeine, io.lettuce, redis.clients.jedis and org.springframework.cache)\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'no-cache',\n    comment: 'ADR No cache: supersede it before keeping copies of the store\\'s data. Redis for idempotency keys, rate limits and sessions is decided elsewhere.',\n    severity: 'error',\n    from: { path: '^src/', pathNot: '^src/(idempotency|rate-limit|sessions)/' },\n    to: { path: '^node_modules/(ioredis|redis|iovalkey|memjs|memcached|lru-cache|node-cache|keyv|cache-manager|@redis/[^/]+|@valkey/[^/]+|@keyv/[^/]+|@isaacs/ttlcache)/' },\n  }],\n}\n```",
       "hubWhen": {
         "WHERE": [
@@ -782,7 +790,10 @@
       "label": "Cache Redis bounded, every key expiring",
       "x": 1040,
       "y": 260,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A script run after every deploy and hourly by the monitoring job reads the cache's memory settings with INFO memory (which managed services allow where CONFIG GET is disabled) and scans the cache keys without blocking Redis (SCAN), failing on a key with no expiry or a longer one.\n\nThreshold: maxmemory above 0 and maxmemory-policy allkeys-lru or allkeys-lfu; 0 cache keys without an expiry or with more than {{TTL_SECONDS}} seconds left\n\nTool: redis-cli in a shell step (REDIS_URL points at the cache's own Redis or Valkey; valkey-cli takes the same arguments)\n\n```bash\nset -euo pipefail\ninfo=$(redis-cli -u \"$REDIS_URL\" --raw INFO memory | tr -d '\\r')\npolicy=$(awk -F: '$1 == \"maxmemory_policy\" { print $2 }' <<<\"$info\")\nmax=$(awk -F: '$1 == \"maxmemory\" { print $2 }' <<<\"$info\")\n[[ \"$policy\" == allkeys-lru || \"$policy\" == allkeys-lfu ]] || { echo \"eviction policy $policy: the cache needs allkeys-lru or allkeys-lfu\"; exit 1; }\n[ \"$max\" -gt 0 ] || { echo \"maxmemory is 0: the cache grows until the host runs out of memory\"; exit 1; }\nbad=0\nwhile read -r key; do\n  ttl=$(redis-cli -u \"$REDIS_URL\" --raw TTL \"$key\" < /dev/null)\n  [ \"$ttl\" -eq -2 ] && continue                                 # expired during the scan\n  if [ \"$ttl\" -lt 0 ] || [ \"$ttl\" -gt {{TTL_SECONDS}} ]; then echo \"$key: TTL $ttl\"; bad=1; fi\ndone < <(redis-cli -u \"$REDIS_URL\" --scan --pattern 'cache:*')\nexit $bad\n```",
       "hubWhen": {
         "WHERE": [
@@ -796,7 +807,11 @@
       "label": "In-process cache bounded in size and age",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A unit test builds the cache with its production settings from the one module that makes it, checks the bound and the TTL, then loads 1,000 more keys than the bound and checks that it evicted instead of growing.\n\nThreshold: The cache's bound is at most {{LOCAL_MAX_ENTRIES}} entries and its TTL above 0 and at most {{TTL_SECONDS}} seconds; after 1,000 more keys than the bound, it holds at most {{LOCAL_MAX_ENTRIES}}\n\nTool: Vitest over lru-cache; for the JVM: JUnit over Caffeine, reading cache.policy().eviction() and cache.policy().expireAfterWrite()\n\n```ts\nimport { expect, it } from 'vitest'\nimport { createProductCache } from '../src/cache/local'   // the in-process cache with its production settings (lru-cache)\n\nconst MAX_ENTRIES = {{LOCAL_MAX_ENTRIES}}\nconst TTL_SECONDS = {{TTL_SECONDS}}\n\nit('is bounded in size and in age', () => {\n  const cache = createProductCache()\n  expect(cache.max).toBeLessThanOrEqual(MAX_ENTRIES)\n  expect(cache.ttl).toBeGreaterThan(0)\n  expect(cache.ttl).toBeLessThanOrEqual(TTL_SECONDS * 1000)\n})\n\nit('evicts instead of growing past the bound', async () => {\n  const cache = createProductCache({ load: async (id: string) => ({ id }) })\n  for (let i = 0; i < MAX_ENTRIES + 1000; i++) await cache.fetch(String(i))\n  expect(cache.size).toBeLessThanOrEqual(MAX_ENTRIES)\n})\n```",
       "hubWhen": {
         "WHERE": [
@@ -810,7 +825,11 @@
       "label": "A change reaches every reader in time",
       "x": 1040,
       "y": 520,
-      "category": "operational",
+      "characteristic": "functional-suitability",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "deploy",
+      "invocation": "automated",
       "description": "An integration test against a deployed environment reads one product through every reader so that each has it cached, changes its price through the API, and polls every reader until it serves the new price, failing past the bound. With deletion by change events, a second run makes the change with SQL straight in the store, as a job or another service would, and expects the same.\n\nThreshold: Every reader (each instance, or the CDN) serves the changed value within {{INVALIDATE_SECONDS}} seconds of the write\n\nTool: Vitest with fetch against the environment (READ_URLS lists each instance's own address, or the CDN's; for the JVM: JUnit with the HTTP client)\n\n```ts\nimport { expect, it } from 'vitest'\n\nconst READ_URLS = process.env.READ_URLS!.split(',')     // every instance's own address, or the CDN's\nconst WRITE_URL = process.env.WRITE_URL!\nconst INVALIDATE_SECONDS = {{INVALIDATE_SECONDS}}\nconst price = (url: string) => fetch(`${url}/products/42`).then((r) => r.json()).then((p) => p.price as number)\n\nit('a committed change reaches every reader within the bound', async () => {\n  const before = await Promise.all(READ_URLS.map(price))  // now cached by every reader\n  const changed = before[0] + 1\n  const write = await fetch(`${WRITE_URL}/products/42`, {\n    method: 'PATCH',\n    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.WRITER_TOKEN}` },\n    body: JSON.stringify({ price: changed }),\n  })\n  expect(write.ok).toBe(true)\n  const committed = Date.now()\n  for (const url of READ_URLS) {\n    while ((await price(url)) !== changed) {\n      expect(Date.now() - committed).toBeLessThan(INVALIDATE_SECONDS * 1000)\n      await new Promise((r) => setTimeout(r, 200))\n    }\n  }\n}, 60_000)\n```",
       "hubWhen": {
         "WHERE": [
@@ -830,7 +849,11 @@
       "label": "Commands never read the cache",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A dependency rule follows every import from the operations that change data and fails the build when one of them reaches the cached reads. Removing entries after a write (src/cache/invalidate) stays allowed.\n\nThreshold: 0 modules under src/commands that reach src/cache/read, directly or through other modules\n\nTool: dependency-cruiser (reachable rule); for the JVM: an ArchUnit rule that classes in ..commands.. do not depend on ..cache.read..\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'writes-decide-on-the-store',\n    comment: 'ADR cache: a decision that writes reads the store inside its transaction, never a cached entry (src/cache/invalidate stays allowed)',\n    severity: 'error',\n    from: { path: '^src/commands/' },\n    to: { path: '^src/cache/read', reachable: true },\n  }],\n  options: { tsConfig: { fileName: 'tsconfig.json' } },\n}\n```",
       "hubWhen": {
         "WHERE": [
@@ -845,7 +868,11 @@
       "label": "Concurrent misses read the store once",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test forgets one key, starts 100 reads of it at once through the cached reads and counts the calls to the store. With a shared cache it runs against a Redis started by Testcontainers; with an in-process cache, against the cache itself.\n\nThreshold: 100 concurrent reads of one uncached key cause exactly 1 store read and return 1 value\n\nTool: Vitest (vi.spyOn on the store reads); for the JVM: JUnit with Caffeine's AsyncLoadingCache or the Redis client of the decision\n\n```ts\nimport { expect, it, vi } from 'vitest'\nimport { products } from '../src/cache/read'          // the cached reads: getOrLoad and forget\nimport { productStore } from '../src/catalog/store'   // the store reads a miss falls back to\n\nit('100 concurrent misses for one key read the store once', async () => {\n  const read = vi.spyOn(productStore, 'findById')\n  await products.forget('42')                         // a cold key\n  const answers = await Promise.all(Array.from({ length: 100 }, () => products.getOrLoad('42')))\n  expect(read).toHaveBeenCalledTimes(1)\n  expect(new Set(answers.map((p) => JSON.stringify(p))).size).toBe(1)\n})\n```",
       "hubWhen": {
         "WHERE": [
@@ -863,7 +890,11 @@
       "label": "Hot entries refreshed just before expiry",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A unit test drives the early-refresh check with a read every millisecond across the entry's life and records the first read that refreshes it. With XFetch, the chance of a refresh more than 1 second (20 load times) early is about 50 times e to the minus 20, so the test is stable.\n\nThreshold: For an entry read every millisecond whose load took 50 ms, a refresh happens before expiry and less than 1 second before it\n\nTool: Vitest; for the JVM: JUnit over the same check (Caffeine's refreshAfterWrite refreshes at a fixed age, not probabilistically, so the check is code of your own)\n\n```ts\nimport { expect, it } from 'vitest'\nimport { refreshEarly } from '../src/cache/xfetch'   // true when now - delta * beta * ln(random()) >= expiry\n\nit('refreshes a hot entry before it expires, and not long before', () => {\n  const expiry = {{TTL_SECONDS}} * 1000\n  const delta = 50                                  // the last load took 50 ms\n  let refreshedAt: number | undefined\n  for (let now = 0; now < expiry && refreshedAt === undefined; now += 1) {   // a read every millisecond\n    if (refreshEarly({ now, expiry, delta, beta: 1 })) refreshedAt = now\n  }\n  expect(refreshedAt).toBeDefined()\n  expect(expiry - refreshedAt!).toBeLessThan(1000)\n})\n```",
       "hubWhen": {
         "WHERE": [
@@ -881,7 +912,11 @@
       "label": "The store carries the peak on a cold cache",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "30d",
+      "invocation": "automated",
       "description": "The scheduled load job empties the cache (FLUSHDB on the cache's own Redis, or a rolling restart for in-process caches) and at once runs k6 at the peak rate against 20 hot keys, the shape that makes a stampede. PEAK_RPS and P95_MS come from the Capacity and scaling pack's decision.\n\nThreshold: With the cache emptied, 5 minutes at the peak read rate on 20 hot keys: errors under 0.1 % and the 95th percentile under the latency budget of the Capacity and scaling pack\n\nTool: k6 (constant-arrival-rate executor and thresholds), run by the scheduled load job\n\n```js\n// load/cold-cache.js, run right after emptying the cache:\n//   shared cache: redis-cli -u \"$REDIS_URL\" FLUSHDB; in-process caches: a rolling restart of the instances\nimport http from 'k6/http'\n\nexport const options = {\n  scenarios: {\n    cold: { executor: 'constant-arrival-rate', rate: Number(__ENV.PEAK_RPS), timeUnit: '1s', duration: '5m', preAllocatedVUs: 200, maxVUs: 1000 },\n  },\n  thresholds: {\n    http_req_failed: ['rate<0.001'],\n    http_req_duration: [`p(95)<${__ENV.P95_MS}`],     // the latency budget of the Capacity and scaling pack\n  },\n}\n\nexport default function () {\n  http.get(`${__ENV.BASE_URL}/products/${1 + Math.floor(Math.random() * 20)}`)   // 20 hot keys\n}\n```",
       "hubWhen": {
         "WHERE": [
@@ -899,7 +934,11 @@
       "label": "Cache outage falls back within a limit",
       "x": 1040,
       "y": 1170,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts Redis in a container, builds the app on it, warms one key, stops the container and fires 200 reads at 50 keys. A probe around the store reads records how many ran at once.\n\nThreshold: With the cache container stopped, 200 concurrent reads answer only 200 or 503 with Retry-After, at least one 200, and at most {{FALLBACK_CONCURRENCY}} store reads run at once\n\nTool: Vitest with supertest and Testcontainers (@testcontainers/redis); for the JVM: JUnit with Testcontainers and Resilience4j's CircuitBreaker and Bulkhead\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { RedisContainer } from '@testcontainers/redis'\nimport { createApp } from '../src/app'             // the app, built on the given cache\nimport { storeProbe } from './cache/storeProbe'    // counts the store reads, and how many ran at once\n\nconst FALLBACK_CONCURRENCY = {{FALLBACK_CONCURRENCY}}\n\nit('reads from the store, a limited number at a time, while the cache is down', async () => {\n  const redis = await new RedisContainer('redis:7.4').start()\n  const app = createApp({ cacheUrl: redis.getConnectionUrl() })\n  await request(app).get('/products/1').expect(200)   // warms the cache\n  await redis.stop()\n  storeProbe.reset()\n  const answers = await Promise.all(Array.from({ length: 200 }, (_, i) => request(app).get(`/products/${1 + (i % 50)}`)))\n  for (const a of answers) expect(a.status === 200 || (a.status === 503 && a.headers['retry-after'] !== undefined)).toBe(true)\n  expect(answers.filter((a) => a.status === 200).length).toBeGreaterThan(0)\n  expect(storeProbe.maxConcurrent()).toBeLessThanOrEqual(FALLBACK_CONCURRENCY)\n}, 60_000)\n```",
       "hubWhen": {
         "WHERE": [
@@ -916,7 +955,11 @@
       "label": "Cache outage refused fast",
       "x": 1040,
       "y": 1300,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts Redis in a container, builds the app on it, warms one key, stops the container, then times one read and counts the store reads it caused.\n\nThreshold: With the cache container stopped, a read is answered 503 with Retry-After within {{CACHE_TIMEOUT_MS}} ms plus 100 ms, and 0 store reads happen\n\nTool: Vitest with supertest and Testcontainers (@testcontainers/redis); for the JVM: JUnit with Testcontainers\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { RedisContainer } from '@testcontainers/redis'\nimport { createApp } from '../src/app'             // the app, built on the given cache\nimport { storeProbe } from './cache/storeProbe'    // counts the store reads\n\nconst CACHE_TIMEOUT_MS = {{CACHE_TIMEOUT_MS}}\n\nit('refuses reads at once while the cache is down, sparing the store', async () => {\n  const redis = await new RedisContainer('redis:7.4').start()\n  const app = createApp({ cacheUrl: redis.getConnectionUrl() })\n  await request(app).get('/products/1').expect(200)   // warms the cache\n  await redis.stop()\n  storeProbe.reset()\n  const started = Date.now()\n  const res = await request(app).get('/products/2')\n  expect(res.status).toBe(503)\n  expect(res.headers['retry-after']).toBeDefined()\n  expect(Date.now() - started).toBeLessThan(CACHE_TIMEOUT_MS + 100)\n  expect(storeProbe.total()).toBe(0)\n}, 60_000)\n```",
       "hubWhen": {
         "WHERE": [
@@ -933,7 +976,10 @@
       "label": "Hit ratio watched",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "Prometheus computes the hit ratio over an hour. For a shared cache, from redis_exporter's keyspace counters of the cache's own Redis (meaningful because nothing else uses it); for an in-process cache, from the cache.gets meter that Micrometer's Caffeine binder exports (in Node.js, a prom-client counter of the same name and labels). Keep the rule of the cache the decision names.\n\nThreshold: An alert opens a ticket when the share of lookups answered from the cache over the last hour stays below {{HIT_RATIO}} % for 15 minutes\n\nTool: Prometheus alerting rules over redis_exporter (shared cache) or Micrometer's CaffeineCacheMetrics (in-process cache)\n\n```yaml\ngroups:\n  - name: cache\n    rules:\n      - alert: SharedCacheHitRatioLow        # the cache's own Redis or Valkey, scraped by redis_exporter\n        expr: |\n          sum by (instance) (rate(redis_keyspace_hits_total[1h]))\n            / (sum by (instance) (rate(redis_keyspace_hits_total[1h])) + sum by (instance) (rate(redis_keyspace_misses_total[1h])))\n            < {{HIT_RATIO}} / 100\n        for: 15m\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Cache {{ $labels.instance }} answers only {{ $value | humanizePercentage }} of lookups\"\n      - alert: LocalCacheHitRatioLow         # Micrometer's Caffeine binder: cache_gets_total{cache, result=\"hit\"|\"miss\"}\n        expr: |\n          sum by (cache) (rate(cache_gets_total{result=\"hit\"}[1h])) / sum by (cache) (rate(cache_gets_total[1h])) < {{HIT_RATIO}} / 100\n        for: 15m\n        labels: { severity: ticket }\n        annotations:\n          summary: \"In-process cache {{ $labels.cache }} answers only {{ $value | humanizePercentage }} of lookups\"\n```",
       "hubWhen": {
         "WHERE": [

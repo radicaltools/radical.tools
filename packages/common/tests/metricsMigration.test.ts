@@ -41,7 +41,7 @@ describe('models from before metrics', () => {
     expect((data.nodes.find((n) => n.id === 'plain') as unknown as Record<string, unknown>).tests).toBe('kept: no checked type')
     expect((data.snapshots![0].nodes.ff as unknown as Record<string, unknown>).metrics).toBe('test(tests/load.test.ts) passed')
     const keys = (type: string) => data.metamodel!.nodeTypes[type].properties!.map((p) => p.key)
-    expect(keys('fitness-fn')).toEqual(['description', 'category', 'metrics', 'combine', 'max_age'])
+    expect(keys('fitness-fn')).toEqual(['description', 'characteristic', 'scope', 'cadence', 'trigger', 'every', 'invocation', 'measure', 'metrics', 'combine', 'max_age'])
     expect(keys('scenario')).toEqual(['given', 'when', 'then', 'gherkin', 'metrics', 'combine', 'max_age'])
     const saved = serializeToMdFolder(data, 'Old')
     const ffFile = Object.entries(saved).find(([path]) => path.endsWith('latency.md'))![1]

@@ -205,7 +205,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-guide-declared', label: 'Contracts name their guide', category: 'structural', implements: GUIDES, checks: ['req-guide-declared'],
+      id: 'ff-guide-declared', label: 'Contracts name their guide', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-guide-declared'],
       threshold: 'Every document under api/ has info.x-api-guide with a name, an https URL and a revision; 1 distinct guide across all documents',
       description: 'A test reads every OpenAPI document under api/ and checks info.x-api-guide, then that all documents name the same guide.',
       tool: 'Vitest with the yaml package (or the test runner of your stack)',
@@ -233,7 +233,7 @@ it('names the same guide in every document', () => {
 })`,
     },
     {
-      id: 'ff-spectral-ci', label: 'Spectral lints every contract change', when: SPECTRAL, category: 'process', implements: GUIDES, checks: ['req-lint'],
+      id: 'ff-spectral-ci', label: 'Spectral lints every contract change', when: SPECTRAL, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-lint'],
       threshold: '0 Spectral findings of severity error in the documents under api/ for the pull request to merge; warnings annotated, not blocking',
       description: 'A workflow runs on every pull request that touches api/ or the ruleset, lints all documents with the ruleset in .spectral.yaml and fails at severity error; the github-actions format puts each finding on its line in the pull request. The job is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.',
       tool: 'Spectral CLI (@stoplight/spectral-cli) in GitHub Actions',
@@ -257,7 +257,7 @@ jobs:
       - run: npx spectral lint "api/*.yaml" --ruleset .spectral.yaml --fail-severity error --format github-actions`,
     },
     {
-      id: 'ff-ruleset', label: 'Ruleset pinned and every rule sourced', when: SPECTRAL, category: 'structural', implements: GUIDES, checks: ['req-ruleset-pinned', 'req-rule-sources'],
+      id: 'ff-ruleset', label: 'Ruleset pinned and every rule sourced', when: SPECTRAL, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-ruleset-pinned', 'req-rule-sources'],
       threshold: '0 extends entries that are URLs or packages without an exact version; 0 rules defined in api/style/ruleset.yaml without an https documentationUrl or with a severity other than error or warn',
       description: 'A script run in the API style job reads api/style/ruleset.yaml: every extends entry must be a local file, a Spectral built-in or a package installed at an exact version in package.json, and every rule the file defines (not a mere severity change of an extended rule) must link to its guideline and carry error or warn.',
       tool: 'Node.js with the yaml package',
@@ -285,7 +285,7 @@ for (const [name, rule] of Object.entries(ruleset.rules ?? {})) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-codeowners', label: 'API owners own the contracts', category: 'process', implements: GUIDES, checks: ['req-owners-review'],
+      id: 'ff-codeowners', label: 'API owners own the contracts', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-owners-review'],
       threshold: 'CODEOWNERS assigns /api/ to {{API_OWNERS}}, and the rules of the main branch require a code owner\'s review',
       description: 'A CI step checks that .github/CODEOWNERS gives /api/ (the documents and the style ruleset) to the API owners, and asks GitHub whether the rules that apply to main require a code owner\'s review, so the approval cannot be skipped. The branch ruleset itself is kept by the Code review and branching pack; this check only reads it. The step needs a token that can read the repository\'s rules (GH_TOKEN).',
       tool: 'bash with the GitHub CLI (REST: GET /repos/{owner}/{repo}/rules/branches/{branch})',
@@ -300,7 +300,7 @@ required=$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" \\
 [ "$required" = true ] || { echo "main does not require a code owner's review"; exit 1; }`,
     },
     {
-      id: 'ff-review-checklist', label: 'Style checklist ticked', when: { LINT: ['review'] }, category: 'process', implements: GUIDES, checks: ['req-review-checklist'],
+      id: 'ff-review-checklist', label: 'Style checklist ticked', when: { LINT: ['review'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: GUIDES, checks: ['req-review-checklist'],
       threshold: '0 unticked items in the "API style checklist" section of a pull request that changes api/; a missing section fails too',
       description: 'The pull-request template (.github/pull_request_template.md) carries a section "## API style checklist" with one item per MUST rule of the guide that a reviewer checks. A workflow on pull requests that touch api/ reads the description and fails while the section is missing or has an unticked item; it reruns when the description is edited.',
       tool: 'GitHub Actions (bash over the pull request\'s body)',
@@ -324,7 +324,7 @@ jobs:
           if printf '%s\\n' "$section" | grep -q '^- \\[ \\]'; then echo "unticked items in the API style checklist"; exit 1; fi`,
     },
     {
-      id: 'ff-design-first-pr', label: 'Contract changes come alone', when: { DESIGN: ['design'] }, category: 'process', implements: ['adr-design-first'], checks: ['req-design-first'],
+      id: 'ff-design-first-pr', label: 'Contract changes come alone', when: { DESIGN: ['design'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-design-first'], checks: ['req-design-first'],
       threshold: '0 pull requests that change a document under api/ and a file under src/ together',
       description: 'A CI step on every pull request lists the files changed against the base branch and fails when both a contract document and implementation code are among them.',
       tool: 'bash and git in the CI job (checkout with fetch-depth: 0)',
@@ -340,7 +340,7 @@ if printf '%s\\n' "$changed" | grep -q '^api/[^/]*\\.yaml$' && printf '%s\\n' "$
 fi`,
     },
     {
-      id: 'ff-routes-match', label: 'Server serves the contract', when: { DESIGN: ['design'] }, category: 'structural', implements: ['adr-design-first'], checks: ['req-design-routes'],
+      id: 'ff-routes-match', label: 'Server serves the contract', when: { DESIGN: ['design'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-design-first'], checks: ['req-design-routes'],
       threshold: '0 routes in the router\'s table that the documents do not describe; every described operation not in the table answers 501',
       description: 'A test lists the operations of every document under api/ and the routes from the router itself (not from a list kept by hand), fails on a route the documents do not describe, and calls each described operation the router does not serve, expecting 501 from the fallback handler.',
       tool: 'Vitest with supertest and the yaml package (or the test runner and HTTP client of your stack)',
@@ -372,7 +372,7 @@ it('answers 501 for each described operation not built yet', async () => {
 })`,
     },
     {
-      id: 'ff-generated-matches', label: 'Committed contract is what the code makes', when: { DESIGN: ['code'] }, category: 'process', implements: ['adr-code-first'], checks: ['req-code-first'],
+      id: 'ff-generated-matches', label: 'Committed contract is what the code makes', when: { DESIGN: ['code'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-code-first'], checks: ['req-code-first'],
       threshold: '0 differences, new files included, under api/ after regenerating the documents from the code',
       description: 'A workflow on every pull request regenerates the OpenAPI documents from the code and fails when anything under api/ changed or appeared, so a contract change that was not committed cannot merge.',
       tool: 'GitHub Actions with the project\'s generator (npm run openapi:generate over @nestjs/swagger or tsoa; on Spring, springdoc-openapi-maven-plugin in ./mvnw verify)',
@@ -397,7 +397,7 @@ jobs:
           test -z "$(git status --porcelain -- api/)" || { echo "run npm run openapi:generate and commit api/"; exit 1; }`,
     },
     {
-      id: 'ff-exceptions', label: 'Exceptions complete and current', when: { EXCEPTIONS: ['inline'] }, category: 'structural', implements: GUIDES, checks: ['req-exception-recorded', 'req-exception-expiry'],
+      id: 'ff-exceptions', label: 'Exceptions complete and current', when: { EXCEPTIONS: ['inline'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-exception-recorded', 'req-exception-expiry'],
       threshold: '0 exceptions without a rule, a reason, an approver and dates; 0 expired; 0 standing more than {{EXCEPTION_MONTHS}} months from approval; 0 differences between the committed .spectral.yaml and the one the exceptions produce',
       description: 'A script run in CI walks every document under api/ for x-api-style-exceptions entries, checks each, and writes .spectral.yaml: the style ruleset plus one Spectral override per exception, turning its rule off at that JSON pointer only. CI runs it and then git diff --exit-code .spectral.yaml, so an override added by hand, without its entry, fails. With review only, the overrides are written but nothing lints with them.',
       tool: 'Node.js with the yaml package; Spectral overrides',
@@ -429,7 +429,7 @@ writeFileSync('.spectral.yaml', stringify({ extends: ['./api/style/ruleset.yaml'
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-no-exceptions', label: 'No rule turned off for one API', when: { EXCEPTIONS: ['none'] }, category: 'structural', implements: GUIDES, checks: ['req-no-exceptions'],
+      id: 'ff-no-exceptions', label: 'No rule turned off for one API', when: { EXCEPTIONS: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: GUIDES, checks: ['req-no-exceptions'],
       threshold: '0 x-api-style-exceptions or x-zally-ignore keys under api/; 0 overrides sections in .spectral.yaml or api/style/*.yaml',
       description: 'A CI step searches the documents for inline exceptions and the ruleset files for Spectral overrides, and fails on any; turning a rule off for every API in api/style/ruleset.yaml stays allowed, through a pull request the API owners approve.',
       tool: 'bash and grep in the CI job',
@@ -446,7 +446,7 @@ if [ -n "$inline$overrides" ]; then
 fi`,
     },
     {
-      id: 'ff-own-guide', label: 'Our guide says how each rule is checked', when: { GUIDE: ['own'] }, category: 'structural', implements: ['adr-guide-own'], checks: ['req-own-guide'],
+      id: 'ff-own-guide', label: 'Our guide says how each rule is checked', when: { GUIDE: ['own'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-guide-own'], checks: ['req-own-guide'],
       threshold: 'api/style/guide.md names its base guide with an https link and a revision; every "### R<n> MUST|SHOULD" rule is followed by a "Checked by:" line; 0 lint rules named that the ruleset does not define',
       description: 'A test parses api/style/guide.md: the "Derived from:" line, each numbered rule with its "Checked by: review" or "Checked by: spectral `rule-name`" line, and the rule names, which must be defined in api/style/ruleset.yaml or in a local ruleset it extends. With review only, every rule says review and the ruleset may be absent.',
       tool: 'Vitest with the yaml package',
