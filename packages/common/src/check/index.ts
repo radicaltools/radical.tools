@@ -124,6 +124,8 @@ export interface CheckOptions {
   measurements?: Measurement[]
   /** When the conditions are evaluated, for max_age (ms since the epoch). */
   now?: number
+  /** Earlier measurements a condition against a baseline compares with. */
+  baseline?: Measurement[]
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
@@ -231,6 +233,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.tests ? { tests: options.tests } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
     ...(options.measurements ? { measurements: options.measurements } : {}),
+    ...(options.baseline ? { baseline: options.baseline } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
   }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))

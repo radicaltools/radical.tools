@@ -162,6 +162,34 @@ describe('radical check', () => {
     expect(dir.out).toContain('Test reports: 2 test cases')
   })
 
+  it('compares a condition against a baseline with the median of the --baseline files, keeping none of them beside the model', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('adr', 'adr', 'Fast open', { status: 'accepted', date: '2026-10-30', context: 'c', decision: 'd', consequences: 'q' }),
+        node('ff', 'fitness-fn', 'Open time', { metrics: 'studio.open_ms{model=x14} <= baseline + 20%', max_age: '3d' }),
+      ],
+      relations: [{ id: 'i', relationType: 'implements', sourceId: 'ff', targetId: 'adr' }],
+    })
+    const file = (value: number, daysAgo: number) => JSON.stringify({
+      format: 'radical-metrics', version: 1, source: 'json', at: new Date(Date.now() - daysAgo * 86400e3).toISOString(),
+      measurements: [{ metric: 'studio.open_ms', value, unit: 'ms', labels: { model: 'x14' } }],
+    })
+    await mkdir(join(cwd, 'history'))
+    for (const [i, v] of [5000, 5200, 4800].entries()) await writeFile(join(cwd, `history/night-${i}.json`), file(v, i + 1))
+    await writeFile(join(cwd, 'tonight.json'), file(6500, 0))
+    // Without a baseline it is not evaluated: a warning, no error.
+    const none = await run(cwd, 'check', 'model', '--metrics', 'tonight.json')
+    expect(none.code).toBe(0)
+    expect(none.out).toContain('studio.open_ms{model=x14} <= baseline + 20% was not evaluated: no baseline to compare with')
+    // Against the median of the history (5000 ms): 6500 is beyond 6000.
+    const slow = await run(cwd, 'check', 'model', '--metrics', 'tonight.json', '--baseline', 'history')
+    expect(slow.code).toBe(1)
+    expect(slow.out).toContain('baseline 5000 ms, the median of 3; limit 6000 ms')
+    // The baseline is read, never kept: only tonight's measurement is beside the model.
+    const store = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    expect(store.measurements.map((m: { value: number }) => m.value)).toEqual([6500])
+  })
+
   it('reads measurements given with --metrics, keeps them beside the model, and judges the conditions by them', async () => {
     const cwd = await workspace({
       nodes: [

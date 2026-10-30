@@ -88,7 +88,7 @@ export function conditionResults(node: C4Node, model: CheckModel): ConditionResu
   return conditionsOf(node).map((c): ConditionResult => {
     if (c.kind === 'invalid') return { condition: c.raw, outcome: 'invalid', detail: c.problem }
     if (c.kind === 'test') return { condition: c.raw, test: c.id.raw, outcome: testOutcome(c.id, model) }
-    const e = evaluateMetric(c, model.measurements ?? [], maxAge, now)
+    const e = evaluateMetric(c, model.measurements ?? [], maxAge, now, model.baseline ?? [])
     return { condition: c.raw, outcome: e.outcome, ...(e.measurement ? { measurement: e.measurement } : {}), ...(e.detail ? { detail: e.detail } : {}) }
   })
 }

@@ -30,6 +30,11 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
                       the latest measurement each matches
+  --baseline <path>   earlier radical-metrics/1 files (a file, or a directory of
+                      them; repeat for more) that a condition stated against a
+                      baseline (<metric> <= baseline + 20%) compares with: the
+                      median of the latest seven measurements of its metric
+                      and labels. Read only, never kept beside the model
   --evidence <file>   with --report or measurements: write what they say about
                       each scenario, fitness function, requirement and ADR as JSON
   --ratchet           lower each baseline (max) in the config to the count found
@@ -78,6 +83,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         format: { type: 'string', default: 'text' },
         report: { type: 'string', multiple: true },
         metrics: { type: 'string', multiple: true },
+        baseline: { type: 'string', multiple: true },
         evidence: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
@@ -167,7 +173,19 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     await writeBeside(storePath, serializeMeasurementStore(measurements))
   }
 
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), concerns: concernPacks() })
+  // Earlier measurements, for conditions against a baseline; not kept.
+  let baseline: Measurement[] | undefined
+  if (values.baseline?.length) {
+    baseline = []
+    try {
+      for (const file of await reportFiles(values.baseline, io.cwd, /\.json$/i, 'baseline')) baseline.push(...parseMetricsFile(await readFile(resolve(io.cwd, file), 'utf8'), file))
+    } catch (error) {
+      io.err((error as NodeJS.ErrnoException).code === 'ENOENT' ? `Cannot read the baseline ${(error as NodeJS.ErrnoException).path}: no such file.` : (error as Error).message)
+      return 2
+    }
+  }
+
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), concerns: concernPacks() })
   if (tests) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited.

@@ -122,7 +122,7 @@ describe('invalid conditions', () => {
     const data = model('p95 is fine\nload.share{env=prod} <= 300 ms', { combine: 'most', max_age: 'soon' })
     const result = run(data, [measured('load.share', 40, '%', { env: 'prod' })])
     expect(messages(result, 'metric-invalid')).toEqual([
-      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed` nor `<metric>{<labels>} <op> <number> [unit]`.',
+      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`.',
       'Fitness function "Checkout latency": "load.share{env=prod} <= 300 ms" cannot be evaluated: the measurement is in %, which does not convert to ms.',
       'Fitness function "Checkout latency": combine "most" is none of all, any, at least N.',
       'Fitness function "Checkout latency": max_age "soon" is no age such as 7d, 12h or 30min.',
@@ -132,5 +132,41 @@ describe('invalid conditions', () => {
     // Without measurements only what the lines themselves say.
     expect(messages(run(data), 'metric-invalid')).toHaveLength(3)
     expect(computeEvidence({ nodes: { ff: data.nodes[1] }, relations: {}, metamodel: data.metamodel!, measurements: [] }).nodes.ff.conditions![0].outcome).toBe('invalid')
+  })
+})
+
+describe('conditions against a baseline', () => {
+  const night = (value: number, nightsAgo: number, unit = 'ms'): Measurement => measured('studio.open_ms', value, unit, { model: 'x14' }, nightsAgo * DAY)
+  const withBaseline = (data: DiagramData, measurements: Measurement[], baseline?: Measurement[]) =>
+    checkModel(data, {}, { measurements, ...(baseline ? { baseline } : {}), now: NOW })
+
+  it('reads the baseline with a margin in percent or in a unit, and none', () => {
+    expect(parseCondition('studio.open_ms{model=x14} <= baseline + 20%')).toMatchObject({ kind: 'metric', metric: 'studio.open_ms', labels: { model: 'x14' }, op: '<=', baseline: { sign: 1, by: 20, percent: true } })
+    expect(parseCondition('bundle.kb >= baseline - 5 kb')).toMatchObject({ kind: 'metric', op: '>=', baseline: { sign: -1, by: 5, percent: false, unit: 'kb' } })
+    expect(parseCondition('deps.cycles <= baseline')).toMatchObject({ kind: 'metric', baseline: { sign: 1, by: 0, percent: true } })
+    expect(parseCondition('studio.open_ms <= baseline + 20')).toMatchObject({ kind: 'invalid' })
+  })
+
+  it('compares the latest measurement with the median of the latest seven of the baseline, plus the margin', () => {
+    // Nine nights: the two oldest are past the seven, and one slow night does not move the median.
+    const baseline = [5000, 5100, 4900, 9000, 5050, 4950, 5000, 20000, 20000].map((v, i) => night(v, i + 1))
+    const data = model('studio.open_ms{model=x14} <= baseline + 20%')
+    const ok = withBaseline(data, [night(5900, 0.1)], baseline)
+    expect(ok.evidence!.nodes.ff.conditions![0]).toMatchObject({ outcome: 'passed', detail: 'baseline 5000 ms, the median of 7; limit 6000 ms' })
+    const slow = withBaseline(data, [night(6100, 0.1)], baseline)
+    expect(messages(slow, 'metric-failed')).toEqual(['Fitness function "Checkout latency": studio.open_ms{model=x14} <= baseline + 20% does not hold (6100 ms from json, 2 h ago); baseline 5000 ms, the median of 7; limit 6000 ms.'])
+  })
+
+  it('takes a margin in a unit, and a baseline measured in another unit, in the measurement\'s unit', () => {
+    const baseline = [night(5, 1, 's'), night(5, 2, 's'), night(5, 3, 's')]
+    expect(withBaseline(model('studio.open_ms{model=x14} <= baseline + 0.5 s'), [night(5400, 0.1)], baseline).evidence!.nodes.ff.status).toBe('passed')
+    expect(withBaseline(model('studio.open_ms{model=x14} <= baseline + 0.5 s'), [night(5600, 0.1)], baseline).evidence!.nodes.ff.status).toBe('failed')
+  })
+
+  it('says a condition is not evaluated while the baseline has nothing to compare with, and fails nothing for it', () => {
+    const result = withBaseline(model('studio.open_ms{model=x14} <= baseline + 20%'), [night(9000, 0.1)])
+    expect(result.evidence!.nodes.ff.status).toBe('not-run')
+    expect(messages(result, 'metric-failed')).toEqual([])
+    expect(messages(result, 'metric-not-measured')).toEqual(['Fitness function "Checkout latency": studio.open_ms{model=x14} <= baseline + 20% was not evaluated: no baseline to compare with (9000 ms from json, 2 h ago).'])
   })
 })

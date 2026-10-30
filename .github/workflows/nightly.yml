@@ -8,6 +8,10 @@ name: Nightly
 # crucible/findings/, proposed in a bot pull request. The findings go neither
 # into the model nor into Studio.
 #
+# A condition against a baseline (`<= baseline + 20%`) compares with the
+# median of the last seven nights: their measurements are handed on from
+# night to night as the artifact nightly-history, outside git.
+#
 # Sensors:
 #   - Large model in Studio: apps/e2e/tests/studio/scale.spec.ts on
 #     radical.tools' own model repeated 14 times, for the fitness function
@@ -25,9 +29,10 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 jobs:
-  sensors:
+  measure:
     name: Nightly sensors
     runs-on: ubuntu-latest
     # The same image as the E2E suite (e2e.yml): browsers and fonts.
@@ -66,23 +71,65 @@ jobs:
           --context commit=${{ github.sha }}
           --out reports/metrics/scale.json
 
+      - name: Upload what the night measured
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reports
+          path: reports/
+          retention-days: 30
+
+  findings:
+    name: Nightly findings
+    needs: measure
+    if: ${{ !cancelled() }}
+    # Off the container: gh is on the runner.
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @radicaltools/cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightly-reports
+          path: reports
+
+      - name: Earlier nights
+        # The last seven nights' measurements, from the latest earlier run
+        # that kept them.
+        run: |
+          mkdir -p history
+          for run in $(gh run list --workflow nightly.yml --branch main --limit 10 --json databaseId,status -q '.[] | select(.status == "completed") | .databaseId'); do
+            [ "$run" = "${{ github.run_id }}" ] && continue
+            if gh run download "$run" --name nightly-history --dir history 2>/dev/null; then echo "From run $run:"; break; fi
+          done
+          ls history
+
       - name: Check
-        # What the conditions say, for the run's log and artifacts; the
-        # findings come from the next step.
-        run: node apps/cli/dist/index.js check architecture --metrics reports/metrics --format github || true
+        # What the conditions say, for the run's log; the findings come from
+        # the next step.
+        run: |
+          baseline=""
+          if ls history/*.json >/dev/null 2>&1; then baseline="--baseline history"; fi
+          node apps/cli/dist/index.js check architecture --metrics reports/metrics $baseline --format github || true
       - name: Findings
-        run: >-
-          npx tsx tools/nightly-findings.ts architecture crucible/findings
-          --metrics reports/metrics --expect studio.
-          --commit ${{ github.sha }}
-          --run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          | tee reports/nightly-findings.txt
+        run: |
+          baseline=""
+          if ls history/*.json >/dev/null 2>&1; then baseline="--baseline history"; fi
+          npx tsx tools/nightly-findings.ts architecture crucible/findings \
+            --metrics reports/metrics $baseline --expect studio. \
+            --commit ${{ github.sha }} \
+            --run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} \
+            | tee nightly-findings.txt
 
       - name: Propose the findings
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           if [ -z "$(git status --porcelain crucible/findings)" ]; then echo "No new findings."; exit 0; fi
           branch="bot/nightly-findings-$(date -u +%Y-%m-%d)-${{ github.run_id }}"
           git config user.name "github-actions[bot]"
@@ -95,10 +142,16 @@ jobs:
             --title "Nightly findings $(date -u +%Y-%m-%d)" \
             --body "The nightly sensors broke conditions of the model (run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Each finding is a file in crucible/findings/; merged, it starts the next change: a fix, or a decision that the condition is wrong."
 
-      - name: Upload what the night measured
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+      - name: Hand on the last seven nights
+        # Tonight's measurements join the history, which keeps the seven
+        # latest; a night that measured nothing adds nothing.
+        run: |
+          if [ -f reports/metrics/scale.json ]; then cp reports/metrics/scale.json "history/$(date -u +%Y-%m-%dT%H%M)-${{ github.run_id }}.json"; fi
+          ls history/*.json 2>/dev/null | sort | head -n -7 | xargs -r rm --
+          ls history
+      - uses: actions/upload-artifact@v4
         with:
-          name: nightly-reports
-          path: reports/
-          retention-days: 30
+          name: nightly-history
+          path: history/
+          if-no-files-found: ignore
+          retention-days: 90

@@ -48,6 +48,9 @@ export interface CheckModel {
   /** The measurements passed in; the metric rules that read values run only
    *  with them. */
   measurements?: Measurement[]
+  /** Earlier measurements a condition against a baseline compares with
+   *  (the median of the latest seven of its metric). */
+  baseline?: Measurement[]
   /** The time conditions are evaluated at (ms since the epoch), for max_age;
    *  now when not given. */
   now?: number
@@ -142,7 +145,7 @@ function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, mode
 
 /** A rule over the metric conditions with `outcome`, with measurements. A
  *  failing one names what it leaves unverified as related. */
-function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition: string, detail: string) => string): (model: CheckModel) => RuleFinding[] {
+function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition: string, detail: string, why?: string) => string): (model: CheckModel) => RuleFinding[] {
   return (model) => {
     if (!model.measurements) return []
     return Object.values(model.nodes)
@@ -155,7 +158,7 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
             const m = r.measurement
             const seen = m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
             const related = outcome === 'failed' ? affectedBy(model, node).map((n) => n.id) : []
-            return { nodeId: node.id, message: message(node, r.condition, seen), ...(related.length ? { relatedIds: related } : {}) }
+            return { nodeId: node.id, message: message(node, r.condition, seen, r.detail), ...(related.length ? { relatedIds: related } : {}) }
           })
       })
   }
@@ -390,7 +393,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'error',
     dimension: 'tests',
     readsMeasurements: true,
-    run: metricRule('failed', (node, condition, seen) => `${TYPE_NAME[node.type]} ${quote(node)}: ${condition} does not hold${seen}.`),
+    run: metricRule('failed', (node, condition, seen, why) => `${TYPE_NAME[node.type]} ${quote(node)}: ${condition} does not hold${seen}${why ? `; ${why}` : ''}.`),
   },
   {
     id: 'metric-stale',
@@ -406,7 +409,9 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'tests',
     readsMeasurements: true,
-    run: metricRule('not-run', (node, condition) => `${TYPE_NAME[node.type]} ${quote(node)}: nothing measured ${condition}.`),
+    run: metricRule('not-run', (node, condition, seen, why) => why
+      ? `${TYPE_NAME[node.type]} ${quote(node)}: ${condition} was not evaluated: ${why}${seen}.`
+      : `${TYPE_NAME[node.type]} ${quote(node)}: nothing measured ${condition}.`),
   },
   {
     id: 'test-unbound',
