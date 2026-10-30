@@ -126,7 +126,9 @@ function notifyExternalChange(id: string): void {
 function webSession(id: string, handle: FsDirHandle): MdFolderSession {
   let session = webSessions.get(id)
   if (!session) {
-    session = new MdFolderSession(handleFolderStorage(handle))
+    // Opened as the folder's cache has it; the poll reloads what changed
+    // since (ADR Model cache beside the model).
+    session = new MdFolderSession(handleFolderStorage(handle), { openFromCache: true })
     session.onExternalChange = () => notifyExternalChange(id)
     webSessions.set(id, session)
   }

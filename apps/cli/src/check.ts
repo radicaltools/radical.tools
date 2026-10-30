@@ -108,7 +108,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   try {
     root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
-    files = await new MdFolderSession(diskFolderStorage(root)).readAll()
+    files = await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()
   } catch (error) {
     io.err(`Cannot read the model folder ${folder}: ${(error as Error).message}`)
     return 2

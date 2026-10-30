@@ -733,6 +733,11 @@ export function viewFolderPaths(views: Pick<DiagramView, 'folder'>[]): string[] 
   return [...paths].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
+/** The most elements a canvas draws. Beyond it a view is not drawn nor
+ *  laid out (a table shows any number): the live layout keeps matrices of
+ *  their number squared, and Smart Layout, labels and the DOM grow with it. */
+export const CANVAS_MAX_ELEMENTS = 1000
+
 export const WIKI_DEPTH_MIN = 1
 export const WIKI_DEPTH_MAX = 5
 

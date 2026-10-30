@@ -22,6 +22,7 @@ import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { NodeActions, RelationActions } from './SelectionActions'
+import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 /** A text field got or lost focus: what is typed into it in between (each
@@ -1840,6 +1841,16 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   const setOpenSection = (open: PanelSectionId) => useLeftPanelSection.setState({ open })
   type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
+  // A view's properties asked for from elsewhere (a canvas too large to draw).
+  useEffect(() => {
+    if (isReadOnly) return
+    const open = (e: Event): void => {
+      const id = (e as CustomEvent<string>).detail
+      if (id) { setPaneContent({ kind: 'view', id }); setOpenSection('views') }
+    }
+    window.addEventListener(OPEN_VIEW_PROPERTIES_EVENT, open)
+    return () => window.removeEventListener(OPEN_VIEW_PROPERTIES_EVENT, open)
+  }, [isReadOnly])
   const hasPaneContent = !!paneContent
   // The pane slid out of sight takes no Tab stop: the hidden "◀ Back" (and,
   // with properties open, the cards behind them) were stops the user could

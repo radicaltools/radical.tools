@@ -570,11 +570,13 @@ radical-mcp --version</code></pre>
    ├─ forge-run.json          <span class="cm"># where an agent's Forge run stands</span>
    ├─ agent-activity.json     <span class="cm"># an agent is writing</span>
    ├─ test-results.json       <span class="cm"># test cases from the last radical check --report</span>
-   └─ measurements.json       <span class="cm"># the latest value of each metric, from radical sense and --metrics</span></code></pre>
+   ├─ measurements.json       <span class="cm"># the latest value of each metric, from radical sense and --metrics</span>
+   └─ cache/model.json        <span class="cm"># the folder in one file, for opening it fast; safe to delete</span></code></pre>
         <ul>
           <li>Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the properties, sorted) and the description as body. Hierarchy is the directory tree.</li>
           <li>Output is deterministic: sorted keys, stable file names. A file is named after its element and keeps its name until the element is renamed or moved; two of one name are <code>orders-db.md</code> and <code>orders-db-2.md</code>.</li>
           <li>Edit the files by hand or through the MCP server; Studio picks them up and merges what you have not saved yet. A file with a byte-order mark reads as any other.</li>
+          <li>The files are the model; <code>.radical/cache/model.json</code> only repeats them, each with its modification time and size. Studio opens a folder from it and then reads what changed since (after a pull, or an agent's edits), the MCP server reads from it each file that has not changed, and the CLI reads it when it is there. Studio and the MCP server write it again when it is missing or well out of date; deleting it is always safe.</li>
         </ul>
       </section>
 

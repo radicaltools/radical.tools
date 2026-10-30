@@ -19,10 +19,11 @@
  */
 
 import { d3adaptor, Layout, InputNode, Group, Link, Rectangle, computeGroupBounds } from 'webcola'
+import './webcolaHeap'
 import { dispatch } from 'd3-dispatch'
 import { timer } from 'd3-timer'
 import { drag as d3drag } from 'd3-drag'
-import { C4Node, C4Relation } from '@radical/common/c4'
+import { C4Node, C4Relation, CANVAS_MAX_ELEMENTS } from '@radical/common/c4'
 import { compoundPadding, drawnSize, effectiveWidth, effectiveHeight, isVisible } from '@radical/layout/geometry'
 import { alongAxis, type Alignment } from '@radical/layout/constraints'
 
@@ -1433,7 +1434,10 @@ export class LiveColaEngine {
       return p
     }
     const visibleNodes = Object.values(nodes).filter((n) => isVisible(n, nodes) && !frameIds.has(n.id))
-    if (visibleNodes.length === 0) {
+    // More than a canvas draws (All elements is the whole model, as a
+    // table): WebCoLa's start keeps three matrices of their number squared,
+    // and a model of 21,000 elements ran the worker out of memory.
+    if (visibleNodes.length === 0 || visibleNodes.length > CANVAS_MAX_ELEMENTS) {
       this.cola = null
       this.seedPositions.clear()
       return

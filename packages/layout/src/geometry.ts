@@ -10,6 +10,31 @@
  */
 import { C4Node, C4Relation, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, NODE_SIZES, isContainerType, landscapeSlot } from '@radical/common/c4'
 
+
+// Each element's children, while placeUnplaced runs: placing looked them up
+// by going through every element, again for each one placed and each step
+// (84 elements placed in a model of 21,000 took 1.8 s). It changes places
+// and sizes only, never parents, so they hold for the run. In the order the
+// elements are in, as a scan finds them.
+let placing: { nodes: Record<string, C4Node>; children: Map<string | undefined, C4Node[]> } | null = null
+
+function childrenIndex(nodes: Record<string, C4Node>): Map<string | undefined, C4Node[]> {
+  const out = new Map<string | undefined, C4Node[]>()
+  for (const n of Object.values(nodes)) {
+    const key = n.parentId ?? undefined
+    const list = out.get(key)
+    if (list) list.push(n)
+    else out.set(key, [n])
+  }
+  return out
+}
+
+/** The elements directly in `parentId` (at the root when undefined). */
+function childrenOf(nodes: Record<string, C4Node>, parentId: string | undefined): C4Node[] {
+  if (placing?.nodes === nodes) return placing.children.get(parentId ?? undefined) ?? []
+  return Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (parentId ?? undefined))
+}
+
 export function effectiveWidth(n: C4Node): number {
   if (isContainerType(n.type) && n.collapsed) return COLLAPSED_WIDTH[n.type]
   return n.width ?? NODE_SIZES[n.type].width
@@ -96,7 +121,7 @@ export function fitAncestors(nodes: Record<string, C4Node>, startId: string | un
   while (cur && !seen.has(cur.id)) {
     seen.add(cur.id)
     const parentId = cur.id
-    const children = Object.values(nodes).filter((n) => n.parentId === parentId)
+    const children = childrenOf(nodes, parentId)
     if (isContainerType(cur.type) && !cur.collapsed && children.length > 0) {
       const size = fittedParentSize(cur, children.map((c) => ({ x: c.x, y: c.y, width: effectiveWidth(c), height: effectiveHeight(c) })))
       cur.width = size.width
@@ -111,7 +136,7 @@ export function fitAncestors(nodes: Record<string, C4Node>, startId: string | un
  *  node. Positions are relative to the parent, like C4Node.x/y. */
 export function placeNewNode(nodes: Record<string, C4Node>, parentId: string | undefined): { x: number; y: number } {
   const parent = parentId ? nodes[parentId] : undefined
-  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (parent?.id ?? undefined))
+  const siblings = childrenOf(nodes, parent?.id)
   const right = Math.max(...siblings.map((n) => n.x + effectiveWidth(n)))
   if (!parent) return { x: siblings.length ? right + 80 : 0, y: 0 }
   const pad = compoundPadding(parent.type)
@@ -128,7 +153,7 @@ export function placeBesideSiblings(
   counts: (sibling: C4Node) => boolean = () => true,
 ): { x: number; y: number } {
   const parent = parentId ? nodes[parentId] : undefined
-  const siblings = Object.values(nodes).filter((s) => (s.parentId ?? undefined) === (parent?.id ?? undefined) && counts(s))
+  const siblings = childrenOf(nodes, parent?.id).filter((s) => counts(s))
   if (siblings.length === 0) {
     const pad = parent ? compoundPadding(parent.type) : { top: 0, side: 0 }
     return { x: pad.side, y: pad.top }
@@ -173,7 +198,7 @@ export function gridSlotIn(
 ): { x: number; y: number } {
   const parent = nodes[parentId]
   const pad = compoundPadding(parent?.type ?? 'system')
-  const kids = Object.values(nodes).filter((c) => c.parentId === parentId && counts(c))
+  const kids = childrenOf(nodes, parentId).filter((c) => counts(c))
   if (!kids.length) return centredIn(frame ?? { width: parent?.width ?? 0, height: parent?.height ?? 0 }, size, pad)
   const cellW = Math.max(size.width, ...kids.map(effectiveWidth))
   const cellH = Math.max(size.height, ...kids.map(effectiveHeight))
@@ -234,7 +259,7 @@ export function liesClearInParent(
     const frame = canvas.boxOf(parent)
     if (box.x < 0 || box.y < 0 || box.x + box.w > frame.w || box.y + box.h > frame.h) return false
   }
-  return !Object.values(nodes).some((s) => s.id !== node.id && (s.parentId ?? undefined) === (node.parentId ?? undefined)
+  return !childrenOf(nodes, node.parentId).some((s) => s.id !== node.id
     && canvas.shown(s) && !ignore(s) && drawnBoxesOf(s, nodes, canvas, (c) => c.id !== node.id && !ignore(c)).some((b) => boxesOverlap(box, b)))
 }
 
@@ -245,7 +270,7 @@ export function liesClearInParent(
 export function drawnBoxesOf(node: C4Node, nodes: Record<string, C4Node>, canvas: CanvasShape, keep: (n: C4Node) => boolean = () => true): CanvasBox[] {
   const box = canvas.boxOf(node)
   if (!canvas.frame?.(node)) return [box]
-  return Object.values(nodes).filter((c) => c.parentId === node.id && canvas.shown(c) && keep(c))
+  return childrenOf(nodes, node.id).filter((c) => canvas.shown(c) && keep(c))
     .flatMap((c) => drawnBoxesOf(c, nodes, canvas, keep).map((b) => ({ ...b, x: b.x + box.x, y: b.y + box.y })))
 }
 
@@ -354,7 +379,7 @@ const CHILD_TOP_MIN = 50
 export function growFrameLeftUp(nodes: Record<string, C4Node>, parentId: string, shown: (n: C4Node) => boolean = () => true): void {
   const parent = nodes[parentId]
   if (!parent) return
-  const kids = Object.values(nodes).filter((c) => c.parentId === parentId && shown(c))
+  const kids = childrenOf(nodes, parentId).filter((c) => shown(c))
   if (!kids.length) return
   const pad = compoundPadding(parent.type)
   const minX = Math.min(...kids.map((c) => c.x))
@@ -373,7 +398,7 @@ export function growFrameLeftUp(nodes: Record<string, C4Node>, parentId: string,
 export function fitShown(nodes: Record<string, C4Node>, parentId: string, canvas: CanvasShape | { shown: (n: C4Node) => boolean }): void {
   const parent = nodes[parentId]
   if (!parent || !isContainerType(parent.type) || parent.collapsed) return
-  const children = Object.values(nodes).filter((c) => c.parentId === parentId && canvas.shown(c))
+  const children = childrenOf(nodes, parentId).filter((c) => canvas.shown(c))
   if (!children.length) return
   const size = fittedParentSize(parent, children.map((c) => ({ x: c.x, y: c.y, width: effectiveWidth(c), height: effectiveHeight(c) })))
   parent.width = size.width
@@ -410,7 +435,7 @@ export function makeRoomAround(
   const grown = nodes[grownId]
   if (!grown) return {}
   const { shown, boxOf } = canvas
-  const siblings = Object.values(nodes).filter((n) => (n.parentId ?? undefined) === (grown.parentId ?? undefined) && shown(n))
+  const siblings = childrenOf(nodes, grown.parentId).filter((n) => shown(n))
   if (siblings.length < 2) return {}
   const box = new Map(siblings.map((n) => [n.id, boxOf(n)]))
   const before = new Map(siblings.map((n) => [n.id, boxOf(n)]))
@@ -553,6 +578,22 @@ export function placeUnplaced(
   folded?: (n: C4Node) => boolean,
   options: { frames?: ReadonlySet<string>; wrap?: ReadonlySet<string>; wrapped?: string[] } = {},
 ): string[] {
+  const outer = placing
+  placing = { nodes, children: childrenIndex(nodes) }
+  try {
+    return placeUnplacedNow(nodes, positions, shown, folded, options)
+  } finally {
+    placing = outer
+  }
+}
+
+function placeUnplacedNow(
+  nodes: Record<string, C4Node>,
+  positions: Record<string, unknown> | undefined,
+  shown?: Set<string>,
+  folded?: (n: C4Node) => boolean,
+  options: { frames?: ReadonlySet<string>; wrap?: ReadonlySet<string>; wrapped?: string[] } = {},
+): string[] {
   if (!positions || Object.keys(positions).length === 0) return []
   const { frames } = options
   const strays = strayNodeIds(nodes, positions, folded, shown, frames)
@@ -583,7 +624,7 @@ export function placeUnplaced(
   for (const node of fresh) if (!waiting.has(node.id)) fitShown(nodes, node.id, canvas)
   const placed: string[] = []
   for (const node of unplaced) {
-    const held = options.wrap?.has(node.id) ? Object.values(nodes).filter((c) => c.parentId === node.id && known(c.id) && drawn.shown(c)) : []
+    const held = options.wrap?.has(node.id) ? childrenOf(nodes, node.id).filter((c) => known(c.id) && drawn.shown(c)) : []
     if (held.length) {
       waiting.delete(node.id)
       wrapRound(nodes, node, held, canvas, !!frames?.has(node.id))

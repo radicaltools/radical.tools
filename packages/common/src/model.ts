@@ -114,8 +114,35 @@ export function forkPresetMetamodel(mm: Metamodel): Metamodel | null {
   return { ...copy, id: `${mm.id.replace(/-builtin$/, '')}-custom`, name: `${mm.name} (custom)` }
 }
 
-/** Ids of every node below `id` in the containment tree. */
-export function descendantIds(id: string, nodes: Record<string, C4Node>): string[] {
+// Where an element is drawn.
+const PLACE_KEYS = new Set(['x', 'y', 'width', 'height'])
+
+/** Whether `b` holds the elements of `a`, changed at most in where they are
+ *  drawn: what reads the model and not the canvas (the Inspector's check)
+ *  need not run again when the live layout moves elements every frame. */
+export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
+  if (a === b) return true
+  const ids = Object.keys(b)
+  if (ids.length !== Object.keys(a).length) return false
+  for (const id of ids) {
+    const x = a[id] as unknown as Record<string, unknown> | undefined
+    const y = b[id] as unknown as Record<string, unknown>
+    if (x === y) continue
+    if (!x) return false
+    for (const k in y) if (!PLACE_KEYS.has(k) && x[k] !== y[k]) return false
+    for (const k in x) if (!PLACE_KEYS.has(k) && !(k in y)) return false
+  }
+  return true
+}
+
+/** Each element's children, by its id. Kept for frozen data (Studio's
+ *  store): a wiki asked for every page's descendants, and the map of a
+ *  model of 21,000 elements was made again each time (0.9 s a view). The
+ *  MCP server's model changes in place, so its map is made each time. */
+function childrenByParent(nodes: Record<string, C4Node>): Map<string, string[]> {
+  const frozen = Object.isFrozen(nodes)
+  const known = frozen ? childrenCache.get(nodes) : undefined
+  if (known) return known
   const children = new Map<string, string[]>()
   for (const n of Object.values(nodes)) {
     if (!n.parentId) continue
@@ -123,6 +150,15 @@ export function descendantIds(id: string, nodes: Record<string, C4Node>): string
     if (list) list.push(n.id)
     else children.set(n.parentId, [n.id])
   }
+  if (frozen) childrenCache.set(nodes, children)
+  return children
+}
+
+const childrenCache = new WeakMap<object, Map<string, string[]>>()
+
+/** Ids of every node below `id` in the containment tree. */
+export function descendantIds(id: string, nodes: Record<string, C4Node>): string[] {
+  const children = childrenByParent(nodes)
   const out: string[] = []
   const stack = [...(children.get(id) ?? [])]
   while (stack.length) {

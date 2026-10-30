@@ -31,7 +31,7 @@ interface RelationIndex {
   children: Map<string, string[]>
 }
 
-const indexCache = new WeakMap<object, { nodes: object; index: RelationIndex }>()
+const indexCache = new WeakMap<object, { nodes: Record<string, C4Node>; index: RelationIndex }>()
 
 /** The index each context was answered with (relationIndex). */
 const ctxIndex = new WeakMap<PipelineContext, RelationIndex>()
@@ -89,7 +89,9 @@ function relationIndex(ctx: PipelineContext): RelationIndex {
   if (own) return own
   const cacheable = Object.isFrozen(ctx.relations) && Object.isFrozen(ctx.nodes)
   const cached = cacheable ? indexCache.get(ctx.relations) : undefined
-  if (cached && cached.nodes === ctx.nodes) {
+  // Children are all it holds of the elements: one moved or renamed (a
+  // view opened, a letter typed) keeps it.
+  if (cached && sameForChain(cached.nodes, ctx.nodes, 'parentId')) {
     ctxIndex.set(ctx, cached.index)
     return cached.index
   }
@@ -433,8 +435,20 @@ export function pipelineActive(p: ViewPipeline | undefined): boolean {
 
 /** The elements `view`'s chain works among: the ones it lists, or every
  *  element for a view that lists none. */
+/** The elements as a list, kept (frozen) for frozen data: every view's
+ *  chain starts from it, and listing a model of 21,000 elements for each of
+ *  46 views took 0.8 s when a model opened. */
+function nodeList(nodes: Record<string, C4Node>): C4Node[] {
+  if (!Object.isFrozen(nodes)) return Object.values(nodes)
+  let list = nodeLists.get(nodes)
+  if (!list) nodeLists.set(nodes, list = Object.freeze(Object.values(nodes)) as C4Node[])
+  return list
+}
+
+const nodeLists = new WeakMap<object, C4Node[]>()
+
 export function pipelineSource(view: DiagramView | undefined, ctx: PipelineContext): C4Node[] {
-  const all = Object.values(ctx.nodes)
+  const all = nodeList(ctx.nodes)
   if (!view || viewShowsEveryNode(view)) return all
   const ids = new Set(view.nodeIds)
   return all.filter((n) => ids.has(n.id))
@@ -622,7 +636,7 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
   const cacheable = Object.isFrozen(nodes) && Object.isFrozen(relations) && Object.isFrozen(view.nodeIds)
   if (cacheable) {
     const hit = shownCache.get(view.nodeIds)
-    if (hit && hit.nodes === nodes && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty) return hit.shown
+    if (hit && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty && sameForChain(hit.nodes, nodes, chainKeys(view.pipeline))) return hit.shown
   }
   const shown = computeShownNodes(view, nodes, relations)
   if (cacheable) shownCache.set(view.nodeIds, { nodes, relations, pipeline: view.pipeline, kind: view.kind, empty: view.empty, shown })
@@ -631,8 +645,67 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
 
 /** What viewShownNodes answered for a view's node list, and from what. */
 const shownCache = new WeakMap<readonly string[], {
-  nodes: object; relations: object; pipeline: unknown; kind: DiagramView['kind']; empty: DiagramView['empty']; shown: Set<string> | undefined
+  nodes: Record<string, C4Node>; relations: object; pipeline: unknown; kind: DiagramView['kind']; empty: DiagramView['empty']; shown: Set<string> | undefined
 }>()
+
+/** The fields of an element what a view shows depends on: its type and
+ *  parent, and what its filters read (a text filter: name, description and
+ *  technology; a property filter: that property). Kept per chain. */
+function chainKeys(pipeline: unknown): string {
+  if (!pipeline || typeof pipeline !== 'object') return BASE_KEYS
+  const known = keysOfChain.get(pipeline)
+  if (known) return known
+  const keys = new Set(BASE_KEYS.split(','))
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) { v.forEach(walk); return }
+    if (!v || typeof v !== 'object') return
+    const o = v as Record<string, unknown>
+    if (o.kind === 'text') for (const k of ['label', 'description', 'technology']) keys.add(k)
+    if (o.kind === 'property' && typeof o.key === 'string') keys.add(o.key)
+    Object.values(o).forEach(walk)
+  }
+  walk(pipeline)
+  const out = [...keys].join(',')
+  keysOfChain.set(pipeline, out)
+  return out
+}
+
+const BASE_KEYS = 'type,parentId'
+const keysOfChain = new WeakMap<object, string>()
+
+/** Whether `b` holds the elements of `a`, each the same in `keys` (comma
+ *  separated). Opening a view puts its positions into the elements, and an
+ *  edit changes one: without this every view's chain ran again after each
+ *  (1.5 s for 46 views of a model of 21,000 elements after a view switch,
+ *  3 s after each letter typed in a name). Asked once for a pair and keys,
+ *  however many views ask. */
+function sameForChain(a: Record<string, C4Node>, b: Record<string, C4Node>, keys: string): boolean {
+  if (a === b) return true
+  let byB = sameAnswers.get(a)
+  if (!byB) sameAnswers.set(a, byB = new WeakMap())
+  let byKeys = byB.get(b)
+  if (!byKeys) byB.set(b, byKeys = new Map())
+  const hit = byKeys.get(keys)
+  if (hit !== undefined) return hit
+  const same = compareFor(a, b, keys.split(','))
+  byKeys.set(keys, same)
+  return same
+}
+
+const sameAnswers = new WeakMap<object, WeakMap<object, Map<string, boolean>>>()
+
+function compareFor(a: Record<string, C4Node>, b: Record<string, C4Node>, keys: string[]): boolean {
+  // The lists are kept for frozen data: no walk of 21,000 keys each time.
+  const listA = nodeList(a)
+  const listB = nodeList(b)
+  if (listA.length !== listB.length) return false
+  for (const y of listB) {
+    const x = a[y.id] as unknown as Record<string, unknown> | undefined
+    if (x === (y as unknown)) continue
+    if (!x || keys.some((k) => x[k] !== (y as unknown as Record<string, unknown>)[k])) return false
+  }
+  return true
+}
 
 function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (pipelineOf(view)?.levels?.length && view.kind !== 'dynamic') {

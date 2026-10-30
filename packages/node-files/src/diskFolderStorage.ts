@@ -1,11 +1,12 @@
 import type { Stats } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { lstat, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'
 import { isMdFolderModelPath, stripBom } from '@radical/common/formats/mdFolder'
-import type { MdFolderStorage } from '@radical/common/formats/mdFolderSync'
+import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR } from '@radical/common/formats/canvasSelection'
-import { editorStateDir } from './selectionFile'
+import { MODEL_CACHE_FILE } from '@radical/common/formats/modelCache'
+import { editorStateDir, readEditorStateFile } from './selectionFile'
 
 /** The folder's write turn, under `.radical/`: the id of the process that
  *  holds it, when it took it, and a token of its own. */
@@ -125,30 +126,52 @@ export function diskFolderStorage(root: string): MdFolderStorage {
   }
 
   return {
-    async list() {
-      const stamps: Record<string, string> = {}
-      const add = async (rel: string): Promise<void> => {
-        try { stamps[rel] = stampOf(await stat(await inside(rel))) }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+    readCache: () => readEditorStateFile(base, MODEL_CACHE_FILE),
+    async writeCache(content) {
+      await editorStateDir(base)
+      const dir = join(base, dirname(MODEL_CACHE_FILE))
+      if (await lstat(dir).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${dirname(MODEL_CACHE_FILE)}`)
+      await mkdir(dir, { recursive: true })
+      // What a write cut short left (the process ended in the middle); not
+      // one another process is writing now.
+      for (const name of await readdir(dir)) {
+        if (!name.endsWith('.part')) continue
+        const left = join(dir, name)
+        if (await stat(left).then((st) => Date.now() - st.mtimeMs > 60_000, () => false)) await rm(left, { force: true })
       }
+      // Whole or not at all: a reader never finds half a cache.
+      const file = join(base, MODEL_CACHE_FILE)
+      const part = `${file}.${randomUUID()}.part`
+      await writeFile(part, content, 'utf-8')
+      await rename(part, file)
+    },
+    async list() {
+      const files: string[] = []
+      const add = (rel: string): void => { files.push(rel) }
       const walk = async (rel: string): Promise<void> => {
         const entries = await readdir(await inside(`${rel}/_index.md`).then(dirname), { withFileTypes: true })
         for (const entry of entries) {
           if (entry.name.startsWith('.')) continue
           const child = `${rel}/${entry.name}`
           if (entry.isDirectory()) await walk(child)
-          else if (entry.isFile() && isMdFolderModelPath(child)) await add(child)
+          else if (entry.isFile() && isMdFolderModelPath(child)) add(child)
           else if (entry.isSymbolicLink()) throw new Error(`symlink in model path: ${child}`)
         }
       }
       const top = await readdir(base, { withFileTypes: true })
       for (const entry of top) {
-        if (entry.isFile() && isMdFolderModelPath(entry.name)) await add(entry.name)
+        if (entry.isFile() && isMdFolderModelPath(entry.name)) add(entry.name)
         else if (entry.isDirectory() && entry.name === 'nodes') await walk('nodes')
         else if (entry.isSymbolicLink() && (entry.name === 'nodes' || isMdFolderModelPath(entry.name))) {
           throw new Error(`symlink in model path: ${entry.name}`)
         }
       }
+      const found = await readEach(files, async (rel) => {
+        try { return stampOf(await stat(await inside(rel))) }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+      })
+      const stamps: Record<string, string> = {}
+      files.forEach((rel, i) => { if (found[i] !== undefined) stamps[rel] = found[i]! }) // else gone meanwhile
       return stamps
     },
     // Decoded as the browser decodes a file: without a byte-order mark.

@@ -336,7 +336,9 @@ export class FolderModel {
     await startIfEmpty(path, preset)
     const canonical = await realpath(path)
     if (!(await stat(canonical)).isDirectory()) throw new Error(`Not a directory: ${folder}`)
-    const files = await new MdFolderSession(diskFolderStorage(canonical)).readAll()
+    const opening = new MdFolderSession(diskFolderStorage(canonical))
+    const files = await opening.readAll()
+    await opening.cacheWritten()
     checkFiles(files)
     const data = deserializeFromMdFolder(files).data
     checkData(data)
@@ -399,6 +401,9 @@ export class FolderModel {
       await startIfEmpty(this.folder, this.preset)
       const session = new MdFolderSession(diskFolderStorage(this.folder))
       const before = await session.readAll()
+      // The folder's cache, when this read found it out of date, is written
+      // before the call ends: nothing of a call goes on after its answer.
+      await session.cacheWritten()
       checkFiles(before)
       const data = deserializeFromMdFolder(before).data
       checkData(data)

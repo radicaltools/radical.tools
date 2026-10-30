@@ -3218,6 +3218,53 @@ div.milestone-option { cursor: default; }
   overflow: auto;
   padding: 0;
 }
+/* In place of a canvas with more elements than a canvas draws. */
+.lcn-wrap {
+  grid-area: canvas;
+  display: flex;
+  min-height: 0;
+  background: var(--bg-canvas);
+  overflow: auto;
+}
+.lcn-box {
+  margin: auto;
+  text-align: center;
+  padding: 40px;
+  max-width: 460px;
+}
+.lcn-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.lcn-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.lcn-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.lcn-btn {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.lcn-btn:hover { border-color: var(--accent); }
+.lcn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 .mx-empty {
   margin: auto;
   text-align: center;

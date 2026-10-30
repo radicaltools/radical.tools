@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { LiveColaEngine, relaxLayout, LIVE_CHILD_TOP_MIN, WHOLE_DIAGRAM_MAX_NODES, type LiveColaPositions } from '../src/liveColaEngine'
-import type { C4Node, C4Relation } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, type C4Node, type C4Relation } from '@radical/common/c4'
 
 type Nodes = Record<string, C4Node>
 
@@ -363,5 +363,25 @@ describe('Live layout physics: collapsing a container', () => {
     expect(Object.keys(moved).some((id) => id.startsWith('s0c1k'))).toBe(true)
     const ys = [0, 1, 2, 3, 4].map((k) => nodes[`s0c1k${k}`].y)
     expect(new Set(ys.map((y) => Math.round(y))).size).toBe(5)
+  })
+})
+
+describe('Live layout physics: more elements than a canvas draws', () => {
+  it('lays out none of them, and builds none of its matrices', async () => {
+    const nodes: Nodes = {}
+    const relations: Record<string, C4Relation> = {}
+    for (let i = 0; i <= CANVAS_MAX_ELEMENTS; i++) {
+      nodes[`n${i}`] = node(`n${i}`, (i % 40) * 300, Math.floor(i / 40) * 200)
+      if (i) relations[`r${i}`] = { id: `r${i}`, sourceId: `n${i - 1}`, targetId: `n${i}` }
+    }
+    const before = at(nodes)
+    const { engine, moved } = engineOver(nodes, relations)
+    expect(() => engine.start(false)).not.toThrow()
+    await wait(100)
+    expect((engine as unknown as { cola: unknown }).cola).toBeNull()
+    expect(() => { engine.grab('n0', 10, 10); engine.drag('n0', 50, 50); engine.release('n0') }).not.toThrow()
+    engine.stop()
+    expect(moved).toEqual({})
+    expect(at(nodes)).toEqual(before)
   })
 })

@@ -120,7 +120,7 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
     if (!isDir) fail(`${shown(folder, place)} is not there${named ? `: radical setup ${named} starts a model there` : ''}`)
     else {
       try {
-        const files = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+        const files = await new MdFolderSession(diskFolderStorage(folder), { writeCache: false }).readAll()
         if (!isValidMdFolderManifest(files['radical.md'])) throw new Error('it has no valid radical.md, so it is not a Radical model folder')
         const data = deserializeFromMdFolder(files).data
         ok(`reads as a model: ${data.nodes.length} elements, ${data.relations.length} relations, ${data.views?.length ?? 0} views`)

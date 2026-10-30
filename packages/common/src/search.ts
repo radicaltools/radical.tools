@@ -116,26 +116,30 @@ function foldChar(c: string): string {
   return SPECIAL[c] ?? c.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
+// Most text is ASCII: it folds by case alone, each character in its place.
+const ASCII = /^[\x00-\x7f]*$/
+
 /** `text` without case and accents: "Źródło" is "zrodlo". */
 export function foldText(text: string): string {
+  if (ASCII.test(text)) return text.toLowerCase()
   let out = ''
   for (const c of text) out += foldChar(c)
   return out
 }
 
-/** The folded text, and for each of its characters where it is in `text`. */
-function foldWithMap(text: string): { folded: string; at: number[] } {
-  let folded = ''
+/** For each character of `foldText(text)`, where it is in `text` (null
+ *  where each stays in its place). */
+function foldPositions(text: string): number[] | null {
+  if (ASCII.test(text)) return null
   const at: number[] = []
   let i = 0
   for (const c of text) {
     const f = foldChar(c)
     for (let k = 0; k < f.length; k++) at.push(i)
-    folded += f
     i += c.length
   }
   at.push(i)
-  return { folded, at }
+  return at
 }
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
@@ -271,7 +275,29 @@ function initials(folded: string): string {
   return (folded.match(/[a-z0-9]+/g) ?? []).map((w) => w[0]).join('')
 }
 
-interface Folded { folded: string; at: number[] }
+interface Folded { text: string; folded: string; at?: number[] | null }
+
+// A model's texts change little between keystrokes: each is folded once,
+// and where its characters came from is worked out only for a match to
+// mark. Folding them all again on every keystroke took 1.4 s a letter in a
+// model of 21,000 elements.
+const FOLD_CACHE_MAX = 250_000
+const folds = new Map<string, Folded>()
+
+function foldedOf(text: string): Folded {
+  let f = folds.get(text)
+  if (!f) {
+    if (folds.size >= FOLD_CACHE_MAX) folds.clear()
+    f = { text, folded: foldText(text) }
+    folds.set(text, f)
+  }
+  return f
+}
+
+function positionsOf(f: Folded): number[] | null {
+  if (f.at === undefined) f.at = foldPositions(f.text)
+  return f.at
+}
 
 /** How the words match the fields, or null when one of them matches none. */
 function matchFields(fields: Field[], words: string[], foldedFields: Folded[]): { score: number; matches: WordMatch[] } | null {
@@ -295,8 +321,9 @@ function matchFields(fields: Field[], words: string[], foldedFields: Folded[]): 
 
 /** The original text's ranges for folded ranges, joined where they touch. */
 function marksOf(f: Folded, ranges: Array<[number, number]>): Mark[] {
+  const at = positionsOf(f)
   const marks = ranges
-    .map(([a, b]): Mark => [f.at[a], f.at[b - 1] + 1])
+    .map(([a, b]): Mark => at ? [at[a], at[b - 1] + 1] : [a, b])
     .sort((x, y) => x[0] - y[0])
   const out: Mark[] = []
   for (const m of marks) {
@@ -339,7 +366,7 @@ function snippetOf(text: string, f: Folded, ranges: Array<[number, number]>): { 
 
 /** A hit for `fields` (the first is the label), or null. */
 function hitFor(fields: Field[], parsed: ParsedSearch, allowInitials: boolean): Pick<SearchHit, 'marks' | 'snippet' | 'score'> | null {
-  const folded = fields.map((f) => foldWithMap(f.text))
+  const folded = fields.map((f) => foldedOf(f.text))
   const m = matchFields(fields, parsed.words, folded)
   let score = m?.score ?? 0
   const matches = m?.matches ?? []
