@@ -96,6 +96,13 @@ export interface HostCapabilities {
   /** Write the model's base (`.radical/base.json`) in an md-folder, as a
    *  Radical Forge run does where git saved none. */
   writeModelBase?(folderPath: string, content: string): Promise<HostResult>
+  /** Whether an md-folder's files differed from the cache it was opened
+   *  from (`.radical/cache/`): resolves once they are listed. */
+  folderVerified?(folderPath: string): Promise<{ stale: boolean }>
+  /** Read and write an md-folder's view index (`.radical/cache/views.json`);
+   *  content is null when there is none. */
+  readViewIndex?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  writeViewIndex?(folderPath: string, content: string): Promise<HostResult>
   /** Read what `radical check` and `radical sense` keep beside an md-folder
    *  model: the test results (`.radical/test-results.json`), the
    *  measurements (`.radical/measurements.json`) and the rule settings

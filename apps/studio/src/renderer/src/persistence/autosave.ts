@@ -156,6 +156,13 @@ if (typeof window !== 'undefined') {
         return
       }
     }
+    // A folder opened as its cache had it is saved once its files are
+    // listed; when they differ it is loaded afresh instead, and what was
+    // edited meanwhile is saved after, merged into them.
+    if (!leaving && documents.listDocuments().find((d) => d.id === activeId)?.source === 'md') {
+      const { stale } = await documents.verifyOpened(activeId).catch(() => ({ stale: false }))
+      if (stale || _suspended || presenting() || documents.getActiveId() !== activeId) return
+    }
     try {
       const data = buildPersistData()
       _layoutSafePending = false
@@ -378,7 +385,7 @@ if (typeof window !== 'undefined') {
   const loadActive = (
     id: string,
     source: DocumentSource | undefined,
-    opts?: { keepUi?: boolean; firstView?: boolean },
+    opts?: { keepUi?: boolean; firstView?: boolean; keepView?: boolean },
   ): void => {
     const seq = ++_loadSeq
     _changedWhilePresenting = null
@@ -437,7 +444,7 @@ if (typeof window !== 'undefined') {
         // it has none. It landed on All elements.
         if (opts?.firstView) openFirstView()
         // A reload of the same document keeps the user where they were.
-        if (opts?.keepUi) {
+        if (opts?.keepUi || opts?.keepView) {
           const next = useDiagramStore.getState()
           // The exploration shown too (it stays through a reload).
           if (activeViewId && viewById(next, activeViewId)) next.setActiveView(activeViewId)
@@ -489,6 +496,17 @@ if (typeof window !== 'undefined') {
         // The merged edits are still to be saved.
         if (mergedEdits) schedulePersist()
         if (documents.getActiveId() === id) for (const listener of [..._loadListeners]) listener(id)
+        // A folder opened as its cache had it: when its files differ, it is
+        // loaded afresh from them, the view kept; an edit made meanwhile is
+        // merged into them as into an outside change (ADR Model cache
+        // beside the model). Saves wait for this (flushPersist).
+        if (source === 'md' && !opts?.keepUi) {
+          void documents.verifyOpened(id).then(({ stale }) => {
+            if (!stale || seq !== _loadSeq || documents.getActiveId() !== id) return
+            console.info('[diagramStore] the folder differs from its cache — loading it afresh')
+            loadActive(id, 'md', _unsaved ? { keepUi: true } : { keepView: true })
+          })
+        }
       })
   }
 

@@ -5,7 +5,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { isMdFolderModelPath, stripBom } from '@radical/common/formats/mdFolder'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR } from '@radical/common/formats/canvasSelection'
-import { MODEL_CACHE_FILE } from '@radical/common/formats/modelCache'
+import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { editorStateDir, readEditorStateFile } from './selectionFile'
 
 /** The folder's write turn, under `.radical/`: the id of the process that
@@ -126,11 +126,12 @@ export function diskFolderStorage(root: string): MdFolderStorage {
   }
 
   return {
-    readCache: () => readEditorStateFile(base, MODEL_CACHE_FILE),
-    async writeCache(content) {
+    readCache: (name) => (MODEL_CACHE_NAMES.has(name) ? readEditorStateFile(base, `${MODEL_CACHE_DIR}/${name}`) : Promise.resolve(null)),
+    async writeCache(name, content) {
+      if (!MODEL_CACHE_NAMES.has(name)) throw new Error(`not a cache file: ${name}`)
       await editorStateDir(base)
-      const dir = join(base, dirname(MODEL_CACHE_FILE))
-      if (await lstat(dir).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${dirname(MODEL_CACHE_FILE)}`)
+      const dir = join(base, MODEL_CACHE_DIR)
+      if (await lstat(dir).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${MODEL_CACHE_DIR}`)
       await mkdir(dir, { recursive: true })
       // What a write cut short left (the process ended in the middle); not
       // one another process is writing now.
@@ -140,7 +141,7 @@ export function diskFolderStorage(root: string): MdFolderStorage {
         if (await stat(left).then((st) => Date.now() - st.mtimeMs > 60_000, () => false)) await rm(left, { force: true })
       }
       // Whole or not at all: a reader never finds half a cache.
-      const file = join(base, MODEL_CACHE_FILE)
+      const file = join(dir, name)
       const part = `${file}.${randomUUID()}.part`
       await writeFile(part, content, 'utf-8')
       await rename(part, file)

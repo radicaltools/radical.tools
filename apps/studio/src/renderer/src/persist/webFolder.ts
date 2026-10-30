@@ -17,7 +17,7 @@
 
 import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
-import { MODEL_CACHE_FILE } from '@radical/common/formats/modelCache'
+import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 
 // Minimal structural typings for the File System Access API (avoids depending
@@ -164,24 +164,25 @@ export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
   // The files as the last listing found them: a read goes straight to the
   // file instead of through each of its folders again.
   let listed = new Map<string, FsFileHandle>()
-  const [cacheDir, cacheName] = [MODEL_CACHE_FILE.split('/').slice(1, -1), MODEL_CACHE_FILE.split('/').pop()!]
+  const cacheDir = MODEL_CACHE_DIR.split('/').slice(1)
   return {
-    async readCache() {
+    async readCache(name) {
+      if (!MODEL_CACHE_NAMES.has(name)) return null
       try {
         let dir = await root.getDirectoryHandle(SELECTION_DIR)
         for (const part of cacheDir) dir = await dir.getDirectoryHandle(part)
-        return await (await (await dir.getFileHandle(cacheName)).getFile()).text()
+        return await (await (await dir.getFileHandle(name)).getFile()).text()
       } catch {
         return null
       }
     },
-    async writeCache(content) {
-      const state = await editorStateDirOf(root)
-      let dir = state
+    async writeCache(name, content) {
+      if (!MODEL_CACHE_NAMES.has(name)) throw new Error(`not a cache file: ${name}`)
+      let dir = await editorStateDirOf(root)
       for (const part of cacheDir) dir = await dir.getDirectoryHandle(part, { create: true })
       // The browser writes beside the file and swaps it in on close: a
       // reader never finds half a cache.
-      await writeText(dir, cacheName, content)
+      await writeText(dir, name, content)
     },
     async list() {
       const files = new Map<string, FsFileHandle>()

@@ -731,6 +731,8 @@ export class FolderModel {
     // Studio (or an editor, git) may have written the folder since this call
     // read it: the change is merged with that edit rather than written over it.
     const write = await session.write(next, mergeMdFolderFiles)
+    // The cache keeps up with what was written, before the call ends.
+    await session.cacheWritten()
     if (!write.ok) return { ok: false, text: `The folder changed while this call ran and does not read as a model (${write.conflict.join(', ')}); no files written. Fix the file, then try again.` }
     await this.markAgentWriting()
     const notices = write.merged ? mergeNotices(write.merged, { ours: 'by this call', theirs: 'in the folder meanwhile' }) : []

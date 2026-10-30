@@ -374,19 +374,16 @@ Still open after it (measured on radical.tools' own model ×14, see
 - Placing elements without a place: `makeRoomAround` compares each sibling
   with every other, so a level with a thousand siblings stays slow
   (0.3 s for 100 elements under 1,250 root systems).
-- Opening still works out every view's shown elements to trim positions
-  (`withCanvasPositions`, about 1 s once): the cache could keep them.
 - A save serializes the whole model and works out every file's path (about
   0.4 s at 20,000); a save that serializes only the elements that changed
   would not.
 - Quick Search: the first letter folds every text (0.4 s); an idle warm-up
   after opening would hide it.
-- Opening straight from the cache, before listing the files, would save
-  another second at 20,000 files, but is not safe as it stands: Studio's own
-  saves leave the cache behind, and reloading what the poll then finds
-  changed keeps the open canvas's places, so the old places were shown and
-  saved again (it broke `folders.spec.ts`'s drag-during-outside-write test).
-  It needs saves to keep the cache current and a stale open to load afresh.
+- Opening from the cache now shows the model before the files are listed
+  (3.2 s at 21,000 elements). What is left is drawing: `_sync` runs three
+  times while a model opens (the load, the perspective, the first view),
+  about 0.9 s, and the first view's lines 0.5 s; the Inspector's check
+  (0.55 s) could be kept in the cache beside the view index.
 
 ### Dogfooding (2026-10-29): sensors apart from the engine
 
