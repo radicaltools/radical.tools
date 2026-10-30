@@ -609,7 +609,11 @@
       "label": "OpenAPI break check",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "In every pull request, oasdiff compares each contract document with the same document at the last release tag and fails on any change it rates as breaking (removed or renamed operations and fields, new required inputs, narrowed types, removed enum values); a deprecated operation must carry x-sunset at least {{SUNSET_MONTHS}} months away, and once that date has passed its removal is not breaking (whether anybody still calls it is checked by the usage alert). A new version is a new document with nothing to diff against. After each deployment the same tool compares the stable URL with the release's document.\n\nThreshold: 0 breaking changes (oasdiff level ERR) between each version's document at the last release tag and the pull request, a removal after its x-sunset date and {{SUNSET_MONTHS}} months of deprecation not counting; after a deployment, 0 differences between the stable URL and the release's document\n\nTool: oasdiff\n\n```yaml\n# .github/workflows/api-contract.yml (job steps; actions/checkout@v4.2.2 with fetch-depth: 0 — pin by commit SHA in your repository)\n- name: No breaking API changes outside a new version\n  run: |\n    last=$(git describe --tags --abbrev=0)\n    for doc in api/*.yaml; do                               # one document per served version\n      git show \"$last:$doc\" > /tmp/base.yaml 2>/dev/null || continue   # a new version: nothing to diff against\n      docker run --rm -v /tmp:/base -v \"$PWD\":/rev tufin/oasdiff:stable \\\n        breaking /base/base.yaml \"/rev/$doc\" --fail-on ERR \\\n        --deprecation-days-stable $(( {{SUNSET_MONTHS}} * 30 ))      # x-sunset required this far away; removal after it is not breaking\n    done\n# after each deployment:\n- name: The stable URL serves the release's contract\n  run: |\n    for doc in api/*.yaml; do\n      docker run --rm -v \"$PWD\":/rev tufin/oasdiff:stable \\\n        diff \"/rev/$doc\" \"$API_URL/openapi/$(basename \"$doc\" .yaml).json\" --fail-on-diff\n    done\n```",
       "hubWhen": {
         "FORMAT": [
@@ -623,7 +627,11 @@
       "label": "GraphQL break check",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "In every pull request, graphql-inspector diffs the schema with the one at the last release tag and fails on a breaking change (a removed field or type, a changed argument, a nullable field made non-null on input). Removing a deprecated field is allowed when the usage module, asked per field, reports no call in the last {{USAGE_DAYS}} days (the dates in the reason are checked by the sunset test). After each deployment the served schema is introspected and must equal the release's.\n\nThreshold: 0 breaking changes between the schema at the last release tag and the pull request, the removal of a deprecated field unused for {{USAGE_DAYS}} days not counting; after a deployment, 0 differences between the served schema and the release's\n\nTool: graphql-inspector\n\n```yaml\n# .github/workflows/api-contract.yml (job steps; actions/checkout@v4.2.2 with fetch-depth: 0 — pin by commit SHA in your repository)\n- name: No breaking schema changes\n  run: |\n    git show \"$(git describe --tags --abbrev=0)\":schema.graphql > /tmp/base.graphql\n    npx @graphql-inspector/cli diff /tmp/base.graphql schema.graphql \\\n      --rule suppressRemovalOfDeprecatedField \\\n      --rule considerUsage --onUsage ./usage.js\n    # usage.js: export default (fields) => Promise<boolean[]>, true when the field had 0 calls in the last {{USAGE_DAYS}} days\n# after each deployment:\n- name: The endpoint serves the release's schema\n  run: |\n    npx @graphql-inspector/cli introspect \"$API_URL/graphql\" --write /tmp/served.graphql\n    npx @graphql-inspector/cli diff schema.graphql /tmp/served.graphql | grep -q 'No changes detected'\n```",
       "hubWhen": {
         "FORMAT": [
@@ -637,7 +645,11 @@
       "label": "Protobuf break check",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "buf lint requires a version suffix on every package, and buf breaking compares the .proto files with the last release tag, failing on a renumbered field, a changed type, a removed RPC, or a field deleted without reserving its number and name (which is how a field past its sunset goes). After each deployment the services the server reflects are compared with the services of the release's descriptors.\n\nThreshold: 0 breaking changes against the last release tag, a deleted field whose number and name are reserved not counting; 0 lint findings, PACKAGE_VERSION_SUFFIX included; after a deployment, the services the server reflects equal the contract's\n\nTool: buf breaking, grpcurl\n\n```yaml\n# buf.yaml\nversion: v2\nlint:\n  use: [STANDARD]          # includes PACKAGE_VERSION_SUFFIX: acme.orders.v1\nbreaking:\n  use: [FILE, FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED, FIELD_NO_DELETE_UNLESS_NAME_RESERVED]\n  except: [FIELD_NO_DELETE]   # a field may go once its number and name are reserved\n# CI step (checkout with fetch-depth: 0); with a version header, each version is its own module directory, diffed with subdir=:\n#   buf lint && buf breaking --against \".git#tag=$(git describe --tags --abbrev=0)\"\n# after each deployment: the server reflects the services of the release\n#   buf build -o /tmp/release.binpb\n#   diff <(grpcurl -protoset /tmp/release.binpb list | sort) <(grpcurl -plaintext \"$GRPC_ADDRESS\" list | grep -v '^grpc\\.' | sort)\n```",
       "hubWhen": {
         "FORMAT": [
@@ -651,7 +663,11 @@
       "label": "Deprecations carry a sunset",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads the operations marked deprecated from the contract documents (not from a list kept by hand), calls each and checks the Deprecation (RFC 9745) and Sunset (RFC 8594) headers against the contract's x-sunset.\n\nThreshold: Every operation marked deprecated in the contract carries x-sunset and answers with a Deprecation header and a Sunset date equal to it and at least {{SUNSET_MONTHS}} months after the deprecation; 0 without\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport { readFileSync, readdirSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport request from 'supertest'\nimport { app } from '../src/app'\n\nconst SUNSET_MONTHS = {{SUNSET_MONTHS}}\ntype Op = { deprecated?: boolean; 'x-sunset'?: string; 'x-example'?: string }\nconst deprecated = readdirSync('api').filter((f) => f.endsWith('.yaml')).flatMap((file) => {\n  const spec = parse(readFileSync(`api/${file}`, 'utf8'))\n  return Object.entries(spec.paths as Record<string, Record<string, Op>>).flatMap(([path, ops]) =>\n    Object.entries(ops).filter(([, op]) => op.deprecated).map(([method, op]) => ({ method, path: op['x-example'] ?? path, sunset: op['x-sunset'] })))\n})\n\ndescribe.each(deprecated)('$method $path', ({ method, path, sunset }) => {\n  it('announces its deprecation and a sunset far enough away', async () => {\n    expect(sunset).toMatch(/^\\d{4}-\\d{2}-\\d{2}/)                      // x-sunset in the contract\n    const res = await request(app)[method](path)\n    expect(res.headers.deprecation).toMatch(/^@\\d+$/)                  // RFC 9745: @<epoch seconds>\n    const from = new Date(Number(res.headers.deprecation.slice(1)) * 1000)\n    from.setMonth(from.getMonth() + SUNSET_MONTHS)\n    expect(Date.parse(res.headers.sunset)).toBe(Date.parse(sunset!))     // RFC 8594, the contract's date\n    expect(Date.parse(res.headers.sunset)).toBeGreaterThanOrEqual(from.getTime())\n  })\n})\n```",
       "hubWhen": {
         "FORMAT": [
@@ -665,7 +681,11 @@
       "label": "Deprecated fields carry their dates",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test builds the schema from schema.graphql, walks every type for deprecated fields, arguments and enum values, and checks the two dates in each reason.\n\nThreshold: Every @deprecated field, argument and enum value has a reason ending in \"deprecated YYYY-MM-DD, sunset YYYY-MM-DD\" with the sunset at least {{SUNSET_MONTHS}} months after the deprecation; 0 without\n\nTool: Vitest with the graphql package (or the test runner of your stack)\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { buildSchema, isObjectType, isInputObjectType, isEnumType, isInterfaceType } from 'graphql'\n\nconst SUNSET_MONTHS = {{SUNSET_MONTHS}}\nconst DATES = /deprecated (\\d{4}-\\d{2}-\\d{2}), sunset (\\d{4}-\\d{2}-\\d{2})$/\nconst schema = buildSchema(readFileSync('schema.graphql', 'utf8'))\nconst deprecated: Array<{ where: string; reason: string | null | undefined }> = []\nfor (const type of Object.values(schema.getTypeMap())) {\n  if (type.name.startsWith('__')) continue\n  if (isEnumType(type)) for (const v of type.getValues()) if (v.deprecationReason != null) deprecated.push({ where: `${type.name}.${v.name}`, reason: v.deprecationReason })\n  if (isObjectType(type) || isInterfaceType(type) || isInputObjectType(type)) for (const f of Object.values(type.getFields())) {\n    if (f.deprecationReason != null) deprecated.push({ where: `${type.name}.${f.name}`, reason: f.deprecationReason })\n    if ('args' in f) for (const a of f.args) if (a.deprecationReason != null) deprecated.push({ where: `${type.name}.${f.name}(${a.name})`, reason: a.deprecationReason })\n  }\n}\n\ndescribe.each(deprecated)('$where', ({ reason }) => {\n  it('names its deprecation and sunset dates, far enough apart', () => {\n    const m = DATES.exec(reason ?? '')\n    expect(m, 'reason ends in \"deprecated YYYY-MM-DD, sunset YYYY-MM-DD\"').not.toBeNull()\n    const from = new Date(m![1])\n    from.setMonth(from.getMonth() + SUNSET_MONTHS)\n    expect(Date.parse(m![2])).toBeGreaterThanOrEqual(from.getTime())\n  })\n})\n```",
       "hubWhen": {
         "FORMAT": [
@@ -679,7 +699,11 @@
       "label": "Deprecated fields carry their dates",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step greps the .proto files for deprecated elements and checks the dated comment above each; reserving the number and name on removal is checked by buf breaking.\n\nThreshold: Every [deprecated = true] field, RPC and enum value has a comment \"Deprecated: YYYY-MM-DD, sunset: YYYY-MM-DD\" on the line above with the sunset at least {{SUNSET_MONTHS}} months after the deprecation; 0 without\n\nTool: grep and GNU date in the CI job\n\n```bash\n#!/usr/bin/env bash\n# every deprecated field, RPC or enum value: the line above reads \"// Deprecated: 2026-01-01, sunset: 2026-07-01\"\nset -uo pipefail\nfail=0\nwhile IFS=: read -r file line _; do\n  dates=$(sed -n \"$((line - 1))p\" \"$file\" | grep -Eo 'Deprecated: [0-9]{4}-[0-9]{2}-[0-9]{2}, sunset: [0-9]{4}-[0-9]{2}-[0-9]{2}' || true)\n  if [ -z \"$dates\" ]; then echo \"$file:$line: deprecated without its dates\"; fail=1; continue; fi\n  from=$(date -d \"$(echo \"$dates\" | cut -d' ' -f2 | tr -d ,)\" +%s)\n  to=$(date -d \"$(echo \"$dates\" | cut -d' ' -f4)\" +%s)\n  if [ $(( (to - from) / 86400 )) -lt $(( {{SUNSET_MONTHS}} * 30 )) ]; then echo \"$file:$line: sunset under {{SUNSET_MONTHS}} months after deprecation\"; fail=1; fi\ndone < <(grep -rn 'deprecated = true' api/ --include='*.proto')\nexit $fail\n```",
       "hubWhen": {
         "FORMAT": [
@@ -693,7 +717,10 @@
       "label": "Deprecated usage counted and alerted",
       "x": 1040,
       "y": 780,
-      "category": "operational",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "The element exports api_deprecated_calls_total{caller, operation} and api_sunset_timestamp_seconds{operation} (from the dates in the contract); Prometheus rules alert when the counter is missing and when a deprecated element close to its sunset is still called.\n\nThreshold: The counter api_deprecated_calls_total{caller, operation} is scraped (an alert fires while it is absent); an alert names every caller that called an element whose sunset is under 30 days away in the last 7 days\n\nTool: Prometheus alerting rules\n\n```yaml\ngroups:\n- name: api-deprecations\n  rules:\n  - alert: DeprecatedUsageNotCounted\n    expr: absent(api_deprecated_calls_total)\n    for: 1h\n    labels: { severity: ticket }\n    annotations: { summary: \"the API exports no usage counter for deprecated elements\" }\n  - alert: SunsetNearWithCallers\n    expr: |\n      sum by (operation, caller) (increase(api_deprecated_calls_total[7d])) > 0\n      and on (operation) (api_sunset_timestamp_seconds - time()) < 30 * 86400\n    labels: { severity: ticket }\n    annotations: { summary: \"{{ $labels.caller }} still calls {{ $labels.operation }}, whose sunset is under 30 days away\" }\n```"
     },
     {
@@ -702,7 +729,11 @@
       "label": "Two major versions at most",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the routes from the router (not from a list kept by hand), collects their /vN/ prefixes (for gRPC, the .vN package suffixes of the registered services) and fails when there are more than two.\n\nThreshold: The router serves at most 2 distinct major version prefixes; a third fails the test\n\nTool: Vitest (or the test runner of your stack)\n\n```ts\nimport { routes } from '../src/app'          // the router's table\n\nit('serves at most two major versions', () => {\n  const majors = new Set(routes.map((r) => /^\\/v(\\d+)\\//.exec(r.path)?.[1]).filter(Boolean))\n  expect([...majors].length, `major versions served: ${[...majors].join(', ')}`).toBeLessThanOrEqual(2)\n})\n```",
       "hubWhen": {
         "VERSIONING": [
@@ -716,7 +747,11 @@
       "label": "Version header required and echoed",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test calls the API without the header, with an unknown version and with each served version, and checks the status, the list in the 400 body and the echoed header.\n\nThreshold: A request without Api-Version, and one naming an unserved version, get 400 with the served versions; a request naming a served version is answered with that version echoed; at most 2 versions are served\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\n\nit('requires the version header, echoes it, and serves two versions at most', async () => {\n  const missing = await request(app).get('/orders').expect(400)\n  const served: string[] = missing.body.versions\n  expect(served.length).toBeLessThanOrEqual(2)\n  const unknown = await request(app).get('/orders').set('Api-Version', '2000-01-01').expect(400)\n  expect(unknown.body.versions).toEqual(served)\n  for (const v of served) {\n    const res = await request(app).get('/orders').set('Api-Version', v).expect(200)\n    expect(res.headers['api-version']).toBe(v)\n  }\n})\n```",
       "hubWhen": {
         "VERSIONING": [
@@ -730,7 +765,11 @@
       "label": "Caller contracts verified",
       "x": 1040,
       "y": 1170,
-      "category": "process",
+      "characteristic": "compatibility",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Every build of the API fetches the pacts of its callers from the Pact Broker and replays them against the running API, publishing the result; the deployment step asks can-i-deploy and stops on no.\n\nThreshold: 100 % of the callers' pacts for the main branch and every deployed version verify on each build; can-i-deploy answers yes before every deployment\n\nTool: Pact (pact-js Verifier, Pact Broker can-i-deploy)\n\n```ts\nimport { Verifier } from '@pact-foundation/pact'\n\nit('honours every caller\\'s pact', () =>\n  new Verifier({\n    provider: 'order-api',\n    providerBaseUrl: 'http://localhost:8080',\n    pactBrokerUrl: process.env.PACT_BROKER_BASE_URL,\n    consumerVersionSelectors: [{ mainBranch: true }, { deployedOrReleased: true }],\n    publishVerificationResult: true,\n    providerVersion: process.env.GIT_SHA,\n  }).verifyProvider())\n\n// before deploying:\n//   npx --package=@pact-foundation/pact-cli pact-broker can-i-deploy --pacticipant order-api --version \"$GIT_SHA\" --to-environment production\n```",
       "hubWhen": {
         "CONTRACT_TESTS": [
@@ -744,7 +783,11 @@
       "label": "API conforms to contract",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "On every build, Schemathesis generates calls for each operation of the published contract (OpenAPI or GraphQL), runs them against a running instance and fails on an answer the contract does not allow or on a server error.\n\nThreshold: 0 answers whose status code, headers or body the contract does not describe, and 0 server errors, over every operation, on each build\n\nTool: Schemathesis\n\n```bash\n# CI step, after the API is started\npip install 'schemathesis>=4'\nst run \"$API_URL/openapi.json\" --checks all      # for a GraphQL schema: st run \"$API_URL/graphql\" --checks all\n```",
       "hubWhen": {
         "CONTRACT_TESTS": [
@@ -762,7 +805,11 @@
       "label": "Server conforms to contract",
       "x": 1040,
       "y": 1430,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "On every build, the services the server reflects are compared with those of the contract's descriptors, and every RPC is called with an empty request; a crash (Unknown, Internal) fails the build, an InvalidArgument does not.\n\nThreshold: The services the running server reflects equal the services of the contract; 0 RPCs answer Unknown or Internal to an empty request\n\nTool: buf and grpcurl\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nbuf build -o /tmp/contract.binpb\ndiff <(grpcurl -protoset /tmp/contract.binpb list | sort) <(grpcurl -plaintext \"$GRPC_ADDRESS\" list | grep -v '^grpc\\.' | sort)\nfail=0\nfor svc in $(grpcurl -protoset /tmp/contract.binpb list); do\n  for rpc in $(grpcurl -protoset /tmp/contract.binpb list \"$svc\"); do\n    out=$(grpcurl -plaintext -d '{}' \"$GRPC_ADDRESS\" \"$rpc\" 2>&1 || true)\n    if echo \"$out\" | grep -qE 'Code: (Unknown|Internal)'; then echo \"$rpc crashes on an empty request\"; fail=1; fi\n  done\ndone\nexit $fail\n```",
       "hubWhen": {
         "CONTRACT_TESTS": [

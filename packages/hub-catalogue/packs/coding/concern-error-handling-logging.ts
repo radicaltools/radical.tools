@@ -207,7 +207,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-eslint-errors', label: 'TypeScript error rules', category: 'structural', implements: STYLES,
+      id: 'ff-eslint-errors', label: 'TypeScript error rules', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-swallow', 'req-cause'],
       threshold: '0 violations of no-empty (catch included), preserve-caught-error, only-throw-error, no-floating-promises and no-console in src on every pull request',
       description: 'ESLint (9.35 or later for preserve-caught-error) runs as a required check: an empty catch, a rethrow that drops the cause, a thrown non-Error, an unhandled rejected promise and a console call each fail the build. For .NET the matching Roslyn analyzers are CA1031 and CA2200 as errors in .editorconfig.',
@@ -228,7 +228,7 @@ export default tseslint.config({
 })`,
     },
     {
-      id: 'ff-ruff-errors', label: 'Python error rules', category: 'structural', implements: STYLES,
+      id: 'ff-ruff-errors', label: 'Python error rules', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-swallow', 'req-cause'],
       threshold: '0 violations of the BLE, TRY, LOG, G, T20, S110 and B904 rules in src on every pull request',
       description: 'Ruff runs as a required check with the exception and logging rule families: a blind except that does not re-raise (BLE001, which covers a catch that only logs), a try-except-pass, a raise inside except without from, logging.error instead of logging.exception, an f-string in a log call and a print each fail the build.',
@@ -250,7 +250,7 @@ extend-select = [
 "tests/**" = ["T20", "BLE001"]`,
     },
     {
-      id: 'ff-java-errors', label: 'Java error rules', category: 'structural', implements: STYLES,
+      id: 'ff-java-errors', label: 'Java error rules', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-swallow', 'req-cause', 'req-log-once'],
       threshold: '0 Error Prone errors from the exception patterns at compile time; 0 open Sonar issues of S108, S1166, S2139, S1181, S112, S106 on new code',
       description: 'Error Prone runs in the compiler with its exception patterns raised to errors; the SonarQube quality profile sets the matching rules to Blocker so the quality gate on new code fails on an empty catch, a dropped cause, log-and-rethrow, a caught Throwable, a thrown generic exception or System.out.',
@@ -273,7 +273,7 @@ extend-select = [
      S112  generic exception thrown   S106 System.out used to log -->`,
     },
     {
-      id: 'ff-semgrep-logging', label: 'No console, print, whole objects, log-and-continue or log-and-rethrow', category: 'structural', implements: STYLES,
+      id: 'ff-semgrep-logging', label: 'No console, print, whole objects, log-and-continue or log-and-rethrow', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-swallow', 'req-log-once', 'req-no-secrets'],
       threshold: '0 Semgrep findings of the five logging rules in src on every pull request',
       description: 'Semgrep runs on src with five rules: console in TypeScript, print in Python, a log call passed a whole request, response, headers or body object (as a bare argument or as a property of the first object), a catch whose body is a single log call (the error is swallowed), and a catch that logs and rethrows (the error would be logged twice).',
@@ -319,7 +319,7 @@ rules:
       try { ... } catch ($E) { ... $LOG.$LEVEL(...); ... throw ...; }`,
     },
     {
-      id: 'ff-redact-denylist', label: 'Secret paths redacted in the logger', when: { REDACTION: ['denylist'] }, category: 'structural', implements: STYLES,
+      id: 'ff-redact-denylist', label: 'Secret paths redacted in the logger', when: { REDACTION: ['denylist'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-secrets'],
       threshold: 'Every path of {{REDACTED_FIELDS}} is in the logger\'s redact list; a unit test logging each of them at the top level and one level down sees only the redaction marker',
       description: 'The logger is built once by a factory with a redact list of the known secret and personal-data paths and level labels as words; the exported logger and the test\'s logger come from the same factory, so the test logs an object holding each path at the top level and one level down into a stream and asserts that the written line holds only the marker. structlog: a processor that walks event_dict for the same keys; Serilog: Destructurama.Attributed or a masking enricher with the same list.',
@@ -347,7 +347,7 @@ it('redacts every listed path at the top level and one level down', () => {
 })`,
     },
     {
-      id: 'ff-redact-allowlist', label: 'Only allowed fields leave the logger', when: { REDACTION: ['allowlist'] }, category: 'structural', implements: STYLES,
+      id: 'ff-redact-allowlist', label: 'Only allowed fields leave the logger', when: { REDACTION: ['allowlist'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-secrets'],
       threshold: '100 % of top-level log fields are on the allow-list and every object field goes through a serializer; a unit test logging an unknown field and a whole user object sees neither',
       description: 'The logger\'s formatter drops every top-level field that is not on the allow-list, and each object type has a serializer that picks its allowed fields, so nothing is logged whole; the exported logger and the test\'s logger come from the same factory, and the test logs an unknown field and a whole user record into a stream and asserts that only the allowed fields are written. structlog: a processor that filters event_dict to the same list.',
@@ -383,7 +383,7 @@ it('writes only allowed fields, never a whole object', () => {
 })`,
     },
     {
-      id: 'ff-log-shape', label: 'Every log line well-formed, correlated and levelled', category: 'process', implements: STYLES,
+      id: 'ff-log-shape', label: 'Every log line well-formed, correlated and levelled', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-correlation', 'req-structured', 'req-text', 'req-levels'],
       threshold: '100 % of the lines written during a full test run parse as {{LOGS}}, carry a level from {{LEVELS}}, a {{CORRELATION_FIELD}} of 16 to 36 hex characters and a message of at most {{MAX_MESSAGE_CHARS}} characters; 0 JSON lines with a 4xx status at level error',
       description: 'The test run writes its logs to a file; a test afterwards reads every line and asserts the shape: JSON lines must parse, hold the fields, carry a level word from the list and never pair a 4xx status with level error; text lines must match the fixed layout built from the same levels and limit. One malformed, uncorrelated or mislevelled line fails the build.',
@@ -412,7 +412,7 @@ it('every log line of the test run is well-formed, correlated and levelled by me
 })`,
     },
     {
-      id: 'ff-no-stack-to-caller', label: 'Nothing internal reaches a caller', category: 'process', implements: STYLES,
+      id: 'ff-no-stack-to-caller', label: 'Nothing internal reaches a caller', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLES,
       checks: ['req-no-leak'],
       threshold: '0 stack-trace patterns, exception class names, source paths, SQL or internal addresses in the body of a 500 response or in the output of a failing CLI command, with production settings',
       description: 'An integration test starts the element with production settings, calls a route that throws an unexpected error, runs the CLI\'s test-only command that throws the same, and asserts that neither the HTTP body nor the CLI output matches a stack-trace, class-name, path, SQL or address pattern. Drop the CLI test where the element has none; a queue consumer\'s test applies the same pattern to the reason it writes on a dead-lettered message. The shape of the HTTP error body is checked in the Errors pack.',
@@ -438,7 +438,7 @@ it('an unexpected error reaches a CLI user as a clean message', () => {
 })`,
     },
     {
-      id: 'ff-error-hierarchy', label: 'Error classes extend the base and stay few', when: { STYLE: ['exceptions'] }, category: 'structural', implements: ['adr-exceptions'],
+      id: 'ff-error-hierarchy', label: 'Error classes extend the base and stay few', when: { STYLE: ['exceptions'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-exceptions'],
       checks: ['req-hierarchy'],
       threshold: 'Every class exported from src/errors extends {{BASE_ERROR}} and carries a non-empty string code; at most 10 classes',
       description: 'A test imports every export of src/errors, instantiates each class and asserts that it is an instance of {{BASE_ERROR}} and of Error, that its code is a non-empty string, and that the module exports at most ten classes; only-throw-error in the lint keeps thrown values to Error instances. On the JVM the same is an ArchUnit rule over classes ending in Exception; in Python a test over the subclasses of the base.',
@@ -461,7 +461,7 @@ it.each(classes)('%s extends {{BASE_ERROR}} and carries a code', (name, Cls) => 
 })`,
     },
     {
-      id: 'ff-edge-imports', label: 'Only the edge maps errors to responses', when: EDGE, category: 'structural', implements: ['adr-edge'],
+      id: 'ff-edge-imports', label: 'Only the edge maps errors to responses', when: EDGE, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-edge'],
       checks: ['req-edge'],
       threshold: '0 modules outside src/http import the error handler or the response mapping; 0 domain or application modules import an HTTP framework',
       description: 'A dependency rule fails the build when any module outside the edge imports the error-to-response mapping, or when domain or application code imports the HTTP framework (and so could build a response or know a status code). On the JVM the same rule is an ArchUnit test; in Python, import-linter.',
@@ -488,7 +488,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-layer-errors', label: 'Driver errors stay below the domain', when: LAYERED, category: 'structural', implements: ['adr-layered'],
+      id: 'ff-layer-errors', label: 'Driver errors stay below the domain', when: LAYERED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-layered'],
       checks: ['req-layered'],
       threshold: '0 dependencies from the domain or application packages on driver, persistence or HTTP-client exception types; 0 public persistence-adapter methods declaring a driver exception; every domain exception extends {{BASE_ERROR}}',
       description: 'An ArchUnit test fails the build when a domain or application class depends on a driver or framework exception type, when a persistence adapter method declares a driver exception, or when a domain exception does not extend {{BASE_ERROR}}. In TypeScript the same rules are dependency-cruiser rules on the driver packages (pg, mysql2, mongodb, undici) from src/domain and src/application.',
@@ -515,7 +515,7 @@ class LayerErrorsTest {
 }`,
     },
     {
-      id: 'ff-result-must-use', label: 'No Result ignored', when: { STYLE: ['result'] }, category: 'structural', implements: ['adr-result'],
+      id: 'ff-result-must-use', label: 'No Result ignored', when: { STYLE: ['result'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-result'],
       checks: ['req-result'],
       threshold: '0 Results left unhandled in src: the build fails on an unused Result, an unchecked error value or an unwrap outside tests',
       description: 'The linter of the language makes a dropped Result a build error: neverthrow/must-use-result in TypeScript, unused_must_use plus clippy\'s unwrap_used and expect_used in Rust, errcheck, errorlint and wrapcheck in golangci-lint (v2 configuration).',
@@ -537,7 +537,7 @@ export default [{
 //     settings: { errcheck: { check-blank: true, check-type-assertions: true } }`,
     },
     {
-      id: 'ff-codes-catalogue', label: 'Every code is in the catalogue and stable', when: { STYLE: ['codes'] }, category: 'structural', implements: ['adr-codes'],
+      id: 'ff-codes-catalogue', label: 'Every code is in the catalogue and stable', when: { STYLE: ['codes'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-codes'],
       checks: ['req-codes'],
       threshold: '100 % of codes used in src exist in the catalogue; the sorted list of codes matches its snapshot, so a rename or removal fails the build',
       description: 'A test collects every code used in src, checks each against the catalogue, snapshots the sorted list of codes so that a removed or renamed code is a reviewed change, and checks that every entry has a status, a type URI (absolute, or a relative reference /problems/… where the Errors pack keeps codes as identifiers) and a message template under the length limit.',

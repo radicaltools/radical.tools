@@ -192,7 +192,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-timeout', label: 'Slow calls cut off', category: 'operational', implements: OUTAGE_ADRS, checks: ['req-timeout'],
+      id: 'ff-timeout', label: 'Slow calls cut off', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: OUTAGE_ADRS, checks: ['req-timeout'],
       threshold: 'With 10 s of latency injected on each outside system, a single attempt gives up within {{TIMEOUT_MS}} ms + 10 %, and no user action waits longer than {{DEADLINE_MS}} ms',
       description: 'An integration test puts a Toxiproxy proxy in front of each outside system (or its sandbox stub), adds a latency toxic far above the timeout, and measures one attempt with retries turned off and then a whole action with the production settings.',
       tool: 'Toxiproxy (Testcontainers module) with Vitest (or the test runner of your stack)',
@@ -221,7 +221,7 @@ it('a whole action stays within the deadline', async () => {
 })`,
     },
     {
-      id: 'ff-retry', label: 'Retries bounded and jittered', category: 'structural', implements: OUTAGE_ADRS, checks: ['req-retry'],
+      id: 'ff-retry', label: 'Retries bounded and jittered', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: OUTAGE_ADRS, checks: ['req-retry'],
       threshold: 'Against a stub that always answers 503: exactly {{RETRIES}} + 1 attempts per run, and the delays of two runs differ; against 400: exactly 1 attempt',
       description: 'A test points the production client at a WireMock stub that always fails, counts the requests it received and their spacing over two runs (jitter makes the two sequences differ; plain exponential backoff repeats them), and repeats with an answer that must not be retried.',
       tool: 'WireMock (JUnit 5 extension; WireMock.Net, the WireMock container, or the stub server of your stack)',
@@ -257,7 +257,7 @@ class PartnerRetryTest {
 }`,
     },
     {
-      id: 'ff-breaker', label: 'Circuit opens and recovers', category: 'operational', implements: PROTECTION_ADRS, checks: ['req-breaker'],
+      id: 'ff-breaker', label: 'Circuit opens and recovers', characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: PROTECTION_ADRS, checks: ['req-breaker'],
       threshold: 'With every call failing (above {{BREAKER_PERCENT}} %), after 20 calls within 30 s 0 of the next 50 calls reach the outside system; after 30 s at most 3 of 10 calls reach it while it still fails; once it answers, calls resume',
       description: 'A black-box test against a running instance (with its library or its sidecar) points the outside host at a WireMockServer started by the test, drives calls through the instance, and counts what reaches the stub before, during and after the open period.',
       tool: 'WireMockServer (JUnit 5; or the stub server of your stack) against the running instance',
@@ -283,7 +283,7 @@ void circuitOpensThenProbes() throws Exception {
 }`,
     },
     {
-      id: 'ff-fail', label: 'Outage drill: refused cleanly', when: { FAILURE: ['fail'] }, category: 'operational', implements: ['adr-fail'], checks: ['req-fail'],
+      id: 'ff-fail', label: 'Outage drill: refused cleanly', when: { FAILURE: ['fail'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-fail'], checks: ['req-fail'],
       threshold: 'With each outside system down, every user action that needs it answers 503 with Retry-After within {{DEADLINE_MS}} ms, and 0 records are changed',
       description: 'An integration test cuts each outside system off with Toxiproxy, runs the actions that need it, and checks the answer, its time and that the database is unchanged.',
       tool: 'Toxiproxy (Testcontainers module) with Vitest and supertest (or the test runner and HTTP client of your stack)',
@@ -300,7 +300,7 @@ void circuitOpensThenProbes() throws Exception {
 })`,
     },
     {
-      id: 'ff-degrade', label: 'Outage drill: answers with less', when: { FAILURE: ['degrade'] }, category: 'operational', implements: ['adr-degrade'], checks: ['req-degrade', 'req-degrade-writes'],
+      id: 'ff-degrade', label: 'Outage drill: answers with less', when: { FAILURE: ['degrade'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-degrade'], checks: ['req-degrade', 'req-degrade-writes'],
       threshold: 'With each outside system down, every read that uses it answers within {{DEADLINE_MS}} ms from data at most {{STALE_MINUTES}} minutes old or a default, marked incomplete; every change that needs it answers 503 within {{DEADLINE_MS}} ms with nothing changed',
       description: 'An integration test warms the cache, cuts the outside system off with Toxiproxy, and checks that reads still answer, in time and marked incomplete, while changes are refused in time and leave the database as it was.',
       tool: 'Toxiproxy (Testcontainers module) with Vitest and supertest (or the test runner and HTTP client of your stack)',
@@ -325,7 +325,7 @@ it('refuses a change in time, with nothing changed', async () => {
 })`,
     },
     {
-      id: 'ff-defer', label: 'Outage drill: completed later', when: { FAILURE: ['defer'] }, category: 'operational', implements: ['adr-defer'], checks: ['req-defer', 'req-defer-expire'],
+      id: 'ff-defer', label: 'Outage drill: completed later', when: { FAILURE: ['defer'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-defer'], checks: ['req-defer', 'req-defer-expire'],
       threshold: 'With the outside system down, every action is accepted with 202 within {{DEADLINE_MS}} ms and completes after it is back, 0 actions lost; an action still waiting after {{DEFER_HOURS}} h is in the dead-letter queue with the user and the owner told',
       description: 'An integration test cuts the outside system off, starts actions, restarts the worker, brings the system back and waits for completion; a second test advances the clock past the deadline and expects the dead letter and the notices.',
       tool: 'Toxiproxy (Testcontainers module) with Vitest (fake timers for the deadline; or the test runner of your stack)',
@@ -352,7 +352,7 @@ it('gives up visibly after the deadline', async () => {
 })`,
     },
     {
-      id: 'ff-idem-key', label: 'Retries reuse the key', when: { IDEMPOTENCY: ['keys'] }, category: 'structural', implements: OUTAGE_ADRS, checks: ['req-idem-key'],
+      id: 'ff-idem-key', label: 'Retries reuse the key', when: { IDEMPOTENCY: ['keys'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: OUTAGE_ADRS, checks: ['req-idem-key'],
       threshold: 'Every retried call that changes something carries the same Idempotency-Key as its first attempt; 0 changing calls without a key',
       description: 'A test makes the stub time out on the first attempt of each changing call and checks that all attempts carry one and the same Idempotency-Key.',
       tool: 'WireMock (JUnit 5 extension; or the stub server of your stack)',
@@ -370,7 +370,7 @@ void retriesCarryTheSameKey(WireMockRuntimeInfo wm) {
 }`,
     },
     {
-      id: 'ff-idem-lookup', label: 'Lookup before repeat', when: { IDEMPOTENCY: ['lookup'] }, category: 'structural', implements: OUTAGE_ADRS, checks: ['req-idem-lookup'],
+      id: 'ff-idem-lookup', label: 'Lookup before repeat', when: { IDEMPOTENCY: ['lookup'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: OUTAGE_ADRS, checks: ['req-idem-lookup'],
       threshold: 'After a lost answer to a changing call, the client looks the change up by its reference and repeats it 0 times when it exists',
       description: 'A test makes the stub take the change but time out, and checks that the client asks for the reference and sends the change only once.',
       tool: 'WireMock (JUnit 5 extension; or the stub server of your stack)',
@@ -387,7 +387,7 @@ void looksUpInsteadOfRepeating(WireMockRuntimeInfo wm) {
 }`,
     },
     {
-      id: 'ff-readonly', label: 'Clients only read', when: { IDEMPOTENCY: ['readonly'] }, category: 'structural', implements: OUTAGE_ADRS, checks: ['req-readonly'],
+      id: 'ff-readonly', label: 'Clients only read', when: { IDEMPOTENCY: ['readonly'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: OUTAGE_ADRS, checks: ['req-readonly'],
       threshold: '0 calls with POST, PUT, PATCH or DELETE in the clients of outside systems',
       description: 'A Semgrep rule over the integration clients fails the build on a call with a method that changes something, which would mean this decision has to be revisited; an explicit GET passes.',
       tool: 'Semgrep (the rule is for TypeScript; for Java or C#, the same patterns on the HTTP client of your stack)',
@@ -410,7 +410,7 @@ void looksUpInsteadOfRepeating(WireMockRuntimeInfo wm) {
             regex: (?i)^"?(post|put|patch|delete)"?$`,
     },
     {
-      id: 'ff-library', label: 'No unguarded outside calls', when: { PROTECTION: ['library'] }, category: 'structural', implements: ['adr-library'], checks: ['req-library'],
+      id: 'ff-library', label: 'No unguarded outside calls', when: { PROTECTION: ['library'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-library'], checks: ['req-library'],
       threshold: '0 classes outside the integration clients use an HTTP client; every public method of a *Client class in the integration package is guarded by a time limiter, a retry and a circuit breaker',
       description: 'ArchUnit rules fail the build when code outside the integration package uses an HTTP client, or when a public method of an integration client class lacks the Resilience4j annotations (NetArchTest does the same in .NET, dependency-cruiser in TypeScript).',
       tool: 'ArchUnit (JVM; NetArchTest for .NET, dependency-cruiser for TypeScript)',
@@ -433,7 +433,7 @@ class OutsideCallsArchTest {
 }`,
     },
     {
-      id: 'ff-mesh', label: 'Every outside host guarded', when: { PROTECTION: ['mesh'] }, category: 'structural', implements: ['adr-mesh'], checks: ['req-mesh'],
+      id: 'ff-mesh', label: 'Every outside host guarded', when: { PROTECTION: ['mesh'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-mesh'], checks: ['req-mesh'],
       threshold: 'Every ServiceEntry host has a VirtualService with a timeout of at most {{TIMEOUT_MS}} ms and at most {{RETRIES}} retry attempts, and a DestinationRule with outlier detection; the mesh config sets outboundTrafficPolicy REGISTRY_ONLY; 0 hosts without',
       description: 'A Conftest policy runs over the mesh manifests in the repository in each pull request and fails on an outside host that lacks any of the three, or when egress to undeclared hosts is not blocked in the IstioOperator mesh config.',
       tool: 'Conftest (Open Policy Agent)',

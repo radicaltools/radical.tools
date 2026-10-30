@@ -11,6 +11,7 @@ import type { C4Node, C4Relation } from '../c4'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
 import { conditionResults, conditionsOf, linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type TestOutcome } from './evidence'
 import { formatAge, parseCombine, parseMaxAge, type Measurement } from './metrics'
+import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
@@ -59,6 +60,10 @@ export interface CheckModel {
   /** The Hub's concern packs, for concern-unaddressed; without them it
    *  finds nothing. */
   concerns?: ConcernPack[]
+  /** The event the check runs on (pull-request in the gate): a metric
+   *  condition of a fitness function that runs on another one, or
+   *  continually, is not reported when nothing measured it. */
+  trigger?: string
 }
 
 export interface CheckRule {
@@ -145,11 +150,22 @@ function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, mode
 
 /** A rule over the metric conditions with `outcome`, with measurements. A
  *  failing one names what it leaves unverified as related. */
+/** Whether `node` is measured on the check's trigger: a fitness function
+ *  triggered on another event, continual or temporal is not; one with no
+ *  cadence yet, and every scenario, is. */
+const runsOn = (node: C4Node, trigger: string | undefined): boolean => {
+  if (!trigger || node.type !== 'fitness-fn') return true
+  const cadence = prop(node, 'cadence')
+  if (!cadence) return true
+  return cadence === 'triggered' && prop(node, 'trigger') === trigger
+}
+
 function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition: string, detail: string, why?: string) => string): (model: CheckModel) => RuleFinding[] {
   return (model) => {
     if (!model.measurements) return []
     return Object.values(model.nodes)
       .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
+      .filter((n) => outcome !== 'not-run' || runsOn(n, model.trigger))
       .flatMap((node) => {
         const metricLines = new Set(conditionsOf(node).filter((c) => c.kind === 'metric').map((c) => c.raw))
         return conditionResults(node, model)
@@ -347,6 +363,28 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'decisions',
     run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !conditionsOf(n).length)
       .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} names no check.` })),
+  },
+  {
+    id: 'fitness-fn-unclassified',
+    description: 'Every fitness function states its characteristic (ISO/IEC 25010), scope, cadence (with the event it is triggered on, or how often a temporal one falls due) and invocation.',
+    severity: 'warning',
+    dimension: 'decisions',
+    run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => {
+      const missing = ['characteristic', 'scope', 'cadence'].filter((k) => !prop(n, k))
+      if (prop(n, 'cadence') === 'triggered' && !prop(n, 'trigger')) missing.push('trigger')
+      if (prop(n, 'cadence') === 'temporal' && !prop(n, 'every')) missing.push('every')
+      if (!prop(n, 'invocation')) missing.push('invocation')
+      return missing.length ? [{ nodeId: n.id, message: `Fitness function ${quote(n)} states no ${missing.join(', ')}.` }] : []
+    }),
+  },
+  {
+    id: 'fitness-fn-measure-invalid',
+    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}).`,
+    severity: 'error',
+    dimension: 'completeness',
+    run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
+      .filter((line) => !isSensorName(line.sensor))
+      .map((line) => ({ nodeId: n.id, message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}.` }))),
   },
   {
     id: 'metric-invalid',

@@ -219,7 +219,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-layers', label: 'Layers call downwards', when: { STYLE: ['layered'] }, category: 'structural', implements: ['adr-layered'], checks: ['req-layers'],
+      id: 'ff-layers', label: 'Layers call downwards', when: { STYLE: ['layered'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-layered'], checks: ['req-layers'],
       threshold: '0 layer violations: no layer is accessed by a layer above the one it serves, 0 Spring MVC or servlet types in the business layer, 0 SQL or JDBC types outside data access',
       description: 'An ArchUnit test declares the three layers and which may access which, forbids web types in the business layer and SQL outside data access; it runs with the unit tests and fails on any violation.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest; for TypeScript: dependency-cruiser; for Python: import-linter layers contract',
@@ -246,7 +246,7 @@ class LayerRulesTest {
 }`,
     },
     {
-      id: 'ff-hexagonal', label: 'Ports and adapters hold', when: { STYLE: ['hexagonal'] }, category: 'structural', implements: ['adr-hexagonal'], checks: ['req-ports'],
+      id: 'ff-hexagonal', label: 'Ports and adapters hold', when: { STYLE: ['hexagonal'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-hexagonal'], checks: ['req-ports'],
       threshold: '0 violations of the hexagonal rules: the core depends on no adapter and no framework service, adapters reach the core only through ports and do not use each other',
       description: 'Each package names its role in package-info.java with jMolecules\' hexagonal annotations; JMoleculesArchitectureRules.ensureHexagonal() derives the allowed dependencies from them and fails the test on any other, and a second rule keeps the core free of adapters and framework services (whether persistence annotations may appear in the domain is the FRAMEWORK decision, checked by its own rule).',
       tool: 'jMolecules ArchUnit rules (jmolecules-archunit with ArchUnit, JUnit 5); for .NET: NetArchTest; for TypeScript: dependency-cruiser; for Python: import-linter',
@@ -271,7 +271,7 @@ class HexagonalRulesTest {
 }`,
     },
     {
-      id: 'ff-rings', label: 'Rings depend inwards', when: { STYLE: ['clean'] }, category: 'structural', implements: ['adr-clean'], checks: ['req-rings'],
+      id: 'ff-rings', label: 'Rings depend inwards', when: { STYLE: ['clean'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-clean'], checks: ['req-rings'],
       threshold: '0 dependencies from an inner ring to an outer one; 100% of the interactor classes implement an input boundary',
       description: 'ArchUnit\'s onionArchitecture() declares the rings and fails the test on any dependency pointing outwards; a second rule requires every class in application.usecase to implement an interface from application.port.in, so a use case cannot be reached except through its boundary.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest; for TypeScript: dependency-cruiser; for Python: import-linter layers contract',
@@ -297,7 +297,7 @@ class RingRulesTest {
 }`,
     },
     {
-      id: 'ff-slices', label: 'Slices independent', when: { STYLE: ['slices'] }, category: 'structural', implements: ['adr-slices'], checks: ['req-slices'],
+      id: 'ff-slices', label: 'Slices independent', when: { STYLE: ['slices'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-slices'], checks: ['req-slices'],
       threshold: '0 dependencies from one feature slice on another; 0 dependencies from the domain folder on a slice',
       description: 'ArchUnit finds the slices (the packages under features) and checks that none depends on another, and that the common domain folder depends on no slice; it runs with the unit tests.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest over the Features namespaces; for TypeScript: dependency-cruiser',
@@ -314,7 +314,7 @@ class SliceRulesTest {
 }`,
     },
     {
-      id: 'ff-domain-tests', label: 'Domain tested alone', when: { LOGIC: ['rich'] }, category: 'structural', implements: ['adr-rich-domain'], checks: ['req-domain-tests'],
+      id: 'ff-domain-tests', label: 'Domain tested alone', when: { LOGIC: ['rich'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rich-domain'], checks: ['req-domain-tests'],
       threshold: 'The domain unit tests pass on a runner with no database, broker or container runtime and cover at least {{DOMAIN_COVERAGE}}% of the lines of every domain package',
       description: 'A Gradle task runs only the tests of the domain packages and a JaCoCo verification task checks their line coverage per domain package; CI runs the task on a runner without Docker, so a domain test that starts a container fails there.',
       tool: 'Gradle with JaCoCo (JUnit 5), on a CI runner without Docker; for .NET: coverlet with a threshold on the Domain project; for TypeScript: Vitest coverage thresholds per glob (Vitest 3.2 or later for test.projects)',
@@ -343,7 +343,7 @@ tasks.register<JacocoCoverageVerification>("domainCoverage") {
 }`,
     },
     {
-      id: 'ff-pure', label: 'Domain imports no framework', when: { FRAMEWORK: ['pure'] }, category: 'structural', implements: STYLE_ADRS, checks: ['req-pure'],
+      id: 'ff-pure', label: 'Domain imports no framework', when: { FRAMEWORK: ['pure'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLE_ADRS, checks: ['req-pure'],
       threshold: '0 dependencies of domain classes outside the language, the domain itself and the jMolecules role annotations',
       description: 'An ArchUnit rule lets domain classes depend only on the language, the domain and jMolecules (annotation types count as dependencies); the build fails on any other dependency.',
       tool: 'ArchUnit (JUnit 5); for TypeScript: a dependency-cruiser rule from src/domain to node_modules; for .NET: NetArchTest HaveDependencyOnAny over the Domain namespace',
@@ -357,7 +357,7 @@ class DomainPurityTest {
 }`,
     },
     {
-      id: 'ff-annotations', label: 'Only mapping annotations', when: { FRAMEWORK: ['annotations'] }, category: 'structural', implements: STYLE_ADRS, checks: ['req-annotations'],
+      id: 'ff-annotations', label: 'Only mapping annotations', when: { FRAMEWORK: ['annotations'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STYLE_ADRS, checks: ['req-annotations'],
       threshold: '0 dependencies of domain classes outside the language, the domain, jMolecules, Jakarta Persistence and Bean Validation',
       description: 'An ArchUnit rule allows the domain the mapping and validation annotations and nothing else of the framework; a call into Spring, a transaction API or a messaging client fails the build.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest allowing only the EF Core and DataAnnotations namespaces',
@@ -372,7 +372,7 @@ class DomainAnnotationsTest {
 }`,
     },
     {
-      id: 'ff-aggregates', label: 'Aggregates guard their state', when: { LOGIC: ['rich'] }, category: 'structural', implements: ['adr-rich-domain'], checks: ['req-aggregates'],
+      id: 'ff-aggregates', label: 'Aggregates guard their state', when: { LOGIC: ['rich'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rich-domain'], checks: ['req-aggregates'],
       threshold: '0 public setters on domain classes and 0 violations of the jMolecules DDD rules (aggregates referenced by identifier only, entities inside one aggregate)',
       description: 'Aggregates, entities and value objects are marked with jMolecules annotations; JMoleculesDddRules.all() checks that aggregates refer to each other only by identifier and entities belong to one aggregate, and a second rule forbids public setters in the domain.',
       tool: 'jMolecules DDD rules (jmolecules-archunit with ArchUnit, JUnit 5); for .NET and TypeScript: an architecture test over the naming conventions of aggregates and identifiers',
@@ -390,7 +390,7 @@ class DomainModelRulesTest {
 }`,
     },
     {
-      id: 'ff-scripts', label: 'Scripts stand alone', when: { LOGIC: ['scripts'] }, category: 'structural', implements: ['adr-transaction-scripts'], checks: ['req-scripts'],
+      id: 'ff-scripts', label: 'Scripts stand alone', when: { LOGIC: ['scripts'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-transaction-scripts'], checks: ['req-scripts'],
       threshold: '0 scripts depended on by another script; 100% of public script methods annotated @Transactional',
       description: 'ArchUnit rules over the classes named *Script: a script is used only by entry points and application code (never by another script), and every public method of a script is transactional.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest over classes named *Script; for TypeScript: dependency-cruiser between *Script files',
@@ -412,7 +412,7 @@ class ScriptRulesTest {
 }`,
     },
     {
-      id: 'ff-one-model', label: 'No read side without a decision', when: { CQRS: ['none'] }, category: 'structural', implements: ['adr-one-model'], checks: ['req-one-model'],
+      id: 'ff-one-model', label: 'No read side without a decision', when: { CQRS: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-one-model'], checks: ['req-one-model'],
       threshold: '0 classes in a query package and 0 projections in the deployable',
       description: 'An ArchUnit rule fails the build when a query package or a projection class appears, which would mean a read side arrived without its decision.',
       tool: 'ArchUnit (JUnit 5); for TypeScript: a dependency-cruiser rule forbidding src/query; for .NET: NetArchTest over a Query namespace',
@@ -426,7 +426,7 @@ class OneModelRulesTest {
 }`,
     },
     {
-      id: 'ff-read-models', label: 'Queries skip the write side', when: SEPARATE_READS, category: 'structural', implements: READ_ADRS, checks: ['req-read-models'],
+      id: 'ff-read-models', label: 'Queries skip the write side', when: SEPARATE_READS, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: READ_ADRS, checks: ['req-read-models'],
       threshold: '0 dependencies from the query package on the domain, the application or the persistence adapter, and 0 from the write side on the query package',
       description: 'ArchUnit rules keep the two sides apart: the query package (or a slice\'s query package) may not use the domain model, the use cases or the write side\'s repositories, and the write side may not read the read models.',
       tool: 'ArchUnit (JUnit 5); for .NET: NetArchTest over the Query and Domain namespaces; for TypeScript: dependency-cruiser between src/query and src/domain',
@@ -445,7 +445,7 @@ class CqrsRulesTest {
 }`,
     },
     {
-      id: 'ff-read-lag', label: 'Read store lag bounded', when: { CQRS: ['store'] }, category: 'operational', implements: ['adr-read-store'], checks: ['req-read-lag'],
+      id: 'ff-read-lag', label: 'Read store lag bounded', when: { CQRS: ['store'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-read-store'], checks: ['req-read-lag'],
       threshold: '99th percentile of projection lag at most {{READ_LAG_SECONDS}} seconds over 10 minutes',
       description: 'Each projection records, for every event it applies, the seconds between the event\'s commit and the read store update as a histogram projection_lag_seconds labelled with the projection; an alert fires when the 99th percentile passes the limit.',
       tool: 'Prometheus alerting rule (the histogram is exported by the projections with Micrometer)',
@@ -462,7 +462,7 @@ class CqrsRulesTest {
           summary: "Projection {{ $labels.projection }} lags more than {{READ_LAG_SECONDS}} s (ADR A separate read store)"`,
     },
     {
-      id: 'ff-projection-rebuild', label: 'Projection rebuilt from the stream', when: { CQRS: ['store'] }, category: 'structural', implements: ['adr-read-store'], checks: ['req-rebuild'],
+      id: 'ff-projection-rebuild', label: 'Projection rebuilt from the stream', when: { CQRS: ['store'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-read-store'], checks: ['req-rebuild'],
       threshold: 'For every projection, the read model cleared and replayed from the start of the stream equals the one built as the events arrived',
       description: 'An integration test starts the broker in a container, places an order and waits for the read model, then clears the read store, seeks the projection\'s consumer group to the start and waits for the rebuild; the two read models must be equal. One such test per projection.',
       tool: 'Testcontainers (Kafka) with Spring Boot and Awaitility (JUnit 5); for TypeScript: the same test with @testcontainers/kafka and Vitest',

@@ -216,7 +216,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-key-http', label: 'Repeats replay, misuse is refused', when: KEY, category: 'structural', implements: ['adr-key'], checks: ['req-key-replay', 'req-key-required', 'req-key-mismatch'],
+      id: 'ff-key-http', label: 'Repeats replay, misuse is refused', when: KEY, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-key'], checks: ['req-key-replay', 'req-key-required', 'req-key-mismatch'],
       threshold: 'A repeat with the same key gets the first status and body and creates 0 more orders; a reused key with another body gets 422; a POST without a key gets 400',
       description: 'An HTTP test sends one order twice with the same key and compares the answers and the orders stored, then reuses the key with another body and sends one without a key. Each test uses a fresh UUID as its key and as the order\'s reference, so tests in parallel do not see each other\'s orders.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc or REST Assured, xUnit with WebApplicationFactory)',
@@ -248,7 +248,7 @@ it('refuses a reused key with another body (422) and a missing key (400)', async
 })`,
     },
     {
-      id: 'ff-key-concurrent', label: 'Overlapping repeats run once', when: KEY, category: 'structural', implements: ['adr-key'], checks: ['req-key-concurrent'],
+      id: 'ff-key-concurrent', label: 'Overlapping repeats run once', when: KEY, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-key'], checks: ['req-key-concurrent'],
       threshold: 'In 10 runs of two overlapping requests with one key, each run stores 1 order, and the second answer is the first one\'s or 409',
       description: 'The test app holds every order change for 500 ms through a test hook, so the two requests overlap; whether the second waits for the first or is refused with 409 depends on the key store, and the test accepts either, but never a second order.',
       tool: 'Vitest with supertest, the app built by a test fixture with a 500 ms hold in the order handler (on the JVM: JUnit with REST Assured and a CompletableFuture pair)',
@@ -269,7 +269,7 @@ it.each([...Array(10).keys()])('never runs two overlapping requests with one key
 })`,
     },
     {
-      id: 'ff-key-contract', label: 'The contract requires the key', when: KEY, category: 'structural', implements: ['adr-key'], checks: ['req-key-required'],
+      id: 'ff-key-contract', label: 'The contract requires the key', when: KEY, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-key'], checks: ['req-key-required'],
       threshold: '0 POST or PATCH operations in openapi.yaml without a required Idempotency-Key header parameter and documented 400 and 422 answers',
       description: 'A Spectral rule over the OpenAPI document fails the build when a POST or PATCH does not declare the Idempotency-Key header as required or does not document the 400 and 422 answers; references to shared parameters are resolved. A new operation fails until it takes the key. Add the rule to the ruleset the API style guide keeps.',
       tool: 'Spectral (npx @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml --fail-severity error); for a Java build the same CLI runs in the pipeline',
@@ -298,7 +298,7 @@ rules:
             responses: { type: object, required: ['400', '422'] }`,
     },
     {
-      id: 'ff-key-atomic', label: 'A failed change leaves no key', when: KEY_DB, category: 'structural', implements: ['adr-store-db'], checks: ['req-key-atomic'],
+      id: 'ff-key-atomic', label: 'A failed change leaves no key', when: KEY_DB, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-store-db'], checks: ['req-key-atomic'],
       threshold: 'After a request whose second write fails: 0 rows in idempotency_keys and 0 orders for its key; the retry with the same key answers 201',
       description: 'An integration test against the real database makes the second write of an order fail once, then checks that neither the order nor the key was kept and that the retry with the same key creates the order.',
       tool: 'Vitest with supertest against PostgreSQL in a container (Testcontainers); for the JVM: JUnit with Testcontainers and a Mockito spy on the repository',
@@ -321,7 +321,7 @@ it('a change that rolls back leaves no key, so the retry runs', async () => {
 })`,
     },
     {
-      id: 'ff-key-table', label: 'Old keys are cleaned up', when: KEY_DB, category: 'operational', implements: ['adr-store-db'], checks: ['req-key-expiry'],
+      id: 'ff-key-table', label: 'Old keys are cleaned up', when: KEY_DB, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-store-db'], checks: ['req-key-expiry'],
       threshold: '0 keys older than {{KEY_HOURS}} hours plus one; 1 clean-up job scheduled; 0 failed clean-up runs in the last day',
       description: 'A query run every hour by the monitoring job against the element\'s database returns one row per problem; any row with a count above 0 raises an alert. The clean-up itself is a pg_cron job created once by a migration (shown in the comment).',
       tool: 'PostgreSQL with pg_cron (cron.job, cron.job_run_details), the query run by the monitoring job; on another database the scheduler\'s own job history',
@@ -344,7 +344,7 @@ WHERE j.command ILIKE '%DELETE FROM idempotency_keys%'
   AND d.status = 'failed' AND d.start_time > now() - interval '1 day';`,
     },
     {
-      id: 'ff-key-redis', label: 'Redis keys expire, never evicted', when: KEY_REDIS, category: 'operational', implements: ['adr-store-redis'], checks: ['req-key-expiry', 'req-key-redis'],
+      id: 'ff-key-redis', label: 'Redis keys expire, never evicted', when: KEY_REDIS, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-store-redis'], checks: ['req-key-expiry', 'req-key-redis'],
       threshold: 'maxmemory-policy is noeviction; 0 idem:* keys without an expiry or with one above {{KEY_HOURS}} hours',
       description: 'A script run after every deploy and hourly by the monitoring job reads the eviction policy and scans the idempotency keys without blocking Redis (SCAN), failing on a key with no expiry or a longer one. Managed Redis that blocks CONFIG (some ElastiCache setups) has its policy read from the provider\'s parameter group instead.',
       tool: 'redis-cli in a shell step (REDIS_URL points at the key store)',
@@ -363,7 +363,7 @@ done < <(redis-cli -u "$REDIS_URL" --scan --pattern 'idem:*')
 [ "$bad" -eq 0 ] || { echo "$bad idempotency keys without a valid expiry"; exit 1; }`,
     },
     {
-      id: 'ff-put-repeat', label: 'A repeated PUT changes nothing', when: { IDEMPOTENCY: ['put'] }, category: 'structural', implements: ['adr-put'], checks: ['req-put-create'],
+      id: 'ff-put-repeat', label: 'A repeated PUT changes nothing', when: { IDEMPOTENCY: ['put'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-put'], checks: ['req-put-create'],
       threshold: 'The first PUT to a new id answers 201, the repeat 200 with the same body; 1 order stored for the id',
       description: 'An HTTP test creates an order with a PUT to a fresh UUID, repeats the same request, and checks the answers and the rows stored.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc or REST Assured)',
@@ -383,7 +383,7 @@ it('a repeated PUT leaves one resource and changes nothing', async () => {
 })`,
     },
     {
-      id: 'ff-put-contract', label: 'No POST in the contract', when: { IDEMPOTENCY: ['put'] }, category: 'structural', implements: ['adr-put'], checks: ['req-put-no-post'],
+      id: 'ff-put-contract', label: 'No POST in the contract', when: { IDEMPOTENCY: ['put'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-put'], checks: ['req-put-no-post'],
       threshold: '0 POST operations and 0 PATCH request bodies other than application/merge-patch+json in openapi.yaml',
       description: 'Two Spectral rules over the OpenAPI document fail the build on any POST and on a PATCH that accepts another media type. A POST that only reads (a search with a large body) is exempted by name in the ruleset\'s overrides, where the exception is visible in review.',
       tool: 'Spectral (npx @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml --fail-severity error)',
@@ -408,7 +408,7 @@ rules:
         schema: { type: object, minProperties: 1, propertyNames: { const: application/merge-patch+json } }`,
     },
     {
-      id: 'ff-none-contract', label: 'Unsafe operations marked', when: { IDEMPOTENCY: ['none'] }, category: 'structural', implements: ['adr-none'], checks: ['req-none-retry'],
+      id: 'ff-none-contract', label: 'Unsafe operations marked', when: { IDEMPOTENCY: ['none'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-none'], checks: ['req-none-retry'],
       threshold: '0 POST or PATCH operations in openapi.yaml without x-retry-safe: false and a description of at least 20 characters',
       description: 'A Spectral rule over the OpenAPI document fails the build when a POST or PATCH is not marked as unsafe to retry or has no description to tell the caller how to look the result up. Generated clients and the API portal read the extension.',
       tool: 'Spectral (npx @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml --fail-severity error)',
@@ -432,7 +432,7 @@ rules:
             description: { type: string, minLength: 20 }`,
     },
     {
-      id: 'ff-etag', label: 'Changes only from the current ETag', when: { CONCURRENCY: ['etag'] }, category: 'structural', implements: ['adr-etag'], checks: ['req-etag', 'req-etag-required'],
+      id: 'ff-etag', label: 'Changes only from the current ETag', when: { CONCURRENCY: ['etag'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-etag'], checks: ['req-etag', 'req-etag-required'],
       threshold: 'A GET answers a strong ETag; a change without If-Match gets 428, with a stale one 412, with the current one 200 and a new ETag; the refused changes leave the order unchanged',
       description: 'An HTTP test reads an order, tries to change it without If-Match, changes it with the ETag it read, and then tries again with that now stale ETag, checking the stored quantity at the end.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc or REST Assured)',
@@ -455,7 +455,7 @@ it('changes a resource only from the version the client saw', async () => {
 })`,
     },
     {
-      id: 'ff-version', label: 'Stale versions refused', when: { CONCURRENCY: ['version'] }, category: 'structural', implements: ['adr-version'], checks: ['req-version'],
+      id: 'ff-version', label: 'Stale versions refused', when: { CONCURRENCY: ['version'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-version'], checks: ['req-version'],
       threshold: 'A change from the current version answers 200 with a new version; a change from the old version answers 409 and leaves the order unchanged',
       description: 'An HTTP test reads an order with its version, saves a change from it, and saves another change from the same, now stale, copy.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc or REST Assured)',
@@ -475,7 +475,7 @@ it('refuses a change made from a stale version with 409', async () => {
 })`,
     },
     {
-      id: 'ff-lww', label: 'The last writer is shown', when: { CONCURRENCY: ['lww'] }, category: 'structural', implements: ['adr-lww'], checks: ['req-lww'],
+      id: 'ff-lww', label: 'The last writer is shown', when: { CONCURRENCY: ['lww'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-lww'], checks: ['req-lww'],
       threshold: 'Two changes from the same copy both answer 200; the order holds the second one\'s quantity, its writer in updatedBy and a valid updatedAt',
       description: 'An HTTP test has two users change the same order from the same copy, one after the other, and checks that the second write is kept and that the representation names its writer.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc or REST Assured)',

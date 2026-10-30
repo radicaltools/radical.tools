@@ -168,7 +168,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-deploy-record', label: 'Deployments carry their record', when: { SOURCE: ['script'] }, category: 'process', implements: ['adr-script'], checks: ['req-deploy-recorded'],
+      id: 'ff-deploy-record', label: 'Deployments carry their record', when: { SOURCE: ['script'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-script'], checks: ['req-deploy-recorded'],
       threshold: '0 production deployments of the last {{WINDOW_DAYS}} days without a payload naming service, team and a kind of planned, hotfix or rollback',
       description: 'A weekly step lists the production deployments through the Deployments API and fails on any whose payload lacks the service, the team or a valid kind. The comment shows how the deploy job creates the record and posts success after the rollout.',
       tool: 'GitHub CLI (gh api --paginate) with jq, in the weekly GitHub Actions workflow (ubuntu runner, GNU date)',
@@ -190,7 +190,7 @@ gh api --paginate "repos/$GITHUB_REPOSITORY/deployments?environment=production&p
 jq -e 'length == 0' reports/unrecorded.json > /dev/null || { echo "production deployments without service, team or kind:"; cat reports/unrecorded.json; exit 1; }`,
     },
     {
-      id: 'ff-failure-marked', label: 'Repaired deployments are marked failed', when: { SOURCE: ['script'] }, category: 'process', implements: ['adr-script'], checks: ['req-failure-marked'],
+      id: 'ff-failure-marked', label: 'Repaired deployments are marked failed', when: { SOURCE: ['script'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-script'], checks: ['req-failure-marked'],
       threshold: '0 rollbacks or hotfixes of the last {{WINDOW_DAYS}} days that name no repaired deployment, or whose repaired deployment carries no failure status',
       description: 'A weekly step takes every rollback and hotfix deployment, reads the deployment it names as repaired and fails when that one has no failure status. Interventions without a deployment (a flag switched off) are marked by the incident process and are not seen by this check.',
       tool: 'GitHub CLI (gh api) with jq, in the weekly GitHub Actions workflow',
@@ -211,7 +211,7 @@ done < <(gh api --paginate "repos/$GITHUB_REPOSITORY/deployments?environment=pro
 exit $status`,
     },
     {
-      id: 'ff-change-flow', label: 'Deployment frequency and lead time', when: { SOURCE: ['script'] }, category: 'operational', implements: ['adr-script'], checks: ['req-flow-targets'],
+      id: 'ff-change-flow', label: 'Deployment frequency and lead time', when: { SOURCE: ['script'] }, characteristic: 'maintainability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-script'], checks: ['req-flow-targets'],
       threshold: 'At least {{DEPLOYS_PER_WEEK}} production deployments a week and a median change lead time of at most {{LEAD_TIME_HOURS}} hours over the last {{WINDOW_DAYS}} days',
       description: 'The script reads the production deployments of the unit (SCOPE=service:<name> or team:<name>), keeps those with a success status, and for each takes the commits it brought (the compare API between the previous live deployment and it); a commit\'s lead time runs from its committer date to the first deployment that brought it. It writes reports/delivery-flow.json and fails when a target is missed. UNTIL moves the window back for the streak check.',
       tool: 'Node 20 (fetch) over the GitHub REST API: deployments, deployment statuses, compare two commits; run by the weekly GitHub Actions workflow',
@@ -242,7 +242,7 @@ writeFileSync('reports/delivery-flow.json', JSON.stringify({ until: new Date(unt
 if (misses.length) { console.error(\`missed targets: \${misses.join(', ')}\`); process.exitCode = 1 }`,
     },
     {
-      id: 'ff-failures', label: 'Change fail rate, recovery and rework', when: { SOURCE: ['script'] }, category: 'operational', implements: ['adr-script'], checks: ['req-stability-targets', 'req-rework'],
+      id: 'ff-failures', label: 'Change fail rate, recovery and rework', when: { SOURCE: ['script'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-script'], checks: ['req-stability-targets', 'req-rework'],
       threshold: 'Change fail rate at most {{CHANGE_FAIL_PCT}}%, median failed deployment recovery time at most {{RECOVERY_HOURS}} hours and deployment rework rate at most {{REWORK_PCT}}% over the last {{WINDOW_DAYS}} days',
       description: 'The script reads the production deployments of the unit that went live in the window; a deployment failed when a failure status follows its success status, and its recovery time runs from the one to the other; it is rework when its kind is hotfix or rollback. It writes reports/delivery-failures.json and fails when a target is missed.',
       tool: 'Node 20 (fetch) over the GitHub REST API: deployments and deployment statuses; run by the weekly GitHub Actions workflow',
@@ -272,7 +272,7 @@ writeFileSync('reports/delivery-failures.json', JSON.stringify({ until: new Date
 if (misses.length) { console.error(\`missed targets: \${misses.join(', ')}\`); process.exitCode = 1 }`,
     },
     {
-      id: 'ff-platform-metrics', label: 'Platform figures against the targets', when: { SOURCE: ['platform'] }, category: 'operational', implements: ['adr-platform'], checks: ['req-flow-targets', 'req-stability-targets'],
+      id: 'ff-platform-metrics', label: 'Platform figures against the targets', when: { SOURCE: ['platform'] }, characteristic: 'maintainability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-platform'], checks: ['req-flow-targets', 'req-stability-targets'],
       threshold: 'At least {{DEPLOYS_PER_WEEK}} deployments a week, median lead time at most {{LEAD_TIME_HOURS}} hours, change fail rate at most {{CHANGE_FAIL_PCT}}% and median time to restore at most {{RECOVERY_HOURS}} hours over the last {{WINDOW_DAYS}} days, as GitLab reports them',
       description: 'A scheduled GitLab pipeline reads the four figures GitLab computes (deployment_frequency is a count for the period, lead time and time to restore are seconds, change failure rate is a ratio), converts them, writes reports/delivery-platform.json and fails when a target is missed. With interval=all GitLab returns the median of daily medians. With LinearB, Swarmia, DX or Sleuth, the same comparison runs over their export.',
       tool: 'GitLab DORA API (GET /projects/:id/dora/metrics or /groups/:id/dora/metrics, GitLab Ultimate) with curl and jq in a scheduled pipeline',
@@ -294,7 +294,7 @@ jq -n --arg until "$end" --argjson deploys "$(dora deployment_frequency)" --argj
 jq -e '.misses == []' reports/delivery-platform.json > /dev/null || { jq -r '"missed targets: \\(.misses | join(", "))"' reports/delivery-platform.json; exit 1; }`,
     },
     {
-      id: 'ff-platform-tiers', label: 'Deploy jobs declare their tier', when: { SOURCE: ['platform'] }, category: 'structural', implements: ['adr-platform'], checks: ['req-platform-data'],
+      id: 'ff-platform-tiers', label: 'Deploy jobs declare their tier', when: { SOURCE: ['platform'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-platform'], checks: ['req-platform-data'],
       threshold: '0 jobs in .gitlab-ci.yml that deploy without environment:deployment_tier, and at least 1 that deploys to the production tier',
       description: 'A check in the pipeline reads .gitlab-ci.yml and fails when a job with an environment does not declare its tier (GitLab would infer it from the name, and count an oddly named production environment as something else), or when no job deploys to production. It reads the file as written: with include: or extends:, point it at the merged YAML that GitLab\'s CI Lint shows.',
       tool: 'Node 20 with the yaml package, in a GitLab CI job',
@@ -312,7 +312,7 @@ if (!deploying.some((job) => tier(job) === 'production')) throw new Error('no jo
 console.log(\`\${deploying.length} deploy jobs, each with its tier\`)`,
     },
     {
-      id: 'ff-miss-streak', label: 'Lasting misses are found', when: MEASURED, category: 'process', implements: SOURCES, checks: ['req-response-report'],
+      id: 'ff-miss-streak', label: 'Lasting misses are found', when: MEASURED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: SOURCES, checks: ['req-response-report'],
       threshold: 'Every metric off target in each of the last {{MISS_WEEKS}} weekly measurements is listed in the job summary',
       description: 'After the weekly measurement, the job runs scripts/delivery-metrics.sh again with UNTIL moved back a week at a time, takes the targets missed in every one of the last {{MISS_WEEKS}} windows, writes them to reports/streak.json and lists them in the job summary. The improvement check reads the same file.',
       tool: 'bash with jq and GNU date, in the weekly GitHub Actions workflow (or the scheduled GitLab pipeline)',
@@ -331,7 +331,7 @@ jq -r '.[] | "\\(.): off target in each of the last {{MISS_WEEKS}} weekly measur
   | tee -a "\${GITHUB_STEP_SUMMARY:-/dev/null}"`,
     },
     {
-      id: 'ff-improvement-item', label: 'Lasting misses have an item', when: { ...MEASURED, RESPONSE: ['retro', 'reserve'] }, category: 'process', implements: SOURCES, checks: ['req-response-retro', 'req-response-reserve'],
+      id: 'ff-improvement-item', label: 'Lasting misses have an item', when: { ...MEASURED, RESPONSE: ['retro', 'reserve'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: SOURCES, checks: ['req-response-retro', 'req-response-reserve'],
       threshold: '0 metrics off target in {{MISS_WEEKS}} weekly measurements in a row without an open issue labelled delivery-improvement that names the metric in its title',
       description: 'After the streak step, the job looks for an open improvement item for each metric in reports/streak.json and fails until one exists, so the weekly workflow stays red until the team has taken the miss up.',
       tool: 'GitHub CLI (gh issue list); on GitLab: glab issue list --label delivery-improvement --search <metric> --output json',
@@ -346,7 +346,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-review-record', label: 'The quarterly review is on record', when: { SOURCE: ['review'] }, category: 'process', implements: ['adr-review'], checks: ['req-review'],
+      id: 'ff-review-record', label: 'The quarterly review is on record', when: { SOURCE: ['review'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '90d', invocation: 'manual', implements: ['adr-review'], checks: ['req-review'],
       threshold: 'The latest file in docs/delivery-reviews is at most 100 days old and has an Answer: and a Target: line for each of the five figures, and an Actions section',
       description: 'A CI step on the main branch finds the latest review by its quarter in the file name, takes its age from the last commit that touched it, and checks each of the five sections for an answer and a target, and that the review records its actions.',
       tool: 'bash with git, awk and grep, in CI on the main branch',

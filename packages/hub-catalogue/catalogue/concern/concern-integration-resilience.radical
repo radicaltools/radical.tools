@@ -645,7 +645,11 @@
       "label": "Slow calls cut off",
       "x": 1040,
       "y": 0,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test puts a Toxiproxy proxy in front of each outside system (or its sandbox stub), adds a latency toxic far above the timeout, and measures one attempt with retries turned off and then a whole action with the production settings.\n\nThreshold: With 10 s of latency injected on each outside system, a single attempt gives up within {{TIMEOUT_MS}} ms + 10 %, and no user action waits longer than {{DEADLINE_MS}} ms\n\nTool: Toxiproxy (Testcontainers module) with Vitest (or the test runner of your stack)\n\n```ts\nimport { ToxiProxyContainer } from '@testcontainers/toxiproxy'\n\nconst slowPartner = async () => {\n  const toxiproxy = await new ToxiProxyContainer('ghcr.io/shopify/toxiproxy:2.9.0').start()\n  const proxy = await toxiproxy.createProxy({ name: 'partner', upstream: 'partner-stub:8080' })\n  await proxy.instance.addToxic({ type: 'latency', name: 'slow', stream: 'downstream', toxicity: 1, attributes: { latency: 10_000 } })\n  return 'http://' + proxy.host + ':' + proxy.port\n}\n\nit('one attempt gives up at the timeout', async () => {\n  const client = partnerClient(await slowPartner(), { retries: 0 })    // production settings, retries off\n  const started = Date.now()\n  await expect(client.getQuote(SAMPLE)).rejects.toThrow()\n  expect(Date.now() - started).toBeLessThan({{TIMEOUT_MS}} * 1.1)\n})\n\nit('a whole action stays within the deadline', async () => {\n  const client = partnerClient(await slowPartner())                     // production settings\n  const started = Date.now()\n  await expect(client.getQuote(SAMPLE)).rejects.toThrow()\n  expect(Date.now() - started).toBeLessThan({{DEADLINE_MS}})\n})\n```"
     },
     {
@@ -654,7 +658,11 @@
       "label": "Retries bounded and jittered",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test points the production client at a WireMock stub that always fails, counts the requests it received and their spacing over two runs (jitter makes the two sequences differ; plain exponential backoff repeats them), and repeats with an answer that must not be retried.\n\nThreshold: Against a stub that always answers 503: exactly {{RETRIES}} + 1 attempts per run, and the delays of two runs differ; against 400: exactly 1 attempt\n\nTool: WireMock (JUnit 5 extension; WireMock.Net, the WireMock container, or the stub server of your stack)\n\n```java\n@WireMockTest\nclass PartnerRetryTest {\n  static final int RETRIES = {{RETRIES}};\n\n  List<Long> gapsOfOneRun(WireMockRuntimeInfo wm) {\n    resetAllRequests();\n    assertThrows(PartnerUnavailableException.class, () -> PartnerClient.create(wm.getHttpBaseUrl()).quote(SAMPLE));  // production settings\n    var requests = findAll(getRequestedFor(urlPathEqualTo(\"/quotes\")));\n    assertEquals(RETRIES + 1, requests.size());\n    return IntStream.range(1, requests.size())\n        .mapToObj(i -> requests.get(i).getLoggedDate().getTime() - requests.get(i - 1).getLoggedDate().getTime())\n        .toList();\n  }\n\n  @Test\n  void retriesTransientFailuresAFewTimesWithJitter(WireMockRuntimeInfo wm) {\n    stubFor(get(urlPathEqualTo(\"/quotes\")).willReturn(serviceUnavailable()));\n    var first = gapsOfOneRun(wm);\n    var second = gapsOfOneRun(wm);\n    assertNotEquals(first, second, \"delays are jittered: two runs never wait the same\");\n  }\n\n  @Test\n  void doesNotRetryAClientError(WireMockRuntimeInfo wm) {\n    stubFor(get(urlPathEqualTo(\"/quotes\")).willReturn(badRequest()));\n    assertThrows(PartnerRejectedException.class, () -> PartnerClient.create(wm.getHttpBaseUrl()).quote(SAMPLE));\n    verify(exactly(1), getRequestedFor(urlPathEqualTo(\"/quotes\")));\n  }\n}\n```"
     },
     {
@@ -663,7 +671,11 @@
       "label": "Circuit opens and recovers",
       "x": 1040,
       "y": 260,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A black-box test against a running instance (with its library or its sidecar) points the outside host at a WireMockServer started by the test, drives calls through the instance, and counts what reaches the stub before, during and after the open period.\n\nThreshold: With every call failing (above {{BREAKER_PERCENT}} %), after 20 calls within 30 s 0 of the next 50 calls reach the outside system; after 30 s at most 3 of 10 calls reach it while it still fails; once it answers, calls resume\n\nTool: WireMockServer (JUnit 5; or the stub server of your stack) against the running instance\n\n```java\n// wiremock: new WireMockServer(options().port(8089)), the instance under test points its outside host at it\n@Test\nvoid circuitOpensThenProbes() throws Exception {\n  wiremock.stubFor(get(anyUrl()).willReturn(serviceUnavailable()));\n  for (int i = 0; i < 20; i++) app.get(\"/quote\");               // calls through the instance under test\n  wiremock.resetRequests();\n  for (int i = 0; i < 50; i++) app.get(\"/quote\");\n  assertEquals(0, wiremock.findAll(getRequestedFor(anyUrl())).size(), \"circuit is open\");\n\n  Thread.sleep(30_000);\n  wiremock.resetRequests();\n  for (int i = 0; i < 10; i++) app.get(\"/quote\");               // half-open: only trial calls reach the stub\n  assertTrue(wiremock.findAll(getRequestedFor(anyUrl())).size() <= 3, \"at most 3 trial calls\");\n\n  wiremock.stubFor(get(anyUrl()).willReturn(ok(\"{}\")));\n  Thread.sleep(30_000);\n  for (int i = 0; i < 3; i++) app.get(\"/quote\");                // trial calls succeed\n  assertEquals(200, app.get(\"/quote\").statusCode(), \"circuit closed after successful trials\");\n}\n```"
     },
     {
@@ -672,7 +684,11 @@
       "label": "Outage drill: refused cleanly",
       "x": 1040,
       "y": 390,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test cuts each outside system off with Toxiproxy, runs the actions that need it, and checks the answer, its time and that the database is unchanged.\n\nThreshold: With each outside system down, every user action that needs it answers 503 with Retry-After within {{DEADLINE_MS}} ms, and 0 records are changed\n\nTool: Toxiproxy (Testcontainers module) with Vitest and supertest (or the test runner and HTTP client of your stack)\n\n```ts\nit('refuses an action cleanly while the partner is down', async () => {\n  await partnerProxy.setEnabled(false)                     // Toxiproxy: the partner is unreachable\n  const before = await snapshot(db)\n  const started = Date.now()\n  const res = await request(app).post('/orders').send(SAMPLE_ORDER)\n  expect(res.status).toBe(503)\n  expect(res.headers['retry-after']).toBeDefined()\n  expect(Date.now() - started).toBeLessThan({{DEADLINE_MS}})\n  expect(await snapshot(db)).toEqual(before)\n})\n```",
       "hubWhen": {
         "FAILURE": [
@@ -686,7 +702,11 @@
       "label": "Outage drill: answers with less",
       "x": 1040,
       "y": 520,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test warms the cache, cuts the outside system off with Toxiproxy, and checks that reads still answer, in time and marked incomplete, while changes are refused in time and leave the database as it was.\n\nThreshold: With each outside system down, every read that uses it answers within {{DEADLINE_MS}} ms from data at most {{STALE_MINUTES}} minutes old or a default, marked incomplete; every change that needs it answers 503 within {{DEADLINE_MS}} ms with nothing changed\n\nTool: Toxiproxy (Testcontainers module) with Vitest and supertest (or the test runner and HTTP client of your stack)\n\n```ts\nit('answers from the cache, marked, while the partner is down', async () => {\n  await request(app).get('/products/42').expect(200)       // warms the cache\n  await partnerProxy.setEnabled(false)\n  const started = Date.now()\n  const res = await request(app).get('/products/42').expect(200)\n  expect(Date.now() - started).toBeLessThan({{DEADLINE_MS}})\n  expect(res.body.incomplete).toEqual(['shippingEstimate'])\n  expect(res.body.shippingEstimate.asOfMinutesAgo).toBeLessThanOrEqual({{STALE_MINUTES}})\n})\n\nit('refuses a change in time, with nothing changed', async () => {\n  await partnerProxy.setEnabled(false)\n  const before = await snapshot(db)\n  const started = Date.now()\n  await request(app).post('/products/42/reserve').expect(503)\n  expect(Date.now() - started).toBeLessThan({{DEADLINE_MS}})\n  expect(await snapshot(db)).toEqual(before)\n})\n```",
       "hubWhen": {
         "FAILURE": [
@@ -700,7 +720,11 @@
       "label": "Outage drill: completed later",
       "x": 1040,
       "y": 650,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test cuts the outside system off, starts actions, restarts the worker, brings the system back and waits for completion; a second test advances the clock past the deadline and expects the dead letter and the notices.\n\nThreshold: With the outside system down, every action is accepted with 202 within {{DEADLINE_MS}} ms and completes after it is back, 0 actions lost; an action still waiting after {{DEFER_HOURS}} h is in the dead-letter queue with the user and the owner told\n\nTool: Toxiproxy (Testcontainers module) with Vitest (fake timers for the deadline; or the test runner of your stack)\n\n```ts\nit('keeps the action and completes it once the partner is back', async () => {\n  await partnerProxy.setEnabled(false)\n  const started = Date.now()\n  const res = await request(app).post('/bookings').send(SAMPLE_BOOKING).expect(202)\n  expect(Date.now() - started).toBeLessThan({{DEADLINE_MS}})\n  await restartWorker()\n  await partnerProxy.setEnabled(true)\n  await waitFor(async () => (await request(app).get(res.body.statusUrl)).body.state === 'completed')\n  expect(await partnerStub.bookings()).toHaveLength(1)\n})\n\nit('gives up visibly after the deadline', async () => {\n  vi.useFakeTimers()\n  await partnerProxy.setEnabled(false)\n  const res = await request(app).post('/bookings').send(SAMPLE_BOOKING).expect(202)\n  await vi.advanceTimersByTimeAsync({{DEFER_HOURS}} * 3_600_000 + 60_000)\n  expect(await deadLetters()).toContainEqual(expect.objectContaining({ reference: res.body.reference }))\n  expect((await request(app).get(res.body.statusUrl)).body.state).toBe('failed')\n  expect(await alertsSent()).toContainEqual(expect.objectContaining({ to: 'integration-owner' }))\n})\n```",
       "hubWhen": {
         "FAILURE": [
@@ -714,7 +738,11 @@
       "label": "Retries reuse the key",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test makes the stub time out on the first attempt of each changing call and checks that all attempts carry one and the same Idempotency-Key.\n\nThreshold: Every retried call that changes something carries the same Idempotency-Key as its first attempt; 0 changing calls without a key\n\nTool: WireMock (JUnit 5 extension; or the stub server of your stack)\n\n```java\n@Test\nvoid retriesCarryTheSameKey(WireMockRuntimeInfo wm) {\n  stubFor(post(\"/payments\").inScenario(\"lost\").whenScenarioStateIs(STARTED)\n      .willReturn(ok().withFixedDelay({{TIMEOUT_MS}} * 2)).willSetStateTo(\"answered\"));\n  stubFor(post(\"/payments\").inScenario(\"lost\").whenScenarioStateIs(\"answered\").willReturn(ok(\"{}\")));\n  PartnerClient.create(wm.getHttpBaseUrl()).pay(SAMPLE_PAYMENT);\n  var keys = findAll(postRequestedFor(urlEqualTo(\"/payments\"))).stream()\n      .map(r -> r.getHeader(\"Idempotency-Key\")).distinct().toList();\n  assertEquals(1, keys.size());\n  assertNotNull(keys.get(0));\n}\n```",
       "hubWhen": {
         "IDEMPOTENCY": [
@@ -728,7 +756,11 @@
       "label": "Lookup before repeat",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test makes the stub take the change but time out, and checks that the client asks for the reference and sends the change only once.\n\nThreshold: After a lost answer to a changing call, the client looks the change up by its reference and repeats it 0 times when it exists\n\nTool: WireMock (JUnit 5 extension; or the stub server of your stack)\n\n```java\n@Test\nvoid looksUpInsteadOfRepeating(WireMockRuntimeInfo wm) {\n  stubFor(post(\"/bookings\").willReturn(created().withFixedDelay({{TIMEOUT_MS}} * 2)));\n  stubFor(get(urlPathEqualTo(\"/bookings\")).withQueryParam(\"reference\", matching(\".+\"))\n      .willReturn(okJson(\"[{\\\"id\\\":\\\"b-1\\\"}]\")));\n  var booking = PartnerClient.create(wm.getHttpBaseUrl()).book(SAMPLE_BOOKING);\n  assertEquals(\"b-1\", booking.id());\n  verify(exactly(1), postRequestedFor(urlEqualTo(\"/bookings\")));\n  verify(exactly(1), getRequestedFor(urlPathEqualTo(\"/bookings\")));\n}\n```",
       "hubWhen": {
         "IDEMPOTENCY": [
@@ -742,7 +774,11 @@
       "label": "Clients only read",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Semgrep rule over the integration clients fails the build on a call with a method that changes something, which would mean this decision has to be revisited; an explicit GET passes.\n\nThreshold: 0 calls with POST, PUT, PATCH or DELETE in the clients of outside systems\n\nTool: Semgrep (the rule is for TypeScript; for Java or C#, the same patterns on the HTTP client of your stack)\n\n```yaml\nrules:\n- id: outside-clients-only-read\n  message: Outside systems are only read (ADR on integration resilience); a changing call needs idempotency protection first\n  severity: ERROR\n  languages: [typescript]\n  paths: { include: ['src/integrations/'] }\n  pattern-either:\n    - pattern: $HTTP.post(...)\n    - pattern: $HTTP.put(...)\n    - pattern: $HTTP.patch(...)\n    - pattern: $HTTP.delete(...)\n    - patterns:\n        - pattern: 'fetch($URL, { ..., method: \"$M\", ... })'\n        - metavariable-regex:\n            metavariable: $M\n            regex: (?i)^\"?(post|put|patch|delete)\"?$\n```",
       "hubWhen": {
         "IDEMPOTENCY": [
@@ -756,7 +792,11 @@
       "label": "No unguarded outside calls",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "ArchUnit rules fail the build when code outside the integration package uses an HTTP client, or when a public method of an integration client class lacks the Resilience4j annotations (NetArchTest does the same in .NET, dependency-cruiser in TypeScript).\n\nThreshold: 0 classes outside the integration clients use an HTTP client; every public method of a *Client class in the integration package is guarded by a time limiter, a retry and a circuit breaker\n\nTool: ArchUnit (JVM; NetArchTest for .NET, dependency-cruiser for TypeScript)\n\n```java\n@AnalyzeClasses(packages = \"com.acme.shop\")\nclass OutsideCallsArchTest {\n  @ArchTest\n  static final ArchRule onlyClientsCallOut = noClasses()\n      .that().resideOutsideOfPackage(\"..integration..\")\n      .should().dependOnClassesThat().resideInAnyPackage(\"org.springframework.web.client..\", \"java.net.http..\", \"okhttp3..\");\n\n  @ArchTest\n  static final ArchRule clientsAreGuarded = methods()\n      .that().areDeclaredInClassesThat().resideInAPackage(\"..integration..\")\n      .and().areDeclaredInClassesThat().haveSimpleNameEndingWith(\"Client\")\n      .and().arePublic()\n      .should().beAnnotatedWith(io.github.resilience4j.timelimiter.annotation.TimeLimiter.class)\n      .andShould().beAnnotatedWith(io.github.resilience4j.retry.annotation.Retry.class)\n      .andShould().beAnnotatedWith(io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker.class);\n}\n```",
       "hubWhen": {
         "PROTECTION": [
@@ -770,7 +810,11 @@
       "label": "Every outside host guarded",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Conftest policy runs over the mesh manifests in the repository in each pull request and fails on an outside host that lacks any of the three, or when egress to undeclared hosts is not blocked in the IstioOperator mesh config.\n\nThreshold: Every ServiceEntry host has a VirtualService with a timeout of at most {{TIMEOUT_MS}} ms and at most {{RETRIES}} retry attempts, and a DestinationRule with outlier detection; the mesh config sets outboundTrafficPolicy REGISTRY_ONLY; 0 hosts without\n\nTool: Conftest (Open Policy Agent)\n\n```rego\n# conftest test --combine mesh/\npackage main\n\nimport rego.v1\n\n# every document of every file, multi-document YAML flattened\ndocs contains d if { some f in input; is_array(f.contents); some d in f.contents }\ndocs contains d if { some f in input; not is_array(f.contents); d := f.contents }\n\nhosts contains h if { some e in docs; e.kind == \"ServiceEntry\"; some h in e.spec.hosts }\n\nguarded_vs(h) if {\n  some v in docs; v.kind == \"VirtualService\"; h in v.spec.hosts\n  some r in v.spec.http\n  time.parse_duration_ns(r.timeout) <= {{TIMEOUT_MS}} * 1000000\n  r.retries.attempts <= {{RETRIES}}\n}\n\nguarded_dr(h) if {\n  some d in docs; d.kind == \"DestinationRule\"; d.spec.host == h\n  d.spec.trafficPolicy.outlierDetection\n}\n\nregistry_only if {\n  some o in docs; o.kind == \"IstioOperator\"\n  o.spec.meshConfig.outboundTrafficPolicy.mode == \"REGISTRY_ONLY\"\n}\n\ndeny contains msg if { some h in hosts; not guarded_vs(h); msg := sprintf(\"%s: no VirtualService with a timeout of at most {{TIMEOUT_MS}} ms and at most {{RETRIES}} retries\", [h]) }\ndeny contains msg if { some h in hosts; not guarded_dr(h); msg := sprintf(\"%s: no DestinationRule with outlierDetection\", [h]) }\ndeny contains msg if { not registry_only; msg := \"mesh config: outboundTrafficPolicy must be REGISTRY_ONLY, or undeclared hosts are reachable unguarded\" }\n```",
       "hubWhen": {
         "PROTECTION": [

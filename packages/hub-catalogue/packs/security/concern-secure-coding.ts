@@ -212,7 +212,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-semgrep', label: 'Semgrep on the code', when: SAST_RUNS, category: 'structural', implements: STANDARDS,
+      id: 'ff-semgrep', label: 'Semgrep on the code', when: SAST_RUNS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-sast-pr'],
       threshold: '0 findings of severity ERROR from p/owasp-top-ten and p/default; the run finishes within {{SAST_MINUTES}} minutes',
       description: 'Semgrep runs the OWASP Top Ten and default rulesets and exits non-zero on an ERROR-severity finding; on the pull request it is a required check with a hard timeout, on a schedule it uploads SARIF to code scanning, where the findings get owners.',
@@ -238,7 +238,7 @@ jobs:
         with: { sarif_file: semgrep.sarif }`,
     },
     {
-      id: 'ff-codeql', label: 'CodeQL security-extended', when: SAST_RUNS, category: 'structural', implements: STANDARDS,
+      id: 'ff-codeql', label: 'CodeQL security-extended', when: SAST_RUNS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-sast-pr'],
       threshold: '0 open code scanning alerts of severity high or critical on the pull request; the CodeQL check is required for merging',
       description: 'CodeQL analyses each language of the repository with the security-extended query suite; code scanning\'s pull-request check is set to fail on high or above and is a required status check in branch protection. List only the languages the repository holds: autobuild fails for one with no sources.',
@@ -266,7 +266,7 @@ jobs:
 # branch protection requires the "CodeQL" check`,
     },
     {
-      id: 'ff-language-scanner', label: 'The language\'s security scanner', when: SAST_RUNS, category: 'structural', implements: STANDARDS,
+      id: 'ff-language-scanner', label: 'The language\'s security scanner', when: SAST_RUNS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-sast-pr', 'req-no-dynamic-code'],
       threshold: '0 high-severity, medium-confidence-or-better findings from the language\'s scanner outside its suppressions, each suppression with a comment',
       description: 'Bandit (Python) and gosec (Go) run in the same job as Semgrep with their configuration in the repository, so their suppressions are reviewed like code; the JVM uses SpotBugs with find-sec-bugs, .NET the Security Code Scan analyzers.',
@@ -284,7 +284,7 @@ skips = []                      # every skip needs a reviewed reason here
 #     (exits 1 on a finding; suppress with  // #nosec G201 -- <reason>)`,
     },
     {
-      id: 'ff-eslint-security', label: 'ESLint bans dangerous constructs', when: WEB, category: 'structural', implements: WEB_ADRS,
+      id: 'ff-eslint-security', label: 'ESLint bans dangerous constructs', when: WEB, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WEB_ADRS,
       checks: ['req-no-dynamic-code', 'req-output-encoding'],
       threshold: '0 errors from eslint-plugin-security, no-eval, no-implied-eval, no-new-func and react/no-danger; the lint is a required check',
       description: 'The flat ESLint configuration turns the security plugin\'s rules and the core eval rules into errors and bans raw HTML in React; a disable comment needs a description, which eslint-comments/require-description enforces. Python and Java get the same bans from Bandit (B307 eval, B301 pickle) and find-sec-bugs.',
@@ -316,7 +316,7 @@ export default [
 ]`,
     },
     {
-      id: 'ff-sqli-lint', label: 'No string-built queries', category: 'structural', implements: STANDARDS,
+      id: 'ff-sqli-lint', label: 'No string-built queries', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-param-queries'],
       threshold: '0 queries built by concatenation, interpolation or formatting in the code; the rules are ERROR severity and part of the pull-request lint',
       description: 'Semgrep rules kept in the repository match query calls whose SQL is a template literal with an expression, a concatenation or a format call (JavaScript and TypeScript), and a buffer written by sprintf and then passed to a database call (C), and fail the pull request. They run as a lint rule whatever the scanner decision. SonarQube rules S2077 (formatted SQL) and S3649 (SQL injection) do the same for Java and C#, Bandit B608 for Python.',
@@ -351,7 +351,7 @@ rules:
       - metavariable-regex: { metavariable: $EXEC, regex: ^(sqlite3_exec|sqlite3_prepare_v2|PQexec|mysql_query|mysql_real_query)$ }`,
     },
     {
-      id: 'ff-zap-baseline', label: 'ZAP scan of each deployment', when: { DAST: ['pipeline'] }, category: 'operational', implements: STANDARDS,
+      id: 'ff-zap-baseline', label: 'ZAP scan of each deployment', when: { DAST: ['pipeline'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: STANDARDS,
       checks: ['req-dast-pipeline'],
       threshold: '0 ZAP alerts at level FAIL against every environment the pipeline deploys to; the scan finishes within 30 minutes of the deployment',
       description: 'A workflow listens for successful deployments and runs the ZAP baseline scan against the environment\'s URL; the rules file raises the passive alerts that must block (missing CSP, cookie flags, missing anti-clickjacking) to FAIL and turns known noise to IGNORE with a comment. The baseline scan runs passive rules and the spider only; active rules such as SQL injection (40018) need zaproxy/action-api-scan with the OpenAPI document or action-full-scan, run against the ephemeral or staging environment, never production.',
@@ -381,7 +381,7 @@ jobs:
 # 10096	IGNORE	Timestamp disclosure: build ids in a header, reviewed`,
     },
     {
-      id: 'ff-dast-age', label: 'ZAP full scan not older than the limit', when: { DAST: ['periodic'] }, category: 'process', implements: STANDARDS,
+      id: 'ff-dast-age', label: 'ZAP full scan not older than the limit', when: { DAST: ['periodic'] }, characteristic: 'security', scope: 'holistic', cadence: 'temporal', every: '{{DAST_DAYS}}d', invocation: 'automated', implements: STANDARDS,
       checks: ['req-dast-periodic'],
       threshold: 'The newest ZAP full scan report in security/dast/ is at most {{DAST_DAYS}} days old and holds 0 high-risk alerts (riskcode 3)',
       description: 'A scheduled workflow runs the ZAP full scan against staging and commits its JSON report to security/dast/ as <date>-zap-staging.json. A daily check fails when there is no such report, when the newest is older than the limit, or when it still holds high-risk alerts. Penetration tests are recorded in security/pentests.yaml and checked by the Secure development process pack, not here.',
@@ -401,7 +401,7 @@ jq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' "
   || { echo "$latest still holds high alerts"; exit 1; }`,
     },
     {
-      id: 'ff-input-400', label: 'Malformed input answered 400 with the field', when: { INPUT: ['boundary-schema'] }, category: 'structural', implements: STANDARDS,
+      id: 'ff-input-400', label: 'Malformed input answered 400 with the field', when: { INPUT: ['boundary-schema'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-input-boundary'],
       threshold: '100 % of the element\'s operations answer 400 naming the failing field to a wrong type, an unknown field and an out-of-range value, with no stack trace in the body',
       description: 'A test sends each operation a body with a wrong type, an unknown field and an out-of-range value and expects 400 with the field\'s path in the errors and no stack trace; the zod schemas are strict, so unknown fields are refused. With Pydantic, model_config = ConfigDict(extra=\'forbid\') and an exception handler that maps the validation error to 400 with its loc.',
@@ -423,7 +423,7 @@ describe.each([
 })`,
     },
     {
-      id: 'ff-argument-guards', label: 'Exported functions refuse bad arguments', when: { INPUT: ['everywhere'] }, category: 'structural', implements: STANDARDS,
+      id: 'ff-argument-guards', label: 'Exported functions refuse bad arguments', when: { INPUT: ['everywhere'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-input-everywhere'],
       threshold: '100 % of the exported functions of the public surface fail with the typed ArgumentError, naming the argument, on a negative number, an out-of-range integer, null, an empty string and a wrong-typed object',
       description: 'A test enumerates the functions exported from the package\'s public surface (not a list kept by hand) and calls each with the usual bad arguments; every call must fail with the shared typed error that names the argument, which means the function checked before doing anything. A function that legitimately accepts one of the values declares it in GUARD_EXCEPTIONS beside the test, where a reviewer sees it. For Python, the same test over the module\'s __all__ with pytest.raises(ArgumentError).',
@@ -446,7 +446,7 @@ describe.each(exported)('%s guards its arguments', (name, fn) => {
 })`,
     },
     {
-      id: 'ff-framework-defaults', label: 'Middleware defenses present in responses', when: WEB, category: 'structural', implements: WEB_ADRS,
+      id: 'ff-framework-defaults', label: 'Middleware defenses present in responses', when: WEB, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: WEB_ADRS,
       checks: ['req-framework-defaults'],
       threshold: 'A state-changing request without the CSRF token is refused with 403; every response carries Content-Security-Policy, Strict-Transport-Security and X-Content-Type-Options, and every cookie is Secure, HttpOnly and SameSite',
       description: 'A test starts the element with its production configuration and checks what the framework\'s middleware must produce: a 403 on a POST without the CSRF token, the security headers on a page, and the flags on every cookie it sets. A hand-rolled replacement that forgets one of them fails here. For Django, the same test with the test client and SECURE_* settings; for Spring, MockMvc against the security filter chain.',
@@ -473,7 +473,7 @@ it('carries the middleware headers and cookie flags', async () => {
 })`,
     },
     {
-      id: 'ff-authz-coverage', label: 'Every sensitive route has negative tests', category: 'structural', implements: STANDARDS,
+      id: 'ff-authz-coverage', label: 'Every sensitive route has negative tests', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STANDARDS,
       checks: ['req-authz-tests'],
       threshold: '100 % of routes with an id in the path or under /admin have a test tagged with the route (authz:METHOD /path) in the pull-request suite',
       description: 'A test lists the element\'s routes from its router, keeps those that take an object id from the path or live under /admin, and fails for every one without a test file that carries the tag authz:METHOD /path; the tagged test itself calls the route as the wrong user, the wrong tenant and anonymously. A new sensitive route fails the suite until its negative tests exist.',
@@ -494,7 +494,7 @@ it.each(sensitive)('$method $path has negative authorization tests', (r) => {
 })`,
     },
     {
-      id: 'ff-triage-queue', label: 'Scheduled findings get an owner in time', when: { SAST: ['scheduled'] }, category: 'process', implements: STANDARDS,
+      id: 'ff-triage-queue', label: 'Scheduled findings get an owner in time', when: { SAST: ['scheduled'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: STANDARDS,
       checks: ['req-sast-scheduled'],
       threshold: '0 open high or critical code scanning alerts older than 1 working day without an assigned issue that names the alert',
       description: 'The nightly scanners upload SARIF to code scanning; the triage queue is the open high and critical alerts. A daily job fails for every such alert older than one working day (three days on a Monday) that no open issue labelled sast, with an assignee, names by its number; the issue\'s assignee is the owner and the deadline runs from the alert.',
@@ -513,7 +513,7 @@ done < due.txt
 exit $status`,
     },
     {
-      id: 'ff-findings-sla', label: 'No finding past its deadline', when: { FINDINGS: ['sla', 'risk-accepted'] }, category: 'operational', implements: FINDINGS_ADRS,
+      id: 'ff-findings-sla', label: 'No finding past its deadline', when: { FINDINGS: ['sla', 'risk-accepted'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FINDINGS_ADRS,
       checks: ['req-findings-sla', 'req-risk-accepted'],
       threshold: '0 open code scanning alerts older than {{CRITICAL_DAYS}} days (critical), {{HIGH_DAYS}} days (high) or {{MEDIUM_DAYS}} days (medium) that no valid acceptance in the risk register names',
       description: 'A job on the main branch reads the repository\'s open code scanning alerts (Semgrep, CodeQL, ZAP and the language scanners all upload SARIF there) and fails on any past its severity\'s deadline, naming the rule and the file. With a risk register, an alert whose "<rule id> <path>" a still-valid acceptance names is skipped; without one, nothing is. Penetration test findings are filed as alerts through a SARIF upload so the same check covers them.',
@@ -531,7 +531,7 @@ gh api --paginate "/repos/$REPO/code-scanning/alerts?state=open&per_page=100" | 
   | if length > 0 then (map("\\(.rule) \\(.file) \\(.sev) \\(.age | floor)d") | join("\\n") | halt_error(1)) else true end'`,
     },
     {
-      id: 'ff-risk-register', label: 'Risk acceptances complete and current', when: { FINDINGS: ['risk-accepted'] }, category: 'process', implements: FINDINGS_ADRS,
+      id: 'ff-risk-register', label: 'Risk acceptances complete and current', when: { FINDINGS: ['risk-accepted'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FINDINGS_ADRS,
       checks: ['req-risk-accepted'],
       threshold: '0 acceptances without finding, owner, second approver, reason and expiry, self-approved, expired, or valid longer than {{ACCEPTANCE_DAYS}} days',
       description: 'A test over the register security/risk-acceptances.yaml fails on an incomplete, self-approved, expired or over-long acceptance; the deadline job skips only the alerts a valid acceptance names (by "<rule id> <path>"), so an overdue finding without an acceptance still fails the build.',
@@ -557,7 +557,7 @@ it('every risk acceptance is complete, approved by a second person and current',
 })`,
     },
     {
-      id: 'ff-clang-tidy', label: 'CERT and MISRA checks as errors', when: { STANDARD: ['cert-misra'] }, category: 'structural', implements: ['adr-cert-misra'],
+      id: 'ff-clang-tidy', label: 'CERT and MISRA checks as errors', when: { STANDARD: ['cert-misra'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cert-misra'],
       checks: ['req-memory-safety', 'req-no-dynamic-code'],
       threshold: '0 warnings from the cert-*, bugprone-* and clang-analyzer-* checks, 0 uses of the banned functions, and 0 MISRA violations outside recorded deviations; the build fails on any',
       description: 'clang-tidy runs over the compilation database with the CERT, bugprone and analyzer checks as errors and the unsafe-functions check naming the banned functions (system among them, so a command built from data cannot run); cppcheck\'s MISRA add-on runs beside it with the rule texts, and suppressions live in a deviation file reviewed like code. The tests run under the sanitizers in a second configuration.',

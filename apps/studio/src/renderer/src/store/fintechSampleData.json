@@ -186,7 +186,10 @@
       "height": 52,
       "collapsed": false,
       "description": "An SLO spec generates the Prometheus recording rules for the availability over 30 days and the multiwindow burn-rate alerts. The SLI is the share of requests answered without a 5xx at the edge. The error budget remaining is what the budget policy reads.\n\nTool: Sloth (Prometheus SLO generator); Pyrra takes the same objective\n\n```yaml\n# sloth generate -i availability.yaml -o availability.rules.yaml\nversion: \"prometheus/v1\"\nservice: \"order-api\"\nlabels:\n  owner: \"orders-team\"\nslos:\n  - name: \"availability\"\n    objective: 99.95\n    description: \"Share of valid requests answered without a server error, over 30 days.\"\n    sli:\n      events:\n        error_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\",http_response_status_code=~\"5..\"}[{{.window}}]))\n        total_query: sum(rate(http_server_request_duration_seconds_count{job=\"order-api\"}[{{.window}}]))\n    alerting:\n      name: OrderApiAvailability\n      page_alert:\n        labels: { severity: page }\n      ticket_alert:\n        labels: { severity: ticket }\n```\n\nThreshold: Availability at least 99.95 % over every rolling 30 days; a page when the budget burns 14.4 times faster than allowed over 1 hour",
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "continual",
+      "invocation": "automated",
       "metrics": "availability.ratio{window=30d} >= 99.95 %",
       "max_age": "1d"
     },
@@ -466,7 +469,11 @@
       "height": 52,
       "collapsed": false,
       "description": "In CI the Terraform plan (terraform show -json) is checked: a vault lock must exist in compliance mode with the retention, and every backup rule must copy to the vault in the other account.\n\nTool: Open Policy Agent (conftest) on the Terraform plan\n\n```rego\npackage main\nimport rego.v1\n\nlocks := [r | some r in input.resource_changes; r.type == \"aws_backup_vault_lock_configuration\"]\n\ndeny contains \"no backup vault is locked (AWS Backup Vault Lock)\" if count(locks) == 0\n\ndeny contains msg if {\n  some l in locks\n  l.change.after.min_retention_days < 35\n  msg := sprintf(\"%s locks copies for fewer than 35 days\", [l.address])\n}\n\ndeny contains msg if {\n  some l in locks\n  not l.change.after.changeable_for_days   # without it the lock is governance mode, which an administrator can lift\n  msg := sprintf(\"%s is not in compliance mode\", [l.address])\n}\n\ndeny contains msg if {\n  some r in input.resource_changes\n  r.type == \"aws_backup_plan\"\n  some rule in r.change.after.rule\n  count(rule.copy_action) == 0\n  msg := sprintf(\"%s rule %s copies nothing to the locked vault\", [r.address, rule.rule_name])\n}\n```\n\nThreshold: Every backup plan copies to a vault under a compliance-mode lock of at least 35 days; 0 plans without a copy",
-      "category": "structural"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "72c1ae50-5632-4f35-abe5-4fd01c2ecb58",
@@ -985,7 +992,11 @@
       "height": 52,
       "collapsed": false,
       "description": "In CI the Terraform plan (terraform show -json) is checked by a policy that fails on any provider or backup copy destination outside the allowed EU regions; the same run checks processors.yaml, the processor register.\n\nTool: Open Policy Agent (conftest)\n\n```rego\npackage main\nimport rego.v1\n\neu_regions := {\"eu-central-1\", \"eu-central-2\", \"eu-west-1\", \"eu-west-3\", \"eu-north-1\", \"eu-south-1\", \"eu-south-2\"}\n\ndeny contains msg if {\n  some name, p in input.configuration.provider_config\n  p.name == \"aws\"\n  region := p.expressions.region.constant_value\n  not region in eu_regions\n  msg := sprintf(\"provider %s deploys to %s, outside the EU\", [name, region])\n}\n\ndeny contains msg if {\n  some r in input.resource_changes\n  r.type == \"aws_backup_plan\"\n  some rule in r.change.after.rule\n  some copy in rule.copy_action\n  not regex.match(\"arn:aws:backup:eu-\", copy.destination_vault_arn)\n  msg := sprintf(\"backup plan %s copies outside the EU\", [r.address])\n}\n```\n\nThreshold: 0 providers, backup copies or processors outside EU/EEA regions in the infrastructure plan and the processor register",
-      "category": "structural"
+      "characteristic": "other",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "sys-channels",
@@ -1048,7 +1059,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test starts the real broker and database in containers, publishes each message type a consumer handles twice with the same id, restarts the consumer, publishes it a third time, and compares the state with a single delivery.\n\nTool: Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest\n\n```ts\nimport { runWith } from './harness'   // starts broker and database with Testcontainers, runs the real consumer\nimport { MESSAGE_SAMPLES } from '../src/messages/samples'   // one sample per message type\n\ndescribe.each(MESSAGE_SAMPLES)('$type', (sample) => {\n  it('has the effect of one delivery when delivered three times', async () => {\n    const once = await runWith([sample])\n    const thrice = await runWith([sample, sample], { restart: true, then: [sample] })\n    expect(thrice.state).toEqual(once.state)\n    expect(thrice.duplicatesCounted).toBe(2)\n  })\n})\n```\n\nThreshold: Every consumer, given each of its message types twice (and again after a restart), ends in the same state as with one delivery; 0 double effects",
-      "category": "structural"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "8ece4454-cb95-43ee-bfa7-37e43c0413a6",
@@ -1073,7 +1088,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A test for each consumer delivers every message it handles twice, including a redelivery after a simulated crash before the acknowledgement, and compares the effects with a single delivery.\n\nTool: Vitest with Testcontainers (PostgreSQL and the broker)\n\n```ts\ndescribe.each(consumers)('%s', (consumer) => {\n  it('has the same effect for a message delivered twice', async () => {\n    const message = consumer.sampleMessage()\n    await consumer.handle(message)\n    const once = await snapshotEffects()\n    await consumer.handle(message)                       // redelivery\n    expect(await snapshotEffects()).toEqual(once)\n  })\n})\n```\n\nThreshold: Every consumer, given each message twice, produces exactly the effects of one delivery",
-      "category": "structural"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "d5eef9e4-ee3d-4d52-83a1-126f5ee25f79",
@@ -1220,7 +1239,11 @@
       "height": 52,
       "collapsed": false,
       "description": "In CI, after the migrations run against an empty database, a query lists the columns without a classification; a new column fails the build until it is classified, and a personal one until the record of processing names it.\n\nTool: psql in the CI pipeline, against the migrated schema\n\n```sql\n-- fails the build when it returns a row\nselect c.table_name, c.column_name\nfrom information_schema.columns c\njoin pg_class t on t.relname = c.table_name\njoin pg_namespace n on n.oid = t.relnamespace and n.nspname = c.table_schema\nleft join pg_description d on d.objoid = t.oid and d.objsubid = c.ordinal_position\nwhere c.table_schema = 'public'\n  and coalesce(d.description, '') !~ '^(personal|not-personal)( |:|$)';\n```\n\nThreshold: 0 columns in the migrated schema without a classification (personal or not-personal) in their comment",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "f93c8c65-4b56-4c42-baf1-690e08a492de",
@@ -1246,7 +1269,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A static rule runs on every pull request and fails on a route registered without going through the authorization module, so a check cannot be forgotten in a handler.\n\nTool: Semgrep\n\n```yaml\nrules:\n  - id: route-without-authorize\n    languages: [typescript]\n    severity: ERROR\n    message: Every route goes through authorize(); ADR \"Permissions decided in code\"\n    patterns:\n      - pattern: $ROUTER.$METHOD($PATH, ...)\n      - metavariable-regex:\n          metavariable: $METHOD\n          regex: ^(get|post|put|patch|delete)$\n      - pattern-not: $ROUTER.$METHOD($PATH, ..., authorize(...), ...)\n```\n\nThreshold: 0 routes registered without the authorize middleware",
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "metrics": "routes.unguarded == 0"
     },
     {
@@ -1300,7 +1327,10 @@
       "height": 52,
       "collapsed": false,
       "description": "Continuously asserts that the end-to-end payment path stays within its latency budget.\n\nThreshold: p99 latency < 250ms measured over any rolling 24h window",
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "continual",
+      "invocation": "automated",
       "metrics": "payment.latency.p99{window=24h} < 250 ms",
       "max_age": "1d"
     },
@@ -1314,7 +1344,11 @@
       "height": 52,
       "collapsed": false,
       "description": "Automated accessibility scan of every screen in CI plus a quarterly manual audit.\n\nThreshold: 0 critical / serious axe violations on any release build",
-      "category": "process",
+      "characteristic": "interaction-capability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated",
       "metrics": "ui.axe.violations{impact=critical} == 0\nui.axe.violations{impact=serious} == 0"
     },
     {
@@ -1327,7 +1361,11 @@
       "height": 52,
       "collapsed": false,
       "description": "Verifies the transaction ledger survives node failure with no committed-record loss.\n\nThreshold: No committed transaction lost during automated chaos / failover tests",
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "metrics": "ledger.lost_transactions{suite=chaos} == 0",
       "max_age": "7d"
     },
@@ -1341,7 +1379,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test saves a record through the element, reads the row directly from the database and fails if any of the sensitive fields holds the original value.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nit('stores sensitive fields as ciphertext', async () => {\n  const card = '4111111111111111'\n  const { id } = await customers.create({ name: 'Ada', cardNumber: card })\n  const { rows } = await pg.query('select card_number from customers where id = $1', [id])\n  expect(rows[0].card_number).not.toContain(card)\n  expect((await customers.get(id)).cardNumber).toBe(card)\n})\n```\n\nThreshold: 0 of the listed sensitive fields readable as plaintext in the database",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "req-dual-approval",
@@ -1689,7 +1731,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test runs many concurrent operations that compete for the same records against the real database engine (not an in-memory fake), at the isolation level and with the retries of the decision, and checks the invariant afterwards.\n\nTool: Vitest with Testcontainers (PostgreSQL)\n\n```ts\nit('never sells more than is in stock', async () => {\n  await db.query(\"update stock set available = 10 where sku = 'A'\")\n  const attempts = Array.from({ length: 1000 }, () => placeOrder({ sku: 'A', quantity: 1 }).then(() => 1, () => 0))\n  const sold = (await Promise.all(attempts)).reduce((a, b) => a + b, 0)\n  const { rows } = await db.query(\"select available from stock where sku = 'A'\")\n  expect(sold).toBe(10)\n  expect(rows[0].available).toBe(0)\n})\n```\n\nThreshold: 0 lost updates or broken invariants in 1,000 concurrent attempts against a real database at the chosen isolation level",
-      "category": "structural"
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "f2695e57-0f67-4342-83af-38b6009f2d9e",
@@ -1718,7 +1764,10 @@
       "height": 52,
       "collapsed": false,
       "description": "Prometheus rules over kafka-exporter metrics alert on a consumer group that has messages waiting but has not moved its offset for 5 minutes (the oldest waiting message is at least that old) and on any message published to a .dlq topic.\n\nTool: Prometheus alerting rules (kafka-exporter)\n\n```yaml\ngroups:\n- name: messaging\n  rules:\n  - alert: ConsumerStuck\n    expr: kafka_consumergroup_lag_sum > 0\n      and delta(kafka_consumergroup_current_offset_sum[5m]) == 0\n    labels: { severity: page }\n    annotations: { summary: \"{{ $labels.consumergroup }} has not moved for 5 minutes\" }\n  - alert: DeadLetters\n    expr: increase(kafka_topic_partition_current_offset{topic=~\".+\\\\.dlq\"}[5m]) > 0\n    labels: { severity: ticket }\n```\n\nThreshold: An alert fires when a consumer group with waiting messages has made no progress for 5 minutes, or a dead-letter topic receives a message",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated"
     },
     {
       "id": "c05f0708-9b01-4ff3-8302-6f1835b5a63e",
@@ -1770,7 +1819,10 @@
       "height": 52,
       "collapsed": false,
       "description": "AWS Config reports every customer-managed KMS key whose automatic rotation is off; a scheduled job checks the rotation period of each.\n\nTool: AWS Config managed rule CMK_BACKING_KEY_ROTATION_ENABLED and the AWS CLI\n\n```bash\nfor key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do\n  [ \"$(aws kms describe-key --key-id \"$key\" --query 'KeyMetadata.KeyManager' --output text)\" = CUSTOMER ] || continue\n  status=$(aws kms get-key-rotation-status --key-id \"$key\" --output json)\n  echo \"$status\" | jq -e --argjson max 365 \\\n    '.KeyRotationEnabled and (.RotationPeriodInDays <= $max)' >/dev/null \\\n    || { echo \"key $key: rotation off or longer than 365 days\"; exit 1; }\ndone\n```\n\nThreshold: 0 customer-managed keys without automatic rotation; rotation period at most 365 days",
-      "category": "operational"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated"
     },
     {
       "id": "ab760dcf-67d1-4ad1-9174-1b3d911d7d34",
@@ -1849,7 +1901,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A Conftest policy over the rendered manifests fails when the mesh-wide mutual TLS policy is missing or anything weakens it.\n\nTool: Conftest (Open Policy Agent) over Istio manifests\n\n```rego\npackage main\n\nimport rego.v1\n\ndeny contains msg if {\n  input.kind == \"PeerAuthentication\"\n  input.spec.mtls.mode != \"STRICT\"\n  msg := sprintf(\"%s/%s weakens mutual TLS to %s\", [input.metadata.namespace, input.metadata.name, input.spec.mtls.mode])\n}\n\ndeny contains msg if {\n  input.kind == \"PeerAuthentication\"\n  some port, setting in input.spec.portLevelMtls\n  setting.mode != \"STRICT\"\n  msg := sprintf(\"%s/%s turns off mutual TLS on port %v\", [input.metadata.namespace, input.metadata.name, port])\n}\n```\n\nThreshold: A mesh-wide PeerAuthentication in STRICT mode exists, and 0 workloads or namespaces override it to PERMISSIVE or DISABLE",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "b37e58f7-4626-44bb-a780-a9c1bf23ec00",
@@ -1960,7 +2016,10 @@
       "height": 52,
       "collapsed": false,
       "description": "The backup job pushes the time of its last success (for point-in-time recovery, the exporter reports the last archived log segment); Prometheus pages when the newest copy is older than the RPO, which also catches a job that silently stopped.\n\nTool: Prometheus (Pushgateway for backup jobs)\n\n```yaml\ngroups:\n  - name: backup-recovery\n    rules:\n      - alert: RecoveryPointTooOld\n        # backup_last_success_timestamp_seconds: pushed by the backup job, or\n        # pg_stat_archiver.last_archived_time exported for point-in-time recovery\n        expr: time() - backup_last_success_timestamp_seconds{store=\"orders\"} > 0 * 60\n        for: 5m\n        labels: { severity: page }\n        annotations:\n          summary: 'The newest copy of {{ $labels.store }} is older than 0 minutes'\n```\n\nThreshold: The newest recoverable copy is never older than 0 minutes for more than 5 minutes",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated"
     },
     {
       "id": "a0cb0082-f3bf-4e2e-b74d-5e2e640891bf",
@@ -1972,7 +2031,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A scheduled CI job runs a query over the grants every day and fails, opening a ticket for the owner, when a grant is overdue for review or belongs to a person who has left.\n\nTool: psql in a scheduled CI job\n\n```sql\n-- fails the job when it returns a row\nselect g.account_id, g.permission, g.last_reviewed_at, p.left_at\nfrom grants g\njoin people p on p.account_id = g.account_id\nwhere g.last_reviewed_at < now() - interval '90 days' - interval '14 days'\n   or (p.left_at is not null and p.left_at < now() - interval '24 hours');\n```\n\nThreshold: 0 grants unreviewed for more than 90 + 14 days; 0 grants of leavers older than 24 hours",
-      "category": "process"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated"
     },
     {
       "id": "94ab4907-56bf-4807-82cb-479ecdf4d5a3",
@@ -1984,7 +2047,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A scheduled query over the cloud account lists the people with administrator policies attached directly; anything returned is a standing right that bypasses elevation. Use the equivalent tables for Azure or Google Cloud.\n\nTool: Steampipe (AWS plugin)\n\n```sql\n-- fails the job when it returns a row\nselect u.name, u.arn\nfrom aws_iam_user u\nwhere u.attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess'\n   or u.attached_policy_arns ? 'arn:aws:iam::aws:policy/PowerUserAccess';\n```\n\nThreshold: 0 people holding administrator rights outside an active, approved elevation",
-      "category": "operational"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated"
     },
     {
       "id": "a3337808-d6cb-4b07-b2ce-e33f2c1ce7af",
@@ -2009,7 +2076,10 @@
       "height": 52,
       "collapsed": false,
       "description": "AWS Config managed rules evaluate every database, snapshot, volume and bucket continuously and report one that is not encrypted at rest. Azure Policy and Google Organization Policy have equivalent built-in rules.\n\nTool: AWS Config managed rules\n\n```hcl\nlocals {\n  encryption_rules = [\n    \"RDS_STORAGE_ENCRYPTED\",\n    \"RDS_SNAPSHOT_ENCRYPTED\",\n    \"ENCRYPTED_VOLUMES\",\n    \"S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED\",\n  ]\n}\n\nresource \"aws_config_config_rule\" \"encrypted_at_rest\" {\n  for_each = toset(local.encryption_rules)\n  name     = lower(replace(each.value, \"_\", \"-\"))\n  source {\n    owner             = \"AWS\"\n    source_identifier = each.value\n  }\n}\n```\n\nThreshold: 0 non-compliant database instances, snapshots, volumes or buckets",
-      "category": "operational"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated"
     },
     {
       "id": "49b7b201-2a21-449b-8068-a62a99fdc261",
@@ -2061,7 +2131,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A database test run in CI after the migrations asserts the privileges of every role on each entity's tables: the owner writes, others at most read.\n\nTool: pgTAP (run with pg_prove)\n\n```sql\nBEGIN;\nSELECT plan(3);\nSELECT table_privs_are('public', 'orders', 'order_service', ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']);\nSELECT table_privs_are('public', 'orders', 'inventory_service', ARRAY['SELECT'], 'inventory reads orders, never writes');\nSELECT table_privs_are('public', 'orders', 'reporting', ARRAY['SELECT']);\nSELECT * FROM finish();\nROLLBACK;\n```\n\nThreshold: 0 roles other than the owner's with INSERT, UPDATE or DELETE on an entity's tables",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "f4512bfa-f670-4ffe-b62b-4497866b8d2b",
@@ -2073,7 +2147,13 @@
       "height": 52,
       "collapsed": false,
       "description": "A dependency rule fails the build when code outside the outbox relay imports the broker's client, which would mean a message sent outside the transaction of its change.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'publish-through-outbox',\n    comment: 'ADR At-least-once delivery: messages go to the outbox table, only the relay talks to the broker',\n    severity: 'error',\n    from: { pathNot: '^src/outbox/relay' },\n    to: { path: 'node_modules/(kafkajs|@confluentinc/kafka-javascript|amqplib|@aws-sdk/client-sqs|@aws-sdk/client-sns)' },\n  }],\n}\n```\n\nThreshold: 0 modules outside the outbox relay import a broker client",
-      "category": "structural"
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
+      "measure": "command --name deps.outbox -- npx depcruise src --config .dependency-cruiser.cjs",
+      "metrics": "deps.outbox.exit_code == 0"
     },
     {
       "id": "0e4b12b0-4bc8-4e42-8f09-c55e4bf58201",
@@ -2085,7 +2165,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A dependency rule fails the build when code outside the relay imports a broker client, which would be a dual write that can lose or invent events.\n\nTool: dependency-cruiser\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [{\n    name: 'publish-through-outbox',\n    comment: 'ADR Transactional outbox: write to the outbox table; only the relay talks to the broker',\n    severity: 'error',\n    from: { pathNot: '^src/outbox/relay' },\n    to: { path: 'node_modules/(kafkajs|amqplib|@aws-sdk/client-sqs|@aws-sdk/client-sns|@azure/service-bus|@google-cloud/pubsub)' },\n  }],\n}\n```\n\nThreshold: 0 modules outside the outbox relay that import a broker client",
-      "category": "structural"
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "e5da59e4-7f34-47cc-93c1-d2970af2c355",
@@ -2215,7 +2299,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test against the real broker in a container publishes numbered messages for 100 keys interleaved, runs four consumers, and checks that each key's numbers were handled in increasing order.\n\nTool: Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest\n\n```ts\nit('keeps the order within each key', async () => {\n  const keys = Array.from({ length: 100 }, (_, i) => 'order-' + i)\n  for (let n = 1; n <= 20; n++) for (const key of keys) await publish({ key, n })\n  const handled = await consumeWith(4, keys.length * 20)          // [{ key, n }] in handling order\n  for (const key of keys) {\n    const ns = handled.filter((m) => m.key === key).map((m) => m.n)\n    expect(ns).toEqual([...ns].sort((a, b) => a - b))\n  }\n})\n```\n\nThreshold: With 4 consumers in parallel, the messages of each of 100 keys are handled in the order published; 0 out of order",
-      "category": "structural"
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "8260fc95-b653-4bc0-bce0-02f6ede5b406",
@@ -2266,7 +2354,10 @@
       "height": 52,
       "collapsed": false,
       "description": "The database exporter reports the age of the oldest unpublished outbox row; Prometheus pages when the relay falls behind, before consumers notice.\n\nTool: Prometheus with sql_exporter\n\n```yaml\n# sql_exporter collector\ncollector_name: outbox\nmetrics:\n  - metric_name: outbox_oldest_unpublished_seconds\n    type: gauge\n    help: 'Age of the oldest event not yet published'\n    values: [age]\n    query: |\n      SELECT coalesce(extract(epoch FROM now() - min(created_at)), 0) AS age FROM outbox WHERE published_at IS NULL\n---\n# Prometheus alerting rule\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: OutboxBehind\n        expr: outbox_oldest_unpublished_seconds > 5\n        for: 2m\n        labels: { severity: page }\n```\n\nThreshold: The oldest unpublished outbox row is never older than 5 seconds for more than 2 minutes",
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "metrics": "outbox.oldest_unpublished.age{quantile=max} <= 5 s",
       "max_age": "1d"
     },
@@ -2307,7 +2398,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test delays replication on purpose (a paused WAL replay on the replica) and checks that a user's read straight after their write still returns it.\n\nTool: Vitest with Testcontainers (PostgreSQL primary and replica)\n\n```ts\nit('shows a user their own write while the replica lags', async () => {\n  await replica.query('select pg_wal_replay_pause()')\n  for (let i = 0; i < 100; i++) {\n    await api.as(user).put('/me/address', { street: `Street ${i}` })\n    const { body } = await api.as(user).get('/me/address')\n    expect(body.street).toBe(`Street ${i}`)\n  }\n  await replica.query('select pg_wal_replay_resume()')\n})\n```\n\nThreshold: 0 of 100 write-then-read pairs return the old value while replicas lag",
-      "category": "structural"
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "0abc316f-0a3d-4ee3-a790-03c678bf032c",
@@ -2582,7 +2677,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A test lists the operations from the router (not from a list kept by hand), calls each as a caller of every role or rule case, and compares allowed or refused with the expected matrix; it also calls each operation that takes an id with the id of a record of another user. An operation without an entry fails the test.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\nimport { EXPECTED } from './authz/expected'       // \"METHOD path\" -> roles allowed\nimport { CASES, tokenFor, otherUsersRecord } from './authz/fixtures'\n\ndescribe.each(routes)('$method $path', (route) => {\n  it.each(CASES)('as %s gives the expected answer', async (who) => {\n    const res = await request(app)[route.method.toLowerCase()](route.example)\n      .set('Authorization', `Bearer ${await tokenFor(who)}`)\n    const allowed = EXPECTED[`${route.method} ${route.path}`]?.includes(who) ?? false\n    expect([403, 404].includes(res.status)).toBe(!allowed)\n  })\n  it.runIf(route.path.includes(':id'))('refuses another user\\'s record', async () => {\n    const res = await request(app)[route.method.toLowerCase()](route.path.replace(':id', await otherUsersRecord()))\n      .set('Authorization', `Bearer ${await tokenFor('owner')}`)\n    expect([403, 404]).toContain(res.status)\n  })\n})\n```\n\nThreshold: Every operation called as every role or rule case gives the expected answer, and with another user's record ids returns 403 or 404; 0 mismatches",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "c29c8cd1-25e5-46ae-b6cc-448ce5804e7e",
@@ -2658,7 +2757,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A nightly job exports a day of logs and a sample of rows from the fields not classified as personal and scans them for e-mail addresses, phone numbers, IP addresses, card numbers, IBANs and names; it reports the place and kind of each finding, never the value.\n\nTool: Microsoft Presidio (presidio-analyzer)\n\n```python\n# scan.py <file>: exits 1 when the file holds personal data\nimport sys\nfrom presidio_analyzer import AnalyzerEngine\n\nENTITIES = [\"EMAIL_ADDRESS\", \"PHONE_NUMBER\", \"IP_ADDRESS\", \"CREDIT_CARD\", \"IBAN_CODE\", \"PERSON\"]\nanalyzer = AnalyzerEngine()\nfound = 0\nwith open(sys.argv[1], encoding=\"utf-8\") as f:\n    for n, line in enumerate(f, 1):\n        for r in analyzer.analyze(text=line, entities=ENTITIES, language=\"en\", score_threshold=0.6):\n            print(f\"{sys.argv[1]}:{n}: {r.entity_type}\")  # never print the value\n            found += 1\nsys.exit(1 if found else 0)\n```\n\nThreshold: 0 personal data findings with a score of 0.6 or more in a day of logs and a sample of rows outside the fields classified as personal",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated"
     },
     {
       "id": "d73f4a67-2a15-48fa-b729-c41cfb6165dd",
@@ -2788,7 +2891,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A scheduled job scans each public endpoint of the element with testssl.sh and fails on a protocol or cipher suite outside the chosen profile, a weak finding or a certificate close to expiry.\n\nTool: testssl.sh\n\n```bash\ntestssl.sh --quiet --warnings off --severity HIGH --jsonfile tls.json \"$ENDPOINT\"\n# fails on HIGH/CRITICAL findings, e.g. TLS 1.0/1.1, CBC suites, weak keys\njq -e '[.[] | select(.severity == \"HIGH\" or .severity == \"CRITICAL\")] | length == 0' tls.json\n# certificate must stay valid for at least 14 more days\necho | openssl s_client -connect \"$ENDPOINT:443\" -servername \"$ENDPOINT\" 2>/dev/null \\\n  | openssl x509 -noout -checkend $(( 14 * 86400 ))\n```\n\nThreshold: 0 findings of severity HIGH or CRITICAL; only TLS 1.3 only offered; certificates valid for at least 14 more days",
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "metrics": "tls.findings{severity=critical} == 0\ntls.findings{severity=high} == 0\ntls.certificate.days_left >= 14",
       "max_age": "1d"
     },
@@ -2845,7 +2952,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A resiliency policy states the objectives; each release is assessed against it and the pipeline fails unless the assessment says the policy is met. On Azure, a test failover with Azure Site Recovery plays the same part.\n\nTool: AWS Resilience Hub (AWS CLI)\n\n```sh\nRPO=$(( 0 * 60 )); RTO=$(( 30 * 60 ))\naws resiliencehub create-resiliency-policy --policy-name orders-store --tier Critical \\\n  --policy \"{\\\"AZ\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Hardware\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Software\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO},\\\"Region\\\":{\\\"rpoInSecs\\\":$RPO,\\\"rtoInSecs\\\":$RTO}}\"\n\n# in the release pipeline, after the assessment of the new version has finished:\nSTATUS=$(aws resiliencehub describe-app-assessment --assessment-arn \"$ASSESSMENT_ARN\" \\\n  --query 'assessment.complianceStatus' --output text)\ntest \"$STATUS\" = \"PolicyMet\" || { echo \"recovery objectives not met: $STATUS\"; exit 1; }\n```\n\nThreshold: The resiliency assessment of the latest release meets the policy (RPO 0 minutes, RTO 30 minutes) for zone, hardware, software and region disruptions",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "release",
+      "invocation": "automated"
     },
     {
       "id": "816d6580-c880-45e8-8511-4051391d1360",
@@ -2909,7 +3020,10 @@
       "height": 52,
       "collapsed": false,
       "description": "The PostgreSQL exporter reports each replica's lag; Prometheus alerts when it passes the bound, and the read router takes the replica out of rotation on the same signal.\n\nTool: Prometheus with postgres_exporter\n\n```yaml\ngroups:\n  - name: data-consistency\n    rules:\n      - alert: ReplicaTooStale\n        expr: pg_replication_lag_seconds > 5\n        for: 1m\n        labels: { severity: ticket }\n        annotations:\n          summary: 'Replica {{ $labels.instance }} is more than 5 s behind'\n```\n\nThreshold: Replica lag above 5 seconds for no more than 1 minute; a lagging replica receives no reads",
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "metrics": "db.replica.lag.p99 <= 5 s",
       "max_age": "1d"
     },
@@ -2947,7 +3061,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A daily data test returns the records past retention and the erasure requests past their deadline; any row fails it and alerts the data owner.\n\nTool: dbt (a singular data test, run daily by the scheduler)\n\n```sql\n-- tests/personal_data_on_time.sql: every row returned is a failure\nselect 'past retention' as problem, cast(customer_id as text) as id\nfrom {{ ref('customers') }}\nwhere last_used_at < now() - interval '60 months'\n  and erased_at is null\n  and legal_hold is not true\nunion all\nselect 'erasure overdue', cast(request_id as text)\nfrom {{ ref('erasure_requests') }}\nwhere completed_at is null\n  and accepted_at < now() - interval '30 days'\n```\n\nThreshold: 0 personal records unused for more than 60 months, and 0 erasure requests open for more than 30 days",
-      "category": "operational"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated"
     },
     {
       "id": "07129dc4-bcce-4e63-9803-f1772d5b6b17",
@@ -3026,7 +3144,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A CI step asks the registry whether each changed schema is compatible with every version of its subject under the subject's mode, and fails on the first that is not.\n\nTool: Confluent Schema Registry compatibility API (Apicurio Registry offers the same check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfor file in $(git diff --name-only origin/main -- 'schemas/*.avsc'); do\n  subject=\"$(basename \"$file\" .avsc)-value\"\n  body=$(jq -n --rawfile s \"$file\" '{schemaType: \"AVRO\", schema: $s}')\n  curl -sf -u \"$SR_KEY:$SR_SECRET\" -H 'Content-Type: application/vnd.schemaregistry.v1+json' \\\n    -d \"$body\" \"$SCHEMA_REGISTRY_URL/compatibility/subjects/$subject/versions?verbose=true\" \\\n    | jq -e '.is_compatible' > /dev/null || { echo \"incompatible: $file\"; exit 1; }\ndone\n```\n\nThreshold: Every changed schema is compatible with all registered versions of its subject before merge; 0 incompatible registrations",
-      "category": "process"
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "388188ba-59c6-47e3-a350-20ec1d4187b1",
@@ -3275,7 +3397,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test signs in on two instances, revokes the session on one and polls the other until it refuses, failing past 60 seconds; a second test advances the clock past 15 idle minutes and expects the next request to be refused.\n\nTool: Vitest (fake timers) against two instances started by Testcontainers or docker compose\n\n```ts\nit('a revoked session stops on every instance in time', async () => {\n  const token = await signIn(instanceA)\n  await signOut(instanceA, token)\n  const started = Date.now()\n  while ((await call(instanceB, token)).status !== 401) {\n    expect(Date.now() - started).toBeLessThan(REVOKE_SECONDS * 1000)\n    await sleep(1000)\n  }\n})\n```\n\nThreshold: An idle session ends after 15 minutes; a revoked one is refused within 60 seconds on every instance",
-      "category": "operational"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "a35854b4-c769-4cfc-a2f6-b15d9fca1153",
@@ -3287,7 +3413,11 @@
       "height": 52,
       "collapsed": false,
       "description": "An integration test against a local KMS writes a person's fields, copies the ciphertext as a backup would, erases the person and expects the key to be pending deletion and every decryption to fail.\n\nTool: Vitest with LocalStack (AWS KMS) or a Vault dev server\n\n```ts\nit('makes every copy of an erased person unreadable', async () => {\n  const person = await createPerson({ email: 'shred@example.test' })\n  const copies = [await store.rawFields(person.id), await events.rawFields(person.id)]  // ciphertext, as backups hold it\n  await erasure.run(person.id)\n  const key = await kms.send(new DescribeKeyCommand({ KeyId: person.keyId }))\n  expect(key.KeyMetadata?.KeyState).toBe('PendingDeletion')\n  for (const fields of copies) await expect(decryptFields(fields)).rejects.toThrow()\n})\n```\n\nThreshold: After an erasure, 0 of the person's encrypted fields decrypt in the store, the event stream or a backup, and their key is scheduled for deletion within 24 hours",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "c7d6a46c-9790-4e1a-b831-711ac8ea5094",
@@ -3338,7 +3468,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A pipeline step before every production deploy reads the error budget remaining from Prometheus (the Sloth recording rule) and fails when it is spent, unless the change carries the label for reliability or security fixes.\n\nTool: GitHub Actions step querying the Prometheus HTTP API\n\n```yaml\n- name: Error budget gate\n  if: ${{ !contains(github.event.pull_request.labels.*.name, 'reliability-fix') }}\n  run: |\n    remaining=$(curl -sf \"$PROMETHEUS_URL/api/v1/query\" \\\n      --data-urlencode 'query=slo:period_error_budget_remaining:ratio{sloth_service=\"order-api\",sloth_slo=\"availability\"}' \\\n      | jq -r '.data.result[0].value[1]')\n    echo \"Error budget remaining: $remaining\"\n    if awk \"BEGIN { exit !($remaining <= 0) }\"; then\n      echo \"::error::Error budget spent: only reliability or security fixes deploy (ADR Spent budget freezes releases)\"\n      exit 1\n    fi\n```\n\nThreshold: A production deploy without the reliability-fix label is refused whenever the 30-day error budget remaining is 0 or below",
-      "category": "process"
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "deploy",
+      "invocation": "automated"
     },
     {
       "id": "f6e74143-b65b-4558-8bff-55871e6aea06",
@@ -3505,7 +3639,10 @@
       "height": 52,
       "collapsed": false,
       "description": "The database exporter counts the standbys replicating synchronously; Prometheus pages when there is none, because writes then either stop or lose their second copy.\n\nTool: Prometheus with sql_exporter\n\n```yaml\n# sql_exporter collector\ncollector_name: replication\nmetrics:\n  - metric_name: pg_sync_standbys\n    type: gauge\n    help: 'Standbys replicating synchronously'\n    values: [n]\n    query: |\n      SELECT count(*) AS n FROM pg_stat_replication WHERE sync_state IN ('sync', 'quorum')\n---\n# Prometheus alerting rule\ngroups:\n  - name: backup-recovery\n    rules:\n      - alert: NoSynchronousStandby\n        expr: pg_sync_standbys < 1\n        for: 1m\n        labels: { severity: page }\n```\n\nThreshold: At least 1 standby in sync or quorum state at every moment; a page after 1 minute without one",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated"
     },
     {
       "id": "e997aa7e-95bf-4895-a42d-22cf908901fb",
@@ -3574,7 +3711,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A test lists the element's operations from its router (not from a list kept by hand), calls each without a credential and with an expired one, and expects 401 from every one that is not on the public list. A new operation fails the test until it is protected or added to the public list, which shows up in the pull request.\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { app, routes } from '../src/app'          // routes: the router's table\nimport { PUBLIC } from '../src/auth/publicRoutes' // the public list, in the code\n\ndescribe.each(routes.filter((r) => !PUBLIC.has(`${r.method} ${r.path}`)))('%s %s', (route) => {\n  it('refuses a call without a credential', async () => {\n    await request(app)[route.method.toLowerCase()](route.example).expect(401)\n  })\n  it('refuses an expired token', async () => {\n    await request(app)[route.method.toLowerCase()](route.example).set('Authorization', `Bearer ${EXPIRED}`).expect(401)\n  })\n})\n```\n\nThreshold: Every operation not on the public list answers 401 without a credential and with an expired one; 0 operations outside the public list answer anything else",
-      "category": "structural"
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated"
     },
     {
       "id": "46ec6dcd-4314-4d59-ac0d-f334eb2deb61",
@@ -3739,7 +3880,11 @@
       "height": 52,
       "collapsed": false,
       "description": "A scheduled workflow restores the latest copy (or rebuilds from the sources) into a throwaway environment, runs the data checks and tears it down; the job's timeout is the RTO, so a slow restore fails it. AWS Backup restore testing can do the same for stores it backs up.\n\nTool: GitHub Actions (scheduled workflow)\n\n```yaml\n# .github/workflows/restore-drill.yml\nname: restore-drill\non:\n  schedule: [{ cron: '0 3 * * 1' }]   # every Monday, 03:00 UTC\n  workflow_dispatch: {}\njobs:\n  restore:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4\n      - name: Restore the latest copy into a clean environment\n        run: ./ops/recover.sh --target \"drill-$GITHUB_RUN_ID\" --latest\n      - name: Check row counts, newest timestamp and a sample of records\n        run: ./ops/verify.sh --target \"drill-$GITHUB_RUN_ID\" --max-age-minutes 0\n      - name: Tear down\n        if: always()\n        run: ./ops/teardown.sh \"drill-$GITHUB_RUN_ID\"\n```\n\nThreshold: A restore (or rebuild) into an isolated environment every week, passing the data checks within 30 minutes, with data no older than 0 minutes",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated"
     },
     {
       "id": "41f9951e-23dc-4f31-bad9-ab0227c8b180",
@@ -3764,7 +3909,12 @@
       "height": 52,
       "collapsed": false,
       "description": "A chaos experiment kills every pod on the nodes of one zone while a load test runs at the expected peak; the load test fails when errors stay above 0.1 % for more than 5 minutes. Run it every month and after every change to the deployment, and once a quarter fail over the database as well.\n\nTool: Chaos Mesh (PodChaos by node zone) with k6 as load\n\n```yaml\napiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata: { name: order-api-zone-a-down, namespace: shop }\nspec:\n  action: pod-kill\n  mode: all\n  selector:\n    namespaces: [shop]\n    labelSelectors: { app: order-api }\n    nodeSelectors:\n      topology.kubernetes.io/zone: eu-west-1a\n# Meanwhile: k6 run --env RATE=<peak rps> zone-loss.js\n# with thresholds: { http_req_failed: [{ threshold: 'rate<0.001', abortOnFail: false }] }\n# evaluated over the window from 5 minutes after the kill to its end.\n```\n\nThreshold: With every instance in one zone killed at production-like load, errors above 0.1 % last no longer than 5 minutes",
-      "category": "operational"
+      "characteristic": "reliability",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "30d",
+      "invocation": "manual",
+      "metrics": "review(zone-loss-game-day) passed"
     },
     {
       "id": "fed8e3c3-c653-4698-9fe4-c8476c652fe6",
@@ -9151,7 +9301,7 @@
         ],
         "sort": {
           "by": "property",
-          "key": "category"
+          "key": "characteristic"
         }
       },
       "positions": {},
@@ -11407,7 +11557,10 @@
           "y": 110
         },
         "ff-latency": {
-          "category": "operational",
+          "characteristic": "performance-efficiency",
+          "scope": "holistic",
+          "cadence": "continual",
+          "invocation": "automated",
           "collapsed": false,
           "description": "Continuously asserts that the end-to-end payment path stays within its latency budget.\n\nThreshold: p99 latency < 250ms measured over any rolling 24h window",
           "height": 52,
@@ -11422,7 +11575,11 @@
           "max_age": "1d"
         },
         "ff-ledger": {
-          "category": "structural",
+          "characteristic": "reliability",
+          "scope": "holistic",
+          "cadence": "triggered",
+          "trigger": "weekly",
+          "invocation": "automated",
           "collapsed": false,
           "description": "Verifies the transaction ledger survives node failure with no committed-record loss.\n\nThreshold: No committed transaction lost during automated chaos / failover tests",
           "height": 52,
@@ -12013,7 +12170,11 @@
           "y": 110
         },
         "ff-a11y": {
-          "category": "process",
+          "characteristic": "interaction-capability",
+          "scope": "atomic",
+          "cadence": "triggered",
+          "trigger": "release",
+          "invocation": "automated",
           "collapsed": false,
           "description": "Automated accessibility scan of every screen in CI plus a quarterly manual audit.\n\nThreshold: 0 critical / serious axe violations on any release build",
           "height": 52,
@@ -12026,7 +12187,10 @@
           "metrics": "ui.axe.violations{impact=critical} == 0\nui.axe.violations{impact=serious} == 0"
         },
         "ff-latency": {
-          "category": "operational",
+          "characteristic": "performance-efficiency",
+          "scope": "holistic",
+          "cadence": "continual",
+          "invocation": "automated",
           "collapsed": false,
           "description": "Continuously asserts that the end-to-end payment path stays within its latency budget.\n\nThreshold: p99 latency < 250ms measured over any rolling 24h window",
           "height": 52,
@@ -12041,7 +12205,11 @@
           "max_age": "1d"
         },
         "ff-ledger": {
-          "category": "structural",
+          "characteristic": "reliability",
+          "scope": "holistic",
+          "cadence": "triggered",
+          "trigger": "weekly",
+          "invocation": "automated",
           "collapsed": false,
           "description": "Verifies the transaction ledger survives node failure with no committed-record loss.\n\nThreshold: No committed transaction lost during automated chaos / failover tests",
           "height": 52,

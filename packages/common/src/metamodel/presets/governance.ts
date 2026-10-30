@@ -33,6 +33,32 @@ export const METRICS_PROPERTIES: PropertyDef[] = [
   { key: 'max_age', label: 'Max age of a measurement (e.g. 7d)', type: 'text' },
 ]
 
+/** The quality characteristics of ISO/IEC 25010:2023: what a fitness
+ *  function protects. */
+export const FITNESS_CHARACTERISTICS = [
+  'functional-suitability', 'performance-efficiency', 'compatibility', 'interaction-capability',
+  'reliability', 'security', 'maintainability', 'flexibility', 'safety', 'other',
+] as const
+
+/** The events a triggered fitness function runs on. */
+export const FITNESS_TRIGGERS = ['pull-request', 'nightly', 'weekly', 'release', 'deploy'] as const
+
+/** How a fitness function is classified, after the dimensions of Building
+ *  Evolutionary Architectures (Ford, Parsons, Kua, Sadalage): what it
+ *  protects, how much of the system it takes in, when it runs and on what,
+ *  whether a person or a sensor runs it, and what to run. Whether its result
+ *  is static or dynamic is read from its metrics (a limit, or one against a
+ *  baseline), not stated. */
+export const FITNESS_CLASSIFICATION_PROPERTIES: PropertyDef[] = [
+  { key: 'characteristic', label: 'Characteristic (ISO/IEC 25010)', type: 'enum', options: [...FITNESS_CHARACTERISTICS] },
+  { key: 'scope', label: 'Scope', type: 'enum', options: ['atomic', 'holistic'] },
+  { key: 'cadence', label: 'Cadence', type: 'enum', options: ['triggered', 'continual', 'temporal'] },
+  { key: 'trigger', label: 'Runs on', type: 'enum', options: [...FITNESS_TRIGGERS], visibleWhen: { key: 'cadence', values: ['triggered'] } },
+  { key: 'every', label: 'Every (e.g. 90d)', type: 'text', visibleWhen: { key: 'cadence', values: ['temporal'] } },
+  { key: 'invocation', label: 'Invocation', type: 'enum', options: ['automated', 'manual'] },
+  { key: 'measure', label: 'Measure (one per line: a sensor and its arguments)', type: 'textarea', visibleWhen: { key: 'invocation', values: ['automated'] } },
+]
+
 export function builtInGovernanceMetamodel(): Metamodel {
   const base = builtInDddC4Metamodel()
 
@@ -95,13 +121,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
 
   const fitnessFnProps: PropertyDef[] = [
     { key: 'description', label: 'Description', type: 'textarea' },
-    {
-      key: 'category',
-      label: 'Category',
-      type: 'enum',
-      options: ['structural', 'operational', 'process', 'holistic'],
-      default: 'structural',
-    },
+    ...FITNESS_CLASSIFICATION_PROPERTIES,
     ...METRICS_PROPERTIES,
   ]
 
@@ -125,10 +145,12 @@ export function builtInGovernanceMetamodel(): Metamodel {
     wizard: {
       trigger: 'create',
       steps: [
-        { kind: 'fields', title: 'Name & category', fields: ['label', 'category'],
-          help: 'Name the architectural characteristic this function protects, e.g. "Checkout p95 latency".' },
-        { kind: 'fields', title: 'What it measures', fields: ['description'],
-          help: 'How is the characteristic measured — a test, a metric, a static check?' },
+        { kind: 'fields', title: 'Name & characteristic', fields: ['label', 'characteristic', 'scope'],
+          help: 'Name what this function protects, e.g. "Checkout p95 latency", and the ISO/IEC 25010 characteristic it is part of. Atomic checks one part in one context (a unit test, a linter rule); holistic checks how several parts behave together (latency under load).' },
+        { kind: 'fields', title: 'When it runs', fields: ['cadence', 'trigger', 'every', 'invocation'],
+          help: 'Triggered runs on an event (a pull request, every night, a release); continual runs all the time (monitoring in production); temporal falls due after a time (every 90 days). Manual means a person reviews it and records the result with radical sense review.' },
+        { kind: 'fields', title: 'What it measures', fields: ['description', 'measure'],
+          help: 'How is the characteristic measured? Measure names a sensor and its arguments, one per line, e.g. "playwright tests/load.spec.ts --label env=staging"; leave it empty for tests the pull-request gate already runs.' },
         { kind: 'fields', title: 'Success criteria', fields: ['metrics'],
           help: 'When does it pass? One condition per line: a measured value and its threshold, e.g. "checkout.latency.p95{env=prod} <= 300 ms", or a test that has to pass, e.g. "test(tests/architecture.test.ts › no cycles) passed".' },
         { kind: 'relations', title: 'Verified decisions', relationType: 'implements', direction: 'out',

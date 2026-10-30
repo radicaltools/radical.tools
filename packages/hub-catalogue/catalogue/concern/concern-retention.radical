@@ -851,7 +851,11 @@
       "label": "Every table in the schedule",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "In CI, after the migrations run against an empty database, a script lists the tables and looks each up in retention/schedule.json; a new table fails the build until it has a complete row, and a row whose last legal review is older than {{REVIEW_MONTHS}} months fails it too, which makes the review a date in the file rather than a promise.\n\nThreshold: Every table in the migrated schema has exactly 1 row in retention/schedule.json with category, basis, period, trigger, date column and owner, reviewed within {{REVIEW_MONTHS}} months, or category \"none\" with a reason\n\nTool: psql and jq in the CI pipeline (GNU date), against the migrated schema\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nsince=$(date -u -d '-{{REVIEW_MONTHS}} months' +%F)\nfail=0\nfor table in $(psql \"$DATABASE_URL\" -Atc \"select tablename from pg_tables where schemaname = 'public'\"); do\n  jq -e --arg t \"$table\" --arg since \"$since\" '\n    [.[] | select(.table == $t)] | length == 1 and (.[0] |\n      (.category == \"none\" and (.reason | length > 0)) or\n      (.category and .basis and .years > 0 and (.from == \"fiscal-year-end\" or .from == \"date\")\n        and .column and .owner and .reviewed >= $since))' \\\n    retention/schedule.json > /dev/null || { echo \"$table: no complete schedule row reviewed since $since\"; fail=1; }\ndone\nexit $fail\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -865,7 +869,11 @@
       "label": "Every table mapped to an exported label",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The records manager exports the labels with Microsoft Graph PowerShell (signed in with the delegated permission RecordsManagement.Read.All, the only kind the API accepts) and commits the file; CI checks its age from git history (checkout with fetch-depth 0) and every table against the mapping. A label kept forever (retentionDurationForever, no days) fails, as does a table mapped to a label the export no longer has. With more labels than one page, follow @odata.nextLink when exporting.\n\nThreshold: retention/labels.json committed within {{REVIEW_MONTHS}} months; every table in the migrated schema has exactly 1 row mapping it to a date column and a label in that export with a retention period in days, or category \"none\" with a reason\n\nTool: Microsoft Graph PowerShell (Invoke-MgGraphRequest) for the export; psql, jq and git in the CI pipeline\n\n```bash\n#!/usr/bin/env bash\n# export, by the records manager:\n#   Connect-MgGraph -Scopes RecordsManagement.Read.All\n#   Invoke-MgGraphRequest -Method GET -Uri '/v1.0/security/labels/retentionLabels' -OutputFilePath retention/labels.json\nset -euo pipefail\nexported=$(git log -1 --format=%cs -- retention/labels.json)\n[[ \"$exported\" > \"$(date -u -d '-{{REVIEW_MONTHS}} months' +%F)\" ]] || { echo \"labels last exported on '$exported'\"; exit 1; }\nfail=0\nfor table in $(psql \"$DATABASE_URL\" -Atc \"select tablename from pg_tables where schemaname = 'public'\"); do\n  jq -e --arg t \"$table\" --slurpfile labels retention/labels.json '\n    [.[] | select(.table == $t)] | length == 1 and (.[0] as $row |\n      ($row.category == \"none\" and ($row.reason | length > 0)) or\n      ($row.column and ($labels[0].value | any(.displayName == $row.label and .retentionDuration.days != null))))' \\\n    retention/schedule.json > /dev/null || { echo \"$table: not mapped to a date column and an exported label\"; fail=1; }\ndone\nexit $fail\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -879,7 +887,11 @@
       "label": "Every table partitioned with a retention",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script run in CI against the migrated schema, and daily against production with a read-only role, joins every table (partitions left out, transient tables skipped) to partman.part_config; a table without retention fails unless it is held, a table that only detaches expired partitions fails, and any row older than its period plus one partition and {{DISPOSE_DAYS}} days means maintenance has stopped.\n\nThreshold: Every records table in the schema has pg_partman retention with retention_keep_table false, or is listed with a matter in retention/holds.json; 0 rows older than retention plus one partition interval plus {{DISPOSE_DAYS}} days\n\nTool: psql and jq, against PostgreSQL with pg_partman 5\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nheld() { jq -e --arg t \"$1\" 'any(.[]; .table == $t and (.matter | length > 0))' retention/holds.json > /dev/null; }\nfail=0\nwhile IFS='|' read -r table control interval retention keep; do\n  grep -qxF \"${table#public.}\" retention/transient-tables.txt && continue\n  if [ -z \"$retention\" ]; then held \"$table\" || { echo \"$table: no pg_partman retention\"; fail=1; }; continue; fi\n  [ \"$keep\" = false ] || { echo \"$table: expired partitions are kept, not dropped\"; fail=1; }\n  late=$(psql \"$DATABASE_URL\" -Atc \"select count(*) from $table where $control < now() - interval '$retention' - interval '$interval' - interval '{{DISPOSE_DAYS}} days'\")\n  [ \"$late\" = 0 ] || { echo \"$table: $late rows past their period\"; fail=1; }\ndone < <(psql \"$DATABASE_URL\" -At -c \"\n  select t.schemaname || '.' || t.tablename, coalesce(c.control, ''), coalesce(c.partition_interval, ''),\n         coalesce(c.retention, ''), coalesce(c.retention_keep_table::text, '')\n  from pg_tables t\n  left join partman.part_config c on c.parent_table = t.schemaname || '.' || t.tablename\n  where t.schemaname = 'public'\n    and not exists (select 1 from pg_inherits i where i.inhrelid = (quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass)\")\nexit $fail\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -893,7 +905,11 @@
       "label": "Every records bucket expires its objects",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A scheduled job and the infrastructure pipeline read each records bucket's lifecycle configuration. In a versioned bucket an Expiration action only adds a delete marker, so without NoncurrentVersionExpiration the record stays as a noncurrent version for ever; versions under Object Lock are left alone by lifecycle, which is how held objects survive. A bucket with no configuration at all answers NoSuchLifecycleConfiguration and fails. Without legal holds, a rule disabled to preserve records for a matter fails this check for as long as it is off.\n\nThreshold: Every bucket in RECORD_BUCKETS has an enabled lifecycle rule that expires objects (Days or Date), and, when versioning is on, one that removes noncurrent versions within {{DISPOSE_DAYS}} days\n\nTool: AWS CLI v2 (s3api get-bucket-lifecycle-configuration, get-bucket-versioning) and jq\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfail=0\nfor bucket in $RECORD_BUCKETS; do\n  rules=$(aws s3api get-bucket-lifecycle-configuration --bucket \"$bucket\" --output json 2>/dev/null) || { echo \"$bucket: no lifecycle configuration\"; fail=1; continue; }\n  echo \"$rules\" | jq -e 'any(.Rules[]; .Status == \"Enabled\" and ((.Expiration.Days // 0) > 0 or .Expiration.Date != null))' > /dev/null \\\n    || { echo \"$bucket: no enabled rule expires objects\"; fail=1; }\n  if [ \"$(aws s3api get-bucket-versioning --bucket \"$bucket\" --query Status --output text)\" = Enabled ]; then\n    echo \"$rules\" | jq -e --argjson d {{DISPOSE_DAYS}} 'any(.Rules[]; .Status == \"Enabled\" and (.NoncurrentVersionExpiration.NoncurrentDays // 100000) <= $d)' > /dev/null \\\n      || { echo \"$bucket: noncurrent versions are not removed within {{DISPOSE_DAYS}} days\"; fail=1; }\n  fi\ndone\nexit $fail\n```"
     },
     {
@@ -902,7 +918,11 @@
       "label": "Disposal removes the expired and nothing else",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test runs the real job against PostgreSQL in a container with the repository's schedule. expectDisposed checks what the disposal decision promises: the row and its search entry gone, and with crypto-shredding the group's key pending deletion, or with totals the row folded into them. The fiscal years are computed from today, so the test keeps working as years pass.\n\nThreshold: An invoice past its period plus {{DISPOSE_DAYS}} days is disposed of in 1 run; an invoice in its period, every row of a table without a schedule row, and every row when the schedule is missing remain; 1 alert for the unknown table\n\nTool: Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers\n\n```ts\nimport { beforeEach, expect, it } from 'vitest'\nimport { runDisposal } from '../../src/retention/job'\nimport { alerts, db, expectDisposed, resetDb } from './fixtures'\nconst inYear = (yearsAgo: number) => new Date(Date.UTC(new Date().getUTCFullYear() - yearsAgo, 0, 15))\nbeforeEach(resetDb)\n\nit('disposes of an expired invoice and keeps one in its period', async () => {\n  const expired = await db.invoices.insert({ issuedAt: inYear({{ACCOUNTING_YEARS}} + 2) })\n  const current = await db.invoices.insert({ issuedAt: inYear({{ACCOUNTING_YEARS}} - 1) })\n  await runDisposal({ now: new Date() })\n  await expectDisposed('invoices', expired.id)\n  expect(await db.invoices.find(current.id)).toBeDefined()\n})\nit('deletes nothing from a table without a schedule row, and says so', async () => {\n  await db.query('create table unscheduled_notes (id serial primary key, created_at timestamptz)')\n  await db.query(\"insert into unscheduled_notes (created_at) values (now() - interval '50 years')\")\n  await runDisposal({ now: new Date() })\n  expect((await db.query('select count(*)::int as n from unscheduled_notes')).rows[0].n).toBe(1)\n  expect(alerts()).toContainEqual(expect.objectContaining({ table: 'unscheduled_notes' }))\n})\nit('deletes nothing at all when the schedule cannot be read', async () => {\n  const expired = await db.invoices.insert({ issuedAt: inYear({{ACCOUNTING_YEARS}} + 2) })\n  await expect(runDisposal({ now: new Date(), schedulePath: 'retention/missing.json' })).rejects.toThrow()\n  expect(await db.invoices.find(expired.id)).toBeDefined()\n})\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -917,7 +937,11 @@
       "label": "Weekly report of overdue records",
       "x": 1040,
       "y": 650,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "weekly",
+      "invocation": "automated",
       "description": "A weekly job, independent of the deletion job's code, reads the schedule the job last applied (the retention_schedule table: table, period, the event it counts from, date column) and counts the overdue rows of each table with a read-only role; where the legal_hold table exists, rows under an open hold are left out. It assumes a calendar fiscal year; shift the date_trunc for another. The scheduler turns a failed run into a ticket.\n\nThreshold: 0 records, per table in retention_schedule, whose period ended more than {{DISPOSE_DAYS}} days ago and that no open legal hold covers; above 0 the job fails and opens a ticket for the records owner\n\nTool: psql in a scheduled job (Kubernetes CronJob, GitHub Actions schedule)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nhold=\"\"\n[ \"$(psql \"$DATABASE_URL\" -Atc \"select to_regclass('public.legal_hold') is not null\")\" = t ] &&\n  hold=\"and not exists (select 1 from legal_hold h where h.table_name = '%s' and (h.record_id is null or h.record_id = r.id::text) and h.lifted_at is null)\"\ntotal=0\nwhile IFS='|' read -r table period start_from column; do\n  start=$column\n  [ \"$start_from\" = fiscal-year-end ] && start=\"date_trunc('year', $column) + interval '1 year'\"\n  n=$(psql \"$DATABASE_URL\" -Atc \"select count(*) from $table r where $start + interval '$period' + interval '{{DISPOSE_DAYS}} days' < now() $(printf \"$hold\" \"$table\")\")\n  echo \"$table: $n records overdue\"\n  total=$((total + n))\ndone < <(psql \"$DATABASE_URL\" -At -c \"select table_name, period, start_from, date_column from retention_schedule where category <> 'none'\")\n[ \"$total\" -eq 0 ]\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -932,7 +956,11 @@
       "label": "Only disposal can delete records",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "In CI against the migrated schema with the production roles created, and weekly against production, a query asks PostgreSQL itself whether each login role can delete from or truncate each table, ownership and inherited grants included; a grant added for convenience fails the build. Superusers can always delete and are kept to the platform team. With each store's own lifecycle configuration there is no retention_job role and the schema owner runs pg_partman's maintenance.\n\nThreshold: 0 login roles other than migrator and retention_job (superusers aside) with DELETE or TRUNCATE on any table or partition not listed in retention/transient-tables.txt\n\nTool: psql and awk in the CI pipeline\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfound=$(psql \"$DATABASE_URL\" -AtF ' ' -c \"\n  select c.relname, r.rolname, p.privilege\n  from pg_class c\n  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'\n  cross join pg_roles r\n  cross join (values ('DELETE'), ('TRUNCATE')) as p(privilege)\n  where c.relkind in ('r', 'p') and r.rolcanlogin and not r.rolsuper\n    and r.rolname not in ('migrator', 'retention_job')\n    and has_table_privilege(r.oid, c.oid, p.privilege)\" |\n  awk 'NR == FNR { transient[$1]; next } !($1 in transient)' retention/transient-tables.txt -)\n[ -z \"$found\" ] || { printf 'roles that can remove records before their period ends:\\n%s\\n' \"$found\"; exit 1; }\n```"
     },
     {
@@ -941,7 +969,11 @@
       "label": "Holds keep records and only named roles set them",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test against PostgreSQL in a container sets a hold as one of the named roles, runs disposal, lifts the hold, runs it again, and tries both as a support engineer; the audit trail is read back for the matter and the actor.\n\nThreshold: An expired invoice under an open hold survives a disposal run and is disposed of in the first run after the lift; holds set or lifted by a role outside {{HOLD_ROLES}} are refused (0 accepted); 1 audit record per accepted change\n\nTool: Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers\n\n```ts\nimport { beforeEach, expect, it } from 'vitest'\nimport { runDisposal } from '../../src/retention/job'\nimport { holds } from '../../src/retention/holds'\nimport { actor, auditTrail, db, expectDisposed, resetDb } from './fixtures'\nconst ALLOWED = '{{HOLD_ROLES}}'.split(/,\\s*/)\nconst expiredAt = () => new Date(Date.UTC(new Date().getUTCFullYear() - ({{ACCOUNTING_YEARS}} + 2), 0, 15))\nbeforeEach(resetDb)\n\nit('keeps held records past their period and disposes of them after the lift', async () => {\n  const held = await db.invoices.insert({ issuedAt: expiredAt() })\n  const hold = await holds.set(actor(ALLOWED[0]), { matter: 'LIT-2026-014', records: [{ table: 'invoices', id: held.id }] })\n  await runDisposal({ now: new Date() })\n  expect(await db.invoices.find(held.id)).toBeDefined()\n  await holds.lift(actor(ALLOWED[0]), hold.id)\n  await runDisposal({ now: new Date() })\n  await expectDisposed('invoices', held.id)\n})\nit('lets only the named roles set and lift a hold, and audits it', async () => {\n  const scope = { matter: 'LIT-2026-015', category: 'contracts' }\n  await expect(holds.set(actor('support engineer'), scope)).rejects.toThrow(/forbidden/i)\n  const hold = await holds.set(actor(ALLOWED[0]), scope)\n  await expect(holds.lift(actor('support engineer'), hold.id)).rejects.toThrow(/forbidden/i)\n  expect(await auditTrail.find({ subject: hold.id })).toContainEqual(expect.objectContaining({ action: 'legal-hold.set', matter: 'LIT-2026-015', actor: ALLOWED[0] }))\n})\n```",
       "hubWhen": {
         "HOLD": [
@@ -959,7 +991,11 @@
       "label": "Held objects cannot be deleted",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "temporal",
+      "every": "30d",
+      "invocation": "automated",
       "description": "A monthly drill, and a run after every IAM change, against a records bucket of the staging account (Object Lock on): it holds a test object, tries to delete the version, lifts the hold and deletes it, then asks the IAM policy simulator which roles may place or lift legal holds. retention/hold-roles.txt lists the ARNs of the roles that {{HOLD_ROLES}} assume. Held tables are checked by the configuration check through retention/holds.json.\n\nThreshold: A permanent delete of a held object version is refused; after the lift it succeeds; 0 IAM roles outside retention/hold-roles.txt are allowed s3:PutObjectLegalHold on the records buckets\n\nTool: AWS CLI v2 (s3api put-object-legal-hold, delete-object; iam simulate-principal-policy)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nbucket=$HOLD_DRILL_BUCKET\necho drill > held.txt\nversion=$(aws s3api put-object --bucket \"$bucket\" --key drill/held.txt --body held.txt --query VersionId --output text)\naws s3api put-object-legal-hold --bucket \"$bucket\" --key drill/held.txt --version-id \"$version\" --legal-hold Status=ON\nif aws s3api delete-object --bucket \"$bucket\" --key drill/held.txt --version-id \"$version\" 2>/dev/null; then\n  echo \"a held version was deleted\"; exit 1\nfi\naws s3api put-object-legal-hold --bucket \"$bucket\" --key drill/held.txt --version-id \"$version\" --legal-hold Status=OFF\naws s3api delete-object --bucket \"$bucket\" --key drill/held.txt --version-id \"$version\" > /dev/null\nfor role in $(aws iam list-roles --query 'Roles[].Arn' --output text); do\n  decision=$(aws iam simulate-principal-policy --policy-source-arn \"$role\" --action-names s3:PutObjectLegalHold \\\n    --resource-arns \"arn:aws:s3:::$bucket/drill/held.txt\" --query 'EvaluationResults[0].EvalDecision' --output text)\n  [ \"$decision\" != allowed ] || grep -qxF \"$role\" retention/hold-roles.txt || { echo \"$role may set or lift legal holds\"; exit 1; }\ndone\n```",
       "hubWhen": {
         "HOLD": [
@@ -976,7 +1012,11 @@
       "label": "Erased person, kept records out of reach",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test creates a customer with an invoice in its period, orders and a ticket, accepts their erasure through the Personal data pack's erasure process, and checks what each role can still find: whether the invoice is restricted or pseudonymised, support and reporting cannot tie it to the person and the compliance role can still produce it.\n\nThreshold: After an accepted erasure, 0 kept records reachable by the person through the support and reporting roles; 1 kept invoice readable by the compliance role for an obligation; the answer to the person lists the kept category with its basis and date\n\nTool: Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers\n\n```ts\nimport { expect, it } from 'vitest'\nimport { acceptErasure } from '../../src/privacy/erasure'\nimport { asRole, customerWith } from './fixtures'\n\nit('keeps what the law requires, for that obligation only', async () => {\n  const person = await customerWith({ invoices: 1, orders: 2, tickets: 1 })\n  const answer = await acceptErasure(person.id)\n  expect(await asRole('support').search(person.email)).toEqual([])\n  expect(await asRole('reporting').invoicesOf(person.id)).toEqual([])\n  const kept = await asRole('compliance').invoicesOf(person.id, { obligation: 'tax-audit' })\n  expect(kept).toHaveLength(1)\n  expect(answer.kept).toEqual([{ category: 'invoices', basis: expect.any(String), until: kept[0].retainUntil }])\n})\n```"
     },
     {
@@ -985,7 +1025,11 @@
       "label": "Keys of disposed groups destroyed",
       "x": 1040,
       "y": 1300,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A daily job reads the groups the deletion job logged in disposal_log (group, key id, time) and asks AWS KMS for each key's state; a key still enabled means the group's copies in backups and archives are still readable. A deleted key answers NotFoundException, which counts as done.\n\nThreshold: 0 record groups disposed of more than 1 day ago whose KMS key is in any state but PendingDeletion or deleted; every pending deletion date within 30 days of the disposal\n\nTool: AWS CLI v2 (kms describe-key) and psql in a scheduled job\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nfail=0\nwhile IFS='|' read -r group key disposed; do\n  meta=$(aws kms describe-key --key-id \"$key\" --output json 2> err.txt) || {\n    grep -q NotFoundException err.txt && continue\n    echo \"$group: $(cat err.txt)\"; fail=1; continue\n  }\n  state=$(echo \"$meta\" | jq -r .KeyMetadata.KeyState)\n  [ \"$state\" = PendingDeletion ] || { echo \"$group: key $key is $state\"; fail=1; continue; }\n  deletion=$(date -u -d \"$(echo \"$meta\" | jq -r .KeyMetadata.DeletionDate)\" +%s)   # AWS CLI v2 prints ISO 8601\n  [ \"$deletion\" -le $((disposed + 30 * 86400)) ] || { echo \"$group: key deleted only at $deletion\"; fail=1; }\ndone < <(psql \"$DATABASE_URL\" -At -c \"select group_key, key_id, extract(epoch from disposed_at)::bigint from disposal_log where disposed_at < now() - interval '1 day'\")\nexit $fail\n```",
       "hubWhen": {
         "SCHEDULE": [
@@ -1003,7 +1047,11 @@
       "label": "Totals identify no one",
       "x": 1040,
       "y": 1430,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A query run in CI against the migrated schema and daily after disposal returns every small group and every column that could carry an identifier; a new column in a totals table fails until it is added to the list on purpose. That expired rows are actually gone is the weekly report's job.\n\nThreshold: 0 rows in any *_totals table with a record count below 5; 0 columns in them outside month, category, region, currency, record_count, net_amount, tax_amount\n\nTool: psql (a SQL check that fails on any row; or the same query as a dbt singular test)\n\n```sql\n-- every row returned is a failure\nselect 'group of fewer than 5 records' as problem, category || ' ' || month::text as detail\nfrom invoice_totals\nwhere record_count < 5\nunion all\nselect 'column that may identify someone', table_name || '.' || column_name\nfrom information_schema.columns\nwhere table_schema = 'public' and table_name like '%\\_totals'\n  and column_name not in ('month', 'category', 'region', 'currency', 'record_count', 'net_amount', 'tax_amount');\n```",
       "hubWhen": {
         "SCHEDULE": [

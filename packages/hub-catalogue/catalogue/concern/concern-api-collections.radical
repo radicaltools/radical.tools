@@ -633,7 +633,11 @@
       "label": "Every list documents page tokens and a page-size cap",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then enforces the range at run time.\n\nThreshold: 0 Spectral errors: every list operation in api/openapi.yaml takes page_token and page_size with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and answers an object with items and next_page_token\n\nTool: Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error\n\n```yaml\nextends: spectral:oas\nrules:\n  list-page-parameters:\n    description: Every list operation takes page_token, and page_size from 1 to {{MAX_PAGE_SIZE}} with default {{DEFAULT_PAGE_SIZE}}.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then:\n      field: parameters\n      function: schema\n      functionOptions:\n        schema:\n          type: array\n          allOf:\n            - contains: { required: [name], properties: { name: { const: page_token } } }\n            - contains:\n                required: [name, schema]\n                properties:\n                  name: { const: page_size }\n                  schema: { required: [minimum, maximum, default], properties: { minimum: { const: 1 }, maximum: { maximum: {{MAX_PAGE_SIZE}} }, default: { const: {{DEFAULT_PAGE_SIZE}} } } }\n  list-page-object:\n    description: Every list operation answers an object with items and next_page_token, never a bare array.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_page_token] } } } } }\n```",
       "hubWhen": {
         "PAGING": [
@@ -647,7 +651,11 @@
       "label": "Every list documents limit and a capped offset",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Spectral lints the OpenAPI document in every pull request with two custom rules in .spectral.yaml, with references resolved. A list operation is a GET on a path that does not end in a path parameter; other paths that are not lists (/health here) are added to the pattern. Request validation against the same document then refuses a limit or offset out of range with 400.\n\nThreshold: 0 Spectral errors: every list operation in api/openapi.yaml takes limit with minimum 1, maximum at most {{MAX_PAGE_SIZE}} and default {{DEFAULT_PAGE_SIZE}}, and offset with minimum 0 and maximum at most {{MAX_OFFSET}}, and answers an object with items and next_offset\n\nTool: Spectral CLI (@stoplight/spectral-cli 6) in CI: npx @stoplight/spectral-cli lint api/openapi.yaml --fail-severity error\n\n```yaml\nextends: spectral:oas\nrules:\n  list-limit-offset:\n    description: Every list operation takes limit (1 to {{MAX_PAGE_SIZE}}, default {{DEFAULT_PAGE_SIZE}}) and offset (0 to {{MAX_OFFSET}}).\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then:\n      field: parameters\n      function: schema\n      functionOptions:\n        schema:\n          type: array\n          allOf:\n            - contains:\n                required: [name, schema]\n                properties:\n                  name: { const: limit }\n                  schema: { required: [minimum, maximum, default], properties: { minimum: { const: 1 }, maximum: { maximum: {{MAX_PAGE_SIZE}} }, default: { const: {{DEFAULT_PAGE_SIZE}} } } }\n            - contains: { required: [name, schema], properties: { name: { const: offset }, schema: { required: [minimum, maximum], properties: { minimum: { const: 0 }, maximum: { maximum: {{MAX_OFFSET}} } } } } }\n  list-page-object:\n    description: Every list operation answers an object with items and next_offset, never a bare array.\n    severity: error\n    given: $.paths[?(!@property.match(/(\\}|^\\/health)$/))].get\n    then: { field: responses.200.content.application/json.schema, function: schema, functionOptions: { schema: { required: [properties], properties: { properties: { required: [items, next_offset] } } } } }\n```",
       "hubWhen": {
         "PAGING": [
@@ -661,7 +669,11 @@
       "label": "Page size held to its range",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test against the application calls the orders list with each page size at and around the limits, and with offset and limit also with the offsets at and past the cap. The fixture names the page-size parameter of the decision (page_size with page tokens, limit with offsets).\n\nThreshold: No page size returns {{DEFAULT_PAGE_SIZE}} items, {{MAX_PAGE_SIZE}} returns {{MAX_PAGE_SIZE}}; {{MAX_PAGE_SIZE}} + 1, 0, -1 and a word are refused with 400; with offsets, offset {{MAX_OFFSET}} is answered and {{MAX_OFFSET}} + 1 refused with 400 naming {{MAX_OFFSET}}\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { PAGED_BY, SIZE_PARAM, seedOrders } from './collections/fixtures' // SIZE_PARAM: page_size or limit\n\nconst DEFAULT_SIZE = {{DEFAULT_PAGE_SIZE}}\nconst MAX_SIZE = {{MAX_PAGE_SIZE}}\nconst MAX_OFFSET = {{MAX_OFFSET}}\nconst list = (query: Record<string, string | number> = {}) => request(app).get('/orders').query(query)\n\nbeforeAll(() => seedOrders(MAX_SIZE + 10))\n\nit('serves the default size and the maximum, and refuses anything outside 1 to the maximum', async () => {\n  expect((await list()).body.items).toHaveLength(DEFAULT_SIZE)\n  expect((await list({ [SIZE_PARAM]: MAX_SIZE })).body.items).toHaveLength(MAX_SIZE)\n  for (const size of [MAX_SIZE + 1, 0, -1, 'ten']) expect((await list({ [SIZE_PARAM]: size })).status).toBe(400)\n})\n\nit.runIf(PAGED_BY === 'offset')('refuses an offset past the cap, naming it', async () => {\n  expect((await list({ offset: MAX_OFFSET })).status).toBe(200)\n  const past = await list({ offset: MAX_OFFSET + 1 })\n  expect(past.status).toBe(400)\n  expect(JSON.stringify(past.body)).toContain(String(MAX_OFFSET))\n})\n```",
       "hubWhen": {
         "PAGING": [
@@ -676,7 +688,11 @@
       "label": "Page tokens sealed and checked",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test reads the first page, decodes its token to show it holds no readable id, then sends the token back with one character changed, to the customers list, and resealed with an issue time {{TOKEN_HOURS}} hours and one more in the past, using the same sealing module the list operations use.\n\nThreshold: The last item's id appears 0 times in the decoded token; an altered token, a token sent to another list and a token older than {{TOKEN_HOURS}} hours are each refused with 400\n\nTool: Vitest with supertest, the token module of the application (Node crypto, AES-256-GCM)\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { openPageToken, sealPageToken } from '../src/collections/pageToken' // AES-256-GCM, as the lists use it\nimport { seedOrders } from './collections/fixtures'\n\nconst TOKEN_HOURS = {{TOKEN_HOURS}}\n\nbeforeAll(() => seedOrders(30))\n\nit('issues tokens that reveal nothing, and refuses altered, foreign and expired ones', async () => {\n  const first = await request(app).get('/orders').query({ page_size: 10 })\n  const token: string = first.body.next_page_token\n  expect(Buffer.from(token, 'base64url').toString('latin1')).not.toContain(first.body.items.at(-1).id)\n  const altered = token.slice(0, 20) + (token[20] === 'A' ? 'B' : 'A') + token.slice(21)\n  const expired = sealPageToken({ ...openPageToken(token), issuedAt: Date.now() - (TOKEN_HOURS + 1) * 3_600_000 })\n  for (const [path, pageToken] of [['/orders', altered], ['/customers', token], ['/orders', expired]]) {\n    const res = await request(app).get(path).query({ page_size: 10, page_token: pageToken })\n    expect(res.status, `${path} with a bad token`).toBe(400)\n  }\n})\n```",
       "hubWhen": {
         "PAGING": [
@@ -690,7 +706,11 @@
       "label": "A read survives concurrent changes",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test reads the orders list page by page with page tokens; after the second page it adds five orders and removes the last five of the list, which have not been read yet, then checks what the read returned against the ids the database held before.\n\nThreshold: While 5 items are added and 5 not yet read are removed during a read of 5 pages, every other item is read exactly once and 0 items twice\n\nTool: Vitest with supertest, with fixtures that write to the test database\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { createOrders, deleteOrders, orderIds, seedOrders } from './collections/fixtures' // orderIds: in the default order\n\nbeforeAll(() => seedOrders(50))\n\nit('reads every surviving item once while items are added and removed', async () => {\n  const before = await orderIds()\n  const removed = before.slice(-5) // not read yet when they go\n  const read: string[] = []\n  let token: string | undefined\n  for (let page = 1; page === 1 || token; page++) {\n    const { body } = await request(app).get('/orders').query({ page_size: 10, ...(token ? { page_token: token } : {}) })\n    read.push(...body.items.map((o: { id: string }) => o.id))\n    token = body.next_page_token\n    if (page === 2) { await createOrders(5); await deleteOrders(removed) }\n  }\n  expect(new Set(read).size).toBe(read.length)\n  for (const id of before.filter((id) => !removed.includes(id))) expect(read).toContain(id)\n})\n```",
       "hubWhen": {
         "PAGING": [
@@ -704,7 +724,11 @@
       "label": "Lists read in a total order",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test seeds orders of which twenty share one creation time, reads every page with the walk helper (which follows the pagination of the decision: page tokens, offsets, or the one response of a bounded list), and checks that no item is missing or repeated and that each item comes strictly after the one before it in the default order, so ties are broken.\n\nThreshold: Reading every page of the orders list in the default order returns each seeded item exactly once, and every item comes strictly after its neighbour in the order {{DEFAULT_ORDER}}\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, expect, it } from 'vitest'\nimport { SEEDED, seedOrders, walk } from './collections/fixtures' // walk: every page, as the decision pages\n\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\ntype Item = Record<string, any>\nconst ORDER = '{{DEFAULT_ORDER}}'.split(',').map((key) => key.trim().split(/\\s+/))\nconst strictlyBefore = (a: Item, b: Item): boolean => {\n  for (const [field, direction] of ORDER) {\n    if (a[field] === b[field]) continue\n    return direction === 'desc' ? a[field] > b[field] : a[field] < b[field]\n  }\n  return false\n}\n\nbeforeAll(() => seedOrders(SEEDED, { sameCreatedAt: 20 })) // twenty items share one creation time\n\nit('reads each item once, in the default order, with every tie broken', async () => {\n  const items: Item[] = await walk('/orders', {})\n  expect(items).toHaveLength(SEEDED)\n  expect(new Set(items.map((item) => item.id)).size).toBe(SEEDED)\n  for (let i = 1; i < items.length; i++) expect(strictlyBefore(items[i - 1], items[i])).toBe(true)\n})\n```"
     },
     {
@@ -713,7 +737,11 @@
       "label": "Bounded lists refuse to grow",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "performance-efficiency",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test per bounded list fills it to the cap through the API, adds one more and reads the list back. The example is a customer's addresses.\n\nThreshold: A list holding {{MAX_ITEMS}} items refuses one more with 409 and returns all {{MAX_ITEMS}} in one response without a page token; one test per bounded list\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { createCustomer } from './collections/fixtures'\n\nconst MAX_ITEMS = {{MAX_ITEMS}}\n\nit('serves a customer\\'s addresses whole and refuses to grow them past the cap', async () => {\n  const customer = await createCustomer()\n  const addresses = `/customers/${customer.id}/addresses`\n  const add = () => request(app).post(addresses).send({ line1: 'Main Street 1', city: 'Gdansk', country: 'PL' })\n  for (let i = 0; i < MAX_ITEMS; i++) expect((await add()).status).toBe(201)\n  expect((await add()).status).toBe(409)\n  const { body } = await request(app).get(addresses)\n  expect(body.items).toHaveLength(MAX_ITEMS)\n  expect(body).not.toHaveProperty('next_page_token')\n})\n```",
       "hubWhen": {
         "PAGING": [
@@ -727,7 +755,11 @@
       "label": "Unknown parameters refused",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test calls the orders list four times with something it does not know. The same four calls hold for every answer: where the pack decided no order_by, filter or fields parameter, the parameter itself is the unknown one.\n\nThreshold: An undocumented parameter, an order_by field off the allow-list, a filter on an unknown field and an unknown field in fields are each refused with 400, the error naming the parameter or field\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../src/app'\n\nit.each([\n  { label: 'an undocumented parameter', query: { colour: 'red' }, names: /colour/ },\n  { label: 'an order_by field off the allow-list', query: { order_by: 'internal_cost' }, names: /order_by|internal_cost/ },\n  { label: 'a filter on an unknown field', query: { filter: 'internal_cost > 1' }, names: /filter|internal_cost/ },\n  { label: 'an unknown field in fields', query: { fields: 'internal_cost' }, names: /fields|internal_cost/ },\n])('refuses $label with 400, naming it', async ({ query, names }) => {\n  const res = await request(app).get('/orders').query(query)\n  expect(res.status).toBe(400)\n  expect(JSON.stringify(res.body)).toMatch(names)\n})\n```"
     },
     {
@@ -736,7 +768,11 @@
       "label": "Filters apply before paging",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test per filterable field reads the whole list, then the list with the filter, and compares the ids; a second call sends a value that does not fit the field. The cases live in the fixtures, one per filterable field of the OpenAPI document, written as the decision filters (a parameter per field, or an AIP-160 expression).\n\nThreshold: For each filterable field, the filtered read across every page returns exactly the matching items of the unfiltered read, in the same order; a value of the wrong type is refused with 400\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport request from 'supertest'\nimport { beforeAll, describe, expect, it } from 'vitest'\nimport { app } from '../src/app'\nimport { FILTER_CASES, SEEDED, seedOrders, walk } from './collections/fixtures'\n// one case per filterable field, for example\n//   { field: 'status', query: { status: 'paid' }, invalid: { created_after: 'yesterday' }, matches: (o) => o.status === 'paid' }\n//   { field: 'status', query: { filter: 'status = \"paid\"' }, invalid: { filter: 'total > \"many\"' }, matches: (o) => o.status === 'paid' }\n\nbeforeAll(() => seedOrders(SEEDED))\n\ndescribe.each(FILTER_CASES)('filter on $field', ({ query, invalid, matches }) => {\n  it('returns exactly the matching items across every page, in order', async () => {\n    const all = await walk('/orders', {})\n    expect((await walk('/orders', query)).map((o) => o.id)).toEqual(all.filter(matches).map((o) => o.id))\n  })\n  it('refuses a value that does not fit the field', async () => {\n    expect((await request(app).get('/orders').query(invalid)).status).toBe(400)\n  })\n})\n```",
       "hubWhen": {
         "FILTER": [
@@ -751,7 +787,11 @@
       "label": "Every allowed order holds across pages",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test reads the orders list page by page once per allowed field and direction, with twenty orders sharing one creation time so ties occur, and checks each neighbouring pair. The allow-list comes from the fixtures, which read it from the OpenAPI document.\n\nThreshold: For each field on the order_by allow-list, ascending and descending, every item read across all pages comes after its neighbour by the field, ties by id in the same direction\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, describe, expect, it } from 'vitest'\nimport { SEEDED, SORTABLE, seedOrders, walk } from './collections/fixtures' // SORTABLE: the order_by allow-list\n\nbeforeAll(() => seedOrders(SEEDED, { sameCreatedAt: 20 }))\n\nconst cases = SORTABLE.flatMap((field: string) => [{ field, direction: 'asc' }, { field, direction: 'desc' }])\n\ndescribe.each(cases)('order_by $field $direction', ({ field, direction }) => {\n  it('orders every page by the field, ties by id in the same direction', async () => {\n    const items = await walk('/orders', { order_by: direction === 'desc' ? `${field} desc` : field })\n    for (let i = 1; i < items.length; i++) {\n      const [a, b] = direction === 'desc' ? [items[i], items[i - 1]] : [items[i - 1], items[i]]\n      expect(a[field] < b[field] || (a[field] === b[field] && a.id < b.id)).toBe(true)\n    }\n  })\n})\n```",
       "hubWhen": {
         "SORT": [
@@ -765,7 +805,11 @@
       "label": "Partial items hold only what was asked",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "functional-suitability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An HTTP test reads every page of the orders list with a fields parameter that names two top-level fields and one nested field, and checks the keys of each item.\n\nThreshold: With fields=status,total,customer.name, every item on every page holds exactly id, status, total and a customer with only its name\n\nTool: Vitest with supertest, through the walk helper in tests/collections\n\n```ts\nimport { beforeAll, expect, it } from 'vitest'\nimport { SEEDED, seedOrders, walk } from './collections/fixtures'\n\nbeforeAll(() => seedOrders(SEEDED))\n\nit('returns only the named fields and the id, on every page', async () => {\n  const items = await walk('/orders', { fields: 'status,total,customer.name' })\n  expect(items).toHaveLength(SEEDED)\n  for (const item of items) {\n    expect(Object.keys(item).sort()).toEqual(['customer', 'id', 'status', 'total'])\n    expect(Object.keys(item.customer)).toEqual(['name'])\n  }\n})\n```",
       "hubWhen": {
         "FIELDS": [
@@ -779,7 +823,11 @@
       "label": "Deep pages answered in time",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A k6 script run nightly against a test environment with a production-sized collection: its setup finds a page a hundred pages deep by following page tokens (with offsets it takes the largest offset accepted), then ten virtual users request that page for two minutes; the threshold fails the run when the 95th percentile is too slow. Only the deep-page requests are tagged, so the setup does not count.\n\nThreshold: p95 of http_req_duration for the deep page below {{LIST_P95_MS}} ms over 2 minutes with 10 virtual users\n\nTool: k6 (k6 run tests/load/deep-pages.js with BASE_URL and PAGED_BY=token or offset)\n\n```js\nimport http from 'k6/http'\nimport { check } from 'k6'\n\nconst BASE = __ENV.BASE_URL\nconst SIZE = {{MAX_PAGE_SIZE}}\nexport const options = {\n  vus: 10,\n  duration: '2m',\n  thresholds: { 'http_req_duration{page:deep}': ['p(95)<{{LIST_P95_MS}}'] },\n}\n\nexport function setup() {\n  if (__ENV.PAGED_BY === 'offset') return { url: `${BASE}/orders?limit=${SIZE}&offset={{MAX_OFFSET}}` }\n  let query = `page_size=${SIZE}`\n  for (let page = 1; page < 100; page++) query = `page_size=${SIZE}&page_token=${http.get(`${BASE}/orders?${query}`).json('next_page_token')}`\n  return { url: `${BASE}/orders?${query}` }\n}\n\nexport default function (data) {\n  check(http.get(data.url, { tags: { page: 'deep' } }), { 'deep page served': (r) => r.status === 200 })\n}\n```",
       "hubWhen": {
         "PAGING": [

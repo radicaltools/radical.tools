@@ -185,7 +185,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-one-config', label: 'One formatter configuration, at the root', category: 'structural', implements: FORMATTERS, checks: ['req-one-config'],
+      id: 'ff-one-config', label: 'One formatter configuration, at the root', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-one-config'],
       threshold: '0 formatter configuration files below the repository root and 0 formatting options on a formatter\'s command line in package.json, Makefile, shell scripts, workflows and .pre-commit-config.yaml',
       description: 'A CI step lists the tracked formatter configuration files outside the root (Prettier, Biome, Ruff, .editorconfig, a [tool.ruff] table in a nested pyproject.toml) and greps the places that run a formatter for formatting flags; either fails the step. A monorepo that needs a package of its own configuration lists it here as an exception, in the same pull request.',
       tool: 'git ls-files and git grep in a CI step (the same over build.gradle.kts for ktlint and Spotless, or Directory.Build.props for dotnet format)',
@@ -202,7 +202,7 @@ flags=$(git grep -nE -e '(prettier|biome format|ruff format|black)[^|;&]*--(prin
 echo "formatter settings: one file per language, at the root"`,
     },
     {
-      id: 'ff-version-match', label: 'One exact formatter version', category: 'structural', implements: FORMATTERS, checks: ['req-same-version'],
+      id: 'ff-version-match', label: 'One exact formatter version', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-same-version'],
       threshold: 'Prettier and Biome pinned without a range in package.json; the ruff-pre-commit rev equal to the ruff==x.y.z pinned in pyproject.toml; the step fails on any difference',
       description: 'A CI step reads the formatter versions from package.json and compares the rev of the ruff-pre-commit hook with the version pyproject.toml pins. On the Node side the hook (lint-staged) and the editor (the Prettier and Biome extensions use the project\'s installed copy first) run the version in node_modules, so an exact pin is enough; on the Python side pre-commit installs a copy of its own, which this keeps equal, and the Ruff extension finds Ruff in the environment first (ruff.importStrategy fromEnvironment, its default).',
       tool: 'jq, grep and sed in a CI step (for Kotlin and Java: the ktlint or Spotless version in libs.versions.toml; for C#: the SDK version in global.json)',
@@ -223,7 +223,7 @@ fi
 exit $fail`,
     },
     {
-      id: 'ff-blame-ignore', label: 'Reformatting commits listed for blame', category: 'process', implements: FORMATTERS, checks: ['req-blame-ignore'],
+      id: 'ff-blame-ignore', label: 'Reformatting commits listed for blame', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: FORMATTERS, checks: ['req-blame-ignore'],
       threshold: '0 commits older than {{BLAME_DAYS}} days that changed a formatter\'s settings or version and are missing from .git-blame-ignore-revs; younger ones are reported as warnings',
       description: 'A daily job on main lists every commit whose diff changes a formatter version or a formatting setting in package.json, pyproject.toml, the formatter configuration or .editorconfig, and looks for its full SHA in .git-blame-ignore-revs. Listing a version bump that reformatted nothing is harmless: blame skips only the lines that commit changed. Each developer runs git config blame.ignoreRevsFile .git-blame-ignore-revs once (or the repository\'s setup script does); GitHub reads the file by itself.',
       tool: 'git log -G in a scheduled GitHub Actions job (actions/checkout with fetch-depth: 0)',
@@ -246,7 +246,7 @@ done < <(git log --format='%H %ct' -G "$SETTINGS" HEAD -- package.json pyproject
 exit $late`,
     },
     {
-      id: 'ff-editorconfig', label: 'Every file follows .editorconfig', category: 'structural', implements: FORMATTERS, checks: ['req-editorconfig'],
+      id: 'ff-editorconfig', label: 'Every file follows .editorconfig', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-editorconfig'],
       threshold: '0 tracked text files that break the root .editorconfig (charset, line endings, final newline, trailing whitespace, indentation); line length is left to the formatters',
       description: 'The root .editorconfig carries what every editor and every file must agree on; editorconfig-checker runs over the tracked files on every pull request and fails on any file that breaks it, which covers the files no formatter touches. Its line-length check is off, because the formatters decide where lines break and leave long strings and URLs whole.',
       tool: 'editorconfig-checker (npm package editorconfig-checker, or its Docker image) in a CI step',
@@ -275,7 +275,7 @@ trim_trailing_whitespace = false
 # CI step: npx --yes editorconfig-checker@7.0.0 -format github-actions -disable-max-line-length`,
     },
     {
-      id: 'ff-editorconfig-consistent', label: '.editorconfig agrees with the formatters', category: 'structural', implements: FORMATTERS, checks: ['req-editorconfig'],
+      id: 'ff-editorconfig-consistent', label: '.editorconfig agrees with the formatters', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-editorconfig'],
       threshold: '.editorconfig has root = true and its [*] section sets charset utf-8, end_of_line lf, insert_final_newline, trim_trailing_whitespace and max_line_length {{LINE_WIDTH}}; .prettierrc.json sets none of printWidth, tabWidth, useTabs, endOfLine; Ruff\'s line-length equals the .editorconfig width for Python',
       description: 'A script reads .editorconfig (with a section added for its preamble, so Python\'s configparser accepts it), checks the [*] section, refuses Prettier settings that .editorconfig already carries (Prettier reads them from it, so a second value could only disagree), and compares Ruff\'s line-length, which does not read .editorconfig, with the width set for Python files. For ktlint and dotnet format nothing needs comparing: they read their settings from .editorconfig itself.',
       tool: 'Python 3.11 or later (configparser, tomllib) in a CI step',
@@ -303,7 +303,7 @@ print("\\n".join(problems) or ".editorconfig agrees with the formatters")
 sys.exit(1 if problems else 0)`,
     },
     {
-      id: 'ff-minimal-config', label: 'Formatters stay on their defaults', when: { FORMATTER: ['defaults'] }, category: 'structural', implements: ['adr-format-defaults'], checks: ['req-defaults'],
+      id: 'ff-minimal-config', label: 'Formatters stay on their defaults', when: { FORMATTER: ['defaults'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-format-defaults'], checks: ['req-defaults'],
       threshold: 'At most {{MAX_FORMAT_OPTIONS}} formatting options in .prettierrc.json (overrides included), in biome.json\'s formatter sections, and in pyproject.toml\'s [tool.ruff] line-length and [tool.ruff.format]; the step fails above it',
       description: 'A CI step counts the formatting options each configuration file sets, leaving out what is not a style choice ($schema, enabled, the files a formatter includes or ignores), and fails when one sets more than the decision allows. Settings read from .editorconfig are not counted: they are the shared ones. For ktlint the same count applies to the ktlint_ properties in .editorconfig; gofmt and google-java-format have no options to count.',
       tool: 'jq and Python (tomllib) in a CI step',
@@ -320,7 +320,7 @@ check() { echo "$2: $1 formatting option(s)"; [ "$1" -le "$MAX" ] || { echo "  m
 exit $fail`,
     },
     {
-      id: 'ff-option-reasons', label: 'Every formatter option has its reason', when: { FORMATTER: ['matched'] }, category: 'structural', implements: ['adr-format-matched'], checks: ['req-matched'],
+      id: 'ff-option-reasons', label: 'Every formatter option has its reason', when: { FORMATTER: ['matched'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-format-matched'], checks: ['req-matched'],
       threshold: '0 formatter options in .prettierrc.yaml, pyproject.toml\'s [tool.ruff] line-length and [tool.ruff.format], and the [*.{kt,kts}] ktlint properties of .editorconfig without a comment on the line above',
       description: 'A CI step walks the formatter configuration files and fails on an option whose line above is not a comment; the comment names the convention of the existing code that the option keeps. A pull request that changes an option is also a reformat of the whole tree, which the Code quality gate\'s formatter check over the whole tree enforces.',
       tool: 'awk in a CI step',
@@ -343,7 +343,7 @@ reasons() {   # file, the section whose options need a reason ('' = the whole fi
 exit $status`,
     },
     {
-      id: 'ff-guide-linked', label: 'Published guides linked, none amended', when: { GUIDE: ['published'] }, category: 'structural', implements: ['adr-guide-published'], checks: ['req-guide-published'],
+      id: 'ff-guide-linked', label: 'Published guides linked, none amended', when: { GUIDE: ['published'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-guide-published'], checks: ['req-guide-published'],
       threshold: 'CONTRIBUTING.md links the published guide of every language with tracked files in the repository, and no docs/STYLE.md exists',
       description: 'A CI step looks for the files of each language, expects the link to its guide in CONTRIBUTING.md, and fails when a guide of the team\'s own appears, which would amend the published ones without a decision. For Go the link is Go Code Review Comments, the maintained companion of Effective Go.',
       tool: 'git ls-files and grep in a CI step',
@@ -367,7 +367,7 @@ GUIDES
 exit $missing`,
     },
     {
-      id: 'ff-guide-rules', label: 'Our guide stays short and sourced', when: { GUIDE: ['own'] }, category: 'structural', implements: ['adr-guide-own'], checks: ['req-guide-own'],
+      id: 'ff-guide-rules', label: 'Our guide stays short and sourced', when: { GUIDE: ['own'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-guide-own'], checks: ['req-guide-own'],
       threshold: 'docs/STYLE.md holds between 1 and {{MAX_GUIDE_RULES}} rules, every rule has a "Based on:" and a "Checked by:" line, and CONTRIBUTING.md links it',
       description: 'A CI step reads docs/STYLE.md, where every rule is a heading "### S<n>. <rule>" followed by its "Based on:" and "Checked by:" lines, counts the rules and fails on a rule without either line, on more rules than the decision allows, or when CONTRIBUTING.md does not link the guide.',
       tool: 'awk and grep in a CI step',
@@ -388,7 +388,7 @@ awk -v max={{MAX_GUIDE_RULES}} '
   }' docs/STYLE.md`,
     },
     {
-      id: 'ff-naming-lint', label: 'Naming rules at error severity', when: { NAMING: ['linted'] }, category: 'structural', implements: FORMATTERS, checks: ['req-naming-linted'],
+      id: 'ff-naming-lint', label: 'Naming rules at error severity', when: { NAMING: ['linted'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-naming-linted'],
       threshold: '@typescript-eslint/naming-convention at severity 2 (error) in the configuration ESLint resolves for src; Ruff reports N802 on a probe with a wrongly named function; the step fails otherwise',
       description: 'The naming rules of the guide are added to the shared ESLint configuration at error severity; object and type properties are left free because they follow wire formats. A CI step asks ESLint for the configuration it resolves for a source file, so a rule turned off or down to a warning in some later block is noticed, and pipes a wrongly named Python function through Ruff with the project\'s configuration. For Kotlin, ktlint\'s standard:class-naming, function-naming and property-naming run unless disabled in .editorconfig; for C#, dotnet_diagnostic.IDE1006.severity = error; for Go, staticcheck\'s ST1003, which is off by default and has to be listed.',
       tool: 'ESLint with typescript-eslint (naming-convention); Ruff (pep8-naming, N); ktlint, IDE1006 and staticcheck ST1003 for Kotlin, C# and Go',
@@ -417,7 +417,7 @@ export default defineConfig({
 //   printf 'def GetOrder():\\n    pass\\n' | ruff check --stdin-filename src/naming_probe.py - | grep -q N802   # pyproject.toml: [tool.ruff.lint] extend-select = ["N"]`,
     },
     {
-      id: 'ff-editor-settings', label: 'Editor settings format on save', when: { EDITOR: ['shared'] }, category: 'structural', implements: FORMATTERS, checks: ['req-editor-shared'],
+      id: 'ff-editor-settings', label: 'Editor settings format on save', when: { EDITOR: ['shared'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-editor-shared'],
       threshold: '.vscode/settings.json has editor.formatOnSave true and a default formatter for every language with tracked files; .vscode/extensions.json recommends each of those formatters',
       description: 'A CI step reads the committed editor settings, kept as plain JSON without comments so jq can read them, and fails when format on save is off, a language in the repository has no default formatter, or that formatter\'s extension is not recommended. The Prettier extension (esbenp.prettier-vscode), Biome\'s (biomejs.biome) and Ruff\'s (charliermarsh.ruff) use the project\'s installed formatter before their bundled one. JetBrains IDEs read .editorconfig and need their Prettier or Ruff on-save setting turned on once per developer.',
       tool: 'jq in a CI step',
@@ -441,7 +441,7 @@ LANGUAGES
 echo "editors format on save with the project's formatters"`,
     },
     {
-      id: 'ff-no-editor-files', label: 'Only .editorconfig is shared', when: { EDITOR: ['editorconfig'] }, category: 'structural', implements: FORMATTERS, checks: ['req-editor-own'],
+      id: 'ff-no-editor-files', label: 'Only .editorconfig is shared', when: { EDITOR: ['editorconfig'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATTERS, checks: ['req-editor-own'],
       threshold: '0 tracked editor-specific settings files (.vscode/settings.json, .idea/, *.code-workspace, .zed/, .fleet/); .editorconfig present',
       description: 'A CI step lists the tracked editor-specific settings files and fails on any, so a personal setting committed by mistake is caught in the pull request; .editorconfig must exist, being the one configuration every editor shares. Recommending extensions in .vscode/extensions.json is not a setting and stays allowed.',
       tool: 'git ls-files in a CI step',

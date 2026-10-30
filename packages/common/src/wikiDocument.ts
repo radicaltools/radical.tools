@@ -4,6 +4,7 @@ import { TYPE_LABELS, viewShowsEveryNode, type C4Node, type C4Relation, type Dia
 import { isMarkdownField } from './markdown'
 import { composeEarsSentence, isPropertyVisible, propertyText, refIds, relationDetails, relationSentences, relationTypeForProse, requirementStatePhrase, resolveEarsSubject, typeNoun, type Metamodel, type PropertyDef, type RelationSentence } from './metamodel'
 import { pipelineOf, runPipeline, type ChainRow } from './viewPipeline'
+import { fitnessResult } from './check/metrics'
 
 export const WIKI_ROOT = '__root__'
 const NO_METAMODEL: Metamodel = { id: '', name: '', nodeTypes: {}, relationTypes: {} }
@@ -49,6 +50,22 @@ export type WikiBlock =
   | { kind: 'section'; field: WikiField }
   | { kind: 'children'; nodes: C4Node[] }
 
+/** A fact read from the element's data rather than stated in a property:
+ *  shown with the facts, never edited (a fitness function's result). */
+export interface WikiDerivedFact {
+  key: string
+  title: string
+  text: string
+}
+
+/** The facts an element's data says without a property of their own: a
+ *  fitness function's result, static or dynamic, as its metrics make it. */
+export function wikiDerivedFacts(node: C4Node): WikiDerivedFact[] {
+  if (node.type !== 'fitness-fn') return []
+  const result = fitnessResult((node as unknown as Record<string, unknown>).metrics)
+  return result ? [{ key: 'result', title: 'Result', text: result }] : []
+}
+
 export interface WikiPage {
   node: C4Node
   typeLabel: string
@@ -56,6 +73,8 @@ export interface WikiPage {
   breadcrumb: C4Node[]
   lead?: WikiField
   facts: WikiField[]
+  /** Facts read from the data, after `facts`; read-only. */
+  derivedFacts: WikiDerivedFact[]
   bylineFacts: { key: string; label: string; text: string }[]
   sections: WikiField[]
   requirement?: WikiRequirement
@@ -129,6 +148,8 @@ function pageOf(node: C4Node, context: WikiContext, children: C4Node[], touching
   const bylineFacts = facts
     .filter((f) => !(node.type === 'requirement' && f.definition.key === 'ears_type' && !requirement?.started) && !!f.text)
     .map((f) => ({ key: f.definition.key, label: f.definition.type === 'boolean' || f.definition.key === 'technology' ? '' : typeNoun(f.definition.label), text: f.text }))
+  const derivedFacts = wikiDerivedFacts(node)
+  for (const f of derivedFacts) bylineFacts.push({ key: f.key, label: typeNoun(f.title), text: f.text })
   const blocks: WikiBlock[] = []
   if (lead) blocks.push({ kind: 'lead', field: lead })
   if (requirement) blocks.push({ kind: 'requirement', requirement })
@@ -137,7 +158,7 @@ function pageOf(node: C4Node, context: WikiContext, children: C4Node[], touching
   if (node.type === 'mockup') blocks.push({ kind: 'wireframe', nodeId: node.id })
   for (const field of sections) blocks.push({ kind: 'section', field })
   blocks.push({ kind: 'children', nodes: children })
-  return { node, typeLabel: def?.label ?? TYPE_LABELS[node.type] ?? node.type, parent: node.parentId ? nodes[node.parentId] : undefined, breadcrumb, lead, facts, bylineFacts, sections, requirement, ownRelations, relationGroups, children, blocks }
+  return { node, typeLabel: def?.label ?? TYPE_LABELS[node.type] ?? node.type, parent: node.parentId ? nodes[node.parentId] : undefined, breadcrumb, lead, facts, derivedFacts, bylineFacts, sections, requirement, ownRelations, relationGroups, children, blocks }
 }
 
 /** A snapshot of a wiki's scope and content. No DOM, Node APIs or rendering libraries. */

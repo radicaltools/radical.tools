@@ -161,7 +161,7 @@
             <tbody>
               <tr><td><strong>Mockup</strong></td><td>One screen of the product, with an optional low-fi wireframe (sanitised SVG).</td><td>Screen / route, Design link, Wireframe</td></tr>
               <tr><td><strong>ADR</strong></td><td>An architecture decision record in the Nygard / MADR shape. A new one starts <em>proposed</em> with today's date.</td><td>Status (proposed, accepted, deprecated, superseded), Date, Context, Decision, Consequences, Alternatives considered, Concern</td></tr>
-              <tr><td><strong>Fitness Function</strong></td><td>An automated check that the architecture keeps a property it was designed for.</td><td>Category (structural, operational, process, holistic), Metrics, Combine, Max age (see <a href="#metrics">Metrics</a>)</td></tr>
+              <tr><td><strong>Fitness Function</strong></td><td>An automated check that the architecture keeps a property it was designed for.</td><td>Characteristic (ISO/IEC 25010), Scope, Cadence with Runs on or Every, Invocation, Measure, Metrics, Combine, Max age (see <a href="#metrics">Metrics</a>)</td></tr>
               <tr><td><strong>Blueprint</strong></td><td>A curated reference architecture as the Hub once shipped them. Not in the palette; models that hold one keep it.</td><td>Status, Domain / context, Rationale</td></tr>
             </tbody>
           </table>
@@ -257,7 +257,7 @@
               <tr><td>Specification</td><td>Wiki</td><td>Needs, their requirements and the scenarios and screens for each</td></tr>
               <tr><td rowspan="3"><strong>Decisions</strong></td><td>Decisions</td><td>Table</td><td>ADRs, the fitness functions that check each and what it constrains</td></tr>
               <tr><td>Decision log</td><td>Wiki</td><td>ADRs, newest first, each with the ones it supersedes</td></tr>
-              <tr><td>Fitness functions</td><td>Table</td><td>By category, with what each checks and constrains</td></tr>
+              <tr><td>Fitness functions</td><td>Table</td><td>By characteristic, with what each checks and constrains</td></tr>
               <tr><td rowspan="2"><strong>UX</strong></td><td>Screen flow</td><td>Structure</td><td>The screens and how users move between them</td></tr>
               <tr><td>Screens</td><td>Table</td><td>The screens with what they illustrate and what presents them</td></tr>
               <tr><td rowspan="3"><strong>States</strong></td><td>Entity lifecycles</td><td>Table</td><td>Entities with a state machine, what implements and verifies it</td></tr>
@@ -323,8 +323,8 @@
             <tbody>
               <tr><td><strong>Requirements</strong></td><td>A requirement without the clauses its EARS type needs; one no scenario verifies; one nothing satisfies; one that derives from nothing; a need no requirement derives from; a scenario that verifies nothing.</td></tr>
               <tr><td><strong>Concerns</strong></td><td><code>concern-unaddressed</code>: a concern a pack finds in the model that no accepted ADR marked with it covers. <code>concern-unbound</code>: an accepted ADR marked with a concern that constrains no element.</td></tr>
-              <tr><td><strong>Decisions</strong></td><td>An accepted ADR no fitness function implements; one without date, context, decision or consequences; a superseded status and Supersedes links that disagree; a fitness function that implements no ADR and constrains nothing.</td></tr>
-              <tr><td><strong>Checks</strong></td><td>A scenario or fitness function whose metrics name no check; a metrics line that is no condition, a unit that does not convert, a combine or max age that does not read (<code>metric-invalid</code>, an error). With measurements: a condition that does not hold (<code>metric-failed</code>, an error), one whose latest measurement is older than its max age (<code>metric-stale</code>), one nothing measured (<code>metric-not-measured</code>). With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
+              <tr><td><strong>Decisions</strong></td><td>An accepted ADR no fitness function implements; one without date, context, decision or consequences; a superseded status and Supersedes links that disagree; a fitness function that implements no ADR and constrains nothing; one without its characteristic, scope, cadence (with its event or time) or invocation (<code>fitness-fn-unclassified</code>).</td></tr>
+              <tr><td><strong>Checks</strong></td><td>A scenario or fitness function whose metrics name no check; a metrics line that is no condition, a unit that does not convert, a combine or max age that does not read (<code>metric-invalid</code>, an error); a measure line that names no sensor (<code>fitness-fn-measure-invalid</code>, an error). With measurements: a condition that does not hold (<code>metric-failed</code>, an error), one whose latest measurement is older than its max age (<code>metric-stale</code>), one nothing measured (<code>metric-not-measured</code>). With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
               <tr><td><strong>The folder</strong></td><td>A missing <code>radical.md</code>, a JSON file that does not parse, git conflict markers, a node file without id or type, two files with one id (errors); views, sequences or slides that point at something gone.</td></tr>
               <tr><td><strong>Goals</strong></td><td><code>goal-unmet</code>: a metric below the share <code>check.json</code> asks for (requirements with a scenario, accepted ADRs with a fitness function, requirements verified, scenarios passing, …).</td></tr>
             </tbody>
@@ -346,8 +346,9 @@
               <tr><td><code>--config &lt;file&gt;</code></td><td>Rule settings. Default: <code>check.json</code> in the model folder.</td></tr>
               <tr><td><code>--format text|json|github</code></td><td>Plain text (default), JSON, or GitHub Actions annotations.</td></tr>
               <tr><td><code>--report &lt;path&gt;</code></td><td>A test report (Vitest or Jest JSON, Playwright JSON, JUnit XML) or a directory of them; repeat for more. The test cases read are kept in <code>.radical/test-results.json</code> for the Inspector. A report with no test case stops the check with status 2.</td></tr>
-              <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.radical/measurements.json</code>, which the check reads without the option too.</td></tr>
+              <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.radical/measurements.json</code>, which the check reads without the option too. The reviews in the model folder's <code>reviews.json</code> are read as measurements as well.</td></tr>
               <tr><td><code>--baseline &lt;path&gt;</code></td><td>Earlier <code>radical-metrics/1</code> files, or a directory of them, that a condition against a baseline compares with (the median of the latest seven of its metric). Read only; never kept beside the model.</td></tr>
+              <tr><td><code>--trigger &lt;event&gt;</code></td><td>The event the check runs on (<code>pull-request</code> in the gate): a metric condition of a fitness function that runs on another event, or continually, is not reported when nothing measured it.</td></tr>
               <tr><td><code>--evidence &lt;file&gt;</code></td><td>With <code>--report</code> or measurements: writes what they say about each scenario, fitness function, requirement and ADR as JSON.</td></tr>
               <tr><td><code>--ratchet</code></td><td>Lowers each <code>max</code> in the config to the count found now and writes the config back. Never raises one.</td></tr>
               <tr><td><code>--verbose</code></td><td>Lists every warning, not the first five of each rule.</td></tr>
@@ -379,7 +380,7 @@
           <table class="doc-table">
             <thead><tr><th>Field</th><th>What it holds</th></tr></thead>
             <tbody>
-              <tr><td><strong>Metrics</strong></td><td><code>test(&lt;file&gt; › &lt;title&gt;) passed</code>: a test that has to pass, named as Vitest and Playwright print it (a file or directory alone names every test in it). <code>&lt;metric&gt;{&lt;label&gt;=&lt;value&gt;, …} &lt;op&gt; &lt;number&gt; [unit]</code>: a measured value, with <code>&lt; &lt;= &gt; &gt;= == !=</code>; it is judged by the latest measurement of the metric whose labels include the condition's. <code>&lt;metric&gt;{…} &lt;op&gt; baseline [+|- &lt;number&gt; %|unit]</code>: the same against earlier measurements given with <code>radical check --baseline</code>, the median of the latest seven of the metric and labels, with the margin (<code>&lt;= baseline + 20%</code>, <code>&lt;= baseline + 500 ms</code>); not evaluated, a warning, while there are none.</td></tr>
+              <tr><td><strong>Metrics</strong></td><td><code>test(&lt;file&gt; › &lt;title&gt;) passed</code>: a test that has to pass, named as Vitest and Playwright print it (a file or directory alone names every test in it). <code>&lt;metric&gt;{&lt;label&gt;=&lt;value&gt;, …} &lt;op&gt; &lt;number&gt; [unit]</code>: a measured value, with <code>&lt; &lt;= &gt; &gt;= == !=</code>; it is judged by the latest measurement of the metric whose labels include the condition's. <code>&lt;metric&gt;{…} &lt;op&gt; baseline [+|- &lt;number&gt; %|unit]</code>: the same against earlier measurements given with <code>radical check --baseline</code>, the median of the latest seven of the metric and labels, with the margin (<code>&lt;= baseline + 20%</code>, <code>&lt;= baseline + 500 ms</code>); not evaluated, a warning, while there are none. <code>review(&lt;name&gt;) passed</code>: the latest review of that name <code>radical sense review</code> recorded passed.</td></tr>
               <tr><td><strong>Combine</strong></td><td><code>all</code> (default): every condition passes. <code>any</code>: one does. <code>at least N</code>.</td></tr>
               <tr><td><strong>Max age</strong></td><td>How old a measurement may be (<code>7d</code>, <code>12h</code>, <code>30min</code>, <code>2w</code>). An older one makes the condition <em>stale</em>, which never passes.</td></tr>
             </tbody>
@@ -387,13 +388,32 @@
         </div>
         <p>Units of one kind convert: <code>ns us ms s min h d</code>, and <code>B KB MB GB TB KiB MiB GiB TiB</code>; other units must match. A condition or a measurement without a unit compares the numbers as they are.</p>
         <h3>radical sense</h3>
-<pre class="code"><code>radical sense &lt;adapter&gt; [input] [options]</code></pre>
+<p>A fitness function is classified as <em>Building Evolutionary Architectures</em> classifies it. Its result is read from its metrics: <em>static</em> for fixed limits, <em>dynamic</em> for one against a baseline.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Property</th><th>Values</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Characteristic</strong></td><td>What it protects, a quality of ISO/IEC 25010:2023: <code>functional-suitability performance-efficiency compatibility interaction-capability reliability security maintainability flexibility safety other</code>.</td></tr>
+              <tr><td><strong>Scope</strong></td><td><code>atomic</code>: one part in one context (a unit test, a linter rule). <code>holistic</code>: several parts together (latency under load, an end-to-end run).</td></tr>
+              <tr><td><strong>Cadence</strong></td><td><code>triggered</code>: on an event, set in <strong>Runs on</strong>: <code>pull-request nightly weekly release deploy</code>. <code>continual</code>: measured all the time (monitoring in production). <code>temporal</code>: falls due after a time, set in <strong>Every</strong> (<code>90d</code>).</td></tr>
+              <tr><td><strong>Invocation</strong></td><td><code>automated</code>: a sensor measures it. <code>manual</code>: a person reviews it and records the result with <code>radical sense review</code>.</td></tr>
+              <tr><td><strong>Measure</strong></td><td>Automated only: what to run, one measurement a line, a sensor and its arguments as on the command line (<code>playwright tests/load.spec.ts --cwd apps/e2e --label env=staging</code>). Empty for tests the gate already runs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Models saved with a <em>category</em> are read classified: <code>holistic</code> gives scope holistic, <code>structural</code> the characteristic maintainability, and one checked by tests alone is triggered on <code>pull-request</code> and automated. The rest stays empty for <code>fitness-fn-unclassified</code> to ask for.</p>
+<pre class="code"><code>radical sense &lt;adapter&gt; [input] [options]
+radical sense run --trigger &lt;event&gt; --out &lt;dir&gt; [--folder &lt;dir&gt;] [--context k=v]
+radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt;text&gt;] [--folder &lt;dir&gt;]</code></pre>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Adapter or option</th><th>What it does</th></tr></thead>
             <tbody>
               <tr><td><code>command [--name m] -- &lt;cmd&gt;</code></td><td>Runs the command; measures <code>m.exit_code</code> and <code>m.duration</code> (s). Its output goes to stderr.</td></tr>
               <tr><td><code>json &lt;file&gt; --metric m=&lt;path&gt;[@unit]</code></td><td>Reads a number from a JSON file by dotted keys with <code>[index]</code>, or a JSON pointer starting with <code>/</code>; repeat for more.</td></tr>
+              <tr><td><code>playwright &lt;spec&gt; [--cwd d] [--project p] [--env K=V] [--runner cmd]</code></td><td>Runs Playwright on the spec (default runner <code>npx playwright test</code>) with <code>RADICAL_METRICS_DIR</code> set, and measures what the <code>radical-metrics/1</code> files the spec writes there hold.</td></tr>
+              <tr><td><code>run --trigger &lt;event&gt; --out &lt;dir&gt;</code></td><td>Runs every line of the measure of each automated fitness function triggered on the event, each with its adapter, into one file a line in the directory. Names each line it could not measure, and exits 2 then.</td></tr>
+              <tr><td><code>review &lt;name&gt; --passed|--failed --by &lt;who&gt;</code></td><td>Adds a person's review, with <code>--note</code>, to the model folder's <code>reviews.json</code>, kept in git; <code>review(&lt;name&gt;) passed</code> reads the latest.</td></tr>
               <tr><td><code>--folder &lt;dir&gt;</code></td><td>The model folder. Default: the working directory. What is measured goes into its <code>.radical/measurements.json</code>, the latest of each metric and labels.</td></tr>
               <tr><td><code>--out &lt;file&gt;</code></td><td>Writes a <code>radical-metrics/1</code> file instead, for <code>radical check --metrics</code> in another job.</td></tr>
               <tr><td><code>--label k=v</code> · <code>--context k=v</code></td><td>A label conditions match (<code>env=staging</code>), or where it was measured (a commit), shown only. Repeat for more.</td></tr>
@@ -565,6 +585,7 @@ radical-mcp --version</code></pre>
 ├─ metamodel.json · hubTemplates.json
 ├─ _layout.json               <span class="cm"># positions, camera, line style — the only noisy file</span>
 ├─ check.json                 <span class="cm"># optional: rule settings for radical check and the Inspector</span>
+├─ reviews.json               <span class="cm"># optional: reviews of manual fitness functions, from radical sense review</span>
 └─ .radical/                  <span class="cm"># editor state, kept out of git by its own .gitignore</span>
    ├─ selection.json          <span class="cm"># what is selected in Studio, for the MCP server</span>
    ├─ base.json               <span class="cm"># the model where the branch left main</span>

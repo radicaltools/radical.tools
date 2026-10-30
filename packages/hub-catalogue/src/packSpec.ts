@@ -12,6 +12,7 @@
 
 import type { HubRadicalDoc, HubSource, TemplateParam } from '@radical/common/hubFormat'
 import type { ConcernGroupId } from '@radical/common/concerns'
+import { FITNESS_CHARACTERISTICS, FITNESS_TRIGGERS } from '@radical/common/metamodel'
 
 /** Answers an element is imported for: every key listed must hold one of its values. */
 export type When = Record<string, string[]>
@@ -72,11 +73,33 @@ export interface AdrSpec {
   alternatives: string
 }
 
+export type FitnessCharacteristic = typeof FITNESS_CHARACTERISTICS[number]
+export type FitnessTrigger = typeof FITNESS_TRIGGERS[number]
+export const FITNESS_SCOPES = ['atomic', 'holistic'] as const
+export type FitnessScope = typeof FITNESS_SCOPES[number]
+export const FITNESS_CADENCES = ['triggered', 'continual', 'temporal'] as const
+export type FitnessCadence = typeof FITNESS_CADENCES[number]
+export const FITNESS_INVOCATIONS = ['automated', 'manual'] as const
+export type FitnessInvocation = typeof FITNESS_INVOCATIONS[number]
+
 export interface FitnessSpec {
   id: string
   label: string
   when?: When
-  category: 'structural' | 'operational' | 'process' | 'holistic'
+  /** What it protects: an ISO/IEC 25010:2023 characteristic. */
+  characteristic: FitnessCharacteristic
+  /** One part in one context (a linter rule, a unit test), or several parts
+   *  together at run time (a load test, DAST, chaos, end to end). */
+  scope: FitnessScope
+  /** On an event, all the time (monitoring), or after a time (a review). */
+  cadence: FitnessCadence
+  /** The event a triggered one runs on: only when triggered. */
+  trigger?: FitnessTrigger
+  /** How often a temporal one falls due, as in "90d": only when temporal. */
+  every?: string
+  /** Run by a sensor, or by a person. A pack states no `measure`: it cannot
+   *  know the project's sensors. */
+  invocation: FitnessInvocation
   threshold: string
   /** How it is checked, in prose. */
   description: string
@@ -147,7 +170,12 @@ export function buildPackDoc(spec: PackSpec): HubRadicalDoc {
   }
   for (const f of spec.fitness) {
     node(f.id, 'fitness-fn', f.label, f.when, {
-      category: f.category,
+      characteristic: f.characteristic,
+      scope: f.scope,
+      cadence: f.cadence,
+      ...(f.cadence === 'triggered' ? { trigger: f.trigger } : {}),
+      ...(f.cadence === 'temporal' ? { every: f.every } : {}),
+      invocation: f.invocation,
       // The pack cannot know the project's tests or metric names: the
       // criterion goes into the text, for the team to turn into conditions
       // in `metrics` once they have the sensor or the test that checks it.
@@ -194,14 +222,46 @@ const combinationsOf = (spec: PackSpec): Array<Record<string, string>> =>
     [{}],
   )
 
+/** What a fitness function lacks of its classification: a characteristic,
+ *  scope, cadence and invocation from their lists, the trigger of a
+ *  triggered one and the period of a temporal one, and neither where it
+ *  does not belong. */
+function classificationProblems(f: FitnessSpec): string[] {
+  const errors: string[] = []
+  const at = `fitness function "${f.id}"`
+  const oneOf = (key: 'characteristic' | 'scope' | 'cadence' | 'invocation' | 'trigger', allowed: readonly string[]): void => {
+    const v = f[key] as unknown
+    if (v === undefined || v === '') errors.push(`${at} states no ${key} (one of ${allowed.join(', ')})`)
+    else if (!allowed.includes(String(v))) errors.push(`${at}: ${key} "${String(v)}" is not one of ${allowed.join(', ')}`)
+  }
+  oneOf('characteristic', FITNESS_CHARACTERISTICS)
+  oneOf('scope', FITNESS_SCOPES)
+  oneOf('cadence', FITNESS_CADENCES)
+  oneOf('invocation', FITNESS_INVOCATIONS)
+  // Where the cadence is missing or unknown, that is the one problem: what
+  // belongs with it cannot be told.
+  if (FITNESS_CADENCES.includes(f.cadence)) {
+    if (f.cadence === 'triggered') oneOf('trigger', FITNESS_TRIGGERS)
+    else if (f.trigger !== undefined) errors.push(`${at} has a trigger but is not triggered`)
+    if (f.cadence === 'temporal') {
+      if (!f.every?.trim()) errors.push(`${at} is temporal but states no every (as in "90d")`)
+      else if (!/^(\d+|\{\{[A-Z0-9_]+\}\})[dw]$/.test(f.every.trim())) errors.push(`${at}: every "${f.every}" is no period (as in "90d", or "{{DAYS}}d" filled by an answer)`)
+    } else if (f.every !== undefined) errors.push(`${at} has an every but is not temporal`)
+  }
+  if ('category' in f) errors.push(`${at} still has a category: state its characteristic, scope, cadence and invocation instead`)
+  if ('measure' in f) errors.push(`${at} states a measure: a pack cannot know the project's sensors`)
+  return errors
+}
+
 /** What a spec lacks of the standard beyond what its document shows: every
- *  requirement is checked by a fitness function imported whenever it is, or
- *  says why the team keeps it by hand; every `checks` and `unchecked` is
- *  well-formed. */
+ *  fitness function is classified; every requirement is checked by a
+ *  fitness function imported whenever it is, or says why the team keeps it
+ *  by hand; every `checks` and `unchecked` is well-formed. */
 export function specProblems(spec: PackSpec): string[] {
   const errors: string[] = []
   const reqIds = new Set(spec.requirements.map((r) => r.id))
   for (const f of spec.fitness) {
+    errors.push(...classificationProblems(f))
     for (const id of f.checks ?? []) if (!reqIds.has(id)) errors.push(`fitness function "${f.id}" checks "${id}", which is no requirement of the pack`)
   }
   const combinations = combinationsOf(spec)

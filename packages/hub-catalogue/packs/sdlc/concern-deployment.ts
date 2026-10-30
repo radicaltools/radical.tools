@@ -224,7 +224,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-rollback-drill', label: 'Rollback drilled', category: 'operational', implements: STRATEGY_ADRS,
+      id: 'ff-rollback-drill', label: 'Rollback drilled', characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: STRATEGY_ADRS,
       checks: ['req-rollback', 'req-continuous', 'req-train'],
       threshold: 'Rollback of the staging deployment to the previous version completes within {{ROLLBACK_MINUTES}} minutes, every week',
       description: 'A scheduled pipeline rolls the staging deployment back to the previous version and forward again, timing each, and fails past {{ROLLBACK_MINUTES}} minutes. With Argo Rollouts use kubectl argo rollouts undo and status instead; on a managed runtime, the platform\'s rollback command (az webapp deployment slot swap, gcloud run services update-traffic).',
@@ -251,7 +251,7 @@ jobs:
           kubectl -n shop-staging rollout status deployment/order-api --timeout={{ROLLBACK_MINUTES}}m`,
     },
     {
-      id: 'ff-graceful', label: 'Deploy under load drops nothing', category: 'operational', implements: STRATEGY_ADRS,
+      id: 'ff-graceful', label: 'Deploy under load drops nothing', characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: STRATEGY_ADRS,
       checks: ['req-graceful'],
       threshold: '0 failed requests (connection errors, 502, 503, 504) in a k6 run that spans a staging deployment at a steady rate',
       description: 'The staging pipeline starts a k6 run at a steady rate, deploys the new version while it runs, and lets the run end two minutes after the rollout finished; the threshold fails the run, and the pipeline, on any failed request. It catches instances stopped with requests in flight and traffic routed before readiness.',
@@ -276,7 +276,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-rolling', label: 'Rolling update keeps capacity', when: { STRATEGY: ['rolling'] }, category: 'structural', implements: ['adr-rolling'],
+      id: 'ff-rolling', label: 'Rolling update keeps capacity', when: { STRATEGY: ['rolling'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rolling'],
       checks: ['req-rolling'],
       threshold: '0 Deployments with a Recreate strategy, maxUnavailable above 0, maxSurge of 0, a progress deadline above 300 s, or a container without a preStop hook',
       description: 'A policy over the Kubernetes manifests fails the pipeline when a Deployment could remove capacity during a rollout, stop an instance without a preStop delay, or carry on forever past failing instances. Liveness and readiness probes are checked by the Observability pack\'s policy.',
@@ -320,7 +320,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-bluegreen', label: 'Switch gated by smoke tests', when: { STRATEGY: ['bluegreen'] }, category: 'operational', implements: ['adr-bluegreen'],
+      id: 'ff-bluegreen', label: 'Switch gated by smoke tests', when: { STRATEGY: ['bluegreen'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-bluegreen'],
       checks: ['req-bluegreen'],
       threshold: 'Traffic switches only after the smoke-test job passes against the preview service; the previous version is kept for 3600 s after the switch',
       description: 'The Rollout runs a k6 smoke-test job against the preview service before promotion; a failed job aborts the release with the live version untouched. The script comes from a ConfigMap mounted into the job. The previous version is scaled down only an hour after the switch.',
@@ -373,7 +373,7 @@ spec:
                     volumeMounts: [{ name: tests, mountPath: /tests }]`,
     },
     {
-      id: 'ff-canary', label: 'Canary analysis aborts bad versions', when: { STRATEGY: ['canary'] }, category: 'operational', implements: ['adr-canary'],
+      id: 'ff-canary', label: 'Canary analysis aborts bad versions', when: { STRATEGY: ['canary'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-canary'],
       checks: ['req-canary'],
       threshold: 'A canary step fails at a success rate below {{CANARY_SUCCESS_PERCENT}} % or a 95th percentile more than 20 % above the stable version\'s; a second failed measurement aborts the rollout',
       description: 'The Rollout shifts traffic in steps and runs an analysis from the first step on, measured every minute: the canary\'s success rate against {{CANARY_SUCCESS_PERCENT}} %, and the ratio of the canary\'s 95th percentile to the stable version\'s against 1.2. A second failed measurement of either aborts the rollout and returns all traffic to the stable version. Flagger\'s Canary resource with metric templates does the same.',
@@ -430,7 +430,7 @@ spec:
             / histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service="{{args.stable}}"}[2m])))`,
     },
     {
-      id: 'ff-migration-lint', label: 'Migrations stay compatible', when: { MIGRATIONS: ['expand'] }, category: 'structural', implements: ['adr-expand-contract'],
+      id: 'ff-migration-lint', label: 'Migrations stay compatible', when: { MIGRATIONS: ['expand'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-expand-contract'],
       checks: ['req-expand-contract'],
       threshold: '0 destructive or backward-incompatible statements (drop, rename, type change) in a migration that is not a marked contract step',
       description: 'Every pull request that adds a migration is linted against the main branch; dropping or renaming a column or table fails the build unless the migration is the contract step of an earlier expand, marked with a lint directive and reviewed.',
@@ -459,7 +459,7 @@ env "ci" {
 #   -- atlas:nolint destructive`,
     },
     {
-      id: 'ff-migration-rehearsal', label: 'Offline migration rehearsed', when: { MIGRATIONS: ['window'] }, category: 'process', implements: ['adr-migration-window'],
+      id: 'ff-migration-rehearsal', label: 'Offline migration rehearsed', when: { MIGRATIONS: ['window'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-migration-window'],
       checks: ['req-migration-window'],
       threshold: 'In the rehearsal on a restored copy of production, the migration and the restore each finish within half of {{WINDOW_MINUTES}} minutes; the production run needs an approved environment',
       description: 'A pipeline job restores the latest backup into a rehearsal database, runs the pending migrations against it and times them, then restores the backup again (the way back) and times that; it fails when either took longer than half the window. The production job runs only after an approval in a protected environment, takes a backup first, and only follows a passed rehearsal.',
@@ -492,7 +492,7 @@ env "ci" {
           flyway -url="$PROD_JDBC_URL" -locations=filesystem:migrations migrate`,
     },
     {
-      id: 'ff-no-schema', label: 'No database client arrives', when: { MIGRATIONS: ['none'] }, category: 'structural', implements: ['adr-no-schema'],
+      id: 'ff-no-schema', label: 'No database client arrives', when: { MIGRATIONS: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-no-schema'],
       checks: ['req-no-schema'],
       threshold: '0 dependencies on a database client or migration tool, and no migrations directory in the repository',
       description: 'A dependency rule fails the build when a database driver, ORM or migration tool is added, which would mean a schema arrived without its decision; a pipeline step fails on a migrations directory. For Python, Go or the JVM, the same rule goes in the dependency allow-list of the build (pip-audit --require-hashes with a constraints file, go.mod review, a Gradle dependency verification).',
@@ -511,7 +511,7 @@ module.exports = {
 // CI, after depcruise:  test ! -e migrations -a ! -e prisma/migrations -a ! -e db/migrate`,
     },
     {
-      id: 'ff-flag-age', label: 'Stale flags removed', when: { FLAGS: ['yes'] }, category: 'structural', implements: ['adr-flags'],
+      id: 'ff-flag-age', label: 'Stale flags removed', when: { FLAGS: ['yes'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-flags'],
       checks: ['req-flags'],
       threshold: '0 flags on for everyone for more than {{FLAG_AGE_DAYS}} days',
       description: 'A test reads the flagd flag definitions kept in the repository, treats a flag as fully released when it is enabled with defaultVariant on and no targeting, takes the date its defaultVariant line last changed from git blame, and fails for every flag released longer than {{FLAG_AGE_DAYS}} days ago, so that it is removed with the code path behind it. The checkout needs the history (fetch-depth: 0). With a hosted provider, read the flags and their last change from its API instead.',
@@ -544,7 +544,7 @@ it.each(Object.entries(flags))('flag %s is removed in time after its full releas
 })`,
     },
     {
-      id: 'ff-flag-propagation', label: 'Flag changes take effect in time', when: { FLAGS: ['yes'] }, category: 'operational', implements: ['adr-flags'],
+      id: 'ff-flag-propagation', label: 'Flag changes take effect in time', when: { FLAGS: ['yes'] }, characteristic: 'flexibility', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-flags'],
       checks: ['req-flags'],
       threshold: 'A flag turned off reaches the element within 60 seconds, with no deployment',
       description: 'An integration test against the staging element turns a flag on and then off at its source (the flag definitions file flagd watches, or the provider\'s API with a hosted provider) and polls the element until its answer changes, failing past 60 seconds.',
@@ -580,7 +580,7 @@ it('a flag turned off reaches the element within 60 seconds', async () => {
 })`,
     },
     {
-      id: 'ff-no-flags', label: 'No flag SDK arrives', when: { FLAGS: ['no'] }, category: 'structural', implements: ['adr-no-flags'],
+      id: 'ff-no-flags', label: 'No flag SDK arrives', when: { FLAGS: ['no'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-no-flags'],
       checks: ['req-no-flags'],
       threshold: '0 dependencies on a feature flag SDK or provider client',
       description: 'A dependency rule fails the build when a feature flag SDK or a provider\'s client is added, which would mean releases became separate from deploys without the decision being superseded. For Python, Go or the JVM, the same rule goes in the dependency review of the build.',
@@ -598,7 +598,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-dora-continuous', label: 'Deploys daily, merges live within a day', when: { CADENCE: ['continuous'] }, category: 'process', implements: ['adr-continuous'],
+      id: 'ff-dora-continuous', label: 'Deploys daily, merges live within a day', when: { CADENCE: ['continuous'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-continuous'],
       checks: ['req-continuous'],
       threshold: 'Production deployments on at least 5 days of every week; the longest lead time from merge to production in the last 7 days at most 24 hours',
       description: 'A weekly job reads the repository\'s production deployments and merged pull requests of the last 7 days: it fails below 5 deployment days, and when any merge waited more than 24 hours for the first production deployment after it. Change failure rate and recovery come from the incident tracker and the rollback drill, reviewed monthly.',
@@ -628,7 +628,7 @@ jobs:
                 | (max // 0) as $worst | "Longest lead time: \\($worst | floor) h" | stderr | $worst <= 24'`,
     },
     {
-      id: 'ff-dora-train', label: 'Train leaves weekly, merges live within a week', when: { CADENCE: ['train'] }, category: 'process', implements: ['adr-release-train'],
+      id: 'ff-dora-train', label: 'Train leaves weekly, merges live within a week', when: { CADENCE: ['train'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-release-train'],
       checks: ['req-train'],
       threshold: 'At least 1 production deployment in every 7 days; the longest lead time from merge to production in the last 14 days at most 7 days',
       description: 'A weekly job reads the repository\'s production deployments and merged pull requests: it fails when no production deployment happened in the last 7 days, and when any merge of the last 14 days waited more than 7 days for the first production deployment after it. Change failure rate and recovery come from the incident tracker and the rollback drill, reviewed monthly.',

@@ -230,7 +230,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-todo-key', label: 'Every TODO names a key', when: KEYED, category: 'structural', implements: ['adr-issues', 'adr-adrs'],
+      id: 'ff-todo-key', label: 'Every TODO names a key', when: KEYED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-issues', 'adr-adrs'],
       checks: ['req-todo-key'],
       threshold: '0 TODO, FIXME, HACK or XXX comments without a register key of the form KEY-123',
       description: 'A script run in lint greps the tracked source files for TODO-like comments and fails on any that does not carry a key in the agreed form, with or without a sunset in brackets before it: TODO (KEY-123): text, or TODO [2027-01-31] (KEY-123): text. A semgrep pattern-regex rule does the same inside semgrep ci.',
@@ -247,7 +247,7 @@ if [ -n "$bad" ]; then
 fi`,
     },
     {
-      id: 'ff-todo-closed', label: 'No TODO points at a closed item', when: KEYED, category: 'structural', implements: ['adr-issues', 'adr-adrs'],
+      id: 'ff-todo-closed', label: 'No TODO points at a closed item', when: KEYED, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-issues', 'adr-adrs'],
       checks: ['req-todo-key'],
       threshold: '0 TODO comments whose issue is closed or whose debt record is marked repaid; the build fails on the first',
       description: 'A CI step collects every key from TODO comments and asks the register for the item\'s state: a DEBT-NNNN key is looked up as docs/debt/NNNN-*.md and its front-matter status must not be repaid; any other key is an issue of the repository (SHOP-123 is issue 123) read with gh and must be open. For Jira, the issue lookup is GET /rest/api/3/issue/KEY?fields=status with curl, as the commented line shows.',
@@ -273,7 +273,7 @@ done
 exit $stale`,
     },
     {
-      id: 'ff-debt-issues', label: 'Debt issues are complete', when: { REGISTRY: ['issues'] }, category: 'process', implements: ['adr-issues'],
+      id: 'ff-debt-issues', label: 'Debt issues are complete', when: { REGISTRY: ['issues'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-issues'],
       checks: ['req-debt-record'],
       threshold: '0 open issues labelled tech-debt without an assignee, a Cost section or a Consequence section',
       description: 'A weekly job lists the open issues labelled tech-debt and fails on one without an assignee or whose body lacks the Cost or Consequence heading that the issue form writes; the form itself (.github/ISSUE_TEMPLATE/tech-debt.yml with required fields) keeps a new item from being opened without them. With Jira the same is a JQL filter on labels = tech-debt AND assignee is EMPTY, plus the required custom fields.',
@@ -289,7 +289,7 @@ bad=$(gh issue list --label tech-debt --state open --limit 500 --json number,ass
 # .github/ISSUE_TEMPLATE/tech-debt.yml: labels: [tech-debt]; body: textarea "Cost" (required), textarea "Consequence" (required)`,
     },
     {
-      id: 'ff-debt-register', label: 'Debt records are complete and not past sunset', when: { REGISTRY: ['adrs'] }, category: 'structural', implements: ['adr-adrs'],
+      id: 'ff-debt-register', label: 'Debt records are complete and not past sunset', when: { REGISTRY: ['adrs'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-adrs'],
       checks: ['req-debt-record'],
       threshold: '0 records in docs/debt without owner, cost_days, date, status and a Consequences section; 0 records not marked repaid with a sunset in the past',
       description: 'A test in the unit suite parses the front matter of every record in docs/debt (copied from the template there) and fails on a missing owner, date or status, a cost of 0 or none, a missing Consequences heading, or a record not marked repaid whose sunset date has passed. An unquoted date is parsed by gray-matter as a Date object, so the test normalises it.',
@@ -313,7 +313,7 @@ it.each(files)('%s has an owner, a cost, a date, a status, consequences and a li
 })`,
     },
     {
-      id: 'ff-debt-ratio', label: 'Debt ratio in the quality gate, every issue owned', when: { REGISTRY: ['tool'] }, category: 'process', implements: ['adr-tool'],
+      id: 'ff-debt-ratio', label: 'Debt ratio in the quality gate, every issue owned', when: { REGISTRY: ['tool'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-tool'],
       checks: ['req-tool-ratio', 'req-debt-record'],
       threshold: 'Technical debt ratio on new code at most {{MAX_DEBT_RATIO_PCT}}% and maintainability rating A on new code as quality-gate conditions; 0 open issues without an assignee in the weekly check',
       description: 'The project\'s quality gate carries the conditions new_sqale_debt_ratio > {{MAX_DEBT_RATIO_PCT}} and new_maintainability_rating > 1 (worse than A) as errors, added once through the API (or in the gate\'s settings page), and the pipeline waits for the gate with sonar.qualitygate.wait=true so that a failed gate fails the build. A weekly job asks the issues API for open, unresolved issues without an assignee and fails when there are any.',
@@ -334,7 +334,7 @@ unassigned=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/issues/search?component
 [ "$unassigned" -eq 0 ] || { echo "$unassigned open issues without an owner"; exit 1; }`,
     },
     {
-      id: 'ff-debt-share', label: 'Repayment share reported', category: 'process', implements: REGISTRIES,
+      id: 'ff-debt-share', label: 'Repayment share reported', characteristic: 'maintainability', scope: 'atomic', cadence: 'temporal', every: '14d', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-share-reported', 'req-fixed-share'],
       threshold: 'The share of pull requests merged in the iteration that carry the label tech-debt is reported with the register\'s size; with a fixed share, it is at least {{DEBT_SHARE_PCT}}%',
       description: 'A scheduled job at the end of each iteration counts the pull requests merged since the iteration started and those among them labelled tech-debt (the label every register variant puts on a repayment), prints the share with the number of open items (issues labelled tech-debt, open records in docs/debt, or unresolved Sonar issues, one line each), and, where a fixed share is agreed, fails below it so that the retrospective sees it. With Jira as the tracker the open count comes from JQL: labels = tech-debt AND resolution = Unresolved.',
@@ -355,7 +355,7 @@ echo "since $SINCE: $debt of $all merged pull requests repaid debt ($share%), $o
 [ "$share" -ge "$MIN" ] || { echo "below the agreed $MIN%"; exit 1; }`,
     },
     {
-      id: 'ff-debt-windows', label: 'Repayment windows scheduled and kept', when: { BUDGET: ['windows'] }, category: 'process', implements: REGISTRIES,
+      id: 'ff-debt-windows', label: 'Repayment windows scheduled and kept', when: { BUDGET: ['windows'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-windows'],
       threshold: 'debt-windows.json holds for the current quarter a window of at least {{WINDOW_DAYS_PER_QUARTER}} working days with its items picked at least 14 days before it starts; 0 pull requests merged during a window without the tech-debt label',
       description: 'A test in the unit suite reads debt-windows.json ([{ "quarter": "2026-Q4", "start": "2026-11-16", "end": "2026-11-20", "pickedOn": "2026-10-30", "items": ["SHOP-123", "DEBT-0042"] }]) and fails when the current quarter has no window, the window is shorter than {{WINDOW_DAYS_PER_QUARTER}} working days, or its items were picked fewer than 14 days before it; a scheduled job on the day after each window lists the pull requests merged during it and fails on one without the tech-debt label.',
@@ -384,7 +384,7 @@ it(\`\${quarter} has a repayment window of at least \${MIN_DAYS} working days, p
 // the day after a window: gh pr list --state merged --search "merged:$START..$END -label:tech-debt" --json number --jq 'length == 0' || exit 1`,
     },
     {
-      id: 'ff-boy-scout', label: 'Touched files do not get worse', when: { BUDGET: ['boy-scout'] }, category: 'process', implements: REGISTRIES,
+      id: 'ff-boy-scout', label: 'Touched files do not get worse', when: { BUDGET: ['boy-scout'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-boy-scout'],
       threshold: 'In every pull request the lint findings (errors and warnings) of the files it modifies are at most what they were on the base branch',
       description: 'A pull-request step lints the modified files on the head and, in a temporary worktree, on the base branch, and fails when the count of findings grew; new files are covered by the quality gate\'s own conditions. ESLint exits 1 whenever a file has an error-level finding, so each run ends in || true and the JSON (complete on exit 1) is counted. With SonarQube the same is a gate condition on new code; this script needs no platform.',
@@ -405,7 +405,7 @@ echo "findings in touched files: $before -> $after"
 [ "$after" -le "$before" ] || { echo 'touched files got worse; leave them at least as clean'; exit 1; }`,
     },
     {
-      id: 'ff-deprecated-marker', label: 'Every deprecation names a replacement and a key', category: 'structural', implements: REGISTRIES,
+      id: 'ff-deprecated-marker', label: 'Every deprecation names a replacement and a key', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-deprecated-marked', 'req-tolerated'],
       threshold: '0 @deprecated, [Obsolete( or warnings.deprecated( markers whose text lacks a register key (KEY-123) or the word "use" naming the replacement',
       description: 'A script run in lint greps the tracked source files for deprecation markers and fails on one whose text (the rest of the line) does not name a register key and a replacement ("use OrdersV2Client"); endpoints are covered by the Deprecation header test of the sunset variant and by the handler that writes it.',
@@ -423,7 +423,7 @@ if [ -n "$bad" ]; then
 fi`,
     },
     {
-      id: 'ff-expiring-todo', label: 'Dated TODOs expire in the lint', when: SUNSET, category: 'structural', implements: REGISTRIES,
+      id: 'ff-expiring-todo', label: 'Dated TODOs expire in the lint', when: SUNSET, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-sunset'],
       threshold: '0 TODO comments with a date in brackets whose date has passed; a TODO without a date is left to the key rule',
       description: 'Deprecated code carries its sunset as a dated TODO beside the @deprecated marker, TODO [2027-01-31] (KEY-123): remove, and unicorn/expiring-todo-comments turns the comment into a lint error the day after the date; allowWarningComments stays true so that an undated, keyed TODO is not an error here (the key rule governs it). For other languages the sunset script of this pack catches the same expired dates by grep.',
@@ -446,7 +446,7 @@ export default [{
 // /** @deprecated use OrdersV2Client: v1 has no idempotency keys (SHOP-123). TODO [2027-01-31] (SHOP-123): remove v1 */`,
     },
     {
-      id: 'ff-sunset-grace', label: 'Sunsets give notice and are kept', when: SUNSET, category: 'structural', implements: REGISTRIES,
+      id: 'ff-sunset-grace', label: 'Sunsets give notice and are kept', when: SUNSET, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-sunset'],
       threshold: '0 dated TODOs in the tree whose date has passed; 0 dated TODOs added by the pull request with a date fewer than {{SUNSET_GRACE_DAYS}} days ahead',
       description: 'A pull-request script greps every TODO [YYYY-MM-DD] in the tracked files (any language) and fails on one whose date has passed, then reads the lines the pull request added and fails on a new dated TODO whose date is inside the grace period, so a sunset cannot be set too close to be noticed.',
@@ -468,7 +468,7 @@ done < <(git diff "origin/\${GITHUB_BASE_REF:-main}...HEAD" -- . ':!*.md' | grep
 exit $bad`,
     },
     {
-      id: 'ff-sunset-header', label: 'Deprecated endpoints announce their sunset', when: SUNSET, category: 'process', implements: REGISTRIES,
+      id: 'ff-sunset-header', label: 'Deprecated endpoints announce their sunset', when: SUNSET, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-sunset', 'req-deprecated-marked'],
       threshold: 'Every route in the deprecated-routes list answers with a Deprecation header and a Sunset header whose date is in the future and at least {{SUNSET_GRACE_DAYS}} days after the deprecation date',
       description: 'The edge keeps the deprecated routes in one list (path, deprecated-since, sunset) from which the handler writes the Deprecation (RFC 9745) and Sunset (RFC 8594) headers; an integration test calls each listed route and asserts both headers, that the sunset has not passed, and that it gives at least {{SUNSET_GRACE_DAYS}} days from the deprecation date.',
@@ -492,7 +492,7 @@ it.each(DEPRECATED_ROUTES)('$path announces its deprecation and sunset', async (
 })`,
     },
     {
-      id: 'ff-no-deprecated', label: 'No new calls to deprecated code', category: 'structural', implements: REGISTRIES,
+      id: 'ff-no-deprecated', label: 'No new calls to deprecated code', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REGISTRIES,
       checks: ['req-no-new-callers', 'req-tolerated'],
       threshold: '0 calls to code marked @deprecated without a line-level disable naming a register key',
       description: 'Lint fails on a call to or import of anything marked @deprecated, using type information so that re-exports and overloads count too; an existing call is tolerated only with a line disable whose description names the register key (the Code quality gate\'s require-description rule makes the description mandatory). On the JVM the same is javac -Xlint:deprecation -Werror; in .NET, CS0618 as an error in the project file.',
@@ -510,7 +510,7 @@ export default tseslint.config({
 // // eslint-disable-next-line @typescript-eslint/no-deprecated -- SHOP-123, goes with the v1 sunset`,
     },
     {
-      id: 'ff-strangler-boundary', label: 'Legacy reached only through the facade', when: { REWRITE: ['strangler'] }, category: 'structural', implements: ['adr-strangler'],
+      id: 'ff-strangler-boundary', label: 'Legacy reached only through the facade', when: { REWRITE: ['strangler'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-strangler'],
       checks: ['req-strangler'],
       threshold: '0 imports of src/legacy from outside src/legacy and src/facade',
       description: 'A dependency rule fails the build when any module outside the legacy code and the facade imports the legacy code directly, so that new code grows only on the new side and the old module can be deleted piece by piece. On the JVM an ArchUnit rule noClasses().that().resideOutsideOfPackages("..legacy..", "..facade..").should().dependOnClassesThat().resideInAPackage("..legacy..") does the same.',
@@ -529,7 +529,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-rewrite-case', label: 'A rewrite has an accepted case', when: { REWRITE: ['big-bang-allowed'] }, category: 'process', implements: ['adr-big-bang'],
+      id: 'ff-rewrite-case', label: 'A rewrite has an accepted case', when: { REWRITE: ['big-bang-allowed'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-big-bang'],
       checks: ['req-rewrite-case'],
       threshold: 'Every ADR of kind rewrite has status accepted, at least 2 names in accepted_by and the sections Cost, Risks, Parity criteria and Cut-over; 0 pull requests labelled rewrite whose description links no such ADR',
       description: 'Rewrite cases are ADRs with kind: rewrite in their front matter. A test in the unit suite fails on a rewrite ADR that is not accepted by at least two owners or lacks one of the required sections; a pull-request step on a pull request labelled rewrite reads the docs/adr path from its description and fails unless that file has kind rewrite and status accepted.',
@@ -554,7 +554,7 @@ it.each(rewrites)('$f is an accepted rewrite case', ({ data, content }) => {
 //   [ -n "$adr" ] && grep -qE '^kind: *rewrite' "$adr" && grep -qE '^status: *accepted' "$adr" || { echo "link an accepted rewrite ADR"; exit 1; }`,
     },
     {
-      id: 'ff-debt-age', label: 'Old debt issues are escalated', when: { AGE: ['max-age'], REGISTRY: ['issues'] }, category: 'process', implements: ['adr-issues'],
+      id: 'ff-debt-age', label: 'Old debt issues are escalated', when: { AGE: ['max-age'], REGISTRY: ['issues'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-issues'],
       checks: ['req-age'],
       threshold: '0 open issues labelled tech-debt older than {{MAX_DEBT_AGE_DAYS}} days without the label escalated or accepted-debt',
       description: 'A weekly job lists open debt issues older than {{MAX_DEBT_AGE_DAYS}} days that carry neither escalated nor accepted-debt and fails naming them, so that the run shows red until each is escalated, scheduled or closed as accepted. With Jira the same is JQL: labels = tech-debt AND created <= -{{MAX_DEBT_AGE_DAYS}}d AND labels not in (escalated, accepted-debt) AND resolution = Unresolved.',
@@ -574,7 +574,7 @@ if [ -n "$old" ]; then
 fi`,
     },
     {
-      id: 'ff-debt-age-records', label: 'Old debt records are escalated', when: { AGE: ['max-age'], REGISTRY: ['adrs'] }, category: 'process', implements: ['adr-adrs'],
+      id: 'ff-debt-age-records', label: 'Old debt records are escalated', when: { AGE: ['max-age'], REGISTRY: ['adrs'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-adrs'],
       checks: ['req-age'],
       threshold: '0 records in docs/debt with status open and a date older than {{MAX_DEBT_AGE_DAYS}} days without escalated: true in the front matter',
       description: 'A test in the unit suite reads the front matter of every record in docs/debt and fails on one still open (not accepted, not repaid) whose date is older than {{MAX_DEBT_AGE_DAYS}} days and which is not marked escalated: true; marking it accepted with the reason in the record, or repaid, is the way out.',
@@ -596,7 +596,7 @@ it.each(files)('%s is repaid, accepted, escalated or young', (file) => {
 })`,
     },
     {
-      id: 'ff-debt-age-sonar', label: 'Old Sonar issues are escalated', when: { AGE: ['max-age'], REGISTRY: ['tool'] }, category: 'process', implements: ['adr-tool'],
+      id: 'ff-debt-age-sonar', label: 'Old Sonar issues are escalated', when: { AGE: ['max-age'], REGISTRY: ['tool'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-tool'],
       checks: ['req-age'],
       threshold: '0 unresolved issues created more than {{MAX_DEBT_AGE_DAYS}} days ago without the tag escalated or accepted-debt',
       description: 'A weekly job asks the issues API for unresolved issues created before the limit and fails on those without the tag escalated or accepted-debt (tags are set on the issue in the platform); accepting an issue as won\'t fix with a reason resolves it and takes it out of the list.',

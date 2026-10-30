@@ -799,7 +799,11 @@
       "label": "Every deployable in the model",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads the architecture model's node files, collects the labels of its containers and web apps, and compares them with the folders under services (a label matches a folder when it equals the folder name ignoring case and spaces); a folder without an element fails the test naming it.\n\nThreshold: 0 folders under services that are not a container or web app in the architecture model\n\nTool: Vitest with the yaml package over the Radical Markdown folder; for a model kept as a single .radical file: the same test over its nodes array\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { join } from 'node:path'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\nconst MODEL = 'architecture/nodes'\nconst files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })\n  .flatMap((e) => e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith('.md') ? [join(dir, e.name)] : [])\nconst frontMatter = (file: string) => parse(readFileSync(file, 'utf8').split(/^---$/m)[1] ?? '') ?? {}\nconst slug = (s: string) => s.toLowerCase().replace(/\\s+/g, '-')\n\nit('every deployable folder is a container or web app in the model', () => {\n  const modelled = new Set(files(MODEL).map(frontMatter)\n    .filter((n) => n.type === 'container' || n.type === 'webapp')\n    .map((n) => slug(String(n.label))))\n  const missing = readdirSync('services', { withFileTypes: true })\n    .filter((e) => e.isDirectory()).map((e) => e.name).filter((name) => !modelled.has(slug(name)))\n  expect(missing, 'deployables missing from the architecture model').toEqual([])\n})\n```"
     },
     {
@@ -808,7 +812,11 @@
       "label": "Pipeline within limit",
       "x": 1040,
       "y": 130,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The CI job that builds, tests and packages the deployable has a timeout; when it is hit, the job fails and the failure is the signal to review the decomposition within a month.\n\nThreshold: Build, test and package finish within {{BUILD_MINUTES}} minutes on the main branch\n\nTool: GitHub Actions (timeout-minutes); the build command is the stack's (./mvnw or ./gradlew on the JVM, dotnet on .NET, npm in TypeScript)\n\n```yaml\n# .github/workflows/build.yml\nname: build\non: { push: { branches: [main] }, pull_request: {} }\njobs:\n  build:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{BUILD_MINUTES}}   # ADR: one deployable stays fast to build\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - run: ./mvnw -B verify package\n```",
       "hubWhen": {
         "SPLIT": [
@@ -823,7 +831,11 @@
       "label": "Modules start alone",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Each module has an integration test that bootstraps only that module (Spring Modulith's standalone bootstrap mode, the default), with the beans of the modules it depends on mocked. A module that needs another to start fails its test.\n\nThreshold: Every module starts and passes its integration tests with the other modules absent\n\nTool: Spring Modulith (@ApplicationModuleTest, JUnit 5); for .NET: a WebApplicationFactory per module project; for TypeScript: one Nx project per module with its own test target\n\n```java\n@ApplicationModuleTest   // bootstraps the ordering module alone (BootstrapMode.STANDALONE is the default)\nclass OrderingModuleTest {\n  @Autowired Ordering ordering;      // the module's own API\n  @MockitoBean BillingApi billing;   // the API of a module ordering depends on\n\n  @Test\n  void placesAnOrderOnItsOwn(Scenario scenario) {\n    scenario.stimulate(() -> ordering.place(new PlaceOrder(CUSTOMER, LINES)))\n        .andWaitForEventOfType(OrderPlaced.class)\n        .toArrive();\n  }\n}\n```",
       "hubWhen": {
         "SPLIT": [
@@ -837,7 +849,11 @@
       "label": "A pipeline per deployable",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads each deployable's workflow file, checks that it is triggered by changes under its own folder only, and that no run step names another deployable's folder; a workflow that builds or deploys two deployables fails the test.\n\nThreshold: 100% of the deployables have a deploy workflow triggered only by their own folder; 0 workflow steps that build or deploy another deployable\n\nTool: Vitest with the yaml package over .github/workflows; for GitLab CI: the same test over the rules:changes of each job\n\n```ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\nconst deployables = readdirSync('services', { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)\n\nit.each(deployables)('%s deploys from a pipeline of its own', (name) => {\n  const workflow = parse(readFileSync(`.github/workflows/deploy-${name}.yml`, 'utf8'))\n  expect(workflow.on.push.paths).toEqual([`services/${name}/**`])\n  const steps: string[] = Object.values<any>(workflow.jobs).flatMap((job) => job.steps.map((s: any) => s.run ?? ''))\n  for (const other of deployables.filter((o) => o !== name))\n    for (const step of steps) expect(step, `${name}'s pipeline touches ${other}`).not.toContain(`services/${other}`)\n})\n```",
       "hubWhen": {
         "SPLIT": [
@@ -852,7 +868,11 @@
       "label": "No releases in lockstep",
       "x": 1040,
       "y": 520,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "30d",
+      "invocation": "automated",
       "description": "A monthly job lists the successful runs of every deployable's deploy workflow on main over the last quarter and counts, per pair, the releases that happened within 15 minutes of each other; a pair over the limit fails the job, which is the signal to review the decomposition within a month.\n\nThreshold: 0 pairs of deployables released within 15 minutes of each other more than twice in the last quarter\n\nTool: GitHub CLI (gh run list) in a TypeScript script run with tsx from a scheduled GitHub Actions job; for GitLab: the same over the pipelines API\n\n```ts\n// scripts/coordinated-releases.ts — scheduled monthly: npx tsx scripts/coordinated-releases.ts\nimport { execFileSync } from 'node:child_process'\nimport { readdirSync } from 'node:fs'\n\nconst since = new Date()\nsince.setMonth(since.getMonth() - 3)\nconst deployables = readdirSync('services', { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)\n\nconst releases = (name: string): number[] =>\n  JSON.parse(execFileSync('gh', ['run', 'list', '--workflow', `deploy-${name}.yml`, '--branch', 'main', '--status', 'success',\n    '--limit', '500', '--json', 'createdAt'], { encoding: 'utf8' }))\n    .map((run: { createdAt: string }) => Date.parse(run.createdAt))\n    .filter((t: number) => t > since.getTime())\n\nconst times = Object.fromEntries(deployables.map((d) => [d, releases(d)]))\nconst together: string[] = []\nfor (const a of deployables) for (const b of deployables) if (a < b) {\n  const n = times[a].filter((ta) => times[b].some((tb) => Math.abs(ta - tb) < 15 * 60_000)).length\n  if (n > 2) together.push(`${a} and ${b}: released together ${n} times`)\n}\nif (together.length) {\n  console.error('deployables released in lockstep this quarter (ADR: deployed independently):\\n' + together.join('\\n'))\n  process.exit(1)\n}\n```",
       "hubWhen": {
         "SPLIT": [
@@ -867,7 +887,11 @@
       "label": "Owners within limit",
       "x": 1040,
       "y": 650,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Each deployable has a Backstage catalog-info.yaml naming its owner; a CI step collects the owners, fails when one is missing, and fails when a team owns more than the limit.\n\nThreshold: Every deployable names one owner in its catalog entry; no team owns more than {{PER_TEAM}}\n\nTool: yq (mikefarah) in a shell step over Backstage catalog-info.yaml; for a different catalog: the same over its owner field\n\n```bash\nset -euo pipefail\n# every service folder has catalog-info.yaml with spec.owner\n: > owners.txt\nfor f in services/*/catalog-info.yaml; do\n  owner=$(yq '.spec.owner // \"\"' \"$f\")\n  [ -n \"$owner\" ] || { echo \"no owner: $f\"; exit 1; }\n  echo \"$owner\" >> owners.txt\ndone\nsort owners.txt | uniq -c | awk -v max={{PER_TEAM}} '$1 > max { print \"too many deployables for \" $2 \": \" $1; bad = 1 } END { exit bad }'\n```",
       "hubWhen": {
         "SPLIT": [
@@ -882,7 +906,11 @@
       "label": "Functions belong to a stack",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CloudFormation Guard rule runs over every synthesised template in CI and fails on a function without a context and owner tag or with a timeout over 30 seconds: SAM functions carry Tags as a map, CDK output as the Lambda resource with a list of Key/Value pairs, and a Lambda function without a Timeout keeps the 3-second default and passes.\n\nThreshold: 0 functions without a context and owner tag or with a timeout above 30 seconds\n\nTool: AWS CloudFormation Guard (cfn-guard validate) over SAM and CDK-synthesised templates; for Bicep: PSRule for Azure with a custom rule; for Terraform: Conftest over the plan JSON\n\n```text\n# rules/functions.guard  —  cfn-guard validate -d template.yaml -r rules/functions.guard\nlet sam_functions = Resources.*[ Type == 'AWS::Serverless::Function' ]\nlet lambda_functions = Resources.*[ Type == 'AWS::Lambda::Function' ]\n\nrule sam_functions_belong_to_a_context when %sam_functions !empty {\n  %sam_functions.Properties {\n    Tags.context exists\n    Tags.owner exists\n    Timeout !exists or Timeout <= 30\n  }\n}\n\nrule lambda_functions_belong_to_a_context when %lambda_functions !empty {\n  %lambda_functions.Properties {\n    Tags[ Key == 'context' ] !empty\n    Tags[ Key == 'owner' ] !empty\n    Timeout !exists or Timeout <= 30\n  }\n}\n```",
       "hubWhen": {
         "SPLIT": [
@@ -896,7 +924,11 @@
       "label": "No foreign credentials",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A policy over the Kubernetes manifests fails when a Deployment, StatefulSet, Job or CronJob references a database secret other than its own (secrets are named db-<app>), whether through envFrom, an env entry with secretKeyRef, or a secret volume.\n\nThreshold: 0 workloads that receive another deployable's database secret\n\nTool: Conftest (Open Policy Agent, rego.v1) over the rendered manifests; for ECS: the same rule over the task definitions' secrets\n\n```rego\npackage main\nimport rego.v1\n\nworkloads := {\"Deployment\", \"StatefulSet\", \"Job\", \"CronJob\"}\n\npod_spec := input.spec.template.spec if { input.kind in {\"Deployment\", \"StatefulSet\", \"Job\"} }\npod_spec := input.spec.jobTemplate.spec.template.spec if { input.kind == \"CronJob\" }\n\ndb_secrets contains name if {\n  some c in pod_spec.containers\n  some src in c.envFrom\n  name := src.secretRef.name\n}\ndb_secrets contains name if {\n  some c in pod_spec.containers\n  some e in c.env\n  name := e.valueFrom.secretKeyRef.name\n}\ndb_secrets contains name if {\n  some v in pod_spec.volumes\n  name := v.secret.secretName\n}\n\ndeny contains msg if {\n  input.kind in workloads\n  app := input.metadata.labels[\"app.kubernetes.io/name\"]\n  some name in db_secrets\n  startswith(name, \"db-\")\n  name != sprintf(\"db-%s\", [app])\n  msg := sprintf(\"%s %s reads database secret %s (ADR A database per deployable)\", [input.kind, app, name])\n}\n```",
       "hubWhen": {
         "DATA": [
@@ -910,7 +942,11 @@
       "label": "Schemas closed to others",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts PostgreSQL in a container, runs every module's migrations and grants, and runs this query; any row fails the test.\n\nThreshold: 0 module users with any privilege on another module's schema\n\nTool: Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL\n\n```sql\n-- module users are named module_<name>, schemas <name>\nSELECT r.rolname AS module_user, n.nspname AS foreign_schema\nFROM pg_roles r CROSS JOIN pg_namespace n\nWHERE r.rolname LIKE 'module\\_%'\n  AND n.nspname NOT IN ('public', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%'\n  AND n.nspname <> substring(r.rolname FROM 8)\n  AND has_schema_privilege(r.rolname, n.oid, 'USAGE');\n-- expected: 0 rows\n```",
       "hubWhen": {
         "DATA": [
@@ -924,7 +960,11 @@
       "label": "One writer per table",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts PostgreSQL in a container, runs the migrations and grants, and checks that every table (including partitioned ones) names its owning module in its table comment and can be written only by that module's user.\n\nThreshold: 0 tables writable by a module user other than the owner's; 0 tables without an owner in their comment\n\nTool: Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL\n\n```sql\n-- tables carry their owning module in the table comment (COMMENT ON TABLE orders IS 'ordering'); module users are module_<module>\nSELECT r.rolname AS module_user, c.relname AS foreign_table, obj_description(c.oid, 'pg_class') AS owner\nFROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\nCROSS JOIN pg_roles r\nWHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND r.rolname LIKE 'module\\_%'\n  AND (obj_description(c.oid, 'pg_class') IS NULL OR obj_description(c.oid, 'pg_class') <> substring(r.rolname FROM 8))\n  AND has_table_privilege(r.rolname, c.oid, 'INSERT, UPDATE, DELETE');\n-- expected: 0 rows\n```",
       "hubWhen": {
         "DATA": [
@@ -938,7 +978,11 @@
       "label": "Changes stay with one team",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "30d",
+      "invocation": "automated",
       "description": "A monthly job lists the pull requests merged in the last quarter with their files, maps each file to its owning team through the CODEOWNERS entries (folder prefixes, one per part, as the Code review and branching pack keeps them) and counts the pull requests whose files belong to one team; below 80% the job fails and the boundaries are reviewed.\n\nThreshold: At least 80% of the pull requests merged in the last quarter touch the parts of one team only\n\nTool: GitHub CLI (gh pr list) in a TypeScript script run with tsx from a scheduled GitHub Actions job\n\n```ts\n// scripts/single-team-changes.ts — scheduled monthly: npx tsx scripts/single-team-changes.ts\nimport { execFileSync } from 'node:child_process'\nimport { readFileSync } from 'node:fs'\n\nconst since = new Date()\nsince.setMonth(since.getMonth() - 3)\nconst owners = readFileSync('.github/CODEOWNERS', 'utf8').split('\\n')\n  .filter((line) => line.trim() && !line.startsWith('#'))\n  .map((line) => { const [pattern, team] = line.trim().split(/\\s+/); return { prefix: pattern.replace(/^\\//, ''), team } })\nconst teamOf = (file: string) => owners.filter((o) => file.startsWith(o.prefix)).sort((a, b) => b.prefix.length - a.prefix.length)[0]?.team\n\nconst prs: Array<{ files: Array<{ path: string }> }> = JSON.parse(execFileSync('gh', ['pr', 'list', '--state', 'merged',\n  '--search', `merged:>=${since.toISOString().slice(0, 10)}`, '--limit', '1000', '--json', 'files'], { encoding: 'utf8' }))\nconst singleTeam = prs.filter((pr) => new Set(pr.files.map((f) => teamOf(f.path)).filter(Boolean)).size <= 1).length\nconst share = Math.round((singleTeam * 100) / Math.max(prs.length, 1))\nconsole.log(`${singleTeam} of ${prs.length} merged pull requests touched one team's parts (${share}%)`)\nif (share < 80) process.exit(1)\n```",
       "hubWhen": {
         "BOUNDARY": [
@@ -957,7 +1001,10 @@
       "label": "Legacy traffic falls",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "The routing facade labels each request with the backend that served it and exports the migration's start as migration_started_timestamp_seconds; a recording rule keeps the old system's 7-day share, one alert fires when the share is above 0 and has not fallen in 30 days, another when it is above 0 past the deadline.\n\nThreshold: The share of requests reaching the old system falls every 30 days while above 0, and is 0 within {{MIGRATION_MONTHS}} months of the migration's start\n\nTool: Prometheus recording and alerting rules\n\n```yaml\ngroups:\n  - name: strangler\n    rules:\n      - record: migration:legacy_share:ratio_7d\n        expr: |\n          sum(rate(facade_requests_total{backend=\"legacy\"}[7d])) / sum(rate(facade_requests_total[7d]))\n      - alert: MigrationStalled\n        expr: |\n          migration:legacy_share:ratio_7d > 0\n          and migration:legacy_share:ratio_7d >= migration:legacy_share:ratio_7d offset 30d\n        labels: { severity: ticket }\n        annotations:\n          summary: \"Legacy share has not fallen in 30 days; it must reach 0 within {{MIGRATION_MONTHS}} months\"\n      - alert: MigrationPastDeadline\n        expr: |\n          migration:legacy_share:ratio_7d > 0\n          and time() - max(migration_started_timestamp_seconds) > {{MIGRATION_MONTHS}} * 30 * 86400\n        labels: { severity: page }\n        annotations:\n          summary: \"The old system still serves traffic {{MIGRATION_MONTHS}} months after the migration started (ADR Strangler fig migration)\"\n```",
       "hubWhen": {
         "MIGRATION": [

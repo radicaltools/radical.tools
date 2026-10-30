@@ -203,7 +203,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-catalogue', label: 'Every audited call leaves a valid record', category: 'structural', implements: STORE_ADRS, checks: ['req-catalogue', 'req-record'],
+      id: 'ff-catalogue', label: 'Every audited call leaves a valid record', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STORE_ADRS, checks: ['req-catalogue', 'req-record'],
       threshold: '0 operations that change data outside the catalogue and the exemptions; exactly 1 record per call of each audited operation, permitted and refused, and 0 records rejected by audit/record.schema.json',
       description: 'A test lists the operations from the router (not from a list kept by hand) and fails on any that changes data but is neither audited nor exempt in audit/catalogue.yaml. It then calls each audited operation as a permitted and as a refused caller, reads the records written since the call, expects exactly one, and validates it against audit/record.schema.json, whose required fields are actor, action, target, outcome, at, correlationId, source and version.',
       tool: 'Vitest with supertest, js-yaml and Ajv (or the test runner and HTTP client of your stack: JUnit with MockMvc and networknt json-schema-validator, xUnit with WebApplicationFactory)',
@@ -236,7 +236,7 @@ describe.each(routes.filter((r) => catalogue.audited.includes(key(r))))('$method
 })`,
     },
     {
-      id: 'ff-atomic', label: 'A failed record stops the change', category: 'structural', implements: STORE_ADRS, checks: ['req-atomic'],
+      id: 'ff-atomic', label: 'A failed record stops the change', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STORE_ADRS, checks: ['req-atomic'],
       threshold: 'With the audit write failing, the operation answers 5xx and 0 business rows are changed',
       description: 'An integration test against the real database makes the audit writer fail once, calls an audited operation that changes a customer, and reads the customer back: the change must have been rolled back with the failed record. The audit writer runs on the business transaction\'s connection, which is what this test proves.',
       tool: 'Vitest with supertest and a database started by Testcontainers (or the test runner of your stack with a spy on the audit writer)',
@@ -260,7 +260,7 @@ it('commits no change without its audit record', async () => {
 })`,
     },
     {
-      id: 'ff-hashes', label: 'Only keyed hashes in the trail', when: { CONTENT: ['hashes'] }, category: 'structural', implements: ['adr-hashes'], checks: ['req-hashes'],
+      id: 'ff-hashes', label: 'Only keyed hashes in the trail', when: { CONTENT: ['hashes'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-hashes'], checks: ['req-hashes'],
       threshold: 'The new-value hash of a changed field equals HMAC-SHA-256 of the value under the test audit key; 0 occurrences of the value in the audit store',
       description: 'An integration test changes a customer\'s e-mail address to a random value, reads the record, recomputes the HMAC with the test instance of the audit key, and searches a dump of the whole audit store (rows, outbox or shipped batches, as decided) for the value.',
       tool: 'Vitest with supertest and node:crypto (or the test runner of your stack with its HMAC implementation)',
@@ -283,7 +283,7 @@ it('keeps a keyed hash of the new value and never the value', async () => {
 })`,
     },
     {
-      id: 'ff-values', label: 'Values kept, secrets not', when: { CONTENT: ['values'] }, category: 'structural', implements: ['adr-values'], checks: ['req-values'],
+      id: 'ff-values', label: 'Values kept, secrets not', when: { CONTENT: ['values'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-values'], checks: ['req-values'],
       threshold: 'The record of an address change holds the old and new address; the record of a password change names the field with no value; 0 occurrences of the password in the audit store',
       description: 'An integration test changes a customer\'s address and an account\'s password (a random value), reads both records, and searches a dump of the whole audit store for the password.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -309,7 +309,7 @@ it('keeps old and new values and never a secret', async () => {
 })`,
     },
     {
-      id: 'ff-chain', label: 'Hash chain verified', when: { STORE: ['table'] }, category: 'operational', implements: ['adr-table'], checks: ['req-tamper'],
+      id: 'ff-chain', label: 'Hash chain verified', when: { STORE: ['table'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-table'], checks: ['req-tamper'],
       threshold: 'Every {{VERIFY_HOURS}} hours: 0 rows whose hash differs from SHA-256(prev_hash ‖ canonical row), 0 breaks in prev_hash or chain_pos, and 0 copied heads that differ from the row at their position',
       description: 'A scheduled job recomputes each row\'s hash with the same audit.canonical function the trigger uses, checks that every row points at the hash of the row before and that positions have no gap, then compares the heads copied to write-once storage over the last 30 days with the rows at their positions. Any finding names the first position affected and fails the job, which pages the audit owner. Positions below the oldest partition kept are skipped, since pg_partman dropped them after the retention.',
       tool: 'bash with psql and the AWS CLI in a scheduled job (for an Azure container, az storage blob download in place of aws s3 cp)',
@@ -335,7 +335,7 @@ done | while read -r pos hash; do
 done`,
     },
     {
-      id: 'ff-table-append-only', label: 'Audit table only appends and keeps', when: { STORE: ['table'] }, category: 'structural', implements: ['adr-table'], checks: ['req-append-only', 'req-retention'],
+      id: 'ff-table-append-only', label: 'Audit table only appends and keeps', when: { STORE: ['table'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-table'], checks: ['req-append-only', 'req-retention'],
       threshold: 'The application role holds only INSERT and SELECT on audit.records; an UPDATE and a DELETE by the table\'s owner are refused; pg_partman retention is {{AUDIT_YEARS}} years',
       description: 'A database test runs in CI after the migrations, as the table\'s owner: it checks the application role\'s privileges, appends one record, expects the append-only trigger to refuse an update and a delete of it, and reads the retention pg_partman applies to the table.',
       tool: 'pgTAP (run with pg_prove) with pg_partman 5',
@@ -355,7 +355,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-object-lock', label: 'Audit bucket locked for the retention', when: { STORE: ['worm'] }, category: 'structural', implements: ['adr-worm'], checks: ['req-append-only', 'req-retention'],
+      id: 'ff-object-lock', label: 'Audit bucket locked for the retention', when: { STORE: ['worm'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-worm'], checks: ['req-append-only', 'req-retention'],
       threshold: '0 audit buckets in the Terraform plan without an Object Lock configuration in compliance mode with a default retention of at least {{AUDIT_YEARS}} years',
       description: 'A policy over the Terraform plan in CI fails when the audit bucket has no Object Lock configuration, when its default retention is in governance mode, or when it is shorter than the retention, so that no identity, the account\'s root user included, can change or delete a batch before it is due.',
       tool: 'Conftest on the Terraform plan (terraform show -json); on Azure check azurerm_storage_container_immutability_policy (immutability_period_in_days, protected_append_writes_enabled false, locked), on Google Cloud google_storage_bucket retention_policy with is_locked = true',
@@ -391,7 +391,7 @@ number_or_zero(x) := x if is_number(x)
 number_or_zero(x) := 0 if not is_number(x)`,
     },
     {
-      id: 'ff-batches', label: 'No batch missing, nothing left behind', when: { STORE: ['worm'] }, category: 'operational', implements: ['adr-worm'], checks: ['req-tamper'],
+      id: 'ff-batches', label: 'No batch missing, nothing left behind', when: { STORE: ['worm'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-worm'], checks: ['req-tamper'],
       threshold: 'Every {{VERIFY_HOURS}} hours: 0 gaps between the record numbers of the listed batches, and 0 outbox rows older than {{SHIP_MINUTES}} minutes',
       description: 'A scheduled job lists the element\'s batches, sorts them by first record number and fails on the first gap, which a batch hidden by a delete marker also shows as; it then counts the outbox rows waiting longer than the shipping limit. A failure pages the audit owner.',
       tool: 'bash with the AWS CLI, jq and psql in a scheduled job (for Azure, az storage blob list --query "[].name" in place of aws s3api list-objects-v2)',
@@ -410,7 +410,7 @@ waiting=$(psql "$DATABASE_URL" -qAtc "select count(*) from audit_outbox where cr
 [ "$waiting" -eq 0 ] || { echo "$waiting audit records waited more than {{SHIP_MINUTES}} minutes to be shipped"; exit 1; }`,
     },
     {
-      id: 'ff-ledger', label: 'Ledger verified against its digests', when: { STORE: ['ledger'] }, category: 'operational', implements: ['adr-ledger'], checks: ['req-tamper', 'req-append-only', 'req-retention'],
+      id: 'ff-ledger', label: 'Ledger verified against its digests', when: { STORE: ['ledger'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-ledger'], checks: ['req-tamper', 'req-append-only', 'req-retention'],
       threshold: 'Every {{VERIFY_HOURS}} hours: audit.records is an APPEND_ONLY_LEDGER_TABLE, automatic digest storage is on, ledger verification succeeds, and the digest container\'s immutability policy is Locked for at least {{AUDIT_YEARS}} × 365 days',
       description: 'A scheduled job checks in the catalog views that the audit table is an append-only ledger table (so updates and deletes are refused by the database) and that a current digest location exists, runs the ledger verification over every digest location, and reads the immutability policy of the container that holds the digests. Any failure ends the job with an error and pages the audit owner.',
       tool: 'bash with sqlcmd (-b ends on the first error) and the Azure CLI in a scheduled job or an Elastic Job',
@@ -431,7 +431,7 @@ read -r state days < <(az storage container immutability-policy show --account-n
 [ "$state" = Locked ] && [ "$days" -ge $(( {{AUDIT_YEARS}} * 365 )) ] || { echo "digest container policy is $state for $days days"; exit 1; }`,
     },
     {
-      id: 'ff-readers', label: 'Only the decided readers read, and reads are recorded', category: 'structural', implements: STORE_ADRS, checks: ['req-readers-auditors', 'req-readers-team', 'req-reads-recorded'],
+      id: 'ff-readers', label: 'Only the decided readers read, and reads are recorded', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: STORE_ADRS, checks: ['req-readers-auditors', 'req-readers-team', 'req-reads-recorded'],
       threshold: 'A search of the audit trail by a caller outside audit/readers.yaml is refused with 403; one by a reader succeeds and leaves exactly 1 audit.read record naming the reader and the filter; where reads are reported, the month\'s report lists it',
       description: 'audit/readers.yaml names the role that may read the trail (the audit role or the team, as decided) and, for the team, whom the monthly report of reads goes to. A test searches the trail as a member of another team and as a customer, expects 403, searches as a reader, and checks the record of the read and, where reads are reported, the report.',
       tool: 'Vitest with supertest and js-yaml (or the test runner and HTTP client of your stack)',
@@ -458,7 +458,7 @@ it('lets only the decided readers search, and records each search', async () => 
 })`,
     },
     {
-      id: 'ff-clock', label: 'Clocks in step with UTC', category: 'operational', implements: STORE_ADRS, checks: ['req-clock'],
+      id: 'ff-clock', label: 'Clocks in step with UTC', characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: STORE_ADRS, checks: ['req-clock'],
       threshold: 'On every host that writes audit records, every 5 minutes: chrony is synchronised and its system time offset is within {{CLOCK_MS}} ms',
       description: 'A check on every host that writes audit records (a cron job or the monitoring agent\'s script check, which pages on failure) reads chrony\'s tracking report and fails when the clock is not synchronised or its offset from NTP time is over the limit. On a managed runtime without host access (AWS Lambda, Fargate, Cloud Run) the provider keeps the clock, and the check runs on the hosts the team does run.',
       tool: 'bash with chronyc (chrony 4), as a cron job or a monitoring agent\'s script check',
@@ -474,7 +474,7 @@ awk -v s="$offset" -v max="{{CLOCK_MS}}" 'BEGIN { exit !(s * 1000 <= max) }' \\
   || { echo "clock is \${offset}s off NTP time, over {{CLOCK_MS}} ms"; exit 1; }`,
     },
     {
-      id: 'ff-cdc', label: 'Direct writes reach the trail', when: { SCOPE: ['cdc'] }, category: 'operational', implements: ['adr-cdc'], checks: ['req-cdc'],
+      id: 'ff-cdc', label: 'Direct writes reach the trail', when: { SCOPE: ['cdc'] }, characteristic: 'security', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: ['adr-cdc'], checks: ['req-cdc'],
       threshold: 'Every hour: the connector and all its tasks are RUNNING, and a canary row written outside the element appears in the audit trail as unattributed within {{CDC_MINUTES}} minutes',
       description: 'A scheduled job asks Kafka Connect for the connector\'s status, writes a canary row straight into the database (outside the element, so with no transaction context), and polls the element\'s audit read operation until the change appears as unattributed, failing past the limit. The job\'s own searches are recorded like any read.',
       tool: 'bash with curl, jq and psql in a scheduled job (sqlcmd -Q on SQL Server), against the Kafka Connect REST API',

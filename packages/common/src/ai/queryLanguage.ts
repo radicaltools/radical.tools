@@ -43,7 +43,7 @@ Boolean logic in WHERE:
 Supported node fields:
 - id, type, label, description, technology, parentId, external,
   plus any custom/governance property key for that node's type
-  (e.g. status, ears_type, category — see the metamodel context message)
+  (e.g. status, ears_type, characteristic — see the metamodel context message)
 
 Supported relation fields:
 - id, sourceId, targetId, label, technology, relationType,
@@ -392,7 +392,7 @@ function getNodeField(node: C4Node, field: string): unknown {
     case 'technology': return node.technology ?? null
     case 'parentId': return node.parentId ?? null
     case 'external': return node.external ?? false
-    // Custom/governance properties (ears_type, status, category, ...) ride as
+    // Custom/governance properties (ears_type, status, characteristic, ...) ride as
     // extra own-keys on the node — fall through to a generic read instead of
     // rejecting any field not in the fixed list above.
     default: return (node as unknown as Record<string, unknown>)[field] ?? null

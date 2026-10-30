@@ -303,7 +303,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-retention', label: 'Retention and requests on time', when: PERSONAL, category: 'operational', implements: ERASURE_ADRS, checks: ['req-retain', 'req-access', 'req-erase'],
+      id: 'ff-retention', label: 'Retention and requests on time', when: PERSONAL, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ERASURE_ADRS, checks: ['req-retain', 'req-access', 'req-erase'],
       threshold: '0 personal records unused for more than {{RETENTION_MONTHS}} months plus the 7-day grace, and 0 access or erasure requests open for more than {{REQUEST_DAYS}} days',
       description: 'A daily data test returns the records past retention and its 7-day grace, and the access and erasure requests past their deadline; any row fails it and alerts the data owner.',
       tool: 'dbt (a singular data test, run daily by the scheduler)',
@@ -326,7 +326,7 @@ where delivered_at is null
   and verified_at < now() - interval '{{REQUEST_DAYS}} days'`,
     },
     {
-      id: 'ff-record', label: 'Every field classified and recorded', when: PERSONAL, category: 'structural', implements: [...ERASURE_ADRS, 'adr-no-special'], checks: ['req-record'],
+      id: 'ff-record', label: 'Every field classified and recorded', when: PERSONAL, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...ERASURE_ADRS, 'adr-no-special'], checks: ['req-record'],
       threshold: '0 columns in the migrated schema without a classification (personal, special or not-personal) in their comment; 0 personal or special columns absent from the record of processing or without purpose, basis, retention, recipients and location there',
       description: 'In CI, after the migrations run against an empty database, a script lists the columns without a classification and checks every personal or special column against docs/record-of-processing.json; a new column fails the build until it is classified, and a personal one until the record names it with all five facts.',
       tool: 'psql and jq in the CI pipeline, against the migrated schema',
@@ -356,7 +356,7 @@ done
 exit $missing`,
     },
     {
-      id: 'ff-pii-scan', label: 'Personal data where declared', category: 'structural', implements: [...ERASURE_ADRS, 'adr-no-personal'], checks: ['req-none'],
+      id: 'ff-pii-scan', label: 'Personal data where declared', characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [...ERASURE_ADRS, 'adr-no-personal'], checks: ['req-none'],
       threshold: '0 e-mail addresses, phone numbers, IP addresses, card numbers or IBANs with a score of 0.6 or more in a day of logs and a sample of rows outside the fields classified as personal',
       description: 'A nightly job exports a day of logs and a sample of rows from the fields not classified as personal and scans them for e-mail addresses, phone numbers, IP addresses, card numbers and IBANs; it reports the place and kind of each finding, never the value. Names (PERSON) are left out of the free-text scan because the recogniser flags product and place names at this threshold; they are scanned only in structured fields.',
       tool: 'Microsoft Presidio (presidio-analyzer)',
@@ -376,7 +376,7 @@ with open(sys.argv[1], encoding="utf-8") as f:
 sys.exit(1 if found else 0)`,
     },
     {
-      id: 'ff-erasure', label: 'Erasure reaches every store', when: { ...PERSONAL, ERASURE: ['delete', 'anonymise'] }, category: 'structural', implements: ['adr-delete', 'adr-anonymise'], checks: ['req-erase', 'req-backups'],
+      id: 'ff-erasure', label: 'Erasure reaches every store', when: { ...PERSONAL, ERASURE: ['delete', 'anonymise'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-delete', 'adr-anonymise'], checks: ['req-erase', 'req-backups'],
       threshold: '0 stores where an erased person\'s identifiers (e-mail, name, phone) are found after the erasure routine, 0 identifiers left on the person\'s row by id, and 0 after a restore of an older backup',
       description: 'An integration test seeds one person with unique identifiers across every store the record of processing names, runs the erasure routine, searches each store by the identifiers and reads the row by its internal id (gone under deletion; present with every identifier overwritten under anonymisation, so identifiersOf returns [] in both cases); it then restores a backup taken before the erasure and checks again after the ledger replay.',
       tool: 'Vitest with Testcontainers (PostgreSQL and the other stores of the deployment)',
@@ -402,7 +402,7 @@ it('erases a person from every store, and keeps them erased after a restore', as
 })`,
     },
     {
-      id: 'ff-k-anonymity', label: 'Anonymised records not singled out', when: { ...PERSONAL, ERASURE: ['anonymise'] }, category: 'operational', implements: ['adr-anonymise'], checks: ['req-anonymise'],
+      id: 'ff-k-anonymity', label: 'Anonymised records not singled out', when: { ...PERSONAL, ERASURE: ['anonymise'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-anonymise'], checks: ['req-anonymise'],
       threshold: 'Every combination of quasi-identifiers among anonymised records occurs in at least 5 records (k ≥ 5); 0 anonymised rows with a non-empty free-text field',
       description: 'A daily data test groups the anonymised records by their quasi-identifiers and returns every group smaller than 5, and every anonymised row whose free text was not cleared.',
       tool: 'dbt (a singular data test)',
@@ -420,7 +420,7 @@ where anonymised_at is not null
   and coalesce(notes, '') <> ''`,
     },
     {
-      id: 'ff-shred', label: 'Shredded data unreadable', when: { ...PERSONAL, ERASURE: ['crypto'] }, category: 'structural', implements: ['adr-crypto'], checks: ['req-shred'],
+      id: 'ff-shred', label: 'Shredded data unreadable', when: { ...PERSONAL, ERASURE: ['crypto'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-crypto'], checks: ['req-shred'],
       threshold: 'After an erasure, the person\'s wrapped data key is gone from the key table, its backup copies expire within {{BACKUP_DAYS}} days, and 0 of the person\'s encrypted fields decrypt in the store, the event stream or a copy taken before',
       description: 'An integration test writes a person\'s fields through the envelope layer, copies the ciphertext as a backup would, erases the person, and expects the key table to hold no data key for them, the key table\'s backup retention to be at most {{BACKUP_DAYS}} days, and every decryption of the copies to fail; the wrapping key in the key service stays, since it wraps everyone\'s data keys.',
       tool: 'Vitest with LocalStack (AWS KMS) or a Vault dev server behind the application\'s envelope layer',
@@ -442,7 +442,7 @@ it('makes every copy of an erased person unreadable', async () => {
 })`,
     },
     {
-      id: 'ff-protect', label: 'TLS floor and reviewed roles', when: PERSONAL, category: 'structural', implements: ERASURE_ADRS, checks: ['req-protect'],
+      id: 'ff-protect', label: 'TLS floor and reviewed roles', when: PERSONAL, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ERASURE_ADRS, checks: ['req-protect'],
       threshold: 'The database refuses TLS below 1.2 (ssl_min_protocol_version TLSv1.2 or higher); 0 roles with SELECT on a table holding personal data whose last review is older than 6 months',
       description: 'A database test run in CI against the migrated database checks the server\'s minimum TLS version, and joins the roles with SELECT on personal tables (the ones with a column commented personal or special) with the role_reviews table the access owner fills in; any role not reviewed in 6 months fails it.',
       tool: 'pgTAP (run with pg_prove); for a managed database the TLS floor is a parameter-group check with the provider\'s CLI',
@@ -469,7 +469,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-breach-register', label: 'Every breach documented and notified in time', when: PERSONAL, category: 'process', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-register', 'req-breach-people'],
+      id: 'ff-breach-register', label: 'Every breach documented and notified in time', when: PERSONAL, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-register', 'req-breach-people'],
       threshold: '0 breaches in the register without an awareness time, facts, effects, remedy and a risk assessment; 0 assessed unlikely without the reason not to notify; 0 others not notified 72 hours after awareness, or first notified later without the reasons for the delay, or whose notification phases together lack the nature, the data protection officer\'s contact, the consequences or the measures; 0 high-risk ones without the time people were told or an Art. 34(3) exception; the last reconciliation with the security incidents at most 92 days old',
       description: 'A daily CI job reads docs/breaches/register.json, the breach register kept in the repository (categories and numbers, never the people\'s data): reconciled_at, and per breach id, aware_at, facts, effects, remedy, risk (unlikely, risk or high), not_notified_reason, notifications (one entry per phase: at, nature, dpo_contact, consequences, measures), delay_reason, people_told_at and art34_exception; times are in UTC (2026-09-07T09:00:00Z). When the breaches are kept as incidents in the incident tool the Incident management pack decides, the job first exports them to this shape. It fails on any gap and prints the breach ids, never their contents.',
       tool: 'jq 1.7 in a daily CI job (bash)',
@@ -493,7 +493,7 @@ problems=$(jq -r --argjson now "$(date -u +%s)" '
 [ -z "$problems" ] || { echo "$problems"; exit 1; }`,
     },
     {
-      id: 'ff-breach-runbook', label: 'Breach runbook and processor notice ready', when: PERSONAL, category: 'structural', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-processor'],
+      id: 'ff-breach-runbook', label: 'Breach runbook and processor notice ready', when: PERSONAL, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ERASURE_ADRS, checks: ['req-breach', 'req-breach-processor'],
       threshold: 'docs/breaches/runbook.md has the lines Supervisory authority: (with a link) and Decides:, and names the 72 hours, the nature of the breach, the data protection officer, the likely consequences and the measures; 0 processors in processors.yaml without breach_notice_hours or with more than {{PROCESSOR_NOTICE_HOURS}} hours',
       description: 'A CI step on every change fails when the breach runbook stops naming the supervisory authority with its notification link, the person who decides whether to notify, the 72 hours or any of the four parts of the notification of GDPR Art. 33(3), or when a processor in processors.yaml, the processor register, has no breach_notice_hours from its contract or a longer one than allowed.',
       tool: 'bash with grep and yq (mikefarah yq v4) in a CI step',
@@ -516,7 +516,7 @@ late=$(yq '.processors[] | select((.breach_notice_hours // 1000) > {{PROCESSOR_N
 exit $problems`,
     },
     {
-      id: 'ff-region', label: 'Deployed in EU regions', when: { ...PERSONAL, REGION: ['eu'] }, category: 'structural', implements: ['adr-region-eu'], checks: ['req-region-eu'],
+      id: 'ff-region', label: 'Deployed in EU regions', when: { ...PERSONAL, REGION: ['eu'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-region-eu'], checks: ['req-region-eu'],
       threshold: '0 providers, backup copies or processors outside EU/EEA regions in the infrastructure plan and the processor register',
       description: 'In CI the Terraform plan (terraform show -json) is checked by a policy that fails on any provider or backup copy destination outside the allowed EU regions (the region is read from the vault ARN, so eu-west-2, London, is refused); the same run checks processors.yaml, the processor register, against the EEA country list.',
       tool: 'Conftest (on the Terraform plan and on processors.yaml)',
@@ -553,7 +553,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-adequacy', label: 'Processors in adequate countries', when: { ...PERSONAL, REGION: ['adequate'] }, category: 'process', implements: ['adr-region-adequate'], checks: ['req-region-adequate'],
+      id: 'ff-adequacy', label: 'Processors in adequate countries', when: { ...PERSONAL, REGION: ['adequate'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-region-adequate'], checks: ['req-region-adequate'],
       threshold: '0 processors in the register outside the EU/EEA and the countries with an adequacy decision; 0 US processors without Data Privacy Framework certification',
       description: 'In CI a policy checks processors.yaml, the processor register kept in the repository, against the EU/EEA and the adequacy list; the list is updated when the Commission adopts or withdraws a decision.',
       tool: 'Conftest (on processors.yaml)',
@@ -581,7 +581,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-scc', label: 'Transfers have clauses and assessment', when: { ...PERSONAL, REGION: ['any'] }, category: 'process', implements: ['adr-region-any'], checks: ['req-region-scc'],
+      id: 'ff-scc', label: 'Transfers have clauses and assessment', when: { ...PERSONAL, REGION: ['any'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-region-any'], checks: ['req-region-scc'],
       threshold: '0 processors outside the EU/EEA and adequate countries without a signing date for the standard contractual clauses and a transfer impact assessment reviewed in the last 12 months',
       description: 'In CI a policy checks processors.yaml, the processor register: every processor outside the EU/EEA and the adequate countries needs the date its clauses were signed and the date of its transfer impact assessment, not older than 12 months; a missing date fails as much as an old one.',
       tool: 'Conftest (on processors.yaml)',
@@ -621,7 +621,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-special', label: 'Special fields encrypted and read-logged', when: { ...PERSONAL, SPECIAL: ['yes'] }, category: 'structural', implements: ['adr-special'], checks: ['req-special'],
+      id: 'ff-special', label: 'Special fields encrypted and read-logged', when: { ...PERSONAL, SPECIAL: ['yes'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-special'], checks: ['req-special'],
       threshold: 'Every column classified as special category is stored as ciphertext (bytea), 0 roles outside the record of processing may read it, and pgAudit object logging through the auditor role covers its table',
       description: 'A database test run in CI after the migrations asserts that each special-category column holds ciphertext, that only the listed roles have SELECT on its table, that pgaudit.role names the auditor role, and that the auditor role holds SELECT on the table, which is what makes pgAudit log every read of it.',
       tool: 'pgTAP (run with pg_prove) with the pgAudit extension',
@@ -637,7 +637,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-dpia-gate', label: 'No DPIA, no deploy', when: { ...PERSONAL, SPECIAL: ['yes'] }, category: 'process', implements: ['adr-special'], checks: ['req-dpia'],
+      id: 'ff-dpia-gate', label: 'No DPIA, no deploy', when: { ...PERSONAL, SPECIAL: ['yes'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-special'], checks: ['req-dpia'],
       threshold: '0 purposes, stores or recipients of special-category data in the record of processing without an approved impact assessment linked',
       description: 'A release gate reads docs/record-of-processing.json: every entry marked special must link a DPIA file under docs/dpia whose front matter says status: approved; the release stops on any that does not.',
       tool: 'jq and grep in the release pipeline (bash)',
@@ -653,7 +653,7 @@ done
 exit $failed`,
     },
     {
-      id: 'ff-purpose-roles', label: 'Purpose enforced by role', when: { ...PERSONAL, BASIS: ['contract'] }, category: 'structural', implements: ['adr-basis-contract'], checks: ['req-purpose'],
+      id: 'ff-purpose-roles', label: 'Purpose enforced by role', when: { ...PERSONAL, BASIS: ['contract'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-basis-contract'], checks: ['req-purpose'],
       threshold: 'Every service role has SELECT on a personal table only when the record of processing lists it for a purpose of that table; 0 grants beyond the record',
       description: 'A database test run in CI after the migrations compares the SELECT grants on personal tables with the recipients of docs/record-of-processing.json, loaded into a temporary table by the pipeline, and fails on any grant the record does not explain.',
       tool: 'pgTAP (run with pg_prove); the pipeline loads the record into record_recipients(table_name, role_name) first',
@@ -679,7 +679,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-consent', label: 'Consent recorded and honoured', when: { ...PERSONAL, BASIS: ['consent'] }, category: 'structural', implements: ['adr-basis-consent'], checks: ['req-consent'],
+      id: 'ff-consent', label: 'Consent recorded and honoured', when: { ...PERSONAL, BASIS: ['consent'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-basis-consent'], checks: ['req-consent'],
       threshold: 'Giving and withdrawing consent each produce 1 record with purpose, wording version, time and channel; withdrawal takes 1 request; after it the purpose\'s job skips the person',
       description: 'An integration test gives consent for personalised offers as a person, withdraws it with one request, reads both records back, and runs the personalisation job to check that the person is skipped.',
       tool: 'Vitest with supertest',
@@ -702,7 +702,7 @@ it('records consent and its withdrawal, and stops the processing', async () => {
 })`,
     },
     {
-      id: 'ff-objection', label: 'Objections honoured', when: { ...PERSONAL, BASIS: ['legitimate'] }, category: 'structural', implements: ['adr-basis-legitimate'], checks: ['req-objection'],
+      id: 'ff-objection', label: 'Objections honoured', when: { ...PERSONAL, BASIS: ['legitimate'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-basis-legitimate'], checks: ['req-objection'],
       threshold: 'After an objection, 0 marketing messages to the person and 0 analytics rows for them from the next job run on; the objection is on the exclusion list with its date',
       description: 'An integration test objects as a person, sends a marketing campaign and runs the analytics job, and checks that neither touched the person and that the exclusion list holds the objection with its date.',
       tool: 'Vitest with supertest, the mail sender captured by the test harness',

@@ -561,7 +561,11 @@
       "label": "Every message is a CloudEvent",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test constructs a CloudEvent from each message sample (one per type, the same samples the consumers are tested with); the SDK refuses a missing or malformed required attribute, and the test checks the attributes the pack adds.\n\nThreshold: Every message sample validates as a CloudEvent and carries dataschema, time and correlationid; 0 duplicate ids among the samples\n\nTool: Vitest with the cloudevents SDK (or the test runner and CloudEvents SDK of your stack)\n\n```ts\nimport { CloudEvent } from 'cloudevents'\nimport { MESSAGE_SAMPLES } from '../src/messages/samples'   // one sample per message type\n\nit('every message type is a valid CloudEvent with schema version, time and correlation id', () => {\n  const ids = new Set<string>()\n  for (const sample of MESSAGE_SAMPLES) {\n    const event = new CloudEvent(sample)                     // strict: throws ValidationError on a bad envelope\n    const attrs = event.toJSON() as Record<string, unknown>\n    expect(attrs.dataschema, `${event.type}: dataschema`).toMatch(/^\\S+$/)\n    expect(attrs.time, `${event.type}: time`).toMatch(/^\\d{4}-\\d{2}-\\d{2}T/)\n    expect(attrs.correlationid, `${event.type}: correlationid`).toMatch(/^\\S+$/)\n    expect(ids.has(event.id), `duplicate id ${event.id}`).toBe(false)\n    ids.add(event.id)\n  }\n})\n```"
     },
     {
@@ -570,7 +574,11 @@
       "label": "Duplicate delivery harmless",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts the real broker and database in containers, publishes each message type a consumer handles twice with the same id, restarts the consumer, publishes it a third time, and compares the state with a single delivery.\n\nThreshold: Every consumer, given each of its message types twice (and again after a restart), ends in the same state as with one delivery; 0 double effects; 2 duplicates counted\n\nTool: Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest (or the test runner of your stack)\n\n```ts\nimport { runWith } from './harness'   // starts broker and database with Testcontainers, runs the real consumer\nimport { MESSAGE_SAMPLES } from '../src/messages/samples'   // one sample per message type\n\ndescribe.each(MESSAGE_SAMPLES)('$type', (sample) => {\n  it('has the effect of one delivery when delivered three times', async () => {\n    const once = await runWith([sample])\n    const thrice = await runWith([sample, sample], { restart: true, then: [sample] })\n    expect(thrice.state).toEqual(once.state)\n    expect(thrice.duplicatesCounted).toBe(2)\n  })\n})\n```",
       "hubWhen": {
         "DELIVERY": [
@@ -584,7 +592,11 @@
       "label": "Only losable types, failures dropped",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test enumerates the message types the producers can publish from their type definitions (not from a list kept by hand) and fails on any that is not on the losable list; a second test, against the real broker in a container, makes the consumer fail on a message and checks that it is delivered once and the drop counter moves.\n\nThreshold: Every message type a producer can publish is on the losable list, 0 off it; a message the consumer fails on is delivered once, never again, and counted as dropped\n\nTool: Vitest with Testcontainers (or the test runner of your stack)\n\n```ts\nimport { PUBLISHED_TYPES } from '../src/messages'       // derived from the producers' type union\nimport { LOSABLE } from '../src/messages/losable'          // reviewed list: loss changes no record\nimport { runWith } from './harness'                        // starts the broker with Testcontainers, runs the real consumer\nimport { FAILING_SAMPLE } from '../src/messages/samples'   // a message the consumer throws on\n\nit('publishes only message types whose loss changes no record', () => {\n  expect(PUBLISHED_TYPES.filter((t) => !LOSABLE.has(t))).toEqual([])\n})\n\nit('drops a failing message after one delivery and counts it', async () => {\n  const result = await runWith([FAILING_SAMPLE])\n  expect(result.deliveries).toBe(1)\n  expect(result.droppedCounted).toBe(1)\n})\n```",
       "hubWhen": {
         "DELIVERY": [
@@ -598,7 +610,11 @@
       "label": "Any order, same result",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A property-based test generates sequences of versioned messages for one record, applies every permutation, and expects the same final state as the ordered sequence.\n\nThreshold: For every message type, all orders of a sequence of 3 versions end in the state of the highest version; 0 differences\n\nTool: fast-check with Vitest (or the property-testing library of your stack)\n\n```ts\nimport fc from 'fast-check'\nimport { apply, emptyState } from '../src/consumers/record'\nimport { arbitraryUpdates } from './arbitraries'   // versioned messages for one record\n\nit('ends in the same state whatever the order', () => {\n  fc.assert(fc.property(\n    arbitraryUpdates(3).chain((updates) =>\n      fc.tuple(fc.constant(updates), fc.shuffledSubarray(updates, { minLength: updates.length }))),\n    ([updates, shuffled]) => {\n      const ordered = [...updates].sort((a, b) => a.version - b.version).reduce(apply, emptyState)\n      expect(shuffled.reduce(apply, emptyState)).toEqual(ordered)\n    }))\n})\n```",
       "hubWhen": {
         "ORDER": [
@@ -612,7 +628,11 @@
       "label": "Order per key holds",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test against the real broker in a container publishes numbered messages for 100 keys interleaved, runs four consumers, and checks that each key's numbers were handled in increasing order.\n\nThreshold: With 4 consumers in parallel, the messages of each of 100 keys are handled in the order published; 0 out of order\n\nTool: Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest (or the test runner of your stack)\n\n```ts\nit('keeps the order within each key', async () => {\n  const keys = Array.from({ length: 100 }, (_, i) => 'order-' + i)\n  for (let n = 1; n <= 20; n++) for (const key of keys) await publish({ key, n })\n  const handled = await consumeWith(4, keys.length * 20)          // [{ key, n }] in handling order\n  for (const key of keys) {\n    const ns = handled.filter((m) => m.key === key).map((m) => m.n)\n    expect(ns).toEqual([...ns].sort((a, b) => a - b))\n  }\n})\n```",
       "hubWhen": {
         "ORDER": [
@@ -626,7 +646,10 @@
       "label": "Kafka lag and dead letters",
       "x": 1040,
       "y": 650,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "Prometheus rules over kafka-exporter metrics alert on a stuck consumer group, on a slow one (lag divided by consumption rate), on any message published to a .dlq topic, and on a dead letter the triage group has not consumed within {{DLQ_HOURS}} hours (the owner's replay or discard tool runs as that group). With at-most-once delivery there are no .dlq topics and those two rules stay idle.\n\nThreshold: An alert fires when a consumer group with waiting messages has made no progress for {{LAG_MINUTES}} minutes, or consumes so slowly that its lag is more than {{LAG_MINUTES}} minutes of its own rate; when a dead-letter topic receives a message; and when the dlq-triage group has had a dead letter waiting for {{DLQ_HOURS}} hours\n\nTool: Prometheus alerting rules (kafka-exporter)\n\n```yaml\ngroups:\n- name: messaging\n  rules:\n  - alert: ConsumerStuck\n    expr: kafka_consumergroup_lag_sum > 0\n      and delta(kafka_consumergroup_current_offset_sum[{{LAG_MINUTES}}m]) == 0\n    labels: { severity: page }\n    annotations: { summary: \"{{ $labels.consumergroup }} has not moved for {{LAG_MINUTES}} minutes\" }\n  - alert: ConsumerSlow\n    expr: kafka_consumergroup_lag_sum / rate(kafka_consumergroup_current_offset_sum[5m]) > {{LAG_MINUTES}} * 60\n    for: 5m\n    labels: { severity: page }\n    annotations: { summary: \"{{ $labels.consumergroup }} is more than {{LAG_MINUTES}} minutes behind at its own rate\" }\n  - alert: DeadLetters\n    expr: increase(kafka_topic_partition_current_offset{topic=~\".+\\\\.dlq\"}[5m]) > 0\n    labels: { severity: ticket }\n  - alert: DeadLetterUntriaged\n    expr: kafka_consumergroup_lag_sum{consumergroup=\"dlq-triage\"} > 0\n    for: {{DLQ_HOURS}}h\n    labels: { severity: page }\n    annotations: { summary: \"a dead letter on {{ $labels.topic }} has waited {{DLQ_HOURS}} hours\" }\n```",
       "hubWhen": {
         "BROKER": [
@@ -640,7 +663,10 @@
       "label": "RabbitMQ backlog and dead letters",
       "x": 1040,
       "y": 780,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "Prometheus rules over the rabbitmq_prometheus plugin's per-object metrics alert on stuck queues, dead letters, and a dead letter older than {{DLQ_HOURS}} hours (the head timestamp needs the timestamp property set by publishers). With at-most-once delivery there are no .dlq queues and those two rules stay idle.\n\nThreshold: An alert fires when a queue has messages ready and no consumer, or messages ready that have not decreased for {{LAG_MINUTES}} minutes, or any message in a .dlq queue, or a .dlq head message older than {{DLQ_HOURS}} hours\n\nTool: Prometheus alerting rules (rabbitmq_prometheus plugin, per-object metrics)\n\n```yaml\ngroups:\n- name: messaging\n  rules:\n  - alert: QueueWithoutConsumer\n    expr: rabbitmq_queue_messages_ready > 0 and rabbitmq_queue_consumers == 0\n    for: {{LAG_MINUTES}}m\n  - alert: QueueStuck\n    expr: rabbitmq_queue_messages_ready > 0 and delta(rabbitmq_queue_messages_ready[{{LAG_MINUTES}}m]) >= 0\n    for: {{LAG_MINUTES}}m\n  - alert: DeadLetters\n    expr: rabbitmq_queue_messages{queue=~\".+\\\\.dlq\"} > 0\n    labels: { severity: ticket }\n  - alert: DeadLetterUntriaged\n    expr: time() - rabbitmq_queue_head_message_timestamp{queue=~\".+\\\\.dlq\"} > {{DLQ_HOURS}} * 3600\n    labels: { severity: page }\n```",
       "hubWhen": {
         "BROKER": [
@@ -654,7 +680,11 @@
       "label": "Every queue quorum with a delivery limit",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "A scheduled job reads every queue from the management API and fails on one that is not a quorum queue or whose effective policy lacks the dead-letter exchange or the delivery limit; the policy itself is applied from the repository.\n\nThreshold: Every queue that is not a .dlq is a quorum queue whose effective policy sets a dead-letter exchange and delivery-limit = {{MAX_ATTEMPTS}}; 0 queues without\n\nTool: RabbitMQ management API with curl and jq\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n# policy, applied from the repository:\n#   rabbitmqctl set_policy dlx \".*\" '{\"dead-letter-exchange\":\"dlx\",\"delivery-limit\":{{MAX_ATTEMPTS}}}' --apply-to quorum_queues\nbad=$(curl -sf -u \"$RABBIT_USER:$RABBIT_PASS\" \"$RABBIT_MGMT_URL/api/queues\" | jq -r --argjson max {{MAX_ATTEMPTS}} '\n  .[] | select(.name | endswith(\".dlq\") | not)\n  | select(.type != \"quorum\"\n           or (.effective_policy_definition[\"delivery-limit\"] // -1) != $max\n           or ((.effective_policy_definition[\"dead-letter-exchange\"] // \"\") == \"\"))\n  | \"\\(.vhost)/\\(.name) (\\(.type))\"')\ntest -z \"$bad\" || { echo \"queues without quorum type or the dead-letter policy:\"; echo \"$bad\"; exit 1; }\n```",
       "hubWhen": {
         "BROKER": [
@@ -668,7 +698,10 @@
       "label": "SQS age and dead letters",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "Each queue, its dead-letter queue and their three CloudWatch alarms are defined together in one Terraform module, so a queue cannot exist without its alarms; the redrive policy itself is checked by the plan policy.\n\nThreshold: An alarm fires when ApproximateAgeOfOldestMessage of a queue exceeds {{LAG_MINUTES}} minutes, when its dead-letter queue holds a message, and when the oldest dead letter is older than {{DLQ_HOURS}} hours\n\nTool: Amazon CloudWatch alarms (Terraform)\n\n```hcl\nresource \"aws_sqs_queue\" \"orders_dlq\" { name = \"orders-dlq\" }\n\nresource \"aws_sqs_queue\" \"orders\" {\n  name           = \"orders\"\n  redrive_policy = jsonencode({ deadLetterTargetArn = aws_sqs_queue.orders_dlq.arn, maxReceiveCount = {{MAX_ATTEMPTS}} })\n}\n\nresource \"aws_cloudwatch_metric_alarm\" \"orders_age\" {\n  alarm_name          = \"orders-oldest-message\"\n  namespace           = \"AWS/SQS\"\n  metric_name         = \"ApproximateAgeOfOldestMessage\"\n  dimensions          = { QueueName = aws_sqs_queue.orders.name }\n  statistic           = \"Maximum\"\n  period              = 60\n  evaluation_periods  = 1\n  threshold           = {{LAG_MINUTES}} * 60\n  comparison_operator = \"GreaterThanThreshold\"\n}\n\nresource \"aws_cloudwatch_metric_alarm\" \"orders_dead_letters\" {\n  alarm_name          = \"orders-dead-letters\"\n  namespace           = \"AWS/SQS\"\n  metric_name         = \"ApproximateNumberOfMessagesVisible\"\n  dimensions          = { QueueName = aws_sqs_queue.orders_dlq.name }\n  statistic           = \"Maximum\"\n  period              = 60\n  evaluation_periods  = 1\n  threshold           = 0\n  comparison_operator = \"GreaterThanThreshold\"\n}\n\nresource \"aws_cloudwatch_metric_alarm\" \"orders_dead_letter_age\" {\n  alarm_name          = \"orders-dead-letter-untriaged\"\n  namespace           = \"AWS/SQS\"\n  metric_name         = \"ApproximateAgeOfOldestMessage\"\n  dimensions          = { QueueName = aws_sqs_queue.orders_dlq.name }\n  statistic           = \"Maximum\"\n  period              = 300\n  evaluation_periods  = 1\n  threshold           = {{DLQ_HOURS}} * 3600\n  comparison_operator = \"GreaterThanThreshold\"\n}\n```",
       "hubWhen": {
         "BROKER": [
@@ -682,7 +715,11 @@
       "label": "No queue without redrive",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A Conftest policy over the Terraform plan fails the pull request on a queue without a redrive policy, or with another maxReceiveCount; a policy only known after apply is reported too, so it is written as a literal.\n\nThreshold: Every aws_sqs_queue in the plan that is not a dead-letter queue has a redrive policy with maxReceiveCount = {{MAX_ATTEMPTS}}; 0 without\n\nTool: Conftest (Open Policy Agent) over terraform show -json\n\n```rego\npackage main\n\nimport rego.v1\n\nqueues contains rc if {\n  some rc in input.resource_changes\n  rc.type == \"aws_sqs_queue\"\n  not endswith(rc.change.after.name, \"-dlq\")\n}\n\ndeny contains msg if {\n  some rc in queues\n  not rc.change.after.redrive_policy\n  msg := sprintf(\"%s has no redrive policy to a dead-letter queue\", [rc.address])\n}\n\ndeny contains msg if {\n  some rc in queues\n  rc.change.after.redrive_policy\n  json.unmarshal(rc.change.after.redrive_policy).maxReceiveCount != {{MAX_ATTEMPTS}}\n  msg := sprintf(\"%s sets maxReceiveCount other than {{MAX_ATTEMPTS}}\", [rc.address])\n}\n```",
       "hubWhen": {
         "BROKER": [
@@ -696,7 +733,11 @@
       "label": "Schemas compatible before merge",
       "x": 1040,
       "y": 1300,
-      "category": "process",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step asks the registry whether each changed Avro, Protobuf or JSON schema is compatible with every version of its subject under the subject's mode, skips subjects that do not exist yet, and fails on the first incompatible one.\n\nThreshold: Every changed schema of an existing subject is compatible with all registered versions under the subject's mode before merge; 0 incompatible registrations; a new subject passes\n\nTool: Confluent Schema Registry compatibility API with curl and jq (Apicurio Registry offers the same check)\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nauth=(-u \"$SR_KEY:$SR_SECRET\")\nfor file in $(git diff --name-only origin/main -- 'schemas/*.avsc' 'schemas/*.proto' 'schemas/*.json'); do\n  name=$(basename \"$file\"); subject=\"${name%.*}-value\"\n  case \"${name##*.}\" in avsc) type=AVRO ;; proto) type=PROTOBUF ;; json) type=JSON ;; esac\n  if ! curl -sf \"${auth[@]}\" \"$SCHEMA_REGISTRY_URL/subjects/$subject/versions\" > /dev/null; then\n    echo \"$subject: new subject, nothing to be compatible with\"; continue\n  fi\n  body=$(jq -n --arg t \"$type\" --rawfile s \"$file\" '{schemaType: $t, schema: $s}')\n  curl -sf \"${auth[@]}\" -H 'Content-Type: application/vnd.schemaregistry.v1+json' -d \"$body\" \\\n    \"$SCHEMA_REGISTRY_URL/compatibility/subjects/$subject/versions?verbose=true\" \\\n    | jq -e '.is_compatible' > /dev/null || { echo \"incompatible: $file\"; exit 1; }\ndone\n```",
       "hubWhen": {
         "SCHEMA": [
@@ -710,7 +751,11 @@
       "label": "AsyncAPI break check",
       "x": 1040,
       "y": 1430,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "In every pull request, the AsyncAPI CLI diffs the document with the one of the last release tag, listing only the changes it classifies as breaking, and the step fails when that list is not empty.\n\nThreshold: 0 breaking changes between the last release's AsyncAPI document and the pull request\n\nTool: AsyncAPI CLI (asyncapi diff)\n\n```yaml\n# .github/workflows/messages.yml (a job step; actions/checkout@v4.2.2 with fetch-depth: 0 — pin by commit SHA in your repository)\n- name: No breaking message changes\n  run: |\n    git show \"$(git describe --tags --abbrev=0)\":asyncapi.yaml > /tmp/base.yaml\n    npx @asyncapi/cli diff /tmp/base.yaml asyncapi.yaml --type breaking --format json > /tmp/breaking.json\n    jq -e 'length == 0' /tmp/breaking.json\n```",
       "hubWhen": {
         "SCHEMA": [

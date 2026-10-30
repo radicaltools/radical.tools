@@ -17,7 +17,7 @@ const MANIFESTS: Record<string, string[]> = {
 function onlyRuntime(value: string, adr: string, name: string, image: string, approved: string): FitnessSpec {
   const foreign = Object.entries(MANIFESTS).filter(([k]) => k !== value).flatMap(([, globs]) => globs)
   return {
-    id: `ff-only-${value}`, label: `Only ${name}`, when: { RUNTIME: [value] }, category: 'structural', implements: [adr], checks: ['req-one-stack'],
+    id: `ff-only-${value}`, label: `Only ${name}`, when: { RUNTIME: [value] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [adr], checks: ['req-one-stack'],
     threshold: `100% of Dockerfiles end in a stage FROM a ${image} image; 0 build manifests of another runtime outside .stack-exceptions`,
     description: `A job in every build reads the final stage of each Dockerfile (a stage alias is resolved to its image) and lists the build manifests in the repository; it fails on a final image that is not a ${image} image or on a manifest of another runtime (${foreign.join(', ')}). A manifest a decision record allows is listed in .stack-exceptions with that record's id. Runs on Linux (git, awk, GNU grep).`,
     tool: 'git with awk and grep (CI job)',
@@ -206,7 +206,7 @@ const pack: PackSpec = {
     onlyRuntime('go', 'adr-go', 'Go', 'Go', 'scratch|gcr\\.io/distroless/(static|base)(-debian[0-9]+)?|cgr\\.dev/chainguard/static|alpine'),
     onlyRuntime('python', 'adr-python', 'Python', 'Python', 'python|cgr\\.dev/chainguard/python|gcr\\.io/distroless/python3(-debian[0-9]+)?'),
     {
-      id: 'ff-eol', label: 'No version near end of support', category: 'operational', implements: RUNTIMES, checks: ['req-eol'],
+      id: 'ff-eol', label: 'No version near end of support', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: RUNTIMES, checks: ['req-eol'],
       threshold: '0 runtime, framework or base image versions within {{EOL_DAYS}} days of their end of support',
       description: 'A scheduled job and every build look up each product and cycle listed in versions.txt on endoflife.date and fail when its end of support is less than {{EOL_DAYS}} days away. versions.txt is kept next to the build files and changed in the same pull request as .nvmrc, go.mod, pom.xml, global.json or pyproject.toml. Runs on Linux (GNU date).',
       tool: 'endoflife.date API (curl and jq)',
@@ -221,7 +221,7 @@ done < versions.txt
 exit $fail`,
     },
     {
-      id: 'ff-upgrade-lts', label: 'On a current LTS', when: { UPGRADE: ['lts'] }, category: 'operational', implements: RUNTIMES, checks: ['req-lts'],
+      id: 'ff-upgrade-lts', label: 'On a current LTS', when: { UPGRADE: ['lts'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: RUNTIMES, checks: ['req-lts'],
       threshold: 'Every cycle in versions.txt is an LTS cycle, and is the newest LTS cycle unless that one was released less than 180 days ago',
       description: 'A scheduled job reads every product\'s cycles from endoflife.date: the cycle in use must be marked LTS (already, not from a future date), and the newest LTS cycle must be the one in use or younger than six months. Go and Python have no LTS cycles, so the check fails for them: pick another version policy. Runs on Linux (GNU date).',
       tool: 'endoflife.date API (curl and jq)',
@@ -241,7 +241,7 @@ done < versions.txt
 exit $fail`,
     },
     {
-      id: 'ff-upgrade-n1', label: 'At most one cycle behind', when: { UPGRADE: ['n1'] }, category: 'operational', implements: RUNTIMES, checks: ['req-n1'],
+      id: 'ff-upgrade-n1', label: 'At most one cycle behind', when: { UPGRADE: ['n1'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: RUNTIMES, checks: ['req-n1'],
       threshold: 'Every cycle in versions.txt is the newest or the second-newest cycle endoflife.date lists for its product',
       description: 'A scheduled job reads every product\'s cycles from endoflife.date (newest first) and fails when the cycle in use is not among the first two.',
       tool: 'endoflife.date API (curl and jq)',
@@ -255,7 +255,7 @@ done < versions.txt
 exit $fail`,
     },
     {
-      id: 'ff-upgrade-latest', label: 'On the latest cycle', when: { UPGRADE: ['latest'] }, category: 'operational', implements: RUNTIMES, checks: ['req-latest'],
+      id: 'ff-upgrade-latest', label: 'On the latest cycle', when: { UPGRADE: ['latest'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: RUNTIMES, checks: ['req-latest'],
       threshold: 'Every cycle in versions.txt is the newest cycle endoflife.date lists for its product, unless that one was released less than 30 days ago',
       description: 'A scheduled job reads every product\'s newest cycle and its release date from endoflife.date and fails when the cycle in use is older and the newest has been out for 30 days or more. Runs on Linux (GNU date).',
       tool: 'endoflife.date API (curl and jq)',
@@ -269,7 +269,7 @@ done < versions.txt
 exit $fail`,
     },
     {
-      id: 'ff-skills', label: 'Two of the team ship', when: { CRITERION: ['skills'] }, category: 'process', implements: RUNTIMES, checks: ['req-skills'],
+      id: 'ff-skills', label: 'Two of the team ship', when: { CRITERION: ['skills'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: RUNTIMES, checks: ['req-skills'],
       threshold: 'At least 2 members of the owning team (team.txt) authored non-merge commits to the service in the last 12 months',
       description: 'A scheduled job counts the distinct authors of the last 12 months of commits on the service\'s path and keeps those whose e-mail address is in team.txt, the owning team\'s list kept next to CODEOWNERS; fewer than two fails. Needs the full history (fetch-depth 0).',
       tool: 'git log (scheduled job)',
@@ -281,7 +281,7 @@ n=$(git log --since='12 months ago' --no-merges --format=%ae -- . | sort -u | gr
 [ "$n" -ge 2 ] || { echo "::error::only $n of the owning team merged a change to the service in 12 months (2 needed)"; exit 1; }`,
     },
     {
-      id: 'ff-dep-review', label: 'New dependencies maintained', when: { CRITERION: ['ecosystem'] }, category: 'process', implements: RUNTIMES, checks: ['req-maintained'],
+      id: 'ff-dep-review', label: 'New dependencies maintained', when: { CRITERION: ['ecosystem'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: RUNTIMES, checks: ['req-maintained'],
       threshold: 'Every direct dependency a pull request adds had a release within 365 days and has an OpenSSF Scorecard of at least 5, or the pull request carries the label dependency-exception',
       description: 'The pipeline runs the script for each direct dependency the pull request adds to the manifest (name from the manifest diff): deps.dev gives the package\'s newest publication date and its source repository\'s Scorecard, for npm, PyPI, Maven, Go and NuGet alike. A failing dependency passes only with the label dependency-exception, which the reviewer adds with the reason in the review. Runs on Linux (GNU date).',
       tool: 'deps.dev API (curl and jq) with the GitHub CLI',
@@ -306,7 +306,7 @@ fi
 exit $fail`,
     },
     {
-      id: 'ff-footprint', label: 'Footprint within budget', when: { CRITERION: ['performance'] }, category: 'operational', implements: RUNTIMES, checks: ['req-footprint'],
+      id: 'ff-footprint', label: 'Footprint within budget', when: { CRITERION: ['performance'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: RUNTIMES, checks: ['req-footprint'],
       threshold: 'A new instance answers its readiness probe within {{STARTUP_SECONDS}} seconds; under the load test its peak memory stays at or under {{MEMORY_MB}} MB and it is not killed for memory',
       description: 'For each release candidate the job starts one instance of the image under a hard memory limit of {{MEMORY_MB}} MB, polls its readiness endpoint until it answers (failing past {{STARTUP_SECONDS}} seconds), runs the load test the Capacity and scaling pack decided against it, then reads the container\'s peak memory from cgroup v2 (memory.peak) and whether it was killed for memory. Runs on a Linux host with cgroup v2 (kernel 5.19 or newer).',
       tool: 'Docker with curl and jq (release pipeline)',

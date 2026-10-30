@@ -225,7 +225,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-samm', label: 'SAMM assessment current and on target', when: { FRAMEWORK: ['samm'] }, category: 'process', implements: ['adr-samm'], checks: ['req-samm-current', 'req-samm-targets'],
+      id: 'ff-samm', label: 'SAMM assessment current and on target', when: { FRAMEWORK: ['samm'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: ['adr-samm'], checks: ['req-samm-current', 'req-samm-targets'],
       threshold: 'The assessment is at most {{ASSESSMENT_MONTHS}} months old; all 15 practices have a score from 0 to 3 and a target from {{SAMM_FLOOR}} to 3; 0 practices below target after their date',
       description: 'A scheduled job, and every pull request that changes security/samm/, reads the assessment copied from the SAMM Toolbox\'s Scorecard and fails on a stale date, a missing practice, a target below the floor, or a practice below its target after its date. The file is a format of this pack: the Toolbox is a workbook with no machine-readable export, so the Scorecard\'s practice scores are copied into it after each assessment.',
       tool: 'Node.js with js-yaml (scripts/security/samm-check.mjs) in a scheduled GitHub Actions job',
@@ -252,7 +252,7 @@ for (const id of PRACTICES) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-ssdf', label: 'SSDF evidence map complete', when: { FRAMEWORK: ['ssdf'] }, category: 'process', implements: ['adr-ssdf'], checks: ['req-ssdf-evidence'],
+      id: 'ff-ssdf', label: 'SSDF evidence map complete', when: { FRAMEWORK: ['ssdf'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-ssdf'], checks: ['req-ssdf-evidence'],
       threshold: 'All 19 SSDF 1.1 practice ids have at least one piece of evidence or a reason; 0 repository paths in the map missing; the map reviewed within {{ASSESSMENT_MONTHS}} months',
       description: 'A scheduled job, and every pull request, reads security/ssdf/evidence.yaml and fails on a missing practice id, a practice with neither evidence nor a reason, a repository path that no longer exists (a renamed workflow), or a stale review date. Links outside the repository must be https links; whether they still show what they claim is the reviewer\'s part. When SSDF 1.2 is final, PO.6 and PW.10 are added to the list.',
       tool: 'Node.js with js-yaml (scripts/security/ssdf-check.mjs) in a scheduled GitHub Actions job',
@@ -280,7 +280,7 @@ for (const id of IDS) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-sdl', label: 'SDL checklist complete and reviewed', when: { FRAMEWORK: ['sdl'] }, category: 'process', implements: ['adr-sdl'], checks: ['req-sdl-checklist'],
+      id: 'ff-sdl', label: 'SDL checklist complete and reviewed', when: { FRAMEWORK: ['sdl'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: ['adr-sdl'], checks: ['req-sdl-checklist'],
       threshold: 'All 10 SDL practices present; each done or partial item has evidence, each partial item says what is missing, each not-applicable item a reason; reviewed within {{ASSESSMENT_MONTHS}} months',
       description: 'A scheduled job, and every pull request, reads security/sdl/checklist.yaml, whose keys are this pack\'s short names for the ten practices on Microsoft\'s SDL page in the page\'s order, and fails on a missing practice, an unsupported status or a stale review date.',
       tool: 'Node.js with js-yaml (scripts/security/sdl-check.mjs) in a scheduled GitHub Actions job',
@@ -308,7 +308,7 @@ for (const id of PRACTICES) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-champions', label: 'A champion named for each team', when: { CHAMPIONS: ['champions'] }, category: 'process', implements: ['adr-champions'], checks: ['req-champion'],
+      id: 'ff-champions', label: 'A champion named for each team', when: { CHAMPIONS: ['champions'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-champions'], checks: ['req-champion'],
       threshold: '0 teams in CODEOWNERS without a champion in security/champions.yaml; every champion a member of their team and of {{SECURITY_TEAM}}, with at least {{CHAMPION_HOURS}} hours a week',
       description: 'A weekly job reads security/champions.yaml and the teams named in .github/CODEOWNERS, asks GitHub for the members of each team and of the champions\' team, and fails naming a team without a champion, a champion who has left their team or the champions\' team, or one with fewer hours than decided. With collective ownership (no CODEOWNERS), the teams listed in the file are checked.',
       tool: 'Node.js with js-yaml and the GitHub CLI (gh api orgs/{org}/teams/{team_slug}/members, a token with read access to the organisation\'s members)',
@@ -335,7 +335,7 @@ for (const [team, c] of Object.entries(teams)) {
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-security-review', label: 'Labelled changes need a security approval', when: REVIEWED, category: 'process', implements: ['adr-champions', 'adr-appsec'], checks: ['req-champion-review', 'req-appsec-review'],
+      id: 'ff-security-review', label: 'Labelled changes need a security approval', when: REVIEWED, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: ['adr-champions', 'adr-appsec'], checks: ['req-champion-review', 'req-appsec-review'],
       threshold: '0 pull requests with the security-review label merged without an approval, still standing, from a member of {{SECURITY_TEAM}} who is not the author',
       description: 'A workflow runs on every change to a pull request\'s labels, commits and reviews; when the security-review label is set, it fails unless the latest review of some member of {{SECURITY_TEAM}} other than the author is an approval. The job is a required check of main, in the ruleset the Code review and branching pack keeps. GITHUB_TOKEN cannot list team members, so the workflow uses a token with read access to the organisation\'s members (a GitHub App installation token or a fine-grained token) stored as ORG_READ_TOKEN.',
       tool: 'GitHub Actions with the GitHub CLI (pulls/{pull_number}/reviews and orgs/{org}/teams/{team_slug}/members)',
@@ -367,7 +367,7 @@ jobs:
           echo "the security-review label needs an approval from {{SECURITY_TEAM}}"; exit 1`,
     },
     {
-      id: 'ff-one-team', label: 'One team owns the code', when: { CHAMPIONS: ['none'] }, category: 'structural', implements: ['adr-no-security-role'], checks: ['req-one-team'],
+      id: 'ff-one-team', label: 'One team owns the code', when: { CHAMPIONS: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-no-security-role'], checks: ['req-one-team'],
       threshold: 'At most 1 distinct team named in .github/CODEOWNERS',
       description: 'A check on every pull request counts the distinct teams that .github/CODEOWNERS names (written @org/team) and fails above one, so that a second team cannot own code while the decision that nobody has security as a role stands. Without a CODEOWNERS file (collective ownership) it passes.',
       tool: 'grep in a GitHub Actions step',
@@ -384,7 +384,7 @@ if [ "$count" -gt 1 ]; then
 fi`,
     },
     {
-      id: 'ff-appsec-wait', label: 'Security reviews given in time', when: { CHAMPIONS: ['appsec'] }, category: 'process', implements: ['adr-appsec'], checks: ['req-appsec-review'],
+      id: 'ff-appsec-wait', label: 'Security reviews given in time', when: { CHAMPIONS: ['appsec'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-appsec'], checks: ['req-appsec-review'],
       threshold: '0 open pull requests labelled security-review for more than {{APPSEC_REVIEW_DAYS}} days without an approval from {{SECURITY_TEAM}}',
       description: 'A daily job lists the open pull requests with the security-review label, skips those a member of {{SECURITY_TEAM}} has approved, finds when the label was last added from the issue\'s events, and fails naming each one that has waited longer than the deadline, so the wait shows up before the team learns to avoid the label.',
       tool: 'GitHub CLI (gh pr list, gh pr view --json latestReviews, gh api issues/{issue_number}/events) in a scheduled GitHub Actions job',
@@ -405,7 +405,7 @@ done
 exit "$late"`,
     },
     {
-      id: 'ff-pentest-age', label: 'Penetration test not older than the limit', when: { PENTEST: ['yearly'] }, category: 'process', implements: ['adr-pentest'], checks: ['req-pentest-yearly'],
+      id: 'ff-pentest-age', label: 'Penetration test not older than the limit', when: { PENTEST: ['yearly'] }, characteristic: 'security', scope: 'holistic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: ['adr-pentest'], checks: ['req-pentest-yearly'],
       threshold: 'The newest penetration test in security/pentests.yaml is at most {{PENTEST_MONTHS}} months old',
       description: 'A scheduled job reads the dates of the tests recorded in security/pentests.yaml and fails when the newest is older than the limit, a month before which the next test should already be booked.',
       tool: 'Node.js with js-yaml (scripts/security/pentest-age.mjs) in a scheduled GitHub Actions job',
@@ -424,7 +424,7 @@ if (!(newest >= oldest)) {
 }`,
     },
     {
-      id: 'ff-pentest-record', label: 'Tests recorded, findings filed, major releases tested', when: TESTED, category: 'process', implements: ['adr-pentest'], checks: ['req-pentest-yearly', 'req-pentest-major'],
+      id: 'ff-pentest-record', label: 'Tests recorded, findings filed, major releases tested', when: TESTED, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-pentest'], checks: ['req-pentest-yearly', 'req-pentest-major'],
       threshold: 'Every recorded test names its tester, scope and report and had its findings filed within {{PENTEST_TRIAGE_DAYS}} days; every tag matching {{MAJOR_TAGS}} since the decision has a test for it dated no later than the tag',
       description: 'A job on every pushed tag, and weekly, reads security/pentests.yaml and the repository\'s tags, and fails on a test without its tester, scope or report link, findings filed late, or a major release tag with no test, or only one dated after the tag. Tags created before the date in adopted: are not checked.',
       tool: 'Node.js with js-yaml and git for-each-ref (scripts/security/pentest-record.mjs) in GitHub Actions',
@@ -452,7 +452,7 @@ for (const [tag, date] of tags.filter(([tag, date]) => MAJOR.test(tag) && new Da
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-pentest-waiver', label: 'No-test record current', when: { PENTEST: ['none'] }, category: 'process', implements: ['adr-no-pentest'], checks: ['req-pentest-none'],
+      id: 'ff-pentest-waiver', label: 'No-test record current', when: { PENTEST: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: ['adr-no-pentest'], checks: ['req-pentest-none'],
       threshold: 'security/pentests.yaml holds a waiver with a reason and a replacement, reviewed within {{ASSESSMENT_MONTHS}} months',
       description: 'A scheduled job reads the waiver in security/pentests.yaml and fails when it has no reason, names nothing that replaces the test, or was last reviewed too long ago.',
       tool: 'Node.js with js-yaml (scripts/security/pentest-waiver.mjs) in a scheduled GitHub Actions job',
@@ -472,7 +472,7 @@ if (!(new Date(waiver?.reviewed) >= oldest)) errors.push(\`the waiver was last r
 if (errors.length) { console.error(errors.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-training-onboarding', label: 'New committers trained', category: 'process', implements: FRAMEWORKS, checks: ['req-training-onboarding'],
+      id: 'ff-training-onboarding', label: 'New committers trained', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-training-onboarding'],
       threshold: '0 people who committed in the last 90 days, first committed more than {{ONBOARDING_DAYS}} days ago, and have no completion of {{TRAINING_COURSE}}',
       description: 'A weekly job downloads the completions from the learning platform (its export or API, reduced to email,course,completed_on in training.csv and never committed), takes each author\'s first commit date from git log, and fails naming everyone who committed recently and is past the onboarding window without a completion. Commits must use the work address the learning platform knows; bots are skipped.',
       tool: 'Node.js and git log (scripts/security/training-onboarding.mjs) in a scheduled GitHub Actions job',
@@ -496,7 +496,7 @@ const missing = [...recent].filter((email) => due(email) && !trained.has(email))
 if (missing.length) { console.error(\`no completion of \${COURSE}:\\n\${missing.join('\\n')}\`); process.exit(1) }`,
     },
     {
-      id: 'ff-training-yearly', label: 'Committers trained in the last 12 months', when: { TRAINING: ['yearly'] }, category: 'process', implements: FRAMEWORKS, checks: ['req-training-yearly'],
+      id: 'ff-training-yearly', label: 'Committers trained in the last 12 months', when: { TRAINING: ['yearly'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: FRAMEWORKS, checks: ['req-training-yearly'],
       threshold: '0 people who committed in the last 90 days without a completion of {{TRAINING_COURSE}} in the last 12 months',
       description: 'The same weekly job compares each recent author\'s latest completion of the course with today, and fails naming everyone whose latest completion is older than 12 months.',
       tool: 'Node.js and git log (scripts/security/training-yearly.mjs) in a scheduled GitHub Actions job',

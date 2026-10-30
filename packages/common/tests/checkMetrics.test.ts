@@ -122,7 +122,7 @@ describe('invalid conditions', () => {
     const data = model('p95 is fine\nload.share{env=prod} <= 300 ms', { combine: 'most', max_age: 'soon' })
     const result = run(data, [measured('load.share', 40, '%', { env: 'prod' })])
     expect(messages(result, 'metric-invalid')).toEqual([
-      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`.',
+      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`.',
       'Fitness function "Checkout latency": "load.share{env=prod} <= 300 ms" cannot be evaluated: the measurement is in %, which does not convert to ms.',
       'Fitness function "Checkout latency": combine "most" is none of all, any, at least N.',
       'Fitness function "Checkout latency": max_age "soon" is no age such as 7d, 12h or 30min.',

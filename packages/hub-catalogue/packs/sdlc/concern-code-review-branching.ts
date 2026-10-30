@@ -230,7 +230,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-branch-protection', label: 'Main is protected by a ruleset', category: 'structural', implements: MODELS,
+      id: 'ff-branch-protection', label: 'Main is protected by a ruleset', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: MODELS,
       checks: ['req-protected-main', 'req-one-review'],
       threshold: 'The rules active on main include pull_request with at least 1 required approval and stale-review dismissal, required_status_checks with strict mode and at least one context, non_fast_forward (no force push) and deletion; 0 of them missing',
       description: 'A scheduled job reads the rules in force on main through the GitHub rulesets API and fails when one of the required rules is missing or weaker than the decision, so a setting changed by hand in the web UI is noticed within a day. The endpoint returns ruleset rules only: a repository still on classic branch protection moves to a ruleset first.',
@@ -248,7 +248,7 @@ need 'map(select(.type=="deletion")) | length>0' 'no deletion'
 echo "main is protected as decided"`,
     },
     {
-      id: 'ff-linear-history', label: 'Main history is linear and reviewed', when: LINEAR, category: 'structural', implements: ['adr-trunk', 'adr-feature-pr'],
+      id: 'ff-linear-history', label: 'Main history is linear and reviewed', when: LINEAR, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-trunk', 'adr-feature-pr'],
       checks: ['req-linear-history', 'req-feature-pr'],
       threshold: 'The rules active on main include required_linear_history; merge commits are disabled in the repository; 0 commits on main in the last 30 days without an associated merged pull request',
       description: 'A weekly job reads the rules on main and the repository\'s merge settings through the GitHub API and fails unless linear history is required and merge commits are off; then it walks the commits on main of the last 30 days and asks the API which pull request each belongs to, failing on a commit that belongs to none.',
@@ -270,7 +270,7 @@ done
 exit $bad`,
     },
     {
-      id: 'ff-codeowners', label: 'Every directory has an owner', when: { OWNERSHIP: ['codeowners'] }, category: 'structural', implements: ['adr-codeowners'],
+      id: 'ff-codeowners', label: 'Every directory has an owner', when: { OWNERSHIP: ['codeowners'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-codeowners'],
       checks: ['req-owner-approval'],
       threshold: '0 top-level directories without a matching CODEOWNERS line; every owner is a team (@org/team); the rules on main include pull_request with require_code_owner_review',
       description: 'The CODEOWNERS file names a team per top-level directory with a catch-all first (* @shop/platform, then payments/ @shop/payments, auth/ @shop/identity, migrations/ @shop/data, web/ @shop/storefront); a CI step walks the top-level directories and fails when one has no line of its own, or when an owner is a single person instead of a team, and reads the rules on main to confirm a code-owner review is required.',
@@ -288,7 +288,7 @@ gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" | jq -e 'map(select(.type=
 echo "every top-level directory has an owning team, and the ruleset asks it"`,
     },
     {
-      id: 'ff-review-rotation', label: 'Reviews rotate and arrive in minutes', when: { OWNERSHIP: ['collective'] }, category: 'holistic', implements: ['adr-collective'],
+      id: 'ff-review-rotation', label: 'Reviews rotate and arrive in minutes', when: { OWNERSHIP: ['collective'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-collective'],
       checks: ['req-rotation'],
       threshold: 'The team\'s review assignment is round robin; over the pull requests merged in the last 30 days, every review request came within 15 minutes of ready-for-review and no reviewer gave more than 40% of the reviews',
       description: 'A weekly script reads the team\'s review-assignment settings and the last 100 merged pull requests through the GraphQL API, keeps the ones merged in the last 30 days, measures the minutes from ready-for-review (or creation) to the first review request, counts the reviews per reviewer and fails on a request slower than 15 minutes, a reviewer above 40%, or an assignment algorithm other than round robin.',
@@ -322,7 +322,7 @@ if (!team.reviewRequestDelegationEnabled || team.reviewRequestDelegationAlgorith
 if (slow > 0 || (top && top[1] > 0.4 * total)) process.exit(1)`,
     },
     {
-      id: 'ff-pr-size', label: 'Pull requests stay small', when: { SIZE: ['limit'] }, category: 'process', implements: MODELS,
+      id: 'ff-pr-size', label: 'Pull requests stay small', when: { SIZE: ['limit'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MODELS,
       checks: ['req-pr-size'],
       threshold: 'Changed lines per pull request (additions + deletions, generated and lock files excluded) at most {{MAX_PR_LINES}}; the check fails above it unless the size-exception label is set',
       description: 'A required check on every pull request sums additions and deletions over its files from the GitHub API (all pages, slurped into one array, since a large pull request has more than one page of files), skipping lock files, snapshots and generated code, and fails above the limit with the count; a lead may set the size-exception label, which the check honours.',
@@ -343,7 +343,7 @@ if [ "$lines" -gt "$MAX" ] && ! grep -qx size-exception <<< "$labels"; then
 fi`,
     },
     {
-      id: 'ff-pr-size-report', label: 'Size shown on the pull request', when: { SIZE: ['none'] }, category: 'process', implements: MODELS,
+      id: 'ff-pr-size-report', label: 'Size shown on the pull request', when: { SIZE: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MODELS,
       checks: ['req-size-reported'],
       threshold: 'Every pull request\'s check summary shows its changed lines of source (additions + deletions, generated and lock files excluded); the step exits 0',
       description: 'A step on every pull request sums additions and deletions over its files from the GitHub API (all pages), skipping lock files, snapshots and generated code, and writes the count to the job summary as a notice; nothing blocks.',
@@ -360,7 +360,7 @@ echo "::notice::$lines changed lines of source"
 echo "Changed lines of source: **$lines**" >> "$GITHUB_STEP_SUMMARY"`,
     },
     {
-      id: 'ff-branch-age', label: 'No long-lived branches', category: 'process', implements: MODELS,
+      id: 'ff-branch-age', label: 'No long-lived branches', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: MODELS,
       checks: ['req-branch-age'],
       threshold: '0 branches older than {{MAX_BRANCH_DAYS}} days (first commit not on main) other than main, develop, release/* and hotfix/*; bot branches (renovate/, dependabot/) reported apart and not counted',
       description: 'A daily job lists every branch, computes the age of its first commit not on main, and fails naming the branches over the limit and their last authors; Renovate and Dependabot branches are listed separately so a stale dependency update does not hide a stale feature branch, and the other way round.',
@@ -383,7 +383,7 @@ done
 [ "$stale" -eq 0 ]`,
     },
     {
-      id: 'ff-commitlint', label: 'Commit messages are conventional', when: { COMMITS: ['conventional'] }, category: 'process', implements: MODELS,
+      id: 'ff-commitlint', label: 'Commit messages are conventional', when: { COMMITS: ['conventional'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MODELS,
       checks: ['req-conventional'],
       threshold: '100% of commits in a pull request pass commitlint with the conventional config and a header of at most 72 characters; the pull request title passes the same check; the hook runs on every clone after npm install',
       description: 'commitlint with the conventional config runs on every commit through a husky commit-msg hook, and again in CI over all commits of the pull request, so a commit made with --no-verify is still caught before the merge; a second job checks the pull request title, which becomes the subject on main under squash merges. semantic-release or release-please derives the changelog and version from the types.',
@@ -405,7 +405,7 @@ module.exports = {
 //     env: { GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }} }`,
     },
     {
-      id: 'ff-squash-subjects', label: 'Squash merges with short subjects', when: { COMMITS: ['free'], ...LINEAR }, category: 'process', implements: ['adr-trunk', 'adr-feature-pr'],
+      id: 'ff-squash-subjects', label: 'Squash merges with short subjects', when: { COMMITS: ['free'], ...LINEAR }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-trunk', 'adr-feature-pr'],
       checks: ['req-free-commits'],
       threshold: 'Repository allows squash merge only (merge commits and rebase merges off); 0 commits on main in the last 30 days with a subject over 72 characters or without a pull request number',
       description: 'A scheduled job reads the repository\'s merge settings through the API and fails unless squash is the only merge method, then walks the last 30 days of main and fails on a subject over 72 characters or one that does not end with a pull request number.',
@@ -423,7 +423,7 @@ done < <(git log --since='30 days ago' --no-merges --format=%s origin/main)
 [ "$bad" -eq 0 ]`,
     },
     {
-      id: 'ff-develop-subjects', label: 'Squash merges into develop with short subjects', when: { COMMITS: ['free'], BRANCHING: ['gitflow'] }, category: 'process', implements: ['adr-gitflow'],
+      id: 'ff-develop-subjects', label: 'Squash merges into develop with short subjects', when: { COMMITS: ['free'], BRANCHING: ['gitflow'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-gitflow'],
       checks: ['req-free-commits'],
       threshold: 'Repository allows squash and merge commits, rebase merges off; 0 non-merge commits on develop in the last 30 days with a subject over 72 characters or without a pull request number',
       description: 'Under GitFlow the release and hotfix merges into main are merge commits, so the squash rule applies to develop: a scheduled job checks that rebase merging is off (squash for feature pull requests, merge commits for releases), then walks the non-merge commits of develop in the last 30 days and fails on a subject over 72 characters or without a pull request number.',
@@ -441,7 +441,7 @@ done < <(git log --since='30 days ago' --no-merges --first-parent --format=%s or
 [ "$bad" -eq 0 ]`,
     },
     {
-      id: 'ff-review-turnaround', label: 'Reviews come within hours', category: 'holistic', implements: MODELS,
+      id: 'ff-review-turnaround', label: 'Reviews come within hours', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: MODELS,
       checks: ['req-turnaround'],
       threshold: 'Over the pull requests merged in the last 30 days, working hours from ready-for-review to the first review, review comment or comment by someone else: median under {{REVIEW_HOURS}}, 90th percentile under 8',
       description: 'A weekly job reads the last 100 merged pull requests through the GraphQL API, keeps the ones merged in the last 30 days, takes the later of each one\'s creation and its last ready-for-review event as the start and the first review (which also covers review comments) or conversation comment by someone other than the author as the end, counts working hours (Mon–Fri, 9–17 in the runner\'s TZ) between them, and fails on the percentiles; the numbers go to the team\'s dashboard beside the DORA lead time.',
@@ -474,7 +474,7 @@ console.log({ prs: hours.length, p50: p(0.5), p90: p(0.9) })
 if (p(0.5) > REVIEW_HOURS || p(0.9) > 8) process.exit(1)`,
     },
     {
-      id: 'ff-critical-two-approvals', label: 'Critical paths get two approvals', when: { REVIEW: ['two-critical'] }, category: 'process', implements: MODELS,
+      id: 'ff-critical-two-approvals', label: 'Critical paths get two approvals', when: { REVIEW: ['two-critical'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: MODELS,
       checks: ['req-two-critical'],
       threshold: 'A pull request touching {{CRITICAL_PATHS}} merges only with 2 current approvals from non-authors; 0 such merges with fewer',
       description: 'GitHub rulesets cannot vary the approval count by path, so a required check does it: on every review and push it lists the changed files, and when one is under a critical path it counts the latest review per reviewer (so a reviewer who later requested changes no longer counts) by people other than the author and fails below two. With CODEOWNERS, the ruleset requires the owning team\'s approval on top.',
@@ -502,7 +502,7 @@ jobs:
           [ "$approvals" -ge 2 ] || { echo "::error::critical path changed; $approvals of 2 approvals"; exit 1; }`,
     },
     {
-      id: 'ff-pair-trailer', label: 'Pair changes name their partner', when: { REVIEW: ['pairing'] }, category: 'process', implements: MODELS,
+      id: 'ff-pair-trailer', label: 'Pair changes name their partner', when: { REVIEW: ['pairing'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'manual', implements: MODELS,
       checks: ['req-pairing'],
       threshold: 'A pull request with a Co-authored-by trailer on 100% of its commits merges on any current approval by a non-author; one without merges only on an approval from someone whose e-mail is neither the author\'s nor in any trailer',
       description: 'A required check reads the pull request\'s commits and its latest review per reviewer: when every commit carries a Co-authored-by trailer, an approval from anyone but the author is enough (the partner\'s included); otherwise the approver must have written none of the commits, so each approver\'s login is resolved to e-mail addresses through the users API (the public e-mail and the two noreply forms) and compared with the trailers. Pairs set the trailer once with git-mob or a commit template.',
@@ -530,7 +530,7 @@ done
 echo "::error::not every commit names a partner, and every approver co-wrote the change; ask someone else to review"; exit 1`,
     },
     {
-      id: 'ff-gitflow-history', label: 'Main holds only releases, develop is protected', when: { BRANCHING: ['gitflow'] }, category: 'structural', implements: ['adr-gitflow'],
+      id: 'ff-gitflow-history', label: 'Main holds only releases, develop is protected', when: { BRANCHING: ['gitflow'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-gitflow'],
       checks: ['req-gitflow'],
       threshold: '100% of merge commits on main come from release/* or hotfix/*; every merge to main carries an annotated tag vX.Y.Z; 0 tags on main absent from develop; the rules on develop include pull_request and non_fast_forward',
       description: 'A job on every push to main checks that each merged branch was a release or hotfix branch, that the merge is tagged with a semantic version, and that the tagged commit is reachable from develop (the back-merge happened); it fails otherwise, so a forgotten back-merge is found the same day and not in the next release. It also reads the rules on develop and fails when develop takes direct or force pushes.',
@@ -552,7 +552,7 @@ gh api "repos/$GITHUB_REPOSITORY/rules/branches/develop" | jq -e '(map(select(.t
 echo "main holds tagged releases, all back-merged; develop is protected"`,
     },
     {
-      id: 'ff-daily-integration', label: 'Everyone integrates daily', when: { BRANCHING: ['trunk'] }, category: 'holistic', implements: ['adr-trunk'],
+      id: 'ff-daily-integration', label: 'Everyone integrates daily', when: { BRANCHING: ['trunk'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-trunk'],
       checks: ['req-trunk'],
       threshold: 'Over the last 14 days, every developer with a commit merged to main on at least 80% of the days they committed',
       description: 'A weekly job groups the merges to main by author and day and compares them with the days each person committed anywhere; a developer committing for days without merging is working on a hidden branch, which is what trunk-based development is meant to prevent. The branch age itself is the daily branch report\'s job. The result sits beside the DORA lead time on the team\'s dashboard.',

@@ -24,7 +24,9 @@ export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type 
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, type TestResults } from './files'
 export { computeEvidence, conditionResults, conditionsOf, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
-export { METRICS_FORMAT, convertUnit, evaluateMetric, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
+export { METRICS_FORMAT, REVIEW_METRIC, convertUnit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
+export { REVIEWS_FILE, REVIEWS_FORMAT, addReview, parseReviewsFile, reviewMeasurements, type Review, type ReviewsFile } from './reviews'
+export { SENSOR_NAMES, commandWords, isSensorName, parseMeasure, type MeasureLine } from './sensors'
 export { CHECK_DIMENSIONS, CHECK_METRICS, GOAL_RULE, type CheckDimension, type CheckPerspective, type CheckMetric, type CheckMetricResult, type GoalSetting } from './goals'
 
 /** Rules about the folder's files and its views, sequences and slides. */
@@ -126,6 +128,9 @@ export interface CheckOptions {
   now?: number
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
+  /** The event the check runs on (pull-request in the gate): what runs on
+   *  another one is not reported unmeasured. */
+  trigger?: string
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
@@ -234,6 +239,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.concerns ? { concerns: options.concerns } : {}),
     ...(options.measurements ? { measurements: options.measurements } : {}),
     ...(options.baseline ? { baseline: options.baseline } : {}),
+    ...(options.trigger ? { trigger: options.trigger } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
   }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))

@@ -94,7 +94,7 @@ function metaBadges(concept: HubConceptSummary): Array<{ label: string; value: s
     case 'requirement':
       push('EARS', node.ears_type); break
     case 'fitness-function':
-      push('Category', node.category); break
+      push('Characteristic', node.characteristic); break
     case 'adr':
       push('Status', node.status); break
     case 'pattern':

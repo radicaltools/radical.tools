@@ -699,7 +699,11 @@
       "label": "Semgrep on the code",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Semgrep runs the OWASP Top Ten and default rulesets and exits non-zero on an ERROR-severity finding; on the pull request it is a required check with a hard timeout, on a schedule it uploads SARIF to code scanning, where the findings get owners.\n\nThreshold: 0 findings of severity ERROR from p/owasp-top-ten and p/default; the run finishes within {{SAST_MINUTES}} minutes\n\nTool: Semgrep (semgrep scan with p/owasp-top-ten and p/default)\n\n```yaml\n# .github/workflows/semgrep.yml\nname: semgrep\non:\n  pull_request:                        # blocking variant: a required check\n  schedule: [{ cron: '0 3 * * *' }]    # scheduled variant: findings to the queue\npermissions: { contents: read, security-events: write }\njobs:\n  semgrep:\n    runs-on: ubuntu-latest\n    timeout-minutes: {{SAST_MINUTES}}\n    container: { image: semgrep/semgrep:1.90.0 }\n    steps:\n      - uses: actions/checkout@v4.2.2                     # pin by commit SHA in your repository\n      - run: semgrep scan --config p/owasp-top-ten --config p/default --config .semgrep\n          --severity ERROR --error --sarif --output semgrep.sarif\n      - if: always()\n        uses: github/codeql-action/upload-sarif@v3.28.0   # pin by commit SHA in your repository\n        with: { sarif_file: semgrep.sarif }\n```",
       "hubWhen": {
         "SAST": [
@@ -714,7 +718,11 @@
       "label": "CodeQL security-extended",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "CodeQL analyses each language of the repository with the security-extended query suite; code scanning's pull-request check is set to fail on high or above and is a required status check in branch protection. List only the languages the repository holds: autobuild fails for one with no sources.\n\nThreshold: 0 open code scanning alerts of severity high or critical on the pull request; the CodeQL check is required for merging\n\nTool: GitHub CodeQL (github/codeql-action)\n\n```yaml\n# .github/workflows/codeql.yml\nname: codeql\non:\n  pull_request: { branches: [main] }\n  push: { branches: [main] }\npermissions: { contents: read, security-events: write }\njobs:\n  analyze:\n    runs-on: ubuntu-latest\n    strategy: { matrix: { language: [javascript-typescript] } }   # add each language the repository holds\n    steps:\n      - uses: actions/checkout@v4.2.2                 # pin by commit SHA in your repository\n      - uses: github/codeql-action/init@v3.28.0       # pin by commit SHA in your repository\n        with:\n          languages: ${{ matrix.language }}\n          queries: security-extended\n      - uses: github/codeql-action/autobuild@v3.28.0  # pin by commit SHA in your repository\n      - uses: github/codeql-action/analyze@v3.28.0    # pin by commit SHA in your repository\n# Settings > Code security > Code scanning: \"Check failure: High or higher\";\n# branch protection requires the \"CodeQL\" check\n```",
       "hubWhen": {
         "SAST": [
@@ -729,7 +737,11 @@
       "label": "The language's security scanner",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Bandit (Python) and gosec (Go) run in the same job as Semgrep with their configuration in the repository, so their suppressions are reviewed like code; the JVM uses SpotBugs with find-sec-bugs, .NET the Security Code Scan analyzers.\n\nThreshold: 0 high-severity, medium-confidence-or-better findings from the language's scanner outside its suppressions, each suppression with a comment\n\nTool: Bandit and gosec (SpotBugs find-sec-bugs, Security Code Scan for other stacks)\n\n```toml\n# pyproject.toml\n[tool.bandit]\nexclude_dirs = [\"tests\", \".venv\"]\nskips = []                      # every skip needs a reviewed reason here\n# CI: bandit -c pyproject.toml -r src --severity-level high --confidence-level medium\n#     (exits 1 on a finding; suppress a line with  # nosec B608: <reason>)\n\n# Go, in the same job:\n#   gosec -severity high -confidence medium -fmt sarif -out gosec.sarif ./...\n#     (exits 1 on a finding; suppress with  // #nosec G201 -- <reason>)\n```",
       "hubWhen": {
         "SAST": [
@@ -744,7 +756,11 @@
       "label": "ESLint bans dangerous constructs",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The flat ESLint configuration turns the security plugin's rules and the core eval rules into errors and bans raw HTML in React; a disable comment needs a description, which eslint-comments/require-description enforces. Python and Java get the same bans from Bandit (B307 eval, B301 pickle) and find-sec-bugs.\n\nThreshold: 0 errors from eslint-plugin-security, no-eval, no-implied-eval, no-new-func and react/no-danger; the lint is a required check\n\nTool: ESLint with eslint-plugin-security and eslint-plugin-react\n\n```js\n// eslint.config.js\nimport security from 'eslint-plugin-security'\nimport react from 'eslint-plugin-react'\nimport comments from '@eslint-community/eslint-plugin-eslint-comments/configs'\n\nexport default [\n  security.configs.recommended,\n  comments.recommended,\n  {\n    plugins: { react },\n    rules: {\n      'no-eval': 'error',\n      'no-implied-eval': 'error',\n      'no-new-func': 'error',\n      'security/detect-eval-with-expression': 'error',\n      'security/detect-child-process': 'error',\n      'security/detect-non-literal-regexp': 'error',\n      'security/detect-non-literal-fs-filename': 'error',\n      'react/no-danger': 'error',\n      'no-restricted-properties': ['error', { object: 'document', property: 'write' }],\n      '@eslint-community/eslint-comments/require-description': 'error',\n    },\n  },\n]\n```",
       "hubWhen": {
         "STANDARD": [
@@ -759,7 +775,11 @@
       "label": "No string-built queries",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Semgrep rules kept in the repository match query calls whose SQL is a template literal with an expression, a concatenation or a format call (JavaScript and TypeScript), and a buffer written by sprintf and then passed to a database call (C), and fail the pull request. They run as a lint rule whatever the scanner decision. SonarQube rules S2077 (formatted SQL) and S3649 (SQL injection) do the same for Java and C#, Bandit B608 for Python.\n\nThreshold: 0 queries built by concatenation, interpolation or formatting in the code; the rules are ERROR severity and part of the pull-request lint\n\nTool: Semgrep (repository rules; run with semgrep scan --config .semgrep --error); SonarQube S2077 / S3649 for Java and C#; Bandit B608 for Python\n\n```yaml\n# .semgrep/sql-string-built.yml\nrules:\n  - id: sql-string-built\n    message: SQL built from a string; bind the value as a parameter (ADR Secure coding)\n    severity: ERROR\n    languages: [javascript, typescript]\n    metadata: { cwe: \"CWE-89\", owasp: \"A03:2021\" }\n    patterns:\n      - pattern-either:\n          - pattern: $DB.query(`...${$X}...`, ...)\n          - pattern: $DB.query($A + $B, ...)\n          - pattern: $DB.query(`...`.concat(...), ...)\n          - pattern: $DB.raw(`...${$X}...`)\n          - pattern: $DB.whereRaw(`...${$X}...`)\n      - metavariable-regex: { metavariable: $DB, regex: (?i)(db|pool|client|conn|sequelize|knex|prisma) }\n  - id: sql-string-built-c\n    message: SQL formatted into a buffer and executed; use a prepared statement with bound parameters (ADR Secure coding)\n    severity: ERROR\n    languages: [c]\n    metadata: { cwe: \"CWE-89\" }\n    patterns:\n      - pattern: |\n          $FMT($BUF, ...);\n          ...\n          $EXEC($DB, $BUF, ...);\n      - metavariable-regex: { metavariable: $FMT, regex: ^(sprintf|snprintf|strcat|strcpy)$ }\n      - metavariable-regex: { metavariable: $EXEC, regex: ^(sqlite3_exec|sqlite3_prepare_v2|PQexec|mysql_query|mysql_real_query)$ }\n```"
     },
     {
@@ -768,7 +788,11 @@
       "label": "ZAP scan of each deployment",
       "x": 1040,
       "y": 650,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "deploy",
+      "invocation": "automated",
       "description": "A workflow listens for successful deployments and runs the ZAP baseline scan against the environment's URL; the rules file raises the passive alerts that must block (missing CSP, cookie flags, missing anti-clickjacking) to FAIL and turns known noise to IGNORE with a comment. The baseline scan runs passive rules and the spider only; active rules such as SQL injection (40018) need zaproxy/action-api-scan with the OpenAPI document or action-full-scan, run against the ephemeral or staging environment, never production.\n\nThreshold: 0 ZAP alerts at level FAIL against every environment the pipeline deploys to; the scan finishes within 30 minutes of the deployment\n\nTool: OWASP ZAP (zaproxy/action-baseline; zaproxy/action-api-scan for active rules)\n\n```yaml\n# .github/workflows/dast.yml\nname: dast\non: [deployment_status]\njobs:\n  zap:\n    if: github.event.deployment_status.state == 'success'\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@v4.2.2          # pin by commit SHA in your repository\n      - uses: zaproxy/action-baseline@v0.14.0  # pin by commit SHA in your repository\n        with:\n          target: ${{ github.event.deployment_status.environment_url }}\n          rules_file_name: .zap/rules.tsv\n          cmd_options: '-a -j'          # alpha passive rules, AJAX spider\n          fail_action: true\n          allow_issue_writing: false\n# .zap/rules.tsv (id<TAB>action<TAB>comment), passive rules only:\n# 10038\tFAIL\tContent Security Policy header missing\n# 10054\tFAIL\tCookie without SameSite\n# 10020\tFAIL\tMissing anti-clickjacking header\n# 10096\tIGNORE\tTimestamp disclosure: build ids in a header, reviewed\n```",
       "hubWhen": {
         "DAST": [
@@ -782,7 +806,11 @@
       "label": "ZAP full scan not older than the limit",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "temporal",
+      "every": "{{DAST_DAYS}}d",
+      "invocation": "automated",
       "description": "A scheduled workflow runs the ZAP full scan against staging and commits its JSON report to security/dast/ as <date>-zap-staging.json. A daily check fails when there is no such report, when the newest is older than the limit, or when it still holds high-risk alerts. Penetration tests are recorded in security/pentests.yaml and checked by the Secure development process pack, not here.\n\nThreshold: The newest ZAP full scan report in security/dast/ is at most {{DAST_DAYS}} days old and holds 0 high-risk alerts (riskcode 3)\n\nTool: OWASP ZAP (zaproxy/action-full-scan) and a shell check over the reports\n\n```bash\n# the scan: a workflow on a cron that fits {{DAST_DAYS}} days (e.g. '0 3 1 */3 *' for quarterly, with a 90-day limit):\n#   - uses: zaproxy/action-full-scan@v0.12.0   # pin by commit SHA in your repository\n#     with: { target: https://staging.shop.example, cmd_options: '-J report.json', fail_action: false }\n#   then: cp report.json \"security/dast/$(date +%F)-zap-staging.json\" and commit\n# the daily check (GNU date, as on ubuntu-latest):\nlatest=$(ls security/dast/ | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-zap-.*\\.json$' | sort | tail -1)\n[ -n \"$latest\" ] || { echo \"no ZAP full scan report in security/dast/\"; exit 1; }\nreport_date=$(echo \"$latest\" | cut -c1-10)\nage=$(( ( $(date +%s) - $(date -d \"$report_date\" +%s) ) / 86400 ))\n[ \"$age\" -le {{DAST_DAYS}} ] || { echo \"newest ZAP full scan $report_date is $age days old\"; exit 1; }\njq -e '[.site[].alerts[] | select((.riskcode | tonumber) >= 3)] | length == 0' \"security/dast/$latest\" \\\n  || { echo \"$latest still holds high alerts\"; exit 1; }\n```",
       "hubWhen": {
         "DAST": [
@@ -796,7 +824,11 @@
       "label": "Malformed input answered 400 with the field",
       "x": 1040,
       "y": 910,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test sends each operation a body with a wrong type, an unknown field and an out-of-range value and expects 400 with the field's path in the errors and no stack trace; the zod schemas are strict, so unknown fields are refused. With Pydantic, model_config = ConfigDict(extra='forbid') and an exception handler that maps the validation error to 400 with its loc.\n\nThreshold: 100 % of the element's operations answer 400 naming the failing field to a wrong type, an unknown field and an out-of-range value, with no stack trace in the body\n\nTool: Vitest with supertest over zod schemas (pytest with FastAPI's TestClient over Pydantic)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'\n\ndescribe.each([\n  [{ quantity: 'two', email: 'a@b.example' }, 'quantity'],          // wrong type\n  [{ quantity: 1, email: 'a@b.example', extra: 'x' }, 'extra'],     // unknown field: schema is strict\n  [{ quantity: 10_001, email: 'a@b.example' }, 'quantity'],         // out of range\n])('POST /orders with %j', (body, field) => {\n  it(`answers 400 naming ${field}`, async () => {\n    const res = await request(app).post('/orders').send(body).expect(400)\n    expect(res.body.errors.map((e: { path: string }) => e.path)).toContain(field)\n    expect(JSON.stringify(res.body)).not.toMatch(/node_modules|\\bat \\w+ \\(/)   // no stack trace\n  })\n})\n```",
       "hubWhen": {
         "INPUT": [
@@ -810,7 +842,11 @@
       "label": "Exported functions refuse bad arguments",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test enumerates the functions exported from the package's public surface (not a list kept by hand) and calls each with the usual bad arguments; every call must fail with the shared typed error that names the argument, which means the function checked before doing anything. A function that legitimately accepts one of the values declares it in GUARD_EXCEPTIONS beside the test, where a reviewer sees it. For Python, the same test over the module's __all__ with pytest.raises(ArgumentError).\n\nThreshold: 100 % of the exported functions of the public surface fail with the typed ArgumentError, naming the argument, on a negative number, an out-of-range integer, null, an empty string and a wrong-typed object\n\nTool: Vitest over the public surface (pytest for Python)\n\n```ts\nimport * as api from '../src/index'            // the package's public surface\nimport { ArgumentError } from '../src/errors'    // the typed error every guard throws, with .argument\n\nconst BAD: unknown[][] = [[-1], [2 ** 31], [null], [''], [{ unexpected: true }]]\nconst GUARD_EXCEPTIONS: Record<string, unknown[]> = {}   // 'parseOptional': [null], reviewed\nconst exported = Object.entries(api).filter(([, v]) => typeof v === 'function') as Array<[string, (...a: unknown[]) => unknown]>\n\ndescribe.each(exported)('%s guards its arguments', (name, fn) => {\n  const cases = BAD.filter((args) => !(GUARD_EXCEPTIONS[name] ?? []).some((v) => JSON.stringify(v) === JSON.stringify(args[0])))\n  it.each(cases)('refuses %j with a typed error naming the argument', async (...args) => {\n    await expect(Promise.resolve().then(() => fn(...args))).rejects.toSatisfy(\n      (e: unknown) => e instanceof ArgumentError && typeof e.argument === 'string' && e.argument.length > 0,\n    )\n  })\n})\n```",
       "hubWhen": {
         "INPUT": [
@@ -824,7 +860,11 @@
       "label": "Middleware defenses present in responses",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test starts the element with its production configuration and checks what the framework's middleware must produce: a 403 on a POST without the CSRF token, the security headers on a page, and the flags on every cookie it sets. A hand-rolled replacement that forgets one of them fails here. For Django, the same test with the test client and SECURE_* settings; for Spring, MockMvc against the security filter chain.\n\nThreshold: A state-changing request without the CSRF token is refused with 403; every response carries Content-Security-Policy, Strict-Transport-Security and X-Content-Type-Options, and every cookie is Secure, HttpOnly and SameSite\n\nTool: Vitest with supertest (helmet and csurf or csrf-csrf on Express)\n\n```ts\nimport request from 'supertest'\nimport { app } from '../src/app'   // started with NODE_ENV=production and the production middleware\n\nit('refuses a state-changing request without the CSRF token', async () => {\n  await request(app).post('/orders').send({ quantity: 1 }).expect(403)\n})\n\nit('carries the middleware headers and cookie flags', async () => {\n  const res = await request(app).get('/').expect(200)\n  expect(res.headers['content-security-policy']).toBeDefined()\n  expect(res.headers['strict-transport-security']).toMatch(/max-age=\\d{7,}/)\n  expect(res.headers['x-content-type-options']).toBe('nosniff')\n  const cookies = ([] as string[]).concat(res.headers['set-cookie'] ?? [])\n  for (const cookie of cookies) {\n    expect(cookie).toMatch(/;\\s*Secure/i)\n    expect(cookie).toMatch(/;\\s*HttpOnly/i)\n    expect(cookie).toMatch(/;\\s*SameSite=(Lax|Strict)/i)\n  }\n})\n```",
       "hubWhen": {
         "STANDARD": [
@@ -839,7 +879,11 @@
       "label": "Every sensitive route has negative tests",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the element's routes from its router, keeps those that take an object id from the path or live under /admin, and fails for every one without a test file that carries the tag authz:METHOD /path; the tagged test itself calls the route as the wrong user, the wrong tenant and anonymously. A new sensitive route fails the suite until its negative tests exist.\n\nThreshold: 100 % of routes with an id in the path or under /admin have a test tagged with the route (authz:METHOD /path) in the pull-request suite\n\nTool: Vitest over the router's table and the test files\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { globSync } from 'glob'\nimport { routes } from '../src/app'   // the router's table: { method, path }\n\nconst tagged = new Set(\n  globSync('tests/**/*.test.ts').flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/authz:([A-Z]+ \\S+)/g)].map((m) => m[1])),\n)\nconst sensitive = routes.filter((r) => /:\\w+/.test(r.path) || r.path.startsWith('/admin'))\n\nit.each(sensitive)('$method $path has negative authorization tests', (r) => {\n  expect(tagged, `write a test tagged \"authz:${r.method} ${r.path}\" that calls it as the wrong user, the wrong tenant and anonymously`)\n    .toContain(`${r.method} ${r.path}`)\n})\n```"
     },
     {
@@ -848,7 +892,11 @@
       "label": "Scheduled findings get an owner in time",
       "x": 1040,
       "y": 1430,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
       "description": "The nightly scanners upload SARIF to code scanning; the triage queue is the open high and critical alerts. A daily job fails for every such alert older than one working day (three days on a Monday) that no open issue labelled sast, with an assignee, names by its number; the issue's assignee is the owner and the deadline runs from the alert.\n\nThreshold: 0 open high or critical code scanning alerts older than 1 working day without an assigned issue that names the alert\n\nTool: GitHub CLI over code scanning alerts and issues, in a scheduled job\n\n```bash\nlimit_days=$([ \"$(date +%u)\" = 1 ] && echo 3 || echo 1)   # one working day; three over a weekend\nsince=$(date -u -d \"-$limit_days days\" +%FT%TZ)\ngh api --paginate \"/repos/$REPO/code-scanning/alerts?state=open&per_page=100\" \\\n  | jq -r --arg since \"$since\" '.[] | select(.created_at < $since and (.rule.security_severity_level | IN(\"high\", \"critical\"))) | .number' > due.txt\ngh issue list --repo \"$REPO\" --label sast --state open --limit 500 --json title,assignees \\\n  --jq '.[] | select(.assignees | length > 0) | .title' > owned.txt\nstatus=0\nwhile read -r n; do\n  grep -q \"alert #$n\\b\" owned.txt || { echo \"code scanning alert #$n has no owner after $limit_days day(s)\"; status=1; }\ndone < due.txt\nexit $status\n```",
       "hubWhen": {
         "SAST": [
@@ -862,7 +910,11 @@
       "label": "No finding past its deadline",
       "x": 1040,
       "y": 1560,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A job on the main branch reads the repository's open code scanning alerts (Semgrep, CodeQL, ZAP and the language scanners all upload SARIF there) and fails on any past its severity's deadline, naming the rule and the file. With a risk register, an alert whose \"<rule id> <path>\" a still-valid acceptance names is skipped; without one, nothing is. Penetration test findings are filed as alerts through a SARIF upload so the same check covers them.\n\nThreshold: 0 open code scanning alerts older than {{CRITICAL_DAYS}} days (critical), {{HIGH_DAYS}} days (high) or {{MEDIUM_DAYS}} days (medium) that no valid acceptance in the risk register names\n\nTool: GitHub code scanning alerts API through the GitHub CLI, with jq (and yq for the register)\n\n```bash\n# acceptances still valid today, as JSON (an empty list without a register)\nif [ -f security/risk-acceptances.yaml ]; then yq -o=json '.' security/risk-acceptances.yaml > register.json; else echo '[]' > register.json; fi\ngh api --paginate \"/repos/$REPO/code-scanning/alerts?state=open&per_page=100\" | jq -e \\\n  --argjson crit {{CRITICAL_DAYS}} --argjson high {{HIGH_DAYS}} --argjson med {{MEDIUM_DAYS}} --slurpfile reg register.json '\n  ($reg[0] // [] | map(select((.expires | tostring | . + \"T00:00:00Z\" | fromdateiso8601) > now)) | map(.finding)) as $accepted\n  | [.[] | {sev: .rule.security_severity_level, age: ((now - (.created_at | fromdateiso8601)) / 86400),\n            rule: .rule.id, file: .most_recent_instance.location.path}\n         | select((.sev == \"critical\" and .age > $crit) or (.sev == \"high\" and .age > $high) or (.sev == \"medium\" and .age > $med))\n         | \"\\(.rule) \\(.file)\" as $key | select(($accepted | index($key)) == null)]\n  | if length > 0 then (map(\"\\(.rule) \\(.file) \\(.sev) \\(.age | floor)d\") | join(\"\\n\") | halt_error(1)) else true end'\n```",
       "hubWhen": {
         "FINDINGS": [
@@ -877,7 +929,11 @@
       "label": "Risk acceptances complete and current",
       "x": 1040,
       "y": 1690,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test over the register security/risk-acceptances.yaml fails on an incomplete, self-approved, expired or over-long acceptance; the deadline job skips only the alerts a valid acceptance names (by \"<rule id> <path>\"), so an overdue finding without an acceptance still fails the build.\n\nThreshold: 0 acceptances without finding, owner, second approver, reason and expiry, self-approved, expired, or valid longer than {{ACCEPTANCE_DAYS}} days\n\nTool: Vitest over the risk register\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\n// security/risk-acceptances.yaml:\n// - { finding: \"js/sql-injection src/report.ts\", owner: \"ola\", approver: \"sec-team/marek\",\n//     reason: \"allow-listed column names; module replaced in Q1\", controls: \"WAF rule 942100\", accepted: 2026-10-01, expires: 2026-12-30 }\ntype Acceptance = { finding: string; owner: string; approver: string; reason: string; controls: string; accepted: string; expires: string }\nconst register: Acceptance[] = parse(readFileSync('security/risk-acceptances.yaml', 'utf8')) ?? []\nconst DAY = 86_400_000\n\nit('every risk acceptance is complete, approved by a second person and current', () => {\n  const bad = register.filter((r) =>\n    !r.finding || !r.owner || !r.approver || r.owner === r.approver || !r.reason || !r.controls\n    || Date.parse(r.expires) < Date.now()\n    || (Date.parse(r.expires) - Date.parse(r.accepted)) / DAY > {{ACCEPTANCE_DAYS}})\n  expect(bad.map((r) => r.finding)).toEqual([])\n})\n```",
       "hubWhen": {
         "FINDINGS": [
@@ -891,7 +947,11 @@
       "label": "CERT and MISRA checks as errors",
       "x": 1040,
       "y": 1820,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "clang-tidy runs over the compilation database with the CERT, bugprone and analyzer checks as errors and the unsafe-functions check naming the banned functions (system among them, so a command built from data cannot run); cppcheck's MISRA add-on runs beside it with the rule texts, and suppressions live in a deviation file reviewed like code. The tests run under the sanitizers in a second configuration.\n\nThreshold: 0 warnings from the cert-*, bugprone-* and clang-analyzer-* checks, 0 uses of the banned functions, and 0 MISRA violations outside recorded deviations; the build fails on any\n\nTool: clang-tidy and cppcheck --addon=misra (PC-lint Plus or Polyspace where the safety case needs a certified analyser)\n\n```yaml\n# .clang-tidy   (CI: run-clang-tidy -p build -quiet; exits non-zero on an error)\nChecks: >\n  -*, cert-*, bugprone-*, clang-analyzer-*, misc-*,\n  cppcoreguidelines-pro-bounds-array-to-pointer-decay,\n  cppcoreguidelines-pro-bounds-constant-array-index\nWarningsAsErrors: 'cert-*,bugprone-*,clang-analyzer-*'\nCheckOptions:\n  - { key: bugprone-unsafe-functions.ReportDefaultFunctions, value: true }\n  - { key: bugprone-unsafe-functions.CustomFunctions,\n      value: '^::gets$,fgets,;^::strcpy$,strlcpy,;^::strcat$,strlcat,;^::sprintf$,snprintf,;^::system$,,;^::alloca$,,' }\n# MISRA C:2023, in the same job:\n#   cppcheck --addon=misra.json --enable=warning,style --error-exitcode=1 \\\n#            --suppressions-list=misra-deviations.txt --project=build/compile_commands.json\n# sanitizers: cmake -DCMAKE_CXX_FLAGS=\"-fsanitize=address,undefined -fno-omit-frame-pointer\" && ctest\n```",
       "hubWhen": {
         "STANDARD": [

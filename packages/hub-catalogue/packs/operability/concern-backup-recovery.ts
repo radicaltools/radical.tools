@@ -254,7 +254,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-sync', label: 'Synchronous standby attached', when: { METHOD: ['sync'] }, category: 'operational', implements: ['adr-sync'], checks: ['req-sync'],
+      id: 'ff-sync', label: 'Synchronous standby attached', when: { METHOD: ['sync'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-sync'], checks: ['req-sync'],
       threshold: 'At least 1 standby in sync or quorum state at every moment; a page after 1 minute without one',
       description: 'The database exporter counts the standbys replicating synchronously; Prometheus pages when there is none, because writes then either stop or lose their second copy.',
       tool: 'Prometheus with sql_exporter (PostgreSQL; for a managed service, its own replication metric, such as AuroraReplicaLag)',
@@ -279,7 +279,7 @@ groups:
         labels: { severity: page }`,
     },
     {
-      id: 'ff-rpo', label: 'Newest copy within the RPO', when: COPIED, category: 'operational', implements: COPY_ADRS, checks: ['req-pitr', 'req-snapshot', 'req-copy-alert'],
+      id: 'ff-rpo', label: 'Newest copy within the RPO', when: COPIED, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: COPY_ADRS, checks: ['req-pitr', 'req-snapshot', 'req-copy-alert'],
       threshold: 'The newest recoverable copy is never older than {{RPO_MINUTES}} minutes for more than 5 minutes',
       description: 'The backup job pushes the time of its last success (for point-in-time recovery, the exporter reports the last archived log segment); Prometheus pages when the newest copy is older than the RPO, which also catches a job that silently stopped.',
       tool: 'Prometheus (Pushgateway for backup jobs)',
@@ -297,7 +297,7 @@ groups:
           summary: 'The newest copy of {{ $labels.store }} is older than {{RPO_MINUTES}} minutes'`,
     },
     {
-      id: 'ff-vault-copy', label: 'Every backup copies to the vault', when: { ...COPIED, COPIES: ['vault'] }, category: 'structural', implements: ['adr-vault'], checks: ['req-copies-vault'],
+      id: 'ff-vault-copy', label: 'Every backup copies to the vault', when: { ...COPIED, COPIES: ['vault'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-vault'], checks: ['req-copies-vault'],
       threshold: 'Every backup rule in the source account copies to a vault whose ARN names the backup account and another region; 0 rules without, 0 copy destinations unknown at plan time',
       description: 'In CI the source account\'s Terraform plan (terraform show -json) is checked: every backup rule must have a copy action whose destination vault ARN names the backup account (a plan variable) and a region other than the primary. A destination that is unknown at plan time fails too: reference the vault by a variable or data source so the plan can be checked.',
       tool: 'Conftest on the Terraform plan of the source account (AWS Backup; for Azure Backup check the vault\'s cross-region restore and the backup policy\'s vault)',
@@ -325,7 +325,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-vault-lock', label: 'The vault is locked', when: { ...COPIED, COPIES: ['vault'] }, category: 'structural', implements: ['adr-vault'], checks: ['req-copies-vault'],
+      id: 'ff-vault-lock', label: 'The vault is locked', when: { ...COPIED, COPIES: ['vault'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-vault'], checks: ['req-copies-vault'],
       threshold: 'The backup account\'s vault has a compliance-mode lock with a minimum retention of at least {{RETAIN_DAYS}} days; 0 vaults without',
       description: 'In CI the backup account\'s Terraform plan is checked: a vault lock must exist with changeable_for_days set (without it the lock is governance mode, which an administrator can lift) and a minimum retention of at least {{RETAIN_DAYS}} days.',
       tool: 'Conftest on the Terraform plan of the backup account (AWS Backup Vault Lock; for Azure Backup check the vault\'s immutability setting is locked)',
@@ -357,7 +357,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-copy-region', label: 'Copies leave the region and deletions page', when: { ...COPIED, COPIES: ['region'] }, category: 'structural', implements: ['adr-region'], checks: ['req-copies-region'],
+      id: 'ff-copy-region', label: 'Copies leave the region and deletions page', when: { ...COPIED, COPIES: ['region'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-region'], checks: ['req-copies-region'],
       threshold: '0 backup rules without a copy to a vault outside the primary region; 1 or more EventBridge rules on DeleteRecoveryPoint with a target',
       description: 'In CI the Terraform plan is checked: every backup rule must copy to a vault whose ARN names another region (an unknown destination fails: reference the vault by a variable or data source), and an EventBridge rule must match DeleteRecoveryPoint calls from CloudTrail, which is what pages within 5 minutes of a deletion.',
       tool: 'Conftest on the Terraform plan (AWS Backup and EventBridge; on Azure check the backup policy\'s secondary region and an activity log alert on recovery point deletion)',
@@ -390,7 +390,7 @@ deletion_rules := [r |
 deny contains "no EventBridge rule pages on DeleteRecoveryPoint" if count(deletion_rules) == 0`,
     },
     {
-      id: 'ff-offline', label: 'Offline copy fresh', when: { ...COPIED, COPIES: ['offline'] }, category: 'process', implements: ['adr-offline'], checks: ['req-copies-offline'],
+      id: 'ff-offline', label: 'Offline copy fresh', when: { ...COPIED, COPIES: ['offline'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-offline'], checks: ['req-copies-offline'],
       threshold: 'The newest offline copy, written and disconnected, is never older than 26 hours',
       description: 'The job that writes the offline copy pushes its success time after the media are verified and ejected; Prometheus alerts when it is older than a day and a margin.',
       tool: 'Prometheus (Pushgateway)',
@@ -406,7 +406,7 @@ deny contains "no EventBridge rule pages on DeleteRecoveryPoint" if count(deleti
           summary: 'No verified offline copy of {{ $labels.store }} in the last 26 hours'`,
     },
     {
-      id: 'ff-dr-policy-restore', label: 'Region restore assessed', when: { ...COPIED, DR: ['restore'] }, category: 'operational', implements: ['adr-dr-restore'], checks: ['req-dr-restore'],
+      id: 'ff-dr-policy-restore', label: 'Region restore assessed', when: { ...COPIED, DR: ['restore'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-dr-restore'], checks: ['req-dr-restore'],
       threshold: 'The resiliency assessment of the latest release meets the policy: RPO {{RPO_MINUTES}} minutes and RTO {{RTO_MINUTES}} minutes for zone, hardware and software disruptions, RTO {{REGION_RTO_HOURS}} hours for a region disruption',
       description: 'A resiliency policy states the objectives (created once); each release starts an assessment of the application version, waits for it and fails the pipeline unless it says the policy is met. On Azure, a test failover with Azure Site Recovery plays the same part; on Google Cloud, a scripted restore into the second region timed against the objective.',
       tool: 'AWS Resilience Hub (AWS CLI, in the release pipeline)',
@@ -427,7 +427,7 @@ STATUS=$(aws resiliencehub describe-app-assessment --assessment-arn "$ARN" --que
 test "$STATUS" = "PolicyMet" || { echo "recovery objectives not met: $STATUS"; exit 1; }`,
     },
     {
-      id: 'ff-dr-policy-standby', label: 'Region failover assessed', when: { ...COPIED, DR: ['standby'] }, category: 'operational', implements: ['adr-dr-standby'], checks: ['req-dr-standby'],
+      id: 'ff-dr-policy-standby', label: 'Region failover assessed', when: { ...COPIED, DR: ['standby'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-dr-standby'], checks: ['req-dr-standby'],
       threshold: 'The resiliency assessment of the latest release meets the policy: RPO {{RPO_MINUTES}} minutes and RTO {{RTO_MINUTES}} minutes for zone, hardware, software and region disruptions',
       description: 'A resiliency policy states the objectives (created once); each release starts an assessment of the application version, waits for it and fails the pipeline unless it says the policy is met. On Azure, a test failover with Azure Site Recovery plays the same part.',
       tool: 'AWS Resilience Hub (AWS CLI, in the release pipeline)',
@@ -448,7 +448,7 @@ STATUS=$(aws resiliencehub describe-app-assessment --assessment-arn "$ARN" --que
 test "$STATUS" = "PolicyMet" || { echo "recovery objectives not met: $STATUS"; exit 1; }`,
     },
     {
-      id: 'ff-standby-lag', label: 'Standby lag within the RPO', when: { ...COPIED, DR: ['standby'] }, category: 'operational', implements: ['adr-dr-standby'], checks: ['req-dr-standby'],
+      id: 'ff-standby-lag', label: 'Standby lag within the RPO', when: { ...COPIED, DR: ['standby'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-dr-standby'], checks: ['req-dr-standby'],
       threshold: 'The standby\'s replication lag is above {{RPO_MINUTES}} minutes for no more than 5 minutes',
       description: 'The PostgreSQL exporter on the standby reports its replication lag; Prometheus pages when it passes the RPO, since that is the data a region failover would lose.',
       tool: 'Prometheus with postgres_exporter (pg_replication_lag_seconds; for Aurora Global Database, the AuroraGlobalDBReplicationLag CloudWatch metric)',
@@ -464,7 +464,7 @@ test "$STATUS" = "PolicyMet" || { echo "recovery objectives not met: $STATUS"; e
           summary: 'The standby {{ $labels.instance }} lags more than {{RPO_MINUTES}} minutes behind'`,
     },
     {
-      id: 'ff-zones', label: 'Store spans zones', when: { ...COPIED, DR: ['single'] }, category: 'structural', implements: ['adr-dr-single'], checks: ['req-dr-single'],
+      id: 'ff-zones', label: 'Store spans zones', when: { ...COPIED, DR: ['single'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-dr-single'], checks: ['req-dr-single'],
       threshold: '0 database instances in the Terraform plan without Multi-AZ, 0 clusters with fewer than 2 availability zones',
       description: 'In CI the Terraform plan is checked: every database instance must run Multi-AZ and every cluster across at least two zones, since a zone loss is the failure this decision promises to survive.',
       tool: 'Conftest on the Terraform plan (AWS RDS and Aurora; for Azure check high_availability.mode = ZoneRedundant on the flexible server, for Cloud SQL availability_type = REGIONAL)',
@@ -488,7 +488,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-derived', label: 'Only the projector writes', when: { METHOD: ['rebuild'] }, category: 'structural', implements: ['adr-rebuild'], checks: ['req-derived'],
+      id: 'ff-derived', label: 'Only the projector writes', when: { METHOD: ['rebuild'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-rebuild'], checks: ['req-derived'],
       threshold: '0 modules outside the projection that import the store\'s write client',
       description: 'A dependency rule fails the build when code outside the projection imports the store\'s client, which would let something be written that the rebuild cannot bring back. The store\'s database role grants writes to the projector only.',
       tool: 'dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest, a RuboCop custom cop)',
@@ -505,7 +505,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-drill-auto', label: 'Weekly restore test', when: { DRILL: ['auto'] }, category: 'operational', implements: [...ALL_ADRS, 'adr-drill-auto'], checks: ['req-recover', 'req-rebuild', 'req-drill-auto'],
+      id: 'ff-drill-auto', label: 'Weekly restore test', when: { DRILL: ['auto'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: [...ALL_ADRS, 'adr-drill-auto'], checks: ['req-recover', 'req-rebuild', 'req-drill-auto'],
       threshold: 'A restore (or rebuild) into an isolated environment every week, passing the data checks within {{RTO_MINUTES}} minutes, with data no older than {{RPO_MINUTES}} minutes',
       description: 'A scheduled workflow restores the latest copy (or rebuilds from the sources) into a throwaway environment, runs the data checks and tears it down; the job\'s timeout is the RTO, so a slow restore fails it. AWS Backup restore testing can do the same for stores it backs up.',
       tool: 'GitHub Actions (scheduled workflow); the same three scripts run from any scheduler',
@@ -530,7 +530,7 @@ jobs:
         run: ./ops/teardown.sh "drill-$GITHUB_RUN_ID"`,
     },
     {
-      id: 'ff-drill-manual', label: 'Quarterly drill on record', when: { DRILL: ['manual'] }, category: 'process', implements: [...ALL_ADRS, 'adr-drill-manual'], checks: ['req-recover', 'req-rebuild', 'req-drill-manual'],
+      id: 'ff-drill-manual', label: 'Quarterly drill on record', when: { DRILL: ['manual'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'temporal', every: '90d', invocation: 'manual', implements: [...ALL_ADRS, 'adr-drill-manual'], checks: ['req-recover', 'req-rebuild', 'req-drill-manual'],
       threshold: 'The newest drill record is at most 92 days old and its restore took no more than {{RTO_MINUTES}} minutes',
       description: 'Each drill is recorded as docs/drills/YYYY-MM-DD.md with a "minutes:" line; a daily scheduled job fails, and notifies the owner, when the newest record is too old or too slow.',
       tool: 'GitHub Actions (scheduled workflow); the same script runs from any scheduler',

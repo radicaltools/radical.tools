@@ -135,6 +135,8 @@ export function exportWiki(data: DiagramData, view: DiagramView, options: { titl
   const pageMarkdown = (page: DocumentPage, shift: number): string => {
     const content = [`**${escapeMarkdown(page.typeLabel)}**`]
     for (const field of page.facts) if (field.text) content.push(`**${escapeMarkdown(field.title)}**\n\n${fieldValue(field, shift)}`)
+    // What is read from the element, not stated in it (a fitness function's result).
+    for (const fact of page.derivedFacts) content.push(`**${escapeMarkdown(fact.title)}**\n\n${escapeMarkdown(fact.text)}`)
     for (const block of page.blocks) {
       switch (block.kind) {
         case 'lead':

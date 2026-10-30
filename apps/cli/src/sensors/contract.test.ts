@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { metricsFileProblems, serializeMetricsFile } from '@radical/common/check'
+import { SENSOR_NAMES, metricsFileProblems, serializeMetricsFile } from '@radical/common/check'
 import { SENSOR_ADAPTERS } from './registry'
 
 const dirs: string[] = []
@@ -22,6 +22,10 @@ describe('sensor adapters', () => {
       expect(a.description.length).toBeGreaterThan(10)
       expect(a.usage).toContain(`radical sense ${a.name}`)
     }
+  })
+
+  it('are the sensors a measure line can name, and no others', () => {
+    expect(SENSOR_ADAPTERS.map((a) => a.name).sort()).toEqual([...SENSOR_NAMES].sort())
   })
 
   for (const adapter of SENSOR_ADAPTERS) {

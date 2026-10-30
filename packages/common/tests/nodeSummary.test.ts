@@ -19,9 +19,17 @@ describe('element summary', () => {
     expect(summary(node('sc', 'scenario', { given: 'a batch', when: 'it is approved twice', then: 'the second is rejected' })))
       .toBe('**The second is rejected** — when it is approved twice')
     expect(summary(node('adr', 'adr', { status: 'accepted', decision: 'Use Postgres.' }))).toBe('**Accepted**: Use Postgres.')
-    expect(summary(node('ff', 'fitness-fn', { description: 'p95 latency of checkout', metrics: 'test(tests/load.test.ts) passed\ncheckout.latency.p95{env=prod} < 300 ms' }))).toBe('p95 latency of checkout — **checkout.latency.p95{env=prod} < 300 ms**')
+    expect(summary(node('ff', 'fitness-fn', { description: 'p95 latency of checkout', metrics: 'test(tests/load.test.ts) passed\ncheckout.latency.p95{env=prod} < 300 ms' }))).toBe('p95 latency of checkout — **checkout.latency.p95{env=prod} < 300 ms** (static)')
     expect(summary(node('m', 'mockup', { screen: '/checkout', description: 'Pay for the basket' }))).toBe('**/checkout** — Pay for the basket')
     expect(summary(svc)).toBe('[Java] Moves money.')
+  })
+
+  it('says whether a fitness function\'s result is static or dynamic, as its metrics make it', () => {
+    expect(summary(node('ff', 'fitness-fn', { description: 'Studio opens fast.', metrics: 'studio.open.ms{model=x14} <= baseline + 20%' }))).toBe('Studio opens fast. — **studio.open.ms{model=x14} <= baseline + 20%** (dynamic)')
+    // Tests and reviews alone are no result to read.
+    expect(summary(node('ff', 'fitness-fn', { description: 'No cycles.', metrics: 'test(tests/architecture.test.ts) passed' }))).toBe('No cycles.')
+    expect(summary(node('ff', 'fitness-fn', { description: 'Reviewed.', metrics: 'review(threat-model) passed' }))).toBe('Reviewed.')
+    expect(summaryTokens('fitness-fn', builtInGovernanceMetamodel())).toEqual(expect.arrayContaining(['conditions', 'result', 'characteristic', 'scope', 'cadence']))
   })
 
   it('falls back to the description\'s first sentence, in one line', () => {

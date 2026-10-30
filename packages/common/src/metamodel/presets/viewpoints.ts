@@ -217,14 +217,14 @@ export function radicalViewpoints(): ViewpointDef[] {
       id: 'fitness-functions',
       label: 'Fitness functions',
       group: 'Decisions',
-      description: 'A table of the fitness functions by category, each with the decisions it checks and the elements it constrains.',
+      description: 'A table of the fitness functions by characteristic, each with the decisions it checks and the elements it constrains.',
       kind: 'table',
       pipeline: {
         levels: [
           { ways: [{ types: ['fitness-fn'] }] },
           { ways: [{ via: { relationType: 'implements', direction: 'out' }, types: ['adr'] }, { via: { relationType: 'constrains', direction: 'out' } }] },
         ],
-        sort: { by: 'property', key: 'category' },
+        sort: { by: 'property', key: 'characteristic' },
       },
     },
     {

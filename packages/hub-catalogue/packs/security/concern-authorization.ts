@@ -263,7 +263,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-matrix', label: 'Permission matrix enforced', when: PERMISSIONS, category: 'structural', implements: [...MODEL_ADRS, 'adr-in-code', 'adr-engine'], checks: ['req-deny', 'req-default-deny', 'req-object'],
+      id: 'ff-matrix', label: 'Permission matrix enforced', when: PERMISSIONS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MODEL_ADRS, 'adr-in-code', 'adr-engine'], checks: ['req-deny', 'req-default-deny', 'req-object'],
       threshold: 'Every operation called as every role or rule case gives the expected answer, and with another user\'s record ids returns 403 or 404; 0 mismatches and 0 operations without an entry in the expected matrix',
       description: 'A test lists the operations from the router (not from a list kept by hand), fails on any operation the expected matrix does not name, calls each as a caller of every role or rule case, and compares allowed or refused with the matrix; it also calls each operation that takes an id with the id of a record of another user, and checks that a refusal left a log entry with caller, operation and record.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory, RSpec request specs)',
@@ -293,7 +293,7 @@ describe.each(routes)('$method $path', (route) => {
 })`,
     },
     {
-      id: 'ff-route-guard', label: 'Every route guarded', when: { ...PERMISSIONS, ENFORCE: ['code'] }, category: 'structural', implements: ['adr-in-code'], checks: ['req-default-deny'],
+      id: 'ff-route-guard', label: 'Every route guarded', when: { ...PERMISSIONS, ENFORCE: ['code'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-in-code'], checks: ['req-default-deny'],
       threshold: '0 routes registered without the authorize middleware',
       description: 'A static rule runs on every pull request and fails on a route registered without going through the authorization module, so a check cannot be forgotten in a handler. The rule below is the Express-style form ($ROUTER limited to app, router and *Router, so map.get or axios.get do not match); routes mounted with router.use are checked where they are defined.',
       tool: 'Semgrep (Express-style routers); for Spring: ArchUnit methods().that().areAnnotatedWith(RequestMapping.class).should().beAnnotatedWith(PreAuthorize.class); for ASP.NET Core: a Roslyn analyzer over [Authorize]; for Rails: a RuboCop cop over verify_authorized',
@@ -317,7 +317,7 @@ describe.each(routes)('$method $path', (route) => {
       - pattern-not: $ROUTER.route($PATH).$METHOD(..., authorize(...), ...)`,
     },
     {
-      id: 'ff-policy-tests', label: 'Policies tested', when: { MODEL: ['roles', 'attributes'], ENFORCE: ['engine'] }, category: 'structural', implements: ['adr-engine', 'adr-roles', 'adr-attributes'], checks: ['req-policy-release'],
+      id: 'ff-policy-tests', label: 'Policies tested', when: { MODEL: ['roles', 'attributes'], ENFORCE: ['engine'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-engine', 'adr-roles', 'adr-attributes'], checks: ['req-policy-release'],
       threshold: '0 failing policy tests and at least 90% policy coverage before a bundle is released',
       description: 'Every policy has unit tests next to it, including the default deny and a missing attribute; CI runs them with coverage and refuses to publish the bundle below the threshold.',
       tool: 'Open Policy Agent (opa test --coverage --threshold 90); with Cedar: cedar validate and the Cedar test suite of Amazon Verified Permissions in CI',
@@ -345,7 +345,7 @@ test_unknown_action_denied if {
 }`,
     },
     {
-      id: 'ff-policy-rollout', label: 'Policy bundle reaches every decision point', when: { ...PERMISSIONS, ENFORCE: ['engine'] }, category: 'operational', implements: ['adr-engine'], checks: ['req-policy-release'],
+      id: 'ff-policy-rollout', label: 'Policy bundle reaches every decision point', when: { ...PERMISSIONS, ENFORCE: ['engine'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-engine'], checks: ['req-policy-release'],
       threshold: 'Every decision point reports the released bundle revision within 5 minutes of the release; 0 decision log entries without a bundle revision',
       description: 'After the bundle is published, the release pipeline polls the status API of every decision point until each reports the new revision, failing after 5 minutes, then reads a sample of the decision log and fails on an entry without the bundles.<name>.revision field.',
       tool: 'bash with curl and jq in the release pipeline (OPA status API; for Cedar or OpenFGA, the equivalent version endpoint of the engine)',
@@ -365,7 +365,7 @@ missing=$(tail -n 100 "$DECISION_LOG" | jq -c "select(.bundles[\\"$BUNDLE\\"].re
 [ "$missing" -eq 0 ] || { echo "$missing decision log entries carry no policy version"; exit 1; }`,
     },
     {
-      id: 'ff-relation-tests', label: 'Relationship model tested', when: { MODEL: ['relations'], ENFORCE: ['engine'] }, category: 'structural', implements: ['adr-engine', 'adr-relations'], checks: ['req-policy-release'],
+      id: 'ff-relation-tests', label: 'Relationship model tested', when: { MODEL: ['relations'], ENFORCE: ['engine'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-engine', 'adr-relations'], checks: ['req-policy-release'],
       threshold: '0 failing assertions over the authorization model, run on every change of the model',
       description: 'The authorization model has a test file with tuples and expected checks, owners, team members and strangers included; CI runs it on every change to the model.',
       tool: 'OpenFGA CLI (fga model test); with SpiceDB: zed validate over a validation file',
@@ -396,7 +396,7 @@ tests:
         assertions: { can_view: false }`,
     },
     {
-      id: 'ff-sod', label: 'Conflicting roles refused', when: { MODEL: ['roles'] }, category: 'structural', implements: ['adr-roles'], checks: ['req-sod'],
+      id: 'ff-sod', label: 'Conflicting roles refused', when: { MODEL: ['roles'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-roles'], checks: ['req-sod'],
       threshold: 'Every pair on the separation-of-duties list is refused when granted to one account, and the attempt is recorded; 0 pairs granted',
       description: 'A test reads the separation-of-duties pairs from the code, grants the first role of each pair to a fresh account, tries to grant the second, and expects a refusal and a recorded attempt.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -417,7 +417,7 @@ describe.each(SEPARATION_OF_DUTIES)('%s and %s', (first, second) => {
 })`,
     },
     {
-      id: 'ff-unshare', label: 'Unsharing takes effect in time', when: { MODEL: ['relations'] }, category: 'operational', implements: ['adr-relations'], checks: ['req-relation-revoke'],
+      id: 'ff-unshare', label: 'Unsharing takes effect in time', when: { MODEL: ['relations'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-relations'], checks: ['req-relation-revoke'],
       threshold: 'A record is refused within 10 seconds of the relationship that granted it being removed; a check made with the write\'s consistency token is refused at once',
       description: 'An integration test shares a document with a user through a team, removes the user from the team, polls the document until it is refused (failing past 10 seconds), and checks that a request carrying the consistency token of the removal is refused on the first try.',
       tool: 'Vitest with supertest against the service and its relationship store (OpenFGA, SpiceDB or the relationship table)',
@@ -441,7 +441,7 @@ it('closes a document within 10 seconds of the member being removed', async () =
 })`,
     },
     {
-      id: 'ff-missing-attribute', label: 'Missing attributes deny', when: { MODEL: ['attributes'] }, category: 'structural', implements: ['adr-attributes'], checks: ['req-attributes'],
+      id: 'ff-missing-attribute', label: 'Missing attributes deny', when: { MODEL: ['attributes'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-attributes'], checks: ['req-attributes'],
       threshold: 'A request from a user without an attribute the policy reads, or with one refreshed more than 15 minutes ago, is refused and the log names the attribute; 0 such requests allowed',
       description: 'An integration test creates a user without a region, and one whose region was last refreshed 16 minutes ago, asks for a record each and expects 403 with a log entry naming the attribute.',
       tool: 'Vitest with supertest, the attribute source seeded by the test (or the test runner and HTTP client of your stack)',
@@ -461,7 +461,7 @@ it.each([
 })`,
     },
     {
-      id: 'ff-fail-closed', label: 'Engine outage refuses', when: { ...PERMISSIONS, ENFORCE: ['engine'] }, category: 'operational', implements: ['adr-engine'], checks: ['req-pdp-down'],
+      id: 'ff-fail-closed', label: 'Engine outage refuses', when: { ...PERMISSIONS, ENFORCE: ['engine'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-engine'], checks: ['req-pdp-down'],
       threshold: '100% of protected calls refused while the decision point is down; p99 decision time under 10 ms over 200 calls while it is up',
       description: 'An integration test starts the service with its decision point, times 200 allowed calls and checks the p99, then stops the decision point and calls protected operations as a caller with every permission, expecting each to be refused.',
       tool: 'Testcontainers with Vitest',
@@ -489,7 +489,7 @@ it('answers fast while the engine is up and refuses everything while it is down'
 })`,
     },
     {
-      id: 'ff-stale-grants', label: 'No overdue grants', when: { ...PERMISSIONS, REVIEW: ['periodic'] }, category: 'process', implements: ['adr-review-periodic'], checks: ['req-review', 'req-leaver'],
+      id: 'ff-stale-grants', label: 'No overdue grants', when: { ...PERMISSIONS, REVIEW: ['periodic'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-review-periodic'], checks: ['req-review', 'req-leaver'],
       threshold: '0 grants unreviewed for more than {{REVIEW_DAYS}} + 14 days; 0 grants of leavers older than 24 hours',
       description: 'A scheduled CI job runs a query over the grants every day and fails, printing the rows and opening a ticket for the owner, when a grant is overdue for review or belongs to a person who has left.',
       tool: 'psql in a scheduled CI job (bash)',
@@ -505,7 +505,7 @@ overdue=$(psql "$DATABASE_URL" -Atc "
 [ -z "$overdue" ] || { echo "$overdue"; exit 1; }`,
     },
     {
-      id: 'ff-directory-sync', label: 'Grants match the directory', when: { ...PERMISSIONS, REVIEW: ['directory'] }, category: 'process', implements: ['adr-review-directory'], checks: ['req-directory'],
+      id: 'ff-directory-sync', label: 'Grants match the directory', when: { ...PERMISSIONS, REVIEW: ['directory'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-review-directory'], checks: ['req-directory'],
       threshold: '0 grants without a directory group behind them; 0 grants of disabled accounts older than 60 minutes',
       description: 'A scheduled job compares the grants with the directory\'s groups every hour and fails, printing the rows, on any grant that no group explains, or that belongs to an account the directory has disabled.',
       tool: 'psql in a scheduled CI job (bash); the directory_* tables are filled by the SCIM endpoint',
@@ -522,7 +522,7 @@ stray=$(psql "$DATABASE_URL" -Atc "
 [ -z "$stray" ] || { echo "$stray"; exit 1; }`,
     },
     {
-      id: 'ff-standing-admins', label: 'No standing admins', when: { ADMIN: ['jit'] }, category: 'operational', implements: ['adr-jit'], checks: ['req-elevation'],
+      id: 'ff-standing-admins', label: 'No standing admins', when: { ADMIN: ['jit'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-jit'], checks: ['req-elevation'],
       threshold: '0 people holding administrator rights outside an active, approved elevation',
       description: 'A scheduled query over the cloud account lists IAM users with an administrator policy attached directly, through a group or inline, and IAM Identity Center assignments of administrator permission sets to a person or group; every row is compared with the elevation tool\'s active requests, and any without one is a standing right that bypasses elevation. Use the equivalent tables for Azure (azuread_user, azure_role_assignment) or Google Cloud (gcp_iam_policy).',
       tool: 'Steampipe (AWS plugin), in a scheduled CI job that fails when the query returns a row not matched by an active elevation',
@@ -553,7 +553,7 @@ where a.permission_set_arn in (select permission_set_arn from admin_sets)
   and a.target_account_id = '123456789012';   -- the production account`,
     },
     {
-      id: 'ff-break-glass', label: 'Break-glass use alerts', when: { ADMIN: ['jit'] }, category: 'operational', implements: ['adr-jit'], checks: ['req-break-glass'],
+      id: 'ff-break-glass', label: 'Break-glass use alerts', when: { ADMIN: ['jit'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-jit'], checks: ['req-break-glass'],
       threshold: 'A sign-in with the break-glass account raises a page to the security owner within 5 minutes; the credential\'s last rotation is at most 24 hours after its last use',
       description: 'An EventBridge rule matches console sign-ins by the break-glass user from CloudTrail and sends them to the paging topic; a quarterly drill signs in with the account in a non-production environment and times the page. The same scheduled job that counts administrators compares the account\'s password_last_used with its password last changed date.',
       tool: 'Terraform (aws_cloudwatch_event_rule on CloudTrail sign-in events, SNS to the pager); on Azure: an Entra ID sign-in log alert rule for the account; on Google Cloud: a log-based alert on the service account',
@@ -577,7 +577,7 @@ resource "aws_cloudwatch_event_target" "break_glass_page" {
 }`,
     },
     {
-      id: 'ff-admin-list', label: 'Admins few and strong', when: { ADMIN: ['standing'] }, category: 'operational', implements: ['adr-standing'], checks: ['req-named-admins'],
+      id: 'ff-admin-list', label: 'Admins few and strong', when: { ADMIN: ['standing'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-standing'], checks: ['req-named-admins'],
       threshold: 'At most 5 administrator accounts, 0 of them without a FIDO security key registered',
       description: 'A scheduled query counts the people with administrator rights and lists those without a FIDO security key among their MFA devices (serial numbers of security keys are :u2f/ ARNs); the job fails above 5 accounts or on any without one. A passkey registered as a FIDO key appears the same way; a virtual MFA device does not count.',
       tool: 'Steampipe (AWS plugin), in a scheduled CI job; for Azure: azuread_user with authentication methods, for Google Workspace: the users report with isEnforcedIn2Sv and security keys',
@@ -593,7 +593,7 @@ where attached_policy_arns ? 'arn:aws:iam::aws:policy/AdministratorAccess';
 -- the job fails when admins > 5 or without_security_key > 0`,
     },
     {
-      id: 'ff-audit-immutable', label: 'Audit log cannot be changed', when: { ADMIN: ['jit', 'standing'] }, category: 'structural', implements: ['adr-jit', 'adr-standing'], checks: ['req-admin-audit'],
+      id: 'ff-audit-immutable', label: 'Audit log cannot be changed', when: { ADMIN: ['jit', 'standing'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-jit', 'adr-standing'], checks: ['req-admin-audit'],
       threshold: 'The CloudTrail trail has log file validation on and writes to a bucket with Object Lock in compliance mode for at least 365 days, a floor below the audit trail\'s retention; 0 trails without both',
       description: 'A policy over the Terraform plan in CI fails when the CloudTrail trail has no log file validation, or its bucket has no Object Lock configuration in compliance mode with a default retention (in days or years) of at least 365 days, so that no administrator can delete or edit an entry within the retention. 365 days is only a floor: the retention itself is the one the Audit trail pack decides, and the bucket is set to it.',
       tool: 'Conftest on the Terraform plan (AWS form; on Azure check the storage account\'s immutability policy, on Google Cloud the bucket\'s retention policy with locked = true)',
@@ -636,7 +636,7 @@ number_or_zero(x) := x if is_number(x)
 number_or_zero(x) := 0 if not is_number(x)`,
     },
     {
-      id: 'ff-no-data-access', label: 'No person reaches data', when: { ADMIN: ['none'] }, category: 'structural', implements: ['adr-no-direct'], checks: ['req-no-direct'],
+      id: 'ff-no-data-access', label: 'No person reaches data', when: { ADMIN: ['none'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-no-direct'], checks: ['req-no-direct'],
       threshold: '0 infrastructure changes that give a person access to a production data store',
       description: 'A policy runs over every Terraform plan in CI and refuses a change that gives a user or group data-store actions or a wildcard inline, or attaches an administrator or data-store managed policy to a user or group; service roles are not touched.',
       tool: 'Conftest on the Terraform plan (AWS form; for Azure check azurerm_role_assignment with a user principal, for Google Cloud google_project_iam_member with user: or group: members)',
@@ -681,7 +681,7 @@ actions(s) := s.Action if is_array(s.Action)
 actions(s) := [s.Action] if is_string(s.Action)`,
     },
     {
-      id: 'ff-flat', label: 'No permission checks creep in', when: { MODEL: ['flat'] }, category: 'structural', implements: ['adr-flat'], checks: ['req-flat'],
+      id: 'ff-flat', label: 'No permission checks creep in', when: { MODEL: ['flat'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-flat'], checks: ['req-flat'],
       threshold: '0 imports of an authorization library or role check in the application code',
       description: 'A dependency rule fails the build when the code imports an authorization library, which would mean a restricted feature arrived without its decision.',
       tool: 'dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest, a RuboCop custom cop)',

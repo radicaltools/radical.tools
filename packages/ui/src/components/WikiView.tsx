@@ -49,7 +49,7 @@ import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
 import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { newLinkFit, relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { parentCandidates as movableInto } from '@radical/common/model'
-import { createWikiDocument, type WikiBlock, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
+import { createWikiDocument, type WikiBlock, type WikiDerivedFact, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 import { editingControl } from './editingControl'
 
 type Metamodel = ReturnType<typeof useDiagramStore.getState>['metamodel']
@@ -2455,6 +2455,7 @@ function WikiElementPage({
           parent={parent}
           parentCandidates={parentCandidates}
           facts={facts}
+          derivedFacts={page.derivedFacts}
           nodes={nodes}
           editing={factsOpen}
           onDone={() => actions.setFactsFor(null)}
@@ -2478,12 +2479,15 @@ function WikiElementPage({
 // has it: what the element is, where it sits and its short facts. It lists
 // the facts that are set, and is left out when none is. A designer opens it
 // from [edit facts]: it then lists every fact, set or not, with its editor.
+// The facts read from the data (a fitness function's result) follow, never
+// with an editor.
 function WikiInfobox({
   node,
   meta,
   parent,
   parentCandidates,
   facts,
+  derivedFacts,
   nodes,
   editing,
   onDone,
@@ -2495,6 +2499,7 @@ function WikiInfobox({
   parent: C4Node | undefined
   parentCandidates: C4Node[]
   facts: PropertyDef[]
+  derivedFacts: WikiDerivedFact[]
   nodes: Record<string, C4Node>
   editing: boolean
   onDone: () => void
@@ -2506,7 +2511,7 @@ function WikiInfobox({
   const rows = edit ? facts : facts.filter((p) => propertyText(p, values[p.key], nodes))
   const showParent = edit ? parentCandidates.length > 0 : !!parent
   // With no fact to show, the byline has already said everything.
-  if (rows.length === 0 && !edit) return null
+  if (rows.length === 0 && derivedFacts.length === 0 && !edit) return null
   return (
     <aside className="wiki-infobox" aria-label="Facts">
       <div className="wiki-infobox-title">{node.label}</div>
@@ -2518,7 +2523,7 @@ function WikiInfobox({
         )}
         {meta.label}
       </div>
-      {(showParent || rows.length > 0) && (
+      {(showParent || rows.length > 0 || derivedFacts.length > 0) && (
         <dl className="wiki-infobox-rows">
           {showParent && (
             <div className="wiki-infobox-row">
@@ -2555,6 +2560,12 @@ function WikiInfobox({
                   p.type === 'boolean' ? 'yes' : propertyText(p, values[p.key], nodes)
                 )}
               </dd>
+            </div>
+          ))}
+          {derivedFacts.map((f) => (
+            <div className="wiki-infobox-row" key={`derived:${f.key}`} data-derived={f.key}>
+              <dt>{f.title}</dt>
+              <dd>{f.text}</dd>
             </div>
           ))}
         </dl>

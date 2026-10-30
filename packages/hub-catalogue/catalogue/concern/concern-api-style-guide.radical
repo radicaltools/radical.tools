@@ -674,7 +674,11 @@
       "label": "Contracts name their guide",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test reads every OpenAPI document under api/ and checks info.x-api-guide, then that all documents name the same guide.\n\nThreshold: Every document under api/ has info.x-api-guide with a name, an https URL and a revision; 1 distinct guide across all documents\n\nTool: Vitest with the yaml package (or the test runner of your stack)\n\n```ts\n// test/api/guide.test.ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport { describe, expect, it } from 'vitest'\n\nconst docs = readdirSync('api').filter((f) => f.endsWith('.yaml'))\nconst guideOf = (file: string) => parse(readFileSync(`api/${file}`, 'utf8')).info?.['x-api-guide']\n\ndescribe.each(docs)('%s', (file) => {\n  it('names the guide it follows, at a revision', () => {\n    const guide = guideOf(file)\n    expect(guide, 'info.x-api-guide is missing').toBeTruthy()\n    expect(String(guide.name ?? '')).not.toBe('')\n    expect(guide.url).toMatch(/^https:\\/\\//)\n    expect(String(guide.revision ?? '')).not.toBe('')\n  })\n})\n\nit('names the same guide in every document', () => {\n  expect(new Set(docs.map((f) => guideOf(f)?.url)).size).toBeLessThanOrEqual(1)\n})\n```"
     },
     {
@@ -683,7 +687,11 @@
       "label": "Spectral lints every contract change",
       "x": 1040,
       "y": 130,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A workflow runs on every pull request that touches api/ or the ruleset, lints all documents with the ruleset in .spectral.yaml and fails at severity error; the github-actions format puts each finding on its line in the pull request. The job is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.\n\nThreshold: 0 Spectral findings of severity error in the documents under api/ for the pull request to merge; warnings annotated, not blocking\n\nTool: Spectral CLI (@stoplight/spectral-cli) in GitHub Actions\n\n```yaml\n# .github/workflows/api-style.yml\nname: api-style\non:\n  pull_request:\n    paths: ['api/**', '.spectral.yaml', 'package-lock.json']\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - uses: actions/setup-node@v4.1.0   # pin by commit SHA in your repository\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci   # @stoplight/spectral-cli and the guide's ruleset package, at exact versions\n      - run: node api/style/check-ruleset.mjs\n      - run: npx spectral lint \"api/*.yaml\" --ruleset .spectral.yaml --fail-severity error --format github-actions\n```",
       "hubWhen": {
         "LINT": [
@@ -697,7 +705,11 @@
       "label": "Ruleset pinned and every rule sourced",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script run in the API style job reads api/style/ruleset.yaml: every extends entry must be a local file, a Spectral built-in or a package installed at an exact version in package.json, and every rule the file defines (not a mere severity change of an extended rule) must link to its guideline and carry error or warn.\n\nThreshold: 0 extends entries that are URLs or packages without an exact version; 0 rules defined in api/style/ruleset.yaml without an https documentationUrl or with a severity other than error or warn\n\nTool: Node.js with the yaml package\n\n```js\n// api/style/check-ruleset.mjs\nimport { readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\n\nconst ruleset = parse(readFileSync('api/style/ruleset.yaml', 'utf8'))\nconst pkg = JSON.parse(readFileSync('package.json', 'utf8'))\nconst versions = { ...pkg.dependencies, ...pkg.devDependencies }\nconst problems = []\nfor (const entry of [ruleset.extends ?? []].flat()) {\n  const ref = Array.isArray(entry) ? entry[0] : entry               // [ruleset, 'recommended' | 'all' | 'off']\n  if (/^https?:/.test(ref)) { problems.push(`extends ${ref}: a URL changes under you; vendor it or install it at an exact version`); continue }\n  if (ref.startsWith('spectral:') || (ref.startsWith('.') && !ref.includes('node_modules/'))) continue\n  const name = /^(?:.*node_modules\\/)?((?:@[^/]+\\/)?[^/]+)/.exec(ref)[1]\n  if (!/^\\d+\\.\\d+\\.\\d+$/.test(versions[name] ?? '')) problems.push(`${name} is not installed at an exact version`)\n}\nfor (const [name, rule] of Object.entries(ruleset.rules ?? {})) {\n  if (typeof rule !== 'object' || rule === null) continue               // a severity change of an extended rule\n  if (!/^https:\\/\\//.test(rule.documentationUrl ?? '')) problems.push(`${name}: no documentationUrl to the guideline it enforces`)\n  if (!['error', 'warn'].includes(rule.severity)) problems.push(`${name}: severity is error (MUST) or warn (SHOULD)`)\n}\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "LINT": [
@@ -711,7 +723,11 @@
       "label": "API owners own the contracts",
       "x": 1040,
       "y": 390,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step checks that .github/CODEOWNERS gives /api/ (the documents and the style ruleset) to the API owners, and asks GitHub whether the rules that apply to main require a code owner's review, so the approval cannot be skipped. The branch ruleset itself is kept by the Code review and branching pack; this check only reads it. The step needs a token that can read the repository's rules (GH_TOKEN).\n\nThreshold: CODEOWNERS assigns /api/ to {{API_OWNERS}}, and the rules of the main branch require a code owner's review\n\nTool: bash with the GitHub CLI (REST: GET /repos/{owner}/{repo}/rules/branches/{branch})\n\n```bash\n#!/usr/bin/env bash\n# the API owners own api/, and main requires their approval\nset -euo pipefail\ngrep -Eq '^/api/[[:space:]].*{{API_OWNERS}}' .github/CODEOWNERS \\\n  || { echo \"CODEOWNERS: /api/ is not owned by {{API_OWNERS}}\"; exit 1; }\nrequired=$(gh api \"repos/$GITHUB_REPOSITORY/rules/branches/main\" \\\n  --jq '[.[] | select(.type == \"pull_request\") | .parameters.require_code_owner_review] | any')\n[ \"$required\" = true ] || { echo \"main does not require a code owner's review\"; exit 1; }\n```"
     },
     {
@@ -720,7 +736,11 @@
       "label": "Style checklist ticked",
       "x": 1040,
       "y": 520,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "manual",
       "description": "The pull-request template (.github/pull_request_template.md) carries a section \"## API style checklist\" with one item per MUST rule of the guide that a reviewer checks. A workflow on pull requests that touch api/ reads the description and fails while the section is missing or has an unticked item; it reruns when the description is edited.\n\nThreshold: 0 unticked items in the \"API style checklist\" section of a pull request that changes api/; a missing section fails too\n\nTool: GitHub Actions (bash over the pull request's body)\n\n```yaml\n# .github/workflows/api-review.yml\nname: api-review\non:\n  pull_request:\n    types: [opened, edited, synchronize, reopened]\n    paths: ['api/**']\njobs:\n  checklist:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Every item of the API style checklist is ticked\n        env:\n          BODY: ${{ github.event.pull_request.body }}\n        run: |\n          section=$(printf '%s\\n' \"$BODY\" | tr -d '\\r' | sed -n '/^## API style checklist/,/^## /p')\n          [ -n \"$section\" ] || { echo \"no 'API style checklist' section (see .github/pull_request_template.md)\"; exit 1; }\n          if printf '%s\\n' \"$section\" | grep -q '^- \\[ \\]'; then echo \"unticked items in the API style checklist\"; exit 1; fi\n```",
       "hubWhen": {
         "LINT": [
@@ -734,7 +754,11 @@
       "label": "Contract changes come alone",
       "x": 1040,
       "y": 650,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step on every pull request lists the files changed against the base branch and fails when both a contract document and implementation code are among them.\n\nThreshold: 0 pull requests that change a document under api/ and a file under src/ together\n\nTool: bash and git in the CI job (checkout with fetch-depth: 0)\n\n```bash\n#!/usr/bin/env bash\n# a contract change is merged on its own, before the code that serves it\nset -euo pipefail\nchanged=$(git diff --name-only \"origin/${GITHUB_BASE_REF:-main}...HEAD\")\nif printf '%s\\n' \"$changed\" | grep -q '^api/[^/]*\\.yaml$' && printf '%s\\n' \"$changed\" | grep -q '^src/'; then\n  echo \"this pull request changes the contract under api/ and the code under src/ together;\"\n  echo \"merge the contract change first, then implement it\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "DESIGN": [
@@ -748,7 +772,11 @@
       "label": "Server serves the contract",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the operations of every document under api/ and the routes from the router itself (not from a list kept by hand), fails on a route the documents do not describe, and calls each described operation the router does not serve, expecting 501 from the fallback handler.\n\nThreshold: 0 routes in the router's table that the documents do not describe; every described operation not in the table answers 501\n\nTool: Vitest with supertest and the yaml package (or the test runner and HTTP client of your stack)\n\n```ts\n// test/api/routes.test.ts\nimport { readdirSync, readFileSync } from 'node:fs'\nimport { parse } from 'yaml'\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app, routes } from '../../src/app'   // routes: the router's table, [{ method, path }]\n\nconst METHODS = ['get', 'put', 'post', 'delete', 'patch', 'head', 'options', 'trace']\nconst described = readdirSync('api').filter((f) => f.endsWith('.yaml')).flatMap((file) => {\n  const { paths = {} } = parse(readFileSync(`api/${file}`, 'utf8'))\n  return Object.entries(paths as Record<string, object>).flatMap(([path, item]) =>\n    Object.keys(item).filter((k) => METHODS.includes(k)).map((m) => `${m.toUpperCase()} ${path}`))\n})\nconst served = routes.map((r) => `${r.method.toUpperCase()} ${r.path.replace(/:(\\w+)/g, '{$1}')}`)\n\nit('serves no route the contract does not describe', () => {\n  expect(served.filter((r) => !described.includes(r))).toEqual([])\n})\n\nit('answers 501 for each described operation not built yet', async () => {\n  for (const op of described.filter((d) => !served.includes(d))) {\n    const [method, path] = op.split(' ')\n    expect((await request(app)[method.toLowerCase() as 'get'](path.replace(/\\{\\w+\\}/g, 'x'))).status, op).toBe(501)\n  }\n})\n```",
       "hubWhen": {
         "DESIGN": [
@@ -762,7 +790,11 @@
       "label": "Committed contract is what the code makes",
       "x": 1040,
       "y": 910,
-      "category": "process",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A workflow on every pull request regenerates the OpenAPI documents from the code and fails when anything under api/ changed or appeared, so a contract change that was not committed cannot merge.\n\nThreshold: 0 differences, new files included, under api/ after regenerating the documents from the code\n\nTool: GitHub Actions with the project's generator (npm run openapi:generate over @nestjs/swagger or tsoa; on Spring, springdoc-openapi-maven-plugin in ./mvnw verify)\n\n```yaml\n# .github/workflows/api-generated.yml\nname: api-generated\non: [pull_request]\njobs:\n  contract:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4.2.2   # pin by commit SHA in your repository\n      - uses: actions/setup-node@v4.1.0   # pin by commit SHA in your repository\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run openapi:generate   # writes api/*.yaml from the code\n      - name: The committed contract is what the code produces\n        run: |\n          git status --porcelain -- api/\n          test -z \"$(git status --porcelain -- api/)\" || { echo \"run npm run openapi:generate and commit api/\"; exit 1; }\n```",
       "hubWhen": {
         "DESIGN": [
@@ -776,7 +808,11 @@
       "label": "Exceptions complete and current",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A script run in CI walks every document under api/ for x-api-style-exceptions entries, checks each, and writes .spectral.yaml: the style ruleset plus one Spectral override per exception, turning its rule off at that JSON pointer only. CI runs it and then git diff --exit-code .spectral.yaml, so an override added by hand, without its entry, fails. With review only, the overrides are written but nothing lints with them.\n\nThreshold: 0 exceptions without a rule, a reason, an approver and dates; 0 expired; 0 standing more than {{EXCEPTION_MONTHS}} months from approval; 0 differences between the committed .spectral.yaml and the one the exceptions produce\n\nTool: Node.js with the yaml package; Spectral overrides\n\n```js\n// api/style/exceptions.mjs — entries: { rule, reason, approvedBy, approved: 2026-10-01, until: 2027-04-01 }\nimport { readdirSync, readFileSync, writeFileSync } from 'node:fs'\nimport { parse, stringify } from 'yaml'\n\nconst MAX_MONTHS = {{EXCEPTION_MONTHS}}\nconst KEY = 'x-api-style-exceptions'\nconst pointer = (parts) => '#/' + parts.map((p) => encodeURIComponent(String(p).replaceAll('~', '~0').replaceAll('/', '~1'))).join('/')\nconst problems = []\nconst overrides = []\nfunction walk(node, parts, file) {\n  if (!node || typeof node !== 'object') return\n  for (const e of node[KEY] ?? []) {\n    const where = file + pointer(parts)\n    if (!e.rule || !e.reason || !e.approvedBy) problems.push(`${where}: an exception names its rule, reason and approver`)\n    const limit = new Date(e.approved)\n    limit.setMonth(limit.getMonth() + MAX_MONTHS)\n    if (!(Date.parse(e.until) <= limit.getTime())) problems.push(`${where}: ${e.rule} stands past ${MAX_MONTHS} months from its approval`)\n    if (!(Date.parse(e.until) >= Date.now())) problems.push(`${where}: ${e.rule} expired on ${e.until}`)\n    overrides.push({ files: [where], rules: { [e.rule]: 'off' } })\n  }\n  for (const [k, v] of Object.entries(node)) if (k !== KEY) walk(v, [...parts, k], file)\n}\nfor (const f of readdirSync('api').filter((n) => n.endsWith('.yaml'))) walk(parse(readFileSync(`api/${f}`, 'utf8')), [], `api/${f}`)\nwriteFileSync('.spectral.yaml', stringify({ extends: ['./api/style/ruleset.yaml'], ...(overrides.length ? { overrides } : {}) }))\nif (problems.length) { console.error(problems.join('\\n')); process.exit(1) }\n```",
       "hubWhen": {
         "EXCEPTIONS": [
@@ -790,7 +826,11 @@
       "label": "No rule turned off for one API",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A CI step searches the documents for inline exceptions and the ruleset files for Spectral overrides, and fails on any; turning a rule off for every API in api/style/ruleset.yaml stays allowed, through a pull request the API owners approve.\n\nThreshold: 0 x-api-style-exceptions or x-zally-ignore keys under api/; 0 overrides sections in .spectral.yaml or api/style/*.yaml\n\nTool: bash and grep in the CI job\n\n```bash\n#!/usr/bin/env bash\n# no rule is turned off for one part of one API\nset -euo pipefail\ninline=$(grep -rnE '\"?(x-api-style-exceptions|x-zally-ignore)\"?[[:space:]]*:' api/ || true)\noverrides=$(grep -lE '^overrides:' .spectral.yaml api/style/*.yaml 2>/dev/null || true)\nif [ -n \"$inline$overrides\" ]; then\n  printf '%s\\n' \"$inline\" \"$overrides\" | sed '/^$/d'\n  echo \"exceptions are not allowed: change or remove the rule in api/style/ruleset.yaml for every API\"\n  exit 1\nfi\n```",
       "hubWhen": {
         "EXCEPTIONS": [
@@ -804,7 +844,11 @@
       "label": "Our guide says how each rule is checked",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test parses api/style/guide.md: the \"Derived from:\" line, each numbered rule with its \"Checked by: review\" or \"Checked by: spectral `rule-name`\" line, and the rule names, which must be defined in api/style/ruleset.yaml or in a local ruleset it extends. With review only, every rule says review and the ruleset may be absent.\n\nThreshold: api/style/guide.md names its base guide with an https link and a revision; every \"### R<n> MUST|SHOULD\" rule is followed by a \"Checked by:\" line; 0 lint rules named that the ruleset does not define\n\nTool: Vitest with the yaml package\n\n```ts\n// test/api/own-guide.test.ts\nimport { existsSync, readFileSync } from 'node:fs'\nimport { dirname, join } from 'node:path'\nimport { parse } from 'yaml'\nimport { expect, it } from 'vitest'\n\nconst guide = readFileSync('api/style/guide.md', 'utf8')\nconst rulesIn = (file: string): string[] => {\n  if (!existsSync(file)) return []\n  const r = parse(readFileSync(file, 'utf8')) ?? {}\n  const local = [r.extends ?? []].flat().map((e) => (Array.isArray(e) ? e[0] : e)).filter((e) => e.startsWith('.'))\n  return [...Object.keys(r.rules ?? {}), ...local.flatMap((e) => rulesIn(join(dirname(file), e)))]\n}\nconst lintRules = rulesIn('api/style/ruleset.yaml')\n\nit('names the published guide it derives from, at a revision', () => {\n  expect(guide).toMatch(/^Derived from: \\[.+\\]\\(https:\\/\\/[^)]+\\) at revision \\S+/m)\n})\n\nit('says for every rule how it is checked', () => {\n  const headings = guide.match(/^### R\\d+ (MUST|SHOULD) /gm) ?? []\n  const rules = [...guide.matchAll(/^### R\\d+ (?:MUST|SHOULD) .+\\n+Checked by: (?:review|spectral `([\\w-]+)`)$/gm)]\n  expect(rules.length, 'a \"Checked by:\" line after every rule').toBe(headings.length)\n  expect(rules.map((r) => r[1]).filter((name) => name && !lintRules.includes(name))).toEqual([])\n})\n```",
       "hubWhen": {
         "GUIDE": [

@@ -206,7 +206,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-cache-control', label: 'Cache headers right on every route', category: 'structural', implements: ['adr-edge', 'adr-shared', 'adr-local', 'adr-none'], checks: ['req-cache-control', 'req-expiry', 'req-conditional'],
+      id: 'ff-cache-control', label: 'Cache headers right on every route', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-edge', 'adr-shared', 'adr-local', 'adr-none'], checks: ['req-cache-control', 'req-expiry', 'req-conditional'],
       threshold: '100% of GET routes answer with Cache-Control; personal routes private or no-store and never public; every response a shared cache may keep has an ETag, a lifetime of at most {{TTL_SECONDS}} seconds and answers If-None-Match with 304',
       description: 'A test lists the GET routes from the router\'s table (not from a list kept by hand), calls each as a signed-in user and reads its Cache-Control. A route on the personal list must be private or no-store; a response marked for shared caches (public or s-maxage) must carry an ETag and a lifetime, s-maxage (or max-age) plus stale-while-revalidate, within the TTL, and a second request with its ETag must get 304. A new route without a policy fails the test in its pull request.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack: JUnit with MockMvc, xUnit with WebApplicationFactory)',
@@ -238,7 +238,7 @@ describe.each(routes.filter((r) => r.method === 'GET'))('GET $path', (route) => 
 })`,
     },
     {
-      id: 'ff-no-cache', label: 'No cache arrives unannounced', when: { WHERE: ['none'] }, category: 'structural', implements: ['adr-none'], checks: ['req-no-cache'],
+      id: 'ff-no-cache', label: 'No cache arrives unannounced', when: { WHERE: ['none'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-none'], checks: ['req-no-cache'],
       threshold: '0 modules under src, outside the modules other decisions give a Redis of their own, import a cache client or an in-process cache library',
       description: 'A dependency rule fails the build when code under src imports a Redis, Valkey or Memcached client or an in-process cache library, which would mean a cache arrived without its decision. The modules that keep idempotency keys, rate-limit counters or sessions in a Redis by other decisions are left out by path.',
       tool: 'dependency-cruiser (or the equivalent for your stack: an ArchUnit rule forbidding com.github.benmanes.caffeine, io.lettuce, redis.clients.jedis and org.springframework.cache)',
@@ -255,7 +255,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-shared-config', label: 'Cache Redis bounded, every key expiring', when: { WHERE: ['shared'] }, category: 'operational', implements: ['adr-shared'], checks: ['req-shared-own', 'req-expiry'],
+      id: 'ff-shared-config', label: 'Cache Redis bounded, every key expiring', when: { WHERE: ['shared'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-shared'], checks: ['req-shared-own', 'req-expiry'],
       threshold: 'maxmemory above 0 and maxmemory-policy allkeys-lru or allkeys-lfu; 0 cache keys without an expiry or with more than {{TTL_SECONDS}} seconds left',
       description: 'A script run after every deploy and hourly by the monitoring job reads the cache\'s memory settings with INFO memory (which managed services allow where CONFIG GET is disabled) and scans the cache keys without blocking Redis (SCAN), failing on a key with no expiry or a longer one.',
       tool: 'redis-cli in a shell step (REDIS_URL points at the cache\'s own Redis or Valkey; valkey-cli takes the same arguments)',
@@ -275,7 +275,7 @@ done < <(redis-cli -u "$REDIS_URL" --scan --pattern 'cache:*')
 exit $bad`,
     },
     {
-      id: 'ff-local-bounded', label: 'In-process cache bounded in size and age', when: { WHERE: ['local'] }, category: 'structural', implements: ['adr-local'], checks: ['req-local-bound', 'req-expiry'],
+      id: 'ff-local-bounded', label: 'In-process cache bounded in size and age', when: { WHERE: ['local'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-local'], checks: ['req-local-bound', 'req-expiry'],
       threshold: 'The cache\'s bound is at most {{LOCAL_MAX_ENTRIES}} entries and its TTL above 0 and at most {{TTL_SECONDS}} seconds; after 1,000 more keys than the bound, it holds at most {{LOCAL_MAX_ENTRIES}}',
       description: 'A unit test builds the cache with its production settings from the one module that makes it, checks the bound and the TTL, then loads 1,000 more keys than the bound and checks that it evicted instead of growing.',
       tool: 'Vitest over lru-cache; for the JVM: JUnit over Caffeine, reading cache.policy().eviction() and cache.policy().expireAfterWrite()',
@@ -300,7 +300,7 @@ it('evicts instead of growing past the bound', async () => {
 })`,
     },
     {
-      id: 'ff-invalidate', label: 'A change reaches every reader in time', when: { ...CACHED, INVALIDATION: ['delete', 'event'] }, category: 'operational', implements: CACHE_ADRS, checks: ['req-invalidate'],
+      id: 'ff-invalidate', label: 'A change reaches every reader in time', when: { ...CACHED, INVALIDATION: ['delete', 'event'] }, characteristic: 'functional-suitability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: CACHE_ADRS, checks: ['req-invalidate'],
       threshold: 'Every reader (each instance, or the CDN) serves the changed value within {{INVALIDATE_SECONDS}} seconds of the write',
       description: 'An integration test against a deployed environment reads one product through every reader so that each has it cached, changes its price through the API, and polls every reader until it serves the new price, failing past the bound. With deletion by change events, a second run makes the change with SQL straight in the store, as a job or another service would, and expects the same.',
       tool: 'Vitest with fetch against the environment (READ_URLS lists each instance\'s own address, or the CDN\'s; for the JVM: JUnit with the HTTP client)',
@@ -331,7 +331,7 @@ it('a committed change reaches every reader within the bound', async () => {
 }, 60_000)`,
     },
     {
-      id: 'ff-writes-bypass', label: 'Commands never read the cache', when: DATA, category: 'structural', implements: DATA_ADRS, checks: ['req-writes-bypass'],
+      id: 'ff-writes-bypass', label: 'Commands never read the cache', when: DATA, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DATA_ADRS, checks: ['req-writes-bypass'],
       threshold: '0 modules under src/commands that reach src/cache/read, directly or through other modules',
       description: 'A dependency rule follows every import from the operations that change data and fails the build when one of them reaches the cached reads. Removing entries after a write (src/cache/invalidate) stays allowed.',
       tool: 'dependency-cruiser (reachable rule); for the JVM: an ArchUnit rule that classes in ..commands.. do not depend on ..cache.read..',
@@ -349,7 +349,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-coalesce', label: 'Concurrent misses read the store once', when: { ...DATA, STAMPEDE: ['coalesce'] }, category: 'structural', implements: DATA_ADRS, checks: ['req-coalesce'],
+      id: 'ff-coalesce', label: 'Concurrent misses read the store once', when: { ...DATA, STAMPEDE: ['coalesce'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DATA_ADRS, checks: ['req-coalesce'],
       threshold: '100 concurrent reads of one uncached key cause exactly 1 store read and return 1 value',
       description: 'A test forgets one key, starts 100 reads of it at once through the cached reads and counts the calls to the store. With a shared cache it runs against a Redis started by Testcontainers; with an in-process cache, against the cache itself.',
       tool: 'Vitest (vi.spyOn on the store reads); for the JVM: JUnit with Caffeine\'s AsyncLoadingCache or the Redis client of the decision',
@@ -367,7 +367,7 @@ it('100 concurrent misses for one key read the store once', async () => {
 })`,
     },
     {
-      id: 'ff-early', label: 'Hot entries refreshed just before expiry', when: { ...DATA, STAMPEDE: ['early'] }, category: 'structural', implements: DATA_ADRS, checks: ['req-early'],
+      id: 'ff-early', label: 'Hot entries refreshed just before expiry', when: { ...DATA, STAMPEDE: ['early'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DATA_ADRS, checks: ['req-early'],
       threshold: 'For an entry read every millisecond whose load took 50 ms, a refresh happens before expiry and less than 1 second before it',
       description: 'A unit test drives the early-refresh check with a read every millisecond across the entry\'s life and records the first read that refreshes it. With XFetch, the chance of a refresh more than 1 second (20 load times) early is about 50 times e to the minus 20, so the test is stable.',
       tool: 'Vitest; for the JVM: JUnit over the same check (Caffeine\'s refreshAfterWrite refreshes at a fixed age, not probabilistically, so the check is code of your own)',
@@ -387,7 +387,7 @@ it('refreshes a hot entry before it expires, and not long before', () => {
 })`,
     },
     {
-      id: 'ff-cold-cache', label: 'The store carries the peak on a cold cache', when: { ...DATA, STAMPEDE: ['none'] }, category: 'operational', implements: DATA_ADRS, checks: ['req-cold'],
+      id: 'ff-cold-cache', label: 'The store carries the peak on a cold cache', when: { ...DATA, STAMPEDE: ['none'] }, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: DATA_ADRS, checks: ['req-cold'],
       threshold: 'With the cache emptied, 5 minutes at the peak read rate on 20 hot keys: errors under 0.1 % and the 95th percentile under the latency budget of the Capacity and scaling pack',
       description: 'The scheduled load job empties the cache (FLUSHDB on the cache\'s own Redis, or a rolling restart for in-process caches) and at once runs k6 at the peak rate against 20 hot keys, the shape that makes a stampede. PEAK_RPS and P95_MS come from the Capacity and scaling pack\'s decision.',
       tool: 'k6 (constant-arrival-rate executor and thresholds), run by the scheduled load job',
@@ -411,7 +411,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-down-store', label: 'Cache outage falls back within a limit', when: { WHERE: ['shared'], DOWN: ['store'] }, category: 'operational', implements: ['adr-shared'], checks: ['req-down-store'],
+      id: 'ff-down-store', label: 'Cache outage falls back within a limit', when: { WHERE: ['shared'], DOWN: ['store'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-shared'], checks: ['req-down-store'],
       threshold: 'With the cache container stopped, 200 concurrent reads answer only 200 or 503 with Retry-After, at least one 200, and at most {{FALLBACK_CONCURRENCY}} store reads run at once',
       description: 'An integration test starts Redis in a container, builds the app on it, warms one key, stops the container and fires 200 reads at 50 keys. A probe around the store reads records how many ran at once.',
       tool: 'Vitest with supertest and Testcontainers (@testcontainers/redis); for the JVM: JUnit with Testcontainers and Resilience4j\'s CircuitBreaker and Bulkhead',
@@ -437,7 +437,7 @@ it('reads from the store, a limited number at a time, while the cache is down', 
 }, 60_000)`,
     },
     {
-      id: 'ff-down-fail', label: 'Cache outage refused fast', when: { WHERE: ['shared'], DOWN: ['fail'] }, category: 'operational', implements: ['adr-shared'], checks: ['req-down-fail'],
+      id: 'ff-down-fail', label: 'Cache outage refused fast', when: { WHERE: ['shared'], DOWN: ['fail'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-shared'], checks: ['req-down-fail'],
       threshold: 'With the cache container stopped, a read is answered 503 with Retry-After within {{CACHE_TIMEOUT_MS}} ms plus 100 ms, and 0 store reads happen',
       description: 'An integration test starts Redis in a container, builds the app on it, warms one key, stops the container, then times one read and counts the store reads it caused.',
       tool: 'Vitest with supertest and Testcontainers (@testcontainers/redis); for the JVM: JUnit with Testcontainers',
@@ -465,7 +465,7 @@ it('refuses reads at once while the cache is down, sparing the store', async () 
 }, 60_000)`,
     },
     {
-      id: 'ff-hit-ratio', label: 'Hit ratio watched', when: DATA, category: 'operational', implements: DATA_ADRS, checks: ['req-hit-ratio'],
+      id: 'ff-hit-ratio', label: 'Hit ratio watched', when: DATA, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: DATA_ADRS, checks: ['req-hit-ratio'],
       threshold: 'An alert opens a ticket when the share of lookups answered from the cache over the last hour stays below {{HIT_RATIO}} % for 15 minutes',
       description: 'Prometheus computes the hit ratio over an hour. For a shared cache, from redis_exporter\'s keyspace counters of the cache\'s own Redis (meaningful because nothing else uses it); for an in-process cache, from the cache.gets meter that Micrometer\'s Caffeine binder exports (in Node.js, a prom-client counter of the same name and labels). Keep the rule of the cache the decision names.',
       tool: 'Prometheus alerting rules over redis_exporter (shared cache) or Micrometer\'s CaffeineCacheMetrics (in-process cache)',

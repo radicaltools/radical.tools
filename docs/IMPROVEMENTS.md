@@ -356,6 +356,24 @@ gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
 
+### Dogfooding (2026-10-30): fitness functions classified
+
+- A change to a built-in type (the fitness function's new properties)
+  cannot start in the model: `upsert_node_type` forks a built-in metamodel
+  into a custom copy, which would stop following the preset. The preset in
+  `governance.ts` had to change first, and the MCP server be rebuilt, before
+  the model could hold the new properties. A way to propose a change to a
+  built-in type from the model (a draft the preset is checked against) would
+  keep model-first for the metamodel too.
+- The first write through the MCP server after the change rewrote every
+  fitness function file and `snapshots.json` (the migration on read, saved).
+  Right, but it lands in the diff of whatever the first write was; a
+  `radical migrate` that writes only the migration would keep it apart.
+- `radical sense run` runs the model's measure lines in CI with the trust of
+  the repository. A federated model's lines are never run because the
+  composed models live in `.radical/federation/`, which reading a folder
+  skips; no test pins that yet.
+
 ### Dogfooding (2026-10-30): nightly sensors
 
 - The nightly workflow of #291 ran `gh` inside the Playwright container,

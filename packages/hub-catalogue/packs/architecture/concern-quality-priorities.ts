@@ -216,7 +216,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-ranking', label: 'Ranking complete, strict and signed', category: 'structural', implements: LEADS, checks: ['req-ranking', 'req-signoff'],
+      id: 'ff-ranking', label: 'Ranking complete, strict and signed', characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: LEADS, checks: ['req-ranking', 'req-signoff'],
       threshold: 'For every system of the model, quality/<system>/ranking.json names the nine ISO/IEC 25010:2023 characteristics and cost exactly once and nothing else, with {{LEAD}} first, a signer for each of {{APPROVERS}} and a review date',
       description: 'A test lists the systems of the architecture model that are not external and reads each one\'s ranking file. The file holds "adopted" and "reviewed" dates (YYYY-MM-DD), "approvedBy" (a name per role of the decision), "order" (the ten entries, highest first) and, with a ranking only, "measuredBy" (a requirement label per top characteristic), for example {"adopted": "2026-11-02", "reviewed": "2026-11-02", "approvedBy": {"product owner": "A. Nowak", "architect": "B. Lee", "operations lead": "C. Diaz"}, "order": ["reliability", "security", "cost", "performance efficiency", "maintainability", "functional suitability", "compatibility", "interaction capability", "flexibility", "safety"]}.',
       tool: 'Vitest with js-yaml over the Radical Markdown folder (for a model kept as a single .radical file: the same test over its nodes array)',
@@ -235,7 +235,7 @@ it.each(systems)('the ranking of $system is complete, strict and signed', ({ sys
 })`,
     },
     {
-      id: 'ff-review-calendar', label: 'Ranking reviewed within the period', when: { REVIEW: ['calendar'] }, category: 'process', implements: LEADS, checks: ['req-review-calendar'],
+      id: 'ff-review-calendar', label: 'Ranking reviewed within the period', when: { REVIEW: ['calendar'] }, characteristic: 'other', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: LEADS, checks: ['req-review-calendar'],
       threshold: '0 ranking files whose review date is more than {{REVIEW_MONTHS}} months old',
       description: 'A step of the main-branch and nightly builds reads the review date of every ranking file and fails, naming the file, when it is older than the period.',
       tool: 'jq 1.6 or later (strptime, mktime, now) in a shell step',
@@ -253,7 +253,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-review-release', label: 'Ranking reviewed since the last major release', when: { REVIEW: ['release'] }, category: 'process', implements: LEADS, checks: ['req-review-release'],
+      id: 'ff-review-release', label: 'Ranking reviewed since the last major release', when: { REVIEW: ['release'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: LEADS, checks: ['req-review-release'],
       threshold: '0 ranking files reviewed before the date of the previous major release when a major release is tagged',
       description: 'The release job, run on a pushed tag vN.0.0 with the full history checked out, finds the major tag just below it in version order, takes the date of its commit and fails when any ranking was last reviewed before it.',
       tool: 'git (tag --sort=v:refname, log --format=%cs), awk and jq in a step of the release workflow (actions/checkout with fetch-depth: 0)',
@@ -275,7 +275,7 @@ done
 exit $status`,
     },
     {
-      id: 'ff-qas', label: 'Scenarios complete and the leading quality measured', when: WRITTEN, category: 'structural', implements: ['adr-utility-tree', 'adr-qas'], checks: ['req-qas-form', 'req-lead-scenarios'],
+      id: 'ff-qas', label: 'Scenarios complete and the leading quality measured', when: WRITTEN, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-utility-tree', 'adr-qas'], checks: ['req-qas-form', 'req-lead-scenarios'],
       threshold: 'Every requirement labelled "<characteristic>: …" has a trigger, a number with a unit in its action and an element that satisfies it; at least {{LEAD_SCENARIOS}} of them are for {{LEAD}}',
       description: 'A test reads the requirements of the architecture model whose label starts with a characteristic of the ranking and a colon, and checks each for the parts a script can see: the trigger (source and stimulus), a response measure with a number and a unit in the action, and a satisfies relation from the element it is about (the artifact). It then counts those of the leading quality.',
       tool: 'Vitest with js-yaml over the Radical Markdown folder and its relations.json',
@@ -297,7 +297,7 @@ it('the leading quality has its scenarios', () => {
 })`,
     },
     {
-      id: 'ff-utility-tree', label: 'Utility tree complete', when: { METHOD: ['atam'] }, category: 'structural', implements: ['adr-utility-tree'], checks: ['req-utility-tree'],
+      id: 'ff-utility-tree', label: 'Utility tree complete', when: { METHOD: ['atam'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-utility-tree'], checks: ['req-utility-tree'],
       threshold: 'For every system of the model, quality/<system>/utility-tree.yaml exists, each leaf names a requirement of the model and is rated H, M or L for importance and risk, and at least 1 leaf of importance H sits under {{LEAD}}',
       description: 'A test reads each system\'s utility tree: characteristics at the top, concerns below, and lists of leaves with scenario (a requirement label), importance and risk, for example "reliability: { availability: [ { scenario: \'Reliability: checkout survives the loss of a zone\', importance: H, risk: M } ] }". It fails on a missing file, a leaf naming no requirement, a rating outside H, M and L, or no H leaf for the leading quality.',
       tool: 'Vitest with js-yaml over the Radical Markdown folder and the utility-tree files',
@@ -318,7 +318,7 @@ it.each(systems)('the utility tree of $system is complete', ({ system }) => {
 })`,
     },
     {
-      id: 'ff-anchors', label: 'Top three qualities point to their numbers', when: { METHOD: ['ranking'] }, category: 'structural', implements: ['adr-ranking-only'], checks: ['req-anchors'],
+      id: 'ff-anchors', label: 'Top three qualities point to their numbers', when: { METHOD: ['ranking'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-ranking-only'], checks: ['req-anchors'],
       threshold: 'For every system, each of the first 3 entries of the ranking names in measuredBy a requirement of the model whose action holds a number with a unit',
       description: 'A test reads each ranking file\'s measuredBy (characteristic to requirement label, for example "reliability": "Checkout stays available") and looks the requirement up in the architecture model.',
       tool: 'Vitest with js-yaml over the Radical Markdown folder',
@@ -336,7 +336,7 @@ it.each(systems)('the top three qualities of $system point to their numbers', ({
 })`,
     },
     {
-      id: 'ff-tradeoffs', label: 'ADRs name their trade-offs', when: { TRADEOFFS: ['line'] }, category: 'process', implements: LEADS, checks: ['req-tradeoff-line', 'req-tradeoff-exception'],
+      id: 'ff-tradeoffs', label: 'ADRs name their trade-offs', when: { TRADEOFFS: ['line'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: LEADS, checks: ['req-tradeoff-line', 'req-tradeoff-exception'],
       threshold: '0 ADRs accepted since the ranking was adopted without a Favours line, naming an entry outside the ranking, or favouring a lower-ranked characteristic without an Exception line',
       description: 'A test reads the ADRs of the architecture model with status accepted and a date on or after the ranking\'s "adopted" date, finds the line "Favours: … / At the cost of: …" in their consequences and compares the names with the ranking. With several systems in one repository, run it once per ranking file (RANKING=quality/<system>/ranking.json).',
       tool: 'Vitest with js-yaml over the Radical Markdown folder',

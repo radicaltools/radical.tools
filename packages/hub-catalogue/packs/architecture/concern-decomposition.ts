@@ -229,7 +229,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-inventory', label: 'Every deployable in the model', category: 'structural', implements: SPLIT_ADRS, checks: ['req-inventory'],
+      id: 'ff-inventory', label: 'Every deployable in the model', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SPLIT_ADRS, checks: ['req-inventory'],
       threshold: '0 folders under services that are not a container or web app in the architecture model',
       description: 'A test reads the architecture model\'s node files, collects the labels of its containers and web apps, and compares them with the folders under services (a label matches a folder when it equals the folder name ignoring case and spaces); a folder without an element fails the test naming it.',
       tool: 'Vitest with the yaml package over the Radical Markdown folder; for a model kept as a single .radical file: the same test over its nodes array',
@@ -255,7 +255,7 @@ it('every deployable folder is a container or web app in the model', () => {
 })`,
     },
     {
-      id: 'ff-build-time', label: 'Pipeline within limit', when: ONE_DEPLOYABLE, category: 'process', implements: ['adr-monolith', 'adr-modular-monolith'], checks: ['req-build', 'req-revisit'],
+      id: 'ff-build-time', label: 'Pipeline within limit', when: ONE_DEPLOYABLE, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-monolith', 'adr-modular-monolith'], checks: ['req-build', 'req-revisit'],
       threshold: 'Build, test and package finish within {{BUILD_MINUTES}} minutes on the main branch',
       description: 'The CI job that builds, tests and packages the deployable has a timeout; when it is hit, the job fails and the failure is the signal to review the decomposition within a month.',
       tool: 'GitHub Actions (timeout-minutes); the build command is the stack\'s (./mvnw or ./gradlew on the JVM, dotnet on .NET, npm in TypeScript)',
@@ -272,7 +272,7 @@ jobs:
       - run: ./mvnw -B verify package`,
     },
     {
-      id: 'ff-module-alone', label: 'Modules start alone', when: { SPLIT: ['modular'] }, category: 'structural', implements: ['adr-modular-monolith'], checks: ['req-modules'],
+      id: 'ff-module-alone', label: 'Modules start alone', when: { SPLIT: ['modular'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-modular-monolith'], checks: ['req-modules'],
       threshold: 'Every module starts and passes its integration tests with the other modules absent',
       description: 'Each module has an integration test that bootstraps only that module (Spring Modulith\'s standalone bootstrap mode, the default), with the beans of the modules it depends on mocked. A module that needs another to start fails its test.',
       tool: 'Spring Modulith (@ApplicationModuleTest, JUnit 5); for .NET: a WebApplicationFactory per module project; for TypeScript: one Nx project per module with its own test target',
@@ -291,7 +291,7 @@ class OrderingModuleTest {
 }`,
     },
     {
-      id: 'ff-own-pipeline', label: 'A pipeline per deployable', when: MANY_DEPLOYABLES, category: 'structural', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-independent'],
+      id: 'ff-own-pipeline', label: 'A pipeline per deployable', when: MANY_DEPLOYABLES, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-independent'],
       threshold: '100% of the deployables have a deploy workflow triggered only by their own folder; 0 workflow steps that build or deploy another deployable',
       description: 'A test reads each deployable\'s workflow file, checks that it is triggered by changes under its own folder only, and that no run step names another deployable\'s folder; a workflow that builds or deploys two deployables fails the test.',
       tool: 'Vitest with the yaml package over .github/workflows; for GitLab CI: the same test over the rules:changes of each job',
@@ -311,7 +311,7 @@ it.each(deployables)('%s deploys from a pipeline of its own', (name) => {
 })`,
     },
     {
-      id: 'ff-coordinated-releases', label: 'No releases in lockstep', when: MANY_DEPLOYABLES, category: 'process', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-independent', 'req-revisit'],
+      id: 'ff-coordinated-releases', label: 'No releases in lockstep', when: MANY_DEPLOYABLES, characteristic: 'maintainability', scope: 'holistic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-independent', 'req-revisit'],
       threshold: '0 pairs of deployables released within 15 minutes of each other more than twice in the last quarter',
       description: 'A monthly job lists the successful runs of every deployable\'s deploy workflow on main over the last quarter and counts, per pair, the releases that happened within 15 minutes of each other; a pair over the limit fails the job, which is the signal to review the decomposition within a month.',
       tool: 'GitHub CLI (gh run list) in a TypeScript script run with tsx from a scheduled GitHub Actions job; for GitLab: the same over the pipelines API',
@@ -342,7 +342,7 @@ if (together.length) {
 }`,
     },
     {
-      id: 'ff-ownership', label: 'Owners within limit', when: MANY_DEPLOYABLES, category: 'process', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-owners'],
+      id: 'ff-ownership', label: 'Owners within limit', when: MANY_DEPLOYABLES, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-microservices', 'adr-serverless'], checks: ['req-owners'],
       threshold: 'Every deployable names one owner in its catalog entry; no team owns more than {{PER_TEAM}}',
       description: 'Each deployable has a Backstage catalog-info.yaml naming its owner; a CI step collects the owners, fails when one is missing, and fails when a team owns more than the limit.',
       tool: 'yq (mikefarah) in a shell step over Backstage catalog-info.yaml; for a different catalog: the same over its owner field',
@@ -358,7 +358,7 @@ done
 sort owners.txt | uniq -c | awk -v max={{PER_TEAM}} '$1 > max { print "too many deployables for " $2 ": " $1; bad = 1 } END { exit bad }'`,
     },
     {
-      id: 'ff-functions', label: 'Functions belong to a stack', when: { SPLIT: ['serverless'] }, category: 'structural', implements: ['adr-serverless'], checks: ['req-functions'],
+      id: 'ff-functions', label: 'Functions belong to a stack', when: { SPLIT: ['serverless'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-serverless'], checks: ['req-functions'],
       threshold: '0 functions without a context and owner tag or with a timeout above 30 seconds',
       description: 'A CloudFormation Guard rule runs over every synthesised template in CI and fails on a function without a context and owner tag or with a timeout over 30 seconds: SAM functions carry Tags as a map, CDK output as the Lambda resource with a list of Key/Value pairs, and a Lambda function without a Timeout keeps the 3-second default and passes.',
       tool: 'AWS CloudFormation Guard (cfn-guard validate) over SAM and CDK-synthesised templates; for Bicep: PSRule for Azure with a custom rule; for Terraform: Conftest over the plan JSON',
@@ -384,7 +384,7 @@ rule lambda_functions_belong_to_a_context when %lambda_functions !empty {
 }`,
     },
     {
-      id: 'ff-own-database', label: 'No foreign credentials', when: { DATA: ['own'] }, category: 'structural', implements: ['adr-own-database'], checks: ['req-own-data'],
+      id: 'ff-own-database', label: 'No foreign credentials', when: { DATA: ['own'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-own-database'], checks: ['req-own-data'],
       threshold: '0 workloads that receive another deployable\'s database secret',
       description: 'A policy over the Kubernetes manifests fails when a Deployment, StatefulSet, Job or CronJob references a database secret other than its own (secrets are named db-<app>), whether through envFrom, an env entry with secretKeyRef, or a secret volume.',
       tool: 'Conftest (Open Policy Agent, rego.v1) over the rendered manifests; for ECS: the same rule over the task definitions\' secrets',
@@ -422,7 +422,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-schema-grants', label: 'Schemas closed to others', when: { DATA: ['schemas'] }, category: 'structural', implements: ['adr-schema-per-module'], checks: ['req-schemas'],
+      id: 'ff-schema-grants', label: 'Schemas closed to others', when: { DATA: ['schemas'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-schema-per-module'], checks: ['req-schemas'],
       threshold: '0 module users with any privilege on another module\'s schema',
       description: 'An integration test starts PostgreSQL in a container, runs every module\'s migrations and grants, and runs this query; any row fails the test.',
       tool: 'Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL',
@@ -437,7 +437,7 @@ WHERE r.rolname LIKE 'module\\_%'
 -- expected: 0 rows`,
     },
     {
-      id: 'ff-table-writers', label: 'One writer per table', when: { DATA: ['shared'] }, category: 'structural', implements: ['adr-shared-schema'], checks: ['req-shared'],
+      id: 'ff-table-writers', label: 'One writer per table', when: { DATA: ['shared'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-shared-schema'], checks: ['req-shared'],
       threshold: '0 tables writable by a module user other than the owner\'s; 0 tables without an owner in their comment',
       description: 'An integration test starts PostgreSQL in a container, runs the migrations and grants, and checks that every table (including partitioned ones) names its owning module in its table comment and can be written only by that module\'s user.',
       tool: 'Testcontainers (PostgreSQL) with the test runner of the stack; the query is plain SQL',
@@ -452,7 +452,7 @@ WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND r.rolname LIKE 'modul
 -- expected: 0 rows`,
     },
     {
-      id: 'ff-team-changes', label: 'Changes stay with one team', when: { BOUNDARY: ['team'], SPLIT: WITH_BOUNDARIES }, category: 'process', implements: SPLIT_ADRS, checks: ['req-team-changes'],
+      id: 'ff-team-changes', label: 'Changes stay with one team', when: { BOUNDARY: ['team'], SPLIT: WITH_BOUNDARIES }, characteristic: 'maintainability', scope: 'holistic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: SPLIT_ADRS, checks: ['req-team-changes'],
       threshold: 'At least 80% of the pull requests merged in the last quarter touch the parts of one team only',
       description: 'A monthly job lists the pull requests merged in the last quarter with their files, maps each file to its owning team through the CODEOWNERS entries (folder prefixes, one per part, as the Code review and branching pack keeps them) and counts the pull requests whose files belong to one team; below 80% the job fails and the boundaries are reviewed.',
       tool: 'GitHub CLI (gh pr list) in a TypeScript script run with tsx from a scheduled GitHub Actions job',
@@ -476,7 +476,7 @@ console.log(\`\${singleTeam} of \${prs.length} merged pull requests touched one 
 if (share < 80) process.exit(1)`,
     },
     {
-      id: 'ff-legacy-share', label: 'Legacy traffic falls', when: { MIGRATION: ['strangler'] }, category: 'operational', implements: ['adr-strangler'], checks: ['req-strangler'],
+      id: 'ff-legacy-share', label: 'Legacy traffic falls', when: { MIGRATION: ['strangler'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-strangler'], checks: ['req-strangler'],
       threshold: 'The share of requests reaching the old system falls every 30 days while above 0, and is 0 within {{MIGRATION_MONTHS}} months of the migration\'s start',
       description: 'The routing facade labels each request with the backend that served it and exports the migration\'s start as migration_started_timestamp_seconds; a recording rule keeps the old system\'s 7-day share, one alert fires when the share is above 0 and has not fallen in 30 days, another when it is above 0 past the deadline.',
       tool: 'Prometheus recording and alerting rules',

@@ -138,6 +138,13 @@ export type Condition =
   | { kind: 'invalid'; raw: string; problem: string }
 
 const TEST_LINE = /^test\((.+)\)(?:\s+passed)?$/
+// A manual fitness function's review: the latest one `radical sense review`
+// recorded under the name has to have passed.
+const REVIEW_LINE = /^review\((.+)\)\s+passed$/i
+
+/** The metric a recorded review is read as (reviews.ts): 1 passed, 0 failed,
+ *  labelled with the review's name. */
+export const REVIEW_METRIC = 'review'
 const METRIC_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\s*(\S+)?$/i
 const BASELINE_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*baseline(?:\s*([+-])\s*(\d+(?:\.\d+)?(?:e-?\d+)?)\s*(%|[^\s%]+)?)?$/i
 
@@ -159,6 +166,8 @@ export function parseCondition(line: string): Condition {
     const [id] = parseTestIds(test[1])
     return id ? { kind: 'test', raw, id } : { kind: 'invalid', raw, problem: 'test() names no test' }
   }
+  const review = REVIEW_LINE.exec(raw)
+  if (review) return { kind: 'metric', raw, metric: REVIEW_METRIC, labels: { name: review[1].trim() }, op: '==', value: 1 }
   const b = BASELINE_LINE.exec(raw)
   if (b) {
     const labels = b[2] === undefined ? {} : parseLabels(b[2])
@@ -170,7 +179,7 @@ export function parseCondition(line: string): Condition {
     return { kind: 'metric', raw, metric: b[1], labels, op: (b[3] === '=' ? '==' : b[3]) as Comparison, value: Number.NaN, baseline }
   }
   const m = METRIC_LINE.exec(raw)
-  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`' }
+  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`' }
   const labels = m[2] === undefined ? {} : parseLabels(m[2])
   if (typeof labels === 'string') return { kind: 'invalid', raw, problem: labels }
   return { kind: 'metric', raw, metric: m[1], labels, op: (m[3] === '=' ? '==' : m[3]) as Comparison, value: Number(m[4]), ...(m[5] ? { unit: m[5] } : {}) }
@@ -181,6 +190,16 @@ export function parseCondition(line: string): Condition {
 export function parseConditions(text: unknown): Condition[] {
   if (typeof text !== 'string') return []
   return text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map(parseCondition)
+}
+
+/** Whether a fitness function's result is static (its metric conditions
+ *  are fixed limits) or dynamic (one compares with a baseline), as
+ *  Building Evolutionary Architectures classifies it; undefined when it
+ *  states no metric condition (tests or reviews alone). */
+export function fitnessResult(metrics: unknown): 'static' | 'dynamic' | undefined {
+  const values = parseConditions(metrics).filter((c): c is Extract<Condition, { kind: 'metric' }> => c.kind === 'metric' && c.metric !== REVIEW_METRIC)
+  if (!values.length) return undefined
+  return values.some((c) => c.baseline) ? 'dynamic' : 'static'
 }
 
 /** How the outcomes of an element's conditions make its status. */

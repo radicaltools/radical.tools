@@ -182,7 +182,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-envelope', label: 'Every message is a CloudEvent', category: 'structural', implements: DELIVERY_ADRS, checks: ['req-envelope'],
+      id: 'ff-envelope', label: 'Every message is a CloudEvent', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DELIVERY_ADRS, checks: ['req-envelope'],
       threshold: 'Every message sample validates as a CloudEvent and carries dataschema, time and correlationid; 0 duplicate ids among the samples',
       description: 'A test constructs a CloudEvent from each message sample (one per type, the same samples the consumers are tested with); the SDK refuses a missing or malformed required attribute, and the test checks the attributes the pack adds.',
       tool: 'Vitest with the cloudevents SDK (or the test runner and CloudEvents SDK of your stack)',
@@ -204,7 +204,7 @@ it('every message type is a valid CloudEvent with schema version, time and corre
 })`,
     },
     {
-      id: 'ff-dupes', label: 'Duplicate delivery harmless', when: LEAST, category: 'structural', implements: ['adr-least'], checks: ['req-dedupe'],
+      id: 'ff-dupes', label: 'Duplicate delivery harmless', when: LEAST, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-least'], checks: ['req-dedupe'],
       threshold: 'Every consumer, given each of its message types twice (and again after a restart), ends in the same state as with one delivery; 0 double effects; 2 duplicates counted',
       description: 'An integration test starts the real broker and database in containers, publishes each message type a consumer handles twice with the same id, restarts the consumer, publishes it a third time, and compares the state with a single delivery.',
       tool: 'Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest (or the test runner of your stack)',
@@ -222,7 +222,7 @@ describe.each(MESSAGE_SAMPLES)('$type', (sample) => {
 })`,
     },
     {
-      id: 'ff-lossy', label: 'Only losable types, failures dropped', when: { DELIVERY: ['most'] }, category: 'structural', implements: ['adr-most'], checks: ['req-lossy'],
+      id: 'ff-lossy', label: 'Only losable types, failures dropped', when: { DELIVERY: ['most'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-most'], checks: ['req-lossy'],
       threshold: 'Every message type a producer can publish is on the losable list, 0 off it; a message the consumer fails on is delivered once, never again, and counted as dropped',
       description: 'A test enumerates the message types the producers can publish from their type definitions (not from a list kept by hand) and fails on any that is not on the losable list; a second test, against the real broker in a container, makes the consumer fail on a message and checks that it is delivered once and the drop counter moves.',
       tool: 'Vitest with Testcontainers (or the test runner of your stack)',
@@ -243,7 +243,7 @@ it('drops a failing message after one delivery and counts it', async () => {
 })`,
     },
     {
-      id: 'ff-stale', label: 'Any order, same result', when: { ORDER: ['none'] }, category: 'structural', implements: DELIVERY_ADRS, checks: ['req-stale'],
+      id: 'ff-stale', label: 'Any order, same result', when: { ORDER: ['none'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: DELIVERY_ADRS, checks: ['req-stale'],
       threshold: 'For every message type, all orders of a sequence of 3 versions end in the state of the highest version; 0 differences',
       description: 'A property-based test generates sequences of versioned messages for one record, applies every permutation, and expects the same final state as the ordered sequence.',
       tool: 'fast-check with Vitest (or the property-testing library of your stack)',
@@ -263,7 +263,7 @@ it('ends in the same state whatever the order', () => {
 })`,
     },
     {
-      id: 'ff-order', label: 'Order per key holds', when: { ORDER: ['key'] }, category: 'structural', implements: BROKER_ADRS, checks: ['req-order'],
+      id: 'ff-order', label: 'Order per key holds', when: { ORDER: ['key'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: BROKER_ADRS, checks: ['req-order'],
       threshold: 'With 4 consumers in parallel, the messages of each of 100 keys are handled in the order published; 0 out of order',
       description: 'An integration test against the real broker in a container publishes numbered messages for 100 keys interleaved, runs four consumers, and checks that each key\'s numbers were handled in increasing order.',
       tool: 'Testcontainers (Kafka, RabbitMQ or LocalStack module) with Vitest (or the test runner of your stack)',
@@ -279,7 +279,7 @@ it('ends in the same state whatever the order', () => {
 })`,
     },
     {
-      id: 'ff-kafka', label: 'Kafka lag and dead letters', when: { BROKER: ['kafka'] }, category: 'operational', implements: ['adr-kafka'], checks: ['req-lag', 'req-dlq'],
+      id: 'ff-kafka', label: 'Kafka lag and dead letters', when: { BROKER: ['kafka'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-kafka'], checks: ['req-lag', 'req-dlq'],
       threshold: 'An alert fires when a consumer group with waiting messages has made no progress for {{LAG_MINUTES}} minutes, or consumes so slowly that its lag is more than {{LAG_MINUTES}} minutes of its own rate; when a dead-letter topic receives a message; and when the dlq-triage group has had a dead letter waiting for {{DLQ_HOURS}} hours',
       description: 'Prometheus rules over kafka-exporter metrics alert on a stuck consumer group, on a slow one (lag divided by consumption rate), on any message published to a .dlq topic, and on a dead letter the triage group has not consumed within {{DLQ_HOURS}} hours (the owner\'s replay or discard tool runs as that group). With at-most-once delivery there are no .dlq topics and those two rules stay idle.',
       tool: 'Prometheus alerting rules (kafka-exporter)',
@@ -307,7 +307,7 @@ it('ends in the same state whatever the order', () => {
     annotations: { summary: "a dead letter on {{ $labels.topic }} has waited {{DLQ_HOURS}} hours" }`,
     },
     {
-      id: 'ff-rabbitmq', label: 'RabbitMQ backlog and dead letters', when: { BROKER: ['rabbitmq'] }, category: 'operational', implements: ['adr-rabbitmq'], checks: ['req-lag', 'req-dlq'],
+      id: 'ff-rabbitmq', label: 'RabbitMQ backlog and dead letters', when: { BROKER: ['rabbitmq'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-rabbitmq'], checks: ['req-lag', 'req-dlq'],
       threshold: 'An alert fires when a queue has messages ready and no consumer, or messages ready that have not decreased for {{LAG_MINUTES}} minutes, or any message in a .dlq queue, or a .dlq head message older than {{DLQ_HOURS}} hours',
       description: 'Prometheus rules over the rabbitmq_prometheus plugin\'s per-object metrics alert on stuck queues, dead letters, and a dead letter older than {{DLQ_HOURS}} hours (the head timestamp needs the timestamp property set by publishers). With at-most-once delivery there are no .dlq queues and those two rules stay idle.',
       tool: 'Prometheus alerting rules (rabbitmq_prometheus plugin, per-object metrics)',
@@ -329,7 +329,7 @@ it('ends in the same state whatever the order', () => {
     labels: { severity: page }`,
     },
     {
-      id: 'ff-rabbitmq-policy', label: 'Every queue quorum with a delivery limit', when: { BROKER: ['rabbitmq'] }, category: 'structural', implements: ['adr-rabbitmq'], checks: ['req-dlq'],
+      id: 'ff-rabbitmq-policy', label: 'Every queue quorum with a delivery limit', when: { BROKER: ['rabbitmq'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-rabbitmq'], checks: ['req-dlq'],
       threshold: 'Every queue that is not a .dlq is a quorum queue whose effective policy sets a dead-letter exchange and delivery-limit = {{MAX_ATTEMPTS}}; 0 queues without',
       description: 'A scheduled job reads every queue from the management API and fails on one that is not a quorum queue or whose effective policy lacks the dead-letter exchange or the delivery limit; the policy itself is applied from the repository.',
       tool: 'RabbitMQ management API with curl and jq',
@@ -347,7 +347,7 @@ bad=$(curl -sf -u "$RABBIT_USER:$RABBIT_PASS" "$RABBIT_MGMT_URL/api/queues" | jq
 test -z "$bad" || { echo "queues without quorum type or the dead-letter policy:"; echo "$bad"; exit 1; }`,
     },
     {
-      id: 'ff-sqs', label: 'SQS age and dead letters', when: { BROKER: ['sqs'] }, category: 'operational', implements: ['adr-sqs'], checks: ['req-lag', 'req-dlq'],
+      id: 'ff-sqs', label: 'SQS age and dead letters', when: { BROKER: ['sqs'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-sqs'], checks: ['req-lag', 'req-dlq'],
       threshold: 'An alarm fires when ApproximateAgeOfOldestMessage of a queue exceeds {{LAG_MINUTES}} minutes, when its dead-letter queue holds a message, and when the oldest dead letter is older than {{DLQ_HOURS}} hours',
       description: 'Each queue, its dead-letter queue and their three CloudWatch alarms are defined together in one Terraform module, so a queue cannot exist without its alarms; the redrive policy itself is checked by the plan policy.',
       tool: 'Amazon CloudWatch alarms (Terraform)',
@@ -396,7 +396,7 @@ resource "aws_cloudwatch_metric_alarm" "orders_dead_letter_age" {
 }`,
     },
     {
-      id: 'ff-sqs-redrive', label: 'No queue without redrive', when: { BROKER: ['sqs'] }, category: 'structural', implements: ['adr-sqs'], checks: ['req-dlq'],
+      id: 'ff-sqs-redrive', label: 'No queue without redrive', when: { BROKER: ['sqs'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-sqs'], checks: ['req-dlq'],
       threshold: 'Every aws_sqs_queue in the plan that is not a dead-letter queue has a redrive policy with maxReceiveCount = {{MAX_ATTEMPTS}}; 0 without',
       description: 'A Conftest policy over the Terraform plan fails the pull request on a queue without a redrive policy, or with another maxReceiveCount; a policy only known after apply is reported too, so it is written as a literal.',
       tool: 'Conftest (Open Policy Agent) over terraform show -json',
@@ -425,7 +425,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-registry', label: 'Schemas compatible before merge', when: { SCHEMA: ['registry'] }, category: 'process', implements: ['adr-registry'], checks: ['req-schema-registry'],
+      id: 'ff-registry', label: 'Schemas compatible before merge', when: { SCHEMA: ['registry'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-registry'], checks: ['req-schema-registry'],
       threshold: 'Every changed schema of an existing subject is compatible with all registered versions under the subject\'s mode before merge; 0 incompatible registrations; a new subject passes',
       description: 'A CI step asks the registry whether each changed Avro, Protobuf or JSON schema is compatible with every version of its subject under the subject\'s mode, skips subjects that do not exist yet, and fails on the first incompatible one.',
       tool: 'Confluent Schema Registry compatibility API with curl and jq (Apicurio Registry offers the same check)',
@@ -446,7 +446,7 @@ for file in $(git diff --name-only origin/main -- 'schemas/*.avsc' 'schemas/*.pr
 done`,
     },
     {
-      id: 'ff-asyncapi', label: 'AsyncAPI break check', when: { SCHEMA: ['repo'] }, category: 'structural', implements: ['adr-schema-repo'], checks: ['req-schema-repo'],
+      id: 'ff-asyncapi', label: 'AsyncAPI break check', when: { SCHEMA: ['repo'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-schema-repo'], checks: ['req-schema-repo'],
       threshold: '0 breaking changes between the last release\'s AsyncAPI document and the pull request',
       description: 'In every pull request, the AsyncAPI CLI diffs the document with the one of the last release tag, listing only the changes it classifies as breaking, and the step fails when that list is not empty.',
       tool: 'AsyncAPI CLI (asyncapi diff)',

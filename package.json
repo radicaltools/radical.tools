@@ -32,7 +32,7 @@
     "release": "node tools/release.mjs prepare",
     "release:tag": "node tools/release.mjs tag",
     "fuzz": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js fuzz",
-    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports",
+    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports --trigger pull-request",
     "hooks": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js hooks install architecture && node apps/cli/dist/index.js diff architecture --save-base --quiet"
   },
   "devDependencies": {

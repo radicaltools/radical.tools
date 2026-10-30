@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { readCatalogue, validateCatalogue, concernPacksOf } from '../src/catalogue'
 import { concernPackProblems, CONCERN_GROUPS } from '@radical/common/concerns'
-import { buildPackDoc, packFile, packFileText, specProblems, type PackSpec } from '../src/packSpec'
+import { buildPackDoc, packFile, packFileText, specProblems, type FitnessSpec, type PackSpec } from '../src/packSpec'
 import { boundImportProblems } from '../src/packCheck'
 
 const entries = readCatalogue()
@@ -52,6 +52,37 @@ describe('concern packs', () => {
       'requirement "r4": unchecked must say why no fitness function checks it',
       'requirement "r4" is unchecked yet "f1" checks it',
     ])
+  })
+
+  it('specProblems: every fitness function states its characteristic, scope, cadence and invocation', () => {
+    for (const spec of specs) {
+      expect(specProblems(spec).filter((p) => p.startsWith('fitness function')), spec.id).toEqual([])
+      for (const node of buildPackDoc(spec).nodes.filter((n) => n.type === 'fitness-fn')) expect(node, `${spec.id} ${String(node.id)}`).not.toHaveProperty('category')
+    }
+    // A copy of a pack's first fitness function (triggered on pull requests)
+    // with one dimension changed or deleted.
+    const [f] = specs[0].fitness
+    const problemsWith = (change: Record<string, unknown>, drop: string[] = []): string[] => {
+      const g: Record<string, unknown> = { ...f, ...change }
+      for (const key of drop) delete g[key]
+      return specProblems({ ...specs[0], fitness: [g as unknown as FitnessSpec] }).filter((p) => p.startsWith('fitness function'))
+    }
+    expect(problemsWith({})).toEqual([])
+    for (const key of ['characteristic', 'scope', 'cadence', 'invocation']) {
+      expect(problemsWith({}, [key]), key).toEqual([expect.stringContaining(`states no ${key}`)])
+    }
+    expect(problemsWith({ characteristic: 'usability' })).toEqual([expect.stringContaining('characteristic "usability" is not one of')])
+    expect(problemsWith({ scope: 'structural' })).toEqual([expect.stringContaining('scope "structural" is not one of')])
+    expect(problemsWith({ invocation: 'sometimes' })).toEqual([expect.stringContaining('invocation "sometimes" is not one of')])
+    expect(problemsWith({ cadence: 'triggered' }, ['trigger', 'every'])).toEqual([expect.stringContaining('states no trigger')])
+    expect(problemsWith({ cadence: 'triggered', trigger: 'hourly' }, ['every'])).toEqual([expect.stringContaining('trigger "hourly" is not one of')])
+    expect(problemsWith({ cadence: 'temporal' }, ['trigger', 'every'])).toEqual([expect.stringContaining('is temporal but states no every')])
+    expect(problemsWith({ cadence: 'temporal', every: 'quarterly' }, ['trigger'])).toEqual([expect.stringContaining('every "quarterly" is no period')])
+    expect(problemsWith({ cadence: 'temporal', every: '{{REVIEW_DAYS}}d' }, ['trigger'])).toEqual([])
+    expect(problemsWith({ cadence: 'continual', trigger: 'nightly' }, ['every'])).toEqual([expect.stringContaining('has a trigger but is not triggered')])
+    expect(problemsWith({ cadence: 'continual', every: '90d' }, ['trigger'])).toEqual([expect.stringContaining('has an every but is not temporal')])
+    expect(problemsWith({ category: 'structural' })).toEqual([expect.stringContaining('still has a category')])
+    expect(problemsWith({ measure: 'test-results' })).toEqual([expect.stringContaining('states a measure')])
   })
 
   it('every pack imported and bound passes radical check', () => {

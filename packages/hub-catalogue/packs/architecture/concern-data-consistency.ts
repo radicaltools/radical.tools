@@ -192,7 +192,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-concurrency', label: 'Invariants hold under concurrency', category: 'structural', implements: [...MODEL_ADRS, 'adr-read-committed', 'adr-snapshot', 'adr-serializable'], checks: ['req-write-skew'],
+      id: 'ff-concurrency', label: 'Invariants hold under concurrency', characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MODEL_ADRS, 'adr-read-committed', 'adr-snapshot', 'adr-serializable'], checks: ['req-write-skew'],
       threshold: '0 lost updates or broken invariants in 1,000 concurrent attempts against a real database at the chosen isolation level',
       description: 'An integration test runs many concurrent operations that compete for the same records against the real database engine (not an in-memory fake), at the isolation level and with the retries of the decision, and checks the invariant afterwards.',
       tool: 'Vitest with Testcontainers (PostgreSQL)',
@@ -210,7 +210,7 @@ it('never sells more than is in stock', async () => {
 })`,
     },
     {
-      id: 'ff-lost-update', label: 'Second writer gets a conflict', when: { ISOLATION: ['read-committed'] }, category: 'structural', implements: ['adr-read-committed'], checks: ['req-lost-update'],
+      id: 'ff-lost-update', label: 'Second writer gets a conflict', when: { ISOLATION: ['read-committed'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-read-committed'], checks: ['req-lost-update'],
       threshold: 'Of two updates from the same version, exactly 1 commits and 1 is refused with a conflict naming the current version',
       description: 'An integration test reads one order at version 7 in two sessions, saves from both, and expects one success and one conflict that carries the current version; it runs against the real database.',
       tool: 'Vitest with Testcontainers (PostgreSQL)',
@@ -231,7 +231,7 @@ it('refuses the second update from the same version', async () => {
 })`,
     },
     {
-      id: 'ff-serialization-retry', label: 'Serialization failures retried', when: { ISOLATION: ['serializable'] }, category: 'structural', implements: ['adr-serializable'], checks: ['req-serializable'],
+      id: 'ff-serialization-retry', label: 'Serialization failures retried', when: { ISOLATION: ['serializable'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-serializable'], checks: ['req-serializable'],
       threshold: 'The transaction helper retries SQLSTATE 40001 and 40P01 up to 3 times and reports a conflict after the 4th failure',
       description: 'A unit test gives the retry helper a transaction body that fails with 40001 twice and then succeeds, expects 3 attempts, then one that always fails and expects a conflict after 4 attempts. The helper is the only way to open a transaction, which code review keeps.',
       tool: 'Vitest',
@@ -253,7 +253,7 @@ it('retries a serialization failure and gives up after the third retry', async (
 })`,
     },
     {
-      id: 'ff-atomic', label: 'No half operations', when: { MODEL: ['acid'] }, category: 'structural', implements: ['adr-acid'], checks: ['req-atomic'],
+      id: 'ff-atomic', label: 'No half operations', when: { MODEL: ['acid'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-acid'], checks: ['req-atomic'],
       threshold: '0 records left behind when an operation fails at any of its steps',
       description: 'An integration test makes the operation fail after each of its writes in turn and checks that none of its records exist afterwards.',
       tool: 'Vitest with Testcontainers (PostgreSQL)',
@@ -269,7 +269,7 @@ it.each(['afterReservation', 'afterInvoice', 'beforeCommit'])('leaves nothing wh
 })`,
     },
     {
-      id: 'ff-no-dual-write', label: 'Only the relay publishes', when: MESSAGING, category: 'structural', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
+      id: 'ff-no-dual-write', label: 'Only the relay publishes', when: MESSAGING, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
       threshold: '0 modules outside the outbox relay that import a broker client',
       description: 'A dependency rule fails the build when code outside the relay imports a broker client, which would be a dual write that can lose or invent events.',
       tool: 'dependency-cruiser (or the equivalent for your stack: ArchUnit, NetArchTest)',
@@ -286,7 +286,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-outbox-test', label: 'Events follow commits only', when: MESSAGING, category: 'structural', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
+      id: 'ff-outbox-test', label: 'Events follow commits only', when: MESSAGING, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
       threshold: 'A committed change has its event on the broker within {{PROPAGATION_SECONDS}} seconds of the broker\'s return; a rolled-back change has 0 events',
       description: 'An integration test stops the broker, places an order (committed) and makes a second one roll back, restarts the broker and reads the topic: the first order\'s event arrives within the bound, the second never.',
       tool: 'Vitest with Testcontainers (PostgreSQL and the broker)',
@@ -304,7 +304,7 @@ it('publishes committed changes only, once the broker is back', async () => {
 })`,
     },
     {
-      id: 'ff-outbox-lag', label: 'Outbox drained in time', when: MESSAGING, category: 'operational', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
+      id: 'ff-outbox-lag', label: 'Outbox drained in time', when: MESSAGING, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-outbox', 'adr-saga'], checks: ['req-outbox'],
       threshold: 'The oldest unpublished outbox row is never older than {{PROPAGATION_SECONDS}} seconds for more than 2 minutes',
       description: 'The database exporter reports the age of the oldest unpublished outbox row; Prometheus pages when the relay falls behind, before consumers notice.',
       tool: 'Prometheus with sql_exporter',
@@ -329,7 +329,7 @@ groups:
         labels: { severity: page }`,
     },
     {
-      id: 'ff-saga', label: 'Sagas compensate', when: { MODEL: ['saga'] }, category: 'structural', implements: ['adr-saga'], checks: ['req-saga'],
+      id: 'ff-saga', label: 'Sagas compensate', when: { MODEL: ['saga'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-saga'], checks: ['req-saga'],
       threshold: 'For every step of every saga, a failure there runs the compensations of all earlier steps in reverse order, and 0 steps without a compensation test',
       description: 'A workflow test makes each step fail in turn on a time-skipping test server and checks that the completed steps were compensated in reverse order. The Temporal form is below; the same test is written with Step Functions Local, Camunda zeebe-process-test or the MassTransit test harness.',
       tool: 'Temporal TypeScript SDK (@temporalio/testing); for Step Functions: Step Functions Local with mocked service integrations; for Camunda 8: zeebe-process-test; for MassTransit: the in-memory test harness',
@@ -360,7 +360,7 @@ it.each(steps)('compensates everything before $name in reverse order', async (fa
 })`,
     },
     {
-      id: 'ff-saga-resume', label: 'Sagas resume after a restart', when: { MODEL: ['saga'] }, category: 'structural', implements: ['adr-saga'], checks: ['req-saga-state'],
+      id: 'ff-saga-resume', label: 'Sagas resume after a restart', when: { MODEL: ['saga'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-saga'], checks: ['req-saga-state'],
       threshold: 'A saga stopped after its second step continues from the third on a new worker, with 0 steps repeated, and the order stays pending until the saga completes',
       description: 'A workflow test stops the worker once the second activity has completed, starts a new worker, and checks that the saga finishes with each step run exactly once and that the order\'s status was pending until the end.',
       tool: 'Temporal TypeScript SDK (@temporalio/testing); for other orchestrators, the equivalent restart of the engine or harness mid-flow',
@@ -397,7 +397,7 @@ it('continues from the third step on a new worker', async () => {
 })`,
     },
     {
-      id: 'ff-stuck-sagas', label: 'No stuck sagas', when: { MODEL: ['saga'] }, category: 'operational', implements: ['adr-saga'], checks: ['req-saga'],
+      id: 'ff-stuck-sagas', label: 'No stuck sagas', when: { MODEL: ['saga'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-saga'], checks: ['req-saga'],
       threshold: '0 sagas open for more than {{SAGA_MINUTES}} minutes',
       description: 'The database exporter counts sagas neither completed nor compensated after the limit; Prometheus pages when there is one, since the records it holds stay pending.',
       tool: 'Prometheus with sql_exporter',
@@ -422,7 +422,7 @@ groups:
         labels: { severity: page }`,
     },
     {
-      id: 'ff-reads-primary', label: 'Reads hit the primary', when: { READS: ['primary'] }, category: 'structural', implements: ['adr-reads-primary'], checks: ['req-read-primary'],
+      id: 'ff-reads-primary', label: 'Reads hit the primary', when: { READS: ['primary'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-reads-primary'], checks: ['req-read-primary'],
       threshold: 'Every connection pool the application opens reports pg_is_in_recovery() = false; 0 read-only data sources configured',
       description: 'A test starts the application\'s data access with its production configuration shape, asks every pool it opened whether it is on a replica, and checks that no read-only data source is configured.',
       tool: 'Vitest with Testcontainers (PostgreSQL primary and a replica, to make the check meaningful)',
@@ -438,7 +438,7 @@ it('serves every read from the primary', async () => {
 })`,
     },
     {
-      id: 'ff-ryw', label: 'Own writes read back', when: { READS: ['ryw'] }, category: 'structural', implements: ['adr-ryw'], checks: ['req-ryw'],
+      id: 'ff-ryw', label: 'Own writes read back', when: { READS: ['ryw'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-ryw'], checks: ['req-ryw'],
       threshold: '0 of 100 write-then-read pairs return the old value while replicas lag',
       description: 'An integration test delays replication on purpose (a paused WAL replay on the replica) and checks that a user\'s read straight after their write still returns it.',
       tool: 'Vitest with Testcontainers (PostgreSQL primary and replica)',
@@ -456,7 +456,7 @@ it('shows a user their own write while the replica lags', async () => {
 })`,
     },
     {
-      id: 'ff-staleness', label: 'Replica lag bounded and routed', when: { READS: ['ryw', 'bounded'] }, category: 'operational', implements: ['adr-ryw', 'adr-bounded'], checks: ['req-bounded', 'req-ryw'],
+      id: 'ff-staleness', label: 'Replica lag bounded and routed', when: { READS: ['ryw', 'bounded'] }, characteristic: 'functional-suitability', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-ryw', 'adr-bounded'], checks: ['req-bounded', 'req-ryw'],
       threshold: 'Replica lag above {{PROPAGATION_SECONDS}} seconds for no more than 1 minute; a replica lagging more than that receives no reads for more than 1 minute',
       description: 'The PostgreSQL exporter reports each replica\'s lag, and the read router exports replica_in_rotation (1 while it sends reads to the replica); Prometheus alerts when the lag passes the bound, and pages when a lagging replica is still in rotation.',
       tool: 'Prometheus with postgres_exporter (pg_replication_lag_seconds) and the router\'s own replica_in_rotation gauge',

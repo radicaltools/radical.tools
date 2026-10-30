@@ -241,7 +241,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-coverage', label: 'Every table in the schedule', when: { SCHEDULE: ['file'] }, category: 'structural', implements: ['adr-file'], checks: ['req-schedule'],
+      id: 'ff-coverage', label: 'Every table in the schedule', when: { SCHEDULE: ['file'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-file'], checks: ['req-schedule'],
       threshold: 'Every table in the migrated schema has exactly 1 row in retention/schedule.json with category, basis, period, trigger, date column and owner, reviewed within {{REVIEW_MONTHS}} months, or category "none" with a reason',
       description: 'In CI, after the migrations run against an empty database, a script lists the tables and looks each up in retention/schedule.json; a new table fails the build until it has a complete row, and a row whose last legal review is older than {{REVIEW_MONTHS}} months fails it too, which makes the review a date in the file rather than a promise.',
       tool: 'psql and jq in the CI pipeline (GNU date), against the migrated schema',
@@ -261,7 +261,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-tool-mapping', label: 'Every table mapped to an exported label', when: { SCHEDULE: ['tool'] }, category: 'structural', implements: ['adr-tool'], checks: ['req-tool-mapping'],
+      id: 'ff-tool-mapping', label: 'Every table mapped to an exported label', when: { SCHEDULE: ['tool'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-tool'], checks: ['req-tool-mapping'],
       threshold: 'retention/labels.json committed within {{REVIEW_MONTHS}} months; every table in the migrated schema has exactly 1 row mapping it to a date column and a label in that export with a retention period in days, or category "none" with a reason',
       description: 'The records manager exports the labels with Microsoft Graph PowerShell (signed in with the delegated permission RecordsManagement.Read.All, the only kind the API accepts) and commits the file; CI checks its age from git history (checkout with fetch-depth 0) and every table against the mapping. A label kept forever (retentionDurationForever, no days) fails, as does a table mapped to a label the export no longer has. With more labels than one page, follow @odata.nextLink when exporting.',
       tool: 'Microsoft Graph PowerShell (Invoke-MgGraphRequest) for the export; psql, jq and git in the CI pipeline',
@@ -284,7 +284,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-store-config', label: 'Every table partitioned with a retention', when: { SCHEDULE: ['store'] }, category: 'structural', implements: ['adr-store'], checks: ['req-store-config', 'req-dispose'],
+      id: 'ff-store-config', label: 'Every table partitioned with a retention', when: { SCHEDULE: ['store'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-store'], checks: ['req-store-config', 'req-dispose'],
       threshold: 'Every records table in the schema has pg_partman retention with retention_keep_table false, or is listed with a matter in retention/holds.json; 0 rows older than retention plus one partition interval plus {{DISPOSE_DAYS}} days',
       description: 'A script run in CI against the migrated schema, and daily against production with a read-only role, joins every table (partitions left out, transient tables skipped) to partman.part_config; a table without retention fails unless it is held, a table that only detaches expired partitions fails, and any row older than its period plus one partition and {{DISPOSE_DAYS}} days means maintenance has stopped.',
       tool: 'psql and jq, against PostgreSQL with pg_partman 5',
@@ -309,7 +309,7 @@ done < <(psql "$DATABASE_URL" -At -c "
 exit $fail`,
     },
     {
-      id: 'ff-bucket-lifecycle', label: 'Every records bucket expires its objects', category: 'structural', implements: [...MAIN, 'adr-no-hold'], checks: ['req-dispose'],
+      id: 'ff-bucket-lifecycle', label: 'Every records bucket expires its objects', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MAIN, 'adr-no-hold'], checks: ['req-dispose'],
       threshold: 'Every bucket in RECORD_BUCKETS has an enabled lifecycle rule that expires objects (Days or Date), and, when versioning is on, one that removes noncurrent versions within {{DISPOSE_DAYS}} days',
       description: 'A scheduled job and the infrastructure pipeline read each records bucket\'s lifecycle configuration. In a versioned bucket an Expiration action only adds a delete marker, so without NoncurrentVersionExpiration the record stays as a noncurrent version for ever; versions under Object Lock are left alone by lifecycle, which is how held objects survive. A bucket with no configuration at all answers NoSuchLifecycleConfiguration and fails. Without legal holds, a rule disabled to preserve records for a matter fails this check for as long as it is off.',
       tool: 'AWS CLI v2 (s3api get-bucket-lifecycle-configuration, get-bucket-versioning) and jq',
@@ -329,7 +329,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-disposal-job', label: 'Disposal removes the expired and nothing else', when: JOB, category: 'structural', implements: ['adr-file', 'adr-tool', 'adr-hard', 'adr-shred', 'adr-aggregate'], checks: ['req-dispose', 'req-fail-closed'],
+      id: 'ff-disposal-job', label: 'Disposal removes the expired and nothing else', when: JOB, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-file', 'adr-tool', 'adr-hard', 'adr-shred', 'adr-aggregate'], checks: ['req-dispose', 'req-fail-closed'],
       threshold: 'An invoice past its period plus {{DISPOSE_DAYS}} days is disposed of in 1 run; an invoice in its period, every row of a table without a schedule row, and every row when the schedule is missing remain; 1 alert for the unknown table',
       description: 'An integration test runs the real job against PostgreSQL in a container with the repository\'s schedule. expectDisposed checks what the disposal decision promises: the row and its search entry gone, and with crypto-shredding the group\'s key pending deletion, or with totals the row folded into them. The fiscal years are computed from today, so the test keeps working as years pass.',
       tool: 'Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers',
@@ -361,7 +361,7 @@ it('deletes nothing at all when the schedule cannot be read', async () => {
 })`,
     },
     {
-      id: 'ff-overdue', label: 'Weekly report of overdue records', when: JOB, category: 'operational', implements: ['adr-file', 'adr-tool', 'adr-no-hold'], checks: ['req-overdue'],
+      id: 'ff-overdue', label: 'Weekly report of overdue records', when: JOB, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-file', 'adr-tool', 'adr-no-hold'], checks: ['req-overdue'],
       threshold: '0 records, per table in retention_schedule, whose period ended more than {{DISPOSE_DAYS}} days ago and that no open legal hold covers; above 0 the job fails and opens a ticket for the records owner',
       description: 'A weekly job, independent of the deletion job\'s code, reads the schedule the job last applied (the retention_schedule table: table, period, the event it counts from, date column) and counts the overdue rows of each table with a read-only role; where the legal_hold table exists, rows under an open hold are left out. It assumes a calendar fiscal year; shift the date_trunc for another. The scheduler turns a failed run into a ticket.',
       tool: 'psql in a scheduled job (Kubernetes CronJob, GitHub Actions schedule)',
@@ -382,7 +382,7 @@ done < <(psql "$DATABASE_URL" -At -c "select table_name, period, start_from, dat
 [ "$total" -eq 0 ]`,
     },
     {
-      id: 'ff-no-early-delete', label: 'Only disposal can delete records', category: 'structural', implements: MAIN, checks: ['req-not-early'],
+      id: 'ff-no-early-delete', label: 'Only disposal can delete records', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: MAIN, checks: ['req-not-early'],
       threshold: '0 login roles other than migrator and retention_job (superusers aside) with DELETE or TRUNCATE on any table or partition not listed in retention/transient-tables.txt',
       description: 'In CI against the migrated schema with the production roles created, and weekly against production, a query asks PostgreSQL itself whether each login role can delete from or truncate each table, ownership and inherited grants included; a grant added for convenience fails the build. Superusers can always delete and are kept to the platform team. With each store\'s own lifecycle configuration there is no retention_job role and the schema owner runs pg_partman\'s maintenance.',
       tool: 'psql and awk in the CI pipeline',
@@ -402,7 +402,7 @@ found=$(psql "$DATABASE_URL" -AtF ' ' -c "
 [ -z "$found" ] || { printf 'roles that can remove records before their period ends:\\n%s\\n' "$found"; exit 1; }`,
     },
     {
-      id: 'ff-hold', label: 'Holds keep records and only named roles set them', when: { ...HELD, ...JOB }, category: 'structural', implements: ['adr-hold'], checks: ['req-hold', 'req-hold-roles'],
+      id: 'ff-hold', label: 'Holds keep records and only named roles set them', when: { ...HELD, ...JOB }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-hold'], checks: ['req-hold', 'req-hold-roles'],
       threshold: 'An expired invoice under an open hold survives a disposal run and is disposed of in the first run after the lift; holds set or lifted by a role outside {{HOLD_ROLES}} are refused (0 accepted); 1 audit record per accepted change',
       description: 'An integration test against PostgreSQL in a container sets a hold as one of the named roles, runs disposal, lifts the hold, runs it again, and tries both as a support engineer; the audit trail is read back for the matter and the actor.',
       tool: 'Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers',
@@ -433,7 +433,7 @@ it('lets only the named roles set and lift a hold, and audits it', async () => {
 })`,
     },
     {
-      id: 'ff-hold-store', label: 'Held objects cannot be deleted', when: { ...HELD, SCHEDULE: ['store'] }, category: 'operational', implements: ['adr-hold'], checks: ['req-hold-store', 'req-hold-roles'],
+      id: 'ff-hold-store', label: 'Held objects cannot be deleted', when: { ...HELD, SCHEDULE: ['store'] }, characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: ['adr-hold'], checks: ['req-hold-store', 'req-hold-roles'],
       threshold: 'A permanent delete of a held object version is refused; after the lift it succeeds; 0 IAM roles outside retention/hold-roles.txt are allowed s3:PutObjectLegalHold on the records buckets',
       description: 'A monthly drill, and a run after every IAM change, against a records bucket of the staging account (Object Lock on): it holds a test object, tries to delete the version, lifts the hold and deletes it, then asks the IAM policy simulator which roles may place or lift legal holds. retention/hold-roles.txt lists the ARNs of the roles that {{HOLD_ROLES}} assume. Held tables are checked by the configuration check through retention/holds.json.',
       tool: 'AWS CLI v2 (s3api put-object-legal-hold, delete-object; iam simulate-principal-policy)',
@@ -456,7 +456,7 @@ for role in $(aws iam list-roles --query 'Roles[].Arn' --output text); do
 done`,
     },
     {
-      id: 'ff-conflict', label: 'Erased person, kept records out of reach', category: 'structural', implements: [...MAIN, 'adr-restrict', 'adr-pseudonymise'], checks: ['req-conflict-restrict', 'req-conflict-pseudo'],
+      id: 'ff-conflict', label: 'Erased person, kept records out of reach', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...MAIN, 'adr-restrict', 'adr-pseudonymise'], checks: ['req-conflict-restrict', 'req-conflict-pseudo'],
       threshold: 'After an accepted erasure, 0 kept records reachable by the person through the support and reporting roles; 1 kept invoice readable by the compliance role for an obligation; the answer to the person lists the kept category with its basis and date',
       description: 'An integration test creates a customer with an invoice in its period, orders and a ticket, accepts their erasure through the Personal data pack\'s erasure process, and checks what each role can still find: whether the invoice is restricted or pseudonymised, support and reporting cannot tie it to the person and the compliance role can still produce it.',
       tool: 'Vitest with Testcontainers (@testcontainers/postgresql); for the JVM: JUnit 5 with Testcontainers',
@@ -476,7 +476,7 @@ it('keeps what the law requires, for that obligation only', async () => {
 })`,
     },
     {
-      id: 'ff-shred-keys', label: 'Keys of disposed groups destroyed', when: { ...JOB, DELETE: ['crypto'] }, category: 'operational', implements: ['adr-shred'], checks: ['req-shred'],
+      id: 'ff-shred-keys', label: 'Keys of disposed groups destroyed', when: { ...JOB, DELETE: ['crypto'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-shred'], checks: ['req-shred'],
       threshold: '0 record groups disposed of more than 1 day ago whose KMS key is in any state but PendingDeletion or deleted; every pending deletion date within 30 days of the disposal',
       description: 'A daily job reads the groups the deletion job logged in disposal_log (group, key id, time) and asks AWS KMS for each key\'s state; a key still enabled means the group\'s copies in backups and archives are still readable. A deleted key answers NotFoundException, which counts as done.',
       tool: 'AWS CLI v2 (kms describe-key) and psql in a scheduled job',
@@ -497,7 +497,7 @@ done < <(psql "$DATABASE_URL" -At -c "select group_key, key_id, extract(epoch fr
 exit $fail`,
     },
     {
-      id: 'ff-aggregates', label: 'Totals identify no one', when: { ...JOB, DELETE: ['aggregate'] }, category: 'structural', implements: ['adr-aggregate'], checks: ['req-aggregate'],
+      id: 'ff-aggregates', label: 'Totals identify no one', when: { ...JOB, DELETE: ['aggregate'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-aggregate'], checks: ['req-aggregate'],
       threshold: '0 rows in any *_totals table with a record count below 5; 0 columns in them outside month, category, region, currency, record_count, net_amount, tax_amount',
       description: 'A query run in CI against the migrated schema and daily after disposal returns every small group and every column that could carry an identifier; a new column in a totals table fails until it is added to the list on purpose. That expired rows are actually gone is the weekly report\'s job.',
       tool: 'psql (a SQL check that fails on any row; or the same query as a dbt singular test)',

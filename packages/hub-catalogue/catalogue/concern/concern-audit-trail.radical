@@ -629,7 +629,11 @@
       "label": "Every audited call leaves a valid record",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test lists the operations from the router (not from a list kept by hand) and fails on any that changes data but is neither audited nor exempt in audit/catalogue.yaml. It then calls each audited operation as a permitted and as a refused caller, reads the records written since the call, expects exactly one, and validates it against audit/record.schema.json, whose required fields are actor, action, target, outcome, at, correlationId, source and version.\n\nThreshold: 0 operations that change data outside the catalogue and the exemptions; exactly 1 record per call of each audited operation, permitted and refused, and 0 records rejected by audit/record.schema.json\n\nTool: Vitest with supertest, js-yaml and Ajv (or the test runner and HTTP client of your stack: JUnit with MockMvc and networknt json-schema-validator, xUnit with WebApplicationFactory)\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport Ajv from 'ajv'\nimport { load } from 'js-yaml'\nimport request from 'supertest'\nimport { app, routes } from '../src/app'        // routes: the router's table\nimport { audit } from '../src/audit/store'\nimport { exampleBody, tokenFor } from './audit/fixtures'\n\nconst catalogue = load(readFileSync('audit/catalogue.yaml', 'utf8')) as { audited: string[]; exempt: Record<string, string> }\nconst validate = new Ajv({ allErrors: true }).compile(JSON.parse(readFileSync('audit/record.schema.json', 'utf8')))\nconst key = (r: { method: string; path: string }) => `${r.method} ${r.path}`\n\nit('names every operation that changes data as audited or exempt', () => {\n  const writes = routes.filter((r) => r.method !== 'GET').map(key)\n  expect(writes.filter((op) => !catalogue.audited.includes(op) && !(op in catalogue.exempt))).toEqual([])\n})\n\ndescribe.each(routes.filter((r) => catalogue.audited.includes(key(r))))('$method $path', (route) => {\n  it.each(['permitted', 'refused'])('leaves one valid record when %s', async (who) => {\n    const since = new Date()\n    await request(app)[route.method.toLowerCase()](route.example).set('Authorization', `Bearer ${await tokenFor(who, route)}`).send(exampleBody(route))\n    const records = await audit.find({ operation: key(route), since })\n    expect(records).toHaveLength(1)\n    expect(validate(records[0]), JSON.stringify(validate.errors)).toBe(true)\n  })\n})\n```"
     },
     {
@@ -638,7 +642,11 @@
       "label": "A failed record stops the change",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test against the real database makes the audit writer fail once, calls an audited operation that changes a customer, and reads the customer back: the change must have been rolled back with the failed record. The audit writer runs on the business transaction's connection, which is what this test proves.\n\nThreshold: With the audit write failing, the operation answers 5xx and 0 business rows are changed\n\nTool: Vitest with supertest and a database started by Testcontainers (or the test runner of your stack with a spy on the audit writer)\n\n```ts\nimport request from 'supertest'\nimport { expect, it, vi } from 'vitest'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { db } from './db'\nimport { createCustomer, tokenFor } from './audit/fixtures'\n\nit('commits no change without its audit record', async () => {\n  const customer = await createCustomer({ email: 'before@example.test' })\n  const append = vi.spyOn(audit, 'append').mockRejectedValueOnce(new Error('audit store unavailable'))\n  const res = await request(app).patch(`/customers/${customer.id}`).send({ email: 'after@example.test' })\n    .set('Authorization', `Bearer ${await tokenFor('support')}`)\n  expect(append).toHaveBeenCalledOnce()\n  expect(res.status).toBeGreaterThanOrEqual(500)\n  const { rows } = await db.query('select email from customers where id = $1', [customer.id])\n  expect(rows[0].email).toBe('before@example.test')\n})\n```"
     },
     {
@@ -647,7 +655,11 @@
       "label": "Only keyed hashes in the trail",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test changes a customer's e-mail address to a random value, reads the record, recomputes the HMAC with the test instance of the audit key, and searches a dump of the whole audit store (rows, outbox or shipped batches, as decided) for the value.\n\nThreshold: The new-value hash of a changed field equals HMAC-SHA-256 of the value under the test audit key; 0 occurrences of the value in the audit store\n\nTool: Vitest with supertest and node:crypto (or the test runner of your stack with its HMAC implementation)\n\n```ts\nimport { createHmac, randomUUID } from 'node:crypto'\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { auditKey, createCustomer, dumpAuditStore, tokenFor } from './audit/fixtures'   // auditKey: the test instance of the key\n\nit('keeps a keyed hash of the new value and never the value', async () => {\n  const customer = await createCustomer()\n  const email = `${randomUUID()}@example.test`\n  await request(app).patch(`/customers/${customer.id}`).send({ email })\n    .set('Authorization', `Bearer ${await tokenFor('support')}`).expect(200)\n  const [record] = await audit.find({ action: 'customer.update', target: { type: 'customer', id: customer.id } })\n  const expected = createHmac('sha256', auditKey).update(email).digest('hex')\n  expect(record.changes).toContainEqual(expect.objectContaining({ field: 'email', after: expected }))\n  expect(await dumpAuditStore()).not.toContain(email)\n})\n```",
       "hubWhen": {
         "CONTENT": [
@@ -661,7 +673,11 @@
       "label": "Values kept, secrets not",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test changes a customer's address and an account's password (a random value), reads both records, and searches a dump of the whole audit store for the password.\n\nThreshold: The record of an address change holds the old and new address; the record of a password change names the field with no value; 0 occurrences of the password in the audit store\n\nTool: Vitest with supertest (or the test runner and HTTP client of your stack)\n\n```ts\nimport { randomUUID } from 'node:crypto'\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { createAccount, createCustomer, dumpAuditStore, tokenFor } from './audit/fixtures'\n\nit('keeps old and new values and never a secret', async () => {\n  const customer = await createCustomer({ address: 'Old Street 1' })\n  const account = await createAccount()\n  const password = `pw-${randomUUID()}`\n  const auth = `Bearer ${await tokenFor('support')}`\n  await request(app).patch(`/customers/${customer.id}`).send({ address: 'New Street 2' }).set('Authorization', auth).expect(200)\n  await request(app).put(`/accounts/${account.id}/password`).send({ password }).set('Authorization', auth).expect(204)\n  const [address] = await audit.find({ action: 'customer.update', target: { type: 'customer', id: customer.id } })\n  expect(address.changes).toContainEqual({ field: 'address', before: 'Old Street 1', after: 'New Street 2' })\n  const [secret] = await audit.find({ action: 'account.password.change', target: { type: 'account', id: account.id } })\n  expect(secret.changes).toEqual([{ field: 'password' }])\n  expect(await dumpAuditStore()).not.toContain(password)\n})\n```",
       "hubWhen": {
         "CONTENT": [
@@ -675,7 +691,10 @@
       "label": "Hash chain verified",
       "x": 1040,
       "y": 520,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A scheduled job recomputes each row's hash with the same audit.canonical function the trigger uses, checks that every row points at the hash of the row before and that positions have no gap, then compares the heads copied to write-once storage over the last 30 days with the rows at their positions. Any finding names the first position affected and fails the job, which pages the audit owner. Positions below the oldest partition kept are skipped, since pg_partman dropped them after the retention.\n\nThreshold: Every {{VERIFY_HOURS}} hours: 0 rows whose hash differs from SHA-256(prev_hash ‖ canonical row), 0 breaks in prev_hash or chain_pos, and 0 copied heads that differ from the row at their position\n\nTool: bash with psql and the AWS CLI in a scheduled job (for an Azure container, az storage blob download in place of aws s3 cp)\n\n```bash\n#!/usr/bin/env bash\n# audit/verify-chain.sh: AUDIT_DATABASE_URL and HEADS_BUCKET are set by the scheduled job\nset -euo pipefail\nbroken=$(psql \"$AUDIT_DATABASE_URL\" -v ON_ERROR_STOP=1 -qAtc \"\n  select chain_pos from (\n    select chain_pos, hash, prev_hash, sha256(coalesce(prev_hash, ''::bytea) || audit.canonical(r)) as recomputed,\n           lag(hash) over (order by chain_pos) as previous, lag(chain_pos) over (order by chain_pos) as previous_pos\n    from audit.records r) c\n  where hash <> recomputed\n     or (previous_pos is not null and (chain_pos <> previous_pos + 1 or prev_hash is distinct from previous))\n  order by chain_pos limit 1\")\n[ -z \"$broken\" ] || { echo \"audit chain broken at position $broken\"; exit 1; }\nfor day in $(seq 0 29); do\n  key=\"heads/$(date -u -d \"-$day days\" +%F).txt\"            # lines: <chain_pos> <hash in hex>, one per hour\n  aws s3 cp \"s3://$HEADS_BUCKET/$key\" - 2>/dev/null || continue\ndone | while read -r pos hash; do\n  stored=$(psql \"$AUDIT_DATABASE_URL\" -qAtc \"select encode(hash, 'hex') from audit.records where chain_pos = $pos\")\n  [ -z \"$stored\" ] || [ \"$stored\" = \"$hash\" ] || { echo \"row $pos differs from its copied head\"; exit 1; }\ndone\n```",
       "hubWhen": {
         "STORE": [
@@ -689,7 +708,11 @@
       "label": "Audit table only appends and keeps",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A database test runs in CI after the migrations, as the table's owner: it checks the application role's privileges, appends one record, expects the append-only trigger to refuse an update and a delete of it, and reads the retention pg_partman applies to the table.\n\nThreshold: The application role holds only INSERT and SELECT on audit.records; an UPDATE and a DELETE by the table's owner are refused; pg_partman retention is {{AUDIT_YEARS}} years\n\nTool: pgTAP (run with pg_prove) with pg_partman 5\n\n```sql\nBEGIN;\nSELECT plan(5);\nSELECT table_privs_are('audit', 'records', 'app', ARRAY['INSERT', 'SELECT'], 'the application only appends and reads');\nSELECT lives_ok($$INSERT INTO audit.records (actor, action, target_type, target_id, outcome, correlation_id, source, version)\n                  VALUES ('test', 'test.append-only', 'test', '1', 'success', 'test', '{}', 1)$$, 'a record is appended');\nSELECT throws_ok($$UPDATE audit.records SET outcome = 'refused' WHERE action = 'test.append-only'$$,\n                 'P0001', 'audit records are append-only', 'an update is refused, even for the owner');\nSELECT throws_ok($$DELETE FROM audit.records WHERE action = 'test.append-only'$$,\n                 'P0001', 'audit records are append-only', 'a delete is refused, even for the owner');\nSELECT is((SELECT retention FROM partman.part_config WHERE parent_table = 'audit.records'), '{{AUDIT_YEARS}} years',\n          'partitions are dropped only after the retention');\nSELECT * FROM finish();\nROLLBACK;\n```",
       "hubWhen": {
         "STORE": [
@@ -703,7 +726,11 @@
       "label": "Audit bucket locked for the retention",
       "x": 1040,
       "y": 780,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A policy over the Terraform plan in CI fails when the audit bucket has no Object Lock configuration, when its default retention is in governance mode, or when it is shorter than the retention, so that no identity, the account's root user included, can change or delete a batch before it is due.\n\nThreshold: 0 audit buckets in the Terraform plan without an Object Lock configuration in compliance mode with a default retention of at least {{AUDIT_YEARS}} years\n\nTool: Conftest on the Terraform plan (terraform show -json); on Azure check azurerm_storage_container_immutability_policy (immutability_period_in_days, protected_append_writes_enabled false, locked), on Google Cloud google_storage_bucket retention_policy with is_locked = true\n\n```rego\npackage main\n\nimport rego.v1\n\nmin_days := {{AUDIT_YEARS}} * 365\n\nlocks := [r | some r in input.resource_changes; r.type == \"aws_s3_bucket_object_lock_configuration\"]\n\ndeny contains \"no Object Lock configuration on the audit bucket\" if count(locks) == 0\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tretention.mode != \"COMPLIANCE\"\n\tmsg := sprintf(\"%s is not in compliance mode\", [l.address])\n}\n\ndeny contains msg if {\n\tsome l in locks\n\tsome rule in l.change.after.rule\n\tsome retention in rule.default_retention\n\tnumber_or_zero(retention.years) * 365 + number_or_zero(retention.days) < min_days\n\tmsg := sprintf(\"%s keeps audit records for less than %d days\", [l.address, min_days])\n}\n\nnumber_or_zero(x) := x if is_number(x)\n\nnumber_or_zero(x) := 0 if not is_number(x)\n```",
       "hubWhen": {
         "STORE": [
@@ -717,7 +744,10 @@
       "label": "No batch missing, nothing left behind",
       "x": 1040,
       "y": 910,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A scheduled job lists the element's batches, sorts them by first record number and fails on the first gap, which a batch hidden by a delete marker also shows as; it then counts the outbox rows waiting longer than the shipping limit. A failure pages the audit owner.\n\nThreshold: Every {{VERIFY_HOURS}} hours: 0 gaps between the record numbers of the listed batches, and 0 outbox rows older than {{SHIP_MINUTES}} minutes\n\nTool: bash with the AWS CLI, jq and psql in a scheduled job (for Azure, az storage blob list --query \"[].name\" in place of aws s3api list-objects-v2)\n\n```bash\n#!/usr/bin/env bash\n# audit/verify-batches.sh: AUDIT_BUCKET, ELEMENT and DATABASE_URL are set by the scheduled job\nset -euo pipefail\naws s3api list-objects-v2 --bucket \"$AUDIT_BUCKET\" --prefix \"audit/$ELEMENT/\" --query 'Contents[].Key' --output json > keys.json\ngap=$(jq -r '\n  [ (. // [])[] | capture(\"/(?<first>[0-9]+)-(?<last>[0-9]+)\\\\.jsonl\\\\.gz$\") | {first: (.first | tonumber), last: (.last | tonumber)} ]\n  | sort_by(.first)\n  | [ range(1; length) as $i | select(.[$i].first != .[$i - 1].last + 1) | .[$i - 1].last + 1 ]\n  | first // empty' keys.json)\n[ -z \"$gap\" ] || { echo \"audit batches missing from record $gap\"; exit 1; }\nwaiting=$(psql \"$DATABASE_URL\" -qAtc \"select count(*) from audit_outbox where created_at < now() - interval '{{SHIP_MINUTES}} minutes'\")\n[ \"$waiting\" -eq 0 ] || { echo \"$waiting audit records waited more than {{SHIP_MINUTES}} minutes to be shipped\"; exit 1; }\n```",
       "hubWhen": {
         "STORE": [
@@ -731,7 +761,10 @@
       "label": "Ledger verified against its digests",
       "x": 1040,
       "y": 1040,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A scheduled job checks in the catalog views that the audit table is an append-only ledger table (so updates and deletes are refused by the database) and that a current digest location exists, runs the ledger verification over every digest location, and reads the immutability policy of the container that holds the digests. Any failure ends the job with an error and pages the audit owner.\n\nThreshold: Every {{VERIFY_HOURS}} hours: audit.records is an APPEND_ONLY_LEDGER_TABLE, automatic digest storage is on, ledger verification succeeds, and the digest container's immutability policy is Locked for at least {{AUDIT_YEARS}} × 365 days\n\nTool: bash with sqlcmd (-b ends on the first error) and the Azure CLI in a scheduled job or an Elastic Job\n\n```bash\n#!/usr/bin/env bash\n# audit/verify-ledger.sh: SQLCMDSERVER, SQLCMDDATABASE, the sign-in and DIGEST_ACCOUNT are set by the scheduled job\nset -euo pipefail\nsqlcmd -b -Q \"\nSET NOCOUNT ON;\nIF NOT EXISTS (SELECT 1 FROM sys.tables WHERE SCHEMA_NAME(schema_id) = 'audit' AND name = 'records' AND ledger_type_desc = 'APPEND_ONLY_LEDGER_TABLE')\n  THROW 50001, 'audit.records is not an append-only ledger table', 1;\nIF NOT EXISTS (SELECT 1 FROM sys.database_ledger_digest_locations WHERE is_current = 1)\n  THROW 50002, 'automatic digest storage is off', 1;\nDECLARE @digest_locations NVARCHAR(MAX) = (SELECT * FROM sys.database_ledger_digest_locations FOR JSON AUTO, INCLUDE_NULL_VALUES);\nEXECUTE sys.sp_verify_database_ledger_from_digest_storage @digest_locations;\"\nread -r state days < <(az storage container immutability-policy show --account-name \"$DIGEST_ACCOUNT\" \\\n  --container-name sqldbledgerdigests --query '[state, immutabilityPeriodSinceCreationInDays]' -o tsv)\n[ \"$state\" = Locked ] && [ \"$days\" -ge $(( {{AUDIT_YEARS}} * 365 )) ] || { echo \"digest container policy is $state for $days days\"; exit 1; }\n```",
       "hubWhen": {
         "STORE": [
@@ -745,7 +778,11 @@
       "label": "Only the decided readers read, and reads are recorded",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "audit/readers.yaml names the role that may read the trail (the audit role or the team, as decided) and, for the team, whom the monthly report of reads goes to. A test searches the trail as a member of another team and as a customer, expects 403, searches as a reader, and checks the record of the read and, where reads are reported, the report.\n\nThreshold: A search of the audit trail by a caller outside audit/readers.yaml is refused with 403; one by a reader succeeds and leaves exactly 1 audit.read record naming the reader and the filter; where reads are reported, the month's report lists it\n\nTool: Vitest with supertest and js-yaml (or the test runner and HTTP client of your stack)\n\n```ts\nimport { readFileSync } from 'node:fs'\nimport { load } from 'js-yaml'\nimport request from 'supertest'\nimport { app } from '../src/app'\nimport { audit } from '../src/audit/store'\nimport { monthlyReadReport, tokenFor } from './audit/fixtures'\n\nconst readers = load(readFileSync('audit/readers.yaml', 'utf8')) as { role: string; reportTo?: string }\nconst search = async (who: string) => request(app).get('/audit/records?target=customer:42')\n  .set('Authorization', `Bearer ${await tokenFor(who)}`)\n\nit('lets only the decided readers search, and records each search', async () => {\n  for (const outsider of ['other-team', 'customer']) expect((await search(outsider)).status).toBe(403)\n  const since = new Date()\n  expect((await search(readers.role)).status).toBe(200)\n  const reads = await audit.find({ action: 'audit.read', since })\n  expect(reads).toHaveLength(1)\n  expect(reads[0]).toMatchObject({ actor: { role: readers.role }, details: { filter: 'target=customer:42' } })\n  if (readers.reportTo) expect(await monthlyReadReport()).toContainEqual(expect.objectContaining({ id: reads[0].id }))\n})\n```"
     },
     {
@@ -754,7 +791,10 @@
       "label": "Clocks in step with UTC",
       "x": 1040,
       "y": 1300,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A check on every host that writes audit records (a cron job or the monitoring agent's script check, which pages on failure) reads chrony's tracking report and fails when the clock is not synchronised or its offset from NTP time is over the limit. On a managed runtime without host access (AWS Lambda, Fargate, Cloud Run) the provider keeps the clock, and the check runs on the hosts the team does run.\n\nThreshold: On every host that writes audit records, every 5 minutes: chrony is synchronised and its system time offset is within {{CLOCK_MS}} ms\n\nTool: bash with chronyc (chrony 4), as a cron job or a monitoring agent's script check\n\n```bash\n#!/usr/bin/env bash\n# audit/check-clock.sh, every 5 minutes on each host that writes audit records\nset -euo pipefail\ntracking=$(chronyc tracking)\nleap=$(awk -F' *: ' '/^Leap status/ {print $2}' <<< \"$tracking\")\noffset=$(awk '/^System time/ {print $4}' <<< \"$tracking\")   # seconds, fast or slow of NTP time\n[ \"$leap\" != \"Not synchronised\" ] || { echo \"clock not synchronised\"; exit 1; }\nawk -v s=\"$offset\" -v max=\"{{CLOCK_MS}}\" 'BEGIN { exit !(s * 1000 <= max) }' \\\n  || { echo \"clock is ${offset}s off NTP time, over {{CLOCK_MS}} ms\"; exit 1; }\n```"
     },
     {
@@ -763,7 +803,10 @@
       "label": "Direct writes reach the trail",
       "x": 1040,
       "y": 1430,
-      "category": "operational",
+      "characteristic": "security",
+      "scope": "holistic",
+      "cadence": "continual",
+      "invocation": "automated",
       "description": "A scheduled job asks Kafka Connect for the connector's status, writes a canary row straight into the database (outside the element, so with no transaction context), and polls the element's audit read operation until the change appears as unattributed, failing past the limit. The job's own searches are recorded like any read.\n\nThreshold: Every hour: the connector and all its tasks are RUNNING, and a canary row written outside the element appears in the audit trail as unattributed within {{CDC_MINUTES}} minutes\n\nTool: bash with curl, jq and psql in a scheduled job (sqlcmd -Q on SQL Server), against the Kafka Connect REST API\n\n```bash\n#!/usr/bin/env bash\n# audit/canary-cdc.sh: CONNECT_URL, CONNECTOR, DATABASE_URL, APP_URL and AUDIT_READER_TOKEN are set by the scheduled job\nset -euo pipefail\ncurl -fsS \"$CONNECT_URL/connectors/$CONNECTOR/status\" \\\n  | jq -e '.connector.state == \"RUNNING\" and all(.tasks[]; .state == \"RUNNING\")' > /dev/null \\\n  || { echo \"connector $CONNECTOR is not running\"; exit 1; }\nid=$(psql \"$DATABASE_URL\" -qAtc \"insert into audit_canary (touched_at) values (now()) returning id\")\ndeadline=$(( $(date +%s) + {{CDC_MINUTES}} * 60 ))\nuntil curl -fsS -H \"Authorization: Bearer $AUDIT_READER_TOKEN\" \"$APP_URL/audit/records?target=audit_canary:$id\" \\\n  | jq -e '.items[] | select(.actor == \"unattributed\")' > /dev/null; do\n  [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo \"canary write $id not in the audit trail after {{CDC_MINUTES}} minutes\"; exit 1; }\n  sleep 30\ndone\n```",
       "hubWhen": {
         "SCOPE": [

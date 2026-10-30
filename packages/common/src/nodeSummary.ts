@@ -15,7 +15,9 @@
 // phrase) and {condition} the when/while/if/where it holds under (ears.ts,
 // earsSummaryParts); {transitions} where a state machine goes from a state
 // or on an event; {out:type} and {in:type} the names of the elements linked
-// by relations of that type. {key.sentence} takes the first sentence only,
+// by relations of that type; {conditions} the measured values a fitness
+// function or scenario holds itself to, and {result} whether its result is
+// static or dynamic (fitnessResult). {key.sentence} takes the first sentence only,
 // {key.phrase} the first phrase (up to a colon, semicolon or dash aside),
 // {key.cap} starts it with a capital, {key.bold} makes it bold as a whole,
 // and {a|b} is the first of a and b that has a value. A part in [ ] is left
@@ -33,7 +35,7 @@
 import type { C4Node, C4Relation } from './c4'
 import type { Metamodel } from './metamodel/types'
 import { escapeMarkdown, isMarkdownField, markdownToPlain } from './markdown'
-import { parseConditions } from './check/metrics'
+import { REVIEW_METRIC, fitnessResult, parseConditions } from './check/metrics'
 import { composeEarsSentence, earsSummaryParts, firstParagraph, firstPhrase, refIds, requirementStatePhrase, resolveEarsSubject } from './metamodel'
 
 const C4_SUMMARY = '[\\[{technology}\\] ]{description.sentence}'
@@ -50,7 +52,7 @@ export const DEFAULT_SUMMARIES: Record<string, string> = {
   requirement: '[{obligation.bold}][ — {condition}]',
   scenario: '[{then.phrase.cap.bold}][ — when {when}]',
   adr: '[{status.cap.bold}: ]{decision.sentence}',
-  'fitness-fn': '{description.sentence}[ — {conditions.bold}]',
+  'fitness-fn': '{description.sentence}[ — {conditions.bold}][ ({result})]',
   domain: '[{kind.cap.bold} · ]{description.sentence}',
   'state-machine': '[Lifecycle of {out:lifecycle-of.bold}: ]{description.sentence}',
   state: '{description.sentence|transitions.cap|kind.cap}',
@@ -73,7 +75,7 @@ export function summaryTokens(type: string, metamodel: Metamodel | undefined): s
   const props = (metamodel?.nodeTypes[type]?.properties ?? []).map((p) => p.key)
   const ears = props.includes('action') ? ['ears', 'obligation', 'condition'] : []
   const moves = ['state', 'pseudostate', 'event'].includes(type) ? ['transitions'] : []
-  const conditions = props.includes('metrics') ? ['conditions'] : []
+  const conditions = props.includes('metrics') ? ['conditions', 'result'] : []
   return [...new Set(['label', 'description', 'technology', ...ears, ...moves, ...conditions, ...props])]
 }
 
@@ -159,8 +161,12 @@ function singleTokenValue(token: string, ctx: Ctx): string {
     value = line(earsSummaryParts(p, resolveEarsSubject(node.id, relations, nodes), requirementStatePhrase(node, nodes, relations) || undefined)[key])
   } else if (key === 'conditions') {
     // The values a fitness function or scenario holds itself to, from its
-    // metrics; the tests it names are no threshold to read.
-    value = parseConditions(p.metrics).filter((c) => c.kind === 'metric').map((c) => escapeMarkdown(c.raw)).join('; ')
+    // metrics; the tests and reviews it names are no threshold to read.
+    value = parseConditions(p.metrics).filter((c) => c.kind === 'metric' && c.metric !== REVIEW_METRIC).map((c) => escapeMarkdown(c.raw)).join('; ')
+  } else if (key === 'result') {
+    // Static for fixed limits, dynamic for one against a baseline: read from
+    // the metrics, never stated (fitnessResult).
+    value = fitnessResult(p.metrics) ?? ''
   } else if (key === 'type') {
     value = escapeMarkdown(metamodel?.nodeTypes[node.type]?.label ?? node.type)
   } else {

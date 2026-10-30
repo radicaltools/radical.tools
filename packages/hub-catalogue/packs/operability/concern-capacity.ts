@@ -168,7 +168,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-loadtest-release', label: 'Load test gates release', when: { LOADTEST: ['release'] }, category: 'operational', implements: SCALING_ADRS,
+      id: 'ff-loadtest-release', label: 'Load test gates release', when: { LOADTEST: ['release'] }, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: SCALING_ADRS,
       checks: ['req-peak', 'req-autoscale', 'req-loadtest-release'],
       threshold: '95th percentile under {{P95_MS}} ms and errors under 0.1 % through a 5-minute ramp to {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second and 15 minutes at it',
       description: 'The pipeline runs a k6 test against a production-like environment for every release candidate: a 5-minute ramp from the normal load to the peak (which an autoscaler has to follow in time) and 15 minutes at the peak; the thresholds fail the run, and the pipeline stops the release.',
@@ -205,7 +205,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-loadtest-scheduled', label: 'Breaking point measured', when: { LOADTEST: ['scheduled'] }, category: 'operational', implements: SCALING_ADRS,
+      id: 'ff-loadtest-scheduled', label: 'Breaking point measured', when: { LOADTEST: ['scheduled'] }, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: SCALING_ADRS,
       checks: ['req-peak', 'req-autoscale', 'req-loadtest-scheduled'],
       threshold: '95th percentile under {{P95_MS}} ms and errors under 0.1 % up to 1.5 times {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second; the band of load where the 95th percentile broke, up to 3 times the peak, is recorded; run at most 30 days ago',
       description: 'A scheduled job runs a k6 test that ramps from the normal load past the peak to 3 times the peak, tagging requests by the band of load they were sent in. The thresholds assert the latency and error bounds up to 1.5 times the peak; the summary records the first band above it where the 95th percentile broke, as the breaking point, in a file kept with the run. The job runs monthly and 4 weeks before each announced peak event.',
@@ -271,7 +271,7 @@ export function handleSummary(data) {
 }`,
     },
     {
-      id: 'ff-headroom', label: 'Headroom watched', when: { SCALING: ['fixed'] }, category: 'operational', implements: ['adr-fixed'],
+      id: 'ff-headroom', label: 'Headroom watched', when: { SCALING: ['fixed'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-fixed'],
       checks: ['req-headroom'],
       threshold: 'The highest hourly average of CPU and of memory use in the last 7 days at most 70 % of what is provisioned; above it, a ticket alert',
       description: 'Recording rules compute the element\'s CPU and memory use as a share of its requests (container-level series only, so the pod-level and pause-container series are not counted twice); an alert takes the highest hourly average of the last 7 days for each and opens a capacity ticket above 70 %.',
@@ -297,7 +297,7 @@ export function handleSummary(data) {
           summary: "Order API used over 70 % of its provisioned CPU or memory at the week's busiest hour: plan a capacity change"`,
     },
     {
-      id: 'ff-hpa-behaviour', label: 'Autoscaler bounds and scale-in delay', when: { SCALING: ['horizontal'] }, category: 'structural', implements: ['adr-autoscale'],
+      id: 'ff-hpa-behaviour', label: 'Autoscaler bounds and scale-in delay', when: { SCALING: ['horizontal'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-autoscale'],
       checks: ['req-autoscale'],
       threshold: 'The HorizontalPodAutoscaler has minReplicas at least 2, maxReplicas set, and a scale-down stabilization window of at least 900 s',
       description: 'A policy over the Kubernetes manifests fails the pipeline when the element\'s autoscaler could run a single instance, has no ceiling, or scales in sooner than 15 minutes after the load drops. ECS and Container Apps have the same three settings in their scale rules.',
@@ -326,7 +326,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-autoscale-ceiling', label: 'Autoscaling not at its ceiling', when: { SCALING: ['horizontal'] }, category: 'operational', implements: ['adr-autoscale'],
+      id: 'ff-autoscale-ceiling', label: 'Autoscaling not at its ceiling', when: { SCALING: ['horizontal'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-autoscale'],
       checks: ['req-autoscale'],
       threshold: 'The autoscaler sits at its maximum replicas for no more than 15 minutes in a row',
       description: 'A Prometheus alert fires when the HorizontalPodAutoscaler has run at its maximum for 15 minutes: the ceiling is too low or the load is beyond plan, and someone decides which.',
@@ -345,7 +345,7 @@ deny contains msg if {
           summary: "Order API has been at its maximum replicas for 15 minutes"`,
     },
     {
-      id: 'ff-pool-cap', label: 'Replicas times pool size within the cap', when: { SCALING: ['horizontal'] }, category: 'structural', implements: ['adr-autoscale'],
+      id: 'ff-pool-cap', label: 'Replicas times pool size within the cap', when: { SCALING: ['horizontal'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-autoscale'],
       checks: ['req-downstream'],
       threshold: 'maxReplicas of the autoscaler times the connection pool size per instance (DB_POOL_SIZE) is at most {{CONCURRENCY_CAP}}',
       description: 'A policy over the Kubernetes manifests, run with conftest --combine so that it sees the autoscaler and the Deployment together, fails the pipeline when the most instances the autoscaler may run, times the pool size each is configured with, exceeds what the database accepts from the element.',
@@ -370,7 +370,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-serverless-throttles', label: 'Throttled only at our cap', when: { SCALING: ['serverless'] }, category: 'operational', implements: ['adr-serverless'],
+      id: 'ff-serverless-throttles', label: 'Throttled only at our cap', when: { SCALING: ['serverless'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-serverless'],
       checks: ['req-downstream'],
       threshold: '0 throttled invocations in any 5 minutes while concurrency is under 90 % of {{CONCURRENCY_CAP}}; concurrency under 80 % of {{CONCURRENCY_CAP}} for all but 5 minutes',
       description: 'The function\'s reserved concurrency is the cap; throttling at it is the overload rule working. Two CloudWatch alarms in Terraform: one on concurrent executions sustained above 80 % of the cap (raise the cap, or the database\'s limit), and one on throttles that happen while concurrency is still under 90 % of the cap, which means the account or region limit throttled first and must be raised. Cloud Run and Azure Functions expose the same two metrics in Cloud Monitoring and Azure Monitor.',
@@ -429,7 +429,7 @@ resource "aws_cloudwatch_metric_alarm" "order_api_throttled_below_cap" {
 }`,
     },
     {
-      id: 'ff-cold-start', label: 'Burst after idle answered in time', when: { SCALING: ['serverless'] }, category: 'operational', implements: ['adr-serverless'],
+      id: 'ff-cold-start', label: 'Burst after idle answered in time', when: { SCALING: ['serverless'] }, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-serverless'],
       checks: ['req-cold-start'],
       threshold: 'After 15 idle minutes, a 2-minute burst at {{PEAK_FACTOR}} times {{EXPECTED_RPS}} requests per second has every request answered within 1000 ms and fewer than 0.1 % errors',
       description: 'A nightly job waits until the element has been idle at its minimum instances for 15 minutes, then runs a k6 burst at the peak rate; the slowest request, cold starts included, must answer within a second. On AWS, the InitDuration in the function\'s logs says how much of it was the start.',
@@ -453,7 +453,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-shed', label: 'Overload is shed fast', when: SHED, category: 'operational', implements: ['adr-shed'],
+      id: 'ff-shed', label: 'Overload is shed fast', when: SHED, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-shed'],
       checks: ['req-shed'],
       threshold: 'At twice the peak: refused requests answered with 503 in under 50 ms (95th percentile), accepted ones under {{P95_MS}} ms, and nothing but 200 or 503',
       description: 'A k6 overload test drives twice the peak and checks two things separately: refusals are fast 503s, and the requests that were accepted kept their latency. A service that slows everything down instead fails the test.',
@@ -485,7 +485,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-backlog', label: 'Backlog drains, dead letters seen', when: QUEUE, category: 'operational', implements: ['adr-backpressure'],
+      id: 'ff-backlog', label: 'Backlog drains, dead letters seen', when: QUEUE, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-backpressure'],
       checks: ['req-backpressure'],
       threshold: 'The queue\'s ready messages grow for no more than 15 minutes in a row; the dead-letter queue holds messages for no more than 5 minutes before a ticket',
       description: 'Two Prometheus alerts over RabbitMQ\'s per-queue metrics: one fires when the work queue has kept growing for 15 minutes, meaning the workers cannot keep up even after scaling; the other opens a ticket when the dead-letter queue is not empty. The queue is declared with x-max-length and x-overflow reject-publish, so a full queue refuses the publish. With Kafka the first rule reads kafka_consumergroup_lag from kafka_exporter; with SQS, ApproximateAgeOfOldestMessage in CloudWatch.',

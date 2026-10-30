@@ -192,7 +192,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-pr-time', label: 'Pull-request tests in time', category: 'process', implements: SHAPES, checks: ['req-pr-suite'],
+      id: 'ff-pr-time', label: 'Pull-request tests in time', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-pr-suite'],
       threshold: 'The pull-request test job finishes within {{PIPELINE_MINUTES}} minutes',
       description: 'The test job has a hard timeout of {{PIPELINE_MINUTES}} minutes, so a slow suite fails instead of quietly growing; it is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.',
       tool: 'GitHub Actions (timeout-minutes) with Vitest; for the JVM: the same job running ./gradlew test',
@@ -213,7 +213,7 @@ jobs:
       - run: npx vitest run --project integration --reporter=junit --outputFile=reports/integration.xml`,
     },
     {
-      id: 'ff-coverage', label: 'Coverage of new code', category: 'process', implements: SHAPES, checks: ['req-coverage'],
+      id: 'ff-coverage', label: 'Coverage of new code', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-coverage'],
       threshold: 'Coverage on new code at least {{COVERAGE}}%; the quality gate fails the pull request below it',
       description: 'The pipeline sends the coverage report to SonarQube and waits for the quality gate, whose condition "Coverage on New Code is less than {{COVERAGE}}%" is created once through the Web API, not in the properties file.',
       tool: 'SonarQube quality gate (sonar-scanner with sonar.qualitygate.wait, the condition through api/qualitygates/create_condition; SonarQube Cloud takes gateId and organization instead of gateName); for the JVM: the same with the JaCoCo report path',
@@ -231,7 +231,7 @@ curl -fsS -u "$SONAR_TOKEN:" -X POST "$SONAR_HOST_URL/api/qualitygates/create_co
   --data-urlencode "op=LT" --data-urlencode "error={{COVERAGE}}"`,
     },
     {
-      id: 'ff-mutation', label: 'Mutation score on changed files', when: { GATE: ['mutation'] }, category: 'process', implements: SHAPES, checks: ['req-mutation'],
+      id: 'ff-mutation', label: 'Mutation score on changed files', when: { GATE: ['mutation'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-mutation'],
       threshold: 'Mutation score on the files the pull request changes at least {{MUTATION}}%; the build breaks below it',
       description: 'Stryker runs incrementally over the source files the pull request changes (the mutate globs come from git diff) and breaks the build when the score falls below the threshold. On the JVM, PIT with mutationThreshold and the git-based scm goal does the same.',
       tool: 'Stryker Mutator (@stryker-mutator/vitest-runner); for the JVM: PIT with pitest-maven\'s scmMutationCoverage goal',
@@ -243,7 +243,7 @@ changed=$(git diff --name-only origin/main...HEAD -- 'src/**/*.ts' | grep -v '\\
 [ -z "$changed" ] || npx stryker run --mutate "$changed"`,
     },
     {
-      id: 'ff-unit-isolated', label: 'Unit tests stay isolated and few are end-to-end', when: { SHAPE: ['pyramid'] }, category: 'structural', implements: ['adr-pyramid'], checks: ['req-pyramid'],
+      id: 'ff-unit-isolated', label: 'Unit tests stay isolated and few are end-to-end', when: { SHAPE: ['pyramid'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-pyramid'], checks: ['req-pyramid'],
       threshold: '0 unit tests reach the network or run over 100 ms; unit tests at least 70% and end-to-end tests at most 10% of all tests',
       description: 'The unit-test project disables network connections in its setup, so a unit test that reaches a server fails; a step in CI reads the JUnit reports, counts tests per suite and fails when the shares are off or a unit test took more than 100 ms.',
       tool: 'Vitest with nock 14 or later (which intercepts native fetch too) and xmllint over the JUnit reports; for the JVM: JUnit 5 with a SecurityManager-free network block through a test ArchUnit rule and the same report arithmetic',
@@ -262,7 +262,7 @@ afterAll(() => nock.enableNetConnect())
 //   [ "$(xmllint --xpath 'count(//testcase[@time > 0.1])' reports/unit.xml)" = 0 ]   # no unit test over 100 ms`,
     },
     {
-      id: 'ff-no-fakes', label: 'No in-memory database', when: { SHAPE: ['trophy'] }, category: 'structural', implements: ['adr-trophy'], checks: ['req-trophy'],
+      id: 'ff-no-fakes', label: 'No in-memory database', when: { SHAPE: ['trophy'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-trophy'], checks: ['req-trophy'],
       threshold: '0 test or test-helper files import an in-memory database substitute',
       description: 'A dependency rule fails the build when a file under test or src imports an in-memory substitute for the database (helpers included, not only the test files); the integration tests use Testcontainers with the production engine and version.',
       tool: 'dependency-cruiser; for the JVM: an ArchUnit rule forbidding org.h2 in test classes',
@@ -280,7 +280,7 @@ module.exports = {
 }`,
     },
     {
-      id: 'ff-integration-share', label: 'Integration tests carry the suite', when: { SHAPE: ['trophy'] }, category: 'structural', implements: ['adr-trophy'], checks: ['req-trophy'],
+      id: 'ff-integration-share', label: 'Integration tests carry the suite', when: { SHAPE: ['trophy'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-trophy'], checks: ['req-trophy'],
       threshold: 'Integration tests at least 50% of all tests',
       description: 'A step in CI reads the JUnit reports of the unit, integration and end-to-end runs, counts the tests per suite and fails when integration tests are below half of the total.',
       tool: 'xmllint over the JUnit reports in a shell step; for the JVM: the same over the surefire and failsafe reports',
@@ -293,7 +293,7 @@ echo "integration tests: $integration of $all"
 [ $((integration * 100 / all)) -ge 50 ] || { echo "integration tests are below half of the suite (ADR A testing trophy)"; exit 1; }`,
     },
     {
-      id: 'ff-shuffle', label: 'Tests pass in any order', when: { DATA: ['synthetic', 'fixtures'] }, category: 'process', implements: SHAPES, checks: ['req-own-data', 'req-fixtures'],
+      id: 'ff-shuffle', label: 'Tests pass in any order', when: { DATA: ['synthetic', 'fixtures'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: SHAPES, checks: ['req-own-data', 'req-fixtures'],
       threshold: 'The suite passes in 3 consecutive runs with random order and parallel workers',
       description: 'A nightly job runs the suite three times with shuffled order and a different seed each time; a failure prints the seed, so the order can be reproduced.',
       tool: 'Vitest (sequence.shuffle); for the JVM: JUnit 5 with junit.jupiter.testmethod.order.default set to MethodOrderer$Random; for Python: pytest-randomly',
@@ -309,7 +309,7 @@ export default defineConfig({
 // nightly: for run in 1 2 3; do npx vitest run --sequence.seed=$RANDOM || exit 1; done`,
     },
     {
-      id: 'ff-seed-loads', label: 'Seed loads on a fresh database', when: { DATA: ['fixtures'] }, category: 'structural', implements: SHAPES, checks: ['req-fixtures'],
+      id: 'ff-seed-loads', label: 'Seed loads on a fresh database', when: { DATA: ['fixtures'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-fixtures'],
       threshold: 'Every test run starts from a fresh database with the current migrations and the seed under test/seed loaded without error',
       description: 'Vitest\'s global setup starts PostgreSQL in a container, runs the migrations and loads every seed file; a seed that no longer fits the schema fails the setup and with it the run, so the seed cannot drift from the migrations.',
       tool: 'Vitest globalSetup with Testcontainers (@testcontainers/postgresql) and pg; for the JVM: a Testcontainers JDBC URL with an init script',
@@ -338,7 +338,7 @@ export async function teardown() {
 }`,
     },
     {
-      id: 'ff-pii-scan', label: 'Test copies hold no personal data', when: { DATA: ['masked'] }, category: 'operational', implements: SHAPES, checks: ['req-masking'],
+      id: 'ff-pii-scan', label: 'Test copies hold no personal data', when: { DATA: ['masked'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: SHAPES, checks: ['req-masking'],
       threshold: '0 personal-data findings in a sample of 10,000 rows per table of each copy; a copy with findings is not released to test environments',
       description: 'Before a masked copy is released, a job samples every text column and runs Presidio\'s analyzer over it; any finding stops the release of the copy.',
       tool: 'Microsoft Presidio (presidio-analyzer) in a Python job of the copy pipeline',
@@ -357,7 +357,7 @@ hits = list(findings(sample_rows(limit_per_table=10_000)))
 assert not hits, f"personal data in the test copy: {hits[:20]}"`,
     },
     {
-      id: 'ff-journeys-covered', label: 'Every journey has a test', category: 'structural', implements: SHAPES, checks: ['req-e2e-pr', 'req-e2e-staging', 'req-e2e-prod'],
+      id: 'ff-journeys-covered', label: 'Every journey has a test', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-e2e-pr', 'req-e2e-staging', 'req-e2e-prod'],
       threshold: '100% of the journeys {{JOURNEYS}} have a Playwright spec under e2e',
       description: 'A test lists the journeys the decision names and expects a spec file e2e/<journey>.spec.ts for each (spaces in a journey\'s name become dashes); a journey without a spec fails the test, so the list and the suite cannot drift apart.',
       tool: 'Vitest over the e2e directory; for the JVM: the same test with JUnit 5 over src/e2e',
@@ -372,7 +372,7 @@ it.each(JOURNEYS)('journey %s has an end-to-end spec', (journey) => {
 })`,
     },
     {
-      id: 'ff-e2e-gate', label: 'Journeys gate the release', when: { E2E: ['pipeline', 'staging'] }, category: 'process', implements: SHAPES, checks: ['req-e2e-pr', 'req-e2e-staging'],
+      id: 'ff-e2e-gate', label: 'Journeys gate the release', when: { E2E: ['pipeline', 'staging'] }, characteristic: 'functional-suitability', scope: 'holistic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-e2e-pr', 'req-e2e-staging'],
       threshold: 'All end-to-end tests pass before the build is merged or promoted, with 0 skipped',
       description: 'Playwright runs the journeys against the environment the pipeline deployed (an ephemeral one per pull request, or staging after the merge) with no retries and no test.only; a CI step reads the JUnit report and fails on a skipped test. The job is a required check for the merge, or the gate of the promotion.',
       tool: 'Playwright (junit reporter) with xmllint in a shell step; for the JVM: Playwright for Java with the same report',
@@ -390,7 +390,7 @@ export default defineConfig({
 //   [ "$(xmllint --xpath 'string(//testsuites/@skipped)' reports/e2e.xml)" = 0 ] || { echo "skipped end-to-end tests"; exit 1; }`,
     },
     {
-      id: 'ff-synthetic', label: 'Journeys checked in production', when: { E2E: ['production'] }, category: 'operational', implements: SHAPES, checks: ['req-e2e-prod'],
+      id: 'ff-synthetic', label: 'Journeys checked in production', when: { E2E: ['production'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: SHAPES, checks: ['req-e2e-prod'],
       threshold: 'Each journey runs after every deploy and every 5 minutes from 2 locations; 2 failed runs in a row call the rollback webhook',
       description: 'The Playwright journeys run as Checkly browser checks, one per journey, every 5 minutes from two locations; the escalation policy alerts after two failed runs in a row and the alert channel is a webhook on the deployment pipeline that rolls the release back. The deploy job deploys the checks and triggers them against the new release at once.',
       tool: 'Checkly CLI (checkly/constructs; npx checkly deploy and npx checkly trigger in the deploy job)',
@@ -415,7 +415,7 @@ new BrowserCheck('checkout-journey', {
 // deploy job, after the deploy:  npx checkly deploy && npx checkly trigger   (runs the checks against the new release at once)`,
     },
     {
-      id: 'ff-flaky-report', label: 'Flaky tests enter quarantine', when: { FLAKY: ['quarantine'] }, category: 'process', implements: SHAPES, checks: ['req-quarantine'],
+      id: 'ff-flaky-report', label: 'Flaky tests enter quarantine', when: { FLAKY: ['quarantine'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: SHAPES, checks: ['req-quarantine'],
       threshold: '0 tests that passed only on retry in the nightly run without an entry in quarantine.json',
       description: 'The nightly run retries a failed test once, only to tell a flake from a failure; a reporter lists the tests that passed on retry in reports/flaky.json and fails the run for any that is not yet in quarantine.json, so a flake is entered within a day or the nightly stays red. The gate itself skips the tests tagged @quarantine.',
       tool: 'Vitest (retry: 1 with a custom reporter reading each test\'s diagnostic().flaky); for the JVM: Gradle\'s test-retry plugin with failOnPassedAfterRetry off and its flaky report',
@@ -438,7 +438,7 @@ export class FlakyReporter implements Reporter {
 }`,
     },
     {
-      id: 'ff-quarantine', label: 'Quarantine is emptied', when: { FLAKY: ['quarantine'] }, category: 'process', implements: SHAPES, checks: ['req-quarantine'],
+      id: 'ff-quarantine', label: 'Quarantine is emptied', when: { FLAKY: ['quarantine'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-quarantine'],
       threshold: '0 tests in quarantine for more than {{QUARANTINE_DAYS}} days; every entry has an owner and a ticket',
       description: 'Quarantined tests are listed in quarantine.json and tagged @quarantine, which the gate skips and a separate non-blocking job runs. A test over the list fails the build when an entry is older than the deadline or has no owner or ticket.',
       tool: 'Vitest (a test over quarantine.json); for the JVM: the same test with JUnit 5 over the file',
@@ -455,7 +455,7 @@ it('no test stays in quarantine past the deadline', () => {
 })`,
     },
     {
-      id: 'ff-flaky-fails', label: 'Flaky tests fail the build', when: { FLAKY: ['zero'] }, category: 'process', implements: SHAPES, checks: ['req-no-retry'],
+      id: 'ff-flaky-fails', label: 'Flaky tests fail the build', when: { FLAKY: ['zero'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-no-retry'],
       threshold: '0 tests that pass only on retry; such a test fails the build',
       description: 'The run retries a failed test once, only to tell a flake from a real failure; a reporter fails the build when any test passed on retry and names it as flaky.',
       tool: 'Vitest (retry: 1 with a custom reporter reading each test\'s diagnostic().flaky); for the JVM: Gradle\'s test-retry plugin with failOnPassedAfterRetry',

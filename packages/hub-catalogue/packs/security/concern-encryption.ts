@@ -221,7 +221,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-tls-scan', label: 'Public TLS: 1.3 only', when: { TLS: ['modern'] }, category: 'operational', implements: TRANSIT, checks: ['req-tls-outside', 'req-tls13'],
+      id: 'ff-tls-scan', label: 'Public TLS: 1.3 only', when: { TLS: ['modern'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: TRANSIT, checks: ['req-tls-outside', 'req-tls13'],
       threshold: 'On every public endpoint: TLS 1.3 offered and SSLv2, SSLv3, TLS 1.0, 1.1 and 1.2 not offered; 0 findings of severity HIGH or CRITICAL; plain HTTP redirected; HSTS max-age at least 31536000; the certificate valid for at least 14 more days',
       description: 'A scheduled job scans each public endpoint with testssl.sh and reads the protocol findings from its JSON (ids SSLv2, SSLv3, TLS1, TLS1_1, TLS1_2, TLS1_3), then checks the redirect, the HSTS header and the certificate\'s expiry with curl and openssl.',
       tool: 'testssl.sh 3.2 (docker), jq, curl and openssl',
@@ -245,7 +245,7 @@ while read -r endpoint; do
 done < endpoints.txt`,
     },
     {
-      id: 'ff-tls-scan-12', label: 'Public TLS: 1.2 and 1.3, strong suites', when: { TLS: ['intermediate'] }, category: 'operational', implements: TRANSIT, checks: ['req-tls-outside', 'req-tls12'],
+      id: 'ff-tls-scan-12', label: 'Public TLS: 1.2 and 1.3, strong suites', when: { TLS: ['intermediate'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: TRANSIT, checks: ['req-tls-outside', 'req-tls12'],
       threshold: 'On every public endpoint: TLS 1.2 and 1.3 offered; SSLv2, SSLv3, TLS 1.0 and 1.1 not offered; the 3DES/IDEA, obsoleted (CBC, static RSA) and non-forward-secret cipher lists not offered; 0 findings of severity HIGH or CRITICAL; plain HTTP redirected; HSTS max-age at least 31536000; the certificate valid for at least 14 more days',
       description: 'A scheduled job scans each public endpoint with testssl.sh and reads the protocol and cipher-list findings from its JSON (ids TLS1_2, TLS1_3, SSLv2, SSLv3, TLS1, TLS1_1, cipherlist_3DES_IDEA, cipherlist_OBSOLETED, cipherlist_STRONG_NOFS), then checks the redirect, the HSTS header and the certificate\'s expiry with curl and openssl.',
       tool: 'testssl.sh 3.2 (docker), jq, curl and openssl',
@@ -270,7 +270,7 @@ while read -r endpoint; do
 done < endpoints.txt`,
     },
     {
-      id: 'ff-mesh-strict', label: 'Mesh in strict mode', when: { INTERNAL: ['mtls'] }, category: 'structural', implements: ['adr-mtls'], checks: ['req-mtls'],
+      id: 'ff-mesh-strict', label: 'Mesh in strict mode', when: { INTERNAL: ['mtls'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-mtls'], checks: ['req-mtls'],
       threshold: 'A mesh-wide PeerAuthentication (istio-system, no selector) with mtls.mode STRICT exists, and 0 PeerAuthentications or port-level settings with any other mode or none',
       description: 'A Conftest policy over all rendered manifests at once fails when the mesh-wide mutual TLS policy is missing, or when any PeerAuthentication leaves the mode unset (which inherits PERMISSIVE) or sets another one, on the workload or on a port.',
       tool: 'Conftest (Open Policy Agent) over Istio manifests',
@@ -312,7 +312,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-mesh-cert-ttl', label: 'Mesh certificates short-lived', when: { INTERNAL: ['mtls'] }, category: 'operational', implements: ['adr-mtls'], checks: ['req-mtls'],
+      id: 'ff-mesh-cert-ttl', label: 'Mesh certificates short-lived', when: { INTERNAL: ['mtls'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-mtls'], checks: ['req-mtls'],
       threshold: '0 meshed pods whose workload certificate is valid for more than 24 more hours',
       description: 'A scheduled job lists the pods with an istio-proxy sidecar (a container, or a native sidecar among the init containers), reads each one\'s workload certificate (the SDS secret named default) with istioctl, and fails on one that will still be valid in 24 hours, which means the mesh issues certificates that live longer than decided. Together with Mesh in strict mode (configuration) it checks the requirement.',
       tool: 'istioctl proxy-config secret, kubectl, jq and openssl (sidecar mode; in ambient mode: istioctl ztunnel-config certificates)',
@@ -335,7 +335,7 @@ done
 exit $fail`,
     },
     {
-      id: 'ff-backend-tls', label: 'Backends refuse clear text', when: { INTERNAL: ['tls'] }, category: 'structural', implements: ['adr-internal-tls'], checks: ['req-internal-tls'],
+      id: 'ff-backend-tls', label: 'Backends refuse clear text', when: { INTERNAL: ['tls'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-internal-tls'], checks: ['req-internal-tls'],
       threshold: '0 databases that accept a connection without TLS; every internal endpoint (queues, other elements) answers verifiable TLS and 0 answer plain HTTP; 0 client settings that skip or downgrade verification',
       description: 'A smoke test after each deployment tries each database without TLS and expects a refusal, checks every internal endpoint for a certificate that verifies against our CA and for a refusal of plain HTTP; a Semgrep rule set fails the build on settings that skip or downgrade verification.',
       tool: 'psql, openssl, curl and Semgrep',
@@ -369,7 +369,7 @@ RULES
 semgrep --config /tmp/tls-verify.yml --error src/`,
     },
     {
-      id: 'ff-private', label: 'Private network stays private', when: { INTERNAL: ['private'] }, category: 'structural', implements: ['adr-private'], checks: ['req-private'],
+      id: 'ff-private', label: 'Private network stays private', when: { INTERNAL: ['private'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-private'], checks: ['req-private'],
       threshold: '0 VPC peerings, 0 public addresses (elastic IPs, instances with a public address, subnets that assign one) and 0 0.0.0.0/0 or ::/0 ingress rules on the element\'s network in the Terraform plan',
       description: 'A Conftest policy over the Terraform plan fails when the private network gains a peering, a public address or an open ingress rule, any of which breaks the conditions of the decision. The rules are for the AWS provider; the Azure and Google providers\' peering, public IP and security rule resources are checked the same way.',
       tool: 'Conftest (Open Policy Agent) over terraform show -json (AWS provider; for Azure: azurerm_virtual_network_peering, azurerm_public_ip, azurerm_network_security_rule; for Google: google_compute_network_peering, google_compute_address, google_compute_firewall)',
@@ -426,7 +426,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-rest', label: 'Nothing stored unencrypted', when: { AT_REST: ['provider'] }, category: 'operational', implements: ['adr-provider-keys'], checks: ['req-rest'],
+      id: 'ff-rest', label: 'Nothing stored unencrypted', when: { AT_REST: ['provider'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-provider-keys'], checks: ['req-rest'],
       threshold: '0 non-compliant database instances, snapshots, volumes or buckets',
       description: 'AWS Config managed rules evaluate every database, snapshot, volume and bucket continuously and report one that is not encrypted at rest.',
       tool: 'AWS Config managed rules (for Azure: the built-in Azure Policy definitions for storage and SQL encryption; for Google: encryption at rest is always on, the Organization Policy only matters for customer-managed keys)',
@@ -450,7 +450,7 @@ resource "aws_config_config_rule" "encrypted_at_rest" {
 }`,
     },
     {
-      id: 'ff-rest-cmk', label: 'Stored under our key only', when: OWN_KEYS, category: 'operational', implements: ['adr-cmk', 'adr-field'], checks: ['req-rest'],
+      id: 'ff-rest-cmk', label: 'Stored under our key only', when: OWN_KEYS, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-cmk', 'adr-field'], checks: ['req-rest'],
       threshold: '0 database instances, volumes or buckets encrypted with any key but the element\'s customer-managed key; 0 unencrypted snapshots',
       description: 'AWS Config managed rules evaluate every database, volume and bucket continuously with the element\'s key passed as the only allowed key, so a resource encrypted with a provider-managed key is reported too; snapshots are checked for encryption.',
       tool: 'AWS Config managed rules with key parameters (for Azure: Azure Policy "should use customer-managed keys" definitions; for Google: the Organization Policy constraint gcp.restrictNonCmekServices)',
@@ -495,7 +495,7 @@ resource "aws_config_config_rule" "buckets_our_key" {
 }`,
     },
     {
-      id: 'ff-key-policy', label: 'Key use and administration apart', when: OWN_KEYS, category: 'structural', implements: ['adr-cmk', 'adr-field'], checks: ['req-key-access'],
+      id: 'ff-key-policy', label: 'Key use and administration apart', when: OWN_KEYS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-cmk', 'adr-field'], checks: ['req-key-access'],
       threshold: 'In every KMS key policy of the plan (aws_kms_key and aws_kms_key_policy), apart from the account-root statement AWS documents: the principals allowed to use the key are a subset of the element\'s roles, 0 principals may both use and administer it, and 0 statements grant use to *',
       description: 'A Conftest policy over the Terraform plan parses each KMS key policy and fails when a principal outside the element\'s roles may encrypt or decrypt, when one principal appears in both a use and an administration statement (kms:* counts as both), or when use is open to everyone (Principal "*" or {"AWS": "*"}). The account root (arn:aws:iam::<account>:root, or the bare account id) is exempt: AWS documents the statement that gives it kms:* as the one that keeps a key manageable, and the IAM policies it lets grant use are reviewed with the key policy, as adr-cmk says. A policy the plan cannot know yet (computed from another resource) is not checked; write it as a literal or a data source known at plan time. Every KMS call is logged by CloudTrail by default.',
       tool: 'Conftest (Open Policy Agent, rego.v1) over terraform show -json (AWS; for Azure: Key Vault RBAC assignments, for Google: IAM bindings on the key ring, checked the same way)',
@@ -558,7 +558,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-key-rotation', label: 'Key rotation on', when: { AT_REST: ['cmk', 'field'], ROTATION: ['automatic'] }, category: 'operational', implements: ['adr-cmk', 'adr-field'], checks: ['req-rotate-auto'],
+      id: 'ff-key-rotation', label: 'Key rotation on', when: { AT_REST: ['cmk', 'field'], ROTATION: ['automatic'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-cmk', 'adr-field'], checks: ['req-rotate-auto'],
       threshold: '0 customer-managed symmetric keys without automatic rotation; every rotation period at most {{KEY_ROTATE_DAYS}} days',
       description: 'A scheduled job lists the customer-managed keys, skips the asymmetric and HMAC ones (which the KMS cannot rotate) and fails on a symmetric key whose rotation is off or whose period is longer than {{KEY_ROTATE_DAYS}} days.',
       tool: 'AWS CLI and jq (for Azure: az keyvault key rotation-policy show; for Google: gcloud kms keys describe, field rotationPeriod)',
@@ -574,7 +574,7 @@ for key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do
 done`,
     },
     {
-      id: 'ff-key-age', label: 'No key past its period', when: { AT_REST: ['cmk', 'field'], ROTATION: ['reencrypt'] }, category: 'operational', implements: ['adr-cmk', 'adr-field'], checks: ['req-rotate-reencrypt'],
+      id: 'ff-key-age', label: 'No key past its period', when: { AT_REST: ['cmk', 'field'], ROTATION: ['reencrypt'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-cmk', 'adr-field'], checks: ['req-rotate-reencrypt'],
       threshold: '0 enabled customer-managed keys older than {{KEY_ROTATE_DAYS}} + 30 days',
       description: 'A scheduled job lists the customer-managed keys and fails on an enabled key past its cryptoperiod and the 30 days allowed for re-encryption, which means the old key still protects data. The creation date is an ISO 8601 string in the CLI\'s JSON and is converted before comparing.',
       tool: 'AWS CLI and jq (for Azure: az keyvault key list, attributes.created; for Google: gcloud kms keys versions list, createTime)',
@@ -591,7 +591,7 @@ for key in $(aws kms list-keys --query 'Keys[].KeyId' --output text); do
 done`,
     },
     {
-      id: 'ff-field', label: 'Fields stored as ciphertext', when: { AT_REST: ['field'] }, category: 'structural', implements: ['adr-field'], checks: ['req-field'],
+      id: 'ff-field', label: 'Fields stored as ciphertext', when: { AT_REST: ['field'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-field'], checks: ['req-field'],
       threshold: '0 of the listed sensitive fields readable as plaintext in the database',
       description: 'An integration test starts PostgreSQL in a container, runs the element\'s migrations, saves a record through the element\'s repository for each sensitive field, reads the row directly from the database and fails if the column holds the original value, or if the element cannot read it back.',
       tool: 'Vitest with Testcontainers (@testcontainers/postgresql) and node-postgres; for the JVM: JUnit 5 with Testcontainers\' PostgreSQLContainer and JdbcTemplate',
@@ -628,7 +628,7 @@ it.each(SENSITIVE)('stores $field as ciphertext and reads it back', async ({ fie
 })`,
     },
     {
-      id: 'ff-cert-renewal', label: 'Renewal watched', when: { CERTS: ['acme'] }, category: 'operational', implements: TRANSIT, checks: ['req-certs-acme'],
+      id: 'ff-cert-renewal', label: 'Renewal watched', when: { CERTS: ['acme'] }, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: TRANSIT, checks: ['req-certs-acme'],
       threshold: 'An alert fires for every certificate with fewer than 14 days left or not Ready for an hour; 0 certificates expire',
       description: 'Prometheus rules over cert-manager\'s metrics page the owner when a certificate the manager should have renewed at 30 days is still within 14 days of expiry, or has not been Ready for an hour; the public endpoints\' expiry is also checked by the TLS scan.',
       tool: 'Prometheus alerting rules over cert-manager metrics (for AWS Certificate Manager: a CloudWatch alarm on AWS/CertificateManager DaysToExpiry below 14)',
@@ -648,7 +648,7 @@ it.each(SENSITIVE)('stores $field as ciphertext and reads it back', async ({ fie
     annotations: { summary: "{{ $labels.namespace }}/{{ $labels.name }} is not Ready" }`,
     },
     {
-      id: 'ff-cert-inventory', label: 'Inventory expiry check', when: { CERTS: ['managed-ca'] }, category: 'process', implements: TRANSIT, checks: ['req-certs-ca'],
+      id: 'ff-cert-inventory', label: 'Inventory expiry check', when: { CERTS: ['managed-ca'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: TRANSIT, checks: ['req-certs-ca'],
       threshold: 'Every working day, every certificate on the inventory with fewer than 30 days left raises an alert to its named owner; the job fails while one is on the list',
       description: 'A scheduled job reads the inventory (endpoint and owner per line), checks each certificate\'s expiry with openssl and alerts the owner of each one within 30 days of expiry; the job keeps failing, and alerting, until the certificate is replaced.',
       tool: 'openssl in a scheduled job (cron, a scheduled CI workflow) with your alerting hook',

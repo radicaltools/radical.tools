@@ -237,7 +237,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-scope', label: 'DORA scope record current', category: 'process', implements: MAIN, checks: ['req-scope'],
+      id: 'ff-scope', label: 'DORA scope record current', characteristic: 'other', scope: 'atomic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: MAIN, checks: ['req-scope'],
       threshold: 'compliance/dora/scope.yaml has a scope, a basis, a reviewer and a review date at most {{SCOPE_REVIEW_MONTHS}} months old',
       description: 'A script run in CI on every pull request and monthly on a schedule reads the scope record and fails when a field is missing or the last review is older than {{SCOPE_REVIEW_MONTHS}} months, so a stale scope shows up before the supervisor asks.',
       tool: 'Node 20 with js-yaml, in a CI step',
@@ -254,7 +254,7 @@ if (!(age <= {{SCOPE_REVIEW_MONTHS}})) problems.push(\`last reviewed \${scope.re
 if (problems.length) { console.error(\`compliance/dora/scope.yaml: \${problems.join('; ')}\`); process.exit(1) }`,
     },
     {
-      id: 'ff-runbook', label: 'Reporting runbook names authority and deadlines', when: FINANCIAL, category: 'structural', implements: REPORTING_ADRS, checks: ['req-runbook'],
+      id: 'ff-runbook', label: 'Reporting runbook names authority and deadlines', when: FINANCIAL, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: REPORTING_ADRS, checks: ['req-runbook'],
       threshold: 'docs/dora/incident-reporting.md names {{AUTHORITY}}, the three regulations, the 4-hour, 24-hour, 72-hour and one-month deadlines and clients, and has sections Classification, Reporting channel and Who files',
       description: 'A CI step searches the runbook for the phrases a filer needs and for its three sections; a runbook that loses a deadline or the name of the authority in an edit fails the pull request.',
       tool: 'bash with grep, in a CI step',
@@ -273,7 +273,7 @@ done
 exit "$missing"`,
     },
     {
-      id: 'ff-deadlines', label: 'Incidents classified and reported on time', when: FINANCIAL, category: 'operational', implements: REPORTING_ADRS, checks: ['req-classify', 'req-report', 'req-clients'],
+      id: 'ff-deadlines', label: 'Incidents classified and reported on time', when: FINANCIAL, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: REPORTING_ADRS, checks: ['req-classify', 'req-report', 'req-clients'],
       threshold: '0 incidents classified later than {{CLASSIFY_HOURS}} hours after awareness; 0 major incidents with an initial notification, first intermediate report or final report past its time limit, or with affected clients and no time they were informed',
       description: 'A daily CI job reads the incident tool\'s export (reports/incidents.json: id, major, aware_at, classified_at, initial_at, intermediate_at as a list, final_at, clients_affected, clients_informed_at; ISO 8601 UTC, null when not yet done) and computes each time limit of Delegated Regulation (EU) 2025/301 Art. 5(1) and (2); a report not yet filed counts as late once its time limit has passed. The weekend and bank-holiday extension of Art. 5(4) is not applied, so the check is stricter than the rule; a month is a calendar month as jq\'s mktime normalises it (31 January plus one month is 3 March).',
       tool: 'jq 1.7 in a bash CI step, over the export of incident.io, PagerDuty or Jira Service Management',
@@ -295,7 +295,7 @@ late=$(jq -r --argjson classify_h {{CLASSIFY_HOURS}} '
 [ -z "$late" ] || { echo "$late"; exit 1; }`,
     },
     {
-      id: 'ff-register-model', label: 'Every called external system in the register file', when: { ...FINANCIAL, REGISTER: ['model'] }, category: 'structural', implements: [...FINANCIAL_ADRS, 'adr-register-model'], checks: ['req-register', 'req-critical-contracts'],
+      id: 'ff-register-model', label: 'Every called external system in the register file', when: { ...FINANCIAL, REGISTER: ['model'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...FINANCIAL_ADRS, 'adr-register-model'], checks: ['req-register', 'req-critical-contracts'],
       threshold: '0 external systems called by an internal system in the architecture model without a register entry; 0 entries missing contract_reference, provider_id, function_id, data_locations, a true or false critical, or an ict_service_type of S01 to S19; 0 critical entries without exit_plan and clauses_art_30_3',
       description: 'A script on every pull request reads the architecture model folder (nodes/**/*.md with YAML front matter, a folder\'s _index.md being the parent of the files beside it, and relations.json), finds each system an internal system or one of its parts calls with an interacts relation and that is marked external, and looks up its entry by label in compliance/dora/register.yaml. An entry looks like: { provider: Partner, contract_reference: CTR-2025-014, provider_id: <LEI or EUID>, ict_service_type: S19, function_id: F-PAYMENTS, critical: true, data_locations: [DE, IE], exit_plan: docs/dora/exit/partner.md, clauses_art_30_3: [service levels, notice periods, business continuity testing, TLPT participation, audit rights, exit transition period] }.',
       tool: 'Node 20 with js-yaml, in a CI step',
@@ -327,7 +327,7 @@ const problems = [...called].flatMap((label) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-register-grc', label: 'Every called external system in the GRC register', when: { ...FINANCIAL, REGISTER: ['grc'] }, category: 'structural', implements: [...FINANCIAL_ADRS, 'adr-register-grc'], checks: ['req-register', 'req-critical-contracts'],
+      id: 'ff-register-grc', label: 'Every called external system in the GRC register', when: { ...FINANCIAL, REGISTER: ['grc'] }, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: [...FINANCIAL_ADRS, 'adr-register-grc'], checks: ['req-register', 'req-critical-contracts'],
       threshold: '0 external systems called by an internal system in the architecture model missing from the register export; 0 rows with an empty contract_reference, provider_id, ict_service_type, function_id or data_locations; 0 critical rows with an empty exit_plan or clauses_art_30_3',
       description: 'A nightly job exports the register from the GRC tool to reports/register-export.csv with the columns the decision names, then a script reads the architecture model folder (nodes/**/*.md with YAML front matter, _index.md for a folder\'s own node, relations.json), finds each external system an internal system calls, and fails when the export has no complete row for it.',
       tool: 'Node 20 with js-yaml and csv-parse 5, in a scheduled CI job after the GRC tool\'s CSV export',
@@ -359,7 +359,7 @@ const problems = [...called].flatMap((label) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-tests', label: 'Resilience tests on the cycle, findings fixed', when: FINANCIAL, category: 'process', implements: [...FINANCIAL_ADRS, 'adr-no-tlpt'], checks: ['req-testing'],
+      id: 'ff-tests', label: 'Resilience tests on the cycle, findings fixed', when: FINANCIAL, characteristic: 'reliability', scope: 'holistic', cadence: 'temporal', every: '365d', invocation: 'manual', implements: [...FINANCIAL_ADRS, 'adr-no-tlpt'], checks: ['req-testing'],
       threshold: '0 systems marked critical without a test in the last {{TEST_MONTHS}} months; 0 tests without types and tester; 0 findings open past their due date',
       description: 'A monthly CI job reads compliance/dora/resilience-tests.yaml, one item per system named by its label in the architecture model: { system: Shop, critical: true, tests: [{ date: 2026-05-12, types: [vulnerability scans, scenario-based tests, penetration testing], tester: external, findings: [{ id: RT-12, priority: high, due: 2026-07-12, closed: 2026-07-01 }] }] }. It fails on an overdue test, a test that names no types or tester, and a finding open past its due date.',
       tool: 'Node 20 with js-yaml, in a scheduled CI job',
@@ -383,7 +383,7 @@ const problems = systems.flatMap((s) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-tlpt', label: 'Threat-led penetration test not overdue', when: TLPT_NAMED, category: 'process', implements: ['adr-tlpt'], checks: ['req-tlpt'],
+      id: 'ff-tlpt', label: 'Threat-led penetration test not overdue', when: TLPT_NAMED, characteristic: 'security', scope: 'holistic', cadence: 'temporal', every: '1095d', invocation: 'manual', implements: ['adr-tlpt'], checks: ['req-tlpt'],
       threshold: 'The last threat-led penetration test ended at most {{TLPT_MONTHS}} months ago, has an attestation date, and names the functions it covered',
       description: 'A monthly CI job reads the tlpt block of compliance/dora/scope.yaml ({ last_test_end: 2025-11-20, attestation: 2026-02-03, functions: [payments, card issuing] }) and fails when the test is overdue, has no attestation, or names no functions.',
       tool: 'Node 20 with js-yaml, in a scheduled CI job',
@@ -402,7 +402,7 @@ if (tlpt?.last_test_end && !tlpt.attestation) problems.push('no attestation from
 if (problems.length) { console.error(\`TLPT: \${problems.join('; ')}\`); process.exit(1) }`,
     },
     {
-      id: 'ff-client-notice', label: 'Clients told in time with the facts', when: PROVIDER, category: 'operational', implements: ['adr-provider'], checks: ['req-provider-notice'],
+      id: 'ff-client-notice', label: 'Clients told in time with the facts', when: PROVIDER, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-provider'], checks: ['req-provider-notice'],
       threshold: '0 incidents on a client-facing service where clients were told later than {{CLIENT_NOTICE_HOURS}} hours after detection, or not yet told past that; 0 notices missing clients_affected, duration_minutes, downtime_minutes, data_losses, member_states or economic_impact_eur',
       description: 'A daily CI job reads the incident tool\'s export (reports/incidents.json: id, client_impact, detected_at, clients_notified_at, and the notice sent as an object) and fails on a late notice or one that lacks a fact the clients need for their own classification.',
       tool: 'jq 1.7 in a bash CI step, over the export of incident.io, PagerDuty or Jira Service Management',
@@ -419,7 +419,7 @@ late=$(jq -r --argjson hours {{CLIENT_NOTICE_HOURS}} '
 [ -z "$late" ] || { echo "$late"; exit 1; }`,
     },
     {
-      id: 'ff-subcontractors', label: 'Every called external system on the subcontractor list', when: PROVIDER, category: 'structural', implements: ['adr-provider'], checks: ['req-subcontractors'],
+      id: 'ff-subcontractors', label: 'Every called external system on the subcontractor list', when: PROVIDER, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-provider'], checks: ['req-subcontractors'],
       threshold: '0 external systems called by an internal system in the architecture model without an entry in compliance/dora/subcontractors.yaml; 0 entries missing legal_entity, services, data_locations or supports',
       description: 'A script on every pull request reads the architecture model folder (nodes/**/*.md with YAML front matter, _index.md for a folder\'s own node, relations.json), finds each external system an internal system calls, and looks it up by label in the subcontractor list: { provider: Partner, legal_entity: Partner Payments GmbH, services: [card payment authorisation], data_locations: [DE], supports: [order checkout] }.',
       tool: 'Node 20 with js-yaml, in a CI step',
@@ -449,7 +449,7 @@ const problems = [...called].flatMap((label) => {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-addendum', label: 'Contract addendum has every DORA clause', when: PROVIDER, category: 'structural', implements: ['adr-provider'], checks: ['req-provider-contract'],
+      id: 'ff-addendum', label: 'Contract addendum has every DORA clause', when: PROVIDER, characteristic: 'other', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-provider'], checks: ['req-provider-contract'],
       threshold: 'contracts/dora-addendum.md has a heading for each of the 14 clauses of DORA Art. 30(2) and 30(3) it checks',
       description: 'A CI step looks for a heading per clause in the addendum offered to clients: the nine of Art. 30(2) and, for critical or important functions, notice and reporting, business continuity, TLPT, audit and exit of Art. 30(3) (its service levels share the Service levels section). A clause dropped in an edit fails the pull request.',
       tool: 'bash with grep, in a CI step',

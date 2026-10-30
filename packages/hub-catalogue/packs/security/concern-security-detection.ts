@@ -234,7 +234,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-events', label: 'Catalogued events raised with their fields', category: 'structural', implements: SIEMS, checks: ['req-catalogue', 'req-event-shape'],
+      id: 'ff-events', label: 'Catalogued events raised with their fields', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SIEMS, checks: ['req-catalogue', 'req-event-shape'],
       threshold: 'Each of {{REQUIRED_EVENTS}} is listed as raised or not raised; 100% of catalogued events are raised by their trigger with the element at log level error, with their level, every field named and an offset in datetime; 0 lines hold the password, token or session id the test signed in with',
       description: 'A test reads security/events.yaml, checks that each required event is listed, then makes the element raise each catalogued event through its trigger (the harness starts it with LOG_LEVEL=error, signs in with a password, token and session id of random value, and captures the JSON lines it writes) and checks the line: the vocabulary name, the catalogue\'s level, the fields every event carries, the request fields when a request raised it, and none of those credential values.',
       tool: 'Vitest with js-yaml (or JUnit 5 with SnakeYAML, pytest with PyYAML: the same test over the same file)',
@@ -265,7 +265,7 @@ describe.each(catalogue.events)('$event', ({ event, level, trigger, request }) =
 })`,
     },
     {
-      id: 'ff-route', label: 'Security route in the shipper', category: 'structural', implements: SIEMS, checks: ['req-forward'],
+      id: 'ff-route', label: 'Security route in the shipper', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SIEMS, checks: ['req-forward'],
       threshold: 'In the shipper\'s unit tests, a security event at level INFO comes out of the security route and an ordinary line does not; the tests run on every change to vector.yaml',
       description: 'The shipper\'s configuration splits the element\'s output: lines whose event field starts with a vocabulary prefix go to the SIEM sink, read straight from the parsed lines, before any level filter or sampling of the operational logs. Vector\'s own unit tests, run with vector test in CI, prove both directions; the SIEM sink buffers on disk and blocks when full, so a SIEM outage delays events instead of dropping them.',
       tool: 'Vector (vector test); with Fluent Bit, a rewrite_tag filter on the event field and a test that runs fluent-bit with a dummy input',
@@ -297,7 +297,7 @@ tests:
     inputs: [{ insert_at: security, type: log, log_fields: { message: 'order placed', level: INFO } }]`,
     },
     {
-      id: 'ff-sigma-check', label: 'Sigma rules pass the check', when: { RULES: ['sigma'] }, category: 'process', implements: ['adr-sigma'], checks: ['req-sigma'],
+      id: 'ff-sigma-check', label: 'Sigma rules pass the check', when: { RULES: ['sigma'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-sigma'], checks: ['req-sigma'],
       threshold: 'sigma check reports 0 errors, 0 condition errors and 0 issues over rules/, and the conversion for the SIEM\'s backend fails on any rule it cannot convert',
       description: 'Every pull request that touches rules/ runs sigma check with --fail-on-issues over the whole folder, then converts the rules for the SIEM with --fail-unsupported, so a rule the backend cannot express fails the build instead of disappearing from the output. The snippet is the password-guessing pair the drill exercises, two files shown together: a single-event rule and a Sigma correlation rule counting it per account.',
       tool: 'sigma-cli (pip install sigma-cli and sigma plugin install <backend>, both pinned; sigma-cli 4 for the Splunk and Loki backends, sigma-cli 3 for the Kusto, Elasticsearch and OpenSearch backends)',
@@ -329,7 +329,7 @@ tags: [attack.credential-access, attack.t1110]
 level: high`,
     },
     {
-      id: 'ff-sigma-coverage', label: 'Every warning event has a Sigma rule', when: { RULES: ['sigma'] }, category: 'structural', implements: ['adr-sigma'], checks: ['req-coverage'],
+      id: 'ff-sigma-coverage', label: 'Every warning event has a Sigma rule', when: { RULES: ['sigma'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-sigma'], checks: ['req-coverage'],
       threshold: '0 catalogued events at level WARN or CRITICAL that no Sigma rule\'s detection uses; 0 high or critical rules without an attack.tNNNN tag',
       description: 'A script in CI reads the catalogue and every rule under rules/ (several rules per file included), fails on a high or critical rule without an ATT&CK technique tag, and on a WARN or CRITICAL event whose name no rule\'s detection mentions.',
       tool: 'Node 20.1 or later with js-yaml (readdirSync with recursive)',
@@ -354,7 +354,7 @@ for (const { event, level } of events) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-native-coverage', label: 'Every warning event mapped to a rule', when: { RULES: ['native'] }, category: 'structural', implements: ['adr-native'], checks: ['req-coverage'],
+      id: 'ff-native-coverage', label: 'Every warning event mapped to a rule', when: { RULES: ['native'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-native'], checks: ['req-coverage'],
       threshold: '0 catalogued events at level WARN or CRITICAL without an entry in security/detections.yaml; 0 entries naming a missing rule file or no built-in rule id; 0 high or critical entries without an ATT&CK technique',
       description: 'security/detections.yaml lists, per event, the rule that covers it: a built-in rule by the SIEM\'s id, or a rule written by the team by its file under siem/rules. A script in CI checks the mapping against the catalogue and the files. Whether a built-in rule is switched on is shown by the SIEM; the daily drill proves the one for password guessing.',
       tool: 'Node 20 or later with js-yaml',
@@ -378,7 +378,7 @@ for (const d of map) {
 if (problems.length) { console.error(problems.join('\\n')); process.exit(1) }`,
     },
     {
-      id: 'ff-ack', label: 'Security pages acknowledged in time', category: 'process', implements: [...SIEMS, ...RESPONSES], checks: ['req-page', 'req-mdr-escalation'],
+      id: 'ff-ack', label: 'Security pages acknowledged in time', characteristic: 'security', scope: 'atomic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: [...SIEMS, ...RESPONSES], checks: ['req-page', 'req-mdr-escalation'],
       threshold: '0 high-urgency incidents on the security service in the last 30 days acknowledged later than {{ACK_MINUTES}} minutes or never',
       description: 'A monthly job asks the paging tool\'s analytics API for the high-urgency incidents of the security service (the drill service left out) created in the last 30 days, prints the time to first acknowledgement of each, and fails on any later than the limit or never acknowledged. With a managed service, the security service is the one its escalations page. The report goes to the security owner.',
       tool: 'PagerDuty REST API, POST /analytics/raw/incidents, with curl and jq; for another paging tool, the same report from its incident API',
@@ -396,7 +396,7 @@ late=$(jq --argjson limit $(( {{ACK_MINUTES}} * 60 )) '[.data[] | select(.second
 [ "$late" -eq 0 ] || { echo "$late security pages acknowledged after {{ACK_MINUTES}} minutes or never"; exit 1; }`,
     },
     {
-      id: 'ff-drill-sentinel', label: 'Daily drill on Sentinel', when: { SIEM: ['sentinel'] }, category: 'operational', implements: ['adr-sentinel'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
+      id: 'ff-drill-sentinel', label: 'Daily drill on Sentinel', when: { SIEM: ['sentinel'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-sentinel'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
       threshold: 'The canary account\'s password-guessing alert is in the SecurityAlert table within {{ALERT_MINUTES}} minutes of the drill; the security table\'s total retention is at least {{EVENT_DAYS}} days',
       description: 'A scheduled job fails the canary account\'s sign-in the set number of times, polls the workspace for the analytics rule\'s alert with the canary account among its entities, and then reads the custom table\'s total retention. A failure alerts the security owner. The rule\'s alerts on the canary account are routed to the drill service, not to people.',
       tool: 'Azure CLI (az monitor log-analytics query from the log-analytics extension; az monitor log-analytics workspace table show), curl and jq; scheduled by GitHub Actions or the platform\'s scheduler',
@@ -411,7 +411,7 @@ days=$(az monitor log-analytics workspace table show -g "$RESOURCE_GROUP" --work
 [ "$days" -ge {{EVENT_DAYS}} ] || { echo "security events kept $days days, fewer than {{EVENT_DAYS}}"; exit 1; }`,
     },
     {
-      id: 'ff-drill-splunk', label: 'Daily drill on Splunk', when: { SIEM: ['splunk'] }, category: 'operational', implements: ['adr-splunk'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
+      id: 'ff-drill-splunk', label: 'Daily drill on Splunk', when: { SIEM: ['splunk'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-splunk'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
       threshold: 'The canary account\'s password-guessing finding is in the notable index within {{ALERT_MINUTES}} minutes of the drill; the security index keeps events at least {{EVENT_DAYS}} days (frozenTimePeriodInSecs)',
       description: 'A scheduled job fails the canary account\'s sign-in the set number of times, searches the notable index through the REST export endpoint for the correlation search\'s finding on that account, and then reads the security index\'s frozenTimePeriodInSecs. A failure alerts the security owner.',
       tool: 'Splunk REST API (search/v2/jobs/export, data/indexes/{name}) with curl and jq',
@@ -426,7 +426,7 @@ secs=$(curl -fsS -H "Authorization: Bearer $SPLUNK_TOKEN" "$SPLUNK_URL/services/
 [ "$secs" -ge $(( {{EVENT_DAYS}} * 86400 )) ] || { echo "security index keeps $secs seconds, less than {{EVENT_DAYS}} days"; exit 1; }`,
     },
     {
-      id: 'ff-drill-elastic', label: 'Daily drill on Elastic Security', when: { SIEM: ['elastic'] }, category: 'operational', implements: ['adr-elastic'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
+      id: 'ff-drill-elastic', label: 'Daily drill on Elastic Security', when: { SIEM: ['elastic'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-elastic'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
       threshold: 'The password-guessing rule\'s alert is found through the alerts search API within {{ALERT_MINUTES}} minutes of the drill; the security data stream\'s lifecycle policy deletes after at least {{EVENT_DAYS}} days',
       description: 'A scheduled job fails the canary account\'s sign-in the set number of times, searches the detection alerts for the rule\'s name since the drill began (the drill runs at a quiet hour, so an alert of that rule in the window is the drill\'s), and then reads the delete phase of the data stream\'s lifecycle policy. A failure alerts the security owner.',
       tool: 'Kibana detection engine API (POST /api/detection_engine/signals/search) and the Elasticsearch ILM API (GET _ilm/policy), with curl and jq',
@@ -442,7 +442,7 @@ age=$(curl -fsS "$ES_URL/_ilm/policy/shop-security" -H "Authorization: ApiKey $E
 [[ "$age" =~ ^([0-9]+)d$ ]] && [ "\${BASH_REMATCH[1]}" -ge {{EVENT_DAYS}} ] || { echo "security events deleted after $age, before {{EVENT_DAYS}} days"; exit 1; }`,
     },
     {
-      id: 'ff-drill-opensearch', label: 'Daily drill on OpenSearch', when: { SIEM: ['opensearch'] }, category: 'operational', implements: ['adr-opensearch'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
+      id: 'ff-drill-opensearch', label: 'Daily drill on OpenSearch', when: { SIEM: ['opensearch'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-opensearch'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
       threshold: 'The password-guessing monitor has an alert that started after the drill within {{ALERT_MINUTES}} minutes; the security indexes\' ISM policy moves them to delete after at least {{EVENT_DAYS}} days',
       description: 'A scheduled job fails the canary account\'s sign-in the set number of times, lists the alerts of the password-guessing bucket-level monitor through the Alerting API and counts those that started after the drill, and then reads the min_index_age of the policy\'s transition to its delete state. A failure alerts the security owner.',
       tool: 'OpenSearch Alerting API (GET _plugins/_alerting/monitors/alerts) and Index State Management API (GET _plugins/_ism/policies), with curl and jq',
@@ -457,7 +457,7 @@ age=$(curl -fsS -u "$OPENSEARCH_USER:$OPENSEARCH_PASSWORD" "$OPENSEARCH_URL/_plu
 [[ "$age" =~ ^([0-9]+)d$ ]] && [ "\${BASH_REMATCH[1]}" -ge {{EVENT_DAYS}} ] || { echo "security indexes deleted after $age, before {{EVENT_DAYS}} days"; exit 1; }`,
     },
     {
-      id: 'ff-drill-logs', label: 'Daily drill on the log platform', when: { SIEM: ['logs'] }, category: 'operational', implements: ['adr-logs'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
+      id: 'ff-drill-logs', label: 'Daily drill on the log platform', when: { SIEM: ['logs'] }, characteristic: 'security', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-logs'], checks: ['req-brute-force', 'req-drill', 'req-retention'],
       threshold: 'Alertmanager holds a PasswordGuessing alert for the canary account that started after the drill within {{ALERT_MINUTES}} minutes; Loki\'s compactor applies retention and the security stream\'s retention_stream period is at least {{EVENT_DAYS}} days',
       description: 'A scheduled job fails the canary account\'s sign-in the set number of times, asks Alertmanager for the ruler\'s PasswordGuessing alert with the canary account\'s userid label, and then reads the Loki configuration in the repository: retention must be enabled in the compactor and the security stream must have a retention_stream rule of its own. A failure alerts the security owner. With Elasticsearch, OpenSearch or CloudWatch Logs as the log store, the same drill reads their alerts and lifecycle settings instead.',
       tool: 'Alertmanager API v2 (GET /api/v2/alerts with filter), curl, jq, and Node with js-yaml over the Loki configuration',

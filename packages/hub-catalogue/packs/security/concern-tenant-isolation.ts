@@ -222,7 +222,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-cross-tenant', label: 'Cross-tenant calls return nothing', when: SHARED, category: 'structural', implements: SHARED_ADRS, checks: ['req-tenant-context', 'req-cross-tenant'],
+      id: 'ff-cross-tenant', label: 'Cross-tenant calls return nothing', when: SHARED, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHARED_ADRS, checks: ['req-tenant-context', 'req-cross-tenant'],
       threshold: '0 records of another tenant returned or changed, over every operation, with forged tenant headers included; every cross-tenant attempt leaves 1 security event',
       description: 'An integration test sets up two tenants with data of every kind (UUID ids, so a substring match is safe), then calls every operation as a user of the first with the second\'s ids and a forged tenant header and body field, expecting 404 or nothing of the second back, the second\'s data unchanged, and a security event per attempt. The operations come from the router, so a new one is tested without anyone adding it.',
       tool: 'Vitest with supertest (or the test runner and HTTP client of your stack)',
@@ -252,7 +252,7 @@ describe.each(routes)('$method $path', (route) => {
 })`,
     },
     {
-      id: 'ff-tenant-context', label: 'Tenant carried everywhere', when: SHARED, category: 'structural', implements: SHARED_ADRS, checks: ['req-tenant-context'],
+      id: 'ff-tenant-context', label: 'Tenant carried everywhere', when: SHARED, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHARED_ADRS, checks: ['req-tenant-context'],
       threshold: 'After one request per operation as tenant A, 100% of cache keys, object keys, messages and log lines written carry tenant A; 0 without',
       description: 'An integration test runs every operation once as a user of tenant A against a fresh cache, object store, queue and log capture, then reads back every cache key, object key, message and log line written and expects each to carry the tenant.',
       tool: 'Vitest with supertest and Testcontainers (Redis, the object store and the broker of the deployment), logs captured by a test transport',
@@ -273,7 +273,7 @@ it('carries the tenant to every cache key, object key, message and log line', as
 })`,
     },
     {
-      id: 'ff-cross-tenant-alert', label: 'Boundary probing alerted', when: SHARED, category: 'operational', implements: SHARED_ADRS, checks: ['req-cross-tenant'],
+      id: 'ff-cross-tenant-alert', label: 'Boundary probing alerted', when: SHARED, characteristic: 'security', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: SHARED_ADRS, checks: ['req-cross-tenant'],
       threshold: 'An alert within 5 minutes when one tenant produces more than 10 cross-tenant security events in an hour',
       description: 'The application counts cross-tenant attempts per tenant (security_events_total with kind="cross-tenant"); an alerting rule pages when a tenant crosses 10 in an hour.',
       tool: 'Prometheus alerting rules',
@@ -289,7 +289,7 @@ it('carries the tenant to every cache key, object key, message and log line', as
           summary: "Tenant {{ $labels.tenant }} made more than 10 cross-tenant attempts in an hour"`,
     },
     {
-      id: 'ff-rls', label: 'Row-level security on every table', when: { ISOLATION: ['pool'] }, category: 'structural', implements: ['adr-pool'], checks: ['req-rls'],
+      id: 'ff-rls', label: 'Row-level security on every table', when: { ISOLATION: ['pool'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-pool'], checks: ['req-rls'],
       threshold: '0 tables with a tenant_id column without row-level security enabled and forced; the application role has no BYPASSRLS',
       description: 'A database test runs after the migrations in CI and fails on any table holding tenant data without forced row-level security, or when the application role can bypass it.',
       tool: 'pgTAP (run with pg_prove)',
@@ -312,7 +312,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-schema-roles', label: 'Tenant roles see one schema', when: { ISOLATION: ['schema'] }, category: 'structural', implements: ['adr-schema'], checks: ['req-schema-onboard'],
+      id: 'ff-schema-roles', label: 'Tenant roles see one schema', when: { ISOLATION: ['schema'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-schema'], checks: ['req-schema-onboard'],
       threshold: 'Every tenant role is refused with 42501 on a table of another tenant\'s schema; 0 tenant roles with a privilege outside their own schema',
       description: 'A database test runs after onboarding two tenants in CI: as the first tenant\'s role it names a table of the second\'s schema and expects a permission error, and it lists the privileges of every tenant role outside its own schema.',
       tool: 'pgTAP (run with pg_prove)',
@@ -337,7 +337,7 @@ SELECT * FROM finish();
 ROLLBACK;`,
     },
     {
-      id: 'ff-database-credentials', label: 'Credentials open one database', when: { ISOLATION: ['database'] }, category: 'structural', implements: ['adr-database'], checks: ['req-database-onboard'],
+      id: 'ff-database-credentials', label: 'Credentials open one database', when: { ISOLATION: ['database'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-database'], checks: ['req-database-onboard'],
       threshold: 'A tenant\'s credentials open only that tenant\'s database; a request of tenant A opens 0 connections to tenant B\'s database',
       description: 'An integration test onboards two tenants, tries the first tenant\'s credentials against the second\'s database and expects a refusal, then makes a request as the first tenant and checks pg_stat_activity of the second\'s database for connections from the application.',
       tool: 'Vitest with Testcontainers (PostgreSQL) and the node-postgres client',
@@ -361,7 +361,7 @@ it('routes a tenant to its own database and nowhere else', async () => {
 })`,
     },
     {
-      id: 'ff-tenant-migrations', label: 'No tenant left behind', when: { ISOLATION: ['schema', 'database'] }, category: 'operational', implements: ['adr-schema', 'adr-database'], checks: ['req-migrate-all'],
+      id: 'ff-tenant-migrations', label: 'No tenant left behind', when: { ISOLATION: ['schema', 'database'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-schema', 'adr-database'], checks: ['req-migrate-all'],
       threshold: '0 tenants on an older schema version 24 hours after a release',
       description: 'A scheduled job reads the schema version of every tenant from the tenant catalogue and fails, naming them, when any tenant is behind the latest migration once 24 hours have passed since the release that brought it (the release time comes from the pipeline, in RELEASED_AT); while the wave is still rolling, the job reports and passes.',
       tool: 'Flyway (flyway info per tenant schema or database) with psql and jq in a scheduled CI job; with Liquibase: liquibase status per target',
@@ -380,7 +380,7 @@ if [ "$behind" -gt 0 ] && [ "$settled" -eq 1 ]; then echo "$behind tenants behin
 echo "$behind tenants behind, release $(( ($(date +%s) - RELEASED_AT) / 3600 )) hours old"`,
     },
     {
-      id: 'ff-silo', label: 'Stacks share nothing', when: { ISOLATION: ['silo'] }, category: 'structural', implements: ['adr-silo'], checks: ['req-silo'],
+      id: 'ff-silo', label: 'Stacks share nothing', when: { ISOLATION: ['silo'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-silo'], checks: ['req-silo'],
       threshold: '0 resources or access policies in a tenant stack that reference another tenant\'s account or resources',
       description: 'A policy runs over every tenant stack\'s Terraform plan in CI and refuses any resource or policy that names an account other than the tenant\'s own or the shared tooling account.',
       tool: 'Conftest on the Terraform plan (AWS account ids; for Azure match subscription ids in resource ids, for Google Cloud project ids)',
@@ -400,7 +400,7 @@ deny contains msg if {
 }`,
     },
     {
-      id: 'ff-noisy-neighbour', label: 'Bursts stay contained', when: SHARED, category: 'operational', implements: ['adr-quotas', 'adr-tiered'], checks: ['req-quota'],
+      id: 'ff-noisy-neighbour', label: 'Bursts stay contained', when: SHARED, characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: ['adr-quotas', 'adr-tiered'], checks: ['req-quota'],
       threshold: 'With one tenant at 10 × {{TENANT_RPS}} requests per second, the other tenants\' p95 latency rises by less than 10% and more than half of the noisy tenant\'s requests get 429',
       description: 'A load test in a staging environment runs a steady load for a quiet tenant and a burst at ten times the quota for a noisy one, and checks the quiet tenant\'s latency against its baseline and the share of the noisy tenant\'s requests that were throttled (above 50%, since 9 of 10 are over quota).',
       tool: 'k6',
@@ -428,7 +428,7 @@ export function noisy() {
 }`,
     },
     {
-      id: 'ff-tenant-share', label: 'Tenant share watched', when: { ...SHARED, NOISY: ['tiered'] }, category: 'operational', implements: ['adr-tiered'], checks: ['req-tier-move'],
+      id: 'ff-tenant-share', label: 'Tenant share watched', when: { ...SHARED, NOISY: ['tiered'] }, characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'continual', invocation: 'automated', implements: ['adr-tiered'], checks: ['req-tier-move'],
       threshold: 'An alert within 1 hour of any tenant using more than 20% of a shared pool\'s capacity for 7 days',
       description: 'An alerting rule over the per-tenant database time the application emits (db_query_seconds_total, a counter with tenant and pool labels, as the decision requires; no exporter provides it) raises a ticket for the tenant to be moved to dedicated capacity.',
       tool: 'Prometheus alerting rules',
@@ -447,7 +447,7 @@ export function noisy() {
           summary: "Tenant {{ $labels.tenant }} uses over 20% of {{ $labels.pool }}: propose dedicated capacity"`,
     },
     {
-      id: 'ff-key-separation', label: 'Keys open one tenant', when: { ...TENANTS, KEYS: ['tenant', 'customer'] }, category: 'structural', implements: ['adr-tenant-keys', 'adr-customer-keys'], checks: ['req-tenant-keys'],
+      id: 'ff-key-separation', label: 'Keys open one tenant', when: { ...TENANTS, KEYS: ['tenant', 'customer'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-tenant-keys', 'adr-customer-keys'], checks: ['req-tenant-keys'],
       threshold: '0 successful decryptions of a tenant\'s data through another tenant\'s key or context, 0 stored ciphertexts whose encryption context names another tenant, and 0 successful decryptions after the tenant\'s key is deleted',
       description: 'An integration test goes through the application\'s envelope layer, not the key service directly: it writes a record for tenant A, reads the stored ciphertext and checks its encryption context names A, tries to decrypt it as tenant B, then schedules A\'s key for deletion and tries to decrypt A\'s copy again (a local key service honours a disabled or pending-deletion key at once).',
       tool: 'Vitest with LocalStack (KMS) behind the application\'s envelope layer; with Vault Transit or Azure Key Vault emulators the same test, the key service swapped',
@@ -472,7 +472,7 @@ it('decrypts a tenant\\'s data for that tenant only, and not after its key is go
 })`,
     },
     {
-      id: 'ff-byok-revoke', label: 'Revoked key stops access', when: { ...TENANTS, KEYS: ['customer'] }, category: 'operational', implements: ['adr-customer-keys'], checks: ['req-byok-revoke'],
+      id: 'ff-byok-revoke', label: 'Revoked key stops access', when: { ...TENANTS, KEYS: ['customer'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-customer-keys'], checks: ['req-byok-revoke'],
       threshold: 'Reads and writes of a tenant\'s data fail within 5 minutes of its key being disabled, and the tenant\'s administrators get 1 notification',
       description: 'An integration test disables a tenant\'s key in a local key management service, polls a read and a write of its data until they fail (failing itself past 5 minutes), and checks the notification outbox.',
       tool: 'Vitest with LocalStack (KMS), the notification sender captured by the test harness',
@@ -495,7 +495,7 @@ it('stops serving a tenant within 5 minutes of its key being disabled', async ()
 }, 6 * 60_000)`,
     },
     {
-      id: 'ff-offboard', label: 'Offboarded tenant gone', when: TENANTS, category: 'structural', implements: [...TENANT_ADRS, 'adr-tenant-keys', 'adr-customer-keys', 'adr-platform-keys'], checks: ['req-offboard'],
+      id: 'ff-offboard', label: 'Offboarded tenant gone', when: TENANTS, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: [...TENANT_ADRS, 'adr-tenant-keys', 'adr-customer-keys', 'adr-platform-keys'], checks: ['req-offboard'],
       threshold: 'After the offboarding routine, 0 of the tenant\'s records in any live store, cache or search index, 1 deletion certificate issued that states when the last backup copy is gone',
       description: 'An integration test onboards a tenant, seeds data in every store the deployment has, runs the offboarding routine with the export period set to zero for the test, searches every store, cache and index for the tenant id, and reads the certificate; where a key per tenant is used, it also expects the key to be pending deletion.',
       tool: 'Vitest with Testcontainers (the stores, cache and search index of the deployment)',
@@ -514,7 +514,7 @@ it('leaves nothing of a tenant in the live stores and certifies when the copies 
 })`,
     },
     {
-      id: 'ff-single-org', label: 'Exactly one organisation', when: { ISOLATION: ['single'] }, category: 'structural', implements: ['adr-single'], checks: ['req-single'],
+      id: 'ff-single-org', label: 'Exactly one organisation', when: { ISOLATION: ['single'] }, characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-single'], checks: ['req-single'],
       threshold: 'Exactly 1 organisation in the database, and inserting a second violates the single-row constraint (SQLSTATE 23514)',
       description: 'A database test runs after the migrations in CI: it counts the organisations and tries to insert a second one, which the check constraint on the single-row table must refuse with a check violation, not any other error.',
       tool: 'pgTAP (run with pg_prove)',

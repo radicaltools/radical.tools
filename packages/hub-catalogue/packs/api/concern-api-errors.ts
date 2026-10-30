@@ -194,7 +194,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-problem-shape', label: 'Errors are problem details', when: { FORMAT: ['problem-details'] }, category: 'structural', implements: ['adr-problem-details'],
+      id: 'ff-problem-shape', label: 'Errors are problem details', when: { FORMAT: ['problem-details'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-problem-details'],
       checks: ['req-problem-details', 'req-correlation'],
       threshold: 'A 404 and a 500 answered with production settings are application/problem+json with type, title, status equal to the response\'s, detail, instance, a code matching {{CODE_PATTERN}} and the trace id of the request\'s traceparent',
       description: 'An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the media type, the five members, the code and the correlation id in each answer. The correlation field\'s name is the one set in Error handling and logging conventions. For Java the same test is MockMvc or RestAssured; for .NET, WebApplicationFactory with xUnit.',
@@ -218,7 +218,7 @@ it.each(['/orders/does-not-exist', '/__boom'])('GET %s answers problem details',
 })`,
     },
     {
-      id: 'ff-microsoft-shape', label: 'Errors are Microsoft\'s error object', when: { FORMAT: ['microsoft'] }, category: 'structural', implements: ['adr-microsoft-error'],
+      id: 'ff-microsoft-shape', label: 'Errors are Microsoft\'s error object', when: { FORMAT: ['microsoft'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-microsoft-error'],
       checks: ['req-microsoft-error', 'req-correlation'],
       threshold: 'A 404 and a 500 answered with production settings are JSON with only the member error, whose code matches {{CODE_PATTERN}} and equals the x-ms-error-code header, with a message, the trace id of the request\'s traceparent and no innererror',
       description: 'An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the envelope, the code against the header, the message, the correlation id and the absence of innererror. The correlation field\'s name is the one set in Error handling and logging conventions.',
@@ -246,7 +246,7 @@ it.each(['/orders/does-not-exist', '/__boom'])('GET %s answers the error object'
 })`,
     },
     {
-      id: 'ff-google-shape', label: 'Errors are google.rpc.Status', when: { FORMAT: ['google'] }, category: 'structural', implements: ['adr-google-status'],
+      id: 'ff-google-shape', label: 'Errors are google.rpc.Status', when: { FORMAT: ['google'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-google-status'],
       checks: ['req-google-status', 'req-correlation'],
       threshold: 'A 404 and a 500 answered with production settings are JSON with only the member error, whose code equals the response\'s status, whose status is an upper-case google.rpc.Code name, and whose details hold exactly one ErrorInfo with a reason matching {{CODE_PATTERN}} and a domain, and one RequestInfo with the trace id of the request\'s traceparent',
       description: 'An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks the envelope, the HTTP status in code, the google.rpc.Code name, the ErrorInfo and the RequestInfo by their @type, and that no detail type appears twice.',
@@ -274,7 +274,7 @@ it.each(['/orders/does-not-exist', '/__boom'])('GET %s answers google.rpc.Status
 })`,
     },
     {
-      id: 'ff-minimal-shape', label: 'Errors are status, code and message', when: { FORMAT: ['minimal'] }, category: 'structural', implements: ['adr-minimal-body'],
+      id: 'ff-minimal-shape', label: 'Errors are status, code and message', when: { FORMAT: ['minimal'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-minimal-body'],
       checks: ['req-minimal', 'req-correlation'],
       threshold: 'A 404 and a 500 answered with production settings are JSON with exactly the fields code, message and the correlation field, the code matching {{CODE_PATTERN}} and the id the trace id of the request\'s traceparent',
       description: 'An integration test calls an unknown order and the test-only route that throws, both with a traceparent header, and checks that the body holds exactly the three fields, nothing more. The correlation field\'s name is the one set in Error handling and logging conventions.',
@@ -298,7 +298,7 @@ it.each(['/orders/does-not-exist', '/__boom'])('GET %s answers code, message and
 })`,
     },
     {
-      id: 'ff-caller-text', label: 'No exception text reaches the caller', category: 'process', implements: FORMATS,
+      id: 'ff-caller-text', label: 'No exception text reaches the caller', characteristic: 'security', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-caller-text'],
       threshold: '0 occurrences of an exception\'s message in the answers to an unexpected and an expected error with production settings; the 500 answer holds "{{GENERIC_MESSAGE}}"',
       description: 'An integration test puts a random marker in the messages of the errors two test-only routes throw (an unexpected TypeError and an expected not-found error), calls both, and checks that the marker appears in neither answer and that the 500 answer holds the fixed text. The leak of stack traces, class names and SQL is checked in Error handling and logging conventions; this checks the text.',
@@ -326,7 +326,7 @@ it('answers every unexpected error with the fixed text', async () => {
 })`,
     },
     {
-      id: 'ff-openapi-errors', label: 'Every operation documents its errors', category: 'structural', implements: FORMATS,
+      id: 'ff-openapi-errors', label: 'Every operation documents its errors', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-documented'],
       threshold: '0 Spectral errors from the two error rules on the OpenAPI documents under api/ on every pull request: every operation has a default response and at least one 4xx response, and every 4xx, 5xx and default response describes its content',
       description: 'Spectral lints the OpenAPI documents with these rules on every pull request, failing at severity error: where the API style guide pack lints with Spectral, api/style/ruleset.yaml lists this file in its extends and its job runs them; otherwise a job of their own runs spectral lint "api/*.yaml" --ruleset api/style/errors.yaml --fail-severity=error. The first rule demands a default response and a 4xx response on every operation; the second demands content on every error response. The schema each response points to is the one the decision names.',
@@ -355,7 +355,7 @@ rules:
       function: truthy`,
     },
     {
-      id: 'ff-error-codes', label: 'Codes listed, catalogued, described and kept', when: CATALOGUE, category: 'structural', implements: FORMATS,
+      id: 'ff-error-codes', label: 'Codes listed, catalogued, described and kept', when: CATALOGUE, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-codes', 'req-docs-identifiers'],
       threshold: 'Every operation in the OpenAPI documents under api/ lists at least one code in x-error-codes and every listed code is in api/errors/codes.yaml; every catalogue code matches {{CODE_PATTERN}} and has a status of at least 400 and a non-empty description; the sorted list of codes matches its snapshot',
       description: 'A test reads every OpenAPI document under api/ and the catalogue, checks every operation\'s x-error-codes against the catalogue, checks each entry, and snapshots the sorted codes, so that a renamed or removed code fails until the snapshot is updated in a reviewed change (which API evolution then judges). Where Error handling and logging conventions keeps an error catalogue in the code, api/errors/codes.yaml is generated from it, so there is one list.',
@@ -387,7 +387,7 @@ it('every code is well-formed, described and keeps its name', () => {
 })`,
     },
     {
-      id: 'ff-status-codes', label: 'Codes repeat the status', when: { CODES: ['status-only'] }, category: 'structural', implements: FORMATS,
+      id: 'ff-status-codes', label: 'Codes repeat the status', when: { CODES: ['status-only'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-status-only'],
       threshold: 'An unknown order answers 404 with the code NOT_FOUND and the test-only crash 500 with INTERNAL_SERVER_ERROR; a problem details type, where present, is about:blank',
       description: 'An integration test calls an unknown order and the test-only route that throws and looks for the status\'s reason phrase as the code anywhere in the body (the code member, error.code, or ErrorInfo.reason, by format).',
@@ -409,7 +409,7 @@ it.each([
 })`,
     },
     {
-      id: 'ff-validation-all', label: 'Every invalid field reported', when: { VALIDATION: ['all'] }, category: 'structural', implements: FORMATS,
+      id: 'ff-validation-all', label: 'Every invalid field reported', when: { VALIDATION: ['all'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-validation-all'],
       threshold: 'An order posted with three invalid fields is answered {{VALIDATION_STATUS}} with exactly three field errors, located at the e-mail address, the first item\'s quantity and the currency, each with a code matching {{CODE_PATTERN}}',
       description: 'An integration test posts an order with three mistakes and reads the field errors wherever the format keeps them: errors in problem details and the minimal body, error.details in Microsoft\'s object, the fieldViolations of a google.rpc.BadRequest. Locations are JSON Pointers, or dotted paths in Google\'s format.',
@@ -435,7 +435,7 @@ it('reports every invalid field in one answer', async () => {
 })`,
     },
     {
-      id: 'ff-validation-first', label: 'The first invalid field reported', when: { VALIDATION: ['first'] }, category: 'structural', implements: FORMATS,
+      id: 'ff-validation-first', label: 'The first invalid field reported', when: { VALIDATION: ['first'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FORMATS,
       checks: ['req-validation-first'],
       threshold: 'An order posted with three invalid fields is answered {{VALIDATION_STATUS}} with exactly one field error, with a location and a code matching {{CODE_PATTERN}}',
       description: 'An integration test posts an order with three mistakes and reads the field errors wherever the format keeps them: errors in problem details and the minimal body, error.details in Microsoft\'s object, the fieldViolations of a google.rpc.BadRequest.',
@@ -462,7 +462,7 @@ it('reports the first invalid field only', async () => {
 })`,
     },
     {
-      id: 'ff-docs-pages', label: 'Every code has a page', when: { ...CATALOGUE, DOCS: ['page'] }, category: 'operational', implements: FORMATS,
+      id: 'ff-docs-pages', label: 'Every code has a page', when: { ...CATALOGUE, DOCS: ['page'] }, characteristic: 'interaction-capability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: FORMATS,
       checks: ['req-docs-page'],
       threshold: 'Every code in api/errors/codes.yaml has a page at {{ERROR_DOCS_URL}}<code in lower case with dashes> that answers 200 without credentials, with an HTML content type and the code in its text; checked after every documentation deploy and nightly',
       description: 'A script fetches the page of every code in the catalogue, without credentials, and fails naming each code whose page is missing, not HTML or does not name the code. It runs in the documentation site\'s deploy job and on a nightly schedule.',

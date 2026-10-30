@@ -201,7 +201,7 @@ const pack: PackSpec = {
   ],
   fitness: [
     {
-      id: 'ff-slo', label: 'Availability SLO measured', when: { MAINTENANCE: ['none'] }, category: 'operational', implements: [...TIER_ADRS, 'adr-no-downtime'],
+      id: 'ff-slo', label: 'Availability SLO measured', when: { MAINTENANCE: ['none'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: [...TIER_ADRS, 'adr-no-downtime'],
       checks: ['req-target', 'req-online'],
       threshold: 'Availability at least {{TIER}} % over every rolling 30 days from the indicator, nothing excluded; a page alert at 14.4 times the allowed burn over 1 hour and a ticket at 6 times over 6 hours',
       description: 'An SLO spec generates the Prometheus recording rules for the availability over 30 days and the multiwindow burn-rate alerts; no minute is excluded, so planned work counts. The indicator is the one decided in the Observability pack: the request rates recorded at the edge (shown here), or the probe series as a raw indicator (the commented alternative). The error budget remaining is what the budget policy reads; where the alerts go is decided in the Observability pack.',
@@ -231,7 +231,7 @@ slos:
         labels: { severity: ticket }`,
     },
     {
-      id: 'ff-slo-window', label: 'Availability SLO measured outside the window', when: { MAINTENANCE: ['window'] }, category: 'operational', implements: [...TIER_ADRS, 'adr-window'],
+      id: 'ff-slo-window', label: 'Availability SLO measured outside the window', when: { MAINTENANCE: ['window'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: [...TIER_ADRS, 'adr-window'],
       checks: ['req-target', 'req-window'],
       threshold: 'Availability at least {{TIER}} % over every rolling 30 days from the indicator, with only the minutes inside the maintenance window excluded; a page alert at 14.4 times the allowed burn over 1 hour and a ticket at 6 times over 6 hours',
       description: 'The same SLO spec as without a window, with the indicator queries dropped while a recording rule marks the maintenance window, so those minutes leave a gap that the 30-day average skips; any other minute counts. The window rule is the only place the window is encoded, next to the time it is announced for. Where the alerts go is decided in the Observability pack.',
@@ -266,7 +266,7 @@ slos:
         labels: { severity: ticket }`,
     },
     {
-      id: 'ff-window-announced', label: 'Window announced, maintenance page served', when: { MAINTENANCE: ['window'] }, category: 'process', implements: ['adr-window'],
+      id: 'ff-window-announced', label: 'Window announced, maintenance page served', when: { MAINTENANCE: ['window'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-window'],
       checks: ['req-window'],
       threshold: 'The maintenance job runs only when a scheduled maintenance covering now was created on the status page at least 7 days before, and the public URL answers 503 with the maintenance page while the element is stopped',
       description: 'The job that stops the element for maintenance first asks the status page for scheduled maintenances and fails unless one covers the current time and was created at least 7 days earlier; after stopping the element it fetches the public URL and fails unless the maintenance page answers. Shown for Atlassian Statuspage; Instatus and others have the same two fields.',
@@ -294,7 +294,7 @@ slos:
       # ... the offline work (Deployment and rollback pack, ff-migration-rehearsal), then scale back up`,
     },
     {
-      id: 'ff-instance-loss', label: 'Killed instance comes back', when: { TIER: ['99.0'] }, category: 'operational', implements: ['adr-one-zone'],
+      id: 'ff-instance-loss', label: 'Killed instance comes back', when: { TIER: ['99.0'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'weekly', invocation: 'automated', implements: ['adr-one-zone'],
       checks: ['req-instance'],
       threshold: 'After its instance is killed the element answers the probe again within 15 minutes; a probe that fails for 15 minutes after the drill fires an alert',
       description: 'A scheduled chaos experiment kills the element\'s pod in working hours; the Observability pack\'s probe records whether it answers again, and an alerting rule fires when the probe has failed for 15 minutes. This snippet is Kubernetes-bound; on a managed runtime the same drill restarts the instance with the platform\'s CLI (az webapp restart, or scaling the service to zero and back) on the same schedule, and the same alert rule applies.',
@@ -326,7 +326,7 @@ groups:
           summary: "Order API has not answered its probe for 15 minutes (instance not replaced by the platform)"`,
     },
     {
-      id: 'ff-zone-loss', label: 'Zone loss tolerated', when: ZONES, category: 'operational', implements: ['adr-multi-zone'],
+      id: 'ff-zone-loss', label: 'Zone loss tolerated', when: ZONES, characteristic: 'reliability', scope: 'holistic', cadence: 'temporal', every: '30d', invocation: 'automated', implements: ['adr-multi-zone'],
       checks: ['req-zones'],
       threshold: 'With every instance in one zone killed at production-like load, the failure rate from 5 minutes after the kill to the end of the run is below 0.1 %',
       description: 'A chaos experiment kills every pod of the element on the nodes of one zone at the start of a load test at the expected peak; the load test tags requests by phase and fails when the failure rate after the first 5 minutes is 0.1 % or more. Run it every month and after every change to the deployment, and once a quarter fail over the database as well. Chaos Mesh is Kubernetes-bound; on a managed platform, stop the zone\'s instances with the cloud CLI at the same moment.',
@@ -353,7 +353,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-region-failover', label: 'Region failover drilled', when: { TIER: ['99.99'] }, category: 'operational', implements: ['adr-multi-region'],
+      id: 'ff-region-failover', label: 'Region failover drilled', when: { TIER: ['99.99'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'temporal', every: '90d', invocation: 'automated', implements: ['adr-multi-region'],
       checks: ['req-region'],
       threshold: 'With one region cut off, every request is answered from the other region within 60 seconds; 0 % errors after that',
       description: 'A quarterly failover drill cuts the application subnets of one region off the network while a k6 probe calls the global endpoint every second from outside; the probe fails if any request fails more than 60 seconds after the cut. The stop condition ends the experiment when the global error alarm fires. The experiment shown is AWS-bound (Fault Injection Service); on Azure, Chaos Studio\'s network disconnect fault on the region\'s virtual network does the same, and on Google Cloud a firewall rule that drops the region\'s ingress, applied by the drill script.',
@@ -382,7 +382,7 @@ export default function () {
 }`,
     },
     {
-      id: 'ff-budget-gate', label: 'Spent budget blocks deploys', when: { BUDGET: ['freeze'] }, category: 'process', implements: ['adr-budget-freeze'],
+      id: 'ff-budget-gate', label: 'Spent budget blocks deploys', when: { BUDGET: ['freeze'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: ['adr-budget-freeze'],
       checks: ['req-freeze'],
       threshold: 'A production deploy of a commit whose pull request carries neither the reliability-fix nor the security-fix label is refused whenever the 30-day error budget remaining is 0 or below',
       description: 'A pipeline step before every production deploy looks up the pull request of the commit being deployed (so it works on push and manual deploys, not only pull_request runs), lets labelled fixes through, and otherwise reads the error budget remaining from Prometheus (the Sloth recording rule) and fails when it is spent.',
@@ -406,7 +406,7 @@ export default function () {
     fi`,
     },
     {
-      id: 'ff-budget-review', label: 'Spent budget opens a review', when: { BUDGET: ['review'] }, category: 'process', implements: ['adr-budget-review'],
+      id: 'ff-budget-review', label: 'Spent budget opens a review', when: { BUDGET: ['review'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'continual', invocation: 'automated', implements: ['adr-budget-review'],
       checks: ['req-review'],
       threshold: 'An alert fires within 15 minutes of the error budget reaching 0 and routes to the ticket system; 0 postmortem tickets open longer than 7 calendar days (5 working days)',
       description: 'An alerting rule fires when the error budget remaining reaches 0 and Alertmanager routes it to the ticket system (GitHub Issues through a webhook bridge, or Jira), which opens an issue labelled postmortem; a weekly job fails when such an issue has been open longer than 7 days, so the postmortem was not held in time.',
@@ -434,7 +434,7 @@ export default function () {
     test "$old" -eq 0 || { echo "::error::$old postmortem tickets open longer than 5 working days"; exit 1; }`,
     },
     {
-      id: 'ff-dependency-budget', label: 'Dependency availability adds up', when: { DEPENDENCIES: ['stronger'] }, category: 'structural', implements: ['adr-deps-stronger'],
+      id: 'ff-dependency-budget', label: 'Dependency availability adds up', when: { DEPENDENCIES: ['stronger'] }, characteristic: 'reliability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: ['adr-deps-stronger'],
       checks: ['req-dependencies'],
       threshold: 'Every hard dependency in the list has a committed availability above {{TIER}} %, and the product of our own infrastructure\'s commitment and theirs is at least {{TIER}} %',
       description: 'A test reads the list of hard dependencies kept in the repository, with each one\'s committed availability and the SLA it comes from, and fails when any is at or below the target or when the product, with the platform\'s commitment for our own instances and database, falls below it. Adding a synchronous call means adding a line, which the reviewer sees.',
@@ -462,7 +462,7 @@ it('the product of our infrastructure and the hard dependencies meets the target
 })`,
     },
     {
-      id: 'ff-degrade', label: 'Serves without the weak dependency', when: { DEPENDENCIES: ['degrade'] }, category: 'operational', implements: ['adr-deps-degrade'],
+      id: 'ff-degrade', label: 'Serves without the weak dependency', when: { DEPENDENCIES: ['degrade'] }, characteristic: 'reliability', scope: 'holistic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-deps-degrade'],
       checks: ['req-degrade'],
       threshold: 'With the weak dependency cut off: operations that do not need it fail below 0.1 %, and operations that need it answer 200 or 503 within 1 second at the 95th percentile',
       description: 'A k6 run in staging cuts the weak dependency off through Toxiproxy (a timeout toxic that drops every byte), keeps sending a mix of operations that need it and operations that do not, and checks the two behaviours separately; it removes the toxic afterwards. Staging reaches the dependency through the Toxiproxy proxy named partner.',

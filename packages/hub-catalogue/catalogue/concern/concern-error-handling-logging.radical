@@ -651,7 +651,11 @@
       "label": "TypeScript error rules",
       "x": 1040,
       "y": 0,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "ESLint (9.35 or later for preserve-caught-error) runs as a required check: an empty catch, a rethrow that drops the cause, a thrown non-Error, an unhandled rejected promise and a console call each fail the build. For .NET the matching Roslyn analyzers are CA1031 and CA2200 as errors in .editorconfig.\n\nThreshold: 0 violations of no-empty (catch included), preserve-caught-error, only-throw-error, no-floating-promises and no-console in src on every pull request\n\nTool: ESLint with typescript-eslint; Roslyn analyzers for .NET\n\n```js\n// eslint.config.js\nimport tseslint from 'typescript-eslint'\nexport default tseslint.config({\n  files: ['src/**/*.ts'],\n  languageOptions: { parserOptions: { projectService: true } },\n  rules: {\n    'no-empty': ['error', { allowEmptyCatch: false }],   // no swallowed errors\n    'preserve-caught-error': 'error',                     // new Error(msg, { cause }) when rethrowing (ESLint 9.35+)\n    '@typescript-eslint/only-throw-error': 'error',       // throw Error instances only (no-throw-literal, typed)\n    '@typescript-eslint/no-floating-promises': 'error',   // a dropped rejection is a swallowed error\n    'no-console': 'error',                                // the logger, never console\n  },\n})\n```"
     },
     {
@@ -660,7 +664,11 @@
       "label": "Python error rules",
       "x": 1040,
       "y": 130,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Ruff runs as a required check with the exception and logging rule families: a blind except that does not re-raise (BLE001, which covers a catch that only logs), a try-except-pass, a raise inside except without from, logging.error instead of logging.exception, an f-string in a log call and a print each fail the build.\n\nThreshold: 0 violations of the BLE, TRY, LOG, G, T20, S110 and B904 rules in src on every pull request\n\nTool: Ruff\n\n```toml\n# pyproject.toml\n[tool.ruff.lint]\nextend-select = [\n  \"BLE\",   # BLE001: blind except Exception without re-raise (a catch that only logs included)\n  \"TRY\",   # TRY002 raise bare Exception, TRY003 message built inline, TRY201 \"raise e\" where a bare raise re-raises,\n           # TRY203 useless try/except, TRY300 else clause, TRY400 logging.exception, TRY401 redundant exception in message\n  \"LOG\",   # logging module misuse, e.g. LOG015 root logger calls\n  \"G\",     # G004: f-string in a log call; data goes in extra=, not the message\n  \"T20\",   # T201 print, T203 pprint: the logger, never print\n  \"S110\",  # try-except-pass\n  \"B904\",  # raise ... from err inside except: keep the cause\n]\n[tool.ruff.lint.per-file-ignores]\n\"tests/**\" = [\"T20\", \"BLE001\"]\n```"
     },
     {
@@ -669,7 +677,11 @@
       "label": "Java error rules",
       "x": 1040,
       "y": 260,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Error Prone runs in the compiler with its exception patterns raised to errors; the SonarQube quality profile sets the matching rules to Blocker so the quality gate on new code fails on an empty catch, a dropped cause, log-and-rethrow, a caught Throwable, a thrown generic exception or System.out.\n\nThreshold: 0 Error Prone errors from the exception patterns at compile time; 0 open Sonar issues of S108, S1166, S2139, S1181, S112, S106 on new code\n\nTool: Error Prone (javac plugin) and SonarQube\n\n```xml\n<!-- pom.xml: maven-compiler-plugin -->\n<compilerArgs>\n  <arg>-XDcompilePolicy=simple</arg>\n  <arg>--should-stop=ifError=FLOW</arg>\n  <arg>-Xplugin:ErrorProne\n    -Xep:EmptyCatch:ERROR\n    -Xep:UnusedException:ERROR\n    -Xep:CatchAndPrintStackTrace:ERROR\n    -Xep:SystemOut:ERROR\n    -Xep:Finally:ERROR</arg>\n</compilerArgs>\n<!-- SonarQube quality profile, severity Blocker:\n     S108  empty block           S1166 exception handlers should preserve the original exception\n     S2139 logged and rethrown   S1181 Throwable and Error should not be caught\n     S112  generic exception thrown   S106 System.out used to log -->\n```"
     },
     {
@@ -678,7 +690,11 @@
       "label": "No console, print, whole objects, log-and-continue or log-and-rethrow",
       "x": 1040,
       "y": 390,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "Semgrep runs on src with five rules: console in TypeScript, print in Python, a log call passed a whole request, response, headers or body object (as a bare argument or as a property of the first object), a catch whose body is a single log call (the error is swallowed), and a catch that logs and rethrows (the error would be logged twice).\n\nThreshold: 0 Semgrep findings of the five logging rules in src on every pull request\n\nTool: Semgrep\n\n```yaml\n# .semgrep/logging.yml   (semgrep --config .semgrep/ --error src/)\nrules:\n  - id: no-console\n    languages: [typescript, javascript]\n    severity: ERROR\n    message: Use the logger; console lines have no level, no correlation id and no redaction\n    pattern: console.$M(...)\n  - id: no-print\n    languages: [python]\n    severity: ERROR\n    message: Use the logger, not print\n    pattern: print(...)\n  - id: no-whole-object-logged\n    languages: [typescript, javascript, python]\n    severity: ERROR\n    message: Never log a whole request, response, headers or body; log the fields the serializer allows\n    patterns:\n      - pattern-either:\n          - pattern: '$LOG.$LEVEL(..., $OBJ, ...)'\n          - pattern: '$LOG.$LEVEL({ ..., $OBJ: $V, ... }, ...)'\n      - metavariable-regex:\n          metavariable: $LEVEL\n          regex: '^(error|warn|warning|info|debug|exception)$'\n      - metavariable-regex:\n          metavariable: $OBJ\n          regex: '^(req|request|res|response|ctx|event|body|headers)$'\n  - id: log-and-continue\n    languages: [typescript, javascript]\n    severity: ERROR\n    message: A catch that only logs swallows the error; rethrow it, return it, or handle it with a stated recovery\n    pattern: |\n      try { ... } catch ($E) { $LOG.$LEVEL(...); }\n  - id: log-and-rethrow\n    languages: [typescript, javascript]\n    severity: ERROR\n    message: Log once, where the error is handled; a catch that logs and rethrows logs it twice\n    pattern: |\n      try { ... } catch ($E) { ... $LOG.$LEVEL(...); ... throw ...; }\n```"
     },
     {
@@ -687,7 +703,11 @@
       "label": "Secret paths redacted in the logger",
       "x": 1040,
       "y": 520,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The logger is built once by a factory with a redact list of the known secret and personal-data paths and level labels as words; the exported logger and the test's logger come from the same factory, so the test logs an object holding each path at the top level and one level down into a stream and asserts that the written line holds only the marker. structlog: a processor that walks event_dict for the same keys; Serilog: Destructurama.Attributed or a masking enricher with the same list.\n\nThreshold: Every path of {{REDACTED_FIELDS}} is in the logger's redact list; a unit test logging each of them at the top level and one level down sees only the redaction marker\n\nTool: pino (redact) with a Vitest test; structlog processors for Python\n\n```js\n// src/logger.js\nimport pino from 'pino'\nexport const PATHS = '{{REDACTED_FIELDS}}'.split(/,\\s*/)\nexport const createLogger = (stream) => pino({\n  level: process.env.LOG_LEVEL ?? 'info',\n  formatters: { level: (label) => ({ level: label }) },   // \"level\":\"error\", not pino's number\n  redact: { paths: [...PATHS, ...PATHS.map((p) => `*.${p}`), 'req.headers.authorization', 'req.headers.cookie'], censor: '[REDACTED]' },\n}, stream)\nexport const logger = createLogger(pino.destination(1))\n\n// test/logger.test.js\nimport { expect, it } from 'vitest'\nimport { PATHS, createLogger } from '../src/logger.js'\nit('redacts every listed path at the top level and one level down', () => {\n  const lines = []\n  const log = createLogger({ write: (l) => lines.push(l) })\n  log.info({ ...Object.fromEntries(PATHS.map((p) => [p, 'secret-1'])), user: Object.fromEntries(PATHS.map((p) => [p, 'secret-2'])) }, 'sign-in')\n  expect(lines[0]).not.toMatch(/secret-[12]/)\n  expect((lines[0].match(/\\[REDACTED\\]/g) ?? []).length).toBe(PATHS.length * 2)\n})\n```",
       "hubWhen": {
         "REDACTION": [
@@ -701,7 +721,11 @@
       "label": "Only allowed fields leave the logger",
       "x": 1040,
       "y": 650,
-      "category": "structural",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The logger's formatter drops every top-level field that is not on the allow-list, and each object type has a serializer that picks its allowed fields, so nothing is logged whole; the exported logger and the test's logger come from the same factory, and the test logs an unknown field and a whole user record into a stream and asserts that only the allowed fields are written. structlog: a processor that filters event_dict to the same list.\n\nThreshold: 100 % of top-level log fields are on the allow-list and every object field goes through a serializer; a unit test logging an unknown field and a whole user object sees neither\n\nTool: pino (formatters and serializers) with a Vitest test; structlog processors for Python\n\n```js\n// src/logger.js\nimport pino from 'pino'\nconst ALLOWED = new Set(['level', 'time', 'msg', 'service', '{{CORRELATION_FIELD}}', 'err', 'req', 'user', 'order', 'durationMs', 'code', 'status'])\nconst pick = (keys) => (o) => Object.fromEntries(keys.filter((k) => o?.[k] !== undefined).map((k) => [k, o[k]]))\nexport const createLogger = (stream) => pino({\n  base: { service: 'order-api' },\n  formatters: {\n    level: (label) => ({ level: label }),                                               // \"level\":\"error\", not pino's number\n    log: (o) => Object.fromEntries(Object.entries(o).filter(([k]) => ALLOWED.has(k))),\n  },\n  serializers: {\n    req: (r) => ({ id: r.id, method: r.method, path: String(r.url).split('?')[0] }),   // no headers, no body\n    user: pick(['id', 'role']),                                                           // never name, email, phone\n    order: pick(['id', 'status', 'total']),\n    err: pino.stdSerializers.err,\n  },\n}, stream)\nexport const logger = createLogger(pino.destination(1))\n\n// test/logger.test.js\nimport { expect, it } from 'vitest'\nimport { createLogger } from '../src/logger.js'\nit('writes only allowed fields, never a whole object', () => {\n  const lines = []\n  createLogger({ write: (l) => lines.push(l) }).info({ user: { id: 7, email: 'a@b.c' }, password: 'x' }, 'sign-in')\n  expect(lines[0]).toContain('\"user\":{\"id\":7')\n  expect(lines[0]).not.toMatch(/a@b\\.c|password/)\n})\n```",
       "hubWhen": {
         "REDACTION": [
@@ -715,7 +739,11 @@
       "label": "Every log line well-formed, correlated and levelled",
       "x": 1040,
       "y": 780,
-      "category": "process",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The test run writes its logs to a file; a test afterwards reads every line and asserts the shape: JSON lines must parse, hold the fields, carry a level word from the list and never pair a 4xx status with level error; text lines must match the fixed layout built from the same levels and limit. One malformed, uncorrelated or mislevelled line fails the build.\n\nThreshold: 100 % of the lines written during a full test run parse as {{LOGS}}, carry a level from {{LEVELS}}, a {{CORRELATION_FIELD}} of 16 to 36 hex characters and a message of at most {{MAX_MESSAGE_CHARS}} characters; 0 JSON lines with a 4xx status at level error\n\nTool: Vitest (a test over the test run's log file); the same test under pytest for Python\n\n```ts\n// test/log-shape.test.ts  (the app writes LOG_FILE=test-logs/app.log during the run)\nimport { readFileSync } from 'node:fs'\nimport { expect, it } from 'vitest'\nconst FIELD = '{{CORRELATION_FIELD}}'\nconst LEVELS = '{{LEVELS}}'.split(/,\\s*/)\nconst MAX = {{MAX_MESSAGE_CHARS}}\nconst ID = /^[0-9a-f-]{16,36}$/   // a trace id, or a UUID with dashes\nconst TEXT = new RegExp(`^\\\\d{4}-\\\\d\\\\d-\\\\d\\\\dT\\\\S+ (${LEVELS.map((l) => l.toUpperCase()).join('|')}) \\\\[[0-9a-f-]{16,36}\\\\] .{1,${MAX}}(\\\\s\\\\w+=\\\\S+)*$`)\nit('every log line of the test run is well-formed, correlated and levelled by meaning', () => {\n  const lines = readFileSync('test-logs/app.log', 'utf8').split('\\n').filter((l) => l && !l.startsWith(' '))   // indented = stack trace\n  expect(lines.length).toBeGreaterThan(0)\n  for (const line of lines) {\n    if (line.startsWith('{')) {\n      const o = JSON.parse(line)\n      expect(LEVELS, line).toContain(o.level)\n      expect(o[FIELD], line).toMatch(ID)\n      expect(String(o.msg ?? o.message).length, line).toBeLessThanOrEqual(MAX)\n      if (typeof o.status === 'number' && o.status >= 400 && o.status < 500) expect(o.level, `a 4xx logged at error: ${line}`).not.toBe('error')\n    } else expect(line).toMatch(TEXT)\n  }\n})\n```"
     },
     {
@@ -724,7 +752,11 @@
       "label": "Nothing internal reaches a caller",
       "x": 1040,
       "y": 910,
-      "category": "process",
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An integration test starts the element with production settings, calls a route that throws an unexpected error, runs the CLI's test-only command that throws the same, and asserts that neither the HTTP body nor the CLI output matches a stack-trace, class-name, path, SQL or address pattern. Drop the CLI test where the element has none; a queue consumer's test applies the same pattern to the reason it writes on a dead-lettered message. The shape of the HTTP error body is checked in the Errors pack.\n\nThreshold: 0 stack-trace patterns, exception class names, source paths, SQL or internal addresses in the body of a 500 response or in the output of a failing CLI command, with production settings\n\nTool: Vitest with supertest; the same test with httpx under pytest for Python\n\n```ts\n// test/http/error-response.test.ts   (NODE_ENV=production in this file's setup)\nimport { spawnSync } from 'node:child_process'\nimport request from 'supertest'\nimport { expect, it } from 'vitest'\nimport { app } from '../../src/app'   // registers GET /__boom in tests only: throws new TypeError('kaput')\n\nconst LEAKS = /\\n\\s+at |TypeError|kaput|\\/src\\/|node_modules|\\.ts:\\d+|SELECT |INSERT |localhost|10\\.\\d+\\.\\d+\\.\\d+/\n\nit('an unexpected error reaches an HTTP caller as a clean 500', async () => {\n  const res = await request(app).get('/__boom')\n  expect(res.status).toBe(500)\n  expect(res.text).not.toMatch(LEAKS)\n})\nit('an unexpected error reaches a CLI user as a clean message', () => {\n  const run = spawnSync('node', ['dist/cli.js', '__boom'], { env: { ...process.env, NODE_ENV: 'production' }, encoding: 'utf8' })   // test-only command: throws new TypeError('kaput')\n  expect(run.status).not.toBe(0)\n  expect(run.stdout + run.stderr).not.toMatch(LEAKS)\n})\n```"
     },
     {
@@ -733,7 +765,11 @@
       "label": "Error classes extend the base and stay few",
       "x": 1040,
       "y": 1040,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test imports every export of src/errors, instantiates each class and asserts that it is an instance of {{BASE_ERROR}} and of Error, that its code is a non-empty string, and that the module exports at most ten classes; only-throw-error in the lint keeps thrown values to Error instances. On the JVM the same is an ArchUnit rule over classes ending in Exception; in Python a test over the subclasses of the base.\n\nThreshold: Every class exported from src/errors extends {{BASE_ERROR}} and carries a non-empty string code; at most 10 classes\n\nTool: Vitest (a test over src/errors); ArchUnit for the JVM\n\n```ts\n// test/errors/hierarchy.test.ts\nimport { expect, it } from 'vitest'\nimport * as errors from '../../src/errors'\nimport { {{BASE_ERROR}} } from '../../src/errors'\n\nconst classes = Object.entries(errors).filter(([, v]) => typeof v === 'function' && v.prototype instanceof Error && v !== {{BASE_ERROR}}) as Array<[string, new (message?: string) => Error & { code?: unknown }]>\n\nit('exports at most ten error classes', () => {\n  expect(classes.length, classes.map(([n]) => n).join(', ')).toBeLessThanOrEqual(10)\n})\nit.each(classes)('%s extends {{BASE_ERROR}} and carries a code', (name, Cls) => {\n  const e = new Cls('x')\n  expect(e, `${name} does not extend {{BASE_ERROR}}`).toBeInstanceOf({{BASE_ERROR}})\n  expect(typeof e.code === 'string' && e.code.length > 0, `${name} has no stable code`).toBe(true)\n})\n```",
       "hubWhen": {
         "STYLE": [
@@ -747,7 +783,11 @@
       "label": "Only the edge maps errors to responses",
       "x": 1040,
       "y": 1170,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A dependency rule fails the build when any module outside the edge imports the error-to-response mapping, or when domain or application code imports the HTTP framework (and so could build a response or know a status code). On the JVM the same rule is an ArchUnit test; in Python, import-linter.\n\nThreshold: 0 modules outside src/http import the error handler or the response mapping; 0 domain or application modules import an HTTP framework\n\nTool: dependency-cruiser; ArchUnit for the JVM; import-linter for Python\n\n```js\n// .dependency-cruiser.cjs\nmodule.exports = {\n  forbidden: [\n    {\n      name: 'only-the-edge-maps-errors',\n      comment: 'ADR Errors handled once at the edge: only src/http knows the response shape and status codes',\n      severity: 'error',\n      from: { path: '^src/', pathNot: '^src/http/' },\n      to: { path: '^src/http/(error-handler|problem)\\\\.ts$' },\n    },\n    {\n      name: 'inner-code-knows-no-http',\n      comment: 'domain and application code throws or returns; it does not build responses',\n      severity: 'error',\n      from: { path: '^src/(domain|application)/' },\n      to: { path: 'node_modules/(express|fastify|@nestjs/common|hono|koa)' },\n    },\n  ],\n}\n```",
       "hubWhen": {
         "BOUNDARY": [
@@ -761,7 +801,11 @@
       "label": "Driver errors stay below the domain",
       "x": 1040,
       "y": 1300,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "An ArchUnit test fails the build when a domain or application class depends on a driver or framework exception type, when a persistence adapter method declares a driver exception, or when a domain exception does not extend {{BASE_ERROR}}. In TypeScript the same rules are dependency-cruiser rules on the driver packages (pg, mysql2, mongodb, undici) from src/domain and src/application.\n\nThreshold: 0 dependencies from the domain or application packages on driver, persistence or HTTP-client exception types; 0 public persistence-adapter methods declaring a driver exception; every domain exception extends {{BASE_ERROR}}\n\nTool: ArchUnit (JUnit 5); dependency-cruiser for TypeScript\n\n```java\n// src/test/java/com/shop/orders/LayerErrorsTest.java\n@AnalyzeClasses(packages = \"com.shop.orders\")\nclass LayerErrorsTest {\n  @ArchTest\n  static final ArchRule domain_sees_no_driver_errors = noClasses()\n      .that().resideInAnyPackage(\"..domain..\", \"..application..\")\n      .should().dependOnClassesThat().resideInAnyPackage(\n          \"java.sql..\", \"org.springframework.dao..\", \"jakarta.persistence..\", \"org.springframework.web.client..\");\n\n  @ArchTest\n  static final ArchRule adapters_translate_driver_errors = methods()\n      .that().areDeclaredInClassesThat().resideInAPackage(\"..adapter.persistence..\").and().arePublic()\n      .should().notDeclareThrowableOfType(java.sql.SQLException.class);\n\n  @ArchTest\n  static final ArchRule domain_errors_extend_the_base = classes()\n      .that().resideInAPackage(\"..domain..\").and().haveSimpleNameEndingWith(\"Exception\")\n      .should().beAssignableTo({{BASE_ERROR}}.class);\n}\n```",
       "hubWhen": {
         "BOUNDARY": [
@@ -775,7 +819,11 @@
       "label": "No Result ignored",
       "x": 1040,
       "y": 1430,
-      "category": "structural",
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "The linter of the language makes a dropped Result a build error: neverthrow/must-use-result in TypeScript, unused_must_use plus clippy's unwrap_used and expect_used in Rust, errcheck, errorlint and wrapcheck in golangci-lint (v2 configuration).\n\nThreshold: 0 Results left unhandled in src: the build fails on an unused Result, an unchecked error value or an unwrap outside tests\n\nTool: eslint-plugin-neverthrow (TypeScript); clippy (Rust); golangci-lint (Go)\n\n```js\n// eslint.config.js (added for the result style)\nimport neverthrow from 'eslint-plugin-neverthrow'\nexport default [{\n  files: ['src/**/*.ts'],\n  plugins: { neverthrow },\n  rules: { 'neverthrow/must-use-result': 'error' },   // a Result never matched or unwrapped is a dropped error\n}]\n\n// Rust, src/lib.rs:  #![deny(unused_must_use, clippy::unwrap_used, clippy::expect_used)]   (allowed under #[cfg(test)])\n// Go, .golangci.yml (v2):\n//   version: \"2\"\n//   linters:\n//     enable: [errcheck, errorlint, wrapcheck]\n//     settings: { errcheck: { check-blank: true, check-type-assertions: true } }\n```",
       "hubWhen": {
         "STYLE": [
@@ -789,7 +837,11 @@
       "label": "Every code is in the catalogue and stable",
       "x": 1040,
       "y": 1560,
-      "category": "structural",
+      "characteristic": "compatibility",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
       "description": "A test collects every code used in src, checks each against the catalogue, snapshots the sorted list of codes so that a removed or renamed code is a reviewed change, and checks that every entry has a status, a type URI (absolute, or a relative reference /problems/… where the Errors pack keeps codes as identifiers) and a message template under the length limit.\n\nThreshold: 100 % of codes used in src exist in the catalogue; the sorted list of codes matches its snapshot, so a rename or removal fails the build\n\nTool: Vitest (a test over the error catalogue); the same test under pytest for Python\n\n```ts\n// test/errors/catalogue.test.ts\nimport { execSync } from 'node:child_process'\nimport { expect, it } from 'vitest'\nimport { CATALOGUE } from '../../src/errors/catalogue'   // { ORDER_NOT_FOUND: { status: 404, type: 'https://…/errors/order-not-found', message: 'Order {orderId} not found' }, … }\n\nconst used = new Set(execSync(\"grep -rhoE \\\"fail\\\\('[A-Z_]+'\\\" src | grep -oE '[A-Z_]+'\").toString().trim().split('\\n'))\n\nit('every code used in src is in the catalogue', () => {\n  for (const code of used) expect(CATALOGUE, `${code} is not in the catalogue`).toHaveProperty(code)\n})\nit('codes are added or deprecated, never renamed or removed', () => {\n  expect(Object.keys(CATALOGUE).sort()).toMatchSnapshot()\n})\nit('every entry has a status, a type URI and a short message', () => {\n  for (const [code, e] of Object.entries(CATALOGUE)) {\n    expect(e.status, code).toBeGreaterThanOrEqual(400)\n    expect(e.type, code).toMatch(/^(https?:\\/\\/|\\/)/)\n    expect(e.message.length, code).toBeLessThanOrEqual({{MAX_MESSAGE_CHARS}})\n  }\n})\n```",
       "hubWhen": {
         "STYLE": [
