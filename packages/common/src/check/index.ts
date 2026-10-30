@@ -17,12 +17,14 @@ import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
+import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
-export { CHECK_CONFIG_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, type TestResults } from './files'
-export { computeEvidence, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome } from './evidence'
+export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, type TestResults } from './files'
+export { computeEvidence, conditionResults, conditionsOf, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
+export { METRICS_FORMAT, convertUnit, evaluateMetric, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
 export { CHECK_DIMENSIONS, CHECK_METRICS, GOAL_RULE, type CheckDimension, type CheckPerspective, type CheckMetric, type CheckMetricResult, type GoalSetting } from './goals'
 
 /** Rules about the folder's files and its views, sequences and slides. */
@@ -83,8 +85,9 @@ export interface CheckRuleResult {
   /** The rule did not run: it reads test reports and none was given
    *  ('no-report'), the folder could not be read as a model ('no-model'), or
    *  it reads a folder's files and the model was checked in memory
-   *  (checkModel, 'no-folder'). Its count says nothing. */
-  notRun?: 'no-report' | 'no-model' | 'no-folder'
+   *  (checkModel, 'no-folder'), or it reads measurements and none were
+   *  given ('no-measurements'). Its count says nothing. */
+  notRun?: 'no-report' | 'no-model' | 'no-folder' | 'no-measurements'
 }
 
 export interface CheckResult {
@@ -105,8 +108,8 @@ export interface CheckResult {
   goalsNotRun: Array<{ id: string; min: number; notRun: 'no-report' | 'no-model' }>
   nodeCount: number
   relationCount: number
-  /** With test reports: what they say about each scenario, fitness
-   *  function, requirement and ADR. */
+  /** With test reports or measurements: what they say about each scenario,
+   *  fitness function, requirement and ADR. */
   evidence?: Evidence
 }
 
@@ -116,17 +119,56 @@ export interface CheckOptions {
   tests?: TestCase[]
   /** The Hub's concern packs (concerns.ts), for concern-unaddressed. */
   concerns?: ConcernPack[]
+  /** What sensors measured (radical-metrics/1 files, the store beside the
+   *  model). Without them the rules that read values find nothing. */
+  measurements?: Measurement[]
+  /** When the conditions are evaluated, for max_age (ms since the epoch). */
+  now?: number
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]))
 
 const ALL_RULES = [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]
+
+/** Rule and metric ids a check.json may still hold from before `metrics`
+ *  replaced `tests` and `threshold`: the id each counts as now, or null for
+ *  one that is gone (a threshold is a condition now). */
+const RENAMED_RULES: Record<string, string | null> = {
+  'scenario-without-tests': 'scenario-without-metrics',
+  'fitness-fn-without-tests': 'fitness-fn-without-metrics',
+  'fitness-fn-without-threshold': null,
+}
+const RENAMED_METRICS: Record<string, string | null> = {
+  'scenarios-with-tests': 'scenarios-with-metrics',
+  'fitness-fns-with-tests': 'fitness-fns-with-metrics',
+  'fitness-fns-with-threshold': null,
+}
+
+const renamed = <T>(entries: Record<string, T> | undefined, names: Record<string, string | null>): Record<string, T> | undefined => {
+  if (!entries) return entries
+  const out: Record<string, T> = {}
+  for (const [key, value] of Object.entries(entries)) {
+    const [rule, ...code] = key.split('/')
+    if (!(rule in names)) { out[key] = value; continue }
+    const now = names[rule]
+    if (now && !(now in entries)) out[[now, ...code].join('/')] = value
+  }
+  return out
+}
+
+/** `config` with the ids it names from before `metrics` brought up to date. */
+export function upgradeCheckConfig(config: CheckConfig): CheckConfig {
+  const rules = renamed(config.rules, RENAMED_RULES)
+  const goals = renamed(config.goals, RENAMED_METRICS)
+  return { ...config, ...(rules ? { rules } : {}), ...(goals ? { goals } : {}) }
+}
 const RULE_IDS = new Set(ALL_RULES.map((r) => r.id))
 const DEFAULT_SEVERITY = new Map(ALL_RULES.map((r) => [r.id, r.severity]))
 
 /** Checks the model in `files` (paths relative to the model folder). */
-export function runCheck(files: FolderFiles, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
+export function runCheck(files: FolderFiles, given: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
+  const config = upgradeCheckConfig(given)
   const found: Array<RuleFinding & { rule: string }> = []
   const add = (rule: string, finding: RuleFinding): void => { found.push({ rule, ...finding }) }
 
@@ -188,9 +230,11 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
     ...(options.tests ? { tests: options.tests } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
+    ...(options.measurements ? { measurements: options.measurements } : {}),
+    ...(options.now !== undefined ? { now: options.now } : {}),
   }
   for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
-  const evidence = options.tests ? computeEvidence(model) : undefined
+  const evidence = options.tests || options.measurements ? computeEvidence(model) : undefined
   const goals = measureGoals({ model, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
   goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
   return {
@@ -199,7 +243,10 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     relationCount: Object.keys(relations).length,
     metrics: goals.metrics,
     ...(evidence ? { evidence } : {}),
-    notRun: new Map(options.tests ? [] : CHECK_RULES.filter((r) => r.readsReports).map((r) => [r.id, 'no-report'])),
+    notRun: new Map([
+      ...(options.tests ? [] : CHECK_RULES.filter((r) => r.readsReports).map((r) => [r.id, 'no-report'] as const)),
+      ...(options.measurements ? [] : CHECK_RULES.filter((r) => r.readsMeasurements).map((r) => [r.id, 'no-measurements'] as const)),
+    ]),
     goalsNotRun: goals.notRun.map((id) => ({ id, notRun: 'no-report' })),
   }
 }
@@ -207,7 +254,8 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
 /** Checks a model already in memory, as Studio holds it: every rule but the
  *  ones about the folder's files, which only a folder has. Those are not
  *  run, so a count of 0 lowers no baseline the CLI still counts against. */
-export function checkModel(data: DiagramData, config: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
+export function checkModel(data: DiagramData, given: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
+  const config = upgradeCheckConfig(given)
   const model = checkData(data, options, config)
   for (const rule of FOLDER_RULES) if (!MODEL_RULE_IDS.has(rule.id)) model.notRun.set(rule.id, 'no-folder')
   const result = settle(model.found, config, model)

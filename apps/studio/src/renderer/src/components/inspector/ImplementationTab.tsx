@@ -43,13 +43,17 @@ const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' 
 
 /** Why a scenario or fitness function does not count as passing. */
 function reason(e: EvidenceEntry): string {
-  if (e.status === 'no-tests') return 'names no test'
-  const off = (e.tests ?? []).filter((t) => t.outcome !== 'passed')
-  const kinds = [...new Set(off.map((t) => t.outcome))]
-  return kinds.map((k) => k === 'failed' ? 'a test failed' : k === 'not-found' ? 'a test is gone' : k === 'skipped' ? 'its test was skipped' : 'no report has its test').join(', ')
+  if (e.status === 'no-checks') return 'names no check'
+  const off = (e.conditions ?? []).filter((c) => c.outcome !== 'passed')
+  const kinds = [...new Set(off.map((c) => `${c.test ? 'test' : 'metric'}:${c.outcome}`))]
+  const say: Record<string, string> = {
+    'test:failed': 'a test failed', 'test:not-found': 'a test is gone', 'test:skipped': 'its test was skipped', 'test:not-run': 'no report has its test',
+    'metric:failed': 'a value is off its threshold', 'metric:stale': 'a measurement is too old', 'metric:not-run': 'nothing measured a value', 'metric:invalid': 'a condition cannot be read',
+  }
+  return kinds.map((k) => say[k] ?? k.split(':')[1]).join(', ')
 }
 
-const PILL: Record<string, [string, string]> = { failed: ['bad', 'failed'], 'not-run': ['warn', 'not run'], 'no-tests': ['none', 'no test'] }
+const PILL: Record<string, [string, string]> = { failed: ['bad', 'failed'], stale: ['warn', 'stale'], 'not-run': ['warn', 'not run'], 'no-checks': ['none', 'no check'] }
 
 export function ImplementationTab({ check, ctx, relations, results, onSettings }: {
   check: CheckResult; ctx: Ctx; relations: Record<string, C4Relation>; results: TestResults | null; onSettings: () => void
@@ -73,7 +77,7 @@ export function ImplementationTab({ check, ctx, relations, results, onSettings }
     const leaves = (id: string): string[] => Object.values(relations)
       .filter((r) => r.sourceId === id && (r.relationType === 'verifies' || r.relationType === 'implements'))
       .map((r) => r.targetId).filter((t) => ctx.nodes[t] && !PASSING.has(statusOf(t) ?? ''))
-    const order = ['failed', 'not-run', 'no-tests']
+    const order = ['failed', 'stale', 'not-run', 'no-checks']
     const attention = entries.filter(([, e]) => (e.type === 'scenario' || e.type === 'fitness-fn') && e.status !== 'passed')
       .map(([id, e]) => ({ id, e, leaves: leaves(id) }))
       .sort((a, b) => order.indexOf(a.e.status) - order.indexOf(b.e.status) || b.leaves.length - a.leaves.length || Number(b.e.type === 'fitness-fn') - Number(a.e.type === 'fitness-fn'))
@@ -90,7 +94,7 @@ export function ImplementationTab({ check, ctx, relations, results, onSettings }
   }, [ev, relations, ctx.nodes])
 
   if (!ev) {
-    return <p className="insp-notice">No test results beside this model yet. Run <code>radical check &lt;folder&gt; --report &lt;reports&gt;</code> to see which requirements and decisions the tests verify; Studio picks them up by itself.</p>
+    return <p className="insp-notice">No test results or measurements beside this model yet. Run <code>radical check &lt;folder&gt; --report &lt;reports&gt;</code> to see which requirements and decisions the tests verify, and <code>radical sense &lt;adapter&gt;</code> to measure the values the fitness functions hold to; Studio picks them up by itself.</p>
   }
 
   const readAt = results ? new Date(results.readAt) : null
@@ -136,7 +140,7 @@ export function ImplementationTab({ check, ctx, relations, results, onSettings }
             ...(m('requirements-with-scenario') ? [{ label: '… with a scenario', count: m('requirements-with-scenario')!.count }] : []),
             { label: <><b>… verified</b>: their scenarios name tests, and all passed</>, count: m('requirements-verified')!.count, goal: m('requirements-verified')!.min },
           ]} />}
-          <p className="insp-muted insp-foot">{plural(view.scenarios.length, 'scenario')}: {count(view.scenarios, 'passed')} passed · {count(view.scenarios, 'failed')} failed · {count(view.scenarios, 'not-run')} not run · {count(view.scenarios, 'no-tests')} name no test</p>
+          <p className="insp-muted insp-foot">{plural(view.scenarios.length, 'scenario')}: {count(view.scenarios, 'passed')} passed · {count(view.scenarios, 'failed')} failed · {count(view.scenarios, 'stale')} stale · {count(view.scenarios, 'not-run')} not run · {count(view.scenarios, 'no-checks')} name no check</p>
         </section>
         <section>
           <h2>Decisions · fitness functions</h2>
@@ -144,9 +148,9 @@ export function ImplementationTab({ check, ctx, relations, results, onSettings }
           {m('adrs-verified') && <Funnel steps={[
             { label: 'Accepted ADRs', count: m('adrs-verified')!.total },
             ...(m('adrs-with-fitness-fn') ? [{ label: '… with a fitness function', count: m('adrs-with-fitness-fn')!.count }] : []),
-            { label: <><b>… verified</b>: their checks name tests, and all passed</>, count: m('adrs-verified')!.count, goal: m('adrs-verified')!.min },
+            { label: <><b>… verified</b>: their checks name tests or values, and all passed</>, count: m('adrs-verified')!.count, goal: m('adrs-verified')!.min },
           ]} />}
-          <p className="insp-muted insp-foot">{plural(view.ffs.length, 'fitness function')}: {count(view.ffs, 'passed')} passed · {count(view.ffs, 'failed')} failed · {count(view.ffs, 'not-run')} not run · {count(view.ffs, 'no-tests')} name no test</p>
+          <p className="insp-muted insp-foot">{plural(view.ffs.length, 'fitness function')}: {count(view.ffs, 'passed')} passed · {count(view.ffs, 'failed')} failed · {count(view.ffs, 'stale')} stale · {count(view.ffs, 'not-run')} not run · {count(view.ffs, 'no-checks')} name no check</p>
         </section>
       </div>
 

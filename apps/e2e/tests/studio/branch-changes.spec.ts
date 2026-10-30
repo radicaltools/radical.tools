@@ -272,13 +272,13 @@ const SPEC_NOW: DiagramData = {
   nodes: [
     node('api', 'container', 'Checkout API', { x: 40, y: 40 }),
     node('pay', 'requirement', 'Take card payments', { x: 300, y: 40, ears_type: 'ubiquitous', action: 'take card payments' }),
-    node('s-pay', 'scenario', 'Paying by card', { x: 300, y: 200, given: 'a cart', when: 'the user pays', then: 'it is paid', tests: 'tests/pay.test.ts › pays by card' }),
+    node('s-pay', 'scenario', 'Paying by card', { x: 300, y: 200, given: 'a cart', when: 'the user pays', then: 'it is paid', metrics: 'test(tests/pay.test.ts › pays by card) passed' }),
     node('refund', 'requirement', 'Refund payments', { x: 560, y: 40, ears_type: 'ubiquitous', action: 'refund payments' }),
-    node('s-refund', 'scenario', 'Refunding', { x: 560, y: 200, given: 'a paid order', when: 'it is refunded', then: 'the money goes back', tests: 'tests/refund.test.ts › refunds' }),
+    node('s-refund', 'scenario', 'Refunding', { x: 560, y: 200, given: 'a paid order', when: 'it is refunded', then: 'the money goes back', metrics: 'test(tests/refund.test.ts › refunds) passed' }),
     node('wallet', 'requirement', 'Pay by wallet', { x: 820, y: 40, ears_type: 'ubiquitous', action: 'take wallet payments' }),
-    node('s-wallet', 'scenario', 'Paying by wallet', { x: 820, y: 200, given: 'a cart', when: 'the user pays by wallet', then: 'it is paid', tests: 'tests/pay.test.ts › pays by wallet' }),
+    node('s-wallet', 'scenario', 'Paying by wallet', { x: 820, y: 200, given: 'a cart', when: 'the user pays by wallet', then: 'it is paid', metrics: 'test(tests/pay.test.ts › pays by wallet) passed' }),
     node('edit', 'requirement', 'Edit the order', { x: 40, y: 400, ears_type: 'ubiquitous', action: 'let the order be edited within a day' }),
-    node('s-edit', 'scenario', 'Editing', { x: 40, y: 560, given: 'an order', when: 'it is edited', then: 'it changes', tests: 'tests/edit.test.ts › edits' }),
+    node('s-edit', 'scenario', 'Editing', { x: 40, y: 560, given: 'an order', when: 'it is edited', then: 'it changes', metrics: 'test(tests/edit.test.ts › edits) passed' }),
   ],
   relations: [
     rel('sat', 'satisfies', 'api', 'pay'), rel('v-pay', 'verifies', 's-pay', 'pay'), rel('v-refund', 'verifies', 's-refund', 'refund'),
@@ -289,9 +289,9 @@ const SPEC_NOW: DiagramData = {
 const SPEC_BASE = base([
   node('api', 'container', 'Checkout API', { x: 40, y: 40 }),
   node('edit', 'requirement', 'Edit the order', { x: 40, y: 400, ears_type: 'ubiquitous', action: 'let the order be edited' }),
-  node('s-edit', 'scenario', 'Editing', { x: 40, y: 560, given: 'an order', when: 'it is edited', then: 'it changes', tests: 'tests/edit.test.ts › edits' }),
+  node('s-edit', 'scenario', 'Editing', { x: 40, y: 560, given: 'an order', when: 'it is edited', then: 'it changes', metrics: 'test(tests/edit.test.ts › edits) passed' }),
   node('invoice', 'requirement', 'Send invoices', { x: 300, y: 400, ears_type: 'ubiquitous', action: 'send an invoice' }),
-  node('s-invoice', 'scenario', 'Invoicing', { x: 300, y: 560, given: 'a paid order', when: 'it is invoiced', then: 'the invoice is sent', tests: 'tests/invoice.test.ts › invoices' }),
+  node('s-invoice', 'scenario', 'Invoicing', { x: 300, y: 560, given: 'a paid order', when: 'it is invoiced', then: 'the invoice is sent', metrics: 'test(tests/invoice.test.ts › invoices) passed' }),
 ], [rel('v-edit', 'verifies', 's-edit', 'edit'), rel('v-invoice', 'verifies', 's-invoice', 'invoice')])
 const tc = (file: string, title: string, status: TestCase['status']): TestCase => ({ file: `/repo/${file}`, title: [title], status })
 const SPEC_RESULTS = serializeTestResults([

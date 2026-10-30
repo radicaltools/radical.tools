@@ -267,14 +267,16 @@ function _makeBaseData(): { allNodes: C4Node[]; allRels: C4Relation[] } {
 
     // ── Governance: Fitness Functions (Building Evolutionary Architectures) ───
     ffNode('ff-latency', 'FF: Payment p99 < 250ms',
-      'Continuously asserts that the end-to-end payment path stays within its latency budget.', 2900, 0, {
+      'Continuously asserts that the end-to-end payment path stays within its latency budget.\n\nThreshold: p99 latency < 250ms measured over any rolling 24h window', 2900, 0, {
       category: 'operational',
-      threshold: 'p99 latency < 250ms measured over any rolling 24h window',
+      metrics: 'payment.latency.p99{window=24h} < 250 ms',
+      max_age: '1d',
     }),
     ffNode('ff-ledger', 'FF: Zero ledger data loss',
-      'Verifies the transaction ledger survives node failure with no committed-record loss.', 2900, 90, {
+      'Verifies the transaction ledger survives node failure with no committed-record loss.\n\nThreshold: No committed transaction lost during automated chaos / failover tests', 2900, 90, {
       category: 'structural',
-      threshold: 'No committed transaction lost during automated chaos / failover tests',
+      metrics: 'ledger.lost_transactions{suite=chaos} == 0',
+      max_age: '7d',
     }),
   ]
 

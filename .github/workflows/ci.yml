@@ -43,6 +43,11 @@ jobs:
       - run: npm run typecheck
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
+      # The same boundary check as a sensor, for the model: radical sense
+      # measures its exit code, and the fitness function Workspace boundaries
+      # states the condition (job Architecture model reads reports/metrics).
+      - run: npm run build -w @radicaltools/cli
+      - run: node apps/cli/dist/index.js sense command --name workspaces --out reports/metrics/workspaces.json --context commit=${{ github.sha }} -- node tools/check-workspaces.mjs
       - name: Upload test reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -127,7 +132,8 @@ jobs:
 
   # The repository's own architecture model (architecture/), checked with
   # radical check against this run's test reports: the unit reports of
-  # Type-check & Test and, unless the e2e suite was skipped, reports/e2e.json.
+  # Type-check & Test and, unless the e2e suite was skipped, reports/e2e.json,
+  # and what the sensors of Type-check & Test measured (reports/metrics).
   # Its rule settings and baselines are architecture/check.json.
   architecture:
     name: Architecture model
@@ -155,7 +161,7 @@ jobs:
       - name: radical check
         run: |
           if [ -f e2e-report/reports/e2e.json ]; then cp e2e-report/reports/e2e.json reports/; fi
-          node apps/cli/dist/index.js check architecture --report reports --format github
+          node apps/cli/dist/index.js check architecture --report reports --metrics reports/metrics --format github
 
   mcp-package:
     name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})

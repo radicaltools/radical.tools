@@ -11,8 +11,8 @@ import { viewShownNodes } from './viewPipeline'
 import type { ModelCopy } from './model'
 import type { ModelBase } from './formats/modelBase'
 import { modelChangeReport, type ModelChangeReport } from './modelChanges'
-import type { TestCase } from './check'
-import { linkedNodes, testOutcomes, type TestOutcome } from './check/evidence'
+import type { Measurement, TestCase } from './check'
+import { conditionResults, conditionsOf, linkedNodes, testOutcomes, type ConditionOutcome } from './check/evidence'
 import type { Metamodel } from './metamodel'
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> => Object.fromEntries(items.map((item) => [item.id, item]))
@@ -149,8 +149,9 @@ export interface ChangeWorkItem {
   status: ChangeWorkStatus
   /** The scenarios or fitness functions behind the status, from the model (the base for a removed item). */
   checkers: Array<{ id: string; type: string; label: string }>
-  /** The tests they name, with their outcome; only those that decide a failing or not-found status come first. */
-  tests: Array<{ id: string; outcome: TestOutcome }>
+  /** Their conditions (the tests they name, the values they hold to), with
+   *  their outcome; those that decide a failing or not-found status come first. */
+  tests: Array<{ id: string; outcome: ConditionOutcome }>
   /** The elements that satisfy a requirement. */
   satisfiedBy: Array<{ id: string; type: string; label: string }>
 }
@@ -164,11 +165,12 @@ export interface ChangeWork {
 
 const WORK_TYPES = { requirement: { relation: 'verifies', checker: 'scenario' }, adr: { relation: 'implements', checker: 'fitness-fn' } } as const
 
-const OUTCOME_ORDER: TestOutcome[] = ['failed', 'not-found', 'not-run', 'skipped', 'passed']
+const OUTCOME_ORDER: ConditionOutcome[] = ['failed', 'invalid', 'not-found', 'stale', 'not-run', 'skipped', 'passed']
 
 /** Each requirement and ADR added, changed or removed since the base, with
- *  what the tests (`tests`, undefined without a report) say of it. */
-export function changeWork(changes: BranchChanges, base: ModelCopy, now: ModelCopy, metamodel: Metamodel, tests: TestCase[] | undefined): ChangeWork {
+ *  what the tests (`tests`, undefined without a report) and the measurements
+ *  say of it. */
+export function changeWork(changes: BranchChanges, base: ModelCopy, now: ModelCopy, metamodel: Metamodel, tests: TestCase[] | undefined, measurements?: Measurement[]): ChangeWork {
   const items: ChangeWorkItem[] = []
   const ref = (n: C4Node) => ({ id: n.id, type: n.type, label: n.label })
   const touched = new Set([...changes.report.elements.added, ...changes.report.elements.changed].map((c) => c.id))
@@ -180,9 +182,9 @@ export function changeWork(changes: BranchChanges, base: ModelCopy, now: ModelCo
       if (change.type !== 'requirement' && change.type !== 'adr') continue
       const { relation, checker } = WORK_TYPES[change.type]
       const copy = kind === 'removed' ? base : now
-      const model = { ...copy, metamodel, tests: tests ?? [] }
+      const model = { ...copy, metamodel, tests: tests ?? [], ...(measurements ? { measurements } : {}) }
       const checkers = linkedNodes(model, change.id, relation, 'source', checker)
-      const outcomes = checkers.flatMap((c) => testOutcomes(c, model).map((o) => ({ id: o.id.raw, outcome: o.outcome })))
+      const outcomes = checkers.flatMap((c) => conditionResults(c, model).map((r) => ({ id: r.test ?? r.condition, outcome: r.outcome })))
       outcomes.sort((x, y) => OUTCOME_ORDER.indexOf(x.outcome) - OUTCOME_ORDER.indexOf(y.outcome))
       let status: ChangeWorkStatus
       if (kind === 'removed') {
@@ -191,9 +193,9 @@ export function changeWork(changes: BranchChanges, base: ModelCopy, now: ModelCo
         const stillRuns = tests !== undefined && gone.some((c) => testOutcomes(c, model).some((o) => o.outcome === 'passed' || o.outcome === 'failed' || o.outcome === 'skipped'))
         status = stillRuns ? 'test-still-runs' : 'removed'
       } else if (!checkers.length) status = 'no-checker'
-      else if (tests === undefined) status = 'no-report'
-      else if (checkers.some((c) => !testOutcomes(c, model).length)) status = 'test-not-written'
-      else if (outcomes.some((o) => o.outcome === 'failed')) status = 'failing'
+      else if (tests === undefined && !measurements) status = 'no-report'
+      else if (checkers.some((c) => !conditionsOf(c).length)) status = 'test-not-written'
+      else if (outcomes.some((o) => o.outcome === 'failed' || o.outcome === 'invalid')) status = 'failing'
       else if (outcomes.some((o) => o.outcome === 'not-found')) status = 'test-not-written'
       else if (outcomes.some((o) => o.outcome !== 'passed')) status = 'not-run'
       else status = kind === 'changed' && !checkers.some((c) => touched.has(c.id)) ? 'tests-unchanged' : 'verified'

@@ -15,7 +15,7 @@ Turns a finding into a test bound to the model (Radical Crucible).
                       finding is hardened by its own steps, replayed as the
                       test "<fuzz file> › <id> stays fixed: <title>"; the
                       finding is marked hardened with that test, and the test
-                      id is printed for the scenario's Tests
+                      condition is printed for the scenario's Metrics
   --scenario <name>   the scenario the test proves, kept in the finding
 
   --gate              checks a test before it is bound: with the source files
@@ -139,10 +139,10 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
     const test = `${finding!.file} › ${findingTestName(finding!)}`
     writeFinding(findingsDir, { ...finding!, status: 'hardened', test, ...(values.scenario ? { scenario: values.scenario } : {}) })
     io.out(`${finding!.id} is hardened: its fuzz file replays its steps as`)
-    io.out(`  ${test}`)
+    io.out(`  test(${test}) passed`)
     io.out(values.scenario
-      ? `Add that line to the Tests of scenario "${values.scenario}" (the model's files are left as they are).`
-      : 'Add that line to the Tests of the scenario it proves (--scenario keeps its name in the finding).')
+      ? `Add that line to the Metrics of scenario "${values.scenario}" (the model's files are left as they are).`
+      : 'Add that line to the Metrics of the scenario it proves (--scenario keeps its name in the finding).')
     return 0
   }
 

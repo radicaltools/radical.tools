@@ -105,7 +105,7 @@ export interface TestId {
   title: string[]
 }
 
-/** The test ids in a `tests` property, one per line (a title may hold
+/** The test ids in a list, one per line (a title may hold
  *  "; "). Blank lines and lines starting with # are left out. */
 export function parseTestIds(text: unknown): TestId[] {
   if (typeof text !== 'string') return []

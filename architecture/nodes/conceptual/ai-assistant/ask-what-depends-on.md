@@ -4,7 +4,7 @@ type: "scenario"
 label: "Ask what depends on"
 gherkin: "And the model is not changed"
 given: "a model with an Event Bus that three services publish to, and AI configured"
-tests: "apps/studio/tests/aiRunner.test.ts › runAIPrompt — end-to-end with mocked Anthropic tool-calling › runs search_model and continues with the next round"
+metrics: "test(apps/studio/tests/aiRunner.test.ts › runAIPrompt — end-to-end with mocked Anthropic tool-calling › runs search_model and continues with the next round) passed"
 then: "the assistant runs a search_model query, gets the exact dependents, and answers with those three services"
 when: "the user asks in AI mode \"what depends on the Event Bus?\""
 ---

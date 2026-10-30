@@ -148,8 +148,10 @@ export function buildPackDoc(spec: PackSpec): HubRadicalDoc {
   for (const f of spec.fitness) {
     node(f.id, 'fitness-fn', f.label, f.when, {
       category: f.category,
-      threshold: f.threshold,
-      description: `${f.description.trim()}\n\nTool: ${f.tool}\n\n\`\`\`${f.language}\n${f.snippet.trim()}\n\`\`\``,
+      // The pack cannot know the project's tests or metric names: the
+      // criterion goes into the text, for the team to turn into conditions
+      // in `metrics` once they have the sensor or the test that checks it.
+      description: `${f.description.trim()}\n\nThreshold: ${f.threshold.trim()}\n\nTool: ${f.tool}\n\n\`\`\`${f.language}\n${f.snippet.trim()}\n\`\`\``,
     })
     for (const a of f.implements) rel('implements', f.id, a)
   }

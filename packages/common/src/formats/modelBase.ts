@@ -13,6 +13,7 @@
 // wherever there is no base from git: Studio then shows what the run
 // changes. A base from git is never replaced by one.
 
+import { migrateCheckFields } from './checksMigration'
 import type { C4Node, C4Relation } from '../c4'
 import { SELECTION_DIR } from './canvasSelection'
 
@@ -66,7 +67,10 @@ export function parseModelBase(text: string): ModelBase | null {
   return {
     version: 1,
     ...(source === 'forge' ? { source } : {}),
-    commit, described, branch: branch as string | null, savedAt, nodes: nodes as unknown as C4Node[], relations: relations as unknown as C4Relation[],
+    commit, described, branch: branch as string | null, savedAt,
+    // A base saved before `metrics` reads as the model now does, or every
+    // scenario and fitness function would count as changed on the branch.
+    nodes: nodes.map((n) => migrateCheckFields(n)) as unknown as C4Node[], relations: relations as unknown as C4Relation[],
   }
 }
 

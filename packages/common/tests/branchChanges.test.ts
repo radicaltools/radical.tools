@@ -71,7 +71,7 @@ describe('change status', () => {
     tc('src/card.test.ts', 'other test', 'passed'),
     tc('src/edit.test.ts', 'edits', 'passed'),
   ]
-  const scenario = (id: string, testIds: string) => node(id, 'scenario', id, { given: 'g', when: 'w', then: 't', tests: testIds })
+  const scenario = (id: string, testIds: string) => node(id, 'scenario', id, { given: 'g', when: 'w', then: 't', metrics: testIds.split('\n').filter(Boolean).map((t) => `test(${t}) passed`).join('\n') })
   const base = copy([
     node('changed', 'requirement', 'Edit', { action: 'edit the order' }), scenario('s-edit', 'src/edit.test.ts › edits'),
     node('gone', 'requirement', 'Invoice', { action: 'send an invoice' }), scenario('s-old', 'src/old.test.ts › invoices'),

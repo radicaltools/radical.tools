@@ -185,7 +185,7 @@ export interface ForgeGap {
 /** The radical check rules that apply once a stage is done. */
 const CHECK_RULES_AFTER: Partial<Record<ForgeStageId, string[]>> = {
   requirements: ['requirement-incomplete', 'requirement-without-origin', 'need-without-requirement'],
-  fitness: ['fitness-fn-without-threshold'],
+  fitness: ['fitness-fn-without-metrics', 'metric-invalid'],
   scenarios: ['requirement-without-scenario', 'scenario-verifies-nothing'],
   c4: ['requirement-unsatisfied', 'fitness-fn-unlinked'],
 }

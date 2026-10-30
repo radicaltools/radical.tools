@@ -4,9 +4,9 @@ type: "scenario"
 label: "VS Code two-way sync"
 gherkin: "# Not covered by an automated test"
 given: "a .radical file is open in the Radical.Tools editor in VS Code"
-tests: |
-  packages/host-bridge/tests/vscode.test.ts › VS Code webview host › forwards external changes to every listener
-  packages/host-bridge/tests/vscode.test.ts › VS Code webview host › posts writes and resolves immediately
+metrics: |
+  test(packages/host-bridge/tests/vscode.test.ts › VS Code webview host › forwards external changes to every listener) passed
+  test(packages/host-bridge/tests/vscode.test.ts › VS Code webview host › posts writes and resolves immediately) passed
 then: "the editor reloads the git version, and the move is written back into the VS Code document"
 when: "the file is changed by git, and then the user moves an element in the editor"
 ---

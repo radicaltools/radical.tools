@@ -121,7 +121,7 @@ const rel = (id: string, relationType: string, sourceId: string, targetId: strin
 /** Four scenarios, one per outcome, each verifying its own requirement; a
  *  fitness function for an ADR; a scenario that names no test. */
 function model(): DiagramData {
-  const scenario = (id: string, tests: string) => node(id, 'scenario', id.toUpperCase(), { given: 'g', when: 'w', then: 't', tests })
+  const scenario = (id: string, test: string) => node(id, 'scenario', id.toUpperCase(), { given: 'g', when: 'w', then: 't', metrics: test && `test(${test}) passed` })
   return {
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
@@ -136,7 +136,7 @@ function model(): DiagramData {
       scenario('s-later', 'apps/web/site.spec.ts › loads'),
       node('s-none', 'scenario', 'S-NONE', { given: 'g', when: 'w', then: 't' }),
       node('adr', 'adr', 'Decision', { status: 'accepted', date: 'd', context: 'c', decision: 'd', consequences: 'c' }),
-      node('ff', 'fitness-fn', 'Guard', { threshold: 'passes', tests: 'apps/e2e/tests/studio/boot.spec.ts › Forge › is skipped' }),
+      node('ff', 'fitness-fn', 'Guard', { metrics: 'test(apps/e2e/tests/studio/boot.spec.ts › Forge › is skipped) passed' }),
     ],
     relations: [
       rel('v1', 'verifies', 's-pass', 'pass'),
@@ -162,7 +162,7 @@ describe('radical check with test reports', () => {
     expect(messages(result, 'test-not-found')).toEqual(['Scenario "S-GONE": no test apps/cli/src/cli.test.ts › radical check › old title in the reports, though its file ran; renamed or deleted? Not verified now: requirement "Renamed".'])
     expect(messages(result, 'test-not-run')).toEqual(['Scenario "S-LATER": no report has the file of test apps/web/site.spec.ts › loads.'])
     expect(messages(result, 'test-skipped')).toEqual(['Fitness function "Guard": test apps/e2e/tests/studio/boot.spec.ts › Forge › is skipped was skipped.'])
-    expect(messages(result, 'scenario-without-tests')).toEqual(['Scenario "S-NONE" names no test.'])
+    expect(messages(result, 'scenario-without-metrics')).toEqual(['Scenario "S-NONE" names no check.'])
     expect(result.errors).toBe(2)
     expect(result.ok).toBe(false)
   })
@@ -171,15 +171,15 @@ describe('radical check with test reports', () => {
     // They counted 0 and showed ✓ though they did not run: --ratchet (and
     // the Inspector's Ratchet) lowered their baselines to 0, and the next
     // check with the reports failed.
-    const config = { rules: { 'test-not-found': { severity: 'error' as const, max: 1 }, 'scenario-without-tests': { max: 3 } } }
+    const config = { rules: { 'test-not-found': { severity: 'error' as const, max: 1 }, 'scenario-without-metrics': { max: 3 } } }
     const files = serializeToMdFolderWithPaths(model(), 'T').files
     const without = runCheck(files, config)
     expect(without.rules.find((r) => r.id === 'test-not-found')).toMatchObject({ count: 0, max: 1, notRun: 'no-report', failed: false })
-    expect(ratchetConfig(config, without).lowered).toEqual([{ id: 'scenario-without-tests', from: 3, to: 1 }])
+    expect(ratchetConfig(config, without).lowered).toEqual([{ id: 'scenario-without-metrics', from: 3, to: 1 }])
     expect(formatCheckText(without, { folder: 'm' })).toContain('– test-not-found  not run: no test report (max 1)')
     const withReports = runCheck(files, config, { tests })
     expect(withReports.rules.find((r) => r.id === 'test-not-found')?.notRun).toBeUndefined()
-    expect(ratchetConfig(config, withReports).lowered).toEqual([{ id: 'scenario-without-tests', from: 3, to: 1 }])
+    expect(ratchetConfig(config, withReports).lowered).toEqual([{ id: 'scenario-without-metrics', from: 3, to: 1 }])
   })
 
   it('reads no outcomes without reports', () => {
@@ -191,7 +191,7 @@ describe('radical check with test reports', () => {
   it('works out the evidence of scenarios, requirements, fitness functions and ADRs', () => {
     const { evidence } = checkWith(model())
     const status = (id: string) => evidence!.nodes[id].status
-    expect([status('s-pass'), status('s-fail'), status('s-gone'), status('s-later'), status('s-none')]).toEqual(['passed', 'failed', 'failed', 'not-run', 'no-tests'])
+    expect([status('s-pass'), status('s-fail'), status('s-gone'), status('s-later'), status('s-none')]).toEqual(['passed', 'failed', 'failed', 'not-run', 'no-checks'])
     expect([status('pass'), status('fail'), status('gone'), status('later'), status('none')]).toEqual(['verified', 'broken', 'broken', 'unverified', 'unverified'])
     expect([status('ff'), status('adr')]).toEqual(['not-run', 'unverified'])
     expect(evidence!.nodes['s-gone'].tests).toEqual([{ id: 'apps/cli/src/cli.test.ts › radical check › old title', outcome: 'not-found' }])
@@ -204,7 +204,7 @@ describe('radical check with test reports', () => {
     expect(text).toContain([
       'Test reports: 7 test cases',
       '  Requirements: 1 verified, 2 broken, 2 unverified',
-      '  Scenarios: 1 passed, 2 failed, 1 not-run, 1 no-tests',
+      '  Scenarios: 1 passed, 2 failed, 1 not-run, 1 no-checks',
       '  ADRs: 1 unverified',
       '  Fitness functions: 1 not-run',
     ].join('\n'))
@@ -252,7 +252,7 @@ describe('test-unbound', () => {
   it('counts per file the tests no element names by title or describe block; a whole file or directory covers none', () => {
     const data = model()
     // An umbrella over the whole e2e suite, as "E2E regression" has.
-    data.nodes.push(node('ff-all', 'fitness-fn', 'All e2e', { threshold: 't', tests: 'apps/e2e/tests' }))
+    data.nodes.push(node('ff-all', 'fitness-fn', 'All e2e', { metrics: 'test(apps/e2e/tests) passed' }))
     const [finding] = unbound(data, { include: ['apps/e2e/**'] })
     // The fitness function "Guard" names one test of the four precisely.
     expect(finding).toMatchObject({
@@ -266,7 +266,7 @@ describe('test-unbound', () => {
 
   it('takes a describe block as naming the tests in it, and leaves excluded files out', () => {
     const data = model()
-    data.nodes.push(node('sc-forge', 'scenario', 'Forge', { given: 'g', when: 'w', then: 't', tests: 'apps/e2e/tests/studio/boot.spec.ts › Forge' }))
+    data.nodes.push(node('sc-forge', 'scenario', 'Forge', { given: 'g', when: 'w', then: 't', metrics: 'test(apps/e2e/tests/studio/boot.spec.ts › Forge) passed' }))
     expect(unbound(data, { include: ['apps/e2e/'] }).map((f) => f.details)).toEqual([['boots']])
     expect(unbound(data, { include: ['apps/e2e/**'], exclude: ['**/boot.spec.ts'] })).toEqual([])
     // The unit tests are no part of it unless included.

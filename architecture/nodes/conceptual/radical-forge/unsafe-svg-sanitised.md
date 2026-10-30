@@ -4,7 +4,7 @@ type: "scenario"
 label: "Unsafe SVG sanitised"
 gherkin: "And a reply over 20,000 characters is refused"
 given: "the provider returns an SVG with a script, an onclick handler, a foreignObject and an external href"
-tests: "packages/common/tests/forgeWireframe.test.ts › sanitizeWireframeSvg › strips scripts, foreignObject, event handlers and external hrefs"
+metrics: "test(packages/common/tests/forgeWireframe.test.ts › sanitizeWireframeSvg › strips scripts, foreignObject, event handlers and external hrefs) passed"
 then: "all of these are stripped and only inert SVG remains"
 when: "the wireframe is stored"
 ---

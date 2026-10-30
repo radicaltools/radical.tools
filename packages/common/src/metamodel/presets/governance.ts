@@ -21,14 +21,17 @@ import { radicalViewpoints } from './viewpoints'
 /** What the default metamodel is called in the app. */
 export const RADICAL_METAMODEL_NAME = 'Radical'
 
-/** The automated tests that check a scenario or a fitness function, one per
- *  line as `<file> › <title>` (the title may start with its describe
- *  blocks). `radical check --report` finds them in the test reports. */
-const TESTS_PROPERTY: PropertyDef = {
-  key: 'tests',
-  label: 'Tests (one per line: file › title)',
-  type: 'textarea',
-}
+/** What checks a scenario or a fitness function: one condition per line, a
+ *  test that has to pass (`test(<file> › <title>) passed`, the title as
+ *  Vitest and Playwright print it) or a value a sensor measured with its
+ *  threshold (`api.latency.p95{env=staging} <= 300 ms`); how the outcomes
+ *  combine; and how old a measurement may be. `radical check` evaluates
+ *  them against the test reports and what `radical sense` measured. */
+export const METRICS_PROPERTIES: PropertyDef[] = [
+  { key: 'metrics', label: 'Metrics (one per line: test(file › title) passed, or metric{labels} <= value unit)', type: 'textarea' },
+  { key: 'combine', label: 'Combine (all, any, at least N)', type: 'text' },
+  { key: 'max_age', label: 'Max age of a measurement (e.g. 7d)', type: 'text' },
+]
 
 export function builtInGovernanceMetamodel(): Metamodel {
   const base = builtInDddC4Metamodel()
@@ -99,8 +102,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       options: ['structural', 'operational', 'process', 'holistic'],
       default: 'structural',
     },
-    { key: 'threshold', label: 'Threshold / Success criteria', type: 'text' },
-    TESTS_PROPERTY,
+    ...METRICS_PROPERTIES,
   ]
 
   const fitnessFn: NodeTypeDef = {
@@ -127,8 +129,8 @@ export function builtInGovernanceMetamodel(): Metamodel {
           help: 'Name the architectural characteristic this function protects, e.g. "Checkout p95 latency".' },
         { kind: 'fields', title: 'What it measures', fields: ['description'],
           help: 'How is the characteristic measured — a test, a metric, a static check?' },
-        { kind: 'fields', title: 'Success criteria', fields: ['threshold'],
-          help: 'When does it pass? Give a concrete threshold, e.g. "p95 < 300 ms".' },
+        { kind: 'fields', title: 'Success criteria', fields: ['metrics'],
+          help: 'When does it pass? One condition per line: a measured value and its threshold, e.g. "checkout.latency.p95{env=prod} <= 300 ms", or a test that has to pass, e.g. "test(tests/architecture.test.ts › no cycles) passed".' },
         { kind: 'relations', title: 'Verified decisions', relationType: 'implements', direction: 'out',
           help: 'Which ADRs does this fitness function verify?' },
         { kind: 'relations', title: 'Guarded elements', relationType: 'constrains', direction: 'out',
@@ -362,7 +364,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     { key: 'when',    label: 'When',  type: 'textarea' },
     { key: 'then',    label: 'Then',  type: 'textarea' },
     { key: 'gherkin', label: 'Extra steps (And/But, raw Gherkin)', type: 'textarea' },
-    TESTS_PROPERTY,
+    ...METRICS_PROPERTIES,
   ]
 
   const scenario: NodeTypeDef = {

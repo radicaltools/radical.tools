@@ -4,7 +4,7 @@ type: "scenario"
 label: "Agent adds custom type"
 gherkin: "And a risk node with a severity property can be added and linked"
 given: "an MCP server bound to a folder that uses the built-in metamodel"
-tests: "apps/mcp/src/catalogueTools.test.ts › copies a built-in metamodel on the first edit, persists it and refreshes tool schemas"
+metrics: "test(apps/mcp/src/catalogueTools.test.ts › copies a built-in metamodel on the first edit, persists it and refreshes tool schemas) passed"
 then: "the metamodel is saved as c4-ddd-governance-custom, the reply says it was copied, and add_node now lists risk as a type"
 when: "the agent upserts a new node type risk"
 ---

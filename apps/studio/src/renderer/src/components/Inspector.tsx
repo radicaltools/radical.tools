@@ -31,6 +31,7 @@ type Tab = InspectorTab
 export function Inspector(): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
   const results = useInspectorStore((s) => s.results)
+  const measurements = useInspectorStore((s) => s.measurements)
   const configError = useInspectorStore((s) => s.configError)
   const config = useInspectorStore((s) => s.config)
   const draft = useSettingsDraft()
@@ -58,8 +59,8 @@ export function Inspector(): React.ReactElement {
     return { nodes: branch.changes.nodes, baseNodes }
   }, [branch.changes, branch.baseModel])
   const work = useMemo(() => branch.changes && branch.baseModel && branch.model
-    ? changeWork(branch.changes, branch.baseModel, branch.model, metamodel, results?.cases)
-    : null, [branch.changes, branch.baseModel, branch.model, metamodel, results])
+    ? changeWork(branch.changes, branch.baseModel, branch.model, metamodel, results?.cases, measurements ?? undefined)
+    : null, [branch.changes, branch.baseModel, branch.model, metamodel, results, measurements])
 
   if (!check) return <div className="insp"><div className="insp-main"><p className="insp-muted">Checking the model…</p></div></div>
 

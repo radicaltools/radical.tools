@@ -497,14 +497,19 @@
           "type": "enum"
         },
         {
-          "key": "threshold",
-          "label": "Threshold / Success criteria",
+          "key": "metrics",
+          "label": "Metrics (one per line: test(file › title) passed, or metric{labels} <= value unit)",
+          "type": "textarea"
+        },
+        {
+          "key": "combine",
+          "label": "Combine (all, any, at least N)",
           "type": "text"
         },
         {
-          "key": "tests",
-          "label": "Tests (one per line: file › title)",
-          "type": "textarea"
+          "key": "max_age",
+          "label": "Max age of a measurement (e.g. 7d)",
+          "type": "text"
         }
       ],
       "width": 180,
@@ -529,7 +534,7 @@
           },
           {
             "fields": [
-              "threshold"
+              "metrics"
             ],
             "help": "When does it pass? Give a concrete threshold, e.g. \"p95 < 300 ms\".",
             "kind": "fields",
@@ -844,9 +849,19 @@
           "type": "textarea"
         },
         {
-          "key": "tests",
-          "label": "Tests (one per line: file › title)",
+          "key": "metrics",
+          "label": "Metrics (one per line: test(file › title) passed, or metric{labels} <= value unit)",
           "type": "textarea"
+        },
+        {
+          "key": "combine",
+          "label": "Combine (all, any, at least N)",
+          "type": "text"
+        },
+        {
+          "key": "max_age",
+          "label": "Max age of a measurement (e.g. 7d)",
+          "type": "text"
         }
       ],
       "width": 200,

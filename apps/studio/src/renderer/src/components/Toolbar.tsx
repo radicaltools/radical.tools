@@ -623,15 +623,16 @@ function letGoOfFocus(): void {
 
 /** The Inspector perspective, with how many errors and warnings the check
  *  finds in the model now. Greyed out while the model has no report of
- *  `radical check --report` beside it: there is nothing to inspect yet. */
+ *  `radical check --report` and nothing `radical sense` measured beside it:
+ *  there is nothing to inspect yet. */
 function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
   const check = useInspectorStore((s) => s.check)
-  const hasReport = useInspectorStore((s) => s.results !== null)
+  const hasReport = useInspectorStore((s) => s.results !== null || s.measurements !== null)
   // With a base beside the model, This change lists the branch's changes.
   const hasBase = useBranchStore((s) => s.base !== null)
   const enabled = hasReport || hasBase || active
   const title = !enabled
-    ? 'Inspector — no check report beside this model yet. Run radical check <model folder> --report <test reports> to make one; Studio picks it up by itself.'
+    ? 'Inspector — no check report or measurements beside this model yet. Run radical check <model folder> --report <test reports>, or radical sense, to make one; Studio picks it up by itself.'
     : check
       ? `Inspector — what radical check says about the model: ${check.errors} errors, ${check.warnings} warnings`
       : 'Inspector — what radical check says about the model'

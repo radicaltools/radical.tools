@@ -6,7 +6,7 @@ gherkin: |
   And the Models dialog shows the model under Folders with a FOLDER badge
   And nodes/customer.md has the label in its front-matter and the description as its body
 given: "the bookstore sample is open as a local model in a browser with folder access"
-tests: "apps/e2e/tests/studio/folders.spec.ts › save as folder writes one Markdown file per element"
+metrics: "test(apps/e2e/tests/studio/folders.spec.ts › save as folder writes one Markdown file per element) passed"
 then: "the folder holds radical.md, one .md per element with systems and containers as directories with _index.md, relations.json and _layout.json"
 when: "the user chooses Save as folder… in Manage models"
 ---

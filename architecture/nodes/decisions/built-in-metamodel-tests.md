@@ -3,10 +3,11 @@ id: "e7c8c7ff-8512-490c-aeda-9fb3a6367dab"
 type: "fitness-fn"
 label: "Built-in metamodel tests"
 category: "structural"
-tests: |
-  packages/ui/tests/model.test.ts › built-in metamodels
-  apps/e2e/tests/studio/boot.spec.ts
-threshold: "All suites pass in CI"
+metrics: |
+  test(packages/ui/tests/model.test.ts › built-in metamodels) passed
+  test(apps/e2e/tests/studio/boot.spec.ts) passed
 ---
 
 packages/ui/tests/model.test.ts › built-in metamodels: availableMetamodels() offers exactly the Radical metamodel and C4, in that order, and a document saved with c4-ddd-builtin loads as the Radical metamodel with every C4 + DDD type unchanged; apps/e2e/tests/studio/boot.spec.ts (the New model step preselects the Radical metamodel).
+
+Threshold: All suites pass in CI

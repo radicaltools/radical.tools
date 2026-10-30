@@ -4,7 +4,7 @@ type: "scenario"
 label: "Idle nested canvas stays still"
 gherkin: "And this is a known bug: the live WebCoLa layout never converges on nested views (marked test.fail)"
 given: "the bookstore fixture is open on the Containers view, which shows nested elements"
-tests: "apps/e2e/tests/studio/physics.spec.ts › a diagram keeps the layout it is opened with"
+metrics: "test(apps/e2e/tests/studio/physics.spec.ts › a diagram keeps the layout it is opened with) passed"
 then: "every element keeps its position"
 when: "nobody touches the canvas for two seconds"
 ---

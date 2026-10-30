@@ -9,7 +9,8 @@
 
 import type { C4Node, C4Relation } from '../c4'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
-import { linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type TestOutcome } from './evidence'
+import { conditionResults, conditionsOf, linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type TestOutcome } from './evidence'
+import { formatAge, parseCombine, parseMaxAge, type Measurement } from './metrics'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
@@ -44,6 +45,12 @@ export interface CheckModel {
   metamodel: Metamodel
   /** The test cases of the reports passed in; the test rules run only with them. */
   tests?: TestCase[]
+  /** The measurements passed in; the metric rules that read values run only
+   *  with them. */
+  measurements?: Measurement[]
+  /** The time conditions are evaluated at (ms since the epoch), for max_age;
+   *  now when not given. */
+  now?: number
   /** The config's rule settings, for rules that take options. */
   settings?: Record<string, import('./index').RuleSetting>
   /** The Hub's concern packs, for concern-unaddressed; without them it
@@ -60,6 +67,8 @@ export interface CheckRule {
   dimension: CheckDimension
   /** It reads the outcomes in test reports: without them it does not run. */
   readsReports?: true
+  /** It reads measurements: without them it does not run. */
+  readsMeasurements?: true
   run(model: CheckModel): RuleFinding[]
 }
 
@@ -129,6 +138,46 @@ function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, mode
           return { nodeId: node.id, message: message(node, o.id.raw, model), ...(related.length ? { relatedIds: related } : {}) }
         }))
   }
+}
+
+/** A rule over the metric conditions with `outcome`, with measurements. A
+ *  failing one names what it leaves unverified as related. */
+function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition: string, detail: string) => string): (model: CheckModel) => RuleFinding[] {
+  return (model) => {
+    if (!model.measurements) return []
+    return Object.values(model.nodes)
+      .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
+      .flatMap((node) => {
+        const metricLines = new Set(conditionsOf(node).filter((c) => c.kind === 'metric').map((c) => c.raw))
+        return conditionResults(node, model)
+          .filter((r) => r.outcome === outcome && metricLines.has(r.condition))
+          .map((r) => {
+            const m = r.measurement
+            const seen = m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
+            const related = outcome === 'failed' ? affectedBy(model, node).map((n) => n.id) : []
+            return { nodeId: node.id, message: message(node, r.condition, seen), ...(related.length ? { relatedIds: related } : {}) }
+          })
+      })
+  }
+}
+
+/** What in a node's checks cannot be read: lines that are no condition,
+ *  units that do not convert, a combine or max_age that is none. */
+function invalidChecks(model: CheckModel): RuleFinding[] {
+  return Object.values(model.nodes)
+    .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
+    .flatMap((node) => {
+      const what = `${TYPE_NAME[node.type]} ${quote(node)}`
+      const found: RuleFinding[] = conditionsOf(node).flatMap((c) => c.kind === 'invalid' ? [{ nodeId: node.id, message: `${what}: "${c.raw}" cannot be read: ${c.problem}.` }] : [])
+      if (model.measurements) {
+        for (const r of conditionResults(node, model)) {
+          if (r.outcome === 'invalid' && r.measurement) found.push({ nodeId: node.id, message: `${what}: "${r.condition}" cannot be evaluated: ${r.detail}.` })
+        }
+      }
+      if (!parseCombine(prop(node, 'combine'))) found.push({ nodeId: node.id, message: `${what}: combine "${prop(node, 'combine')}" is none of all, any, at least N.` })
+      if (parseMaxAge(prop(node, 'max_age')) === null) found.push({ nodeId: node.id, message: `${what}: max_age "${prop(node, 'max_age')}" is no age such as 7d, 12h or 30min.` })
+      return found
+    })
 }
 
 export const CHECK_RULES: CheckRule[] = [
@@ -281,28 +330,27 @@ export const CHECK_RULES: CheckRule[] = [
       })),
   },
   {
-    id: 'fitness-fn-without-threshold',
-    description: 'Every fitness function states its threshold or success criteria.',
-    severity: 'warning',
-    dimension: 'completeness',
-    run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !prop(n, 'threshold'))
-      .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} states no threshold.` })),
-  },
-  {
-    id: 'scenario-without-tests',
-    description: 'Every scenario names the automated tests that run it (property `tests`, one `file › title` per line).',
+    id: 'scenario-without-metrics',
+    description: 'Every scenario states what checks it (property `metrics`, one condition per line: `test(<file> › <title>) passed` or `<metric>{<labels>} <op> <number> [unit]`).',
     severity: 'warning',
     dimension: 'traceability',
-    run: (model) => nodesOf(model, 'scenario').filter((n) => !testIdsOf(n).length)
-      .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no test.` })),
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length)
+      .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no check.` })),
   },
   {
-    id: 'fitness-fn-without-tests',
-    description: 'Every fitness function names the automated checks that run it (property `tests`).',
+    id: 'fitness-fn-without-metrics',
+    description: 'Every fitness function states what checks it and when it passes (property `metrics`, one condition per line).',
     severity: 'warning',
     dimension: 'decisions',
-    run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !testIdsOf(n).length)
-      .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} names no test.` })),
+    run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !conditionsOf(n).length)
+      .map((n) => ({ nodeId: n.id, message: `Fitness function ${quote(n)} names no check.` })),
+  },
+  {
+    id: 'metric-invalid',
+    description: 'Every line of a scenario\'s or fitness function\'s `metrics` reads as a condition, its unit converts to the unit of the measurement it matches, and `combine` and `max_age` read.',
+    severity: 'error',
+    dimension: 'completeness',
+    run: invalidChecks,
   },
   {
     id: 'test-failed',
@@ -335,6 +383,30 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'tests',
     readsReports: true,
     run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
+  },
+  {
+    id: 'metric-failed',
+    description: 'With measurements: every metric condition a scenario or fitness function states holds for the latest measurement it matches.',
+    severity: 'error',
+    dimension: 'tests',
+    readsMeasurements: true,
+    run: metricRule('failed', (node, condition, seen) => `${TYPE_NAME[node.type]} ${quote(node)}: ${condition} does not hold${seen}.`),
+  },
+  {
+    id: 'metric-stale',
+    description: 'With measurements: the latest measurement each metric condition matches is no older than the element\'s max_age (a stale one never passes).',
+    severity: 'warning',
+    dimension: 'tests',
+    readsMeasurements: true,
+    run: metricRule('stale', (node, condition, seen) => `${TYPE_NAME[node.type]} ${quote(node)}: ${condition} has only a stale measurement${seen}.`),
+  },
+  {
+    id: 'metric-not-measured',
+    description: 'With measurements: a measurement matches every metric condition a scenario or fitness function states.',
+    severity: 'warning',
+    dimension: 'tests',
+    readsMeasurements: true,
+    run: metricRule('not-run', (node, condition) => `${TYPE_NAME[node.type]} ${quote(node)}: nothing measured ${condition}.`),
   },
   {
     id: 'test-unbound',

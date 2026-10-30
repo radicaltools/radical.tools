@@ -10,7 +10,7 @@
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseTestResults, type CheckConfig, type CheckResult, type TestResults } from '@radical/common/check'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseTestResults, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -24,6 +24,9 @@ const RECHECK_MS = 400
 interface InspectorState {
   /** The test results kept beside the model, when there are any. */
   results: TestResults | null
+  /** What `radical sense` measured, kept beside the model, when there is a
+   *  store of it. */
+  measurements: Measurement[] | null
   config: CheckConfig
   /** Why check.json could not be read, when it could not. */
   configError: string | null
@@ -37,7 +40,7 @@ interface InspectorState {
   settingsDrafts: Record<string, CheckConfig>
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {} }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {} }))
 
 /** The unsaved Settings of the active document, or null. */
 export function useSettingsDraft(): CheckConfig | null {
@@ -101,25 +104,26 @@ function recheck(): void {
   // Until the model and the files beside it are in, there is nothing whole
   // to show; the Inspector says it is checking.
   if (!id || filesReadFor !== id || loadingDocumentId() === id) return
-  const { results, config } = useInspectorStore.getState()
+  const { results, measurements, config } = useInspectorStore.getState()
   // saveDiagram gives the live model also while a milestone is on screen.
   // The Hub's concern packs, for concern-unaddressed (none until loaded).
   const concerns = packs
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases } : {}), concerns })
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases } : {}), ...(measurements ? { measurements } : {}), concerns })
   useInspectorStore.setState({ check })
 }
 
 if (typeof window !== 'undefined') {
   let polledFor: string | null = null
   let lastResults = ''
+  let lastMeasurements = ''
 
   const poll = async (): Promise<void> => {
     const id = documents.getActiveId()
     if (id !== polledFor) {
       polledFor = id
       filesReadFor = null
-      lastResults = lastConfig = ''
-      useInspectorStore.setState({ results: null, config: {}, configError: null, check: null, configText: '' })
+      lastResults = lastConfig = lastMeasurements = ''
+      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '' })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
@@ -128,21 +132,23 @@ if (typeof window !== 'undefined') {
     if (documents.getActiveId() !== id || !files) return
     const resultsText = files.results ?? ''
     const configText = files.config ?? ''
-    if (filesReadFor === id && resultsText === lastResults && configText === lastConfig) return
+    const measurementsText = files.measurements ?? ''
+    if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements) return
     filesReadFor = id
     // The concern packs, once, for a model that has a check report or
     // settings beside it: the one the Inspector is for.
-    if ((resultsText || configText) && !packsLoading) {
+    if ((resultsText || configText || measurementsText) && !packsLoading) {
       packsLoading = loadBundledConcepts().then((concepts) => { packs = concernPacks(concepts); recheck() })
     }
     lastResults = resultsText
     lastConfig = configText
+    lastMeasurements = measurementsText
     let config: CheckConfig = {}
     let configError: string | null = null
     if (configText) {
       try { config = parseCheckConfig(configText) } catch (error) { configError = `check.json: ${(error as Error).message}` }
     }
-    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, config, configError, configText })
+    useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, measurements: measurementsText ? parseMeasurementStore(measurementsText) : null, config, configError, configText })
     recheck()
   }
 

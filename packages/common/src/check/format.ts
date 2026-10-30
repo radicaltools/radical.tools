@@ -25,7 +25,7 @@ export function formatCheckText(result: CheckResult, options: FormatOptions): st
   for (const rule of result.rules) {
     if (rule.notRun) {
       // Not ✓: it found nothing because it did not look.
-      if (rule.max !== undefined && rule.severity !== 'off') lines.push(`– ${rule.id}  not run: ${rule.notRun === 'no-report' ? 'no test report' : rule.notRun === 'no-folder' ? 'no model folder' : 'the folder is no model'} (max ${rule.max})`)
+      if (rule.max !== undefined && rule.severity !== 'off') lines.push(`– ${rule.id}  not run: ${rule.notRun === 'no-report' ? 'no test report' : rule.notRun === 'no-measurements' ? 'no measurements' : rule.notRun === 'no-folder' ? 'no model folder' : 'the folder is no model'} (max ${rule.max})`)
       continue
     }
     if (rule.severity === 'off' || rule.count === 0) {
@@ -74,13 +74,14 @@ export function formatCheckGithub(result: CheckResult, options: FormatOptions): 
   return [...lines, formatCheckText(result, options)].join('\n')
 }
 
-const STATUS_ORDER = ['verified', 'passed', 'broken', 'failed', 'not-run', 'unverified', 'no-tests']
+const STATUS_ORDER = ['verified', 'passed', 'broken', 'failed', 'stale', 'not-run', 'unverified', 'no-checks']
 const SUMMARY_TYPES: Array<[string, string]> = [['requirement', 'Requirements'], ['scenario', 'Scenarios'], ['adr', 'ADRs'], ['fitness-fn', 'Fitness functions']]
 
 /** One line per type: how many have each status in the evidence. */
 function evidenceSummary(result: CheckResult): string[] {
   const entries = Object.values(result.evidence!.nodes)
-  const lines = [`Test reports: ${plural(result.evidence!.testCases, 'test case')}`]
+  const measured = result.evidence!.measurements
+  const lines = [`Test reports: ${plural(result.evidence!.testCases, 'test case')}${measured !== undefined ? `; measurements: ${measured}` : ''}`]
   for (const [type, name] of SUMMARY_TYPES) {
     const ofType = entries.filter((e) => e.type === type)
     if (!ofType.length) continue

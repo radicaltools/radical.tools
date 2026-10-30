@@ -16,6 +16,7 @@
 // `Record<relativePath, fileContent>` map so they can be unit-tested and reused
 // by both the Electron and web builds.
 
+import { migrateChecks } from './checksMigration'
 import type {
   DiagramData,
   C4Node,
@@ -499,7 +500,7 @@ export function deserializeFromMdFolder(
   if (layout.defaultEdgeStyle === 'orthogonal') data.defaultEdgeStyle = layout.defaultEdgeStyle
 
   const manifest = typeof files[MD_MANIFEST_FILE] === 'string' ? parseMarkdown(files[MD_MANIFEST_FILE]).front.name : undefined
-  return { data, ...(typeof manifest === 'string' && manifest.trim() ? { name: manifest.trim() } : {}) }
+  return { data: migrateChecks(data), ...(typeof manifest === 'string' && manifest.trim() ? { name: manifest.trim() } : {}) }
 }
 
 /** True when the file map looks like a Radical md-folder (has the manifest). */
