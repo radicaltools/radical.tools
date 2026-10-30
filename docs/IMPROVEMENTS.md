@@ -381,6 +381,12 @@ Still open after it (measured on radical.tools' own model ×14, see
   would not.
 - Quick Search: the first letter folds every text (0.4 s); an idle warm-up
   after opening would hide it.
+- Opening straight from the cache, before listing the files, would save
+  another second at 20,000 files, but is not safe as it stands: Studio's own
+  saves leave the cache behind, and reloading what the poll then finds
+  changed keeps the open canvas's places, so the old places were shown and
+  saved again (it broke `folders.spec.ts`'s drag-during-outside-write test).
+  It needs saves to keep the cache current and a stale open to load afresh.
 
 ### Dogfooding (2026-10-29): sensors apart from the engine
 

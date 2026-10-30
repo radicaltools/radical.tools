@@ -92,31 +92,6 @@ describe('a model folder\'s cache', () => {
     expect(await session.readAll()).toEqual(f.files)
     await expect(session.cacheWritten()).resolves.toBeUndefined()
   })
-  it('opens as the cache has it, without looking at the files, and the next poll reports what changed since', async () => {
-    const f = folder(20)
-    await f.open()
-    f.edit('nodes/n3.md', '---\nid: n3\ntype: component\nlabel: Pulled\n---\n')
-    let lists = 0
-    const storage = {
-      list: async () => { lists++; return { ...f.stamps } },
-      read: async (path: string) => { f.state.reads.push(path); return f.files[path] },
-      write: async () => '1', remove: async () => {},
-      readCache: async () => f.state.cache,
-    }
-    const session = new MdFolderSession(storage, { openFromCache: true })
-    const changes: string[][] = []
-    session.onExternalChange = (paths) => changes.push(paths)
-    f.state.reads = []
-    const first = await session.readAll()
-    expect(lists).toBe(0)
-    expect(f.state.reads).toEqual([])
-    expect(first['nodes/n3.md']).toContain('label: N3')
-    // The poll finds the file changed since the cache, as an outside edit.
-    expect(await session.poll()).toEqual(['nodes/n3.md'])
-    expect(changes).toEqual([['nodes/n3.md']])
-    // Read again (the reload that follows): the files as they are.
-    expect((await session.readAll())['nodes/n3.md']).toContain('label: Pulled')
-  })
 })
 
 describe('the cache file', () => {

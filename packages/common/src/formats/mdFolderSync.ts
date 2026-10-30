@@ -131,12 +131,8 @@ export class MdFolderSession {
 
   /** `writeCache: false`: read the folder's cache when there is one, never
    *  write it (the CLI, which exits as soon as it is done; Studio and the
-   *  MCP server keep it). `openFromCache`: the session's first read takes
-   *  the folder as its cache has it, without looking at the files first;
-   *  the next poll finds what changed since and reports it as an outside
-   *  edit (Studio, which polls; not the MCP server, which reads once per
-   *  call and must see the files as they are). */
-  constructor(private readonly storage: MdFolderStorage, private readonly options: { writeCache?: boolean; openFromCache?: boolean } = {}) {}
+   *  MCP server keep it). */
+  constructor(private readonly storage: MdFolderStorage, private readonly options: { writeCache?: boolean } = {}) {}
 
   /** Read every model file and make that the baseline. */
   readAll(): Promise<FolderFiles> {
@@ -227,19 +223,11 @@ export class MdFolderSession {
   /** `rebuildCache`: write the cache again when it is out of date (not
    *  for a write, which changes the folder at once). */
   private async loadBaseline(rebuildCache = true): Promise<void> {
-    const cached = this.storage.readCache ? readModelCache(await this.storage.readCache().catch(() => null)) : null
-    // Opened as the cache has it; the stamps it has are the ones last seen,
-    // so the next poll reads what changed since and reports it.
-    if (cached && this.options.openFromCache && !this.loaded && rebuildCache) {
-      this.baseline = new Map(Object.entries(cached).map(([path, { content, stamp }]) => [path, { content, stamp }]))
-      this.observed = Object.fromEntries(Object.entries(cached).map(([path, { stamp }]) => [path, stamp]))
-      this.loaded = true
-      return
-    }
     const stamps = await this.storage.list()
     const paths = Object.keys(stamps)
     // Each file whose stamp the cache has comes from it; only the others
     // are read (ADR Model cache beside the model).
+    const cached = this.storage.readCache ? readModelCache(await this.storage.readCache().catch(() => null)) : null
     const toRead = cached ? paths.filter((path) => cached[path]?.stamp !== stamps[path]) : paths
     const contents = await readEach(toRead, (path) => this.storage.read(path))
     const read = new Map(toRead.map((path, i) => [path, contents[i]]))

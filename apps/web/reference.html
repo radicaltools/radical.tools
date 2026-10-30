@@ -576,7 +576,7 @@ radical-mcp --version</code></pre>
           <li>Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the properties, sorted) and the description as body. Hierarchy is the directory tree.</li>
           <li>Output is deterministic: sorted keys, stable file names. A file is named after its element and keeps its name until the element is renamed or moved; two of one name are <code>orders-db.md</code> and <code>orders-db-2.md</code>.</li>
           <li>Edit the files by hand or through the MCP server; Studio picks them up and merges what you have not saved yet. A file with a byte-order mark reads as any other.</li>
-          <li>The files are the model; <code>.radical/cache/model.json</code> only repeats them, each with its modification time and size. Studio opens a folder from it and then reads what changed since (after a pull, or an agent's edits), the MCP server reads from it each file that has not changed, and the CLI reads it when it is there. Studio and the MCP server write it again when it is missing or well out of date; deleting it is always safe.</li>
+          <li>The files are the model; <code>.radical/cache/model.json</code> only repeats them, each with its modification time and size. Studio and the MCP server take from it each file that has not changed and read only the others (after a pull, or an agent's edits), and the CLI reads it when it is there. Studio and the MCP server write it again when it is missing or well out of date; deleting it is always safe.</li>
         </ul>
       </section>
 

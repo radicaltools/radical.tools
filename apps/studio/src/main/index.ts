@@ -32,9 +32,7 @@ function folderSession(folderPath: string): MdFolderSession {
   const key = resolve(folderPath)
   let session = folderSessions.get(key)
   if (!session) {
-    // Opened as the folder's cache has it; the poll reloads what changed
-    // since (ADR Model cache beside the model).
-    session = new MdFolderSession(diskFolderStorage(key), { openFromCache: true })
+    session = new MdFolderSession(diskFolderStorage(key))
     session.onExternalChange = (paths) => {
       if (!watchedFolder || resolve(watchedFolder) !== key) return
       for (const win of BrowserWindow.getAllWindows()) {
