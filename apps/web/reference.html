@@ -346,6 +346,9 @@
               <tr><td><code>--config &lt;file&gt;</code></td><td>Rule settings. Default: <code>check.json</code> in the model folder.</td></tr>
               <tr><td><code>--format text|json|github</code></td><td>Plain text (default), JSON, or GitHub Actions annotations.</td></tr>
               <tr><td><code>--report &lt;path&gt;</code></td><td>A test report (Vitest or Jest JSON, Playwright JSON, JUnit XML) or a directory of them; repeat for more. The test cases read are kept in <code>.radical/test-results.json</code> for the Inspector. A report with no test case stops the check with status 2.</td></tr>
+              <tr><td><code>--from-ci</code></td><td>Reads the test reports of CI instead of <code>--report</code>: those of the latest completed GitHub Actions runs of the nearest commit in HEAD's history that CI tested (a commit merged from a pull request stands for the pull request's head), downloaded with the GitHub CLI (<code>gh</code>, signed in). The artifacts read are <code>check.json</code>'s <code>"ci": { "artifacts": [&hellip;] }</code>, or every artifact of the run. They are kept in <code>.radical/test-results.json</code> with the commit and runs they come from, unless the results there were read with <code>--report</code> at that commit or a later one.</td></tr>
+              <tr><td><code>--quiet</code></td><td>Prints nothing.</td></tr>
+              <tr><td><code>--detach</code></td><td>Starts the same check in the background and returns at once; the git hooks run <code>--from-ci --quiet --detach</code>.</td></tr>
               <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.radical/measurements.json</code>, which the check reads without the option too. The reviews in the model folder's <code>reviews.json</code> are read as measurements as well.</td></tr>
               <tr><td><code>--baseline &lt;path&gt;</code></td><td>Earlier <code>radical-metrics/1</code> files, or a directory of them, that a condition against a baseline compares with (the median of the latest seven of its metric). Read only; never kept beside the model.</td></tr>
               <tr><td><code>--trigger &lt;event&gt;</code></td><td>The event the check runs on (<code>pull-request</code> in the gate): a metric condition of a fitness function that runs on another event, or continually, is not reported when nothing measured it.</td></tr>
@@ -447,6 +450,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
         </div>
         <ul>
           <li><code>radical hooks install &lt;folder&gt;</code> adds the four hooks. A fetch, a reset or a stash runs no hook.</li>
+          <li>After saving the base, each hook starts <code>radical check &lt;folder&gt; --from-ci --quiet</code> in the background, so the Inspector has the test results of CI for the commit checked out. Without the GitHub CLI it does nothing.</li>
           <li>Committing keeps the base, so the list holds the whole branch's work. After the pull request is merged, switch to <code>main</code> and pull: the list empties.</li>
           <li>To see only what is not committed yet: <code>radical diff &lt;folder&gt; --save-base --since HEAD</code>.</li>
           <li>A folder outside git has no base from git. A Radical Forge run on such a folder saves the model before it as the base; the next run replaces it.</li>
@@ -591,7 +595,7 @@ radical-mcp --version</code></pre>
    ├─ base.json               <span class="cm"># the model where the branch left main</span>
    ├─ forge-run.json          <span class="cm"># where an agent's Forge run stands</span>
    ├─ agent-activity.json     <span class="cm"># an agent is writing</span>
-   ├─ test-results.json       <span class="cm"># test cases from the last radical check --report</span>
+   ├─ test-results.json       <span class="cm"># test cases from the last radical check --report or --from-ci</span>
    ├─ measurements.json       <span class="cm"># the latest value of each metric, from radical sense and --metrics</span>
    └─ cache/                  <span class="cm"># the folder in a few files, for opening it fast; safe to delete</span></code></pre>
         <ul>

@@ -8,9 +8,9 @@
 // reads it again.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { formatAge, type Measurement, type TestResults } from '@radical/common/check'
+import { formatAge, testsRanAt, type Measurement, type TestResults } from '@radical/common/check'
 import { Command } from '../BranchChanges'
-import { isOutdated, latestOf, measureCommands, measuredWhen, reviewCommand, runsWithPullRequest, testsAge, testsCommand } from './attention'
+import { ciTestsCommand, isOutdated, latestOf, measureCommands, measuredWhen, reviewCommand, runsWithPullRequest, testsAge, testsCommand, testsSource } from './attention'
 
 const when = (at: number): string => new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -57,23 +57,32 @@ export function FreshnessChips({ results, measurements, folder, changedAt, waiti
 }): React.ReactElement {
   const now = Date.now()
   const why = changedAt != null ? 'The model changed after these were read: they may not hold for it now.' : 'Older than a day: the model or the code may have changed since.'
-  const readAt = results ? Date.parse(results.readAt) : null
+  // Results from CI are as old as the run that made them.
+  const readAt = results ? Date.parse(testsRanAt(results)) : null
+  const ci = results?.ci
   const sensed = latestOf(measurements, false)
   const reviewed = latestOf(measurements, true)
   return (
     <span className="insp-ages" aria-label="Evidence">
       {readAt !== null ? (
-        <Chip name="Tests" text={testsAge(readAt, now)} marked={isOutdated(readAt, now, changedAt)} why={why}>
-          <p><b>Test results read {when(readAt)}</b>, {plural(results!.cases.length, 'test case')}.</p>
+        <Chip name="Tests" text={`${testsAge(readAt, now)}${ci ? ' · CI' : ''}`} marked={isOutdated(readAt, now, changedAt)} why={why}>
+          <p><b>{ci ? `Test results of CI, run ${when(readAt)}` : `Test results read ${when(readAt)}`}</b>, {plural(results!.cases.length, 'test case')}.</p>
           {isOutdated(readAt, now, changedAt) && <p className="insp-age-why">{why}</p>}
-          <p className="insp-muted">From {results!.reports.length ? results!.reports.map((r, i) => <React.Fragment key={r}>{i ? ', ' : ''}<code>{r}</code></React.Fragment>) : 'no report named'}.</p>
-          <p>Read them again in the repository:</p>
-          <Command text={testsCommand(folder)} />
+          <p>{testsSource(results!)}.</p>
+          {ci ? (
+            <p className="insp-muted">{ci.runs.map((r, i) => <React.Fragment key={r.id}>{i ? ', ' : ''}<a href={r.url} target="_blank" rel="noreferrer">{r.workflow} run {r.id}</a> ({r.artifacts.join(', ')})</React.Fragment>)}.</p>
+          ) : (
+            <p className="insp-muted">From {results!.reports.length ? results!.reports.map((r, i) => <React.Fragment key={r}>{i ? ', ' : ''}<code>{r}</code></React.Fragment>) : 'no report named'}.</p>
+          )}
+          <p>{ci ? 'The git hooks fetch them after a checkout, a commit and a pull; fetch them now, or run the tests and read their reports:' : 'Read them again in the repository, or fetch those of CI:'}</p>
+          <Command text={ci ? ciTestsCommand(folder) : testsCommand(folder)} />
+          <Command text={ci ? testsCommand(folder) : ciTestsCommand(folder)} />
         </Chip>
       ) : (
         <Chip name="Tests" marked={false} none why={why}>
           <p><b>No test results beside this model.</b></p>
-          <p>Run the tests and read their reports in the repository:</p>
+          <p>Fetch those of CI for the commit checked out, or run the tests and read their reports in the repository:</p>
+          <Command text={ciTestsCommand(folder)} />
           <Command text={testsCommand(folder)} />
         </Chip>
       )}

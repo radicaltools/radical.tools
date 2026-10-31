@@ -4,11 +4,11 @@
  * when it is marked, and the fields of a changed element by their labels.
  */
 import { describe, expect, it } from 'vitest'
-import { computeEvidence, type CheckFinding, type CheckResult, type Measurement, type TestCase } from '@radical/common/check'
+import { computeEvidence, testsRanAt, type CheckFinding, type CheckResult, type Measurement, type TestCase, type TestResults } from '@radical/common/check'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import {
-  DAY, attentionGroups, fieldLabel, isOutdated, latestOf, measureCommands, measuredWhen, modelChangedAt, notRunItems, ruleName, testsAge, testsCommand,
+  DAY, attentionGroups, fieldLabel, isOutdated, latestOf, measureCommands, measuredWhen, modelChangedAt, notRunItems, ruleName, testsAge, testsCommand, testsSource, ciTestsCommand,
   triggerOf, unverifiedBreakdown, valueText, waitingForMeasurement,
 } from '../src/renderer/src/components/inspector/attention'
 
@@ -99,8 +99,22 @@ describe('how old the evidence is', () => {
     expect(latestOf(null, false)).toBeNull()
   })
 
+  it('says the commit and run the results of CI come from', () => {
+    const base: TestResults = { version: 1, readAt: '2026-10-31T11:00:00Z', reports: [], cases: [] }
+    const run = { id: 41192813920, url: 'https://github.com/o/r/actions/runs/41192813920', sha: '70b7350d3705', ranAt: '2026-10-31T10:30:00Z', workflow: 'CI', artifacts: ['e2e-report', 'test-reports'] }
+    const fromCi = { ...base, ci: { provider: 'github' as const, commit: '0023cdb7f79f', behind: 2, runs: [{ ...run, pr: 299 }] } }
+    expect(testsSource(fromCi)).toBe('From CI, pull request #299, run 41192813920, for commit 0023cdb (2 commits before HEAD)')
+    expect(testsSource({ ...fromCi, ci: { ...fromCi.ci, behind: 0, runs: [run, { ...run, id: 7 }] } })).toBe('From CI, runs 41192813920, 7, for commit 0023cdb (HEAD)')
+    expect(testsSource({ ...base, commit: 'abcdef123456' })).toBe('Read with --report at commit abcdef1')
+    expect(testsSource(base)).toBe('Read with --report')
+    // As old as the run that made them, not as the download.
+    expect(testsRanAt(fromCi)).toBe('2026-10-31T10:30:00Z')
+    expect(testsRanAt(base)).toBe('2026-10-31T11:00:00Z')
+  })
+
   it('gives the commands that read them again for the model folder', () => {
     expect(testsCommand('architecture')).toBe('npm run test:reports && radical check architecture --report reports')
+    expect(ciTestsCommand('architecture')).toBe('radical check architecture --from-ci')
     expect(measureCommands('architecture')).toEqual([
       'radical sense run --trigger <event> --folder architecture --out reports/metrics',
       'radical check architecture --metrics reports/metrics',

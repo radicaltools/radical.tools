@@ -6,7 +6,7 @@
 // checks did not run, why a requirement or decision is not verified, and the
 // fields of a changed element as a person reads them.
 
-import type { CheckFinding, CheckResult, CheckSeverity, EvidenceEntry, Measurement } from '@radical/common/check'
+import type { CheckFinding, CheckResult, CheckSeverity, EvidenceEntry, Measurement, TestResults } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { formatAge } from '@radical/common/check'
 
@@ -104,6 +104,22 @@ export function latestOf(measurements: Measurement[] | null, reviews: boolean): 
 
 /** What reads the test results again, run in the repository. */
 export const testsCommand = (folder: string): string => `npm run test:reports && radical check ${folder} --report reports`
+
+/** What fetches the test results of CI for the commit checked out. */
+export const ciTestsCommand = (folder: string): string => `radical check ${folder} --from-ci`
+
+const short = (sha: string): string => sha.slice(0, 7)
+
+/** Where the test results come from, as a person reads it: the CI runs and
+ *  the commit they stand for, or the commit they were read at. */
+export function testsSource(results: TestResults): string {
+  const { ci } = results
+  if (!ci) return `Read with --report${results.commit ? ` at commit ${short(results.commit)}` : ''}`
+  const pr = ci.runs.find((r) => r.pr)?.pr
+  const runs = `run${ci.runs.length > 1 ? 's' : ''} ${ci.runs.map((r) => r.id).join(', ')}`
+  const behind = ci.behind === 0 ? 'HEAD' : `${ci.behind} commit${ci.behind > 1 ? 's' : ''} before HEAD`
+  return `From CI${pr ? `, pull request #${pr}` : ''}, ${runs}, for commit ${short(ci.commit)} (${behind})`
+}
 
 /** What measures again what runs on `trigger`, and what reads the
  *  measurements into the check. */

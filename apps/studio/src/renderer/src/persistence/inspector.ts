@@ -12,7 +12,7 @@
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -130,7 +130,7 @@ function recheck(): void {
   const concerns = packs
   // The kept results are a run of the past: a test they lack may have been
   // added since, so it and the goals they leave unmet are warnings.
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: results.readAt } : {}), ...(measurements ? { measurements } : {}), concerns })
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns })
   useInspectorStore.setState({ check })
 }
 

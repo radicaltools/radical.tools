@@ -246,7 +246,11 @@ radical hooks install path/to/model
 
 Adds one marked line to the repository's `post-checkout`, `post-commit`,
 `post-merge` and `post-rewrite` hooks that runs `radical diff <folder> --save-base --quiet`, so
-the base Studio compares with follows the branch checked out. The line goes
+the base Studio compares with follows the branch checked out, and then
+`radical check <folder> --from-ci --quiet --detach`, which fetches the test
+results of CI for the commit checked out in the background (a command of its
+own, its output closed: a CLI built before `--from-ci` still saves the
+base, and without the GitHub CLI nothing is fetched). The line goes
 right after the hook's `#!` line, where an `exit` or `exec` further down
 cannot skip it; what the hooks already do stays. Each model folder of the
 repository has a line of its own, a second install adds nothing (or brings
@@ -390,6 +394,35 @@ folder's `.radical/test-results.json` (out of git, like the rest of
 quality and Implementation show the result by dimension, and Settings edit
 `check.json` (goals, severities, baselines), marking a change that loosens
 the gate.
+
+### Test results from CI
+
+```sh
+radical check path/to/model --from-ci
+```
+
+reads the test reports of CI instead of `--report`. Test results never go
+into git, since a commit cannot hold the results of its own tests; CI runs
+every suite on every pull request and keeps the reports as artifacts. The
+command finds, with the GitHub CLI (`gh`, signed in), the nearest commit in
+HEAD's first-parent history that a completed GitHub Actions run tested; a
+commit merged from a pull request (a squash merge has no run of its own)
+stands for the pull request's head. For each artifact it takes the latest
+completed run that kept it, downloads it, and reads the `.json` and `.xml`
+test reports in it. Which artifacts hold reports is set in `check.json`:
+
+```json
+{ "ci": { "artifacts": ["test-reports", "e2e-report"] } }
+```
+
+(every artifact of the run without it). The results are kept in
+`.radical/test-results.json` with the commit they stand for, the runs, when
+each ran and how many commits HEAD is past it, which the Inspector's *Tests*
+chip shows; the same runs a second time download nothing. Results read with
+`--report` at that commit or a later one are kept, and checked. `--quiet`
+prints nothing; `--detach` starts the check in the background and returns,
+as the git hooks of `radical hooks install` do after every checkout, commit,
+pull and rebase.
 
 ### Measured values
 

@@ -2357,6 +2357,13 @@
     "targetId": "5c2f7df2-9042-4d25-ae20-0bee0371ef0c"
   },
   {
+    "id": "22d76f5e-6f28-4372-b9e6-665a37ce1b61",
+    "label": "downloads the test reports of CI runs through gh",
+    "relationType": "interacts",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05"
+  },
+  {
     "id": "231e9071-4187-46db-8a4c-226ed3c3321f",
     "relationType": "verifies",
     "sourceId": "f6c3330a-4e72-4d54-8426-1fa98c067639",
@@ -3992,6 +3999,12 @@
     "relationType": "references",
     "sourceId": "18315c1a-d5b3-433f-8751-b6354e1cdab0",
     "targetId": "27f210c4-914c-40a3-b7dc-1c3cb0907bd1"
+  },
+  {
+    "id": "3a5d33f7-adb5-49ce-9ad2-11abe6d87d09",
+    "relationType": "constrains",
+    "sourceId": "a532b5a9-35a7-4d2a-bd69-c0867d5efb84",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "3a6b9a30-a929-4d1c-ae29-770f36d73cba",
@@ -6115,6 +6128,12 @@
     "relationType": "satisfies",
     "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
     "targetId": "f3190c2b-5608-40ce-8aa2-b65c4107fac1"
+  },
+  {
+    "id": "57c64af3-6fa8-42f8-bd2e-be6eed5a0e75",
+    "relationType": "verifies",
+    "sourceId": "1d66d5e0-77d1-4171-b3f8-c04e137e9691",
+    "targetId": "911195ec-f656-47c8-990f-d7b1870b55b2"
   },
   {
     "id": "57cb887c-2f7d-41f1-b4a1-26affa69d8ad",
@@ -10659,6 +10678,12 @@
     "targetId": "8f212f42-5336-40c8-aa2a-fda0ee0573f6"
   },
   {
+    "id": "961205ec-caee-4d2a-8870-c278ecc7fdd1",
+    "relationType": "satisfies",
+    "sourceId": "0f2bd2dc-9024-4a47-ab42-8acb021a3591",
+    "targetId": "911195ec-f656-47c8-990f-d7b1870b55b2"
+  },
+  {
     "id": "96121508-5f87-40c8-a49d-cf4a4f3d79c5",
     "relationType": "derives",
     "sourceId": "22418a18-7acd-45b7-a7de-790d90cda253",
@@ -11263,6 +11288,12 @@
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "54215859-48cb-4f1a-bc8e-e42a8f216a93"
+  },
+  {
+    "id": "9f76bc3f-8c67-4e0b-a988-0a9d41678ca7",
+    "relationType": "derives",
+    "sourceId": "911195ec-f656-47c8-990f-d7b1870b55b2",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
     "id": "9f7efc50-5010-4843-a92e-525017b94c95",
@@ -12758,6 +12789,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "b71c965d-cada-4a74-bbeb-b39ca01d2f5e"
+  },
+  {
+    "id": "b535c683-51fc-409a-a563-a2e08b82b0df",
+    "relationType": "verifies",
+    "sourceId": "201c41c3-b0e4-4f35-9994-8f3ee360eaf4",
+    "targetId": "694bdc99-13bf-4e4c-ac8d-017a96546f70"
   },
   {
     "id": "b54599ce-7e31-40a7-87ef-3a1df60c0186",
@@ -14969,6 +15006,12 @@
     "targetId": "62f79689-9555-444b-bfef-db6b512a83c0"
   },
   {
+    "id": "d3148f36-0a80-4b17-a855-5a80d54721bb",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "68aa50a2-b7e2-4be0-b886-c139d2ec3e83"
+  },
+  {
     "id": "d31951a9-b1ea-4de3-a22a-03d9777ea613",
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
@@ -16059,6 +16102,12 @@
     "sourceId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05",
     "targetId": "974cc763-a121-4f53-a92d-18a64562a0c9",
     "technology": "GitHub Actions, OIDC to AWS"
+  },
+  {
+    "id": "e25c9389-a196-4ab2-bde7-90754cc8651e",
+    "relationType": "implements",
+    "sourceId": "64951276-e875-4deb-b423-96b553aa2a30",
+    "targetId": "a532b5a9-35a7-4d2a-bd69-c0867d5efb84"
   },
   {
     "id": "e272d376-a6a0-4662-ba3b-e27fa86095f9",
@@ -17228,6 +17277,12 @@
     "targetId": "62f79689-9555-444b-bfef-db6b512a83c0"
   },
   {
+    "id": "f4f9a87f-c834-46ca-8070-dcf07e2d5b95",
+    "relationType": "derives",
+    "sourceId": "68aa50a2-b7e2-4be0-b886-c139d2ec3e83",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
+  },
+  {
     "id": "f53307ce-158c-468b-bf94-0daad69ff957",
     "relationType": "derives",
     "sourceId": "27e1d49e-e220-473b-a672-50607e58c2d5",
@@ -17564,6 +17619,12 @@
     "relationType": "interacts",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "08e414ea-974c-4a75-8bef-9fd30d3cfaf4"
+  },
+  {
+    "id": "f9c3eb4c-9d84-4225-8296-df69db87211b",
+    "relationType": "verifies",
+    "sourceId": "258ed3df-d62e-41be-b3b1-b01b536dc8b4",
+    "targetId": "68aa50a2-b7e2-4be0-b886-c139d2ec3e83"
   },
   {
     "id": "fa05e8e3-5e05-4e12-8a50-9cd5462c4da2",

@@ -3,11 +3,12 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, type CheckConfig, type Measurement, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
+import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -23,6 +24,20 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       for more. The tests that scenarios and fitness functions
                       name are looked up in them. The test cases read are kept
                       in the model folder's .radical/test-results.json for Studio
+  --from-ci           read the test reports of CI instead: those of the latest
+                      completed runs of the nearest commit in HEAD's history
+                      that CI ran (a commit merged from a pull request stands
+                      for the pull request's head), through the GitHub CLI
+                      (gh, signed in). The artifacts read are check.json's
+                      "ci": { "artifacts": [<name>, …] }, or every artifact of
+                      the run. They are kept for Studio as --report keeps
+                      them, with the commit and runs they come from, unless
+                      the results there were read with --report at that
+                      commit or a later one. radical hooks install fetches
+                      them after a checkout, a commit, a pull and a rebase
+  --quiet             print nothing (the git hooks fetch with --from-ci --quiet)
+  --detach            start this check in the background and return at once
+                      (the git hooks, which git waits for)
   --metrics <path>    a radical-metrics/1 file (radical sense --out), or a
                       directory of them (.json files); repeat for more. They
                       are added to what radical sense keeps in the model
@@ -75,6 +90,12 @@ export interface Io {
   execPath?: string
   /** The version this CLI pins the MCP server to and compares with (default: its build's). */
   version?: string
+  /** Runs the GitHub CLI for radical check --from-ci (default: gh on the PATH). */
+  gh?: Gh
+  /** Starts this CLI with `args` in the background, detached from the
+   *  command that started it (radical check --detach); absent when nothing
+   *  can be started. */
+  background?: (args: string[]) => void
 }
 
 /** Runs `radical check` with `args` (after the command name); returns the exit status. */
@@ -88,6 +109,9 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         config: { type: 'string' },
         format: { type: 'string', default: 'text' },
         report: { type: 'string', multiple: true },
+        'from-ci': { type: 'boolean', default: false },
+        quiet: { type: 'boolean', default: false },
+        detach: { type: 'boolean', default: false },
         metrics: { type: 'string', multiple: true },
         baseline: { type: 'string', multiple: true },
         trigger: { type: 'string' },
@@ -110,9 +134,17 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'evidence' : '').padEnd(8)} ${metric.description}`)
     return 0
   }
-  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (values.evidence && !values.report?.length && !values.metrics?.length)) {
+  const fromCi = values['from-ci']
+  if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (fromCi && values.report?.length)
+    || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)) {
     io.err(CHECK_USAGE)
     return 2
+  }
+
+  if (values.detach) {
+    if (!io.background) { io.err('radical check --detach: nothing here can start a command in the background.'); return 2 }
+    io.background(['check', ...args.filter((a) => a !== '--detach')])
+    return 0
   }
 
   const folder = positionals[0] ?? '.'
@@ -141,7 +173,43 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   let tests: TestCase[] | undefined
-  if (values.report?.length) {
+  // Results that are not this run's: from CI, or kept from a later commit.
+  let testsReadAt: string | undefined
+  let keep: { reports: string[]; ci?: CiSource; commit?: string } | undefined
+  if (fromCi) {
+    const say = (text: string) => { if (!values.quiet) io.err(text) }
+    const resultsPath = join(root, TEST_RESULTS_FILE)
+    const existing = await readFile(resultsPath, 'utf8').then(parseTestResults, () => null)
+    const gh = io.gh ?? ghCli(io.env ?? process.env)
+    let got
+    try {
+      got = await withFetchLock(root, async () => {
+        const source = await findCiRuns(root, gh, config.ci?.artifacts)
+        if (await readLater(root, existing, source.commit)) return { source, kept: existing! }
+        if (sameRuns(existing, source)) return { source, cases: existing!.cases, reports: existing!.reports }
+        return { source, ...await downloadCiReports(root, gh, source) }
+      })
+    } catch (error) {
+      say(`radical check --from-ci: ${error instanceof CiError ? error.message : (error as Error).message}`)
+      return 2
+    }
+    if (!got) {
+      say('radical check --from-ci: another fetch for this folder is running.')
+      return 2
+    }
+    const { source } = got
+    const runs = `run${source.runs.length > 1 ? 's' : ''} ${source.runs.map((r) => r.id).join(', ')}${source.runs[0]?.pr ? ` (pull request #${source.runs[0].pr})` : ''}`
+    if (got.kept) {
+      tests = got.kept.cases
+      testsReadAt = got.kept.readAt
+      say(`Kept the test results read with --report at ${got.kept.commit!.slice(0, 7)}: CI's (${runs}) are of ${source.commit.slice(0, 7)}, before it.`)
+    } else {
+      tests = got.cases!
+      testsReadAt = testsRanAt({ version: 1, readAt: new Date().toISOString(), reports: [], cases: [], ci: source })
+      keep = { reports: got.reports!, ci: source, commit: (await headOf(root)) ?? undefined }
+      say(`Test results of CI ${runs} for ${source.commit.slice(0, 7)}${source.behind ? `, ${source.behind} commit${source.behind > 1 ? 's' : ''} before HEAD` : ''}.`)
+    }
+  } else if (values.report?.length) {
     tests = []
     let reports: string[]
     try {
@@ -203,15 +271,17 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks() })
-  if (tests) {
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks() })
+  if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
-    // model while it is edited.
-    await writeBeside(join(root, TEST_RESULTS_FILE), serializeTestResults(tests, values.report ?? []))
+    // model while it is edited; with the commit they were read at, so
+    // results of CI never replace those of a later one.
+    await writeBeside(join(root, TEST_RESULTS_FILE), serializeTestResults(tests, keep?.reports ?? values.report ?? [], new Date(),
+      keep ?? { commit: (await headOf(root)) ?? undefined }))
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   const options = { folder, verbose: values.verbose }
-  io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
+  if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)
       : formatCheckText(result, options))
 
@@ -220,7 +290,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     if (lowered.length) {
       await writeFile(configPath, JSON.stringify(next, null, 2) + '\n')
       // To stderr: stdout may be the JSON result.
-      io.err(`Ratchet: ${lowered.map((l) => `${l.id} ${l.from} → ${l.to}`).join(', ')} (written to ${configPath}).`)
+      if (!values.quiet) io.err(`Ratchet: ${lowered.map((l) => `${l.id} ${l.from} → ${l.to}`).join(', ')} (written to ${configPath}).`)
     }
   }
   return result.ok ? 0 : 1

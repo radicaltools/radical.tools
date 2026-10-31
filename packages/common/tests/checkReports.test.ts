@@ -229,10 +229,17 @@ describe('radical check on a model in memory, and the files beside it', () => {
     expect(parseTestResults(bad)!.cases).toEqual([tests[0]])
     expect(parseTestResults('{"version":2}')).toBeNull()
     expect(parseTestResults('nope')).toBeNull()
+    // Where they come from: the commit read at, and for CI the runs.
+    const ci = { provider: 'github' as const, commit: 'c0ffee', behind: 2, runs: [{ id: 11, url: 'https://github.com/o/r/actions/runs/11', sha: 'feed', ranAt: '2026-10-31T10:30:00Z', workflow: 'CI', pr: 7, artifacts: ['test-reports'] }] }
+    const fromCi = serializeTestResults(tests, ['run 11 test-reports/a.json'], new Date('2026-10-31T11:00:00Z'), { commit: 'head', ci })
+    expect(parseTestResults(fromCi)).toMatchObject({ commit: 'head', ci })
+    expect(parseTestResults(JSON.stringify({ ...JSON.parse(fromCi), ci: { provider: 'gitlab' } }))!.ci).toBeUndefined()
   })
 
   it('reads a config and refuses what is none', () => {
     expect(parseCheckConfig('{"rules":{"metamodel":"error"}}')).toEqual({ rules: { metamodel: 'error' } })
+    expect(parseCheckConfig('{"ci":{"artifacts":["test-reports"]}}')).toEqual({ ci: { artifacts: ['test-reports'] } })
+    expect(() => parseCheckConfig('{"ci":{"artifacts":"test-reports"}}')).toThrow('"ci" is an object')
     expect(() => parseCheckConfig('[]')).toThrow('a config is a JSON object')
     expect(() => parseCheckConfig('{"rules":[]}')).toThrow('"rules" is an object of rule settings')
   })
