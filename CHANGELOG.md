@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-31
+
 ### Added
 - `radical check --from-ci` reads the test reports of CI: those GitHub Actions kept for the commit checked out, or the nearest one before it that CI tested (a squash-merged commit stands for its pull request's head), downloaded with the GitHub CLI; `check.json`'s `ci.artifacts` names the artifacts that hold them. The git hooks of `radical hooks install` fetch them in the background after a checkout, a commit, a pull and a rebase, so the Inspector has the results of CI without a local run, and its *Tests* chip says the pull request, the run and the commit they come from. Results read with `--report` at a later commit are kept. Test results stay out of git
 - Fitness functions are classified as *Building Evolutionary Architectures* classifies them: the **characteristic** they protect (ISO/IEC 25010:2023), their **scope** (atomic or holistic), their **cadence** (triggered on `pull-request`, `nightly`, `weekly`, `release` or `deploy`; continual; or temporal, every a given time), their **invocation** (automated or manual) and, automated, a **measure**: one line a measurement, a sensor of `radical sense` and its arguments. Whether the result is static or dynamic is read from the metrics (a limit, or one against a baseline) and shown in the summary and the wiki. The wizard, the card, the Fitness functions table, Forge and every concern pack of the Hub use them; `fitness-fn-unclassified` warns about a dimension left out and `fitness-fn-measure-invalid` about a measure line that names no sensor
@@ -341,5 +343,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/radicaltools/radical.tools/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/radicaltools/radical.tools/releases/tag/v0.3.0
