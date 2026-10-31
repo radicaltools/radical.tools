@@ -53,5 +53,11 @@
     "tests-bound": {
       "min": 100
     }
+  },
+  "ci": {
+    "artifacts": [
+      "test-reports",
+      "e2e-report"
+    ]
   }
 }

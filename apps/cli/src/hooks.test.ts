@@ -10,6 +10,8 @@ import { main } from './cli'
 import { HOOK_MARKER, HOOK_NAMES } from './hooks'
 
 const exec = promisify(execFile)
+/** What the line runs after saving the base, with the CLI `radical`. */
+const FETCH = 'radical check "model" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true'
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
 
@@ -62,7 +64,7 @@ describe('radical hooks', () => {
 
     await git(cwd, 'add', 'my model')
     await git(cwd, 'commit', '-q', '-m', 'model')
-    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff my model --save-base --quiet\n')
+    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff my model --save-base --quiet\ncheck my model --from-ci --quiet --detach\n')
     expect(await readFile(join(cwd, 'own.txt'), 'utf8')).toBe('own\n')
   })
 
@@ -116,7 +118,7 @@ describe('radical hooks', () => {
     await git(cwd, 'commit', '-q', '--allow-empty', '-m', 'x')
     expect(await readFile(join(cwd, 'python-ran.txt'), 'utf8')).toBe('yes')
     await git(cwd, 'checkout', '-q', '-b', 'feature')
-    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\n')
+    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\n')
     expect(await readFile(join(cwd, 'sh-ran.txt'), 'utf8')).toBe('ran\n')
   })
 
@@ -130,7 +132,7 @@ describe('radical hooks', () => {
     const line = 'radical diff "model" --save-base --quiet </dev/null || true'
     await writeFile(join(hooks, 'post-checkout'), `#!/bin/sh\nexit 0\n${HOOK_MARKER}\n${line}\n`)
     expect((await run(cwd, 'radical', 'hooks', 'install', 'model')).out).toContain('Updated in post-checkout')
-    expect(await readFile(join(hooks, 'post-checkout'), 'utf8')).toBe(`#!/bin/sh\n${HOOK_MARKER}\n${line}\nexit 0\n`)
+    expect(await readFile(join(hooks, 'post-checkout'), 'utf8')).toBe(`#!/bin/sh\n${HOOK_MARKER}\n${line}; ${FETCH}\nexit 0\n`)
   })
 
   it('runs the CLI of the working tree the hook runs in, and says when it is not there', async () => {
@@ -155,7 +157,7 @@ describe('radical hooks', () => {
     await git(repo, 'worktree', 'remove', tree)
 
     await git(repo, 'commit', '-q', '--allow-empty', '-m', 'x')
-    expect(await readFile(join(repo, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\n')
+    expect(await readFile(join(repo, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\n')
     await git(repo, 'rm', '-q', 'tools/record.mjs')
     const { stderr } = await git(repo, 'commit', '-q', '-m', 'no cli')
     expect(stderr).toContain('tools/record.mjs is not in this working tree, so the base of model was not saved')
@@ -172,8 +174,29 @@ describe('radical hooks', () => {
     const code = await main(['hooks', 'install', 'model'], { cwd, cli: { node: `"${process.execPath}"`, script }, out: () => {}, err: () => {} })
     expect(code).toBe(0)
     const text = await readFile(join(cwd, '.git/hooks/post-commit'), 'utf8')
-    expect(text).toMatch(/\nnpx -y @radicaltools\/cli(@\d\S*)? diff "model" --save-base --quiet <\/dev\/null \|\| true\n/)
+    expect(text).toMatch(/\nnpx -y @radicaltools\/cli(@\d\S*)? diff "model" --save-base --quiet <\/dev\/null \|\| true; npx -y @radicaltools\/cli(@\d\S*)? check "model" --from-ci --quiet --detach /)
     expect(text).not.toContain('_npx')
+  })
+
+  it('the line fetches the results of CI in the background', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-hooks-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    await mkdir(join(cwd, 'model'))
+    expect((await run(cwd, 'radical', 'hooks', 'install', 'model')).code).toBe(0)
+    // A command of its own after the base, its input and output closed: a
+    // CLI built before --from-ci still saves the base, and says nothing.
+    for (const name of HOOK_NAMES) {
+      expect(await readFile(join(cwd, '.git/hooks', name), 'utf8')).toContain(`radical diff "model" --save-base --quiet </dev/null || true; ${FETCH}\n`)
+    }
+    // --detach starts the check on its own and returns: git waits for the hook.
+    const started: string[][] = []
+    const code = await main(['check', 'model', '--from-ci', '--quiet', '--detach'], { cwd, out: () => {}, err: () => {}, background: (args) => started.push(args) })
+    expect(code).toBe(0)
+    expect(started).toEqual([['check', 'model', '--from-ci', '--quiet']])
+    let err = ''
+    expect(await main(['check', 'model', '--detach'], { cwd, out: () => {}, err: (t) => { err += t } })).toBe(2)
+    expect(err).toContain('nothing here can start a command in the background')
   })
 
   it('exits 2 outside git and on a wrong action', async () => {

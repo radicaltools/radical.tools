@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline/promises'
 import { main } from './cli'
 import type { Io } from './check'
@@ -25,6 +26,9 @@ const io: Io = {
   // The hooks run this very script with the node on the PATH, else the one
   // running now (a versioned path that an upgrade of node may remove).
   cli: { node: `"$(command -v node || echo '${process.execPath.replace(/\\/g, '/')}')"`, script: process.argv[1] },
+  // This very CLI again, on its own: the git hook that started this one
+  // returns at once, and nothing the child prints reaches it.
+  background: (args) => spawn(process.execPath, [process.argv[1], ...args], { cwd: process.cwd(), detached: true, stdio: 'ignore', windowsHide: true }).unref(),
 }
 
 main(process.argv.slice(2), io).then(
