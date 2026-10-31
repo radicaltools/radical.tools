@@ -83,9 +83,9 @@ describe('route parse/format', () => {
   })
 
   it('round-trips the Inspector tab and the selected element, in one form', () => {
-    const inspector: Route = { doc: 'md:/repo/architecture', mode: 'inspector', view: 'v-arch', tab: 'changes', el: 'api' }
+    const inspector: Route = { doc: 'md:/repo/architecture', mode: 'inspector', view: 'v-arch', tab: 'branch', el: 'api' }
     const hash = formatRoute(inspector)
-    expect(hash).toBe('#/d/md%3A%2Frepo%2Farchitecture/m/inspector/v/v-arch/t/changes/e/api')
+    expect(hash).toBe('#/d/md%3A%2Frepo%2Farchitecture/m/inspector/v/v-arch/t/branch/e/api')
     expect(parseHash(hash)).toEqual(inspector)
     expect(formatRoute(parseHash(hash)!)).toBe(hash)
     // On a canvas: the selection, after the view and before a milestone.
@@ -95,6 +95,9 @@ describe('route parse/format', () => {
     // A tab names nothing outside the Inspector, nor an unknown one.
     expect(formatRoute({ mode: 'designer', view: 'v-arch', tab: 'model' })).toBe('#/m/designer/v/v-arch')
     expect(parseHash('#/m/inspector/v/v-arch/t/nope')?.tab).toBeUndefined()
+    // A link from before This branch was Changes still opens it.
+    expect(parseHash('#/m/inspector/v/v-arch/t/changes/e/api')).toMatchObject({ tab: 'branch', el: 'api' })
+    expect(parseHash('#/m/inspector/v/v-arch/t/overview')?.tab).toBe('overview')
     expect(parseHash('#/m/designer/v/v-arch/t/model')?.tab).toBeUndefined()
   })
 

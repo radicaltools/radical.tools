@@ -15,12 +15,19 @@ import { focusWhenDrawn, showOnPage } from '@radical/ui/store/showInView'
 export { showOnPage }
 
 /** The Inspector's tabs. */
-export type InspectorTab = 'changes' | 'model' | 'implementation' | 'settings'
-export const INSPECTOR_TABS: readonly InspectorTab[] = ['changes', 'model', 'implementation', 'settings']
+export type InspectorTab = 'overview' | 'model' | 'implementation' | 'branch' | 'settings'
+export const INSPECTOR_TABS: readonly InspectorTab[] = ['overview', 'model', 'implementation', 'branch', 'settings']
 
-/** Where the Inspector is: the tab picked (null: its first, Changes when the
- *  folder holds a base, else Model quality) and the element whose card is
- *  open in Changes. Part of the place the route names. */
+/** The tab a link names: its own name, or the name it had before (Changes
+ *  is This branch now); undefined for none. */
+export function inspectorTabOf(name: string | undefined): InspectorTab | undefined {
+  if (name === 'changes') return 'branch'
+  return (INSPECTOR_TABS as readonly string[]).includes(name ?? '') ? (name as InspectorTab) : undefined
+}
+
+/** Where the Inspector is: the tab picked (null: its first, Overview) and
+ *  the element whose card is open in This branch. Part of the place the
+ *  route names. */
 export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string | null }>(() => ({ tab: null, cardId: null }))
 
 /** For each view, the elements it shows (viewShownNodes): what its chain

@@ -161,7 +161,8 @@ function AppInner(): React.ReactElement {
       {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
       {!isInspector && <QuickSearch />}
       {!isPresenting && !isInspector && !isMetamodel && <FindInView />}
-      {isDesigner && <NodeWizard />}
+      {/* The Inspector's Add scenario and Add fitness function start one too. */}
+      {(isDesigner || isInspector) && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
       {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}

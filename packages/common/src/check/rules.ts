@@ -38,6 +38,10 @@ export interface RuleFinding {
   /** Lines that belong to the finding, such as the titles of the tests it
    *  counts. */
   details?: string[]
+  /** When the test results it reads were read (ISO time), when they were
+   *  kept from an earlier run: the finding is a warning, whatever the rule's
+   *  setting, as the tests may have changed since. */
+  asOf?: string
 }
 
 export interface CheckModel {
@@ -46,6 +50,9 @@ export interface CheckModel {
   metamodel: Metamodel
   /** The test cases of the reports passed in; the test rules run only with them. */
   tests?: TestCase[]
+  /** When `tests` were read (ISO time), when they are results kept from an
+   *  earlier run (Studio's Inspector) rather than the reports of this one. */
+  testsReadAt?: string
   /** The measurements passed in; the metric rules that read values run only
    *  with them. */
   measurements?: Measurement[]
@@ -407,7 +414,10 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'error',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('not-found', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`),
+    run: (model) => testRule('not-found', (node, id) => model.testsReadAt
+      ? `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the test results read ${model.testsReadAt.slice(0, 10)}, ${formatAge((model.now ?? Date.now()) - Date.parse(model.testsReadAt))} ago; added since, renamed or deleted? radical check --report reads the tests again.`
+      : `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`)(model)
+      .map((f) => (model.testsReadAt ? { ...f, asOf: model.testsReadAt } : f)),
   },
   {
     id: 'test-skipped',

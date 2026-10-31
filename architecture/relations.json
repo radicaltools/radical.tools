@@ -30,6 +30,12 @@
     "targetId": "c0b14ec9-a738-44b5-b900-7207232b8f67"
   },
   {
+    "id": "00f9cbdf-46dc-4b2a-9113-7179d95826fd",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "694bdc99-13bf-4e4c-ac8d-017a96546f70"
+  },
+  {
     "id": "01162bf5-8a32-42e4-9654-359041e95375",
     "relationType": "satisfies",
     "sourceId": "0dd058ca-b674-4a65-8b4e-07d87e50a5b0",
@@ -983,6 +989,12 @@
     "relationType": "satisfies",
     "sourceId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5",
     "targetId": "1b3d6d74-456f-460b-8e44-d905a1bb475c"
+  },
+  {
+    "id": "0ec07c9d-5e23-4853-a912-b176f0232b91",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "9f10826c-636a-4701-b83d-2e6c5145afcc"
   },
   {
     "id": "0f4b07d0-c43b-479e-9af0-0bd16c1a8814",
@@ -3332,6 +3344,12 @@
     "targetId": "ac88d41d-2dd6-427d-9ed5-fb3541100ebc"
   },
   {
+    "id": "30ea1ace-4f3b-4f5e-bb9b-448bc918e3f0",
+    "relationType": "verifies",
+    "sourceId": "86dda253-3f72-474b-8b1a-4dd50b913aaa",
+    "targetId": "694bdc99-13bf-4e4c-ac8d-017a96546f70"
+  },
+  {
     "description": "SemVer against tool names, input schemas and result shapes; the version is also the MCP handshake version; pre-releases on the npm dist-tag next.",
     "id": "310bcc26-27b0-400c-961e-5eef3fe03272",
     "relationType": "constrains",
@@ -3744,6 +3762,12 @@
     "relationType": "performed-by",
     "sourceId": "4982156e-b54d-49d7-9b0e-0a68346bc9cb",
     "targetId": "45c95a3b-968d-4b77-8fc3-94af06de5087"
+  },
+  {
+    "id": "36dad21a-9782-4e48-974d-759e30bccee0",
+    "relationType": "verifies",
+    "sourceId": "86dda253-3f72-474b-8b1a-4dd50b913aaa",
+    "targetId": "0c8746d9-8f7a-4b76-81a2-a7f8bf22bc0a"
   },
   {
     "id": "36e23665-34a5-474a-a49a-4b011615815e",
@@ -5022,6 +5046,12 @@
     "targetId": "6fb01e7c-846d-417b-93f6-f236f9ac7989"
   },
   {
+    "id": "4865819a-16dd-40f1-90be-e38d921fe50f",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "0b3494f2-23c6-4541-b91b-b03a1c0de62f"
+  },
+  {
     "id": "489dba0f-a82a-499f-8392-f5b699cddaa4",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -5216,6 +5246,12 @@
     "relationType": "satisfies",
     "sourceId": "bdcfe019-e771-4c56-ba74-0ea611571502",
     "targetId": "82850ee4-5c85-407c-8597-af1a919434ab"
+  },
+  {
+    "id": "4b2ef64d-249a-4df7-87c7-7b2ea1b4103d",
+    "relationType": "derives",
+    "sourceId": "0b3494f2-23c6-4541-b91b-b03a1c0de62f",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
     "id": "4b5cfb2f-0d7e-4e9e-a623-5e7a94726f24",
@@ -5824,6 +5860,12 @@
     "relationType": "verifies",
     "sourceId": "ab9ee6c8-bb88-45f9-8d7a-0d82e25f80d3",
     "targetId": "33421548-8635-4917-8793-ba89753d6de0"
+  },
+  {
+    "id": "536c149f-e8d6-41e3-8be2-deee0703cf33",
+    "relationType": "verifies",
+    "sourceId": "4e8f5201-ab83-4f55-9ce2-516242645fec",
+    "targetId": "0b3494f2-23c6-4541-b91b-b03a1c0de62f"
   },
   {
     "id": "53786150-2596-4a10-b67b-cbcfd71ef744",
@@ -6689,6 +6731,12 @@
     "targetId": "9fb646d2-b550-45f2-b4b7-1b6dbb688919"
   },
   {
+    "id": "603e0c56-15ae-4c2c-98db-0a9729253ac1",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "0b3494f2-23c6-4541-b91b-b03a1c0de62f"
+  },
+  {
     "id": "604fbb73-80af-4be9-b2ec-9e0aa7898fc9",
     "relationType": "derives",
     "sourceId": "f63e9415-f5a7-41db-8a05-4c70c4a7732d",
@@ -7373,6 +7421,12 @@
     "relationType": "verifies",
     "sourceId": "7032c204-b530-48b3-a25b-08bd11a6a857",
     "targetId": "eb3a7d02-6411-4332-a40f-80613f599e2e"
+  },
+  {
+    "id": "6b3097b6-a45c-4059-a160-92f5cce41355",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "0c8746d9-8f7a-4b76-81a2-a7f8bf22bc0a"
   },
   {
     "id": "6b5dbf3c-24c4-4abd-ae60-3c2915d9ab3c",
@@ -8198,6 +8252,12 @@
     "targetId": "62f79689-9555-444b-bfef-db6b512a83c0"
   },
   {
+    "id": "76299a9f-b724-4ad8-90b0-beab3b7b88be",
+    "relationType": "verifies",
+    "sourceId": "9aad9f70-7052-4b0b-b209-b3cbdba62701",
+    "targetId": "694bdc99-13bf-4e4c-ac8d-017a96546f70"
+  },
+  {
     "id": "763648d8-6dee-4d72-abae-1d8ba73c5c08",
     "relationType": "derives",
     "sourceId": "9cfa0c62-057a-48c9-95d0-e57beef55249",
@@ -8328,6 +8388,12 @@
     "relationType": "constrains",
     "sourceId": "df8f747e-807f-465c-8a1c-714b12943406",
     "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
+    "id": "777dfe52-a24c-4348-934b-38801a9b6eb9",
+    "relationType": "verifies",
+    "sourceId": "bb8b7ee1-a961-48ea-85fa-c5787153f67c",
+    "targetId": "0c8746d9-8f7a-4b76-81a2-a7f8bf22bc0a"
   },
   {
     "id": "7789467d-a15c-42fb-bf8d-2f228d7139d0",
@@ -9198,6 +9264,12 @@
     "targetId": "224b849a-621f-456d-bee7-2b15f10fd82f"
   },
   {
+    "id": "8333d4f4-c635-4237-88dd-0339bb188e81",
+    "relationType": "derives",
+    "sourceId": "0c8746d9-8f7a-4b76-81a2-a7f8bf22bc0a",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
+  },
+  {
     "id": "83550eb6-3cd9-442a-8760-ec9dcbd7b803",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -10052,6 +10124,12 @@
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "e81279dc-b55b-4e18-b449-9ed917821dbf"
+  },
+  {
+    "id": "8f26cb7f-65dd-460a-ba95-39bfd5982cb6",
+    "relationType": "derives",
+    "sourceId": "9f10826c-636a-4701-b83d-2e6c5145afcc",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
     "actions": "write nothing",
@@ -11547,6 +11625,12 @@
     "targetId": "8a2fb157-4bb6-4043-9748-42152f8cb625"
   },
   {
+    "id": "a582f7a6-8c73-4a81-b51b-5a0a09490f8f",
+    "relationType": "verifies",
+    "sourceId": "86dda253-3f72-474b-8b1a-4dd50b913aaa",
+    "targetId": "9f10826c-636a-4701-b83d-2e6c5145afcc"
+  },
+  {
     "id": "a593fbac-3906-42f0-952a-86eb8839bd93",
     "relationType": "implements",
     "sourceId": "78205392-99eb-48f8-8ea6-9cd6a648d86e",
@@ -12028,6 +12112,12 @@
     "relationType": "implements",
     "sourceId": "43e82eec-94cf-4c90-951b-36d6132b97eb",
     "targetId": "04279c33-97b6-44a4-95a5-68b1f1623115"
+  },
+  {
+    "id": "ac68b935-b31b-45a2-8d61-b1f0845da698",
+    "relationType": "derives",
+    "sourceId": "694bdc99-13bf-4e4c-ac8d-017a96546f70",
+    "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
     "id": "ac768343-3edc-420c-a22a-c0a35551b9e3",

@@ -3,6 +3,7 @@ import { ModelFolder, test } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeMeasurementStore, serializeTestResults, type TestCase } from '@radical/common/check'
+import { serializeModelBase } from '@radical/common/formats/modelBase'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { HUB_PORT } from '../../playwright.config'
 
@@ -10,8 +11,9 @@ import { HUB_PORT } from '../../playwright.config'
 // kept in a folder: the rules run on the model as it is, the test results
 // come from .radical/test-results.json, which `radical check --report`
 // writes beside the model, and what sensors measured from
-// .radical/measurements.json, which `radical sense` keeps there. Its tabs: Model quality, Implementation (what
-// the tests say) and Settings (the folder's check.json).
+// .radical/measurements.json, which `radical sense` keeps there. Its tabs: Overview (the scores and what
+// needs attention), Model, Implementation (what the tests say), This branch (with a base beside the
+// model) and Settings (the folder's check.json); its header says how old the evidence is.
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -65,8 +67,9 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   for (const name of ['Fit All', 'Smart Layout', 'Undo', 'Redo']) {
     await expect(page.locator('.toolbar').getByRole('button', { name })).toHaveCount(0)
   }
-  // A failed test is about the implementation, not the model.
-  await expect(page.getByRole('tab', { name: /^Model quality/ })).toHaveAttribute('aria-selected', 'true')
+  // It opens on Overview. A failed test is about the implementation, not the model.
+  await expect(page.getByRole('tab', { name: /^Overview/ })).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('tab', { name: /^Model/ }).click()
   await expect(page.locator('.insp-error')).toHaveCount(0)
   await expect(page.locator('.insp-tile[data-dimension="traceability"]')).toContainText('100%')
   await page.getByRole('tab', { name: /^Implementation/ }).click()
@@ -107,6 +110,206 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await page.getByRole('tab', { name: /^Implementation/ }).click()
   await expect(page.locator('.insp-tile').first()).toContainText('100% · 1 / 1')
   await expect(page.locator('.insp-tile').first()).toContainText('0 broken')
+})
+
+test('the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  // The branch added a requirement no scenario verifies and an accepted
+  // decision no fitness function implements; the scenario's test failed.
+  const model: DiagramData = {
+    ...MODEL,
+    nodes: [
+      ...MODEL.nodes,
+      node('refund', 'requirement', 'Refund payments', { x: 960, y: 220, ears_type: 'ubiquitous', action: 'refund payments' }),
+      node('adr', 'adr', 'Card payments only', { x: 40, y: 400, status: 'accepted', date: '2026-10-29', context: 'c', decision: 'd', consequences: 'q' }),
+    ],
+    relations: [
+      ...MODEL.relations,
+      { id: 'r4', relationType: 'derives', sourceId: 'refund', targetId: 'need' },
+      { id: 'r5', relationType: 'satisfies', sourceId: 'api', targetId: 'refund' },
+    ],
+    views: [MODEL.views![0], { id: 'v-spec', name: 'Specification', nodeIds: ['need', 'req', 'sc', 'refund', 'adr'], positions: {} }],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
+  await folder.write('.radical/test-results.json', results('failed'))
+  await folder.write('.radical/base.json', serializeModelBase({ commit: '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90', described: 'merge base with origin/main', branch: 'feat/refunds', nodes: MODEL.nodes, relations: MODEL.relations }))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+
+  // Overview first: the scores of the model and of what the tests verify.
+  await expect(page.getByRole('tab', { name: /^Overview/ })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab')).toHaveText([/^Overview/, /^Model/, /^Implementation/, /^This branch/, /^Settings/])
+  const scores = page.getByRole('region', { name: 'Model scores' }).locator('.insp-score')
+  await expect(scores).toHaveCount(4)
+  await expect(scores.first()).toContainText('Consistency')
+  const verified = page.getByRole('region', { name: 'Implementation scores' }).locator('.insp-score[data-metric="requirements-verified"]')
+  await expect(verified).toContainText('Requirements verified')
+  await expect(verified).toContainText('0%')
+
+  // Needs attention: the error first, then the warnings, a group per rule with its count.
+  const attention = page.getByRole('region', { name: 'Needs attention' })
+  const groups = attention.locator('details.insp-group')
+  await expect(groups.first()).toHaveAttribute('data-rule', 'test-failed')
+  await expect(groups.first()).toHaveClass(/error/)
+  await expect(groups.first()).toHaveAttribute('open', '')
+  await expect(groups.first()).toContainText('test tests/pay.test.ts › pays by card failed.')
+  const severities = await groups.evaluateAll((list) => list.map((g) => (g.classList.contains('error') ? 'error' : 'warning')))
+  expect(severities.lastIndexOf('error')).toBeLessThan(severities.indexOf('warning'))
+  const missing = attention.locator('details.insp-group[data-rule="requirement-without-scenario"]')
+  await expect(missing.locator('summary')).toContainText('Requirement without scenario')
+  await expect(missing.locator('summary')).toContainText('Every requirement is verified by at least one scenario.')
+  await expect(missing.locator('summary .insp-rcount')).toHaveText('1')
+  const undecided = attention.locator('details.insp-group[data-rule="adr-without-fitness-fn"]')
+  await expect(undecided.locator('summary .insp-rcount')).toHaveText('1')
+  // Warnings wait closed; a click opens the group to its elements.
+  await expect(undecided).not.toHaveAttribute('open')
+  await undecided.locator('summary').click()
+  await expect(undecided.getByRole('button', { name: 'Add fitness function' })).toBeVisible()
+  await undecided.getByRole('button', { name: 'Open Card payments only' }).click()
+  const peek = page.getByRole('complementary', { name: 'Element' })
+  await expect(peek.locator('h3')).toHaveText('Card payments only')
+  await expect(peek.getByRole('button', { name: /^Show on canvas/ })).toBeVisible()
+
+  // Add scenario: the scenario's wizard, the requirement offered as what it verifies.
+  await missing.locator('summary').click()
+  await missing.getByRole('button', { name: 'Add scenario' }).click()
+  const wizard = page.getByRole('dialog', { name: 'New Scenario — wizard' })
+  await expect(wizard).toBeVisible()
+  await wizard.getByRole('textbox').first().fill('Refunding a payment')
+  await wizard.getByRole('button', { name: 'Create' }).first().click()
+  await expect(wizard).toBeHidden()
+  await expect(peek.locator('h3')).toHaveText('Refunding a payment')
+  // Nothing is left without a scenario; the new one stands beside the requirement.
+  await expect(missing).toHaveCount(0, { timeout: 10_000 })
+  await peek.getByRole('button', { name: /^Show on canvas/ }).click()
+  await expect(page.getByRole('menuitem')).toHaveText([/^Specification/])
+  await page.keyboard.press('Escape')
+  // It verifies the requirement: This branch lists it as the requirement's scenario.
+  await page.getByRole('tab', { name: /^This branch/ }).click()
+  await expect(page.locator('.insp-branch-row', { hasText: 'Refund payments' }).first()).toContainText('Refunding a payment')
+  // The verdict leads back to what needs attention.
+  await page.locator('.insp-verdict').click()
+  await expect(page.getByRole('tab', { name: /^Overview/ })).toHaveAttribute('aria-selected', 'true')
+  await expect(attention.getByRole('heading', { name: 'Needs attention' })).toBeFocused()
+
+  // This branch: only what the branch changed, so not the failed test.
+  const onBranch = attention.getByRole('button', { name: 'This branch' })
+  await expect(onBranch).toBeEnabled()
+  await onBranch.click()
+  await expect(attention.locator('details.insp-group[data-rule="test-failed"]')).toHaveCount(0)
+  await expect(undecided).toBeVisible()
+  await attention.getByRole('button', { name: 'All', exact: true }).click()
+  await expect(attention.locator('details.insp-group[data-rule="test-failed"]')).toBeVisible()
+})
+
+test('the Inspector header says how old the test results are, and how to read them again', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  const readAt = new Date(Date.now() - 8 * 86400e3)
+  await folder.write('.radical/test-results.json', serializeTestResults([{ file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed' }], ['reports/unit.json', 'reports/e2e.json'], readAt))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+
+  // Eight days old, and the header says so, marked.
+  const tests = page.locator('.insp-head .insp-age', { hasText: /Tests/ })
+  await expect(tests).toContainText('8 d old')
+  await expect(tests).toHaveClass(/marked/)
+  await expect(page.locator('.insp-meta')).not.toContainText('tests read')
+  await expect(page.locator('.insp-fresh')).toHaveCount(0)
+  // Opened: when they were read, from which reports, and the command that reads them again.
+  await tests.click()
+  const pop = page.getByRole('dialog', { name: 'Tests' })
+  const when = await page.evaluate((iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }), readAt.toISOString())
+  await expect(pop).toContainText(`Test results read ${when}, 1 test case.`)
+  await expect(pop).toContainText('From reports/unit.json, reports/e2e.json.')
+  await expect(pop.locator('.branch-cmd code')).toHaveText([/^npm run test:reports && radical check \S+ --report reports$/])
+  await expect(pop.getByRole('button', { name: 'Copy' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(pop).toBeHidden()
+  // Nothing measured, and no reviews to speak of.
+  await expect(page.locator('.insp-head .insp-age', { hasText: /measurements/i })).toHaveText('No measurements')
+  await expect(page.locator('.insp-head .insp-age', { hasText: /reviews/i })).toHaveCount(0)
+})
+
+test('the Overview tells an ADR without a fitness function from one whose fitness function has not run', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  const adr = (id: string, label: string, y: number): C4Node => node(id, 'adr', label, { x: 40, y, status: 'accepted', date: '2026-10-29', context: 'c', decision: 'd', consequences: 'q' })
+  const model: DiagramData = {
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      adr('a-none', 'Payments in one service', 40),
+      adr('a-empty', 'Errors as problem details', 200), node('f-empty', 'fitness-fn', 'Problem details everywhere', { x: 300, y: 200 }),
+      adr('a-night', 'Large models open fast', 360),
+      node('f-night', 'fitness-fn', 'Open time', { x: 300, y: 360, cadence: 'triggered', trigger: 'nightly', invocation: 'automated', metrics: 'studio.open_ms <= 11000 ms' }),
+      adr('a-pr', 'One build for all workspaces', 520),
+      node('f-pr', 'fitness-fn', 'Workspaces build', { x: 300, y: 520, cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', metrics: 'workspaces.exit_code == 0' }),
+      adr('a-fail', 'Layered packages', 680),
+      node('f-fail', 'fitness-fn', 'Layers hold', { x: 300, y: 680, cadence: 'triggered', trigger: 'pull-request', metrics: 'test(tests/layers.test.ts › layers hold) passed' }),
+    ],
+    relations: [
+      { id: 'i1', relationType: 'implements', sourceId: 'f-empty', targetId: 'a-empty' },
+      { id: 'i2', relationType: 'implements', sourceId: 'f-night', targetId: 'a-night' },
+      { id: 'i3', relationType: 'implements', sourceId: 'f-pr', targetId: 'a-pr' },
+      { id: 'i4', relationType: 'implements', sourceId: 'f-fail', targetId: 'a-fail' },
+    ],
+    views: [{ id: 'v-decisions', name: 'Decisions', nodeIds: [], positions: {} }],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
+  // Test results, in which the layers test failed; nothing measured.
+  await folder.write('.radical/test-results.json', serializeTestResults([{ file: '/repo/tests/layers.test.ts', title: ['layers hold'], status: 'failed' }], ['reports/unit.json']))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+
+  // Why each decision is not verified, the parts adding up to the five.
+  const decisions = page.getByRole('region', { name: 'Implementation scores' }).locator('.insp-score[data-metric="adrs-verified"]')
+  await expect(decisions).toContainText('0 of 5')
+  await expect(decisions.locator('[data-why]')).toHaveText(['1 no fitness function', '1 no check', '2 not run (1 measured nightly)', '1 failing'])
+
+  // Not run: both fitness functions nothing measured, with when they run;
+  // the nightly one is expected not to have run here.
+  const attention = page.getByRole('region', { name: 'Needs attention' })
+  const notRun = attention.locator('details.insp-group[data-rule="not-run"]')
+  await expect(notRun.locator('summary')).toContainText('Not run')
+  await expect(notRun.locator('summary')).toContainText('Scenarios and fitness functions whose checks nothing ran in the results and measurements here.')
+  await expect(notRun.locator('summary .insp-rcount')).toHaveText('2')
+  await notRun.locator('summary').click()
+  const pr = notRun.locator('.insp-finding[data-trigger="pull-request"]')
+  await expect(pr).toContainText('Workspaces build')
+  await expect(pr).toContainText('nothing measured workspaces.exit_code == 0')
+  await expect(pr).not.toHaveClass(/expected/)
+  const nightly = notRun.locator('.insp-finding[data-trigger="nightly"]')
+  await expect(nightly).toContainText('Open time')
+  await expect(nightly).toHaveClass(/expected/)
+  await expect(nightly).toContainText('measured nightly — expected here')
+  // After the rule groups.
+  await expect(attention.locator('details.insp-group').last()).toHaveAttribute('data-rule', 'not-run')
+  await nightly.getByRole('button', { name: 'Open Open time' }).click()
+  await expect(page.getByRole('complementary', { name: 'Element' }).locator('h3')).toHaveText('Open time')
+
+  // The Measurements chip: what waits for a measurement, and how to measure here.
+  const measured = page.locator('.insp-head .insp-age', { hasText: /measurements/i })
+  await expect(measured).toHaveText('No measurements')
+  await measured.click()
+  const pop = page.getByRole('dialog', { name: 'Measurements' })
+  await expect(pop.locator('.insp-age-list li')).toHaveText([/^Workspaces build\s+pull-request$/, /^Open time\s+nightly$/])
+  await expect(pop.locator('.branch-cmd code')).toHaveText([
+    /^radical sense run --trigger pull-request --folder \S+ --out reports\/metrics$/,
+    /^radical check \S+ --metrics reports\/metrics$/,
+  ])
+  await expect(pop.getByRole('button', { name: 'Copy' })).toHaveCount(2)
+  await expect(pop).toContainText('the nightly workflow measures the nightly ones')
 })
 
 test('the Inspector shows each condition with its measurement', async ({ page, studio }) => {
@@ -232,8 +435,8 @@ test('Settings save goals and rules to check.json, and say when a change loosens
     rules: { 'requirement-without-scenario': { severity: 'error', max: 0 } },
     goals: { 'requirements-verified': { min: 100 }, 'scenarios-with-metrics': { min: 90 } },
   })
-  await page.getByRole('tab', { name: /^Model quality/ }).click()
-  await expect(page.getByRole('tab', { name: /^Model quality/ })).toContainText('1 / 1 goals')
+  await page.getByRole('tab', { name: /^Model/ }).click()
+  await expect(page.getByRole('tab', { name: /^Model/ })).toContainText('1 / 1 goals')
   await expect(page.getByRole('tab', { name: /^Implementation/ })).toContainText('1 / 1 goals')
 })
 
@@ -255,7 +458,7 @@ test('Settings edits wait for Save on another tab and after Back, and the tab sa
   await expect(page.locator('.insp-savebar')).toContainText('1 unsaved change')
   await expect(settings).toContainText('unsaved')
 
-  await page.getByRole('tab', { name: /^Model quality/ }).click()
+  await page.getByRole('tab', { name: /^Model/ }).click()
   await expect(page).toHaveURL(/\/t\/model/)
   await settings.click()
   await expect(page).toHaveURL(/\/t\/settings/)
@@ -337,6 +540,7 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
   await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /^Model/ }).click()
 
   const decisions = page.locator('details.insp-dim[data-dimension="decisions"]')
   await expect(decisions).toBeVisible({ timeout: 10_000 })

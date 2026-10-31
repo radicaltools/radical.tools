@@ -175,9 +175,13 @@ export function measureGoals(ctx: MeasureContext, goals: Record<string, GoalSett
       ...value, percent: Math.floor((value.count * 100) / value.total), ...(min !== undefined ? { min } : {}), met,
     })
     if (!met) {
+      // Read from test results kept from an earlier run, it says how the
+      // tests stood then.
+      const asOf = metric.tests ? ctx.model.testsReadAt : undefined
       findings.push({
         code: metric.id,
-        message: `${metric.label}: ${Math.floor((value.count * 100) / value.total)}% (${value.count} of ${value.total}), below the goal of ${min}%.`,
+        message: `${metric.label}: ${Math.floor((value.count * 100) / value.total)}% (${value.count} of ${value.total}), below the goal of ${min}%${asOf ? ` by the test results read ${asOf.slice(0, 10)}` : ''}.`,
+        ...(asOf ? { asOf } : {}),
       })
     }
   }

@@ -119,6 +119,10 @@ export interface CheckOptions {
   /** Test cases from the reports (parseTestReport). Without them the rules
    *  that read test outcomes find nothing and there is no evidence. */
   tests?: TestCase[]
+  /** When `tests` were read, when they are results kept from an earlier
+   *  run (.radical/test-results.json): a test they lack, and a goal they
+   *  leave unmet, are warnings naming that time. */
+  testsReadAt?: string
   /** The Hub's concern packs (concerns.ts), for concern-unaddressed. */
   concerns?: ConcernPack[]
   /** What sensors measured (radical-metrics/1 files, the store beside the
@@ -236,6 +240,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const model = {
     nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
     ...(options.tests ? { tests: options.tests } : {}),
+    ...(options.tests && options.testsReadAt ? { testsReadAt: options.testsReadAt } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
     ...(options.measurements ? { measurements: options.measurements } : {}),
     ...(options.baseline ? { baseline: options.baseline } : {}),
@@ -345,7 +350,7 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
     const settled = list.map((f): CheckFinding => ({
       ...f,
       key,
-      severity: withinBaseline ? 'warning' : set ?? f.severity ?? ruleSeverity,
+      severity: withinBaseline || f.asOf ? 'warning' : set ?? f.severity ?? ruleSeverity,
     }))
     findings.push(...settled)
     results.push({
