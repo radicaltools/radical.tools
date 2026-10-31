@@ -6,11 +6,9 @@
 // coverage by element of the architecture, and the checks that do not run.
 
 import React, { useMemo, useState } from 'react'
-import type { CheckMetricResult, CheckResult, EvidenceEntry, TestResults } from '@radical/common/check'
+import type { CheckMetricResult, CheckResult, EvidenceEntry } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { Bar, Chip, FindingsByDimension, GoalPill, MetricBar, PASSING, metricOf, tally, type Ctx } from './shared'
-
-const DAY = 24 * 60 * 60 * 1000
 
 function MetricTile({ m, label, notes }: { m: CheckMetricResult | undefined; label: string; notes: React.ReactNode }): React.ReactElement {
   return (
@@ -55,8 +53,8 @@ function reason(e: EvidenceEntry): string {
 
 const PILL: Record<string, [string, string]> = { failed: ['bad', 'failed'], stale: ['warn', 'stale'], 'not-run': ['warn', 'not run'], 'no-checks': ['none', 'no check'] }
 
-export function ImplementationTab({ check, ctx, relations, results, onSettings }: {
-  check: CheckResult; ctx: Ctx; relations: Record<string, C4Relation>; results: TestResults | null; onSettings: () => void
+export function ImplementationTab({ check, ctx, relations, onSettings }: {
+  check: CheckResult; ctx: Ctx; relations: Record<string, C4Relation>; onSettings: () => void
 }): React.ReactElement {
   const ev = check.evidence?.nodes
   const m = (id: string): CheckMetricResult | undefined => metricOf(check, id)
@@ -97,21 +95,12 @@ export function ImplementationTab({ check, ctx, relations, results, onSettings }
     return <p className="insp-notice">No test results or measurements beside this model yet. Run <code>radical check &lt;folder&gt; --report &lt;reports&gt;</code> to see which requirements and decisions the tests verify, and <code>radical sense &lt;adapter&gt;</code> to measure the values the fitness functions hold to; Studio picks them up by itself.</p>
   }
 
-  const readAt = results ? new Date(results.readAt) : null
-  const age = readAt ? Date.now() - readAt.getTime() : 0
   const unbound = check.findings.filter((f) => f.rule === 'test-unbound')
   const bound = m('tests-bound')
   const attentionShown = allAttention ? view.attention : view.attention.slice(0, 8)
 
   return (
     <>
-      {readAt && (
-        <div className={`insp-fresh${age > DAY ? ' stale' : ''}`}>
-          <span className="insp-fresh-what">{age > DAY ? `Test results are ${plural(Math.floor(age / DAY), 'day')} old.` : 'Test results from today.'}</span>
-          <span className="insp-muted">Read {readAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}, {plural(results!.cases.length, 'test case')}. They hold for the code as it was then; the model is checked as it is now.</span>
-          {age > DAY && <code>radical check &lt;folder&gt; --report &lt;reports&gt;</code>}
-        </div>
-      )}
       <p className="insp-lede insp-tab-lede">How faithfully the code follows the model, by what the tests say. Behaviour: requirements are verified by scenarios, which name functional tests. Decisions: accepted ADRs are verified by the fitness functions that implement them. And the other way round: tests the model does not name.</p>
 
       <div className="insp-tiles">

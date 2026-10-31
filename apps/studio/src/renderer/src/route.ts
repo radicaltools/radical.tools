@@ -42,7 +42,7 @@ import { isExplorationId, useDiagramStore, viewById } from '@radical/ui/store/di
 import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
-import { INSPECTOR_TABS, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
+import { inspectorTabOf, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
 import { useBranchStore } from './persistence/branchChanges'
 import { useInspectorStore } from './persistence/inspector'
 import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, stepIndex, useNavHistory, type NavEntry } from './navHistory'
@@ -144,7 +144,7 @@ export function parseHash(hash: string): Route | null {
     doc: map.d || undefined,
     mode,
     view: map.v && !isAllElements(map.v) ? map.v : ALL_ELEMENTS,
-    tab: mode === 'inspector' && (INSPECTOR_TABS as readonly string[]).includes(map.t) ? (map.t as InspectorTab) : undefined,
+    tab: mode === 'inspector' ? inspectorTabOf(map.t) : undefined,
     focus: map.f || undefined,
     el: map.e || undefined,
     snap: map.s || undefined,
@@ -195,7 +195,7 @@ export function currentRoute(): Route {
   const inspector = s.appMode === 'inspector'
   const nav = useInspectorNav.getState()
   const tab = inspector ? inspectorTabShown() : undefined
-  const el = inspector ? (tab === 'changes' ? nav.cardId ?? undefined : undefined) : s.selectedNodeId ?? undefined
+  const el = inspector ? (tab === 'branch' ? nav.cardId ?? undefined : undefined) : s.selectedNodeId ?? undefined
   return {
     doc: currentDocToken(),
     mode: s.appMode,
@@ -210,9 +210,9 @@ export function currentRoute(): Route {
   }
 }
 
-/** The Inspector's tab on screen: the one picked, else its first. */
+/** The Inspector's tab on screen: the one picked, else its first, Overview. */
 export function inspectorTabShown(): InspectorTab {
-  return useInspectorNav.getState().tab ?? (useBranchStore.getState().changes ? 'changes' : 'model')
+  return useInspectorNav.getState().tab ?? 'overview'
 }
 
 // ─── Route → state ───────────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ function applyViewModeFocus(route: Route): void {
     }
     // The Inspector's tab and card, or the selection: the route is the whole place.
     if (route.mode === 'inspector') {
-      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'changes' || (!route.tab && route.el) ? route.el ?? null : null })
+      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'branch' ? route.el ?? null : null })
     } else {
       const s = useDiagramStore.getState()
       const el = route.el && s.c4Nodes[route.el] ? route.el : null
@@ -355,14 +355,14 @@ export function applyRoute(route: Route): void {
 // ─── State → URL ─────────────────────────────────────────────────────────────
 
 const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presenter', metamodel: 'Metamodel', inspector: 'Inspector' }
-const TAB_NAMES: Record<InspectorTab, string> = { changes: 'Changes', model: 'Model quality', implementation: 'Implementation', settings: 'Settings' }
+const TAB_NAMES: Record<InspectorTab, string> = { overview: 'Overview', model: 'Model', implementation: 'Implementation', branch: 'This branch', settings: 'Settings' }
 
 /** What the History list says of a route: where, in which perspective, on what. */
 export function describeRoute(route: Route, hash = formatRoute(route), at = Date.now()): NavEntry {
   const s = useDiagramStore.getState()
   // The exploration too, by its name ("Explore: API"), not its id.
   const view = isAllElements(route.view) ? 'All elements' : viewById(s, route.view)?.name ?? route.view
-  const where = route.mode === 'inspector' ? `Inspector › ${TAB_NAMES[route.tab ?? 'model']}`
+  const where = route.mode === 'inspector' ? `Inspector › ${TAB_NAMES[route.tab ?? 'overview']}`
     : route.mode === 'metamodel' ? 'Metamodel' : view
   const id = route.el ?? route.focus
   const node = id ? s.c4Nodes[id] : undefined

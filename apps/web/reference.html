@@ -450,7 +450,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
           <li>Committing keeps the base, so the list holds the whole branch's work. After the pull request is merged, switch to <code>main</code> and pull: the list empties.</li>
           <li>To see only what is not committed yet: <code>radical diff &lt;folder&gt; --save-base --since HEAD</code>.</li>
           <li>A folder outside git has no base from git. A Radical Forge run on such a folder saves the model before it as the base; the next run replaces it.</li>
-          <li>A base older than a day is marked in the Inspector with the commands that save it again.</li>
+          <li>A base older than a day is marked in the Inspector's This branch tab with the commands that save it again.</li>
         </ul>
       </section>
 
@@ -613,7 +613,7 @@ radical-mcp --version</code></pre>
             <tbody>
               <tr><td><code>m</code></td><td><code>designer</code> · <code>viewer</code> · <code>presenter</code> · <code>metamodel</code> · <code>inspector</code></td></tr>
               <tr><td><code>v</code></td><td>A view id, or <code>canvas</code> for the default structure view</td></tr>
-              <tr><td><code>t</code></td><td>The Inspector's tab: <code>changes</code> · <code>model</code> · <code>implementation</code> · <code>settings</code></td></tr>
+              <tr><td><code>t</code></td><td>The Inspector's tab: <code>overview</code> · <code>model</code> · <code>implementation</code> · <code>branch</code> · <code>settings</code> (<code>changes</code>, its old name, opens <code>branch</code>)</td></tr>
               <tr><td><code>f</code> · <code>e</code></td><td>The wiki page shown · the selected element</td></tr>
               <tr><td><code>s</code></td><td>The active milestone</td></tr>
               <tr><td><code>p</code> · <code>sl</code></td><td>The presentation and the 0-based slide while presenting</td></tr>

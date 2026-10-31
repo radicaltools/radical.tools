@@ -190,6 +190,28 @@ describe('radical check: the folder', () => {
   })
 })
 
+describe('radical check: test results from before', () => {
+  it('reports a test the kept results do not have, and a goal they leave unmet, as warnings naming when they were read', () => {
+    const now = Date.parse('2026-10-31T10:00:00Z')
+    // The scenario's test was added after the run; the fitness function's failed in it.
+    const tests = [
+      { file: 'tests/pay.test.ts', title: ['declines'], status: 'passed' as const },
+      { file: 'tests/cards.test.ts', title: ['only cards'], status: 'failed' as const },
+    ]
+    const config: CheckConfig = { rules: { 'test-not-found': 'error' }, goals: { 'requirements-verified': { min: 80 } } }
+    const rule = (result: ReturnType<typeof checkModel>, id: string) => result.findings.filter((f) => f.rule === id).map((f) => [f.severity, f.message])
+    const kept = checkModel(complete(), config, { tests, testsReadAt: '2026-10-23T08:55:00Z', now })
+    expect(rule(kept, 'test-not-found')).toEqual([['warning', 'Scenario "Paying": no test tests/pay.test.ts › pays in the test results read 2026-10-23, 8 d ago; added since, renamed or deleted? radical check --report reads the tests again.']])
+    expect(rule(kept, 'goal-unmet')).toEqual([['warning', 'Requirements verified: 0% (0 of 1), below the goal of 80% by the test results read 2026-10-23.']])
+    // A test that failed then failed: that stays an error.
+    expect(rule(kept, 'test-failed').map(([severity]) => severity)).toEqual(['error'])
+    // The reports of this run: errors.
+    const fresh = checkModel(complete(), config, { tests, now })
+    expect(rule(fresh, 'test-not-found').map(([severity]) => severity)).toEqual(['error'])
+    expect(rule(fresh, 'goal-unmet').map(([severity]) => severity)).toEqual(['error'])
+  })
+})
+
 describe('radical check: config', () => {
   const incomplete = (): DiagramData => {
     const data = complete()

@@ -13,7 +13,7 @@
 
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
 import { samePlacesAside } from '@radical/common/model'
@@ -41,9 +41,12 @@ interface InspectorState {
   /** Settings edited and not saved yet, by document: kept when the user goes
    *  to another tab, perspective or model, and back. */
   settingsDrafts: Record<string, CheckConfig>
+  /** When the model was last edited in Studio since it was opened (epoch
+   *  ms): evidence read before then may not hold for it. */
+  editedAt: number | null
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {} }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, editedAt: null }))
 
 /** The unsaved Settings of the active document, or null. */
 export function useSettingsDraft(): CheckConfig | null {
@@ -125,7 +128,9 @@ function recheck(): void {
   // saveDiagram gives the live model also while a milestone is on screen.
   // The Hub's concern packs, for concern-unaddressed (none until loaded).
   const concerns = packs
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases } : {}), ...(measurements ? { measurements } : {}), concerns })
+  // The kept results are a run of the past: a test they lack may have been
+  // added since, so it and the goals they leave unmet are warnings.
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: results.readAt } : {}), ...(measurements ? { measurements } : {}), concerns })
   useInspectorStore.setState({ check })
 }
 
@@ -141,7 +146,7 @@ if (typeof window !== 'undefined') {
       polledFor = id
       filesReadFor = null
       lastResults = lastConfig = lastMeasurements = lastReviews = ''
-      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '' })
+      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
@@ -173,11 +178,18 @@ if (typeof window !== 'undefined') {
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined
+  /** The user's steps when the active model came in (historyMark). */
+  let markAtLoad = historyMark()
   useDiagramStore.subscribe((s, prev) => {
     // Elements moved (the live layout, every frame) change nothing it checks.
     if (samePlacesAside(prev.c4Nodes, s.c4Nodes) && s.c4Relations === prev.c4Relations && s.views === prev.views
       && s.sequences === prev.sequences && s.presentations === prev.presentations && s.metamodel === prev.metamodel
       && s.liveBackup === prev.liveBackup) return
+    // The model changed after an edit since it came in, not as it came in.
+    const id = documents.getActiveId()
+    if (historyMark() !== markAtLoad && id && loadingDocumentId() !== id && (s.c4Nodes !== prev.c4Nodes || s.c4Relations !== prev.c4Relations)) {
+      useInspectorStore.setState({ editedAt: Date.now() })
+    }
     clearTimeout(timer)
     timer = setTimeout(recheck, RECHECK_MS)
   })
@@ -185,7 +197,13 @@ if (typeof window !== 'undefined') {
   // read the files beside it now rather than at the next poll.
   // The check waits a moment, as after an edit: a model of 21,000 elements
   // took 0.8 s to check, and the model opened that much later.
-  onDocumentLoaded((id) => { if (id === documents.getActiveId()) { clearTimeout(timer); timer = setTimeout(recheck, RECHECK_MS); void poll() } })
+  onDocumentLoaded((id) => {
+    if (id !== documents.getActiveId()) return
+    markAtLoad = historyMark()
+    clearTimeout(timer)
+    timer = setTimeout(recheck, RECHECK_MS)
+    void poll()
+  })
 
 
   setInterval(() => { void poll() }, POLL_MS)

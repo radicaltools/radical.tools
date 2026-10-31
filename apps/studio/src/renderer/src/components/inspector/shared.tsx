@@ -30,6 +30,20 @@ export const dimensionOfFinding = (f: CheckFinding): CheckDimension | undefined 
 
 export const metricOf = (check: CheckResult, id: string): CheckMetricResult | undefined => check.metrics.find((m) => m.id === id)
 
+/** The metric with the smallest share met. */
+export const weakest = (metrics: CheckMetricResult[]): CheckMetricResult | undefined =>
+  metrics.reduce<CheckMetricResult | undefined>((w, m) => !w || m.count * w.total < w.count * m.total ? m : w, undefined)
+
+/** Each dimension of the model with its metrics, its errors, its weakest
+ *  metric (a dimension is as strong as that) and whether its rules gate. */
+export function modelScores(check: CheckResult): Array<{ d: (typeof CHECK_DIMENSIONS)[number]; metrics: CheckMetricResult[]; errors: number; weak: CheckMetricResult | undefined; gated: boolean }> {
+  return dimensionsOf('model').map((d) => {
+    const metrics = check.metrics.filter((x) => x.dimension === d.id)
+    const errors = check.findings.filter((f) => f.severity === 'error' && dimensionOfKey(f.key) === d.id).length
+    return { d, metrics, errors, weak: weakest(metrics), gated: gatedDimension(check, d.id) }
+  })
+}
+
 export const SHORT_TYPE: Record<string, string> = { requirement: 'Req', 'fitness-fn': 'FF', scenario: 'Scenario', adr: 'ADR', need: 'Need', database: 'DB', webapp: 'Web app', component: 'Comp', container: 'Cont', system: 'System' }
 export const MARK: Record<string, string> = { verified: '✓', passed: '✓', broken: '✗', failed: '✗', unverified: '○', 'not-run': '○', 'no-checks': '○', 'not-found': '?', skipped: '–', stale: '◷', invalid: '!' }
 export const FAILING = new Set(['broken', 'failed', 'not-found', 'invalid'])
@@ -58,10 +72,11 @@ export function Chip({ id, ctx, status }: { id: string; ctx: Ctx; status?: strin
 }
 
 /** The message with each element it quotes as a link. What a failure takes
- *  down shows as links of its own, so it leaves the sentence. */
-export function Message({ f, ctx }: { f: CheckFinding; ctx: Ctx }): React.ReactElement {
+ *  down shows as links of its own, so it leaves the sentence. With `own`,
+ *  the finding's element stays text: its link stands before the message. */
+export function Message({ f, ctx, own }: { f: CheckFinding; ctx: Ctx; own?: boolean }): React.ReactElement {
   const text = f.relatedIds?.length ? f.message.replace(/ Not verified now: .*$/, '') : f.message
-  const ids = [...new Set([f.nodeId, ...(f.relatedIds ?? [])].filter((id): id is string => !!id && !!ctx.nodes[id]))]
+  const ids = [...new Set([own ? undefined : f.nodeId, ...(f.relatedIds ?? [])].filter((id): id is string => !!id && !!ctx.nodes[id]))]
   const parts: React.ReactNode[] = []
   let rest = text
   for (let guard = 0; guard < 20; guard++) {

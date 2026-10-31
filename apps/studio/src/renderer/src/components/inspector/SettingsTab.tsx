@@ -98,7 +98,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
     return (
       <React.Fragment key={metric.id}>
         <div className={`insp-set-row goal${change ? (change.loosens ? ' loose' : ' changed') : ''}`} data-metric={metric.id}>
-          <span title={metric.description}><b>{metric.label}</b> <span className="insp-muted">· {dim.perspective === 'model' ? 'Model quality' : 'Implementation'} · {dim.label}</span>
+          <span title={metric.description}><b>{metric.label}</b> <span className="insp-muted">· {dim.perspective === 'model' ? 'Model' : 'Implementation'} · {dim.label}</span>
             {change && <span className={`insp-pill ${change.loosens ? 'warn' : 'new'}`}>changed</span>}</span>
           <b className="insp-set-now" title={now ? `${now.count} of ${now.total}` : undefined}>{now ? `${now.percent}%` : <span className="insp-muted">{metric.tests && !check.evidence ? 'needs test results' : '—'}</span>}</b>
           <label className="insp-set-target">
@@ -156,7 +156,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
   const codeKeys = Object.keys(shown.rules ?? {}).filter((k) => k.includes('/'))
   const groups = [...DIMENSIONS.values()].map((d) => ({
     id: d.id as string,
-    label: `${d.perspective === 'model' ? 'Model quality' : 'Implementation'} · ${d.label}`,
+    label: `${d.perspective === 'model' ? 'Model' : 'Implementation'} · ${d.label}`,
     keys: [...ruleKeys.filter((k) => dimensionOfKey(k) === d.id), ...codeKeys.filter((k) => !k.startsWith(`${GOAL_RULE.id}/`) && dimensionOfKey(k) === d.id)],
   })).filter((g) => g.keys.length)
   groups.push({ id: 'goals', label: 'Goals', keys: [GOAL_RULE.id, ...codeKeys.filter((k) => k.startsWith(`${GOAL_RULE.id}/`))] })

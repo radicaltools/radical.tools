@@ -1,4 +1,4 @@
-// ─── Inspector: Model quality ────────────────────────────────────────────────
+// ─── Inspector: Model ────────────────────────────────────────────────────────
 //
 // How good the model is on its own, before any test runs: a tile per
 // dimension (as strong as its weakest metric), the chain from needs to
@@ -8,10 +8,7 @@
 import React, { useMemo, useState } from 'react'
 import type { CheckMetricResult, CheckResult } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { Bar, FindingsByDimension, GoalPill, MetricBar, dimensionOfKey, dimensionsOf, gatedDimension, metricOf, type Ctx } from './shared'
-
-const weakest = (metrics: CheckMetricResult[]): CheckMetricResult | undefined =>
-  metrics.reduce<CheckMetricResult | undefined>((w, m) => !w || m.count * w.total < w.count * m.total ? m : w, undefined)
+import { Bar, FindingsByDimension, GoalPill, MetricBar, dimensionOfKey, dimensionsOf, metricOf, modelScores, weakest, type Ctx } from './shared'
 
 /** A link of the traceability chain: the share of what is on its left that
  *  has what is on its right. A click opens the findings that break it. */
@@ -35,11 +32,7 @@ export function ModelTab({ check, ctx, relations, onSettings }: { check: CheckRe
   const open = (rule: string): void => { setFocus(null); requestAnimationFrame(() => setFocus(rule)) }
   const m = (id: string): CheckMetricResult | undefined => metricOf(check, id)
 
-  const dims = dimensionsOf('model').map((d) => {
-    const metrics = check.metrics.filter((x) => x.dimension === d.id)
-    const errors = check.findings.filter((f) => f.severity === 'error' && dimensionOfKey(f.key) === d.id).length
-    return { d, metrics, errors, weak: weakest(metrics), gated: gatedDimension(check, d.id) }
-  })
+  const dims = modelScores(check)
 
   const elements = useMemo(() => new Set(Object.values(relations)
     .filter((r) => r.relationType === 'satisfies' && ctx.nodes[r.targetId]?.type === 'requirement' && ctx.nodes[r.sourceId])
