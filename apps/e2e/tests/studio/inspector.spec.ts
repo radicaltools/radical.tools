@@ -230,8 +230,10 @@ test('the Inspector header says how old the test results are, and how to read th
   const when = await page.evaluate((iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }), readAt.toISOString())
   await expect(pop).toContainText(`Test results read ${when}, 1 test case.`)
   await expect(pop).toContainText('From reports/unit.json, reports/e2e.json.')
-  await expect(pop.locator('.branch-cmd code')).toHaveText([/^npm run test:reports && radical check \S+ --report reports$/])
-  await expect(pop.getByRole('button', { name: 'Copy' })).toBeVisible()
+  await expect(pop).toContainText('Read with --report.')
+  // Read again here, or fetched from CI.
+  await expect(pop.locator('.branch-cmd code')).toHaveText([/^npm run test:reports && radical check \S+ --report reports$/, /^radical check \S+ --from-ci$/])
+  await expect(pop.getByRole('button', { name: 'Copy' })).toHaveCount(2)
   await page.keyboard.press('Escape')
   await expect(pop).toBeHidden()
   // Nothing measured, and no reviews to speak of.
