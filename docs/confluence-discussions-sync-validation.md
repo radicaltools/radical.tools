@@ -59,3 +59,21 @@ or cross-machine handoff. Native Studio-hosted sync, automatic scheduling,
 edits/deletions/resolution sync and a dedicated review acknowledgement UI remain
 outside this release. See the CLI README for credentials, compatibility,
 permissions, privacy and recovery.
+
+
+## Final PR branch validation (2026-11-01)
+
+The change was rebased onto current main after removing all live test data.
+All four affected workspace typechecks, production Studio/Hub builds, 72 focused
+sync/publication tests, packaged CLI verification, and 16 discussion browser E2E
+tests pass. The model has no metamodel issues and includes the sync requirement,
+roundtrip/recovery scenarios and test evidence.
+
+The repository-wide report run is not green on this Windows host: CLI has 22
+failures (121 passed, one skipped), node-files has one chmod-based failure
+(16 passed), and Studio has one watcher/merge failure (282 passed). These failures
+are outside the sync tests; details are retained in local ignored reports.
+The architecture evidence check reports 62 errors and 554 warnings, including
+failed tests and missing evidence from E2E specs outside the 16 targeted tests.
+No baselines or goals were changed to hide these results. The PR is a draft
+pending CI/review of those broader checks.

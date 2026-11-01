@@ -9,6 +9,7 @@ metrics: |
   test(packages/common/tests/wikiDocument.test.ts) passed
   test(apps/cli/src/confluence.test.ts) passed
   test(apps/e2e/tests/studio/wiki.spec.ts) passed
+  test(apps/cli/src/discussionSync.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---
