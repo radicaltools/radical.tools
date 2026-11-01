@@ -24,6 +24,7 @@ const api = {
   readAgentActivity: (folderPath) => ipcRenderer.invoke('folder:read-agent-activity', folderPath),
   readModelBase: (folderPath) => ipcRenderer.invoke('folder:read-model-base', folderPath),
   writeModelBase: (folderPath, content) => ipcRenderer.invoke('folder:write-model-base', folderPath, content),
+  readFederation: (folderPath) => ipcRenderer.invoke('folder:read-federation', folderPath),
   folderVerified: (folderPath) => ipcRenderer.invoke('folder:verified', folderPath),
   readViewIndex: (folderPath) => ipcRenderer.invoke('folder:read-view-index', folderPath),
   writeViewIndex: (folderPath, content) => ipcRenderer.invoke('folder:write-view-index', folderPath, content),

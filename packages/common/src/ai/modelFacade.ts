@@ -241,13 +241,17 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     getMilestones: () => carried.snapshots ?? [],
     createMilestone(name: string) {
       const id = newId()
+      // The model's own elements, and the versions of the other models of a
+      // federation it was made against: theirs are fetched, never kept here.
+      const own = model.ownModel({ nodes: Object.values(state.c4Nodes), relations: Object.values(state.c4Relations) })
       const milestone: DiagramSnapshot = {
         id,
         name,
         timestamp: Date.now(),
-        nodes: clone(state.c4Nodes),
-        relations: clone(state.c4Relations),
+        nodes: clone(Object.fromEntries(own.nodes.map((n) => [n.id, n]))),
+        relations: clone(Object.fromEntries(own.relations.map((r) => [r.id, r]))),
         sequences: clone(state.sequences),
+        ...(carried.federation?.dependencies.length ? { otherModels: carried.federation.dependencies.map(({ name, commit }) => ({ name, commit })) } : {}),
       }
       carried.snapshots = [...(carried.snapshots ?? []), milestone]
       return id

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { otherModelViewShown, useDiagramStore } from '../store/diagramStore'
 import { openCard, useShowRequest } from '../store/showInView'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { keepKeysHere } from './keysHere'
@@ -250,7 +250,7 @@ export function WarnierView(): React.ReactElement {
   const activeView = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
   const selectedId = useDiagramStore((s) => s.selectedNodeId)
   // Read-only out of Designer, and on a slide played from it (F5).
-  const readOnly = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive)
+  const readOnly = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive || !!otherModelViewShown(s))
   const selectNode = useDiagramStore((s) => s.selectNode)
   const addNode = useDiagramStore((s) => s.addNode)
   const updateNode = useDiagramStore((s) => s.updateNode)

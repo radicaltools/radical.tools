@@ -11,7 +11,7 @@ import { HOOK_MARKER, HOOK_NAMES } from './hooks'
 
 const exec = promisify(execFile)
 /** What the line runs after saving the base, with the CLI `radical`. */
-const FETCH = 'radical check "model" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true'
+const FETCH = 'radical check "model" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true; radical federation fetch "model" --quiet --detach </dev/null >/dev/null 2>&1 || true'
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
 
@@ -64,7 +64,7 @@ describe('radical hooks', () => {
 
     await git(cwd, 'add', 'my model')
     await git(cwd, 'commit', '-q', '-m', 'model')
-    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff my model --save-base --quiet\ncheck my model --from-ci --quiet --detach\n')
+    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff my model --save-base --quiet\ncheck my model --from-ci --quiet --detach\nfederation fetch my model --quiet --detach\n')
     expect(await readFile(join(cwd, 'own.txt'), 'utf8')).toBe('own\n')
   })
 
@@ -118,7 +118,7 @@ describe('radical hooks', () => {
     await git(cwd, 'commit', '-q', '--allow-empty', '-m', 'x')
     expect(await readFile(join(cwd, 'python-ran.txt'), 'utf8')).toBe('yes')
     await git(cwd, 'checkout', '-q', '-b', 'feature')
-    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\n')
+    expect(await readFile(join(cwd, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\nfederation fetch model --quiet --detach\n')
     expect(await readFile(join(cwd, 'sh-ran.txt'), 'utf8')).toBe('ran\n')
   })
 
@@ -157,7 +157,7 @@ describe('radical hooks', () => {
     await git(repo, 'worktree', 'remove', tree)
 
     await git(repo, 'commit', '-q', '--allow-empty', '-m', 'x')
-    expect(await readFile(join(repo, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\n')
+    expect(await readFile(join(repo, 'ran.txt'), 'utf8')).toBe('diff model --save-base --quiet\ncheck model --from-ci --quiet --detach\nfederation fetch model --quiet --detach\n')
     await git(repo, 'rm', '-q', 'tools/record.mjs')
     const { stderr } = await git(repo, 'commit', '-q', '-m', 'no cli')
     expect(stderr).toContain('tools/record.mjs is not in this working tree, so the base of model was not saved')

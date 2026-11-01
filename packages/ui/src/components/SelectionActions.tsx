@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { activeLayoutConstraints, childrenInView, hideRefusal, shownExploration, useDiagramStore } from '../store/diagramStore'
+import { activeLayoutConstraints, childrenInView, hideRefusal, otherModelViewShown, shownExploration, useDiagramStore } from '../store/diagramStore'
 import { standingOrder } from '@radical/layout/constraints'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypeName } from '@radical/common/metamodel'
@@ -336,7 +336,9 @@ export function SelectionActionBar(): React.ReactElement | null {
   const appMode = useDiagramStore((s) => s.appMode)
   const removeNodes = useDiagramStore((s) => s.removeNodes)
   const setSelectedNodeIds = useDiagramStore((s) => s.setSelectedNodeIds)
-  if (appMode !== 'designer' || selectedNodeIds.length < 2) return null
+  // Nothing on another model's view (a federation) is done to here.
+  const onOtherModelView = useDiagramStore((s) => !!otherModelViewShown(s))
+  if (appMode !== 'designer' || onOtherModelView || selectedNodeIds.length < 2) return null
   return (
     <div className="sel-bar" role="toolbar" aria-label="Selection actions">
       <div className="sel-bar-count">

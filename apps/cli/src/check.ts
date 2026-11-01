@@ -299,8 +299,13 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   const options = { folder, verbose: values.verbose }
-  if (federation && values.format !== 'json' && !values.quiet) io.out(`Checked with ${describeDeps(federation.fetched) || 'no other model'} (${DEPS_FILE}).`)
-  const json = federation ? { ...result, federation: federation.fetched.map(({ name, ref, commit }) => ({ name, ref, commit })) } : result
+  if (federation && values.format !== 'json' && !values.quiet) {
+    io.out(`Checked with ${describeDeps(federation.fetched) || 'no other model'} (${DEPS_FILE}).`)
+    for (const note of federation.notes) io.out(`Note: ${note}`)
+  }
+  const json = federation
+    ? { ...result, federation: federation.fetched.map(({ name, ref, commit, via }) => ({ name, ref, commit, ...(via ? { via } : {}) })), ...(federation.notes.length ? { federationNotes: federation.notes } : {}) }
+    : result
   if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(json, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)
       : formatCheckText(result, options))

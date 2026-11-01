@@ -1,23 +1,22 @@
 // ─── A federation of models ──────────────────────────────────────────────────
 //
 // Each repository keeps the model of what it implements, and names in
-// deps.json the models it depends on. `radical federation open` composes one
-// model folder from it under .radical/federation/: the repository's own
-// elements and relations as they are, and every dependency's marked with its
-// origin ("orders@abc1234"), which makes them read-only in Studio and the MCP
-// server (model.ts, originOf). `sync` splits the composed folder again: what
-// has no origin goes home, every change to what has one is refused and named.
-// Fetching from git is the CLI's (node-files/gitDeps); this file is pure.
+// deps.json the models it depends on. `radical federation fetch` fetches
+// them (theirs too) and writes their elements and relations, each marked
+// with its origin ("orders@abc1234"), into the model folder's
+// .radical/federation.json. Studio and the MCP server open the model folder
+// itself, add those (withOtherModels) and never write them back (ownModel in
+// model.ts, applied by the serializer); every change to them is refused
+// (model.ts, originOf). Fetching from git is the CLI's (node-files/gitDeps);
+// this file is pure.
 
-import type { C4Node, C4Relation, DiagramData } from './c4'
-import { originOf } from './model'
-import { modelFieldChanges, type FieldChange } from './modelChanges'
+import { normalizeViewFolder, type C4Node, type C4Relation, type DiagramData, type DiagramView, type ModelPin } from './c4'
+import { originModel, originOf } from './model'
 
 /** The file in a model folder that names its dependencies. */
 export const DEPS_FILE = 'deps.json'
-/** Where the composed folder lives, inside the model folder (git-ignored). */
-export const FEDERATION_DIR = '.radical/federation'
-/** What the composed folder was made from, inside it. */
+/** The other models' elements and relations as fetched, inside the model
+ *  folder and out of git (FederationFile). */
 export const FEDERATION_FILE = '.radical/federation.json'
 
 export interface Dependency {
@@ -69,7 +68,14 @@ export function parseDeps(text: string): Deps {
 /** A dependency as fetched: the commit its ref named, and its model then. */
 export interface FetchedDependency extends Dependency {
   commit: string
-  data: Pick<DiagramData, 'nodes' | 'relations'>
+  data: Pick<DiagramData, 'nodes' | 'relations' | 'views'>
+  /** Its own deps.json at that commit, when it has one. */
+  deps?: Deps
+  /** Its model folder on disk, when its repository is a path: what a path
+   *  in its own deps.json is relative to. */
+  home?: string
+  /** The model whose deps.json pinned it (absent: this model's own). */
+  via?: string
 }
 
 /** The origin of a dependency's elements: its name and short commit. */
@@ -84,9 +90,10 @@ export interface Federation {
 
 /** The folder's own model with every dependency's elements and relations,
  *  each marked with its origin. The own model keeps its views, metamodel,
- *  milestones and layout; what it has wins over a dependency's. A
- *  dependency's relations to elements no composed model has (its own
- *  dependencies) are left out. */
+ *  milestones and layout; what it has wins over a dependency's. The
+ *  dependencies come in transitively (their own dependencies too), so a
+ *  dependency's relations to another hold; one to an element no composed
+ *  model has is left out. */
 export function composeFederation(own: DiagramData, deps: FetchedDependency[]): Federation {
   const notes: string[] = []
   const nodes = new Map<string, C4Node>(own.nodes.map((n) => [n.id, n]))
@@ -121,69 +128,115 @@ export function composeFederation(own: DiagramData, deps: FetchedDependency[]): 
   return { data: { ...own, nodes: [...nodes.values()], relations: [...relations.values()] }, notes }
 }
 
-/** A change to another model's element or relation, kept out of this model. */
-export interface RefusedChange {
-  kind: 'element' | 'relation'
-  id: string
-  /** The element's label, or the relation's "source → target". */
-  label: string
-  origin: string
-  change: 'changed' | 'removed' | 'added'
-  /** Changed: the fields that differ, layout left out. */
-  fields?: FieldChange[]
+/** What `radical federation fetch` writes into the model folder, out of
+ *  git: the other models' elements and relations, each with its origin, and
+ *  what they were fetched from. Studio and the MCP server add them to the
+ *  model they read (withOtherModels) and never write them back. */
+export interface FederationFile {
+  version: 2
+  /** This model's name, from its deps.json. */
+  name: string
+  /** When they were fetched (ISO 8601). */
+  fetchedAt: string
+  /** Each model fetched, at the commit its pin named; `via` names the model
+   *  whose deps.json pinned it, absent for this model's own. */
+  dependencies: Array<Dependency & { commit: string; via?: string; dependsOn?: string[] }>
+  /** What was left out: a pin farther away, an id two models have. */
+  notes: string[]
+  nodes: C4Node[]
+  relations: C4Relation[]
+  /** Their views, each with its origin and the folder it has there. */
+  views?: DiagramView[]
+  /** The versions of them the model's milestones keep (DiagramSnapshot
+   *  .otherModels), by origin, where they are not the current ones. */
+  atCommits?: Record<string, { nodes: C4Node[]; relations: C4Relation[] }>
 }
 
-export interface FederationSplit {
-  /** The folder's own model: everything without an origin. */
-  own: DiagramData
-  refused: RefusedChange[]
+export function serializeFederationFile(file: FederationFile): string {
+  return JSON.stringify(file, null, 2) + '\n'
 }
 
-/** Splits an edited composed model (`workspace`) into the folder's own model
- *  and the changes to other models' elements and relations, which stay out:
- *  `composed` is the federation as it was composed, which says what was theirs. */
-export function splitFederation(workspace: DiagramData, composed: DiagramData): FederationSplit {
-  const refused: RefusedChange[] = []
-  const theirs = <T extends { id: string; origin?: string }>(items: T[]) => new Map(items.filter((item) => originOf(item)).map((item) => [item.id, item]))
-  const theirNodes = theirs(composed.nodes)
-  const theirRelations = theirs(composed.relations)
-  const labelOf = (id: string) => workspace.nodes.find((n) => n.id === id)?.label ?? theirNodes.get(id)?.label ?? id
-  const relationLabel = (rel: C4Relation) => `${labelOf(rel.sourceId)} → ${labelOf(rel.targetId)}`
+/** The file's content, or null when it is no federation file this version reads. */
+export function parseFederationFile(text: string | null | undefined): FederationFile | null {
+  if (!text) return null
+  try {
+    const raw = JSON.parse(text) as Partial<FederationFile>
+    if (raw.version !== 2 || !Array.isArray(raw.nodes) || !Array.isArray(raw.relations) || !Array.isArray(raw.dependencies)) return null
+    return { notes: [], name: '', fetchedAt: '', ...raw } as FederationFile
+  } catch { return null }
+}
 
-  const nodes = workspace.nodes.filter((node) => {
-    const was = theirNodes.get(node.id)
-    if (was) {
-      const fields = modelFieldChanges(was, node)
-      if (fields.length) refused.push({ kind: 'element', id: node.id, label: was.label, origin: was.origin!, change: 'changed', fields })
-      return false
-    }
-    const origin = originOf(node)
-    if (origin) { refused.push({ kind: 'element', id: node.id, label: node.label, origin, change: 'added' }); return false }
-    return true
+/** The model read from its folder with the other models' elements and
+ *  relations added, each with its origin. The model's own win where an id is
+ *  both; a relation of theirs to an element none has is left out. An element
+ *  of theirs is placed where the model's layout keeps it. */
+export function withOtherModels<T extends DiagramData>(data: T, file: FederationFile | null): T {
+  if (!file) return data
+  // Even with nothing current, it holds what milestones need.
+  if (!file.nodes.length && !file.relations.length && !file.views?.length) return { ...data, federation: file }
+  const ownNodes = new Set(data.nodes.map((n) => n.id))
+  const ownRelations = new Set(data.relations.map((r) => r.id))
+  const nodes = file.nodes.filter((n) => !ownNodes.has(n.id) && originOf(n)).map((n) => {
+    const at = data.defaultPositions?.[n.id]
+    return at ? { ...n, x: at.x, y: at.y, ...(at.width ? { width: at.width } : {}), ...(at.height ? { height: at.height } : {}) } : n
   })
-  const relations = workspace.relations.filter((rel) => {
-    const was = theirRelations.get(rel.id)
-    if (was) {
-      const fields = modelFieldChanges(was, rel)
-      if (fields.length) refused.push({ kind: 'relation', id: rel.id, label: relationLabel(was), origin: was.origin!, change: 'changed', fields })
-      return false
-    }
-    const origin = originOf(rel)
-    if (origin) { refused.push({ kind: 'relation', id: rel.id, label: relationLabel(rel), origin, change: 'added' }); return false }
-    return true
+  const all = new Set([...ownNodes, ...nodes.map((n) => n.id)])
+  const relations = file.relations.filter((r) => !ownRelations.has(r.id) && originOf(r) && all.has(r.sourceId) && all.has(r.targetId))
+  // Their views, each in a folder named after its model (two models' views
+  // of one name stay apart), showing that model's elements and those of the
+  // models it depends on.
+  const ownViews = new Set((data.views ?? []).map((v) => v.id))
+  const dependsOn = new Map(file.dependencies.map((d) => [d.name, d.dependsOn ?? []]))
+  const scopeOf = (name: string): string[] => {
+    const scope = new Set<string>()
+    const walk = (n: string) => { if (scope.has(n)) return; scope.add(n); for (const d of dependsOn.get(n) ?? []) walk(d) }
+    walk(name)
+    return [...scope]
+  }
+  const views = (file.views ?? []).filter((v) => !ownViews.has(v.id) && originOf(v)).map((v): DiagramView => {
+    const model = originModel(v.origin!)
+    return { ...v, folder: normalizeViewFolder(v.folder ? `${model}/${v.folder}` : model), originScope: scopeOf(model) }
   })
-  const kept = new Set([...workspace.nodes.map((n) => n.id), ...workspace.relations.map((r) => r.id)])
-  for (const node of theirNodes.values()) if (!kept.has(node.id)) refused.push({ kind: 'element', id: node.id, label: node.label, origin: node.origin!, change: 'removed' })
-  for (const rel of theirRelations.values()) if (!kept.has(rel.id)) refused.push({ kind: 'relation', id: rel.id, label: relationLabel(rel), origin: rel.origin!, change: 'removed' })
-  return { own: { ...workspace, nodes, relations }, refused }
+  return {
+    ...data,
+    nodes: [...data.nodes, ...nodes],
+    relations: [...data.relations, ...relations],
+    ...(views.length ? { views: [...(data.views ?? []), ...views] } : {}),
+    federation: file,
+  }
 }
 
-/** One line per refused change, for the terminal. */
-export function formatRefused(refused: RefusedChange[]): string[] {
-  return refused.map((r) => {
-    const what = `${r.kind === 'element' ? 'element' : 'relation'} "${r.label}" of ${r.origin}`
-    if (r.change === 'removed') return `Kept: the deletion of ${what}; delete it in that model's repository.`
-    if (r.change === 'added') return `Left out: ${what}, which ${r.origin} does not have; only radical federation gives an origin.`
-    return `Kept out: the change to ${what} (${(r.fields ?? []).map((f) => f.field).join(', ')}); change it in that model's repository.`
-  })
+/** The other models' elements and relations a milestone shows: at the
+ *  commits it keeps, from the current fetch or the versions fetched for
+ *  milestones; as fetched now for one made before that keeps none. `missing`
+ *  names the versions not fetched. */
+export function otherModelsAt(file: FederationFile | null, pins: ModelPin[] | undefined): { nodes: C4Node[]; relations: C4Relation[]; missing: ModelPin[] } {
+  if (!file) return { nodes: [], relations: [], missing: pins ?? [] }
+  if (!pins) return { nodes: file.nodes, relations: file.relations, missing: [] }
+  const nodes: C4Node[] = []
+  const relations: C4Relation[] = []
+  const missing: ModelPin[] = []
+  for (const pin of pins) {
+    const origin = originFor(pin.name, pin.commit)
+    const current = file.dependencies.some((d) => d.name === pin.name && d.commit === pin.commit)
+    const at = current ? { nodes: file.nodes.filter((n) => n.origin === origin), relations: file.relations.filter((r) => r.origin === origin) } : file.atCommits?.[origin]
+    if (!at) { missing.push(pin); continue }
+    nodes.push(...at.nodes)
+    relations.push(...at.relations)
+  }
+  const ids = new Set(nodes.map((n) => n.id))
+  return { nodes, relations: relations.filter((r) => ids.has(r.sourceId) && ids.has(r.targetId)), missing }
 }
+
+/** Another model's view as it is kept in .radical/federation.json: what it
+ *  shows, its filter, places and settings, without what this model cannot
+ *  have of it (its sequence, its exploration). */
+export function otherModelView(view: DiagramView, origin: string): DiagramView | null {
+  if (view.kind === 'explore') return null
+  const { sequenceId: _sequence, explore: _explore, partOf: _partOf, ...kept } = view
+  return { ...kept, origin }
+}
+
+/** The dependencies with their commits, for a line of output. */
+export const describeFetched = (deps: FederationFile['dependencies']): string =>
+  deps.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${d.ref})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')

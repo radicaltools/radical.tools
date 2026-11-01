@@ -13,6 +13,8 @@
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { ownModel } from '@radical/common/model'
+import { withOtherModels } from '@radical/common/federation'
 import { mergeModelEdits, mergeModels, mergeNotices, modelEdits, type MergeDrop, type ModelEdits } from '@radical/common/modelMerge'
 import { useDiagramStore, afterDrag, dragHeld, historyMark, onExploration, parkedLiveModel, viewById, type ParkedDesigner } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore, DocumentUnreadableError, StorageFullError, type DocumentSource } from '../store/documentStore'
@@ -212,7 +214,8 @@ if (typeof window !== 'undefined') {
         localStorage.removeItem(KEPT_EDITS + id)
         return
       }
-      const edits = modelEdits(_baseModel, now)
+      // The other models' elements are no edit: they come with the folder.
+      const edits = modelEdits(ownModel(_baseModel), ownModel(now))
       if (Object.keys(edits).length) localStorage.setItem(KEPT_EDITS + id, JSON.stringify(edits))
       else localStorage.removeItem(KEPT_EDITS + id)
     } catch (e) {
@@ -426,14 +429,18 @@ if (typeof window !== 'undefined') {
         const outsideChange = !!opts?.keepUi
         // Edits the page had not written when it went away (keepEdits).
         const kept = !opts?.keepUi && source === 'md' ? takeKeptEdits(id) : null
+        // The edits are merged into the model's own elements, and the other
+        // models (a federation) are added as fetched now: a fetch between
+        // the two reads is no delete, which took them out of the views.
+        const others = documents.otherModels(id).fetched
         if (unsaved) {
-          const { merged, ...report } = mergeModels(unsaved.base, unsaved.ours, data)
-          store.loadDiagram(structuredClone(merged), { outsideChange })
+          const { merged, ...report } = mergeModels(ownModel(unsaved.base), ownModel(unsaved.ours), ownModel(data))
+          store.loadDiagram(structuredClone(withOtherModels(merged, others)), { outsideChange })
           mergedEdits = true
           reportMergeConflicts(report)
         } else if (kept) {
-          const { merged, ...report } = mergeModelEdits(kept, data)
-          store.loadDiagram(structuredClone(merged))
+          const { merged, ...report } = mergeModelEdits(kept, ownModel(data))
+          store.loadDiagram(structuredClone(withOtherModels(merged, others)))
           mergedEdits = true
           reportMergeConflicts(report)
         } else {

@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type Presentation, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes, withAncestors } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
@@ -222,8 +222,8 @@ function materializeDefaults(node: NodeRecord, mm: Metamodel | undefined): void 
 
 // ── Other models ─────────────────────────────────────────────────────────────
 //
-// A federation (radical federation open) holds the elements and relations of
-// the models this one depends on, each with its origin. They belong to those
+// A federation (radical federation fetch) brings the elements and relations
+// of the models this one depends on, each with its origin. They belong to those
 // models' repositories: every change to them is refused, but where they lie
 // on this model's views is free.
 
@@ -231,6 +231,61 @@ function materializeDefaults(node: NodeRecord, mm: Metamodel | undefined): void 
  *  "<name>@<commit>", or undefined for this model's own. */
 export function originOf(item: { origin?: unknown } | undefined): string | undefined {
   return typeof item?.origin === 'string' && item.origin ? item.origin : undefined
+}
+
+/** The model's own: its elements and relations without an origin, and its
+ *  milestones without theirs. What is written into the model folder, saved
+ *  elsewhere or compared with git; the other models' elements come from the
+ *  file `radical federation fetch` writes, never from the folder. */
+export function ownModel<T extends { nodes: C4Node[]; relations: C4Relation[]; views?: DiagramView[]; snapshots?: DiagramSnapshot[]; presentations?: Presentation[] }>(data: T): T {
+  const own = <X extends { origin?: unknown }>(items: Record<string, X>): Record<string, X> =>
+    Object.fromEntries(Object.entries(items).filter(([, item]) => !originOf(item)))
+  const theirs = data.nodes.some((n) => originOf(n)) || data.relations.some((r) => originOf(r)) || (data.views ?? []).some((v) => originOf(v))
+    || (data.snapshots ?? []).some((s) => Object.values(s.nodes).some((n) => originOf(n)) || Object.values(s.relations).some((r) => originOf(r)))
+    || (data.presentations ?? []).some((p) => p.slides.some((sl) => sl.modelSnapshot && (Object.values(sl.modelSnapshot.nodes).some((n) => originOf(n)) || Object.values(sl.modelSnapshot.relations).some((r) => originOf(r)))))
+  // What was fetched with it is read with it, never saved with it.
+  if ('federation' in data) {
+    const { federation: _fetched, ...rest } = data as T & { federation?: unknown }
+    return ownModel(rest as T)
+  }
+  if (!theirs) return data
+  return {
+    ...data,
+    nodes: data.nodes.filter((n) => !originOf(n)),
+    relations: data.relations.filter((r) => !originOf(r)),
+    ...(data.views ? { views: data.views.filter((v) => !originOf(v)) } : {}),
+    ...(data.snapshots ? { snapshots: data.snapshots.map((s) => ({ ...s, nodes: own(s.nodes), relations: own(s.relations) })) } : {}),
+    // A slide's own copy of the model, as a milestone.
+    ...(data.presentations ? { presentations: data.presentations.map((p) => ({ ...p, slides: p.slides.map((sl) => (sl.modelSnapshot ? { ...sl, modelSnapshot: { ...sl.modelSnapshot, nodes: own(sl.modelSnapshot.nodes), relations: own(sl.modelSnapshot.relations) } } : sl)) })) } : {}),
+  }
+}
+
+/** Why another model's view (a federation) cannot be changed here, or null
+ *  for the model's own. */
+export function viewRefusal(view: Pick<DiagramView, 'name' | 'origin'> | undefined): string | null {
+  const origin = originOf(view)
+  return view && origin ? readOnlyError(`The view "${view.name}"`, origin).replace(/\.$/, ', or copy it into this model to change the copy.') : null
+}
+
+/** Copies another model's view into the model as its own: editable, in the
+ *  folder it has in its model, with its list, filter and places. It keeps
+ *  its name, or, when the model has a view of that name, gets the model's
+ *  name after it ("Containers (orders)"), and a number after that when
+ *  that is taken too. Returns the copy's name, or why it cannot be copied. */
+export function copyOtherModelView(state: Pick<ModelState, 'views'>, viewId: string, newId: string): { name: string } | { refused: string } {
+  const view = state.views[viewId]
+  const origin = originOf(view)
+  if (!view || !origin) return { refused: 'Only another model\'s view is copied into the model.' }
+  const model = originModel(origin)
+  const taken = new Set(Object.values(state.views).filter((v) => !originOf(v)).map((v) => v.name))
+  let name = view.name
+  if (taken.has(name)) name = `${view.name} (${model})`
+  for (let n = 2; taken.has(name); n++) name = `${view.name} (${model} ${n})`
+  // The folder it has in its model: the one here, without the model's name first.
+  const folder = view.folder && view.folder !== model ? view.folder.slice(model.length + 1) : undefined
+  const { origin: _origin, originScope: _scope, folder: _folder, ...kept } = view
+  state.views[newId] = structuredClone({ ...kept, id: newId, name, ...(folder ? { folder } : {}) }) as DiagramView
+  return { name }
 }
 
 /** The name of the model in an origin: "orders" in "orders@abc1234". */

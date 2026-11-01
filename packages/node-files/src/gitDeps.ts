@@ -13,7 +13,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isMdFolderModelPath, type FolderFiles } from '@radical/common/formats/mdFolder'
-import type { Dependency, FetchedDependency } from '@radical/common/federation'
+import { DEPS_FILE, parseDeps, type Dependency, type FetchedDependency } from '@radical/common/federation'
 import { catFiles } from './gitModel'
 
 const exec = promisify(execFile)
@@ -35,7 +35,8 @@ export function depsCacheDir(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /** An address git fetches from (https://, ssh://, git@host:path), not a path. */
-const isAddress = (repo: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(repo) || /^[^/\\]+@[^/\\]+:/.test(repo)
+/** A git address (a URL or scp-like user@host:path), not a path on disk. */
+export const isAddress = (repo: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(repo) || /^[^/\\]+@[^/\\]+:/.test(repo)
 
 /** The repository's address; a path is relative to the model folder. */
 export const repoAddress = (repo: string, home: string): string => (isAddress(repo) || isAbsolute(repo) ? repo : resolve(home, repo))
@@ -88,7 +89,7 @@ async function modelFilesAt(dir: string, commit: string, path: string): Promise<
     if (tab < 0) continue
     const [mode, type, sha] = entry.slice(0, tab).split(' ')
     const rel = entry.slice(tab + 1)
-    if (type !== 'blob' || mode === '120000' || !isMdFolderModelPath(rel)) continue
+    if (type !== 'blob' || mode === '120000' || !(isMdFolderModelPath(rel) || rel === DEPS_FILE)) continue
     if (rel.split('/').some((part) => part.startsWith('.'))) continue
     blobs.push({ sha, path: rel })
   }
@@ -122,10 +123,14 @@ export async function fetchDependency(dep: Dependency, home: string, options: Fe
     const commit = options.commit
       ? await gitOk(dir, ['rev-parse', '--verify', '--quiet', `${options.commit}^{commit}`]) ?? await fetchRef(dir, { ...dep, ref: options.commit })
       : await fetchRef(dir, dep)
-    const files = await modelFilesAt(dir, commit, dep.path)
+    const { [DEPS_FILE]: depsText, ...files } = await modelFilesAt(dir, commit, dep.path)
     if (!Object.keys(files).length) throw new Error(`no model folder "${dep.path}" at ${dep.ref} (${commit.slice(0, 7)})`)
-    const { nodes, relations } = deserializeFromMdFolder(files).data
-    return { ...dep, commit, data: { nodes, relations } }
+    const { nodes, relations, views } = deserializeFromMdFolder(files).data
+    // Its own dependencies, for a federation composed transitively; a repo
+    // path in them is relative to its model folder, known only on disk.
+    const deps = depsText === undefined ? undefined : parseDeps(depsText)
+    const home = isAddress(address) ? undefined : join(address, dep.path)
+    return { ...dep, commit, data: { nodes, relations, ...(views ? { views } : {}) }, ...(deps ? { deps } : {}), ...(home ? { home } : {}) }
   } catch (error) {
     throw new Error(`dependency ${dep.name} (${dep.repo} at ${dep.ref}): ${(error as Error).message}`)
   }

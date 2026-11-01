@@ -352,6 +352,7 @@
               <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.radical/measurements.json</code>, which the check reads without the option too. The reviews in the model folder's <code>reviews.json</code> are read as measurements as well.</td></tr>
               <tr><td><code>--baseline &lt;path&gt;</code></td><td>Earlier <code>radical-metrics/1</code> files, or a directory of them, that a condition against a baseline compares with (the median of the latest seven of its metric). Read only; never kept beside the model.</td></tr>
               <tr><td><code>--trigger &lt;event&gt;</code></td><td>The event the check runs on (<code>pull-request</code> in the gate): a metric condition of a fitness function that runs on another event, or continually, is not reported when nothing measured it.</td></tr>
+              <tr><td><code>--alone</code></td><td>With a <code>deps.json</code>: checks the folder without the models it names. Without it, the model is checked with them, fetched at their pinned refs (see <a href="manual.html#federation">Federation</a>).</td></tr>
               <tr><td><code>--evidence &lt;file&gt;</code></td><td>With <code>--report</code> or measurements: writes what they say about each scenario, fitness function, requirement and ADR as JSON.</td></tr>
               <tr><td><code>--ratchet</code></td><td>Lowers each <code>max</code> in the config to the count found now and writes the config back. Never raises one.</td></tr>
               <tr><td><code>--verbose</code></td><td>Lists every warning, not the first five of each rule.</td></tr>
@@ -390,6 +391,18 @@
           </table>
         </div>
         <p>Units of one kind convert: <code>ns us ms s min h d</code>, and <code>B KB MB GB TB KiB MiB GiB TiB</code>; other units must match. A condition or a measurement without a unit compares the numbers as they are.</p>
+        <h3>radical federation</h3>
+        <p>Fetches the models a model folder's <code>deps.json</code> names, and theirs, into <code>.radical/federation.json</code> (see <a href="manual.html#federation">Federation</a>). Repositories are cached in <code>$RADICAL_CACHE</code>, else the user's cache directory.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>fetch [folder]</code></td><td>Fetches each dependency at its ref, and the models it depends on (a model pinned twice at the nearest pin), and writes their elements, relations and views, each with <code>origin: "&lt;name&gt;@&lt;commit&gt;"</code>, the commits and what was left out, and the versions the model's milestones keep. Without a <code>deps.json</code> there is nothing to fetch (status 0).</td></tr>
+              <tr><td><code>--quiet</code></td><td>Prints nothing.</td></tr>
+              <tr><td><code>--detach</code></td><td>Fetches in the background and returns at once; the git hooks run <code>fetch --quiet --detach</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
         <h3>radical sense</h3>
 <p>A fitness function is classified as <em>Building Evolutionary Architectures</em> classifies it. Its result is read from its metrics: <em>static</em> for fixed limits, <em>dynamic</em> for one against a baseline.</p>
         <div class="doc-table-wrap">

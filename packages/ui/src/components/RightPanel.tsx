@@ -782,8 +782,9 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
 
 // ── View properties (left panel pane 2) ─────────────────────────────────────
 
-function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: string; readOnly?: boolean; onClose: () => void }) {
+function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClose }: { viewId: string; readOnly?: boolean; onClose: () => void }) {
   const view = useDiagramStore((s) => s.views[viewId])
+  const copyOtherModelView = useDiagramStore((s) => s.copyOtherModelView)
   const sequences = useDiagramStore((s) => s.sequences)
   const renameView = useDiagramStore((s) => s.renameView)
   const removeView = useDiagramStore((s) => s.removeView)
@@ -814,6 +815,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const allNodes = useDiagramStore((s) => s.c4Nodes)
 
   if (!view) return null
+  // Another model's view (a federation): shown, not changed; a copy is.
+  const origin = originOf(view)
+  const readOnly = panelReadOnly || !!origin
   const ofType = viewpointOfView(view, metamodel)
   // One of a group's views: its viewpoint and view type are the group's.
   const ofGroup = view.partOf ? allViews[view.partOf] : undefined
@@ -842,6 +846,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
         &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : isWarnier ? 'WARNIER VIEW' : isExplore ? 'EXPLORE VIEW' : 'STRUCTURE VIEW'}
         {ofType && <>&nbsp;·&nbsp;{ofType.label.toUpperCase()}</>}
       </div>
+      {origin && <OtherModelViewNote origin={origin} onCopy={panelReadOnly ? undefined : () => { copyOtherModelView(view.id); onClose() }} />}
       <div>
         <div className="props-section-title">Name</div>
         <div className="props-field">
@@ -1227,7 +1232,7 @@ const VIEW_BADGE_STYLE: React.CSSProperties = { marginLeft: 4, fontSize: 9, font
 
 /** Properties of a folder of the list of views: its name (renaming moves
  *  every view in it and below it along), where it sits, and its views. */
-function FolderPropertiesContent({ path, readOnly = false, onRenamed }: {
+function FolderPropertiesContent({ path, readOnly: panelReadOnly = false, onRenamed }: {
   path: string
   readOnly?: boolean
   onRenamed: (path: string) => void
@@ -1241,6 +1246,8 @@ function FolderPropertiesContent({ path, readOnly = false, onRenamed }: {
   const [nameVal, setNameVal] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
   const inside = Object.values(views).filter((v) => isInViewFolder(v, path))
+  // A folder of another model's views (a federation) is that model's.
+  const readOnly = panelReadOnly || inside.some((v) => originOf(v))
   const cut = path.lastIndexOf('/')
   const name = path.slice(cut + 1)
   const parent = cut < 0 ? '' : path.slice(0, cut)
@@ -1561,6 +1568,11 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
               <BranchCount n={branchCounts?.[v.id]} />
               {!group && <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>}
             </div>
+            {v.origin && (
+              <div className="lp-card-origin" title={`A view of the model ${v.origin}, read-only`}>
+                <span className="lp-view-origin">{originModel(v.origin)}</span> read-only
+              </div>
+            )}
             {viewpoint && (
               <div className="lp-card-viewpoint" title={viewpoint.description ?? `Viewpoint ${viewpoint.label}`}>
                 <span className="lp-card-viewpoint-kind">Viewpoint</span> {viewpoint.label}
@@ -2893,6 +2905,18 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
   }
 
   return null
+}
+
+/** Says that a view is another model's, at which version, and read-only,
+ *  and offers to copy it into the model (`onCopy`, in Designer). */
+export function OtherModelViewNote({ origin, onCopy, className = 'pp-other-model', style }: { origin: string; onCopy?: () => void; className?: string; style?: React.CSSProperties }): React.ReactElement {
+  const version = origin.slice(origin.lastIndexOf('@') + 1)
+  return (
+    <div className={className} role="note" style={style}>
+      <span>A view of the model <strong>{originModel(origin)}</strong> at <code>{version}</code> · read-only. Change it in that model's repository, or copy it to change the copy.</span>
+      {onCopy && <button type="button" className="other-model-copy" onClick={onCopy}>Copy to this model</button>}
+    </div>
+  )
 }
 
 /** Says that the element or relation is another model's, at which version,
