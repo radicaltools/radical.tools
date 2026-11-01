@@ -209,8 +209,8 @@ export function canAddMoreOfType(
  * themselves list as properties.)
  */
 const RESERVED_PROPERTY_KEYS = {
-  node: new Set(['id', 'type', 'parentId', 'x', 'y', 'width', 'height', 'collapsed']),
-  relation: new Set(['id', 'sourceId', 'targetId', 'relationType']),
+  node: new Set(['id', 'type', 'parentId', 'x', 'y', 'width', 'height', 'collapsed', 'origin']),
+  relation: new Set(['id', 'sourceId', 'targetId', 'relationType', 'origin']),
 }
 
 export function isReservedPropertyKey(key: string, of: 'node' | 'relation'): boolean {

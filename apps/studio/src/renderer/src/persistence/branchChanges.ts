@@ -15,7 +15,7 @@ import { create } from 'zustand'
 import type { C4Node } from '@radical/common/c4'
 import { forgeModelBase, isBaseOld, mayReplaceWithForgeBase, parseModelBase, type ModelBase } from '@radical/common/formats/modelBase'
 import { baseCopy, branchChanges, type BranchChanges } from '@radical/common/branchChanges'
-import type { ModelCopy } from '@radical/common/model'
+import { ownModel, type ModelCopy } from '@radical/common/model'
 import { useDiagramStore, type BranchOverlay } from '@radical/ui/store/diagramStore'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
@@ -60,7 +60,9 @@ function recompute(): void {
     return
   }
   // saveDiagram gives the live model also while a milestone is on screen.
-  const data = useDiagramStore.getState().saveDiagram()
+  // The base holds the model's own elements: the other models' (a
+  // federation) are none of the branch's changes.
+  const data = ownModel(useDiagramStore.getState().saveDiagram())
   const model = { nodes: byId(data.nodes), relations: byId(data.relations) }
   useBranchStore.setState({ model, changes: branchChanges(baseModel, model.nodes, model.relations) })
   showOverlay()
@@ -77,7 +79,7 @@ export async function saveForgeBase(): Promise<boolean> {
   if (!id) return false
   const existing = await documents.readModelBase(id).catch(() => null)
   if (!mayReplaceWithForgeBase(existing)) return false
-  const data = useDiagramStore.getState().saveDiagram()
+  const data = ownModel(useDiagramStore.getState().saveDiagram())
   if (!(await documents.writeModelBase(id, forgeModelBase(data.nodes, data.relations)))) return false
   await pollNow()
   return true

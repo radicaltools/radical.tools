@@ -8,7 +8,7 @@ import {
   type ReactFlowState,
 } from 'reactflow'
 import { C4EdgeRFData } from '@radical/common/c4'
-import { useDiagramStore } from '../../store/diagramStore'
+import { otherModelViewShown, useDiagramStore } from '../../store/diagramStore'
 import { edgeFocus } from '../../store/canvasFocus'
 import { edgeGeometry, edgeLabelsShownAt, LABEL_BOX } from './edgeGeometry'
 import { editingControl } from '../editingControl'
@@ -188,7 +188,7 @@ export const RelationEdge = memo(
     const focus = useDiagramStore((s) => edgeFocus(s, id))
     // Its ends are rewired in Designer only: in Viewer and Presenter a drag
     // rewired the relation on the canvas, unsaved and gone back in Designer.
-    const rewirable = useDiagramStore((s) => s.appMode === 'designer' && !s.presentationActive)
+    const rewirable = useDiagramStore((s) => s.appMode === 'designer' && !s.presentationActive && !otherModelViewShown(s))
 
     // Not drawable yet (an end is hidden or not measured).
     if (!geometry) return null

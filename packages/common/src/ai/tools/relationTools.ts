@@ -2,6 +2,7 @@
 
 import type { C4Relation } from '../../c4'
 import { inferRelationType, isReservedPropertyKey, type Metamodel } from '../../metamodel'
+import { checkPatchRelation, checkRemove } from '../../model'
 import { fail, sequenceStepCount, stepsGone, type ToolDef, type ToolHandler } from './types'
 import { validateProperties, type PropertyValue } from './propertyBag'
 
@@ -183,6 +184,14 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
         ...Object.fromEntries([...cleared, ...removed].map((key) => [key, undefined])),
       } as Partial<Omit<C4Relation, 'id'>>
 
+      const refused = checkPatchRelation({
+        c4Nodes: ctx.diagram.getNodes(),
+        c4Relations: rels,
+        views: ctx.diagram.getViews?.() ?? {},
+        activeViewId: null,
+        metamodel: mm,
+      }, realId, updates)
+      if (refused) return fail(`update_relation: ${refused}`)
       ctx.diagram.updateRelation(realId, updates)
       const resultText = notes.length ? `Updated relation ${realId}. ${notes.join('; ')}` : `Updated relation ${realId}.`
       return { ok: true, resultText, updated: { relations: 1 } }
@@ -193,6 +202,13 @@ export function buildRelationToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.id !== 'string' || !input.id) return fail('delete_relation: id is required')
       const realId = ctx.resolveId(input.id)
       if (!(realId in ctx.diagram.getRelations())) return fail(`delete_relation: unknown id "${input.id}"`)
+      const refused = checkRemove({
+        c4Nodes: ctx.diagram.getNodes(),
+        c4Relations: ctx.diagram.getRelations(),
+        views: ctx.diagram.getViews?.() ?? {},
+        activeViewId: null,
+      }, [], [realId])
+      if (refused) return fail(`delete_relation: ${refused}`)
       const steps = sequenceStepCount(ctx)
       ctx.diagram.removeRelation(realId)
       return { ok: true, resultText: `Deleted relation ${realId}${stepsGone(steps - sequenceStepCount(ctx))}.`, deleted: { relations: 1 } }

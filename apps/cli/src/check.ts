@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
+import { DEPS_FILE } from '@radical/common/federation'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
+import { composeFolder, describeDeps, federationOthers } from './federation'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -62,6 +64,9 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       now, so a rule that got better cannot get worse again
                       (the test rules only with --report: without it they
                       do not run and keep their baselines)
+  --alone             check without the models deps.json names; with a
+                      deps.json the model is checked composed with them, at
+                      their pinned refs (radical federation --help)
   --verbose           list every warning, not the first five of each rule
   --list-rules        list the rules and their default severity, and the
                       metrics check.json can set goals for ("goals":
@@ -96,6 +101,8 @@ export interface Io {
    *  command that started it (radical check --detach); absent when nothing
    *  can be started. */
   background?: (args: string[]) => void
+  /** Stops a command that runs until stopped (radical federation watch). */
+  signal?: AbortSignal
 }
 
 /** Runs `radical check` with `args` (after the command name); returns the exit status. */
@@ -117,6 +124,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         trigger: { type: 'string' },
         evidence: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
+        alone: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'list-rules': { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -271,7 +279,17 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks() })
+  // With deps.json: checked with the models it depends on, so its relations
+  // to their elements hold, and one to an element none has is an error.
+  let federation
+  try {
+    federation = values.alone ? null : await composeFolder(root)
+  } catch (error) {
+    io.err(`Cannot compose the federation of ${folder}: ${(error as Error).message}`)
+    return 2
+  }
+  const others = federation ? federationOthers(files, federation.fetched) : undefined
+  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
@@ -281,7 +299,14 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   const options = { folder, verbose: values.verbose }
-  if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(result, null, 2)
+  if (federation && values.format !== 'json' && !values.quiet) {
+    io.out(`Checked with ${describeDeps(federation.fetched) || 'no other model'} (${DEPS_FILE}).`)
+    for (const note of federation.notes) io.out(`Note: ${note}`)
+  }
+  const json = federation
+    ? { ...result, federation: federation.fetched.map(({ name, ref, commit, via }) => ({ name, ref, commit, ...(via ? { via } : {}) })), ...(federation.notes.length ? { federationNotes: federation.notes } : {}) }
+    : result
+  if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(json, null, 2)
     : values.format === 'github' ? formatCheckGithub(result, options)
       : formatCheckText(result, options))
 

@@ -5188,3 +5188,36 @@ Processes and steps in the Radical metamodel and the Warnier view type
    machines, into a Warnier view; the C4 stage adds performed-by.
 6. **Large trees.** Every row is drawn; a model with thousands of elements in
    one Warnier view would want folding like the table's.
+### Federation of models (2026-10-17, reworked 2026-11-01)
+
+`radical federation fetch` writes the other models a `deps.json` names (and
+theirs, the nearest pin winning) into `.radical/federation.json`; Studio and
+the MCP server open the model folder itself, show them read-only and never
+write them back. Done on 2026-11-01: transitive dependencies, Studio opening
+the model folder (no composed copy, no sync), tables and the wiki read-only,
+the note in Studio when nothing is fetched, and the other models' views
+(read-only, in a folder per model, with Copy to this model), and milestones
+that keep the versions of the other models and show them. Left open:
+
+1. **Other models' places on All elements.** A view of this model keeps where
+   it draws another model's element, and so does the model's layout
+   (`defaultPositions`), but whether it is folded (`collapsed`) is kept only
+   for the model's own elements.
+2. **A selected element loses its dashed outline** to the selection outline.
+3. **Types a dependency has and the model's metamodel lacks** are named as a
+   note, and then reported by the metamodel rule; the models of a federation
+   are expected to share a metamodel.
+4. **One fetch at a time.** Two commands fetching the same repository into
+   the cache at once may meet git's lock files.
+5. **One `radical fetch` for all that comes from outside.** A command that
+   fetches both the test results of CI (today `radical check --from-ci`) and
+   the other models of a `deps.json`, so the hooks call one command and it
+   means something without a federation too. Kept as `radical federation
+   fetch` for now (the product owner's choice, 2026-11-01).
+6. **The other models' views over MCP.** An agent sees them in the summary
+   and is refused a change, but has no tool to copy one into the model
+   (Studio has *Copy to this model*); a sequence, an exploration or a
+   view's membership in a group of views is not fetched with a view.
+7. **A relative repository path in a dependency's `deps.json`** resolves only
+   when that dependency is itself on disk; for one fetched by address the
+   model has to pin it itself.

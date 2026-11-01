@@ -2,7 +2,7 @@
 
 import { NODE_SIZES, type C4ElementType, type C4Node } from '../../c4'
 import type { Metamodel } from '../../metamodel'
-import { checkNodeUpdate, checkReparent, relationsToNewHolders } from '../../model'
+import { checkNodeUpdate, checkRemove, checkReparent, relationsToNewHolders } from '../../model'
 import { fail, sequenceStepCount, stepsGone, type ToolDef, type ToolHandler } from './types'
 import { validateProperties } from './propertyBag'
 
@@ -195,6 +195,13 @@ export function buildNodeToolHandlers(): Record<string, ToolHandler> {
       if (typeof input.id !== 'string' || !input.id) return fail('delete_node: id is required')
       const realId = ctx.resolveId(input.id)
       if (!(realId in ctx.diagram.getNodes())) return fail(`delete_node: unknown id "${input.id}"`)
+      const refused = checkRemove({
+        c4Nodes: ctx.diagram.getNodes(),
+        c4Relations: ctx.diagram.getRelations(),
+        views: ctx.diagram.getViews?.() ?? {},
+        activeViewId: null,
+      }, [realId])
+      if (refused) return fail(`delete_node: ${refused}`)
       const steps = sequenceStepCount(ctx)
       ctx.diagram.removeNode(realId)
       return { ok: true, resultText: `Deleted node ${realId}${stepsGone(steps - sequenceStepCount(ctx))}.`, deleted: { nodes: 1 } }

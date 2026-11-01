@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { otherModelViewShown, useDiagramStore } from '../store/diagramStore'
 import { openCard, useShowRequest } from '../store/showInView'
 import type { C4Node, C4ElementType } from '@radical/common/c4'
 import { NODE_COLORS, NODE_FG, TYPE_LABELS, nodeTypeSize } from '@radical/common/c4'
@@ -10,6 +10,7 @@ import { nodeSummary, nodeSummaryDetail } from '@radical/common/nodeSummary'
 import { MarkdownText } from './MarkdownText'
 import { WikiMenu } from './WikiMenu'
 import { editingControl } from './editingControl'
+import { originModel, originOf } from '@radical/common/model'
 
 // ─── Table view ──────────────────────────────────────────────────────────────
 // Shows what the view's steps give (viewPipeline.ts, set in the Nodes panel)
@@ -121,7 +122,8 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
   const selectedNodeId   = useDiagramStore((s) => s.selectedNodeId)
   const activeView       = useDiagramStore((s) => s.activeViewId ? s.views[s.activeViewId] : undefined)
   // Read-only out of Designer, and on a slide played from it (F5).
-  const readOnly         = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive)
+  // Another model's view (a federation) is read-only as Viewer's tables are.
+  const readOnly         = useDiagramStore((s) => s.appMode !== 'designer' || s.presentationActive || !!otherModelViewShown(s))
   const presenting       = useDiagramStore((s) => s.presentationActive)
   const discussNode      = presenting ? undefined : onDiscuss
   const metamodel        = useDiagramStore((s) => s.metamodel)
@@ -177,7 +179,10 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
       while (stack.length && stack[stack.length - 1].depth >= depth) {
         const under = stack.pop()!
         if (foldedRows.has(under.path)) continue
+        // Another model's element (a federation) takes no child here; what
+        // is linked to it is this model's own.
         const choices = addChoices(activeView, pipelineCtx, { node: under.node, depth: under.depth })
+          .filter((c) => !originOf(under.node) || c.link)
         if (choices.length) out.push({ kind: 'add', under, depth: under.depth + 1, choices })
       }
     }
@@ -325,9 +330,9 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
   }
 
   const startEdit = useCallback((rowId: string, current: string) => {
-    if (readOnly) return
+    if (readOnly || originOf(nodes[rowId])) return
     setEditCell({ rowId, draft: current, initial: current })
-  }, [readOnly])
+  }, [readOnly, nodes])
 
   // A click on a row selects the element; a double-click shows its
   // attributes in the properties card (brought back if ✕ hid it); F2 or
@@ -351,6 +356,7 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
     const node = row.node
 
     const rawVal = node.label
+    const origin = originOf(node)
     if (editCell?.rowId === node.id) {
       return (
         <input
@@ -380,7 +386,7 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
     return (
       <span
         className="tv-cell-value tv-chain-cell"
-        title={readOnly ? rawVal : `${rawVal ? `${rawVal} · ` : ''}F2 to rename`}
+        title={origin ? `${rawVal} · from the model ${origin}, read-only` : readOnly ? rawVal : `${rawVal ? `${rawVal} · ` : ''}F2 to rename`}
       >
         {Array.from({ length: row.depth }, (_, i) => <span key={i} className="tv-tree-guide" aria-hidden />)}
         {row.hasChildren ? (
@@ -393,7 +399,8 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
         <span className="tv-chain-type" style={{ background: NODE_COLORS[node.type] ?? metamodel.nodeTypes[node.type]?.color ?? '#555', color: NODE_FG[node.type] ?? '#fff' }}>
           {metamodel.nodeTypes[node.type]?.label ?? TYPE_LABELS[node.type] ?? node.type}
         </span>
-        {rawVal || <span className="tv-cell-placeholder">{readOnly ? '—' : 'F2 to name…'}</span>}
+        {rawVal || <span className="tv-cell-placeholder">{readOnly || origin ? '—' : 'F2 to name…'}</span>}
+        {origin && <span className="tv-origin" title={`From the model ${origin}, read-only`}>{originModel(origin)}</span>}
         {row.alsoIn > 0 && (
           <span className="tv-also-in" title={`Also under ${row.alsoIn} other element${row.alsoIn === 1 ? '' : 's'}`}>+{row.alsoIn}</span>
         )}

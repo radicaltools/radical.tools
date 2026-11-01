@@ -96,6 +96,11 @@ export interface HostCapabilities {
   /** Write the model's base (`.radical/base.json`) in an md-folder, as a
    *  Radical Forge run does where git saved none. */
   writeModelBase?(folderPath: string, content: string): Promise<HostResult>
+  /** Read what a federation keeps beside an md-folder model: its
+   *  `deps.json` and the other models fetched into
+   *  `.radical/federation.json` (by `radical federation fetch`); each is null
+   *  when there is none. */
+  readFederation?(folderPath: string): Promise<HostResult & { deps?: string | null; federation?: string | null }>
   /** Whether an md-folder's files differed from the cache it was opened
    *  from (`.radical/cache/`): resolves once they are listed. */
   folderVerified?(folderPath: string): Promise<{ stale: boolean }>

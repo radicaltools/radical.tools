@@ -171,7 +171,7 @@ describe('radical setup', () => {
       env: { PATH: `${w.bin}:/usr/local/bin:/usr/bin:/bin` },
     })
     expect(await readFile(join(fresh, '.git', 'hooks', 'post-checkout'), 'utf8'))
-      .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff "architecture" --save-base --quiet </dev/null || true; sh "radical.sh" check "architecture" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true\n`)
+      .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff "architecture" --save-base --quiet </dev/null || true; sh "radical.sh" check "architecture" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true; sh "radical.sh" federation fetch "architecture" --quiet --detach </dev/null >/dev/null 2>&1 || true\n`)
 
     const again = await run(w, ['setup', 'architecture', '--yes', '--no-check', '--client', 'claude-code'], { cwd: fresh, env })
     expect(again.out).toContain('✓ radical.sh runs 0.2.0')

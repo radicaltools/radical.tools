@@ -30,6 +30,9 @@ export interface C4Node {
   y: number
   width: number
   height: number
+  /** The model of a federation the element comes from, "<name>@<commit>"
+   *  (radical federation sets it); an element with one is read-only. */
+  origin?: string
 }
 
 export interface C4Relation {
@@ -40,6 +43,8 @@ export interface C4Relation {
   relationType?: string
   label?: string
   technology?: string
+  /** As on C4Node: the model of a federation it comes from; read-only. */
+  origin?: string
 }
 
 export interface NodePosition {
@@ -188,6 +193,13 @@ export interface DiagramView {
   /** Where the view sits in the list of views: a folder path such as
    *  "C4/Components" (segments split by "/"). No folder: at the top. */
   folder?: string
+  /** Another model's view, from a federation (radical federation fetch):
+   *  "<name>@<commit>", as its elements' origin. Read-only, never saved
+   *  into this model's folder. */
+  origin?: string
+  /** For another model's view: the models whose elements it shows, its own
+   *  and those it depends on, so a filter does not take this model's. */
+  originScope?: string[]
   /** How the view draws relations; none: the model's (DiagramData.defaultEdgeStyle). */
   edgeStyle?: EdgeStyle
   /** ID of the DiagramSequence to visualise when kind='dynamic' */
@@ -448,6 +460,12 @@ export function constraintLines(constraints: readonly LayoutConstraint[]): Align
 }
 
 /** Named snapshot (version) of the diagram state */
+/** A model of a federation at a commit. */
+export interface ModelPin {
+  name: string
+  commit: string
+}
+
 export interface DiagramSnapshot {
   id: string
   name: string
@@ -455,6 +473,11 @@ export interface DiagramSnapshot {
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   /** Sequences captured at this point in time (optional for backward compat). */
+  /** The other models of a federation this milestone was made against:
+   *  each one's name and the commit fetched then. Their elements are not in
+   *  it; Studio shows them as they were at those commits, fetched by
+   *  radical federation fetch. Absent: made before, or without a federation. */
+  otherModels?: ModelPin[]
   sequences?: Record<string, DiagramSequence>
   /** What this milestone keeps of a view its own (by view id), over the
    *  view's one layout (model.milestoneView): only the settings it shows
@@ -513,6 +536,9 @@ export interface PresentationSlide {
   modelSnapshot?: {
     nodes: Record<string, C4Node>
     relations: Record<string, C4Relation>
+    /** As a milestone keeps them: the other models of a federation the copy
+     *  was made against, whose elements it does not hold. */
+    otherModels?: ModelPin[]
   }
 }
 
@@ -538,6 +564,10 @@ export interface DiagramData {
   sequences?: DiagramSequence[]
   views?: DiagramView[]
   /** Positions for the "All" (default) view */
+  /** The other models of a federation as read with this model
+   *  (withOtherModels, federation.ts): what a milestone made now records,
+   *  and the versions a milestone shown needs. Never saved. */
+  federation?: import('./federation').FederationFile
   defaultPositions?: Record<string, NodePosition>
   /** Camera state (pan + zoom) for the "All" (default) view */
   defaultViewport?: { x: number; y: number; zoom: number } | null
@@ -801,7 +831,33 @@ export function viewCanvasPositions<P>(
       if (cur in positions) kept[cur] = positions[cur]
     }
   }
+  // An element the view lists and the model does not have is another
+  // model's of a federation not fetched here: its place stays for those who
+  // have fetched it.
+  for (const id of view.nodeIds) if (!nodes[id] && view.positions && id in view.positions) kept[id] = view.positions[id]
   return kept
+}
+
+/** The model's layout (All elements) as saved: `next`, with the places
+ *  `previous` keeps of elements the model does not have but a relation or a
+ *  view names, which are another model's of a federation not fetched here.
+ *  A place of an element deleted is not kept: its relations and its entries
+ *  in views went with it. */
+export function keepOtherModelsPlaces<P>(
+  next: Record<string, P>, previous: Record<string, P> | undefined,
+  nodes: Record<string, unknown>, relations: Iterable<Pick<C4Relation, 'sourceId' | 'targetId'>>, views: Iterable<Pick<DiagramView, 'nodeIds'>>,
+): Record<string, P> {
+  if (!previous) return next
+  const named = new Set<string>()
+  for (const r of relations) { named.add(r.sourceId); named.add(r.targetId) }
+  for (const v of views) for (const id of v.nodeIds) named.add(id)
+  let out = next
+  for (const [id, at] of Object.entries(previous)) {
+    if (nodes[id] || id in next || !named.has(id)) continue
+    if (out === next) out = { ...next }
+    out[id] = at
+  }
+  return out
 }
 
 /** Views with only the positions they draw (viewCanvasPositions, `drawnOf`

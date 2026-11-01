@@ -5,6 +5,7 @@ import {
   computeViewCollapsedSet,
   isNodeHidden,
   getViewVisibleAncestor,
+  otherModelViewShown,
 } from '@radical/ui/store/diagramStore'
 import type { C4Node } from '@radical/common/c4'
 import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
@@ -55,7 +56,9 @@ export function MatrixView(): React.ReactElement {
   const appMode          = useDiagramStore((s) => s.appMode)
   // Read-only out of Designer, and on a slide played from it (F5).
   const presenting       = useDiagramStore((s) => s.presentationActive)
-  const readonly         = appMode !== 'designer' || presenting
+  // Another model's view (a federation) is read-only as Viewer's matrices are.
+  const otherModels      = useDiagramStore((s) => !!otherModelViewShown(s))
+  const readonly         = appMode !== 'designer' || presenting || otherModels
 
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null)
 

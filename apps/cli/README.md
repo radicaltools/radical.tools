@@ -261,6 +261,47 @@ It runs the CLI that installed it, with the `node` on the PATH, else the one
 that installed it. In this repository `npm run hooks` builds the CLI,
 installs the hooks for `architecture/` and saves its base once.
 
+## radical federation
+
+```sh
+node apps/cli/dist/index.js federation open|sync|watch path/to/model [--force]
+```
+
+One model across many repositories. A model folder names the models it
+depends on in `deps.json`:
+
+```json
+{
+  "name": "payments",
+  "dependencies": [
+    { "name": "orders", "repo": "git@github.com:acme/orders.git", "path": "architecture", "ref": "v2.3.0" }
+  ]
+}
+```
+
+`repo` is a git address or a path relative to the model folder, `path` the
+model folder in that repository, `ref` a branch, tag or commit.
+
+- `open` fetches each dependency at its ref into the cache (`$RADICAL_CACHE`,
+  else the user's cache directory; one bare partial clone per repository, so
+  only the model files are downloaded) and composes one model folder in
+  `.radical/federation/`: the folder's own elements, relations, views and
+  metamodel as they are, and every dependency's elements and relations with
+  `origin: "<name>@<commit>"`. Studio and the MCP server open that folder;
+  they draw elements with an origin dashed and refuse every change to them
+  but their place. The composed folder gets a base composed the same way
+  (Changes on branch shows only this model's changes), `check.json` and the
+  test results. Changes not carried home yet are carried first.
+- `sync` writes what has no origin back to the model folder, and names each
+  change to an element or relation with an origin, which it keeps out and
+  undoes in the composed folder (exit 1). When the model folder changed too,
+  nothing is carried unless `--force`; `open --force` composes again from the
+  model folder and drops the composed folder's changes.
+- `watch` opens, then keeps both in step until stopped (Ctrl-C).
+
+Dependencies are not composed transitively. With a `deps.json`,
+`radical check` checks the model composed with its dependencies (see below).
+
 ## radical check
 
 ```sh
@@ -283,6 +324,12 @@ Checks one model folder and prints what it finds:
 With test reports it also checks that the tests the model names passed, and
 with measurements that the values it holds to were met (see below). `radical check --list-rules` lists every rule and every metric a goal can
 be set for. It reads the files only and never writes the model.
+
+With a `deps.json` the model is checked composed with the models it names,
+at their pinned refs: its relations to their elements hold, one to an element
+no model has is the error `rel-end-missing`, and what is found about their own
+elements is left to their check. It names the dependencies and commits
+(`federation` in the JSON). `--alone` checks the folder without them.
 
 Exit status: 0 no errors (warnings allowed), 1 errors, 2 the check could not
 run. `--format json` prints the result as JSON, `--format github` as GitHub

@@ -19,6 +19,7 @@ import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
 import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
+import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
@@ -297,6 +298,20 @@ export async function readModelBaseFromHandle(root: FsDirHandle): Promise<string
   } catch {
     return null
   }
+}
+
+/** What a federation keeps beside the model: its deps.json and the other
+ *  models fetched into `.radical/federation.json`; each null when there is
+ *  none. */
+export async function readFederationFromHandle(root: FsDirHandle): Promise<{ deps: string | null; federation: string | null }> {
+  const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
+    try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
+  }
+  const deps = await text(root, DEPS_FILE)
+  let dir: FsDirHandle | null = null
+  try { dir = await root.getDirectoryHandle(SELECTION_DIR) } catch { dir = null }
+  const federation = dir ? await text(dir, FEDERATION_FILE.slice(SELECTION_DIR.length + 1)) : null
+  return { deps, federation }
 }
 
 /** What `radical check` and `radical sense` keep beside the model:

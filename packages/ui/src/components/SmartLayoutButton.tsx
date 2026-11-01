@@ -8,7 +8,7 @@
  * maintained copies that can drift.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
+import { otherModelViewShown, useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
 import type { SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { formatPart } from '@radical/layout/tidy'
@@ -185,7 +185,7 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
   // Continuous layout is the view's (saved with it): a static view in Designer.
   const continuousView = useDiagramStore((s) => {
     const v = s.activeViewId ? s.views[s.activeViewId] : undefined
-    return s.appMode === 'designer' && v && (v.kind ?? 'static') === 'static' ? v : undefined
+    return s.appMode === 'designer' && v && (v.kind ?? 'static') === 'static' && !otherModelViewShown(s) ? v : undefined
   })
   const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
   const continuous = !!continuousView?.continuousLayout

@@ -26,6 +26,7 @@ import {
   Presentation,
   SlideCanvasState,
   NodePosition,
+  ModelPin,
   PositionMap,
   LayoutConstraint,
   AlignConstraint,
@@ -60,6 +61,7 @@ import {
 } from '@radical/common/metamodel'
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
+import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
@@ -101,7 +103,7 @@ import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
 import { viewCameras } from './viewCameras'
-import { CANVAS_MAX_ELEMENTS, type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, isInViewFolder, keepOtherModelsPlaces, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -766,6 +768,22 @@ export function editsModel(state: Pick<DiagramStore, 'appMode' | 'presentationAc
   return (state.appMode === 'designer' || state.appMode === 'metamodel') && !state.presentationActive
 }
 
+/** The view shown when it is another model's of a federation (it has an
+ *  origin): drawn as that model draws it, and never changed here. */
+export function otherModelViewShown(state: Pick<DiagramStore, 'activeViewId' | 'views'>): DiagramView | undefined {
+  const view = state.activeViewId ? state.views[state.activeViewId] : undefined
+  return view && model.originOf(view) ? view : undefined
+}
+
+/** Whether what is shown may be edited by hand: the model may be
+ *  (editsModel) and the view shown is the model's own. On another model's
+ *  view Designer draws as Viewer does; the model itself stays editable
+ *  (an agent's tools, the card of an element), so this is the canvas's,
+ *  the table's and the panels' question, not the store's. */
+export function editsShownView(state: Pick<DiagramStore, 'appMode' | 'presentationActive' | 'activeViewId' | 'views'>): boolean {
+  return editsModel(state) && !otherModelViewShown(state)
+}
+
 function _pushUndo(state: DiagramStore): void {
   // Undo belongs to Designer. What is collapsed or laid out in Viewer or
   // Presenter is put back on the way out and is no step of Designer's.
@@ -1066,7 +1084,7 @@ function suggestSmartLayoutIfUnarranged(loaded = false): void {
   if (loaded) _layoutHintPending = true
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (!_layoutHintPending || !view || (view.kind ?? 'static') !== 'static') return
+  if (!_layoutHintPending || !view || (view.kind ?? 'static') !== 'static' || model.originOf(view)) return
   _layoutHintPending = false
   if (!looksUnarranged(s.c4Nodes, s.activeViewId, s.activeViewId ? s.views[s.activeViewId] : undefined)) return
   s.pushNotification('This diagram is not laid out yet. The live layout only moves what you drag or add: use Smart Layout to arrange it.', 'info')
@@ -1111,7 +1129,8 @@ function hasNoPlaces(nodes: Record<string, C4Node>): boolean {
 function arrangeOnFirstOpen(): void {
   const s = useDiagramStore.getState()
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  const neverLaidOut = !!view && s.appMode === 'designer' && !s.activeSnapshotId && !Object.keys(view.positions ?? {}).length
+  // Another model's view (a federation) is drawn as fetched, never laid out here.
+  const neverLaidOut = !!view && s.appMode === 'designer' && !s.activeSnapshotId && !model.originOf(view) && !Object.keys(view.positions ?? {}).length
   const viewpointView = neverLaidOut && !!(view.partOf || view.viewpoint) && (view.kind ?? 'static') === 'static'
   const placeless = neverLaidOut && ((view.kind ?? 'static') === 'static' || view.kind === 'dynamic') && hasNoPlaces(s.c4Nodes)
   if (view && (viewpointView || placeless)) {
@@ -1782,18 +1801,74 @@ function atDefaultPositions(nodes: readonly C4Node[], positions: Record<string, 
   return out
 }
 
+// ─── Milestones in a federation ──────────────────────────────────────────────
+// A milestone keeps the model's own elements and relations, and the commit
+// of each other model fetched when it was made (DiagramSnapshot.otherModels);
+// the other models' elements are fetched (.radical/federation.json), never
+// kept. Shown, it has them as they were at those commits (otherModelsAt).
+
+/** Elements or relations without the other models' of a federation: what a
+ *  milestone keeps. The same record when it holds none of theirs. */
+function ownOnly<T extends { origin?: string }>(items: Record<string, T>): Record<string, T> {
+  return Object.values(items).some((item) => model.originOf(item))
+    ? Object.fromEntries(Object.entries(items).filter(([, item]) => !model.originOf(item)))
+    : items
+}
+
+/** The other models fetched now, as a milestone made now records them. */
+function otherModelPins(federation: FederationFile | null): Pick<DiagramSnapshot, 'otherModels'> {
+  return federation?.dependencies.length ? { otherModels: federation.dependencies.map(({ name, commit }) => ({ name, commit })) } : {}
+}
+
+/** A milestone's elements and relations as it is shown: its own, with the
+ *  other models' as they were at the commits it was made against, placed
+ *  where the model's layout (`positions`) keeps them, as its own are; and
+ *  the commits not fetched (`missing`). One made before milestones kept
+ *  them, or of a model with no federation, has the other models fetched now. */
+function milestoneWithOthers(
+  milestone: Pick<DiagramSnapshot, 'nodes' | 'relations' | 'otherModels'>,
+  federation: FederationFile | null,
+  positions: Record<string, NodePosition> | undefined,
+): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; missing: ModelPin[] } {
+  const own = ownOnly(milestone.nodes as Record<string, C4Node>)
+  const ownRelations = ownOnly(milestone.relations as Record<string, C4Relation>)
+  if (!federation && !milestone.otherModels?.length) return { nodes: own, relations: ownRelations, missing: [] }
+  const theirs = otherModelsAt(federation, milestone.otherModels)
+  const nodes = { ...atDefaultPositions(theirs.nodes.filter((n) => !own[n.id]), positions), ...own }
+  const relations: Record<string, C4Relation> = { ...ownRelations }
+  for (const r of theirs.relations) if (!relations[r.id] && nodes[r.sourceId] && nodes[r.targetId]) relations[r.id] = r
+  return { nodes, relations, missing: theirs.missing }
+}
+
+/** What a milestone shown says of the other models it was made against
+ *  and that are not fetched, or null. */
+function missingOthersNotice(missing: ModelPin[]): string | null {
+  if (!missing.length) return null
+  const named = missing.map((pin) => originFor(pin.name, pin.commit).replace('@', ' at '))
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
+  return `This milestone was made with ${list}, which ${missing.length === 1 ? 'is' : 'are'} not fetched. Run radical federation fetch in the model folder to see ${missing.length === 1 ? 'it' : 'them'}.`
+}
+
 /** The model a slide shows: its linked milestone when it has one (linked by
- *  hand, so it wins), else the copy captured when the slide was added. A slide
- *  with neither shows the live model: `live` while a milestone is shown over
- *  it (it showed that milestone), else undefined, the model shown. */
+ *  hand, so it wins), with the other models as it was made against them,
+ *  else the copy captured when the slide was added. A slide with neither
+ *  shows the live model: `live` while a milestone is shown over it (it
+ *  showed that milestone), else undefined, the model shown. */
 function slideModel(
   slide: PresentationSlide,
-  snapshots: DiagramSnapshot[],
+  state: Pick<DiagramStore, 'snapshots' | 'federation' | 'defaultPositions'>,
   live?: { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> },
 ): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } | undefined {
-  const milestone = slide.snapshotId ? snapshots.find((s) => s.id === slide.snapshotId) : undefined
-  if (milestone) return { nodes: milestone.nodes as Record<string, C4Node>, relations: milestone.relations as Record<string, C4Relation> }
-  return slide.modelSnapshot ?? live
+  const milestone = slide.snapshotId ? state.snapshots.find((s) => s.id === slide.snapshotId) : undefined
+  if (milestone) {
+    const { nodes, relations } = milestoneWithOthers(milestone, state.federation, state.defaultPositions)
+    return { nodes, relations }
+  }
+  if (slide.modelSnapshot) {
+    const { nodes, relations } = milestoneWithOthers(slide.modelSnapshot, state.federation, state.defaultPositions)
+    return { nodes, relations }
+  }
+  return live
 }
 
 /** The live model while a milestone is shown over it (Designer's, or one
@@ -2708,7 +2783,8 @@ function deriveRFNodes(
       // saved layout cannot drift while someone browses the document.
       selectable: !hidden && !isGhost && !locked,
       draggable: !hidden && !isGhost && !locked,
-      className: isGhost ? 'rf-node-ghost' : undefined,
+      // Another model's element (a federation): drawn dashed, read-only.
+      className: isGhost ? 'rf-node-ghost' : model.originOf(n) ? 'rf-node-other-model' : undefined,
       data: {
         c4id: n.id,
         type: n.type,
@@ -3265,6 +3341,10 @@ interface DiagramStore {
   unpinNodes: (ids: string[]) => void
   /** Link/unlink a sequence to a dynamic view. */
   setViewSequence: (viewId: string, sequenceId: string | null) => void
+  /** Copies another model's view (a federation) into the model as its own,
+   *  editable, and opens the copy (copyOtherModelView in model.ts). One
+   *  undo step. Returns the copy's id, or null when refused (said). */
+  copyOtherModelView: (viewId: string) => string | null
   /**
    * Create a new dynamic view scoped to a sequence:
    * populates nodeIds with the source/target nodes of every relation in the
@@ -3346,6 +3426,10 @@ interface DiagramStore {
 
   // ── actions: snapshots (versions / milestones) ──
   snapshots: DiagramSnapshot[]
+  /** The other models of a federation as last read (.radical/federation.json,
+   *  DiagramData.federation): what a milestone shows of them at its commits.
+   *  Never saved. */
+  federation: FederationFile | null
   /** ID of the milestone currently loaded onto the canvas (null = live HEAD). */
   activeSnapshotId: string | null
   /** Backup of the live HEAD state, kept while a milestone is loaded. Its
@@ -4415,6 +4499,7 @@ export const useDiagramStore = create<DiagramStore>()(
       canUndo: false,
       canRedo: false,
       snapshots: initSnapshots,
+      federation: persisted?.federation ?? null,
       activeSnapshotId: null,
       liveBackup: null,
       milestoneDirty: false,
@@ -4761,6 +4846,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const removed = before.filter((b) => !links.some((l) => sameWizardLink(l, b)))
         const added = links.filter((l) => !before.some((b) => sameWizardLink(l, b)))
 
+        const refused = (Object.keys(patch).length ? model.checkNodeUpdate(get(), id, patch) : null)
+          ?? (removed.length ? model.checkRemove(get(), [], removed.map((r) => r.relationId)) : null)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return ''
+        }
         if (Object.keys(patch).length || removed.length || added.length) {
           get()._pushUndo()
           get()._markMilestoneEdit()
@@ -4818,6 +4909,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       removeNode(id) {
+        // Another model's element, or one of its relations, stays.
+        const refused = model.checkRemove(get(), [id])
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         // The node, its descendants, their relations, every view reference,
@@ -4860,6 +4957,12 @@ export const useDiagramStore = create<DiagramStore>()(
 
       requestDelete(nodeIds) {
         if (!nodeIds.length || get().appMode !== 'designer') return
+        // Another model's element is refused at once, not after a prompt.
+        const refused = model.checkRemove(get(), nodeIds)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         set((state) => { state.pendingDelete = { nodeIds, edgeIds: [] } })
       },
 
@@ -5286,6 +5389,11 @@ export const useDiagramStore = create<DiagramStore>()(
 
       removeRelation(id) {
         if (!editsModel(get())) return
+        const refused = model.checkRemove(get(), [], [id])
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.deleteRelation(state, id) })
@@ -5813,6 +5921,20 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           if (state.views[id]) state.views[id].name = name
         })
+      },
+      copyOtherModelView(viewId) {
+        const id = uid()
+        // Copied out of the store's draft, which cannot be cloned.
+        const views = { ...get().views }
+        const copied = model.copyOtherModelView({ views }, viewId, id)
+        if ('refused' in copied) {
+          get().pushNotification(copied.refused, 'error')
+          return null
+        }
+        get()._pushUndo()
+        set((state) => { state.views[id] = views[id] })
+        get().setActiveView(id)
+        return id
       },
       setActiveView(newId) {
         finishGlide()
@@ -6870,7 +6992,10 @@ export const useDiagramStore = create<DiagramStore>()(
         const removals = changes.filter((c) => c.type === 'remove') as Array<{ type: 'remove'; id: string }>
         // Deleting is Designer's, and not while a presentation plays.
         if (removals.length > 0 && (get().appMode !== 'designer' || get().presentationActive)) return
-        if (removals.length > 0) {
+        // Another model's element is refused at once, not after a prompt.
+        const refusedRemoval = removals.length > 0 ? model.checkRemove(get(), removals.map((c) => c.id)) : null
+        if (refusedRemoval) get().pushNotification(refusedRemoval, 'error')
+        else if (removals.length > 0) {
           const ids = removals.map((c) => c.id)
           set((state) => {
             const prev = state.pendingDelete ?? { nodeIds: [], edgeIds: [] }
@@ -6930,13 +7055,21 @@ export const useDiagramStore = create<DiagramStore>()(
         // A line is deleted as the relations it is: a rolled-up one as those
         // it stands for, and one that is none (a step's arrow, an
         // exploration's containment) not at all. Its own id named no
-        // relation: the prompt counted nothing and removed nothing.
+        // relation: the prompt counted nothing and removed nothing. The
+        // relations of another model's element go with it, which is refused
+        // (onNodesChange): they stay too, without a prompt.
+        const kept = new Set(get().rfNodes.filter((n) => n.selected && model.originOf(get().c4Nodes[n.id])).map((n) => n.id))
         const ids = [...new Set(removals.flatMap((c) => {
           if (get().c4Relations[c.id]) return [c.id]
           const line = get().rfEdges.find((e) => e.id === c.id)
           return (line?.data?.relationIds ?? []).filter((id) => get().c4Relations[id])
-        }))]
-        if (ids.length > 0) {
+        }))].filter((id) => {
+          const r = get().c4Relations[id]
+          return !r || !(kept.has(r.sourceId) || kept.has(r.targetId))
+        })
+        const refusedRemoval = ids.length > 0 ? model.checkRemove(get(), [], ids) : null
+        if (refusedRemoval) get().pushNotification(refusedRemoval, 'error')
+        else if (ids.length > 0) {
           set((state) => {
             const prev = state.pendingDelete ?? { nodeIds: [], edgeIds: [] }
             state.pendingDelete = {
@@ -7706,17 +7839,20 @@ export const useDiagramStore = create<DiagramStore>()(
         // With a milestone shown it is the live model that is captured
         // (decided 2026-10-22), at All elements' live places: the milestone
         // on the canvas was saved again as the newest one.
-        const { c4Nodes, activeViewId, defaultPositions, activeSnapshotId, liveBackup } = get()
+        // Of a federation it keeps the model's own and the commit of each
+        // other model fetched now: theirs are fetched, never kept here.
+        const { c4Nodes, activeViewId, defaultPositions, activeSnapshotId, liveBackup, federation } = get()
         const live = activeSnapshotId && liveBackup ? liveBackup : null
         const snap: DiagramSnapshot = {
           id,
           name,
           timestamp: Date.now(),
-          nodes: live
+          nodes: ownOnly(live
             ? atDefaultPositions(Object.values(live.nodes), live.defaultPositions ?? defaultPositions)
-            : activeViewId === null ? c4Nodes : atDefaultPositions(Object.values(c4Nodes), defaultPositions),
-          relations: live ? live.relations : get().c4Relations,
+            : activeViewId === null ? c4Nodes : atDefaultPositions(Object.values(c4Nodes), defaultPositions)),
+          relations: ownOnly(live ? live.relations : get().c4Relations),
           sequences: live ? live.sequences : get().sequences,
+          ...otherModelPins(federation as FederationFile | null),
         }
         get()._pushUndo()
         set((state) => { state.snapshots.push(snap as any) })
@@ -7745,20 +7881,27 @@ export const useDiagramStore = create<DiagramStore>()(
           try { get().discardMilestoneChanges() } finally { _arrangeOnLeavingMilestone = true }
         }
         _pushUndo(get())
+        // Its own elements become the live ones; the other models stay as
+        // fetched now, as the live model has them.
+        const restored = { nodes: { ...ownOnly(snap.nodes as Record<string, C4Node>) }, relations: { ...ownOnly(snap.relations as Record<string, C4Relation>) } }
+        for (const n of Object.values(get().c4Nodes)) if (model.originOf(n) && !restored.nodes[n.id]) restored.nodes[n.id] = n
+        for (const r of Object.values(get().c4Relations)) {
+          if (model.originOf(r) && !restored.relations[r.id] && restored.nodes[r.sourceId] && restored.nodes[r.targetId]) restored.relations[r.id] = r
+        }
         set((state) => {
           // The Hub template values its texts hold become the live ones.
           state.hubTemplates = milestoneHubTemplates(state.hubTemplates as Record<string, HubImportRecord>, snap.nodes as Record<string, C4Node>) as any
           // What the milestone lacks goes out of the views, as a delete
           // takes it: they kept its id (a view listing 23 drew 3).
-          const gone = new Set(Object.keys(state.c4Nodes).filter((id) => !(snap.nodes as Record<string, C4Node>)[id]))
+          const gone = new Set(Object.keys(state.c4Nodes).filter((id) => !restored.nodes[id]))
           // The views as the milestone shows them (model.milestoneViews):
           // what it keeps of a view its own (its list, with the elements the
           // live model deleted since) and the views it has alone are the
           // live ones now, and it keeps nothing of them its own any more.
           // Left out, an element it brought back was on no view.
           restoreMilestoneViews(state as DiagramStore, snap)
-          state.c4Nodes = snap.nodes as any
-          state.c4Relations = snap.relations as any
+          state.c4Nodes = restored.nodes as any
+          state.c4Relations = restored.relations as any
           if (gone.size) model.forgetNodesInViews(state as unknown as model.ModelState, gone)
           // What the milestone has: none when it was saved without them.
           state.sequences = (snap.sequences ?? {}) as any
@@ -7889,6 +8032,9 @@ export const useDiagramStore = create<DiagramStore>()(
               snap.relations as Record<string, C4Relation>,
             )
           : { nodes: {}, relations: {} }
+        // Its own, and the other models as they were at the commits it was
+        // made against, where the model's layout places them.
+        const shownModel = milestoneWithOthers(snap, get().federation as FederationFile | null, get().defaultPositions)
         // Designer's steps only: Viewer and Presenter have none, and what
         // they pick is put back on return (setAppMode).
         if (get().appMode === 'designer') _historyEntersMilestone(!activeSnapshotId, _captureState(get()))
@@ -7899,7 +8045,7 @@ export const useDiagramStore = create<DiagramStore>()(
           // everything else stays a shared reference with the snapshot.
           let nextNodes: Record<string, C4Node>
           if (preserveLayout) {
-            nextNodes = { ...(snap.nodes as Record<string, C4Node>) }
+            nextNodes = { ...shownModel.nodes }
             for (const [nid, live] of livePosByLabel) {
               const n = nextNodes[nid]
               if (!n) continue
@@ -7911,10 +8057,10 @@ export const useDiagramStore = create<DiagramStore>()(
               }
             }
           } else {
-            nextNodes = snap.nodes as Record<string, C4Node>
+            nextNodes = shownModel.nodes
           }
           state.c4Nodes = nextNodes as any
-          state.c4Relations = snap.relations as any
+          state.c4Relations = shownModel.relations as any
           // A milestone saved without sequences has none: it showed the live
           // ones, and Save as new and Propagate then stored them in it.
           state.sequences = (snap.sequences ?? {}) as any
@@ -7950,7 +8096,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // The milestone's nodes hold its All elements positions; a view shows
         // the layout it has for every milestone.
         if (!preserveLayout) {
-          _milestoneAllPositions = snapshotPositions(snap.nodes as Record<string, C4Node>)
+          _milestoneAllPositions = snapshotPositions(shownModel.nodes)
           get()._showLiveCanvasPositions()
         } else if (shownExploration(get())) {
           // Viewer's exploration: what this milestone has and it had no place
@@ -7963,6 +8109,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // previous canvas's cached coords). Physics keeps running so the
         // user can still drag / nudge nodes around on the milestone.
         _liveLayout?.reset()
+        // The other models it was made against and that are not fetched: said each time it is shown.
+        const missing = missingOthersNotice(shownModel.missing)
+        if (missing) get().pushNotification(missing, 'warning')
       },
 
       dismissMilestonePrompt() {
@@ -8028,11 +8177,15 @@ export const useDiagramStore = create<DiagramStore>()(
         // immer's copy-on-write (see _captureState).
         // With a view shown the nodes hold its (shared) layout: what is kept
         // in the milestone, or carried on as a change, is its All elements'.
-        const editedNodes = get().activeViewId === null
+        const shownNodes = get().activeViewId === null
           ? c4Nodes as Record<string, C4Node>
           : atDefaultPositions(Object.values(c4Nodes), _milestoneAllPositions ?? snapshotPositions(snapshots[idx].nodes as Record<string, C4Node>))
-        const editedRels = c4Relations as Record<string, C4Relation>
-        _milestoneAllPositions = snapshotPositions(editedNodes)
+        _milestoneAllPositions = snapshotPositions(shownNodes)
+        // What a milestone keeps: the model's own. The other models shown in
+        // it are those of the commits it was made against (otherModels),
+        // which it keeps; an edit cannot change them.
+        const editedNodes = ownOnly(shownNodes)
+        const editedRels = ownOnly(c4Relations as Record<string, C4Relation>)
         const editedSeqs = sequences as Record<string, DiagramSequence>
         // Snapshot of the milestone BEFORE edits — used to compute the diff.
         const baseSnap = snapshots[idx]
@@ -8064,6 +8217,7 @@ export const useDiagramStore = create<DiagramStore>()(
             nodes: editedNodes,
             relations: editedRels,
             sequences: editedSeqs,
+            ...(baseSnap.otherModels ? { otherModels: baseSnap.otherModels } : {}),
             ...(Object.keys(ownViews).length ? { views: ownViews } : {}),
           }
           // The edits are the new milestone now: there is nothing behind
@@ -8171,6 +8325,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // The relations a later model refuses, which the edits left out of
         // it (model.relationsRefusedHere), and where: said once it is done.
         const refusedHere = new Map<string, { text: string; reason: string; where: string[] }>()
+        // The other models' elements (a federation), which a milestone does
+        // not keep: a relation of its own to one of them stays.
+        const theirs = new Set<string>()
+        const federation = get().federation as FederationFile | null
+        for (const n of [...Object.values(c4Nodes), ...Object.values(liveBackup?.nodes ?? {}), ...(federation?.nodes ?? []), ...Object.values(federation?.atCommits ?? {}).flatMap((at) => at.nodes)]) {
+          if (model.originOf(n)) theirs.add(n.id)
+        }
         const applyDiff = (
           targetNodes: Record<string, C4Node>,
           targetRels: Record<string, C4Relation>,
@@ -8214,8 +8375,9 @@ export const useDiagramStore = create<DiagramStore>()(
             if (targetRels[id]) Object.assign(targetRels[id], updates)
           }
           for (const id of removedRelIds) delete targetRels[id]
+          const present = (id: string): boolean => !!targetNodes[id] || theirs.has(id)
           for (const [rid, r] of Object.entries(targetRels)) {
-            if (!targetNodes[r.sourceId] || !targetNodes[r.targetId]) delete targetRels[rid]
+            if (!present(r.sourceId) || !present(r.targetId)) delete targetRels[rid]
           }
           // What this model refuses goes, as a nest made here takes it and a
           // relation made here is refused: a nest carried here kept the
@@ -8444,7 +8606,11 @@ export const useDiagramStore = create<DiagramStore>()(
           return
         }
         void liveBackup
-        const diff = computeSnapDiff(baseNodes, c4Nodes as Record<string, C4Node>, baseRels, c4Relations as Record<string, C4Relation>)
+        // The model's own, as milestones keep it: the other models shown are
+        // of the commits the milestone was made against, not an edit.
+        const shownNodes = ownOnly(c4Nodes as Record<string, C4Node>)
+        const shownRels = ownOnly(c4Relations as Record<string, C4Relation>)
+        const diff = computeSnapDiff(baseNodes, shownNodes, baseRels, shownRels)
         // Augment with sequence membership changes.
         const baseSnap2 = snapshots.find(s => s.id === resolvedBaseId)
         if (baseSnap2) {
@@ -8456,7 +8622,7 @@ export const useDiagramStore = create<DiagramStore>()(
             if (!diff[rid]) diff[rid] = action
           }
         }
-        const ghosts = computeDiffGhosts(baseNodes, c4Nodes as Record<string, C4Node>, baseRels, c4Relations as Record<string, C4Relation>)
+        const ghosts = computeDiffGhosts(baseNodes, shownNodes, baseRels, shownRels)
         set((state) => {
           state.diffHighlight = diff as any
           state.diffBaseSnapshotId = resolvedBaseId
@@ -8865,9 +9031,12 @@ export const useDiagramStore = create<DiagramStore>()(
         // the slide shows the milestone it is linked to: a copy of it
         // outlived the link, and the slide drew the milestone after it was
         // deleted or unlinked.
+        // The model's own, and the versions of the other models it shows
+        // (a federation), as a milestone keeps them.
         const modelSnapshot = activeSnapshotId ? undefined : {
-          nodes: get().c4Nodes as Record<string, C4Node>,
-          relations: get().c4Relations as Record<string, C4Relation>,
+          nodes: ownOnly(get().c4Nodes as Record<string, C4Node>),
+          relations: ownOnly(get().c4Relations as Record<string, C4Relation>),
+          ...otherModelPins(get().federation),
         }
         const id = uid()
         const slideName = name ?? `Slide ${presentationSlides.length + 1}`
@@ -9004,7 +9173,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Disable physics while presenting
         get().stopLiveLayout()
 
-        const shown = slideModel(slide, get().snapshots, liveUnderMilestone(get()))
+        const shown = slideModel(slide, get(), liveUnderMilestone(get()))
         if (shown) {
           set((state) => {
             state.c4Nodes = shown.nodes as any
@@ -9056,8 +9225,8 @@ export const useDiagramStore = create<DiagramStore>()(
         // copy (preferred here, the colours were of models not shown).
         {
           const prevSlide = i > 0 ? presentationSlides[i - 1] : null
-          const currModel = slideModel(slide, get().snapshots)
-          const prevModel = prevSlide ? slideModel(prevSlide, get().snapshots) : undefined
+          const currModel = slideModel(slide, get())
+          const prevModel = prevSlide ? slideModel(prevSlide, get()) : undefined
           if (currModel && prevModel) {
             get().setDiffHighlight(computeSnapDiff(prevModel.nodes, currModel.nodes, prevModel.relations, currModel.relations))
           } else {
@@ -9116,7 +9285,7 @@ export const useDiagramStore = create<DiagramStore>()(
         } else if (get().activeSnapshotId) {
           get().discardMilestoneChanges()
         }
-        const shown = slideModel(slide, get().snapshots)
+        const shown = slideModel(slide, get())
         if (shown && !own) {
           _beforeSlidePreview = { nodes: get().c4Nodes, relations: get().c4Relations }
           set((state) => {
@@ -9184,8 +9353,9 @@ export const useDiagramStore = create<DiagramStore>()(
         // Re-capture the full inline model snapshot too — "Capture viewport"
         // semantically means "this slide should look like the screen does now".
         const modelSnapshot = {
-          nodes: get().c4Nodes as Record<string, C4Node>,
-          relations: get().c4Relations as Record<string, C4Relation>,
+          nodes: ownOnly(get().c4Nodes as Record<string, C4Node>),
+          relations: ownOnly(get().c4Relations as Record<string, C4Relation>),
+          ...otherModelPins(get().federation),
         }
         const { activeSnapshotId } = get()
         set((state) => {
@@ -9425,6 +9595,8 @@ export const useDiagramStore = create<DiagramStore>()(
           state.canUndo = _undoStack.length > 0
           state.canRedo = _redoStack.length > 0
           state.snapshots = snapshots as any
+          // The other models as read with it: what its milestones show of them.
+          state.federation = (data.federation ?? null) as any
           state.activeSnapshotId = null
           // A milestone viewed before the load belongs to the model it left:
           // drop its parked live model and diff, or they would show (ghosts)
@@ -9583,7 +9755,10 @@ export const useDiagramStore = create<DiagramStore>()(
         // Snapshot current positions into the active context before saving —
         // but not from the milestone's nodes, whose layout is not the live one.
         const currentPos = timeTravelling ? null : snapshotPositions(c4Nodes)
-        const savedDefaultPos = activeViewId === null && currentPos ? currentPos : (timeTravelling && liveBackup.defaultPositions) || defaultPositions
+        const savedDefaultPos = activeViewId === null && currentPos
+          // Another model's element not fetched here keeps its place (c4.ts).
+          ? keepOtherModelsPlaces(currentPos, defaultPositions, liveNodes, Object.values(liveRelations), Object.values(views))
+          : (timeTravelling && liveBackup.defaultPositions) || defaultPositions
         // Same for camera state so on reload each view restores its framing.
         const rawVP = (window as any).__rfCurrentViewport
         const currentVP: { x: number; y: number; zoom: number } | null = rawVP && !timeTravelling
@@ -9771,6 +9946,58 @@ export const useDiagramStore = create<DiagramStore>()(
     }
   })
 )
+
+// ─── Other models' views ─────────────────────────────────────────────────────
+// Another model's view of a federation (one with an origin) is shown as that
+// model draws it and never changed here: each action that changes a view
+// refuses it, saying whose it is (viewRefusal), whatever menu, key or panel
+// calls it. Moving about it (a hierarchy's level, a wiki's page, a fold) and
+// opening it change nothing of it, and stay.
+
+/** The actions whose first argument names the view they change. */
+const VIEW_CHANGES = [
+  'removeView', 'renameView', 'addNodeToView', 'removeNodeFromView', 'setViewNodes',
+  'hideRelationFromView', 'unhideRelationInView', 'setViewHiddenRelations', 'setViewFolder',
+  'setViewEdgeStyle', 'setViewContinuousLayout', 'setViewPipeline', 'applyViewpoint', 'detachViewpoint',
+  'setViewKind', 'setWikiDepth', 'setTreemapSizeBy', 'setTreemapMaxDepth', 'setViewLayoutMode', 'setViewSequence',
+] as const satisfies ReadonlyArray<keyof DiagramStore>
+/** The actions that change a view's layout rules or places: the view named
+ *  by the argument at the index given, when there is one, else the view shown. */
+const LAYOUT_CHANGES = {
+  addAlignment: null, addGrid: null, unpinNodes: null, runSmartLayout: null,
+  setGridColumns: 2, setAlignmentOrdered: 2, removeLayoutConstraint: 1,
+} as const satisfies Partial<Record<keyof DiagramStore, number | null>>
+/** The actions that change the views in a folder, named by its path. */
+const FOLDER_CHANGES = ['renameViewFolder', 'moveViewFolder'] as const satisfies ReadonlyArray<keyof DiagramStore>
+
+{
+  const s = useDiagramStore.getState()
+  // An empty refusal refuses without a word.
+  const refuse = (refusal: string | null): boolean => {
+    if (refusal) useDiagramStore.getState().pushNotification(refusal, 'error')
+    return refusal !== null
+  }
+  const guard = (name: keyof DiagramStore, refusal: (args: unknown[]) => string | null, refused: unknown = undefined) => {
+    const action = s[name] as (...args: unknown[]) => unknown
+    return [name, (...args: unknown[]) => (refuse(refusal(args)) ? refused : action(...args))] as const
+  }
+  const viewOf = (id: unknown) => (typeof id === 'string' ? useDiagramStore.getState().views[id] : undefined)
+  const guarded = [
+    ...VIEW_CHANGES.map((name) => guard(name, (args) => model.viewRefusal(viewOf(args[0])), name === 'applyViewpoint' ? false : undefined)),
+    ...Object.entries(LAYOUT_CHANGES).map(([name, at]) => guard(name as keyof DiagramStore, (args) => {
+      const st = useDiagramStore.getState()
+      const view = at !== null && args[at] ? viewOf(args[at]) : otherModelViewShown(st)
+      // Continuous layout runs by itself: on their view it just does not.
+      if (name === 'runSmartLayout' && (args[0] as { continuous?: boolean } | undefined)?.continuous && view && model.originOf(view)) return ''
+      return model.viewRefusal(view)
+    }, name === 'addAlignment' || name === 'addGrid' ? null : undefined)),
+    ...FOLDER_CHANGES.map((name) => guard(name, (args) => {
+      const theirs = Object.values(useDiagramStore.getState().views).find((v) => model.originOf(v) && isInViewFolder(v, String(args[0])))
+      return theirs ? model.viewRefusal(theirs) : null
+    }, name === 'renameViewFolder' ? null : undefined)),
+  ]
+  useDiagramStore.setState(Object.fromEntries(guarded) as Partial<DiagramStore>)
+}
 
 // A view keeping itself tidied looks at its shape after each change to the
 // model or the views (continuousCheck); a glide's frames only reset the wait.

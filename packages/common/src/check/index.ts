@@ -12,7 +12,7 @@
 
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
-import { documentMetamodel, milestoneViews } from '../model'
+import { documentMetamodel, milestoneViews, originOf } from '../model'
 import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
@@ -138,6 +138,10 @@ export interface CheckOptions {
   /** The event the check runs on (pull-request in the gate): what runs on
    *  another one is not reported unmeasured. */
   trigger?: string
+  /** The elements and relations of the models this one depends on (a
+   *  federation, each with its origin): the model is checked with them, so
+   *  its relations to them hold. */
+  others?: Pick<DiagramData, 'nodes' | 'relations'>
 }
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
@@ -212,7 +216,11 @@ export function runCheck(files: FolderFiles, given: CheckConfig = {}, options: C
     found: [], nodeCount: 0, relationCount: 0, metrics: [], notRun: new Map([...MODEL_RULE_IDS].map((id) => [id, 'no-model'])),
     goalsNotRun: Object.keys(config.goals ?? {}).filter(isMetricId).map((id) => ({ id, notRun: 'no-model' })),
   }
-  if (!found.some((f) => FATAL.has(f.rule))) model = checkData(deserializeFromMdFolder(files).data, options, config)
+  if (!found.some((f) => FATAL.has(f.rule))) {
+    const data = deserializeFromMdFolder(files).data
+    const others = options.others
+    model = checkData(others ? { ...data, nodes: [...data.nodes, ...others.nodes], relations: [...data.relations, ...others.relations] } : data, options, config)
+  }
 
   const result = settle([...found, ...model.found].map((f) => ({
     ...f,
@@ -234,14 +242,18 @@ interface ModelCheck {
   goalsNotRun: Array<{ id: string; notRun: 'no-report' | 'no-model' }>
 }
 
+/** Checks the model. Elements and relations of other models (with an
+ *  origin, in a federation) are checked with it, so what points at them
+ *  holds; what is found about them, and their share of the metrics, is
+ *  their own model's. */
 function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
   const found: Array<RuleFinding & { rule: string }> = []
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations, data.snapshots ?? [])
     .forEach((finding) => found.push({ rule: STALE_REFERENCE, ...finding }))
-  const model = {
-    nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
+  const settings = {
+    metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
     ...(options.tests ? { tests: options.tests } : {}),
     ...(options.tests && options.testsReadAt ? { testsReadAt: options.testsReadAt } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
@@ -250,14 +262,23 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.trigger ? { trigger: options.trigger } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
   }
-  for (const rule of CHECK_RULES) rule.run(model).forEach((finding) => found.push({ rule: rule.id, ...finding }))
-  const evidence = options.tests || options.measurements ? computeEvidence(model) : undefined
-  const goals = measureGoals({ model, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
+  const model = { nodes, relations, ...settings }
+  const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))
+  const ownModel = theirs.size
+    ? { nodes: byId(data.nodes.filter((n) => !theirs.has(n.id))), relations: byId(data.relations.filter((r) => !theirs.has(r.id))), ...settings }
+    : model
+  for (const rule of CHECK_RULES) {
+    rule.run(model).forEach((finding) => {
+      if (!(finding.nodeId && theirs.has(finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
+    })
+  }
+  const evidence = options.tests || options.measurements ? computeEvidence(ownModel) : undefined
+  const goals = measureGoals({ model: ownModel, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
   goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
   return {
     found,
-    nodeCount: Object.keys(nodes).length,
-    relationCount: Object.keys(relations).length,
+    nodeCount: Object.keys(ownModel.nodes).length,
+    relationCount: Object.keys(ownModel.relations).length,
     metrics: goals.metrics,
     ...(evidence ? { evidence } : {}),
     notRun: new Map([

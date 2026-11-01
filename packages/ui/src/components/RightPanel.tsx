@@ -16,6 +16,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
+import { originModel, originOf } from '@radical/common/model'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
@@ -781,8 +782,9 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
 
 // ── View properties (left panel pane 2) ─────────────────────────────────────
 
-function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: string; readOnly?: boolean; onClose: () => void }) {
+function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClose }: { viewId: string; readOnly?: boolean; onClose: () => void }) {
   const view = useDiagramStore((s) => s.views[viewId])
+  const copyOtherModelView = useDiagramStore((s) => s.copyOtherModelView)
   const sequences = useDiagramStore((s) => s.sequences)
   const renameView = useDiagramStore((s) => s.renameView)
   const removeView = useDiagramStore((s) => s.removeView)
@@ -813,6 +815,9 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
   const allNodes = useDiagramStore((s) => s.c4Nodes)
 
   if (!view) return null
+  // Another model's view (a federation): shown, not changed; a copy is.
+  const origin = originOf(view)
+  const readOnly = panelReadOnly || !!origin
   const ofType = viewpointOfView(view, metamodel)
   // One of a group's views: its viewpoint and view type are the group's.
   const ofGroup = view.partOf ? allViews[view.partOf] : undefined
@@ -841,6 +846,7 @@ function ViewPropertiesContent({ viewId, readOnly = false, onClose }: { viewId: 
         &nbsp;{isDynamic ? 'FLOW VIEW' : isTreemap ? 'HIERARCHY VIEW' : isTable ? 'TABLE VIEW' : isMatrix ? 'MATRIX VIEW' : isWiki ? 'WIKI VIEW' : isWarnier ? 'WARNIER VIEW' : isExplore ? 'EXPLORE VIEW' : 'STRUCTURE VIEW'}
         {ofType && <>&nbsp;·&nbsp;{ofType.label.toUpperCase()}</>}
       </div>
+      {origin && <OtherModelViewNote origin={origin} onCopy={panelReadOnly ? undefined : () => { copyOtherModelView(view.id); onClose() }} />}
       <div>
         <div className="props-section-title">Name</div>
         <div className="props-field">
@@ -1226,7 +1232,7 @@ const VIEW_BADGE_STYLE: React.CSSProperties = { marginLeft: 4, fontSize: 9, font
 
 /** Properties of a folder of the list of views: its name (renaming moves
  *  every view in it and below it along), where it sits, and its views. */
-function FolderPropertiesContent({ path, readOnly = false, onRenamed }: {
+function FolderPropertiesContent({ path, readOnly: panelReadOnly = false, onRenamed }: {
   path: string
   readOnly?: boolean
   onRenamed: (path: string) => void
@@ -1240,6 +1246,8 @@ function FolderPropertiesContent({ path, readOnly = false, onRenamed }: {
   const [nameVal, setNameVal] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
   const inside = Object.values(views).filter((v) => isInViewFolder(v, path))
+  // A folder of another model's views (a federation) is that model's.
+  const readOnly = panelReadOnly || inside.some((v) => originOf(v))
   const cut = path.lastIndexOf('/')
   const name = path.slice(cut + 1)
   const parent = cut < 0 ? '' : path.slice(0, cut)
@@ -1560,6 +1568,11 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
               <BranchCount n={branchCounts?.[v.id]} />
               {!group && <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>{badge}</span>}
             </div>
+            {v.origin && (
+              <div className="lp-card-origin" title={`A view of the model ${v.origin}, read-only`}>
+                <span className="lp-view-origin">{originModel(v.origin)}</span> read-only
+              </div>
+            )}
             {viewpoint && (
               <div className="lp-card-viewpoint" title={viewpoint.description ?? `Viewpoint ${viewpoint.label}`}>
                 <span className="lp-card-viewpoint-kind">Viewpoint</span> {viewpoint.label}
@@ -2647,9 +2660,12 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
     const node = c4Nodes[selectedNodeId]
+    // Another model's element (a federation) is shown, not edited.
+    const origin = originOf(node)
+    const locked = readOnly || !!origin
     const record = node as unknown as Record<string, unknown>
     const set = (key: string, v: unknown) => {
-      if (!readOnly) updateNode(node.id, { [key]: v } as Parameters<typeof updateNode>[1])
+      if (!locked) updateNode(node.id, { [key]: v } as Parameters<typeof updateNode>[1])
     }
 
     const nodeTypeDef = metamodel?.nodeTypes[node.type]
@@ -2701,24 +2717,25 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
           iconPath={nodeTypeDef?.iconPath ?? TYPE_ICON_PATHS[node.type]}
           title={node.label}
           titlePlaceholder="Unnamed"
-          readOnly={readOnly}
+          readOnly={locked}
           onTitle={(v) => set('label', v)}
           context={parents.length > 0 && (
             <>in {parents.map((p, i) => (
               <React.Fragment key={p.id}>{i > 0 && <span className="pp-sep"> › </span>}<NodeLink id={p.id} label={p.label} /></React.Fragment>
             ))}</>
           )}
-          onWizard={!readOnly && nodeTypeDef?.wizard ? () => openNodeWizard(node.id) : undefined}
+          onWizard={!locked && nodeTypeDef?.wizard ? () => openNodeWizard(node.id) : undefined}
           actions={actions}
           onClose={onClose}
         />
+        {origin && <OtherModelNote origin={origin} />}
         <BranchFieldChanges node={node} branch={branch} />
         {node.type === 'requirement' && (
           <section className="pp-section">
             <div className="pp-section-title">Sentence</div>
             <div className="props-ears-sentence">
-              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} statePhrase={requirementStatePhrase(node, c4Nodes, c4Relations) || undefined} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
-              <EarsQuickEntry nodeId={node.id} readOnly={readOnly} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
+              <EarsSentencePreview node={record} nodeId={node.id} subject={resolveEarsSubject(node.id, c4Relations, c4Nodes)} statePhrase={requirementStatePhrase(node, c4Nodes, c4Relations) || undefined} readOnly={locked} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} />
+              <EarsQuickEntry nodeId={node.id} readOnly={locked} updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])} compact />
             </div>
           </section>
         )}
@@ -2726,13 +2743,13 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
           <section className="pp-section pp-grid" aria-label="Attributes">
             {short.map((p) => (
               <AttrRow key={p.key} label={p.label} missing={missing(p)}>
-                <AttrValue def={p} value={record[p.key]} readOnly={readOnly} onChange={(v) => set(p.key, v)} />
+                <AttrValue def={p} value={record[p.key]} readOnly={locked} onChange={(v) => set(p.key, v)} />
               </AttrRow>
             ))}
             {allowedParentTypes && allowedParentTypes.length > 0 && (
               <AttrRow label="Parent">
-                <select className="pp-input pp-select" aria-label="Parent" value={node.parentId ?? ''} disabled={readOnly}
-                  onChange={(e) => !readOnly && reparentNodes([node.id], e.target.value || null)}>
+                <select className="pp-input pp-select" aria-label="Parent" value={node.parentId ?? ''} disabled={locked}
+                  onChange={(e) => !locked && reparentNodes([node.id], e.target.value || null)}>
                   <option value="">—</option>
                   {/* Only the ones a move takes (it listed parents it then refused). */}
                   {parentCandidates({ c4Nodes, c4Relations, views: {}, activeViewId: null, metamodel }, node.id)
@@ -2749,14 +2766,14 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
               {p.label}
               {missing(p) && <span className="pp-missing" title="Required, not set" aria-label="required, not set" />}
             </div>
-            <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={readOnly}
+            <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={locked}
               onChange={(v) => set(p.key, v)} />
           </section>
         ))}
         {node.type === 'mockup' && (
           <section className="pp-section">
             <div className="pp-section-title">Wireframe</div>
-            <MockupWireframe nodeId={node.id} readOnly={readOnly} />
+            <MockupWireframe nodeId={node.id} readOnly={locked} />
           </section>
         )}
         {hubEntry && (
@@ -2765,7 +2782,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
               record={hubEntry[1]}
               importId={hubEntry[0]}
               nodeId={node.id}
-              readOnly={readOnly}
+              readOnly={locked}
               updateNode={(id, patch) => updateNode(id, patch as Parameters<typeof updateNode>[1])}
             />
           </section>
@@ -2775,7 +2792,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
             <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
             {!readOnly && <NodeActions nodeId={node.id} />}
           </div>
-          {!readOnly && <DeleteSection label="Delete element" note="and what it contains" onDelete={() => { removeNode(node.id); selectNode(null) }} />}
+          {!locked && <DeleteSection label="Delete element" note="and what it contains" onDelete={() => { removeNode(node.id); selectNode(null) }} />}
         </div>
       </div>
     )
@@ -2788,9 +2805,11 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
 
     if (rel) {
       const record = rel as unknown as Record<string, unknown>
+      const origin = originOf(rel)
+      const locked = readOnly || !!origin
       const relTypeDef = metamodel?.relationTypes[rel.relationType ?? '']
       const set = (key: string, v: unknown) => {
-        if (!readOnly) updateRelation(rel.id, { [key]: v } as Parameters<typeof updateRelation>[1])
+        if (!locked) updateRelation(rel.id, { [key]: v } as Parameters<typeof updateRelation>[1])
       }
       // Metamodel-driven properties; Technology only for relations with no type def.
       const defs: PropertyDef[] = relTypeDef
@@ -2824,7 +2843,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
             // A transition without a label of its own reads as its line does
             // ("PaymentReceived [ok] / reserve ^OrderPaid"), not "No label".
             titlePlaceholder={relationDisplayLabel(rel, c4Nodes) || 'No label'}
-            readOnly={readOnly}
+            readOnly={locked}
             onTitle={(v) => set('label', v)}
             context={(
               <>
@@ -2836,11 +2855,12 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
             actions={[]}
             onClose={onClose}
           />
+          {origin && <OtherModelNote origin={origin} />}
           {(short.length > 0 || showType) && (
             <section className="pp-section pp-grid" aria-label="Attributes">
               {showType && (
                 <AttrRow label="Type" missing={!currentType}>
-                  <select className="pp-input pp-select" aria-label="Type" value={currentType} disabled={readOnly}
+                  <select className="pp-input pp-select" aria-label="Type" value={currentType} disabled={locked}
                     onChange={(e) => { if (e.target.value) set('relationType', e.target.value) }}>
                     {!currentType && <option value="" disabled>— choose a type —</option>}
                     {!fitsNow && <option value={currentType}>{`${relTypeDef?.label ?? currentType} (does not connect these)`}</option>}
@@ -2850,7 +2870,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
               )}
               {short.map((p) => (
                 <AttrRow key={p.key} label={p.label} missing={!!p.required && isEmptyValue(record[p.key] ?? p.default)}>
-                  <AttrValue def={p} value={record[p.key]} readOnly={readOnly} onChange={(v) => set(p.key, v)} />
+                  <AttrValue def={p} value={record[p.key]} readOnly={locked} onChange={(v) => set(p.key, v)} />
                 </AttrRow>
               ))}
             </section>
@@ -2858,11 +2878,11 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
           {long.map((p) => (
             <section className="pp-section" key={p.key}>
               <div className="pp-section-title">{p.label}</div>
-              <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={readOnly}
+              <MarkdownField label={p.label} value={String(record[p.key] ?? p.default ?? '')} readOnly={locked}
                 onChange={(v) => set(p.key, v)} />
             </section>
           ))}
-          {!readOnly && (
+          {!locked && (
             <div className="pp-foot">
               <div className="pp-foot-scroll"><RelationActions relationId={rel.id} /></div>
               <DeleteSection label="Delete relation" onDelete={() => { removeRelation(rel.id); selectEdge(null) }} />
@@ -2885,6 +2905,29 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
   }
 
   return null
+}
+
+/** Says that a view is another model's, at which version, and read-only,
+ *  and offers to copy it into the model (`onCopy`, in Designer). */
+export function OtherModelViewNote({ origin, onCopy, className = 'pp-other-model', style }: { origin: string; onCopy?: () => void; className?: string; style?: React.CSSProperties }): React.ReactElement {
+  const version = origin.slice(origin.lastIndexOf('@') + 1)
+  return (
+    <div className={className} role="note" style={style}>
+      <span>A view of the model <strong>{originModel(origin)}</strong> at <code>{version}</code> · read-only. Change it in that model's repository, or copy it to change the copy.</span>
+      {onCopy && <button type="button" className="other-model-copy" onClick={onCopy}>Copy to this model</button>}
+    </div>
+  )
+}
+
+/** Says that the element or relation is another model's, at which version,
+ *  and read-only: a federation composed by radical federation. */
+function OtherModelNote({ origin }: { origin: string }): React.ReactElement {
+  const version = origin.slice(origin.lastIndexOf('@') + 1)
+  return (
+    <div className="pp-other-model" role="note">
+      From the model <strong>{originModel(origin)}</strong> at <code>{version}</code> · read-only. Change it in that model's repository.
+    </div>
+  )
 }
 
 const PANEL_W_KEY = 'radical-props-width'

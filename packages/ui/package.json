@@ -24,6 +24,7 @@
     "./components/propertiesCover": "./src/components/propertiesCover.ts",
     "./components/NotificationHost": "./src/components/NotificationHost.tsx",
     "./components/MilestoneChip": "./src/components/MilestoneChip.tsx",
+    "./components/OtherModelViewBar": "./src/components/OtherModelViewBar.tsx",
     "./components/keysHere": "./src/components/keysHere.ts",
     "./components/editingControl": "./src/components/editingControl.ts",
     "./components/NodeWizard": "./src/components/NodeWizard.tsx",
