@@ -473,7 +473,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
 
       <section class="doc-section" id="setup">
         <h2>radical setup</h2>
-        <p><code>radical setup [folder]</code> connects coding agents to a model folder in five steps: Node, the folder (a missing or empty one becomes a new model; one with other files and no <code>radical.md</code> is refused), the agents, the git hooks (<code>radical hooks install</code>) and the checks of <code>--status</code>. In a terminal it asks each question with its default; without one, or with <code>--yes</code>, it takes the options and the defaults.</p>
+        <p><code>radical setup [folder]</code> connects coding agents to a model folder in six steps: Node, the folder (a missing or empty one becomes a new model; one with other files and no <code>radical.md</code> is refused), the other models it depends on (a <a href="manual.html#federation">federation</a>: each one's name, repository, model folder and version go into <code>deps.json</code>, and they are fetched), the agents, the git hooks (<code>radical hooks install</code>) and the checks of <code>--status</code>. In a terminal it asks each question with its default; without one, or with <code>--yes</code>, it takes the options and the defaults.</p>
 <pre class="code"><code>npx @radicaltools/cli setup
 npx @radicaltools/cli setup architecture --client claude-code --client codex --yes</code></pre>
         <p>Outside a git repository, setup asks in a terminal whether to start one in the working directory before it adds the hooks.</p>
@@ -499,6 +499,7 @@ npx @radicaltools/cli setup architecture --client claude-code --client codex --y
               <tr><td><code>--client &lt;id&gt;</code></td><td>An agent to connect: <code>claude-code</code>, <code>claude-desktop</code>, <code>codex</code>, <code>cursor</code>, <code>vscode</code>; repeat for more. Default: the ones found installed.</td></tr>
               <tr><td><code>--metamodel radical|c4</code></td><td>The metamodel of a new model. Default: <code>radical</code>.</td></tr>
               <tr><td><code>--name &lt;name&gt;</code></td><td>The server's name in the configurations. Default: <code>radical</code>. A name per folder connects several models to one agent: <code>radical setup payments/architecture --name radical-payments</code>; the agent sees each server's tools under its name.</td></tr>
+              <tr><td><code>--depends-on &lt;name&gt;=&lt;repository&gt;[#&lt;version&gt;[:&lt;model folder&gt;]]</code></td><td>A model this one depends on, added to <code>deps.json</code> and fetched; repeat for more. The repository is a git address or a path relative to the model folder; the version defaults to its newest version tag (<code>v1.10.0</code> after <code>v1.2.0</code>), else its default branch; the model folder to <code>architecture</code>. In a terminal setup asks for them instead. Those <code>deps.json</code> names already stay.</td></tr>
               <tr><td><code>--no-hooks</code></td><td>Leaves the git hooks alone.</td></tr>
               <tr><td><code>--no-check</code></td><td>Ends without the checks.</td></tr>
               <tr><td><code>--status</code></td><td>Changes nothing: only the checks, for the folder named, else the working directory or <code>architecture</code> in it when it holds a model, else every server configured.</td></tr>
@@ -522,7 +523,7 @@ npx @radicaltools/cli setup architecture --client claude-code --client codex --y
             </tbody>
           </table>
         </div>
-        <p><code>radical setup --status [folder]</code> changes nothing and reports Node, whether the folder reads as a model and its hooks save the base, and every agent configuration with a Radical MCP server: the folder it serves, a command or folder that is not there, a version other than the CLI's. Then it starts each server for the folder with the agent's command, arguments and environment and asks it for <code>get_model_summary</code>. <code>--no-start</code> only reads the configurations; <code>--timeout &lt;s&gt;</code> limits each server (default 120: npx may download the package first).</p>
+        <p><code>radical setup --status [folder]</code> changes nothing and reports Node, whether the folder reads as a model and its hooks save the base, the models its <code>deps.json</code> names (warning when they are not fetched, or fetched at another version than it pins), and every agent configuration with a Radical MCP server: the folder it serves, a command or folder that is not there, a version other than the CLI's. Then it starts each server for the folder with the agent's command, arguments and environment and asks it for <code>get_model_summary</code>. <code>--no-start</code> only reads the configurations; <code>--timeout &lt;s&gt;</code> limits each server (default 120: npx may download the package first).</p>
         <p>Exit status: 0 set up / nothing is broken, 1 a step or a check failed, 2 it could not run.</p>
       </section>
 

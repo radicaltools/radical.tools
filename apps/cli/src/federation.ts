@@ -1,6 +1,7 @@
-import { readFile, realpath, stat } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
-import { parseArgs } from 'node:util'
+import { parseArgs, promisify } from 'node:util'
 import type { DiagramData, DiagramSnapshot, DiagramView } from '@radical/common/c4'
 import { originOf } from '@radical/common/model'
 import {
@@ -10,7 +11,7 @@ import {
 import { deserializeFromMdFolder, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { fetchDependency, isAddress } from '@radical/node-files/gitDeps'
+import { fetchDependency, isAddress, repoAddress } from '@radical/node-files/gitDeps'
 import { writeEditorStateFile } from '@radical/node-files/selectionFile'
 import type { Io } from './check'
 
@@ -35,6 +36,7 @@ ${DEPS_FILE}: { "name": "<this model>", "dependencies": [ { "name": "orders",
 
 Exit status: 0 fetched (or nothing to fetch), 2 it could not run.`
 
+const exec = promisify(execFile)
 const readText = (path: string): Promise<string | null> => readFile(path, 'utf8').catch(() => null)
 
 async function readDeps(root: string): Promise<{ deps: Deps; text: string } | null> {
@@ -98,6 +100,57 @@ export function federationOthers(files: FolderFiles, fetched: FetchedDependency[
   const { data, notes } = composeFederation(own, fetched)
   const views = fetched.flatMap((dep) => (dep.data.views ?? []).flatMap((view) => otherModelView(view, originFor(dep.name, dep.commit)) ?? []))
   return { nodes: data.nodes.filter((n) => originOf(n)), relations: data.relations.filter((r) => originOf(r)), views, notes }
+}
+
+/** The version setup offers for a dependency: the repository's newest
+ *  version tag (v1.2.0, 1.2), else its default branch. */
+export async function latestRef(repo: string, home: string): Promise<string> {
+  const address = repoAddress(repo, home)
+  const run = (args: string[]) => exec('git', args, { cwd: home, windowsHide: true, timeout: 30_000 }).then((r) => r.stdout, () => '')
+  const tags = (await run(['ls-remote', '--tags', '--refs', address]))
+    .split('\n').map((line) => line.split('refs/tags/')[1]?.trim()).filter((tag): tag is string => !!tag && /^v?\d+(\.\d+)*$/.test(tag))
+  if (tags.length) {
+    const parts = (tag: string) => tag.replace(/^v/, '').split('.').map(Number)
+    return tags.sort((a, b) => {
+      const [x, y] = [parts(a), parts(b)]
+      for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0)
+      return 0
+    }).at(-1)!
+  }
+  return (await run(['ls-remote', '--symref', address, 'HEAD'])).match(/^ref: refs\/heads\/(\S+)\s+HEAD/m)?.[1] ?? 'main'
+}
+
+/** A dependency as `radical setup --depends-on` names it:
+ *  <name>=<repository>[#<version>[:<model folder>]]. Without a version
+ *  `ref` is empty: the newest tag is looked up. */
+export function parseDependsOn(spec: string): Dependency {
+  const at = spec.indexOf('=')
+  if (at < 1) throw new Error(`--depends-on ${spec}: write <name>=<repository>[#<version>[:<model folder>]]`)
+  const name = spec.slice(0, at)
+  const rest = spec.slice(at + 1)
+  const hash = rest.lastIndexOf('#')
+  const repo = hash < 0 ? rest : rest.slice(0, hash)
+  const [ref = '', path = 'architecture'] = hash < 0 ? [] : rest.slice(hash + 1).split(/:(.*)/s)
+  if (!repo) throw new Error(`--depends-on ${spec}: the repository is missing`)
+  return { name, repo, path: path || 'architecture', ref }
+}
+
+/** The model folder's deps.json with `added` in it: a dependency of the
+ *  same name is replaced, the others kept. Throws with what is wrong. */
+export async function addDependencies(root: string, added: Dependency[], modelName: string): Promise<Deps> {
+  const read = await readDeps(root)
+  const deps: Deps = read?.deps ?? { name: modelName, dependencies: [] }
+  const names = new Set(added.map((d) => d.name))
+  const next = { name: deps.name, dependencies: [...deps.dependencies.filter((d) => !names.has(d.name)), ...added] }
+  // Read back as any deps.json is: a wrong name or path is said here.
+  parseDeps(JSON.stringify(next))
+  await writeFile(join(root, DEPS_FILE), JSON.stringify(next, null, 2) + '\n')
+  return next
+}
+
+/** What deps.json names, or null without one; throws when it does not read. */
+export async function readDependencies(root: string): Promise<Deps | null> {
+  return (await readDeps(root))?.deps ?? null
 }
 
 /** The dependencies with their commits, for a line of output. */
