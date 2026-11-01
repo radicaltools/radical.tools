@@ -30,6 +30,9 @@ export interface C4Node {
   y: number
   width: number
   height: number
+  /** The model of a federation the element comes from, "<name>@<commit>"
+   *  (radical federation sets it); an element with one is read-only. */
+  origin?: string
 }
 
 export interface C4Relation {
@@ -40,6 +43,8 @@ export interface C4Relation {
   relationType?: string
   label?: string
   technology?: string
+  /** As on C4Node: the model of a federation it comes from; read-only. */
+  origin?: string
 }
 
 export interface NodePosition {

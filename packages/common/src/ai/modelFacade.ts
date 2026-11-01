@@ -102,6 +102,8 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       syncGroups()
     },
     removeNode(id: string) {
+      const refused = model.checkRemove(state, [id])
+      if (refused) { refuse(refused); return }
       // A milestone that holds it keeps it on the views that list it now.
       if (carried.snapshots?.length && state.c4Nodes[id]) {
         carried.snapshots = model.keepViewsInMilestones(carried.snapshots, state.views, new Set([id, ...model.descendantIds(id, state.c4Nodes)]))
@@ -126,6 +128,8 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
       model.patchRelation(state, id, updates)
     },
     removeRelation(id: string) {
+      const refused = model.checkRemove(state, [], [id])
+      if (refused) { refuse(refused); return }
       model.deleteRelation(state, id)
     },
 

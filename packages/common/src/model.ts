@@ -220,6 +220,65 @@ function materializeDefaults(node: NodeRecord, mm: Metamodel | undefined): void 
   }
 }
 
+// ── Other models ─────────────────────────────────────────────────────────────
+//
+// A federation (radical federation open) holds the elements and relations of
+// the models this one depends on, each with its origin. They belong to those
+// models' repositories: every change to them is refused, but where they lie
+// on this model's views is free.
+
+/** The model an element or relation of a federation comes from,
+ *  "<name>@<commit>", or undefined for this model's own. */
+export function originOf(item: { origin?: unknown } | undefined): string | undefined {
+  return typeof item?.origin === 'string' && item.origin ? item.origin : undefined
+}
+
+/** The name of the model in an origin: "orders" in "orders@abc1234". */
+export function originModel(origin: string): string {
+  const at = origin.lastIndexOf('@')
+  return at > 0 ? origin.slice(0, at) : origin
+}
+
+/** Fields that place an element on the canvas, not part of what it is. */
+const LAYOUT_FIELDS = new Set(['x', 'y', 'width', 'height', 'collapsed'])
+
+function readOnlyError(what: string, origin: string): string {
+  return `${what} belongs to the model ${originModel(origin)} (${origin}): change it in that model's repository.`
+}
+
+function nodeReadOnly(node: C4Node | undefined): string | null {
+  const origin = originOf(node)
+  return node && origin ? readOnlyError(`"${node.label}"`, origin) : null
+}
+
+function relationReadOnly(state: ModelState, rel: C4Relation | undefined): string | null {
+  const origin = originOf(rel)
+  if (!rel || !origin) return null
+  const name = (id: string) => state.c4Nodes[id]?.label ?? id
+  return readOnlyError(`The relation "${name(rel.sourceId)}" → "${name(rel.targetId)}"`, origin)
+}
+
+function parentReadOnly(parent: C4Node | undefined): string | null {
+  const origin = originOf(parent)
+  return parent && origin ? `Cannot put anything inside "${parent.label}": it belongs to the model ${originModel(origin)} (${origin}).` : null
+}
+
+/** Why the nodes and relations cannot be removed, or null: one of them, a
+ *  descendant of a node or a relation removed with it is another model's. */
+export function checkRemove(state: ModelState, nodeIds: string[], relationIds: string[] = []): string | null {
+  const removed = new Set(nodeIds.filter((id) => state.c4Nodes[id]).flatMap((id) => [id, ...descendantIds(id, state.c4Nodes)]))
+  for (const id of removed) {
+    const refused = nodeReadOnly(state.c4Nodes[id])
+    if (refused) return refused
+  }
+  for (const rel of Object.values(state.c4Relations)) {
+    if (!relationIds.includes(rel.id) && !removed.has(rel.sourceId) && !removed.has(rel.targetId)) continue
+    const refused = relationReadOnly(state, rel)
+    if (refused) return refused
+  }
+  return null
+}
+
 // ── Nodes ────────────────────────────────────────────────────────────────────
 
 export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): string | null {
@@ -234,6 +293,9 @@ export function checkAddNode(state: ModelState, node: Omit<C4Node, 'id'>): strin
   // opened in was undone or deleted) is no root: inserted, the child
   // pointed at nothing and the model could not be drawn again.
   if (node.parentId && !parent) return `Cannot add ${label}: the element it was to go into no longer exists.`
+  const external = parentReadOnly(parent)
+  if (external) return external
+  if (originOf(node)) return 'An element\'s origin is set by radical federation, not by an edit.'
   if (!isPlacementAllowed(mm, node.type, parent, state.c4Nodes)) {
     return `Cannot place ${label} inside ${placementError(mm, node.type, parent, state.c4Nodes)}`
   }
@@ -267,6 +329,13 @@ export function insertNode(state: ModelState, id: string, node: Omit<C4Node, 'id
 export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<Omit<C4Node, 'id'>>): string | null {
   const existing = state.c4Nodes[id]
   if (!existing) return null
+  const record = existing as NodeRecord
+  const changed = Object.entries(updates).filter(([key, value]) => record[key] !== value).map(([key]) => key)
+  if (changed.some((key) => !LAYOUT_FIELDS.has(key))) {
+    const external = nodeReadOnly(existing)
+    if (external) return external
+    if (changed.includes('origin')) return 'An element\'s origin is set by radical federation, not by an edit.'
+  }
   if (!('parentId' in updates) && !('type' in updates) && !('kind' in updates)) return null
   const newType = (updates.type as string | undefined) ?? existing.type
   const newParentId = ('parentId' in updates ? (updates.parentId as string | null | undefined) : existing.parentId) ?? undefined
@@ -276,6 +345,10 @@ export function checkNodeUpdate(state: ModelState, id: string, updates: Partial<
   // walk up or down it never leaves.
   if ('parentId' in updates && newParentId && (newParentId === id || descendantIds(id, state.c4Nodes).includes(newParentId))) {
     return 'Cannot move a node into itself or one of its descendants.'
+  }
+  if ('parentId' in updates && newParentId !== existing.parentId) {
+    const external = parentReadOnly(parent)
+    if (external) return external
   }
   if (!isPlacementAllowed(state.metamodel, newType, parent, state.c4Nodes)) {
     return `Cannot move ${typeLabel(state.metamodel, newType)} "${existing.label}" into ${placementError(state.metamodel, newType, parent, state.c4Nodes)}`
@@ -350,6 +423,12 @@ export function checkReparent(state: ModelState, ids: string[], newParentId: str
   }
   const newParent = newParentId ? state.c4Nodes[newParentId] : undefined
   if (newParentId && !newParent) return 'Target parent no longer exists.'
+  for (const n of nodes) {
+    const external = nodeReadOnly(n)
+    if (external) return external
+  }
+  const external = parentReadOnly(newParent)
+  if (external) return external
   const moved = new Set(nodes.flatMap((n) => [n.id, ...descendantIds(n.id, state.c4Nodes)]))
   if (newParentId && moved.has(newParentId)) return 'Cannot move a node into itself or one of its descendants.'
   if (newParent?.external && oldParentId !== newParentId) {
@@ -618,6 +697,10 @@ function leaveAncestorAlignments(state: ModelState, moved: string[]): void {
 export function checkUnwrap(state: ModelState, id: string): string | null {
   const node = state.c4Nodes[id]
   if (!node) return null
+  const external = nodeReadOnly(node) ?? parentReadOnly(node.parentId ? state.c4Nodes[node.parentId] : undefined)
+    ?? Object.values(state.c4Nodes).filter((child) => child.parentId === id).map(nodeReadOnly).find(Boolean)
+    ?? Object.values(state.c4Relations).filter((rel) => rel.sourceId === id || rel.targetId === id).map((rel) => relationReadOnly(state, rel)).find(Boolean)
+  if (external) return external
   const mm = state.metamodel
   const grandparent = node.parentId ? state.c4Nodes[node.parentId] : undefined
   for (const child of Object.values(state.c4Nodes)) {
@@ -1088,6 +1171,7 @@ export function checkRemoveRelationType(state: ModelState, typeId: string, miles
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export function checkAddRelation(state: ModelState, rel: Omit<C4Relation, 'id'>): string | null {
+  if (originOf(rel)) return 'A relation\'s origin is set by radical federation, not by an edit.'
   return relationRefusal(relationContext(state), rel)
 }
 
@@ -1123,6 +1207,12 @@ export function insertRelation(state: ModelState, id: string, rel: Omit<C4Relati
 export function checkPatchRelation(state: ModelState, id: string, updates: Partial<Omit<C4Relation, 'id'>>): string | null {
   const rel = state.c4Relations[id]
   if (!rel) return null
+  const record = rel as unknown as Record<string, unknown>
+  if (Object.entries(updates).some(([key, value]) => record[key] !== value)) {
+    const external = relationReadOnly(state, rel)
+    if (external) return external
+    if ('origin' in updates && updates.origin !== rel.origin) return 'A relation\'s origin is set by radical federation, not by an edit.'
+  }
   const retyped = updates.relationType !== undefined && updates.relationType !== rel.relationType
   if (updates.sourceId === undefined && updates.targetId === undefined && !retyped) return null
   return relationRefusal(relationContext(state), { ...rel, ...updates, relationType: retyped ? updates.relationType : undefined }, id, rel.relationType)

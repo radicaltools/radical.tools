@@ -5188,3 +5188,33 @@ Processes and steps in the Radical metamodel and the Warnier view type
    machines, into a Warnier view; the C4 stage adds performed-by.
 6. **Large trees.** Every row is drawn; a model with thousands of elements in
    one Warnier view would want folding like the table's.
+### Federation of models (2026-10-17)
+
+`radical federation open | sync | watch` composes a model folder with the
+models its `deps.json` names into `.radical/federation/`; Studio and the MCP
+server refuse changes to elements with an origin. Left open:
+
+1. **Not transitive.** A dependency's own dependencies are not fetched, so its
+   relations to them are left out (named as a note). Composing them would
+   need a rule for two pins of one model.
+2. **Other models' places on All elements are theirs.** A view of this model
+   keeps where it draws another model's element, but the model's own layout
+   (All elements, `_layout.json`) keeps only its own elements, so a composed
+   folder places them where their model does.
+3. **The model folder alone in Studio.** Opened directly (not composed), its
+   views list ids of elements it does not have and its relations point at
+   nothing; `radical check --alone` reports them. Studio could say that the
+   folder has a `deps.json` and offer the command that composes it.
+4. **Tables and the wiki refuse rather than lock.** Their cells for another
+   model's element are editable and the edit is refused with a notice; they
+   could be read-only, as the properties card is.
+5. **A selected element loses its dashed outline** to the selection outline.
+6. **Types a dependency has and the model's metamodel lacks** are named as a
+   note, and then reported by the metamodel rule; the models of a federation
+   are expected to share a metamodel. Merging the types would need sync to
+   keep them out of the model folder.
+7. **Studio does not sync.** The composed folder is a second copy kept in step
+   by `radical federation watch`; Studio could run it, or open a federation
+   natively (the alternative the ADR leaves for later).
+8. **One fetch at a time.** Two commands fetching the same repository into
+   the cache at once may meet git's lock files.

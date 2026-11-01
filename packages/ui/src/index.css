@@ -951,6 +951,16 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 /* A sequence's fields, under the card's head: the card's own margins. */
 .right-panel .props-content.props-sequence { padding: 12px 16px 14px; gap: 12px; }
 .right-panel .props-content > .props-empty { margin: 24px 16px; }
+/* Another model's element or relation (a federation): read-only. */
+.pp-other-model {
+  margin: 0 16px 8px;
+  padding: 6px 10px;
+  border: 1px dashed var(--text-muted);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-muted));
+}
+.pp-other-model code { font-size: 11px; }
 .pp-section { padding: 12px 16px; border-bottom: 1px solid var(--border-color-subtle, color-mix(in srgb, var(--border-color) 60%, transparent)); }
 .pp-section:last-child { border-bottom: none; }
 .pp-section-title {
@@ -4427,6 +4437,13 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ⊕ or + in a process's or step's header: how the steps inside it happen. */
 .proc-sign { font-size: 14px; font-weight: 700; line-height: 1; letter-spacing: 0; text-transform: none; }
 
+
+/* An element of another model of a federation: dashed, read-only. */
+.rf-node-other-model {
+  outline: 2px dashed var(--text-muted);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
 .milestone-diff-stat.added   { color: var(--success); }
 .milestone-diff-stat.changed { color: var(--warning, #d97706); }
 .milestone-diff-stat.removed { color: var(--danger); }

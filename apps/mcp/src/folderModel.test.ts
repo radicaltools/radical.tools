@@ -511,6 +511,58 @@ describe('warnier', () => {
     const summary = (await model.call('get_model_summary', {})).text
     expect(summary).toContain('Process (Warnier)')
     expect(model.tools.find((tool) => tool.name === 'update_view')?.inputSchema).toMatchObject({ properties: { kind: { enum: expect.arrayContaining(['warnier']) } } })
+describe('federation', () => {
+  /** A composed folder: Payments is this model's, Orders (with its API and
+   *  a relation) comes from the model orders. */
+  async function composed(): Promise<string> {
+    const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-federation-'))
+    folders.push(folder)
+    const origin = 'orders@abc1234'
+    const at = (id: string, type: string, label: string, extra: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as never
+    const files = serializeToMdFolder({
+      metamodel: builtInGovernanceMetamodel(),
+      nodes: [
+        at('pay', 'system', 'Payments'),
+        at('ord', 'system', 'Orders', { origin }),
+        at('api', 'container', 'Orders API', { parentId: 'ord', origin }),
+        at('db', 'container', 'Orders DB', { parentId: 'ord', origin }),
+      ],
+      relations: [{ id: 'r-ext', sourceId: 'api', targetId: 'db', origin }],
+    }, 'payments')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    return folder
+  }
+
+  it('refuses edits to another model\'s elements and relations, naming the model, and allows relations to them', async () => {
+    const folder = await composed()
+    const model = await FolderModel.open(folder)
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const refusals = [
+      await model.call('update_node', { id: 'ord', description: 'Takes orders.' }),
+      await model.call('update_node', { id: 'ord', label: 'Orders 2' }),
+      await model.call('move_node', { id: 'api', parentId: null }),
+      await model.call('delete_node', { id: 'db' }),
+      await model.call('add_node', { tempId: 'billing', type: 'container', label: 'Billing', parentId: 'ord' }),
+      await model.call('update_relation', { id: 'r-ext', label: 'reads' }),
+      await model.call('delete_relation', { id: 'r-ext' }),
+    ]
+    for (const result of refusals) {
+      expect(result.ok, result.text).toBe(false)
+      expect(result.text).toMatch(/the model orders \(orders@abc1234\)/)
+    }
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+
+    const relation = await model.call('add_relation', { sourceId: 'pay', targetId: 'ord', label: 'reads orders' })
+    expect(relation.ok, relation.text).toBe(true)
+    expect((await model.call('smart_layout', {})).ok).toBe(true)
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    expect(saved.relations.find((r) => r.sourceId === 'pay')).toMatchObject({ targetId: 'ord', label: 'reads orders' })
+    expect(saved.relations.find((r) => r.sourceId === 'pay')?.origin).toBeUndefined()
+    expect(saved.nodes.find((n) => n.id === 'ord')).toMatchObject({ label: 'Orders', origin: 'orders@abc1234' })
   })
 })
 

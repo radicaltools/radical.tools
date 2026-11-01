@@ -2708,7 +2708,8 @@ function deriveRFNodes(
       // saved layout cannot drift while someone browses the document.
       selectable: !hidden && !isGhost && !locked,
       draggable: !hidden && !isGhost && !locked,
-      className: isGhost ? 'rf-node-ghost' : undefined,
+      // Another model's element (a federation): drawn dashed, read-only.
+      className: isGhost ? 'rf-node-ghost' : model.originOf(n) ? 'rf-node-other-model' : undefined,
       data: {
         c4id: n.id,
         type: n.type,
@@ -4761,6 +4762,12 @@ export const useDiagramStore = create<DiagramStore>()(
         const removed = before.filter((b) => !links.some((l) => sameWizardLink(l, b)))
         const added = links.filter((l) => !before.some((b) => sameWizardLink(l, b)))
 
+        const refused = (Object.keys(patch).length ? model.checkNodeUpdate(get(), id, patch) : null)
+          ?? (removed.length ? model.checkRemove(get(), [], removed.map((r) => r.relationId)) : null)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return ''
+        }
         if (Object.keys(patch).length || removed.length || added.length) {
           get()._pushUndo()
           get()._markMilestoneEdit()
@@ -4818,6 +4825,12 @@ export const useDiagramStore = create<DiagramStore>()(
       },
 
       removeNode(id) {
+        // Another model's element, or one of its relations, stays.
+        const refused = model.checkRemove(get(), [id])
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         // The node, its descendants, their relations, every view reference,
@@ -4860,6 +4873,12 @@ export const useDiagramStore = create<DiagramStore>()(
 
       requestDelete(nodeIds) {
         if (!nodeIds.length || get().appMode !== 'designer') return
+        // Another model's element is refused at once, not after a prompt.
+        const refused = model.checkRemove(get(), nodeIds)
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         set((state) => { state.pendingDelete = { nodeIds, edgeIds: [] } })
       },
 
@@ -5286,6 +5305,11 @@ export const useDiagramStore = create<DiagramStore>()(
 
       removeRelation(id) {
         if (!editsModel(get())) return
+        const refused = model.checkRemove(get(), [], [id])
+        if (refused) {
+          get().pushNotification(refused, 'error')
+          return
+        }
         get()._pushUndo()
         get()._markMilestoneEdit()
         set((state) => { model.deleteRelation(state, id) })
@@ -6870,7 +6894,10 @@ export const useDiagramStore = create<DiagramStore>()(
         const removals = changes.filter((c) => c.type === 'remove') as Array<{ type: 'remove'; id: string }>
         // Deleting is Designer's, and not while a presentation plays.
         if (removals.length > 0 && (get().appMode !== 'designer' || get().presentationActive)) return
-        if (removals.length > 0) {
+        // Another model's element is refused at once, not after a prompt.
+        const refusedRemoval = removals.length > 0 ? model.checkRemove(get(), removals.map((c) => c.id)) : null
+        if (refusedRemoval) get().pushNotification(refusedRemoval, 'error')
+        else if (removals.length > 0) {
           const ids = removals.map((c) => c.id)
           set((state) => {
             const prev = state.pendingDelete ?? { nodeIds: [], edgeIds: [] }
@@ -6930,13 +6957,21 @@ export const useDiagramStore = create<DiagramStore>()(
         // A line is deleted as the relations it is: a rolled-up one as those
         // it stands for, and one that is none (a step's arrow, an
         // exploration's containment) not at all. Its own id named no
-        // relation: the prompt counted nothing and removed nothing.
+        // relation: the prompt counted nothing and removed nothing. The
+        // relations of another model's element go with it, which is refused
+        // (onNodesChange): they stay too, without a prompt.
+        const kept = new Set(get().rfNodes.filter((n) => n.selected && model.originOf(get().c4Nodes[n.id])).map((n) => n.id))
         const ids = [...new Set(removals.flatMap((c) => {
           if (get().c4Relations[c.id]) return [c.id]
           const line = get().rfEdges.find((e) => e.id === c.id)
           return (line?.data?.relationIds ?? []).filter((id) => get().c4Relations[id])
-        }))]
-        if (ids.length > 0) {
+        }))].filter((id) => {
+          const r = get().c4Relations[id]
+          return !r || !(kept.has(r.sourceId) || kept.has(r.targetId))
+        })
+        const refusedRemoval = ids.length > 0 ? model.checkRemove(get(), [], ids) : null
+        if (refusedRemoval) get().pushNotification(refusedRemoval, 'error')
+        else if (ids.length > 0) {
           set((state) => {
             const prev = state.pendingDelete ?? { nodeIds: [], edgeIds: [] }
             state.pendingDelete = {
