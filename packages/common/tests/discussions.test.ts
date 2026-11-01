@@ -65,7 +65,7 @@ describe('node discussions', () => {
     const t = thread()
     const child = comment(t.comments[0].id)
     const bad = [
-      { threads: [], version: 2 }, { threads: [{ ...t, unknown: true }] },
+      { threads: [], version: 99 }, { threads: [{ ...t, unknown: true }] },
       { threads: [{ ...t, id: 'invalid' }] }, { threads: [{ ...t, nodeId: '' }] },
       { threads: [{ ...t, comments: [] }] },
       { threads: [{ ...t, comments: [comment(), comment()] }] },

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, open, readFile, rename, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { applyDiscussionAction, DISCUSSIONS_FILE, DISCUSSIONS_LOCK_FILE, DISCUSSIONS_WEB_LOCK_FILE, DiscussionConflict, parseDiscussions, type DiscussionAction, type Discussions } from '@radical/common/discussions'
+import { applyDiscussionAction, DISCUSSIONS_FILE, DISCUSSIONS_LOCK_FILE, DISCUSSIONS_WEB_LOCK_FILE, DiscussionConflict, submissionState, parseDiscussions, type DiscussionAction, type Discussions } from '@radical/common/discussions'
 
 const pause = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms))
 
@@ -76,12 +76,15 @@ export class DiskDiscussions {
     }
   }
 
-  async act(action: DiscussionAction): Promise<Discussions> {
+  async act(action: DiscussionAction, idempotent = false): Promise<Discussions> {
     const release = await this.takeLock()
     const temporary = `${this.file}.${randomUUID()}.tmp`
     try {
       const original = await this.text()
       const latest = original === null ? { threads: [] } : parseDiscussions(original)
+      const state = submissionState(latest, action)
+      if (idempotent && state === 'matching') return latest
+      if (idempotent && state === 'conflict') throw new DiscussionConflict('Imported ID conflicts with current discussions. Review before continuing.')
       const next = applyDiscussionAction(latest, action)
       const handle = await open(temporary, 'wx', 0o600)
       try {
