@@ -177,3 +177,22 @@ describe('browser discussion storage', () => {
     expect([...root.files.keys()]).toEqual([DISCUSSIONS_FILE])
   })
 })
+
+it('preserves imported provenance and version 2 across browser writes and permits only the explicit resolved import path', async () => {
+  const root = new Directory(), adapter = new WebDiscussions(root, writeTurn()), t = thread()
+  t.comments[0].confluence = { accountId: 'remote-account', url: 'https://example.atlassian.net/wiki/pages/viewpage.action?pageId=1' }
+  await adapter.act(create(t))
+  let loaded = await adapter.load()
+  expect(loaded.version).toBe(2)
+  expect(loaded.threads[0].comments[0].confluence).toEqual(t.comments[0].confluence)
+  await adapter.act({ kind: 'setResolved', threadId: t.id, expected: threadState(loaded.threads[0]), resolved: true })
+  const action = reply(t)
+  if (action.kind !== 'addReply') throw new Error('reply expected')
+  action.comment.confluence = { ...t.comments[0].confluence!, reviewRequired: true }
+  await expect(adapter.act(action)).rejects.toThrow('resolved')
+  await adapter.act({ ...action, kind: 'importReply' })
+  loaded = await adapter.load()
+  expect(loaded.version).toBe(2)
+  expect(loaded.threads[0].resolved).toBe(true)
+  expect(loaded.threads[0].comments[1].confluence?.reviewRequired).toBe(true)
+})

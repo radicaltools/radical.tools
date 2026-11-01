@@ -687,3 +687,107 @@ To validate the archive without a release, use **Actions → Publish to npm →
 Run workflow**, select `main`, choose **package: cli**, and leave **dry-run**
 enabled. With **dry-run** disabled it publishes, but only from `main`.
 
+
+## Sync node discussions with Confluence (experimental)
+
+Publish a wiki as a managed page tree first (`export confluence --publish
+--structure tree`). Run discussion sync from one designated machine or CI job.
+Configure `CONFLUENCE_EMAIL` and `CONFLUENCE_API_TOKEN` in that runner's environment.
+The account needs read access to the landing and node pages and permission to
+create footer comments in the space. Tokens never belong in command arguments,
+model files, sync journals, or source control.
+
+```sh
+radical discussions confluence connect ./model --view <wiki-id> --page <landing-url>
+# Read the preview, including existing conversations, account and limitations.
+# Repeat the same command with the returned confirmation token:
+radical discussions confluence connect ./model --view <wiki-id> --page <landing-url> --apply --expect <token>
+radical discussions confluence sync ./model
+radical discussions confluence sync ./model --apply --expect <fresh-token>
+radical discussions confluence status ./model
+```
+
+Preview writes neither local sync state nor remote comments. Apply reads again
+and refuses if the preview token no longer matches. A preview token authorizes
+only that snapshot and its exclusions. Add `--json` for structured output.
+Use `--node <node-id>` (repeatable) on both preview and apply to limit a run to
+selected nodes within the current wiki view. Other node pages are not read or
+written. The filter applies to that invocation; use it again on subsequent runs.
+
+Exit 0 means success, 1 means review/partial results or exclusions, and 2 means
+an operational error. Review can be required even when some comments succeeded.
+
+All supported existing footer comments on the currently selected node pages are
+imported, including pre-connection comments. Existing local and remote threads
+remain separate even when their text matches. To leave a conversation out,
+repeat `--exclude local:<thread-uuid>` or `--exclude remote:<comment-id>` on the
+preview and apply commands. Exclusions are stored and include descendants on
+later runs; they are not automatically removed. Landing, inline, retained pages
+outside the current view and unmanaged page comments are excluded. Missing or
+replaced pages need review; sync never recreates or rebinds them.
+
+The supported comment subset is paragraphs, bold, italic, inline code, line
+breaks and absolute HTTP(S) links without credentials. Images, tables, macros,
+mentions, attachments, raw HTML, lists and other unsupported content are held
+with their source page for review; descendants are held too. The original remote
+body is never modified or partially imported. This subset has automated tests
+but **has not passed a live Confluence editor round trip yet**. Do not treat
+these tests as evidence that editor normalization, republishing, permissions or
+rate limits have been verified on a live site.
+
+The connected account authors outbound posts. Local email addresses are never
+exported or inferred as remote identity. Imported authors use Confluence account
+IDs; display names are shown if present in provenance. The first import upgrades
+discussions.json losslessly to version 2, preserving local UUIDs, email, nesting,
+resolution and timestamps. **Older Studio versions cannot read version 2.**
+Update all writers first and back up the folder before importing. Local-only
+files keep their existing format. Studio displays source links, imported account
+identity and resolved-thread review warnings; sync itself runs through the CLI.
+
+Edits, deletions and resolution are not synchronized. Linked local/remote edits
+and remote disappearance are reported for manual review without overwriting.
+A remote reply to a resolved local thread is imported and flagged; the thread
+stays resolved. After reviewing it, reopen the thread in Studio to acknowledge the imported
+reply. Until then the preview continues to report it for review.
+
+### Interrupted runs and runner handoff
+
+Keep these files together as durable collaboration state:
+
+- `discussions.json`: human content and imported provenance;
+- `discussions-confluence-sync.json`: checksummed, versioned mappings, pending
+  imports, exact staged outbound payloads, exclusions and last result;
+- `discussions-confluence-connection.json`: connection receipt detecting a missing
+  or mismatched journal.
+
+Choose whether to commit all three. Never merge competing journals in Git or
+start another clone while the designated runner is running. Stop the old runner
+before transferring these files together. Local process locks do not coordinate
+different computers. Do not discard a missing/corrupt/conflicted journal and
+reconnect: restore a consistent backup and review the corresponding remote
+comments. A crash creating the first connection receipt before its journal also
+stops safely for manual review, before any comments are posted or imported.
+
+Imports stage a stable local ID before acquiring the ordinary short discussion
+writer lock. Recovery verifies or finishes the same import, preserving concurrent
+Studio posts. Network calls never hold that writer lock. Outbound posts are staged
+as uncertain before the request. No create is automatically retried, even for a
+429. If its acknowledgement is lost, sync pauses the entire affected page:
+inspect Confluence and the intended payload in the journal, then preview and
+apply one of these recovery commands:
+
+```sh
+radical discussions confluence sync ./model --bind <local-comment-uuid>=<verified-remote-id>
+# Repeat with --apply --expect <token> after inspecting the remote page/parent.
+# Only if you checked and decided to post again:
+radical discussions confluence sync ./model --retry <local-comment-uuid>
+```
+
+Binding verifies page, parent and uniqueness, retaining the original local UUID.
+An explicit retry can duplicate a comment if the first request actually succeeded;
+never retry merely because the CLI timed out. Recovery returns review status and
+requires a fresh sync preview afterward. Other pages can continue when one page
+is held. Stale `.discussions-confluence-sync.lock` files may be removed only after
+verifying their recorded process has stopped; locks are never automatically stolen.
+External editors and Git do not honor locks: observed changes stop the runner,
+but ordinary filesystems cannot prevent every change in the final rename window.

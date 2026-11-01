@@ -13,3 +13,14 @@ I want discussions and comments attached to any model object, kept in a separate
 **First release, 2026-10-25:** Desktop folder models only: Discuss on graph nodes, nested replies, resolve/reopen, optional locally remembered email, and validated atomic writes to discussions.json independent of the model. The original broader need above remains future context, including other object targets, connected identity and two-way Confluence synchronization.
 
 **Browser extension, 2026-10-25:** The user also needs discussions when the web UI connects to a model folder. Reuse the panel and file format through File System Access, preserve permission/reconnect behavior, serialize browser tabs with Web Locks and coordinate their writes with the current desktop app.
+
+**Experimental Confluence CLI, 2026-10-31:** Managed wiki trees can preview and
+manually sync new footer threads and nested replies through `radical discussions
+confluence`. Mapping uses node IDs and managed page markers, limited to the current
+view. Imports use stable journaled UUIDs and the shared discussion writer lock;
+outbound creates are staged before sending and uncertain outcomes require explicit
+binding or retry. Exclusions persist. Edits, disappearance and replies into resolved
+threads require review; existing content is never overwritten. Version 2 preserves
+Confluence account provenance separately from local email. Studio displays the
+source and CLI instructions. Live editor feasibility testing is still outstanding;
+see `apps/cli/README.md` for limitations, compatibility and runner handoff.
