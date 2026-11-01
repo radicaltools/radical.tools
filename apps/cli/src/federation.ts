@@ -55,25 +55,40 @@ async function fetchAll(root: string, deps: Deps): Promise<{ fetched: FetchedDep
   const notes: string[] = []
   // Where each model was fetched from, for the versions milestones keep.
   const sources = new Map<string, { dep: Dependency; home: string }>()
-  const chosen = new Map<string, { ref: string; repo: string; via: string }>()
+  const chosen = new Map<string, { ref: string; where: string; via: string }>()
+  // A model is known by where it is as much as by its name: another team
+  // may name this one, or one of them, otherwise.
+  const own = await ownLocations(root)
+  const named = new Map<string, string>()
   let level: Array<{ dep: Dependency; home: string | undefined; via?: string }> = deps.dependencies.map((dep) => ({ dep, home: root }))
   while (level.length) {
     const next: typeof level = []
     // One after the other: two dependencies may share a repository (and its cache).
     for (const { dep, home, via } of level) {
       if (dep.name === deps.name) continue
-      const kept = chosen.get(dep.name)
-      if (kept) {
-        if (kept.ref !== dep.ref || kept.repo !== dep.repo) {
-          notes.push(`${dep.name}: ${via ?? deps.name} pins ${dep.ref}, ${kept.via} pins ${kept.ref}; ${kept.ref} is composed, the nearer pin (pin it in ${DEPS_FILE} to choose).`)
-        }
-        continue
-      }
       if (home === undefined && !isAbsolute(dep.repo) && !isAddress(dep.repo)) {
         notes.push(`${dep.name}: ${via} names its repository as the path ${dep.repo}, which only a repository on disk can resolve; pin it in ${DEPS_FILE}.`)
         continue
       }
-      chosen.set(dep.name, { ref: dep.ref, repo: dep.repo, via: via ?? deps.name })
+      const where = await locationOf(dep, home ?? root)
+      if (own.has(where)) {
+        notes.push(`${dep.name}: ${via ?? deps.name} names this model so; left out, as a dependency back to it.`)
+        continue
+      }
+      const kept = chosen.get(dep.name)
+      if (kept) {
+        if (kept.ref !== dep.ref || kept.where !== where) {
+          notes.push(`${dep.name}: ${via ?? deps.name} pins ${dep.ref}, ${kept.via} pins ${kept.ref}; ${kept.ref} is composed, the nearer pin (pin it in ${DEPS_FILE} to choose).`)
+        }
+        continue
+      }
+      const other = named.get(where)
+      if (other) {
+        notes.push(`${dep.name}: ${via ?? deps.name} names the model ${other} so (the same repository and model folder); fetched once, as ${other}.`)
+        continue
+      }
+      chosen.set(dep.name, { ref: dep.ref, where, via: via ?? deps.name })
+      named.set(where, dep.name)
       sources.set(dep.name, { dep, home: home ?? root })
       const got = await fetchDependency(dep, home ?? root)
       fetched.push(via ? { ...got, via } : got)
@@ -82,6 +97,44 @@ async function fetchAll(root: string, deps: Deps): Promise<{ fetched: FetchedDep
     level = next
   }
   return { fetched, notes, sources }
+}
+
+/** Where a model is: its repository and model folder, the same however a
+ *  deps.json names them (a path from its folder, an https or an ssh address). */
+async function locationOf(dep: Pick<Dependency, 'repo' | 'path'>, home: string): Promise<string> {
+  const address = repoAddress(dep.repo, home)
+  const folder = dep.path.replace(/^\.\/?|\/$/g, '') || '.'
+  if (!isAddress(address)) return `file:${await realpath(join(address, folder)).catch(() => resolve(address, folder))}`
+  return `${addressKey(address)}#${folder}`
+}
+
+/** A git address without what varies between ways of writing it: the
+ *  protocol, the user, the port, a trailing .git; git@host:org/repo and
+ *  https://host/org/repo are one. */
+function addressKey(address: string): string {
+  const text = address.trim().replace(/\/$/, '').replace(/\.git$/, '')
+  const url = text.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/i)
+  if (url) return `${url[1].toLowerCase()}/${url[2]}`
+  const scp = text.match(/^(?:[^@/]+@)?([^:/]+):(.+)$/)
+  return scp ? `${scp[1].toLowerCase()}/${scp[2].replace(/^\//, '')}` : text
+}
+
+/** Where the model at `root` is: its folder on disk, and its repository's
+ *  remotes with its folder in them, so a dependency back to it is known. */
+async function ownLocations(root: string): Promise<Set<string>> {
+  const own = new Set([`file:${await realpath(root).catch(() => root)}`])
+  const run = (args: string[]) => exec('git', args, { cwd: root, windowsHide: true }).then((r) => r.stdout.trim(), () => '')
+  const top = await run(['rev-parse', '--show-toplevel'])
+  if (!top) return own
+  const folder = relative(await realpath(top).catch(() => top), await realpath(root).catch(() => root)) || '.'
+  for (const line of (await run(['remote', '-v'])).split('\n')) {
+    const address = line.split(/\s+/)[1]
+    if (!address) continue
+    // A remote on disk is a folder like any other: the model's folder in it.
+    if (isAddress(address)) own.add(`${addressKey(address)}#${folder}`)
+    else own.add(await locationOf({ repo: address, path: folder }, top))
+  }
+  return own
 }
 
 /** The model folder composed with its pinned dependencies, as radical check
