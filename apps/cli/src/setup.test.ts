@@ -1,12 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { builtInC4Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
+import { parseFederationFile } from '@radical/common/federation'
+import type { C4Node } from '@radical/common/c4'
 import { main } from './cli'
 import { CLIENTS, CLIENT_IDS } from './agentConfig'
 import { HOOK_MARKER } from './hooks'
@@ -14,7 +17,18 @@ import type { Io } from './check'
 
 const exec = promisify(execFile)
 const dirs: string[] = []
-afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
+let cacheBefore: string | undefined
+beforeEach(async () => {
+  cacheBefore = process.env.RADICAL_CACHE
+  const cache = await mkdtemp(join(tmpdir(), 'radical-cache-'))
+  dirs.push(cache)
+  process.env.RADICAL_CACHE = cache
+})
+afterEach(async () => {
+  if (cacheBefore === undefined) delete process.env.RADICAL_CACHE
+  else process.env.RADICAL_CACHE = cacheBefore
+  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+})
 
 /** A repository, a home with a node and an npx of its own, and an Io over them. */
 async function world() {
@@ -44,6 +58,29 @@ async function run(w: Awaited<ReturnType<typeof world>>, args: string[], extra: 
 
 const json = async (path: string) => JSON.parse(await readFile(path, 'utf8'))
 const allClients = CLIENT_IDS.flatMap((id) => ['--client', id])
+
+/** A git repository `name` beside the world's repository with a model in
+ *  `folder`, committed once per tag given (a new element each time). */
+async function modelRepo(w: Awaited<ReturnType<typeof world>>, name: string, tags: string[], folder = 'architecture'): Promise<string> {
+  const dir = join(w.root, name)
+  await mkdir(dir, { recursive: true })
+  const git = (...args: string[]) => exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: dir })
+  await git('init', '-q', '-b', 'main')
+  const nodes: C4Node[] = []
+  for (const tag of tags.length ? tags : ['']) {
+    nodes.push({ id: `${name}-${nodes.length}`, type: 'system', label: `${name} ${nodes.length}`, x: 0, y: 0, width: 200, height: 100, collapsed: false } as C4Node)
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes, relations: [] }, name))) {
+      await mkdir(dirname(join(dir, folder, path)), { recursive: true })
+      await writeFile(join(dir, folder, path), content)
+    }
+    await git('add', '-A')
+    await git('commit', '-q', '-m', tag || 'model')
+    if (tag) await git('tag', tag)
+  }
+  return dir
+}
+
+const fetchedFile = async (folder: string) => parseFederationFile(await readFile(join(folder, '.radical', 'federation.json'), 'utf8'))!
 
 describe('radical setup', () => {
   it('writes each agent\'s configuration once, keeps their other entries, and starts the model', async () => {
@@ -119,12 +156,13 @@ describe('radical setup', () => {
     await mkdir(join(w.home, '.codex'))
     await mkdir(join(w.home, '.cursor'))
     const questions: string[] = []
-    const answers = ['model', 'c4', '1 5', 'n']
+    const answers = ['model', 'c4', '', '1 5', 'n']
     const asked = await run(w, ['setup', '--no-check'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(asked.code).toBe(0)
     expect(questions).toEqual([
       '  Model folder [architecture]: ',
       expect.stringMatching(/^ {2}It holds no model yet\. Metamodel of the new model, .* \[radical\]: $/),
+      '  A model this one depends on, by name (Enter: none): ',
       '  Agents to connect, by number [3 4]: ',
       expect.stringMatching(/git hooks .* \[yes\]: $/),
     ])
@@ -145,6 +183,48 @@ describe('radical setup', () => {
     expect(await readFile(join(w.repo, '.git', 'hooks', 'post-checkout'), 'utf8')).toContain(HOOK_MARKER)
   })
 
+  it('asks for the models this one depends on, offers the newest tag, and fetches them', async () => {
+    const w = await world()
+    await modelRepo(w, 'standards', ['v1.2.0', 'v1.10.0'])
+    const questions: string[] = []
+    const answers = ['', '', 'standards', '../../standards', '', '', '', 'none', 'n']
+    const done = await run(w, ['setup', '--no-check'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
+    expect(done.err).toBe('')
+    expect(done.code).toBe(0)
+    expect(questions.slice(2, 7)).toEqual([
+      '  A model this one depends on, by name (Enter: none): ',
+      '    Its git repository, an address or a path from the model folder: ',
+      '    The model folder in it [architecture]: ',
+      // The newest version tag, by number: v1.10.0 after v1.2.0.
+      '    Version [v1.10.0]: ',
+      '  Another model this one depends on, by name (Enter: no more): ',
+    ])
+    const folder = join(w.repo, 'architecture')
+    expect(await json(join(folder, 'deps.json'))).toEqual({ name: 'repo', dependencies: [{ name: 'standards', repo: '../../standards', path: 'architecture', ref: 'v1.10.0' }] })
+    expect(done.out).toContain('+ standards (../../standards at v1.10.0) in deps.json')
+    expect(done.out).toMatch(/\+ fetched standards@\w{7} \(v1\.10\.0\) into \.radical\/federation\.json: 2 elements/)
+    expect((await fetchedFile(folder)).nodes.map((n) => n.label)).toEqual(['standards 0', 'standards 1'])
+  })
+
+  it('adds the dependencies --depends-on names without asking', async () => {
+    const w = await world()
+    await modelRepo(w, 'standards', ['v1.0.0', 'v2.0.0'])
+    await modelRepo(w, 'billing', [], 'model')
+    const first = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'standards=../../standards#v1.0.0'])
+    expect(first.code).toBe(0)
+    // A second model, its version its default branch (no tags), its model folder named; standards stays.
+    const second = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'billing=../../billing#:model'])
+    expect(second.code).toBe(0)
+    expect(second.out).toContain('✓ depends on standards (../../standards at v1.0.0)')
+    const folder = join(w.repo, 'architecture')
+    expect((await json(join(folder, 'deps.json'))).dependencies).toEqual([
+      { name: 'standards', repo: '../../standards', path: 'architecture', ref: 'v1.0.0' },
+      { name: 'billing', repo: '../../billing', path: 'model', ref: 'main' },
+    ])
+    expect((await fetchedFile(folder)).dependencies.map((d) => [d.name, d.ref])).toEqual([['standards', 'v1.0.0'], ['billing', 'main']])
+    expect((await run(w, ['setup', '--yes', '--depends-on', 'nameless'])).out).toContain('✗ --depends-on nameless: write <name>=<repository>[#<version>[:<model folder>]]')
+  })
+
   it('through the launcher, pins it and starts each agent\'s server through it, in a git repository it starts', async () => {
     const w = await world()
     const fresh = join(w.root, 'fresh')
@@ -154,12 +234,12 @@ describe('radical setup', () => {
     await mkdir(join(w.home, '.config', 'Claude'), { recursive: true })
     const env = { PATH: '/usr/bin:/bin', RADICAL_LAUNCHER: launcher }
     const questions: string[] = []
-    const answers = ['', '', 'yes', '']
+    const answers = ['', '', '', 'yes', '']
     const first = await run(w, ['setup', '--no-check', '--client', 'claude-code', '--client', 'claude-desktop'],
       { cwd: fresh, env, ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(first.err).toBe('')
     expect(first.code).toBe(0)
-    expect(questions[2]).toBe('  Not in a git repository. Start one here (git init)? [yes]: ')
+    expect(questions[3]).toBe('  Not in a git repository. Start one here (git init)? [yes]: ')
     expect(first.out).toContain('+ pinned radical.sh to 0.2.0')
     expect(first.out).toContain('+ started a git repository')
     expect(await readFile(launcher, 'utf8')).toMatch(/^default_version=0\.2\.0$/m)
