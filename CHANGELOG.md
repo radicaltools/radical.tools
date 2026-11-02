@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The view folders of the other models of a federation are marked as theirs and read-only in Studio, over MCP and in the AI chat: no view of the model's own can be made in them, moved or dropped into them, and they cannot be renamed, moved or edited
 
 ### Fixed
+- `fitness-fn-measure-invalid` accepts a measure line that names a sensor of the repository's `radical.sensors.json`: `radical check` reads the file and names its sensors when a line names neither one of them nor a built-in adapter; Studio, which does not see the repository, no longer reports such a line
 - `radical federation fetch` knows a model by its repository and model folder, not only by its name: a dependency back to the model under another name (git@host:org/repo or https://host/org/repo alike) is left out as a cycle instead of fetching the model as another one, and one model two `deps.json` files name differently is fetched once, under the nearer name
 
 ## [0.3.1] - 2026-10-31

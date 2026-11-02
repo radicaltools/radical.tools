@@ -1,19 +1,16 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { ELEMENT_LABEL, MEASUREMENTS_FILE, REVIEWS_FILE, addReview, appliedElements, commandWords, isSensorName, mergeMeasurements, metricsFileProblems, parseMeasure, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile } from '@radical/common/check'
+import { ELEMENT_LABEL, MEASUREMENTS_FILE, REVIEWS_FILE, addReview, appliedElements, isSensorName, mergeMeasurements, metricsFileProblems, parseMeasure, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { MD_MANIFEST_FILE, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { originModel, originOf } from '@radical/common/model'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { writeBeside, type Io } from './check'
+import { SENSORS_FILE, repositorySensors } from './repositorySensors'
 import { composeFolder, federationOthers } from './federation'
 import { SENSOR_ADAPTERS, sensorAdapter } from './sensors/registry'
-
-/** The sensors a repository configures for its own system, at its root:
- *  `{ "sensors": { "<name>": { "command": "<command line>" } } }`. */
-export const SENSORS_FILE = 'radical.sensors.json'
 
 export const SENSE_USAGE = `Usage: radical sense <adapter> [input] [options]
        radical sense run --trigger <event> --out <dir> [--folder <dir>] [--context <k=v>]
@@ -69,30 +66,6 @@ function pairs(list: string[] | undefined, option: string): Record<string, strin
     out[m[1]] = m[2]
   }
   return out
-}
-
-/** The repository's sensors: in the nearest radical.sensors.json from the
- *  model folder up to the repository's root; none without one. */
-async function repositorySensors(folder: string): Promise<{ file: string; sensors: Record<string, string[]> } | null> {
-  for (let dir = folder; ; dir = dirname(dir)) {
-    const file = join(dir, SENSORS_FILE)
-    const text = await readFile(file, 'utf8').catch(() => null)
-    if (text !== null) {
-      let raw: unknown
-      try { raw = JSON.parse(text) } catch (error) { throw new Error(`${file}: ${(error as Error).message}`) }
-      const listed = (raw as { sensors?: unknown })?.sensors
-      if (!listed || typeof listed !== 'object') throw new Error(`${file}: no "sensors" object`)
-      const sensors: Record<string, string[]> = {}
-      for (const [name, sensor] of Object.entries(listed as Record<string, { command?: unknown }>)) {
-        const command = sensor?.command
-        const words = typeof command === 'string' ? commandWords(command) : Array.isArray(command) && command.every((w) => typeof w === 'string') ? command as string[] : []
-        if (!words.length) throw new Error(`${file}: sensor ${name} has no command`)
-        sensors[name] = words
-      }
-      return { file, sensors }
-    }
-    if (await stat(join(dir, '.git')).then(() => true, () => false) || dirname(dir) === dir) return null
-  }
 }
 
 /** A node's own properties, for a sensor's context: what the model states

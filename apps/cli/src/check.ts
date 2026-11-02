@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
@@ -11,6 +11,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 import { composeFolder, describeDeps, federationOthers } from './federation'
+import { repositorySensors } from './repositorySensors'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -289,7 +290,16 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 2
   }
   const others = federation ? federationOthers(files, federation.fetched) : undefined
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // The repository's own sensors, which a measure line may name too.
+  let sensors
+  try {
+    const found = await repositorySensors(root)
+    sensors = found ? { file: relative(io.cwd, found.file), names: Object.keys(found.sensors) } : null
+  } catch (error) {
+    io.err(`Cannot read the repository's sensors: ${(error as Error).message}`)
+    return 2
+  }
+  const result = runCheck(files, config, { sensors, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so

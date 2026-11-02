@@ -44,9 +44,11 @@ jobs:
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
       # What the model measures on a pull request: the measure of every
-      # automated fitness function triggered on pull-request (Workspace
-      # boundaries: the command sensor on tools/check-workspaces.mjs), into
-      # reports/metrics, which the job Architecture model reads.
+      # automated fitness function triggered on pull-request, into
+      # reports/metrics, which the job Architecture model reads. Most name a
+      # sensor of radical.sensors.json (tools/sensors), run once for each
+      # element their ADR constrains (Workspace boundaries, One product
+      # version, One mark everywhere, Installable npm packages).
       - run: npm run build -w @radicaltools/cli
       - run: node apps/cli/dist/index.js sense run --trigger pull-request --folder architecture --out reports/metrics --context commit=${{ github.sha }}
       - name: Upload test reports
