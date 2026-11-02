@@ -38,6 +38,9 @@ export interface ElementChange extends ElementRef {
   changes?: FieldChange[]
   /** The element's relations in its version (the new one, the old one when removed). */
   related: RelatedElement[]
+  /** A scenario's or fitness function's tests, as the repository's
+   *  .radical/radical.json binds them (given by the caller that reads it). */
+  tests?: string[]
 }
 
 export interface RelationChange {
@@ -174,6 +177,7 @@ export function formatModelChanges(report: ModelChangeReport, before: ModelCopy,
       if (long) { field('    ', `${c.field} before`, value(c.before)); field('    ', `${c.field} now`, value(c.after)) }
       else lines.push(`    ${c.field}: ${value(c.before)} → ${value(c.after)}`)
     }
+    if (change.tests) lines.push(`    tests (.radical/radical.json): ${change.tests.length ? '' : 'none bound'}`, ...change.tests.map((t) => `      ${t}`))
     if (change.related.length) {
       lines.push('    relations:')
       for (const r of change.related.slice(0, MAX_RELATED)) {

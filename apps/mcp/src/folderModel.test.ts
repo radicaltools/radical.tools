@@ -1235,3 +1235,49 @@ describe('repository mapping', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(expect.objectContaining({ 'radical.md': expect.any(String) }))
   })
 })
+
+describe('test bindings', () => {
+  it('lists the scenarios the repository verifies, binds their tests, and get_changes names them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-verify-'))
+    folders.push(root)
+    const git = (...args: string[]) => promisify(execFile)('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: root })
+    await git('init', '-q')
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [
+      node('shop', 'system', 'Shop'), node('api', 'container', 'Orders API', { parentId: 'shop' }),
+      node('pay', 'requirement', 'Pay', { ears_type: 'ubiquitous', action: 'The API shall take payments' }),
+      node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' }),
+    ], relations: [
+      { id: 'sat', relationType: 'satisfies', sourceId: 'api', targetId: 'pay' },
+      { id: 'ver', relationType: 'verifies', sourceId: 's-pay', targetId: 'pay' },
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await writeFile(join(root, '.radical', 'radical.json'), JSON.stringify({ implements: [{ element: 'api', name: 'Orders API', paths: ['services/orders'] }] }))
+    await git('add', '-A')
+    await git('commit', '-q', '-m', 'model')
+    const model = await FolderModel.open(folder)
+
+    expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([{ id: 's-pay', label: 'Pays' }])
+    expect((await model.call('get_verification', { id: 's-pay' })).text).toBe('.radical/radical.json binds no test to scenario "Pays" (s-pay): bind its tests with set_verification.')
+    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] })).text)
+      .toBe('scenario "Pays" (s-pay) is checked by 2 test(s) (.radical/radical.json).')
+    expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([])
+    // The mapping of elements is kept beside the tests.
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8'))).toEqual({
+      implements: [{ element: 'api', name: 'Orders API', paths: ['services/orders'] }],
+      verifies: [{ element: 's-pay', name: 'Pays', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] }],
+    })
+    // Only a scenario or fitness function is checked by tests.
+    expect(await model.call('set_verification', { id: 'api', tests: ['x'] })).toMatchObject({ ok: false, text: 'set_verification: container "Orders API" (api) is no scenario or fitness function; only those are checked by tests' })
+
+    // A changed scenario comes with its tests.
+    expect((await model.call('update_node', { id: 's-pay', properties: { then: 'paid and receipted' } })).ok).toBe(true)
+    expect((await model.call('get_changes', { since: 'HEAD' })).text).toContain('    tests (.radical/radical.json): \n      tests/pay.test.ts › pays\n      tests/pay.test.ts › declines')
+    expect((await model.call('set_verification', { id: 's-pay', remove: true })).text).toBe('Took scenario "Pays" (s-pay) out of .radical/radical.json.')
+  })
+})

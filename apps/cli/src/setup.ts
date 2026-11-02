@@ -12,7 +12,8 @@ import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, pinLauncher, 
 import { statusCommand } from './status'
 import { hooksCommand } from './hooks'
 import { MOVES, moveToRadical } from './moveLayout'
-import { MODEL_FOLDER, RADICAL_DIR, findModelFolder, oldLayout, repositoryRoot } from '@radical/node-files/repositoryLayout'
+import { moveTestsOut, testsNamedIn } from './moveTests'
+import { MODEL_FOLDER, RADICAL_DIR, findModelFolder, mappingRoot, oldLayout, repositoryRoot } from '@radical/node-files/repositoryLayout'
 import { addDependencies, describeDeps, fetchFederation, latestRef, parseDependsOn, readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, type Dependency, type Deps } from '@radical/common/federation'
 import type { Io } from './check'
@@ -244,6 +245,14 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
     return 2
   } else {
     io.out(`  ✓ ${folderArg} holds a model`)
+  }
+  // A model naming its tests in Metrics: they move to .radical/radical.json.
+  const named = !empty ? await testsNamedIn(folder).catch(() => 0) : 0
+  if (named) {
+    const what = `${named} scenario${named === 1 ? '' : 's'} and fitness function${named === 1 ? '' : 's'}`
+    if (!(await confirm(`  ${what} name their tests in the model. Move them into .radical/radical.json?`))) io.out('  - left in the model: radical setup moves them later')
+    else if (dry) io.out(`  would move the tests of ${what} into .radical/radical.json`)
+    else for (const line of await moveTestsOut(folder, await mappingRoot(folder))) io.out(`  + ${line}`)
   }
   const real = existsSync(folder) ? await realpath(folder) : folder
   const git = async (...gitArgs: string[]) => (await exec('git', gitArgs, { cwd: existsSync(real) ? real : io.cwd, windowsHide: true })).stdout.trim()

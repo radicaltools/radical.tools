@@ -8,7 +8,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { MD_MANIFEST_FILE } from '@radical/common/formats/mdFolder'
-import { REPOSITORY_FILE, elementPaths, parseRepositoryMapping, type MappedElement } from '@radical/common/repositoryMapping'
+import { REPOSITORY_FILE, elementPaths, parseRepositoryFile, type MappedElement, type VerifiedElement } from '@radical/common/repositoryMapping'
 
 /** The folder of everything Radical keeps in a repository. */
 export const RADICAL_DIR = '.radical'
@@ -124,10 +124,10 @@ export async function mappingRoot(folder: string): Promise<string> {
 }
 
 /** The repository's .radical/radical.json, found from `from` up to the
- *  repository's root: the file, the root its paths are from and what it
- *  maps; null without one. Throws, naming the file, when it does not read. */
-export async function readRepositoryMapping(from: string): Promise<{ file: string; root: string; implements: MappedElement[] } | null> {
+ *  repository's root: the file, the root its paths are from, what it maps
+ *  and the tests it binds; null without one. Throws, naming the file, when it does not read. */
+export async function readRepositoryMapping(from: string): Promise<{ file: string; root: string; implements: MappedElement[]; verifies: VerifiedElement[] } | null> {
   const found = await findRepositoryFile(from, REPOSITORY_FILE, REPOSITORY_FILE)
   if (!found) return null
-  return { file: found.path, root: repositoryFileRoot(found.path), implements: parseRepositoryMapping(await readFile(found.path, 'utf8'), found.path) }
+  return { file: found.path, root: repositoryFileRoot(found.path), ...parseRepositoryFile(await readFile(found.path, 'utf8'), found.path) }
 }

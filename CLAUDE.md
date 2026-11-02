@@ -22,8 +22,8 @@ Inspector's Changes tab show the branch's model changes.
   involved and read the ADRs that constrain them (`GET NEIGHBORS OF <id>`).
 - **Model first, then the code.** A change starts in the model, on the
   branch that will implement it: update the model through the MCP tools
-  rather than by editing the files (add or change requirements, scenarios
-  with the tests they will name, components, relations; record a new
+  rather than by editing the files (add or change requirements, scenarios,
+  components, relations; record a new
   decision as an ADR with status, date, context, decision, consequences and
   alternatives, linked with `constrains`, and an automated check as a fitness
   function that `implements` it; then run `smart_layout` on the views you
@@ -31,20 +31,22 @@ Inspector's Changes tab show the branch's model changes.
   implementation go in the same branch and pull request: never push or merge
   a model change to `main` ahead of its code.
 - **To implement the model change**, start with `get_changes` (or
-  `radical diff architecture`): it lists what changed in the model since the
+  `radical diff`): it lists what changed in the model since the
   branch left `main`, uncommitted and unpushed edits included, with old and
   new values and the related elements. If the model change already reached
   `main`, pass `since` with the commit before it. Call it again before you
   report the work as done, and correct the model where the code turned out
   different.
 - A change that adds behaviour adds its requirement (EARS, derived from a need,
-  satisfied by the component that implements it), and a scenario naming the
-  tests that check it. A change that alters behaviour updates the texts that
+  satisfied by the component that implements it), and a scenario; the tests
+  that check it are bound to the scenario in `.radical/radical.json` with the
+  MCP tool `set_verification` (or `radical verify`), never named in the
+  model. A change that alters behaviour updates the texts that
   describe it. On `main` the model describes the current implementation.
 - Before pushing, run what CI runs: `npm run test:reports` (plus `npm run e2e`
   for the e2e tests; both write to `reports/`), then
   `npm run check:architecture`. It must report no errors: a failing or missing
-  test the model names, a gap above its baseline, or a metric below its goal,
+  test bound to a scenario or fitness function, a gap above its baseline, or a metric below its goal,
   is one. Never raise a baseline or lower a goal in `check.json` to get past
   it; `--ratchet` lowers baselines.
 - Write the model in English.

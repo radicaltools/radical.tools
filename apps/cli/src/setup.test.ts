@@ -183,6 +183,42 @@ describe('radical setup', () => {
     expect(await readFile(join(w.repo, '.git', 'hooks', 'post-checkout'), 'utf8')).toContain(HOOK_MARKER)
   })
 
+  it('moves the tests a model names into .radical/radical.json', async () => {
+    const w = await world()
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(w.repo, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [
+      node('pay', 'scenario', 'Pays', { metrics: 'test(tests/pay.test.ts › pays) passed\ncheckout.p95 <= 300 ms\ntest(tests/pay.test.ts › declines) passed' }),
+      node('ff', 'fitness-fn', 'No cycles', { metrics: 'test(tests/deps.test.ts) passed' }),
+      node('plain', 'scenario', 'Quotes', { metrics: 'quote.ms <= 50 ms' }),
+    ] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const status = await run(w, ['setup', '--status', '--no-start'])
+    expect(status.out).toContain('! 2 scenarios and fitness functions name their tests in the model: radical setup moves them into .radical/radical.json')
+
+    const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
+    expect(moved.err).toBe('')
+    expect(moved.out).toContain('+ moved 3 tests of 2 scenarios and fitness functions from the model into .radical/radical.json')
+    expect(JSON.parse(await readFile(join(w.repo, '.radical', 'radical.json'), 'utf8')).verifies).toEqual(expect.arrayContaining([
+      { element: 'pay', name: 'Pays', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] },
+      { element: 'ff', name: 'No cycles', tests: ['tests/deps.test.ts'] },
+    ]))
+    // The metric conditions stay in the model; a Metrics left empty goes.
+    const files = Object.fromEntries(await Promise.all(['pay', 'ff', 'plain'].map(async (id) => {
+      const { readdir } = await import('node:fs/promises')
+      const name = (await readdir(join(folder, 'nodes'))).find((f) => f.includes(id === 'pay' ? 'pays' : id === 'ff' ? 'no-cycles' : 'quotes'))!
+      return [id, await readFile(join(folder, 'nodes', name), 'utf8')] as const
+    })))
+    expect(files.pay).toContain('metrics: "checkout.p95 <= 300 ms"')
+    expect(files.pay).not.toContain('test(')
+    expect(files.ff).not.toContain('metrics:')
+    expect(files.plain).toContain('metrics: "quote.ms <= 50 ms"')
+    expect((await run(w, ['setup', '--status', '--no-start'])).out).not.toContain('name their tests in the model')
+  })
+
   it('moves a repository laid out the old way into .radical', async () => {
     const w = await world()
     const git = (...args: string[]) => exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: w.repo })

@@ -24,6 +24,26 @@ const finding = (id: string, more: Partial<Finding> = {}): Finding => ({
 })
 
 describe('radical harden', () => {
+  it('binds the hardened test to its scenario in .radical/radical.json', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-harden-'))
+    dirs.push(cwd)
+    execFileSync('git', ['init', '-q'], { cwd })
+    const { serializeToMdFolder } = await import('@radical/common/formats/mdFolder')
+    const { builtInGovernanceMetamodel } = await import('@radical/common/metamodel')
+    const scenario = { id: 'undo', type: 'scenario', label: 'Undo is exact', x: 0, y: 0, width: 200, height: 100, collapsed: false }
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [scenario as never], relations: [] }, 'ui'))) {
+      await mkdir(dirname(join(cwd, '.radical', 'model', path)), { recursive: true })
+      await writeFile(join(cwd, '.radical', 'model', path), content)
+    }
+    writeFinding(join(cwd, '.radical', 'crucible', 'findings'), finding('F-0001'))
+    const { code, out } = await run(cwd, 'F-0001', '--scenario', 'Undo is exact')
+    expect(code).toBe(0)
+    expect(out).toContain('scenario "Undo is exact" (undo) is checked by 1 test (.radical/radical.json)')
+    expect(JSON.parse(await readFile(join(cwd, '.radical', 'radical.json'), 'utf8')).verifies).toEqual([
+      { element: 'undo', name: 'Undo is exact', tests: ['packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off'] },
+    ])
+  })
+
   it('marks a fuzz finding hardened with its test and scenario', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'radical-harden-'))
     dirs.push(cwd)
@@ -31,8 +51,10 @@ describe('radical harden', () => {
     writeFinding(findings, finding('F-0001'))
     const { code, out } = await run(cwd, 'F-0001', '--scenario', 'Undo is exact')
     expect(code).toBe(0)
-    expect(out).toContain('F-0001 is hardened: its fuzz file replays its steps as\n  test(packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off) passed\n')
-    expect(out).toContain('Add that line to the Metrics of scenario "Undo is exact"')
+    expect(out).toContain('F-0001 is hardened: its fuzz file replays its steps as\n  packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off\n')
+    // No model here to bind it in: the command that binds it.
+    expect(out).toContain('Not bound to scenario "Undo is exact" (')
+    expect(out).toContain('radical verify "Undo is exact" --test "packages/ui/tests/invariants.test.ts › F-0001 stays fixed: Undo of a drag leaves the row off"')
     expect(readFindings(findings)[0]).toMatchObject({
       status: 'hardened',
       scenario: 'Undo is exact',

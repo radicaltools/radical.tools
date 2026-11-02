@@ -414,18 +414,26 @@ describe block, since a fitness function that names a whole file or directory
 
 ### Tests and evidence
 
-A scenario or a fitness function says what checks it in its `metrics`
-property, one condition per line. A test that has to pass is named as Vitest
-and Playwright print it:
+The model names no test: the repository binds its tests to the model's
+scenarios and fitness functions in `.radical/radical.json` ("verifies"), and
+a scenario or fitness function passes when every test bound to it passed and
+its `metrics` (metric conditions only) hold. A test is named as Vitest and
+Playwright print it, from the repository's root:
 
-```
-test(apps/cli/src/cli.test.ts › radical check › prints the result as JSON) passed
-test(apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view) passed
-test(packages/layout/tests/geometry.test.ts › createBatchPlacer) passed
-test(apps/e2e/tests) passed
+```sh
+radical verify "Prints JSON" --test "apps/cli/src/cli.test.ts › radical check › prints the result as JSON"
+radical verify "Forge files its stages" --test "apps/e2e/tests/studio/forge.spec.ts › Forge files each stage into its view"
+radical verify "Placement" --test "packages/layout/tests/geometry.test.ts › createBatchPlacer"
+radical verify "E2E regression" --test apps/e2e/tests
+radical verify "Prints JSON"                     # its tests
+radical verify "Prints JSON" --drop "<test>"     # take one off
 ```
 
-An id names the test whose title it ends, otherwise every test in the
+`radical check` warns about a scenario the repository must verify (an
+element it builds satisfies its requirement) that has no test bound and no
+metric condition (`scenario-not-verified-here`), and about a test still
+named in Metrics (`model-names-tests`; it still counts, and `radical setup`
+moves such tests into the file). An id names the test whose title it ends, otherwise every test in the
 describe block it starts; one without a title names every test in a file or
 directory. File paths match by suffix, so absolute paths in a report and
 workspace-relative ones in a JUnit file both do.
@@ -597,9 +605,10 @@ radical harden --gate --test "apps/e2e/tests/studio/views.spec.ts › a view kee
 A fuzz finding is hardened by its own steps: the finding is marked `hardened`,
 and its fuzz file replays the shrunk sequence as the test
 `<fuzz file> › F-0003 stays fixed: <title>`, once and without the known
-failures, so it fails until the bug is fixed. The command prints that test as a
-`test(…) passed` line for the scenario's Metrics and keeps the scenario's name
-in the finding; it does not change the model's files.
+failures, so it fails until the bug is fixed. With `--scenario` it binds that
+test to the scenario in `.radical/radical.json` (as `radical verify` does) and
+keeps the scenario's name in the finding; it does not change the model's
+files.
 
 `--gate` checks a test before it is bound: with the source files changed since
 the base (default: the merge base with `origin/main`) set back to it, the test

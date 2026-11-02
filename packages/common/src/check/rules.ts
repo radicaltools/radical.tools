@@ -9,9 +9,10 @@
 
 import type { C4Node, C4Relation } from '../c4'
 import { originOf } from '../model'
+import { builtIn } from '../repositoryMapping'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
 import { conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
-import { formatAge, parseCombine, parseMaxAge, type Measurement } from './metrics'
+import { formatAge, parseCombine, parseConditions, parseMaxAge, type Measurement } from './metrics'
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
@@ -86,6 +87,8 @@ export interface CheckModel {
 export interface RepositoryMapping {
   file: string
   implements: Array<{ element: string; name?: string; paths: string[]; missing: string[] }>
+  /** The tests it binds to scenarios and fitness functions. */
+  verifies?: Array<{ element: string; name?: string; tests: string[] }>
 }
 
 export interface CheckRule {
@@ -218,6 +221,16 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
   }
 }
 
+/** Whether `scenario` is the repository's to verify: a requirement it
+ *  verifies is satisfied by an element .radical/radical.json says the
+ *  repository builds (or a part of one). */
+export function verifiedHere(model: CheckModel, scenario: C4Node): boolean {
+  const mapped = model.repository?.implements
+  if (!mapped?.length || originOf(scenario)) return false
+  return linkedNodes(model, scenario.id, 'verifies', 'target', 'requirement')
+    .some((req) => linkedNodes(model, req.id, 'satisfies', 'source').some((el) => builtIn(mapped, el.id, (id) => model.nodes[id]?.parentId)))
+}
+
 /** Where .radical/radical.json and the model or the repository part: an
  *  element the model lacks, another name, a path that is not there. */
 function repositoryMapping(model: CheckModel): RuleFinding[] {
@@ -232,7 +245,15 @@ function repositoryMapping(model: CheckModel): RuleFinding[] {
     if (entry.name !== undefined && entry.name !== node.label) found.push({ ...on, message: `${mapping.file}: ${entry.element} is named "${entry.name}"; the model calls it ${quote(node)}.` })
     for (const path of entry.missing) found.push({ ...on, message: `${mapping.file}: ${quote(node)} is built in ${path}, which the repository does not have.` })
     return found
-  })
+  }).concat((mapping.verifies ?? []).flatMap((entry) => {
+    const node = model.nodes[entry.element]
+    if (!node) return [{ message: `${mapping.file}: tests bound to ${entry.name ? `"${entry.name}" (${entry.element})` : entry.element}, which is no element of the model.` }]
+    const on = originOf(node) ? {} : { nodeId: node.id }
+    const found: RuleFinding[] = []
+    if (!(TESTED_TYPES as readonly string[]).includes(node.type)) found.push({ ...on, message: `${mapping.file}: tests bound to ${node.type} ${quote(node)}; only a scenario or a fitness function is checked by tests.` })
+    if (entry.name !== undefined && entry.name !== node.label) found.push({ ...on, message: `${mapping.file}: ${entry.element} is named "${entry.name}"; the model calls it ${quote(node)}.` })
+    return found
+  }))
 }
 
 /** What in a node's checks cannot be read: lines that are no condition,
@@ -405,11 +426,30 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-without-metrics',
-    description: 'Every scenario states what checks it (property `metrics`, one condition per line: `test(<file> › <title>) passed` or `<metric>{<labels>} <op> <number> [unit]`).',
+    description: 'Every scenario has what checks it: tests the repository\'s .radical/radical.json binds to it, or metric conditions (property `metrics`, one per line: `<metric>{<labels>} <op> <number> [unit]`). One the repository must verify is scenario-not-verified-here\'s.',
     severity: 'warning',
     dimension: 'traceability',
-    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length)
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && !verifiedHere(model, n))
       .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no check.` })),
+  },
+  {
+    id: 'scenario-not-verified-here',
+    description: 'With the repository\'s .radical/radical.json (the CLI): every scenario of a requirement an element the repository builds satisfies has tests the file binds to it, or metric conditions.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && verifiedHere(model, n))
+      .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} is this repository's to verify (an element it builds satisfies its requirement), and ${model.repository!.file} binds no test to it: radical verify ${n.id} --test "<file> › <title>".` })),
+  },
+  {
+    id: 'model-names-tests',
+    description: 'A scenario or fitness function names no test in its Metrics: the repository binds its tests in .radical/radical.json (radical setup moves them there). A test named in Metrics still counts.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => Object.values(model.nodes).filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type) && !originOf(n))
+      .flatMap((n) => {
+        const named = parseConditions((n as unknown as Props).metrics).filter((c) => c.kind === 'test').length
+        return named ? [{ nodeId: n.id, message: `${TYPE_NAME[n.type]} ${quote(n)} names ${named} test${named === 1 ? '' : 's'} in its Metrics; ${named === 1 ? 'it belongs' : 'they belong'} in .radical/radical.json (radical setup moves them).` }] : []
+      }),
   },
   {
     id: 'fitness-fn-without-metrics',
@@ -448,7 +488,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'repository-mapping',
-    description: 'With the repository\'s .radical/radical.json (the CLI): each entry names an element of the model, its own or another model\'s of the federation, under the element\'s name, with paths the repository has.',
+    description: 'With the repository\'s .radical/radical.json (the CLI): each entry names an element of the model, its own or another model\'s of the federation, under the element\'s name, with paths the repository has; tests are bound to scenarios and fitness functions.',
     severity: 'warning',
     dimension: 'traceability',
     run: repositoryMapping,

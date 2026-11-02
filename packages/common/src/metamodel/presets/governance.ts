@@ -21,14 +21,15 @@ import { radicalViewpoints } from './viewpoints'
 /** What the default metamodel is called in the app. */
 export const RADICAL_METAMODEL_NAME = 'Radical'
 
-/** What checks a scenario or a fitness function: one condition per line, a
- *  test that has to pass (`test(<file> › <title>) passed`, the title as
- *  Vitest and Playwright print it) or a value a sensor measured with its
- *  threshold (`api.latency.p95{env=staging} <= 300 ms`); how the outcomes
- *  combine; and how old a measurement may be. `radical check` evaluates
- *  them against the test reports and what `radical sense` measured. */
+/** What checks a scenario or a fitness function besides the tests the
+ *  repository's .radical/radical.json binds to it (ADR Tests are bound
+ *  outside the model): one condition per line, a value a sensor measured
+ *  with its threshold (`api.latency.p95{env=staging} <= 300 ms`); how the
+ *  outcomes combine; and how old a measurement may be. `radical check`
+ *  evaluates them against the test reports and what `radical sense`
+ *  measured. A `test(<file> › <title>) passed` line is still read. */
 export const METRICS_PROPERTIES: PropertyDef[] = [
-  { key: 'metrics', label: 'Metrics (one per line: test(file › title) passed, or metric{labels} <= value unit)', type: 'textarea' },
+  { key: 'metrics', label: 'Metrics (one per line: metric{labels} <= value unit; tests are bound in .radical/radical.json)', type: 'textarea' },
   { key: 'combine', label: 'Combine (all, any, at least N)', type: 'text' },
   { key: 'max_age', label: 'Max age of a measurement (e.g. 7d)', type: 'text' },
 ]
@@ -152,7 +153,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
         { kind: 'fields', title: 'What it measures', fields: ['description', 'measure'],
           help: 'How is the characteristic measured? Measure names a sensor and its arguments, one per line, e.g. "playwright tests/load.spec.ts --label env=staging"; leave it empty for tests the pull-request gate already runs.' },
         { kind: 'fields', title: 'Success criteria', fields: ['metrics'],
-          help: 'When does it pass? One condition per line: a measured value and its threshold, e.g. "checkout.latency.p95{env=prod} <= 300 ms", or a test that has to pass, e.g. "test(tests/architecture.test.ts › no cycles) passed".' },
+          help: 'When does it pass? One condition per line: a measured value and its threshold, e.g. "checkout.latency.p95{env=prod} <= 300 ms". The tests that check it are bound in the repository\'s .radical/radical.json (radical verify), not here.' },
         { kind: 'relations', title: 'Verified decisions', relationType: 'implements', direction: 'out',
           help: 'Which ADRs does this fitness function verify?' },
         { kind: 'relations', title: 'Guarded elements', relationType: 'constrains', direction: 'out',

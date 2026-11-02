@@ -13,7 +13,7 @@
 
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
-import { parseRepositoryMapping } from '@radical/common/repositoryMapping'
+import { REPOSITORY_FILE, parseRepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -131,8 +131,17 @@ function recheck(): void {
   const concerns = packs
   // The kept results are a run of the past: a test they lack may have been
   // added since, so it and the goals they leave unmet are warnings.
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns })
+  // The tests the repository's .radical/radical.json binds count as each
+  // scenario's and fitness function's.
+  const repo = useDiagramStore.getState().repository
+  const repository = repo ? { file: REPOSITORY_FILE, implements: repo.implements.map((m) => ({ ...m, missing: [] })), verifies: repo.verifies } : undefined
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns, ...(repository ? { repository } : {}) })
   useInspectorStore.setState({ check })
+  // Each one's tests with their outcomes, for the element's card.
+  const testOutcomes = check.evidence
+    ? Object.fromEntries(Object.entries(check.evidence.nodes).filter(([, e]) => e.tests?.length).map(([id, e]) => [id, e.tests!.map((t) => ({ id: t.id, outcome: t.outcome }))]))
+    : null
+  useDiagramStore.setState({ testOutcomes })
 }
 
 if (typeof window !== 'undefined') {
@@ -149,7 +158,7 @@ if (typeof window !== 'undefined') {
       filesReadFor = null
       lastResults = lastConfig = lastMeasurements = lastReviews = ''
       lastRepository = null
-      useDiagramStore.setState({ repositoryMapping: null })
+      useDiagramStore.setState({ repository: null, testOutcomes: null })
       useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
     }
     if (!id) return
@@ -165,9 +174,11 @@ if (typeof window !== 'undefined') {
     // shown while the file does not read.
     if (files.repository !== lastRepository) {
       lastRepository = files.repository
-      let mapping = null
-      try { mapping = files.repository === null ? null : parseRepositoryMapping(files.repository) } catch { mapping = null }
-      useDiagramStore.setState({ repositoryMapping: mapping })
+      let repository = null
+      try { repository = files.repository === null ? null : parseRepositoryFile(files.repository) } catch { repository = null }
+      useDiagramStore.setState({ repository })
+      // The tests it binds are evidence: check again with them.
+      if (filesReadFor === id) recheck()
     }
     if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements && reviewsText === lastReviews) return
     filesReadFor = id

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { checkModel, type RepositoryMapping } from '../src/check'
-import { builtIn, implementCommand, parseRepositoryMapping, serializeRepositoryMapping } from '../src/repositoryMapping'
+import { builtIn, implementCommand, parseRepositoryMapping, serializeRepositoryFile } from '../src/repositoryMapping'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, DiagramData } from '../src/c4'
 
@@ -36,10 +36,10 @@ describe('repository mapping rule', () => {
 
 describe('where an element is built', () => {
   it('gives the paths an element is built in, where they come from, and the command that maps one', () => {
-    const mapped = parseRepositoryMapping(serializeRepositoryMapping([
+    const mapped = parseRepositoryMapping(serializeRepositoryFile({ implements: [
       { element: 'shop', name: 'Shop', paths: ['.'] },
       { element: 'api', name: 'Orders API', paths: ['apps/api', 'apps/shared'] },
-    ]))
+    ], verifies: [] }))
     const parent: Record<string, string> = { api: 'shop', checkout: 'api' }
     const at = (id: string) => builtIn(mapped, id, (n) => parent[n])
     expect([at('api'), at('checkout'), at('lonely')]).toEqual([{ paths: ['apps/api', 'apps/shared'], from: 'api' }, { paths: ['apps/api', 'apps/shared'], from: 'api' }, null])

@@ -17,7 +17,7 @@ import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { originModel, originOf, otherModelFolder } from '@radical/common/model'
-import { builtIn, implementCommand } from '@radical/common/repositoryMapping'
+import { builtIn, implementCommand, testsBoundTo, verifyCommand } from '@radical/common/repositoryMapping'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
@@ -2606,7 +2606,7 @@ function useViewsShowing(nodeId: string): DiagramView[] {
  *  nowhere it says, the radical implement command that maps it. Nothing
  *  when Studio cannot read the file. */
 function ElementBuiltIn({ nodeId }: { nodeId: string }) {
-  const mapping = useDiagramStore((s) => s.repositoryMapping)
+  const mapping = useDiagramStore((s) => s.repository?.implements ?? null)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const [copied, setCopied] = useState(false)
   const node = c4Nodes[nodeId]
@@ -2630,6 +2630,55 @@ function ElementBuiltIn({ nodeId }: { nodeId: string }) {
         : (
           <div className="pp-built-in-none">
             <p>The repository's .radical/radical.json says nowhere. To say where:</p>
+            <div className="pp-built-in-command">
+              <code>{command}</code>
+              <button type="button" className="pp-head-btn" onClick={copy} title="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+            </div>
+          </div>
+        )}
+    </section>
+  )
+}
+
+/** A test's outcome, as the card says it. */
+const TEST_OUTCOME_LABEL: Record<string, string> = { passed: 'passed', failed: 'failed', skipped: 'skipped', 'not-found': 'gone', 'not-run': 'not run' }
+
+/** The tests the repository's .radical/radical.json binds to a scenario or
+ *  fitness function, each with its outcome in the test results Studio has;
+ *  for one with none, the radical verify command that binds one. Nothing
+ *  when Studio cannot read the file. */
+function ElementTests({ nodeId }: { nodeId: string }) {
+  const repository = useDiagramStore((s) => s.repository)
+  const outcomes = useDiagramStore((s) => s.testOutcomes?.[nodeId])
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const [copied, setCopied] = useState(false)
+  const node = c4Nodes[nodeId]
+  if (!repository || !node) return null
+  const tests = testsBoundTo(repository.verifies, nodeId)
+  const command = verifyCommand(Object.values(c4Nodes), node)
+  const copy = () => {
+    void navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => {})
+  }
+  return (
+    <section className="pp-section" aria-label="Tests">
+      <div className="pp-section-title">Tests · {tests.length}</div>
+      {tests.length
+        ? (
+          <ul className="pp-tests">
+            {tests.map((t) => {
+              const outcome = outcomes?.find((o) => o.id === t)?.outcome
+              return (
+                <li key={t}>
+                  <code>{t}</code>
+                  {outcome && <span className={`pp-test-outcome ${outcome}`}>{TEST_OUTCOME_LABEL[outcome] ?? outcome}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        )
+        : (
+          <div className="pp-built-in-none">
+            <p>The repository's .radical/radical.json binds no test to it. To bind one:</p>
             <div className="pp-built-in-command">
               <code>{command}</code>
               <button type="button" className="pp-head-btn" onClick={copy} title="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
@@ -2835,7 +2884,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
         )}
         <div className="pp-foot">
           <div className="pp-foot-scroll">
-            <ElementBuiltIn nodeId={node.id} />
+            {node.type === 'scenario' || node.type === 'fitness-fn' ? <ElementTests nodeId={node.id} /> : <ElementBuiltIn nodeId={node.id} />}
             <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
             {!readOnly && <NodeActions nodeId={node.id} />}
           </div>

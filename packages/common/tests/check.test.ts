@@ -20,9 +20,9 @@ function complete(): DiagramData {
       node('sys', 'system', 'Shop'),
       node('need', 'need', 'Brief'),
       node('req', 'requirement', 'Pay', { ears_type: 'event-driven', trigger: 'the user pays', action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid', metrics: 'test(tests/pay.test.ts › pays) passed' }),
+      node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid' }),
       node('adr', 'adr', 'Use cards', ACCEPTED_ADR),
-      node('ff', 'fitness-fn', 'Card check', { characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', metrics: 'test(tests/cards.test.ts › only cards) passed' }),
+      node('ff', 'fitness-fn', 'Card check', { characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated' }),
     ],
     relations: [
       rel('r1', 'derives', 'req', 'need'),
@@ -34,7 +34,18 @@ function complete(): DiagramData {
 }
 
 const filesOf = (data: DiagramData): FolderFiles => serializeToMdFolderWithPaths(data, 'Test').files
-const check = (data: DiagramData, config?: CheckConfig) => runCheck(filesOf(data), config)
+/** The tests the repository's .radical/radical.json binds to the scenario and
+ *  the fitness function of the model (those of `bound` it has). */
+const verifiesOf = (data: DiagramData, bound: string[]) => [
+  { element: 'sc', tests: ['tests/pay.test.ts › pays'] },
+  { element: 'ff', tests: ['tests/cards.test.ts › only cards'] },
+].filter((v) => bound.includes(v.element) && data.nodes.some((n) => n.id === v.element))
+/** The check options with the complete model's tests bound. */
+const BOUND = { repository: { file: '.radical/radical.json', implements: [], verifies: [
+  { element: 'sc', tests: ['tests/pay.test.ts › pays'] }, { element: 'ff', tests: ['tests/cards.test.ts › only cards'] },
+] } }
+const check = (data: DiagramData, config?: CheckConfig, bound = ['sc', 'ff']) =>
+  runCheck(filesOf(data), config, { repository: { file: '.radical/radical.json', implements: [], verifies: verifiesOf(data, bound) } })
 const rulesFound = (data: DiagramData) => [...new Set(check(data).findings.map((f) => f.rule))]
 
 describe('radical check', () => {
@@ -50,9 +61,9 @@ describe('radical check', () => {
     const data = complete()
     data.relations = []
     data.nodes.push(node('adr2', 'adr', 'Old', { status: 'superseded' }), node('adr3', 'adr', 'Half', { status: 'accepted' }))
-    Object.assign(data.nodes.find((n) => n.id === 'ff')!, { metrics: '' })
     Object.assign(data.nodes.find((n) => n.id === 'req')!, { trigger: '' })
-    const result = check(data)
+    // The fitness function has no test bound and no metrics.
+    const result = check(data, undefined, ['sc'])
     expect([...new Set(result.findings.map((f) => f.rule))].sort()).toEqual([
       'adr-incomplete', 'adr-superseded-unlinked', 'adr-without-fitness-fn', 'fitness-fn-unlinked', 'fitness-fn-without-metrics',
       'need-without-requirement', 'requirement-incomplete', 'requirement-unsatisfied', 'requirement-without-origin',
@@ -68,15 +79,14 @@ describe('radical check', () => {
 
   it('reports scenarios and fitness functions with no metrics', () => {
     const data = complete()
-    Object.assign(data.nodes.find((n) => n.id === 'sc')!, { metrics: '' })
     Object.assign(data.nodes.find((n) => n.id === 'ff')!, { metrics: '# to do\n' })
-    const result = check(data)
+    const result = check(data, undefined, [])
     expect(result.findings.filter((f) => f.rule.endsWith('-without-metrics')).map((f) => [f.rule, f.message])).toEqual([
       ['scenario-without-metrics', 'Scenario "Paying" names no check.'],
       ['fitness-fn-without-metrics', 'Fitness function "Card check" names no check.'],
     ])
     // A check.json from before metrics counts its baselines under the new ids.
-    const old = check(data, { rules: { 'scenario-without-tests': 'error', 'fitness-fn-without-threshold': 'error' } })
+    const old = check(data, { rules: { 'scenario-without-tests': 'error', 'fitness-fn-without-threshold': 'error' } }, [])
     expect(old.unknownRules).toEqual([])
     expect(old.rules.find((r) => r.id === 'scenario-without-metrics')).toMatchObject({ severity: 'error', failed: true })
   })
@@ -181,7 +191,7 @@ describe('radical check: the folder', () => {
       'nodes/README.md': '# Notes\n',
       'nodes/typo.md': '---\nid: "x"\nlabel: "No type"\n---\n',
       'nodes/copy.md': files[reqPath],
-    })
+    }, undefined, { repository: { file: '.radical/radical.json', implements: [], verifies: verifiesOf(complete(), ['sc', 'ff']) } })
     expect(result.findings.map((f) => [f.rule, f.path])).toEqual([
       ['folder-not-a-node', 'nodes/typo.md'],
       ['folder-duplicate-id', expect.stringMatching(/^nodes\//)],
@@ -200,13 +210,13 @@ describe('radical check: test results from before', () => {
     ]
     const config: CheckConfig = { rules: { 'test-not-found': 'error' }, goals: { 'requirements-verified': { min: 80 } } }
     const rule = (result: ReturnType<typeof checkModel>, id: string) => result.findings.filter((f) => f.rule === id).map((f) => [f.severity, f.message])
-    const kept = checkModel(complete(), config, { tests, testsReadAt: '2026-10-23T08:55:00Z', now })
+    const kept = checkModel(complete(), config, { ...BOUND, tests, testsReadAt: '2026-10-23T08:55:00Z', now })
     expect(rule(kept, 'test-not-found')).toEqual([['warning', 'Scenario "Paying": no test tests/pay.test.ts › pays in the test results read 2026-10-23, 8 d ago; added since, renamed or deleted? radical check --report reads the tests again.']])
     expect(rule(kept, 'goal-unmet')).toEqual([['warning', 'Requirements verified: 0% (0 of 1), below the goal of 80% by the test results read 2026-10-23.']])
     // A test that failed then failed: that stays an error.
     expect(rule(kept, 'test-failed').map(([severity]) => severity)).toEqual(['error'])
     // The reports of this run: errors.
-    const fresh = checkModel(complete(), config, { tests, now })
+    const fresh = checkModel(complete(), config, { ...BOUND, tests, now })
     expect(rule(fresh, 'test-not-found').map(([severity]) => severity)).toEqual(['error'])
     expect(rule(fresh, 'goal-unmet').map(([severity]) => severity)).toEqual(['error'])
   })

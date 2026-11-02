@@ -36,7 +36,7 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
       node('req', 'requirement', 'Pay', { action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › pays) passed\ntest(e2e/pay.spec.ts › pays in the browser) passed' }),
+      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't' }),
     ],
     relations: [{ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'req' }],
   }, 'Shop')
@@ -44,6 +44,9 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
     await mkdir(dirname(join(cwd, 'model', path)), { recursive: true })
     await writeFile(join(cwd, 'model', path), content)
   }
+  // The repository binds the scenario's tests.
+  await mkdir(join(cwd, '.radical'), { recursive: true })
+  await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ implements: [], verifies: [{ element: 'sc', name: 'Paying', tests: ['src/pay.test.ts › pays', 'e2e/pay.spec.ts › pays in the browser'] }] }))
   await git(cwd, 'add', '.')
   await git(cwd, 'commit', '-q', '-m', 'model')
   await git(cwd, 'commit', '-q', '--allow-empty', '-m', 'Pay (#7)')
