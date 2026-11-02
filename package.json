@@ -22,7 +22,7 @@
     "start": "npm run start -w radical-model",
     "dist": "npm run dist -w radical-model",
     "test": "npm run test --workspaces --if-present && npm run test:tools",
-    "test:tools": "vitest run --dir tools",
+    "test:tools": "vitest run tools/ .radical/sensors/",
     "test:reports": "node tools/test-reports.mjs",
     "test:watch": "npm run test:watch -w radical-model",
     "e2e": "npm run build:web && npm run build:hub && npm run e2e -w @radical/e2e",
@@ -32,8 +32,8 @@
     "release": "node tools/release.mjs prepare",
     "release:tag": "node tools/release.mjs tag",
     "fuzz": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js fuzz",
-    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check architecture --report reports --trigger pull-request",
-    "hooks": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js hooks install architecture && node apps/cli/dist/index.js diff architecture --save-base --quiet"
+    "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check --report reports --trigger pull-request",
+    "hooks": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js hooks install && node apps/cli/dist/index.js diff --save-base --quiet"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

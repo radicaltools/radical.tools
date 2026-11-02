@@ -1,0 +1,9 @@
+---
+id: "d2e8af58-c018-4b03-9381-8fd0251e7cbc"
+type: "scenario"
+label: "Undo reachable at 1440px"
+gherkin: "And the Quick Search bar no longer covers Undo/Redo at this width: Fit All, zoom and Smart Layout moved to the canvas, leaving the toolbar room"
+given: "the bookstore fixture is open on the Context view at 1440 px width and the user has added a Software System"
+then: "the added system is removed and three elements remain"
+when: "the user clicks Undo in the toolbar"
+---

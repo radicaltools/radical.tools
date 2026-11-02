@@ -125,7 +125,7 @@ export function BranchChangesButton(): React.ReactElement | null {
       {help && !base && (
         <div className="branch-pop" role="dialog" aria-label="Changes on branch">
           <strong>Nothing to compare with yet</strong>
-          <p className="branch-muted">Studio compares the model with its version where the branch left main, which the command line saves beside the model in .radical/base.json.</p>
+          <p className="branch-muted">Studio compares the model with its version where the branch left main, which the command line saves beside the model in .state/base.json.</p>
           <SaveBaseHelp old={false} />
         </div>
       )}

@@ -1,0 +1,8 @@
+---
+id: "ee70220a-3894-4936-a06d-30ce6d95dc1a"
+type: "scenario"
+label: "Delete ignored while presenting"
+given: "a presentation started with F5 on the System Context view"
+then: "no prompt opens and the view still lists the element"
+when: "the user clicks the Payments element, presses Delete, then Escape"
+---

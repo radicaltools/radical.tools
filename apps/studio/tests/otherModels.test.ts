@@ -35,6 +35,15 @@ describe('otherModelsSummary', () => {
     })
   })
 
+  it('shows the version latest resolved to', () => {
+    const summary = otherModelsSummary(others({
+      deps: deps(pin('orders', 'latest')),
+      fetched: fetched([{ ...pin('orders', 'latest'), commit: 'abc1234def', resolved: 'v1.10.0' }]),
+    }))
+    expect(summary?.rows).toEqual([{ name: 'orders', pinned: 'latest', fetched: 'v1.10.0 · abc1234', status: 'ok' }])
+    expect(summary?.problems).toEqual([])
+  })
+
   it('says which model is not fetched', () => {
     const summary = otherModelsSummary(others({
       deps: deps(pin('orders', 'main'), pin('billing', 'v2.0.0')),

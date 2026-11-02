@@ -4,7 +4,7 @@
 // deps.json the models it depends on. `radical federation fetch` fetches
 // them (theirs too) and writes their elements and relations, each marked
 // with its origin ("orders@abc1234"), into the model folder's
-// .radical/federation.json. Studio and the MCP server open the model folder
+// .state/federation.json. Studio and the MCP server open the model folder
 // itself, add those (withOtherModels) and never write them back (ownModel in
 // model.ts, applied by the serializer); every change to them is refused
 // (model.ts, originOf). Fetching from git is the CLI's (node-files/gitDeps);
@@ -12,12 +12,13 @@
 
 import { normalizeViewFolder, type C4Node, type C4Relation, type DiagramData, type DiagramView, type ModelPin } from './c4'
 import { originModel, originOf } from './model'
+import { STATE_DIR } from './formats/canvasSelection'
 
 /** The file in a model folder that names its dependencies. */
 export const DEPS_FILE = 'deps.json'
 /** The other models' elements and relations as fetched, inside the model
  *  folder and out of git (FederationFile). */
-export const FEDERATION_FILE = '.radical/federation.json'
+export const FEDERATION_FILE = `${STATE_DIR}/federation.json`
 
 export interface Dependency {
   /** The model's name, as its elements' origin names it. */
@@ -65,9 +66,15 @@ export function parseDeps(text: string): Deps {
   return { name, dependencies: deps }
 }
 
+/** The ref that follows a repository's releases: its newest version tag
+ *  (v1.10.0 after v1.2.0), else its default branch, resolved at each fetch. */
+export const LATEST = 'latest'
+
 /** A dependency as fetched: the commit its ref named, and its model then. */
 export interface FetchedDependency extends Dependency {
   commit: string
+  /** For the ref latest: the tag or branch it resolved to. */
+  resolved?: string
   data: Pick<DiagramData, 'nodes' | 'relations' | 'views'>
   /** Its own deps.json at that commit, when it has one. */
   deps?: Deps
@@ -140,7 +147,7 @@ export interface FederationFile {
   fetchedAt: string
   /** Each model fetched, at the commit its pin named; `via` names the model
    *  whose deps.json pinned it, absent for this model's own. */
-  dependencies: Array<Dependency & { commit: string; via?: string; dependsOn?: string[] }>
+  dependencies: Array<Dependency & { commit: string; via?: string; dependsOn?: string[]; resolved?: string }>
   /** What was left out: a pin farther away, an id two models have. */
   notes: string[]
   nodes: C4Node[]
@@ -228,7 +235,7 @@ export function otherModelsAt(file: FederationFile | null, pins: ModelPin[] | un
   return { nodes, relations: relations.filter((r) => ids.has(r.sourceId) && ids.has(r.targetId)), missing }
 }
 
-/** Another model's view as it is kept in .radical/federation.json: what it
+/** Another model's view as it is kept in .state/federation.json: what it
  *  shows, its filter, places and settings, without what this model cannot
  *  have of it (its sequence, its exploration). */
 export function otherModelView(view: DiagramView, origin: string): DiagramView | null {
@@ -239,4 +246,7 @@ export function otherModelView(view: DiagramView, origin: string): DiagramView |
 
 /** The dependencies with their commits, for a line of output. */
 export const describeFetched = (deps: FederationFile['dependencies']): string =>
-  deps.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${d.ref})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
+  deps.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${refShown(d)})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
+
+/** A pin as fetched: its ref, and for latest what it resolved to. */
+export const refShown = (d: { ref: string; resolved?: string }): string => (d.resolved ? `${d.ref} → ${d.resolved}` : d.ref)

@@ -1,0 +1,8 @@
+---
+id: "ab2c5ee2-6cb2-4cfa-8ad0-b0d1ea2179cd"
+type: "scenario"
+label: "Outside write during Smart Layout"
+given: "Smart Layout computing a layout for the canvas shown"
+then: "the layout is applied to the same canvas and Studio does not say it was not applied; the added element is placed as a new element, the deleted one is left out, and the moved one lies inside its new parent, clear of its children"
+when: "an agent's write is reloaded before the layout lands: it adds an element, deletes another, and moves a third into another parent"
+---

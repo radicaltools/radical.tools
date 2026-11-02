@@ -80,7 +80,7 @@ async function modelRepo(w: Awaited<ReturnType<typeof world>>, name: string, tag
   return dir
 }
 
-const fetchedFile = async (folder: string) => parseFederationFile(await readFile(join(folder, '.radical', 'federation.json'), 'utf8'))!
+const fetchedFile = async (folder: string) => parseFederationFile(await readFile(join(folder, '.state', 'federation.json'), 'utf8'))!
 
 describe('radical setup', () => {
   it('writes each agent\'s configuration once, keeps their other entries, and starts the model', async () => {
@@ -160,7 +160,7 @@ describe('radical setup', () => {
     const asked = await run(w, ['setup', '--no-check'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(asked.code).toBe(0)
     expect(questions).toEqual([
-      '  Model folder [architecture]: ',
+      '  Model folder [.radical/model]: ',
       expect.stringMatching(/^ {2}It holds no model yet\. Metamodel of the new model, .* \[radical\]: $/),
       '  A model this one depends on, by name (Enter: none): ',
       '  Agents to connect, by number [3 4]: ',
@@ -176,33 +176,123 @@ describe('radical setup', () => {
     // No terminal: the agents found, the default folder, the hooks.
     const quiet = await run(w, ['setup', '--no-check'])
     expect(quiet.code).toBe(0)
-    expect(quiet.out).toContain('+ started a new model (radical metamodel) in architecture')
-    expect((await json(w.cursor)).mcpServers.radical.args.at(-1)).toBe(join(w.repo, 'architecture'))
+    expect(quiet.out).toContain('+ started a new model (radical metamodel) in .radical/model')
+    expect((await json(w.cursor)).mcpServers.radical.args.at(-1)).toBe(join(w.repo, '.radical/model'))
     expect(await readFile(w.codex, 'utf8')).toContain('[mcp_servers.radical]')
     expect((await json(join(w.repo, '.mcp.json'))).mcpServers.radical.args.at(-1)).toBe('model')
     expect(await readFile(join(w.repo, '.git', 'hooks', 'post-checkout'), 'utf8')).toContain(HOOK_MARKER)
+  })
+
+  it('moves the model folder\'s reviews into .radical/reviews.json', async () => {
+    const w = await world()
+    const folder = join(w.repo, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const reviews = JSON.stringify({ format: 'radical-reviews', version: 1, reviews: [{ name: 'Threat model', result: 'passed', by: 'ana', at: '2026-11-01T10:00:00Z' }] })
+    await writeFile(join(folder, 'reviews.json'), reviews)
+    expect((await run(w, ['setup', '--status', '--no-start'])).out).toContain('! .radical/model/reviews.json is where Radical kept its files before .radical/')
+    const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
+    expect(moved.out).toContain('+ moved .radical/model/reviews.json to .radical/reviews.json')
+    expect(await readFile(join(w.repo, '.radical', 'reviews.json'), 'utf8')).toBe(reviews)
+    expect(existsSync(join(folder, 'reviews.json'))).toBe(false)
+  })
+
+  it('moves the tests a model names into .radical/radical.json', async () => {
+    const w = await world()
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(w.repo, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [
+      node('pay', 'scenario', 'Pays', { metrics: 'test(tests/pay.test.ts › pays) passed\ncheckout.p95 <= 300 ms\ntest(tests/pay.test.ts › declines) passed' }),
+      node('ff', 'fitness-fn', 'No cycles', { metrics: 'test(tests/deps.test.ts) passed' }),
+      node('plain', 'scenario', 'Quotes', { metrics: 'quote.ms <= 50 ms' }),
+    ] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const status = await run(w, ['setup', '--status', '--no-start'])
+    expect(status.out).toContain('! 2 scenarios and fitness functions name their tests in the model: radical setup moves them into .radical/radical.json')
+
+    const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
+    expect(moved.err).toBe('')
+    expect(moved.out).toContain('+ moved 3 tests of 2 scenarios and fitness functions from the model into .radical/radical.json')
+    expect(JSON.parse(await readFile(join(w.repo, '.radical', 'radical.json'), 'utf8')).verifies).toEqual(expect.arrayContaining([
+      { element: 'pay', name: 'Pays', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] },
+      { element: 'ff', name: 'No cycles', tests: ['tests/deps.test.ts'] },
+    ]))
+    // The metric conditions stay in the model; a Metrics left empty goes.
+    const files = Object.fromEntries(await Promise.all(['pay', 'ff', 'plain'].map(async (id) => {
+      const { readdir } = await import('node:fs/promises')
+      const name = (await readdir(join(folder, 'nodes'))).find((f) => f.includes(id === 'pay' ? 'pays' : id === 'ff' ? 'no-cycles' : 'quotes'))!
+      return [id, await readFile(join(folder, 'nodes', name), 'utf8')] as const
+    })))
+    expect(files.pay).toContain('metrics: "checkout.p95 <= 300 ms"')
+    expect(files.pay).not.toContain('test(')
+    expect(files.ff).not.toContain('metrics:')
+    expect(files.plain).toContain('metrics: "quote.ms <= 50 ms"')
+    expect((await run(w, ['setup', '--status', '--no-start'])).out).not.toContain('name their tests in the model')
+  })
+
+  it('moves a repository laid out the old way into .radical', async () => {
+    const w = await world()
+    const git = (...args: string[]) => exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: w.repo })
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(w.repo, 'architecture', path)), { recursive: true })
+      await writeFile(join(w.repo, 'architecture', path), content)
+    }
+    await mkdir(join(w.repo, 'architecture', '.radical'))
+    await writeFile(join(w.repo, 'architecture', '.radical', '.gitignore'), '*\n')
+    await writeFile(join(w.repo, 'architecture', '.radical', 'base.json'), 'base')
+    await writeFile(join(w.repo, 'radical.sensors.json'), JSON.stringify({ sensors: { openapi: { command: 'node openapi.mjs' } } }))
+    await writeFile(join(w.repo, 'crucible.json'), JSON.stringify({ findings: 'crucible/findings', fuzz: [{ file: 'a.test.ts' }] }, null, 2))
+    await mkdir(join(w.repo, 'crucible', 'findings', 'F-0001'), { recursive: true })
+    await writeFile(join(w.repo, 'crucible', 'findings', 'F-0001', 'finding.md'), 'a finding')
+    await writeFile(join(w.repo, '.mcp.json'), JSON.stringify({ mcpServers: { radical: { command: 'npx', args: ['-y', '@radicaltools/mcp@0.2.0', '--folder', 'architecture'] } } }))
+    await git('add', '-A')
+    await git('commit', '-q', '-m', 'old layout')
+
+    const status = await run(w, ['setup', '--status', '--no-start'])
+    expect(status.out).toContain('! architecture, radical.sensors.json, crucible.json, crucible/findings are where Radical kept its files before .radical/: radical setup moves them into .radical/')
+
+    const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
+    expect(moved.err).toBe('')
+    expect(moved.code).toBe(0)
+    for (const line of ['+ moved architecture to .radical/model', '+ moved radical.sensors.json to .radical/sensors/sensors.json', '+ moved crucible.json to .radical/crucible/crucible.json',
+      '+ moved crucible/findings to .radical/crucible/findings', '+ renamed the model\'s .radical/ to .state/', '+ pointed .radical/crucible/crucible.json at the new places', '+ pointed .mcp.json at .radical/model',
+      '✓ .radical/model holds a model']) expect(moved.out).toContain(line)
+    // Moved with git mv, so their history follows them.
+    const renames = (await git('status', '--porcelain')).stdout.split('\n').filter((line) => line.startsWith('R'))
+    expect(renames).toEqual(expect.arrayContaining(['R  radical.sensors.json -> .radical/sensors/sensors.json', 'RM crucible.json -> .radical/crucible/crucible.json', 'R  architecture/radical.md -> .radical/model/radical.md']))
+    expect(await readFile(join(w.repo, '.radical', 'model', '.state', 'base.json'), 'utf8')).toBe('base')
+    expect(JSON.parse(await readFile(join(w.repo, '.radical', 'crucible', 'crucible.json'), 'utf8')).findings).toBe('.radical/crucible/findings')
+    expect(await readFile(join(w.repo, '.radical', 'crucible', 'findings', 'F-0001', 'finding.md'), 'utf8')).toBe('a finding')
+    expect(await readFile(join(w.repo, '.radical', '.gitignore'), 'utf8')).toBe('crucible/rounds/\n')
+    expect((await json(join(w.repo, '.mcp.json'))).mcpServers.radical.args.at(-1)).toBe('.radical/model')
+    expect((await run(w, ['setup', '--status', '--no-start'])).out).not.toContain('where Radical kept its files')
   })
 
   it('asks for the models this one depends on, offers the newest tag, and fetches them', async () => {
     const w = await world()
     await modelRepo(w, 'standards', ['v1.2.0', 'v1.10.0'])
     const questions: string[] = []
-    const answers = ['', '', 'standards', '../../standards', '', '', '', 'none', 'n']
+    const answers = ['', '', 'standards', '../../../standards', '', '', '', 'none', 'n']
     const done = await run(w, ['setup', '--no-check'], { ask: async (q) => { questions.push(q); return answers.shift() ?? '' } })
     expect(done.err).toBe('')
     expect(done.code).toBe(0)
     expect(questions.slice(2, 7)).toEqual([
       '  A model this one depends on, by name (Enter: none): ',
       '    Its git repository, an address or a path from the model folder: ',
-      '    The model folder in it [architecture]: ',
+      '    The model folder in it [.radical/model]: ',
       // The newest version tag, by number: v1.10.0 after v1.2.0.
-      '    Version [v1.10.0]: ',
+      '    Version, or latest to follow its releases [v1.10.0]: ',
       '  Another model this one depends on, by name (Enter: no more): ',
     ])
-    const folder = join(w.repo, 'architecture')
-    expect(await json(join(folder, 'deps.json'))).toEqual({ name: 'repo', dependencies: [{ name: 'standards', repo: '../../standards', path: 'architecture', ref: 'v1.10.0' }] })
-    expect(done.out).toContain('+ standards (../../standards at v1.10.0) in deps.json')
-    expect(done.out).toMatch(/\+ fetched standards@\w{7} \(v1\.10\.0\) into \.radical\/federation\.json: 2 elements/)
+    const folder = join(w.repo, '.radical/model')
+    expect(await json(join(folder, 'deps.json'))).toEqual({ name: 'repo', dependencies: [{ name: 'standards', repo: '../../../standards', path: '.radical/model', ref: 'v1.10.0' }] })
+    expect(done.out).toContain('+ standards (../../../standards at v1.10.0) in deps.json')
+    expect(done.out).toMatch(/\+ fetched standards@\w{7} \(v1\.10\.0\) into \.state\/federation\.json: 2 elements/)
     expect((await fetchedFile(folder)).nodes.map((n) => n.label)).toEqual(['standards 0', 'standards 1'])
   })
 
@@ -210,16 +300,16 @@ describe('radical setup', () => {
     const w = await world()
     await modelRepo(w, 'standards', ['v1.0.0', 'v2.0.0'])
     await modelRepo(w, 'billing', [], 'model')
-    const first = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'standards=../../standards#v1.0.0'])
+    const first = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'standards=../../../standards#v1.0.0'])
     expect(first.code).toBe(0)
     // A second model, its version its default branch (no tags), its model folder named; standards stays.
-    const second = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'billing=../../billing#:model'])
+    const second = await run(w, ['setup', '--yes', '--no-check', '--no-hooks', '--depends-on', 'billing=../../../billing#:model'])
     expect(second.code).toBe(0)
-    expect(second.out).toContain('✓ depends on standards (../../standards at v1.0.0)')
-    const folder = join(w.repo, 'architecture')
+    expect(second.out).toContain('✓ depends on standards (../../../standards at v1.0.0)')
+    const folder = join(w.repo, '.radical/model')
     expect((await json(join(folder, 'deps.json'))).dependencies).toEqual([
-      { name: 'standards', repo: '../../standards', path: 'architecture', ref: 'v1.0.0' },
-      { name: 'billing', repo: '../../billing', path: 'model', ref: 'main' },
+      { name: 'standards', repo: '../../../standards', path: '.radical/model', ref: 'v1.0.0' },
+      { name: 'billing', repo: '../../../billing', path: 'model', ref: 'main' },
     ])
     expect((await fetchedFile(folder)).dependencies.map((d) => [d.name, d.ref])).toEqual([['standards', 'v1.0.0'], ['billing', 'main']])
     expect((await run(w, ['setup', '--yes', '--depends-on', 'nameless'])).out).toContain('✗ --depends-on nameless: write <name>=<repository>[#<version>[:<model folder>]]')
@@ -245,24 +335,24 @@ describe('radical setup', () => {
     expect(await readFile(launcher, 'utf8')).toMatch(/^default_version=0\.2\.0$/m)
     expect(statSync(launcher).mode & 0o111).toBe(0o111)
     expect((await json(join(fresh, '.mcp.json'))).mcpServers.radical)
-      .toEqual({ type: 'stdio', command: 'sh', args: ['radical.sh', 'mcp', '--folder', 'architecture'] })
+      .toEqual({ type: 'stdio', command: 'sh', args: ['radical.sh', 'mcp', '--folder', '.radical/model'] })
     expect((await json(w.desktop)).mcpServers.radical).toEqual({
-      command: 'sh', args: [launcher, 'mcp', '--folder', join(fresh, 'architecture')],
+      command: 'sh', args: [launcher, 'mcp', '--folder', join(fresh, '.radical/model')],
       env: { PATH: `${w.bin}:/usr/local/bin:/usr/bin:/bin` },
     })
     expect(await readFile(join(fresh, '.git', 'hooks', 'post-checkout'), 'utf8'))
-      .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff "architecture" --save-base --quiet </dev/null || true; sh "radical.sh" check "architecture" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true; sh "radical.sh" federation fetch "architecture" --quiet --detach </dev/null >/dev/null 2>&1 || true\n`)
+      .toContain(`${HOOK_MARKER}\nsh "radical.sh" diff ".radical/model" --save-base --quiet </dev/null || true; sh "radical.sh" check ".radical/model" --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true; sh "radical.sh" federation fetch ".radical/model" --quiet --detach </dev/null >/dev/null 2>&1 || true\n`)
 
-    const again = await run(w, ['setup', 'architecture', '--yes', '--no-check', '--client', 'claude-code'], { cwd: fresh, env })
+    const again = await run(w, ['setup', '.radical/model', '--yes', '--no-check', '--client', 'claude-code'], { cwd: fresh, env })
     expect(again.out).toContain('✓ radical.sh runs 0.2.0')
     expect(again.out).toContain('✓ Claude Code: .mcp.json already runs "radical" for the folder')
 
-    const status = await run(w, ['setup', '--status', 'architecture', '--no-start'], { cwd: fresh, env })
-    expect(status.out).toContain('✓ Claude Code "radical" (.mcp.json) serves architecture through radical.sh (0.2.0)')
-    expect(status.out).toContain('✓ Claude Desktop "radical" (~/.config/Claude/claude_desktop_config.json) serves architecture through radical.sh (0.2.0)')
+    const status = await run(w, ['setup', '--status', '.radical/model', '--no-start'], { cwd: fresh, env })
+    expect(status.out).toContain('✓ Claude Code "radical" (.mcp.json) serves .radical/model through radical.sh (0.2.0)')
+    expect(status.out).toContain('✓ Claude Desktop "radical" (~/.config/Claude/claude_desktop_config.json) serves .radical/model through radical.sh (0.2.0)')
     expect(status.code).toBe(0)
     await rm(launcher)
-    const gone = await run(w, ['setup', '--status', 'architecture', '--no-start'], { cwd: fresh, env })
+    const gone = await run(w, ['setup', '--status', '.radical/model', '--no-start'], { cwd: fresh, env })
     expect(gone.code).toBe(1)
     expect(gone.out).toContain('✗ Claude Code "radical" (.mcp.json): its launcher radical.sh is not there: download it from https://radical.tools/radical.sh')
   })

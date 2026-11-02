@@ -5,8 +5,9 @@ say: `radical fuzz` checks the system's rules under random sequences of
 actions, `radical harden` turns a finding into a test that is bound to the
 model, and `radical explore` runs the mechanical parts of an exploratory round
 in which agents use the product as a user would. All three are commands of the
-`radical` CLI (`apps/cli`), driven by `crucible.json` in the folder you run them
-from. Findings are files in the findings folder (`crucible/findings/F-0001.md`).
+`radical` CLI (`apps/cli`), driven by the repository's `.radical/crucible/crucible.json`
+(`crucible.json` at the root before `.radical/`), found from the folder you run them
+in; its paths are from the repository's root. Findings are files in the findings folder (`.radical/crucible/findings/F-0001.md`).
 
 ## How a cycle runs
 
@@ -28,7 +29,7 @@ maintainer decides.
  CONFIRM    explore verify    every script of a run re-run on a fresh page
         │
         ▼
- RECORD     explore record    crucible/findings/F-NNNN.md, open
+ RECORD     explore record    .radical/crucible/findings/F-NNNN.md, open
                               (a question waits for the maintainer)
         │
         ▼
@@ -113,11 +114,11 @@ sequences of actions (add, delete, drag, undo, reload, an agent's write, …)
 and checks the rules after every step (Undo gives back the state before, a
 reload changes nothing, nothing points at nothing, …).
 
-`radical fuzz` runs the fuzz files `crucible.json` lists:
+`radical fuzz` runs the fuzz files `.radical/crucible/crucible.json` lists:
 
 ```json
 {
-  "findings": "crucible/findings",
+  "findings": ".radical/crucible/findings",
   "fuzz": [{ "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }]
 }
 ```
@@ -137,7 +138,7 @@ rule in its Metrics and `radical check` finds it.
 | `--replay <id>` | Runs a finding again with its world, seed, path and length, without shrinking: after a fix, or on another commit. |
 | `--no-known`, `--no-shrink` | Known failures filter nothing (does one still happen?); the first failure is reported as found. |
 | `--report <dir>` | A Vitest JSON report of each file, for `radical check --report`. |
-| `--config <file>` | The settings. Default: `crucible.json` in the working directory. |
+| `--config <file>` | The settings. Default: the repository's `.radical/crucible/crucible.json`. |
 
 A failure shrinks to the shortest sequence that breaks the rule, and names
 the rule, each step as it resolved and what differs, with the seed and path
@@ -161,8 +162,9 @@ For a finding of a fuzz file, the test is its own steps:
 `radical harden F-0003 --scenario "Undo is exact"` marks it hardened, and from
 then on the fuzz file replays its shrunk sequence as a test case of its own
 (`F-0003 stays fixed: …`), once, without the known failures, so it fails until
-the bug is fixed. The command prints the `test(…) passed` line to add to the
-scenario's Metrics; it never changes the model's files. A finding from an exploration has
+the bug is fixed. With `--scenario` it binds that test to the scenario in the
+repository's `.radical/radical.json` (as `radical verify` does); it never
+changes the model's files. A finding from an exploration has
 no steps to replay: its test is written by hand, then gated.
 
 `radical harden --gate` checks a test before it is bound, the way a fix should
@@ -172,9 +174,9 @@ fail; with them put back, it must pass; and it must pass several runs at once
 (`--runs`, 5 by default), so a flaky test does not reach CI. Give a finding
 (`radical harden --gate F-0003`) or any test
 (`--test "apps/e2e/tests/studio/views.spec.ts › …"`). Tests, findings and
-`crucible.json` are not set back, and the working tree is left as it was,
+`.radical/crucible/crucible.json` are not set back, and the working tree is left as it was,
 whatever happens: interrupted, it stops the test, puts the changed files back
-and ends with status 2. A test runs through the runner `crucible.json` gives
+and ends with status 2. A test runs through the runner `.radical/crucible/crucible.json` gives
 for its folder, else with `npx vitest run` in its package:
 
 ```json
@@ -186,7 +188,7 @@ for its folder, else with `npx vitest run` in its package:
 ```
 
 A test of a build (an e2e test runs the web build) needs that build made
-from the files it runs on: the runner's `build`, run from `crucible.json`'s
+from the files it runs on: the runner's `build`, run from `.radical/crucible/crucible.json`'s
 folder, is made before the run without the fix and before the run with it.
 Its `repeat` makes the runs at once one run of that command (`{runs}` the
 number), for tests whose runs cannot go side by side, as Playwright's web
@@ -208,8 +210,8 @@ agent's session starts the agents and talks to you (in this repository, the
 `crucible-explore` skill of Claude Code).
 
 - `radical explore prepare --runs 5 --areas "layout under edits; milestones and undo"`
-  builds the project once (the builds `crucible.json` names), copies what the
-  runs need into the round's folder (`.crucible/rounds/round-70-74/`), so that
+  builds the project once (the builds `.radical/crucible/crucible.json` names), copies what the
+  runs need into the round's folder (`.radical/crucible/rounds/round-70-74/`), so that
   a rebuild during the round changes nothing for them, and gives each run a
   folder, ports of its own (4570, 4670 and 4770 for run 70) and a prompt with
   its area. The round's brief names the commit, what changed since the last
@@ -225,7 +227,7 @@ agent's session starts the agents and talks to you (in this repository, the
   of the repository or the round runs only where the round ran: record warns
   about each one.
 
-`crucible.json`'s `explore` says how: the brief, the documents of known
+`.radical/crucible/crucible.json`'s `explore` says how: the brief, the documents of known
 issues, the model folder, the builds, what to copy, the commands that serve a
 run's build (each with `{port}`, `{hubPort}` or `{otherPort}` and `{build}`,
 and the port it answers on), the first port, and rules of the project's for
@@ -233,8 +235,8 @@ every run.
 
 ## In this repository
 
-- `npm run fuzz` runs the fuzz files of `crucible.json`.
+- `npm run fuzz` runs the fuzz files of `.radical/crucible/crucible.json`.
 - The `crucible-explore` skill runs an exploratory round; the `crucible-fix`
   skill fixes a set of findings in parallel worktrees, each fix gated by
   `radical harden --gate`.
-- Findings live in `crucible/findings`.
+- Findings live in `.radical/crucible/findings`.

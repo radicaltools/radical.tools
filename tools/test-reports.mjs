@@ -37,8 +37,8 @@ for (const dir of workspaces) {
   if (run.status !== 0) failed.push(pkg.name)
 }
 
-// The repository's own scripts in tools/ (the release script), run from the
-// root as `npm run test:tools` does.
+// The repository's own scripts in tools/ (the release script) and its
+// sensors in .radical/sensors/, run from the root as `npm run test:tools` does.
 console.log('\n▶ tools')
 const tools = spawnSync(npm, ['run', 'test:tools', '--', '--reporter=default', '--reporter=json', `--outputFile.json=${join(REPORTS, 'tools.json')}`], {
   cwd: ROOT,

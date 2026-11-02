@@ -3,14 +3,14 @@
 // Where a Radical Forge run that an agent drives over MCP stands, written by
 // the MCP server into the model folder after every forge_* step so Studio,
 // open on the same folder, can show it (read only). It lives next to the
-// canvas selection under `.radical/`, which the md-folder format never lists
-// or watches and `.radical/.gitignore` keeps out of version control. The
+// canvas selection under `.state/`, which the md-folder format never lists
+// or watches and `.state/.gitignore` keeps out of version control. The
 // server keeps the run itself in memory; this is only a picture of it.
 
 import { FORGE_STAGES, type ForgeStageId } from '../ai/forge/prompts'
-import { SELECTION_DIR } from './canvasSelection'
+import { STATE_DIR } from './canvasSelection'
 
-export const FORGE_RUN_FILE = `${SELECTION_DIR}/forge-run.json`
+export const FORGE_RUN_FILE = `${STATE_DIR}/forge-run.json`
 
 /** A run nobody has touched for this long is shown as paused: the agent may
  *  have gone away without the server noticing (a crash, a killed process). */

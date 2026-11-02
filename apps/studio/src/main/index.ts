@@ -5,11 +5,12 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { readCheckFiles, readEditorStateFile, readFederationFiles, writeCheckConfig, writeEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { readCheckFiles, readEditorStateFile, readFederationFiles, writeCheckConfig, writeEditorStateFile, writeRepositoryFile, writeSelectionFile } from '@radical/node-files/selectionFile'
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 import { DiskDiscussions } from '@radical/node-files/discussions'
+import { repositoryModel } from '@radical/node-files/repositoryLayout'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
 
 const discussionFolders = new Map<string, DiskDiscussions>()
@@ -188,7 +189,8 @@ app.whenReady().then(() => {
       properties: ['openDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return { success: false }
-    const folderPath = result.filePaths[0]
+    // A repository picked (its .radical/ hidden in the dialog) opens its model.
+    const folderPath = await repositoryModel(result.filePaths[0])
     try {
       const files = await folderSession(folderPath).readAll()
       return { success: true, folderPath, files }
@@ -273,7 +275,7 @@ app.whenReady().then(() => {
   })
 
   // The models this one depends on (deps.json) and those fetched of them
-  // (.radical/federation.json, written by radical federation fetch), shown
+  // (.state/federation.json, written by radical federation fetch), shown
   // beside the model's own and never written here.
   ipcMain.handle('folder:read-federation', async (_event, folderPath: string) => {
     try {
@@ -311,6 +313,16 @@ app.whenReady().then(() => {
   ipcMain.handle('folder:read-check-files', async (_event, folderPath: string) => {
     try {
       return { success: true, ...(await readCheckFiles(folderPath)) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // The Inspector's settings of the repository, saved in its .radical/radical.json.
+  ipcMain.handle('folder:write-repository-file', async (_event, folderPath: string, content: string) => {
+    try {
+      await writeRepositoryFile(folderPath, content)
+      return { success: true }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

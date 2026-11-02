@@ -93,7 +93,7 @@ Architecture diagrams go stale because they are pictures. In radical.tools they 
 # Install dependencies
 npm install
 
-# Once after cloning: git hooks that keep architecture/.radical/base.json, the
+# Once after cloning: git hooks that keep .radical/model/.state/base.json, the
 # base Studio's "Changes on branch" compares with, after every checkout,
 # commit, pull and rebase (radical hooks install)
 npm run hooks
@@ -131,7 +131,7 @@ npm run check:architecture
 
 ### Releasing (maintainers)
 
-radical.tools has one product version: the CLI, the MCP server, the Desktop app and the VS Code extension always carry the same one (see the ADR *Product and format versioning* in `architecture/`). Write each user-visible change under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) as you make it; a release moves those entries under its version.
+radical.tools has one product version: the CLI, the MCP server, the Desktop app and the VS Code extension always carry the same one (see the ADR *Product and format versioning* in `.radical/model/`). Write each user-visible change under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) as you make it; a release moves those entries under its version.
 
 ```bash
 npm run release -- minor          # or major, patch, or a version such as 0.3.0 or 1.0.0-rc.1
@@ -200,7 +200,7 @@ packages/
                   npm run build:packs), their validation and the Vite plugin
                   that serves and bundles them for the Hub and Studio
   node-files/     @radical/node-files: model folders on disk for Node (MCP, CLI)
-architecture/     The architecture model of radical.tools itself, checked in CI
+.radical/         The architecture model of radical.tools itself (model/), checked in CI; where its elements are built (radical.json), its sensors, Crucible
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/            Repo-wide scripts (check-workspaces.mjs, test-reports.mjs, generate-icons.mjs)
 docs/             Architecture notes and improvement log
@@ -221,7 +221,7 @@ npm run e2e
 # One JSON report per workspace, for radical check
 npm run test:reports
 
-# The fuzz files of crucible.json, through radical fuzz (night: more runs, a random seed)
+# The fuzz files of .radical/crucible/crucible.json, through radical fuzz (night: more runs, a random seed)
 npm run fuzz
 npm run fuzz -- night --survey
 

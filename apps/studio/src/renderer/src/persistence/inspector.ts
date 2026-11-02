@@ -4,7 +4,7 @@
 // rules about the model run here, on the model as it is edited (checkModel
 // from @radical/common, the code the CLI runs). What the tests say comes
 // from the last `radical check --report`: the CLI keeps the test cases in
-// the model folder's .radical/test-results.json, and the project's rule
+// the model folder's .state/test-results.json, and the project's rule
 // settings are the folder's check.json. The reviews of its manual fitness
 // functions (reviews.json, `radical sense review`) are measurements too.
 // They are polled for the active
@@ -12,7 +12,8 @@
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withoutRepositorySettings } from '@radical/common/check'
+import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -87,9 +88,23 @@ export const serializeCheckConfig = (config: CheckConfig): string => JSON.string
 
 /** Saves `config` as the active document's check.json and checks the model
  *  with it at once, without waiting for the next poll to read it back. */
-export async function saveCheckConfig(config: CheckConfig): Promise<void> {
+export async function saveCheckConfig(edited: CheckConfig): Promise<void> {
   const id = documents.getActiveId()
   if (!id) throw new Error('No model is open.')
+  // The repository's settings (test files, CI's artifacts) go to its
+  // .radical/radical.json where Studio can write it; else they stay in
+  // check.json, which is still read.
+  let config = edited
+  const repository = useDiagramStore.getState().repository
+  if (repository && await documents.canWriteRepositoryFile(id)) {
+    const unbound = edited.rules?.['test-unbound']
+    const lists = typeof unbound === 'object' ? { ...(unbound.include?.length ? { include: unbound.include } : {}), ...(unbound.exclude?.length ? { exclude: unbound.exclude } : {}) } : {}
+    const { tests: _tests, ci: _ci, ...rest } = repository
+    const next: RepositoryFile = { ...rest, ...(Object.keys(lists).length ? { tests: lists } : {}), ...(edited.ci?.artifacts?.length ? { ci: { artifacts: edited.ci.artifacts } } : {}) }
+    await documents.writeRepositoryFile(id, serializeRepositoryFile(next))
+    useDiagramStore.setState({ repository: next })
+    config = withoutRepositorySettings(edited)
+  }
   const text = serializeCheckConfig(config)
   await documents.writeCheckConfig(id, text)
   if (documents.getActiveId() !== id) return
@@ -130,8 +145,17 @@ function recheck(): void {
   const concerns = packs
   // The kept results are a run of the past: a test they lack may have been
   // added since, so it and the goals they leave unmet are warnings.
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns })
+  // The tests the repository's .radical/radical.json binds count as each
+  // scenario's and fitness function's.
+  const repo = useDiagramStore.getState().repository
+  const repository = repo ? { file: REPOSITORY_FILE, implements: repo.implements.map((m) => ({ ...m, missing: [] })), verifies: repo.verifies, ...(repo.tests ? { tests: repo.tests } : {}), ...(repo.ci ? { ci: repo.ci } : {}) } : undefined
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns, ...(repository ? { repository } : {}) })
   useInspectorStore.setState({ check })
+  // Each one's tests with their outcomes, for the element's card.
+  const testOutcomes = check.evidence
+    ? Object.fromEntries(Object.entries(check.evidence.nodes).filter(([, e]) => e.tests?.length).map(([id, e]) => [id, e.tests!.map((t) => ({ id: t.id, outcome: t.outcome }))]))
+    : null
+  useDiagramStore.setState({ testOutcomes })
 }
 
 if (typeof window !== 'undefined') {
@@ -139,6 +163,7 @@ if (typeof window !== 'undefined') {
   let lastResults = ''
   let lastMeasurements = ''
   let lastReviews = ''
+  let lastRepository: string | null = null
 
   const poll = async (): Promise<void> => {
     const id = documents.getActiveId()
@@ -146,6 +171,8 @@ if (typeof window !== 'undefined') {
       polledFor = id
       filesReadFor = null
       lastResults = lastConfig = lastMeasurements = lastReviews = ''
+      lastRepository = null
+      useDiagramStore.setState({ repository: null, testOutcomes: null })
       useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
     }
     if (!id) return
@@ -157,6 +184,16 @@ if (typeof window !== 'undefined') {
     const configText = files.config ?? ''
     const measurementsText = files.measurements ?? ''
     const reviewsText = files.reviews ?? ''
+    // Where the repository builds the model's elements, for the card; none
+    // shown while the file does not read.
+    if (files.repository !== lastRepository) {
+      lastRepository = files.repository
+      let repository = null
+      try { repository = files.repository === null ? null : parseRepositoryFile(files.repository) } catch { repository = null }
+      useDiagramStore.setState({ repository })
+      // The tests it binds are evidence: check again with them.
+      if (filesReadFor === id) recheck()
+    }
     if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements && reviewsText === lastReviews) return
     filesReadFor = id
     // The concern packs, once, for a model that has a check report or

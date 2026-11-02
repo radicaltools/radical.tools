@@ -80,42 +80,47 @@ export interface HostCapabilities {
   watchFolder?(folderPath: string | null): Promise<void>
   /** Called when the watched folder's model files change outside Studio. */
   onFolderChanged?(listener: (change: FolderChange) => void): void
-  /** Write the canvas selection file (`.radical/selection.json`) into an
+  /** Write the canvas selection file (`.state/selection.json`) into an
    *  md-folder, for AI clients working on the same folder. */
   writeSelection?(folderPath: string, content: string): Promise<HostResult>
-  /** Read the status of an agent's Forge run (`.radical/forge-run.json`) in an
+  /** Read the status of an agent's Forge run (`.state/forge-run.json`) in an
    *  md-folder, written by the MCP server; content is null when there is none. */
   readForgeRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
-  /** Read the agent activity file (`.radical/agent-activity.json`) in an
+  /** Read the agent activity file (`.state/agent-activity.json`) in an
    *  md-folder, written by the MCP server after each write; content is null
    *  when there is none. */
   readAgentActivity?(folderPath: string): Promise<HostResult & { content?: string | null }>
-  /** Read the model's base (`.radical/base.json`) in an md-folder, written by
+  /** Read the model's base (`.state/base.json`) in an md-folder, written by
    *  the CLI or the MCP server; content is null when there is none. */
   readModelBase?(folderPath: string): Promise<HostResult & { content?: string | null }>
-  /** Write the model's base (`.radical/base.json`) in an md-folder, as a
+  /** Write the model's base (`.state/base.json`) in an md-folder, as a
    *  Radical Forge run does where git saved none. */
   writeModelBase?(folderPath: string, content: string): Promise<HostResult>
   /** Read what a federation keeps beside an md-folder model: its
    *  `deps.json` and the other models fetched into
-   *  `.radical/federation.json` (by `radical federation fetch`); each is null
+   *  `.state/federation.json` (by `radical federation fetch`); each is null
    *  when there is none. */
   readFederation?(folderPath: string): Promise<HostResult & { deps?: string | null; federation?: string | null }>
   /** Whether an md-folder's files differed from the cache it was opened
-   *  from (`.radical/cache/`): resolves once they are listed. */
+   *  from (`.state/cache/`): resolves once they are listed. */
   folderVerified?(folderPath: string): Promise<{ stale: boolean }>
-  /** Read and write an md-folder's view index (`.radical/cache/views.json`);
+  /** Read and write an md-folder's view index (`.state/cache/views.json`);
    *  content is null when there is none. */
   readViewIndex?(folderPath: string): Promise<HostResult & { content?: string | null }>
   writeViewIndex?(folderPath: string, content: string): Promise<HostResult>
   /** Read what `radical check` and `radical sense` keep beside an md-folder
-   *  model: the test results (`.radical/test-results.json`), the
-   *  measurements (`.radical/measurements.json`) and the rule settings
-   *  (`check.json`); each is null when there is none. */
-  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null; reviews?: string | null }>
+   *  model: the test results (`.state/test-results.json`), the
+   *  measurements (`.state/measurements.json`) and the rule settings
+   *  (`check.json`), and the repository's `.radical/radical.json` (where it
+   *  builds the model's elements); each is null when there is none. */
+  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null; reviews?: string | null; repository?: string | null }>
   /** Write the rule settings and goals (`check.json`) of an md-folder model,
    *  as the Inspector's Settings save them. */
   writeCheckConfig?(folderPath: string, content: string): Promise<HostResult>
+  /** Write the repository's `.radical/radical.json` of an md-folder model
+   *  (the one readCheckFiles reads, else a new one beside the model's
+   *  `.radical/`), as the Inspector's Settings save its test files. */
+  writeRepositoryFile?(folderPath: string, content: string): Promise<HostResult>
   /** The file the host opened Studio with (CLI --file, VS Code editor), if any. */
   getWatchedPath?(): Promise<string | null>
   /** Called when the watched file changes outside Studio. */

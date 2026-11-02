@@ -9,11 +9,12 @@
 
 import React, { useMemo, useState } from 'react'
 import {
-  CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig,
+  CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig, withRepositorySettings,
   type CheckConfig, type CheckConfigChange, type CheckMetric, type CheckResult, type CheckSeverity,
 } from '@radical/common/check'
 import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
 import { DIMENSIONS, RULE_INFO, dimensionOfKey, metricOf } from './shared'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { lineDiff, patchRule, setGoal, type RulePatch } from './settingsDraft'
 
 // The rules only radical check counts, on the folder's files; Studio checks
@@ -53,7 +54,11 @@ function GlobList({ label, globs, onChange, disabled }: { label: string; globs: 
 }
 
 export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckResult; editable: boolean; readOnlyReason: string }): React.ReactElement {
-  const config = useInspectorStore((s) => s.config)
+  // check.json, with the test files the repository's .radical/radical.json
+  // names over its own: Settings edit both.
+  const modelConfig = useInspectorStore((s) => s.config)
+  const repository = useDiagramStore((s) => s.repository)
+  const config = useMemo(() => ({ ...modelConfig, rules: withRepositorySettings(modelConfig.rules ?? {}, repository?.tests), ...(repository?.ci ? { ci: repository.ci } : {}) }), [modelConfig, repository])
   const configError = useInspectorStore((s) => s.configError)
   // In the store, not here: going to another tab or Back kept no edit.
   const draft = useSettingsDraft()
@@ -179,7 +184,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
           <span className="insp-savebar-note">{loosening.length ? `${loosening.length === changes.length && changes.length === 1 ? 'It loosens' : `${loosening.length} of them loosen${loosening.length === 1 ? 's' : ''}`} the CI gate.` : 'Each one tightens the gate or keeps it.'}</span>
           {saveError && <span className="insp-savebar-error">{saveError}</span>}
           <button type="button" className="insp-btn ghost" onClick={() => { setDraft(null); setSaveError(null) }} disabled={saving}>Discard</button>
-          <button type="button" className="insp-btn primary" onClick={() => void save()} disabled={saving || !editable}>{saving ? 'Saving…' : 'Save to check.json'}</button>
+          <button type="button" className="insp-btn primary" onClick={() => void save()} disabled={saving || !editable}>{saving ? 'Saving…' : 'Save'}</button>
         </div>
       )}
 

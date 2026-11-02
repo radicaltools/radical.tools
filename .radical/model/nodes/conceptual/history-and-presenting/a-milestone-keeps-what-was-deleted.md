@@ -1,0 +1,8 @@
+---
+id: "336124ff-ceee-40e1-bc8e-52d5b7fefb16"
+type: "scenario"
+label: "A milestone keeps what was deleted"
+given: "a milestone that holds an element a view lists, and later milestones; an element with a view of its own in a group of views per element; and a sequence played on a flow view"
+then: "the milestone's view still draws the element, after the reload too, while the live view does not; Undo leaves the milestone as it was; a delete propagated from a later milestone leaves it on the earlier one's view, and one made in a milestone that shows the view its own way leaves the live view too; the element's own view stays in its group in the milestone, with its places, drawing what the element holds, after Undo of an edit in the milestone and after a reload, and is neither on the live model nor saved with its views; the flow view still plays the sequence in the milestone, while the live view is unlinked, also once saved; Restore to live puts the element back on the views that listed it and its own view back, with its places; the slide plays the milestone's view from the live model too; and the slide added in Presenter saves none of the views the milestone has alone"
+when: "the element is deleted from the live model (in Studio, by Unwrap, by delete_node), or in a later milestone and propagated, and the milestone is shown, also after a reload; and the delete is undone; the element with a view of its own is deleted the same ways; and the sequence is deleted (in Studio, by delete_sequence, or in a later milestone and propagated); then the milestone is restored to live; a slide of the element's own view is added in the milestone and played from the live model; and a slide is added in Presenter while Designer shows the milestone"
+---

@@ -4,7 +4,7 @@ import { builtInC4Metamodel } from '../src/metamodel/index'
 import { createModelFacade } from '../src/ai/modelFacade'
 import {
   checkAddNode, checkAddRelation, checkNodeUpdate, checkPatchRelation, checkRemove, checkReparent, checkUnwrap,
-  copyOtherModelView, originModel, originOf, ownModel, viewRefusal, type ModelState,
+  copyOtherModelView, originModel, originOf, otherModelFolder, ownModel, viewFolderRefusal, viewRefusal, type ModelState,
 } from '../src/model'
 import { composeFederation, otherModelView, otherModelsAt, parseDeps, parseFederationFile, serializeFederationFile, withOtherModels, type FetchedDependency } from '../src/federation'
 import { viewShownNodes } from '../src/viewPipeline'
@@ -195,6 +195,22 @@ describe('federation', () => {
     expect(otherModelsAt(file, [older])).toEqual({ nodes: [], relations: [], missing: [older] })
     // A milestone made before keeps no versions: the other models as fetched now.
     expect(otherModelsAt(file, undefined).nodes).toHaveLength(3)
+  })
+
+  it("keeps the views of the model's own out of another model's folders", () => {
+    const views: Record<string, DiagramView> = {
+      'v-ord': { id: 'v-ord', name: 'Containers', folder: 'orders/Logical', origin: 'orders@abc1234', nodeIds: [], positions: {} },
+      'v-own': { id: 'v-own', name: 'Containers', folder: 'Mine', nodeIds: [], positions: {} },
+    }
+    // The model's folder and every folder in it are orders'.
+    expect(otherModelFolder(views, 'orders')).toBe('orders@abc1234')
+    expect(otherModelFolder(views, 'orders/Logical/More')).toBe('orders@abc1234')
+    expect(viewFolderRefusal(views, ' orders/Logical/ ')).toBe('The folder "orders/Logical" holds the views of the model orders (orders@abc1234), read-only: put the view in a folder of this model.')
+    // A folder of the model's own, one merely starting with the name, and none at all are free.
+    for (const folder of ['Mine', 'orders-archive', 'Mine/orders', '', null, undefined]) expect(viewFolderRefusal(views, folder)).toBeNull()
+    // A copy goes to the folder without the model's name: the model's own.
+    copyOtherModelView({ views }, 'v-ord', 'copy')
+    expect(viewFolderRefusal(views, views.copy.folder)).toBeNull()
   })
 })
 

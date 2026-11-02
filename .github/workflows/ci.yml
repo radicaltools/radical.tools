@@ -44,11 +44,13 @@ jobs:
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
       # What the model measures on a pull request: the measure of every
-      # automated fitness function triggered on pull-request (Workspace
-      # boundaries: the command sensor on tools/check-workspaces.mjs), into
-      # reports/metrics, which the job Architecture model reads.
+      # automated fitness function triggered on pull-request, into
+      # reports/metrics, which the job Architecture model reads. Most name a
+      # sensor of .radical/sensors/sensors.json, run once for each
+      # element their ADR constrains (Workspace boundaries, One product
+      # version, One mark everywhere, Installable npm packages).
       - run: npm run build -w @radicaltools/cli
-      - run: node apps/cli/dist/index.js sense run --trigger pull-request --folder architecture --out reports/metrics --context commit=${{ github.sha }}
+      - run: node apps/cli/dist/index.js sense run --trigger pull-request --out reports/metrics --context commit=${{ github.sha }}
       - name: Upload test reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -131,11 +133,11 @@ jobs:
             git show --stat --format= HEAD | sed 's/^/    /'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # The repository's own architecture model (architecture/), checked with
+  # The repository's own architecture model (.radical/model/), checked with
   # radical check against this run's test reports: the unit reports of
   # Type-check & Test and, unless the e2e suite was skipped, reports/e2e.json,
   # and what the sensors of Type-check & Test measured (reports/metrics).
-  # Its rule settings and baselines are architecture/check.json.
+  # Its rule settings and baselines are .radical/model/check.json.
   architecture:
     name: Architecture model
     needs: [test, e2e]
@@ -162,7 +164,7 @@ jobs:
       - name: radical check
         run: |
           if [ -f e2e-report/reports/e2e.json ]; then cp e2e-report/reports/e2e.json reports/; fi
-          node apps/cli/dist/index.js check architecture --report reports --metrics reports/metrics --trigger pull-request --format github
+          node apps/cli/dist/index.js check --report reports --metrics reports/metrics --trigger pull-request --format github
 
   mcp-package:
     name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})

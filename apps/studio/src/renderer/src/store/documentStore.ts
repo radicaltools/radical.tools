@@ -34,6 +34,7 @@ import {
   webFolderSupported,
   webFileSupported,
   pickWebDirectory,
+  openedFolder,
   pickWebFileToOpen,
   pickWebFileToSave,
   readFileHandle,
@@ -53,6 +54,7 @@ import {
   writeModelBaseToHandle,
   readCheckFilesFromHandle,
   writeCheckConfigToHandle,
+  writeRepositoryFileToHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -142,7 +144,7 @@ function webSession(id: string, handle: FsDirHandle): MdFolderSession {
 // ─── The other models of a federation ────────────────────────────────────────
 // A folder model's deps.json names the models it depends on; `radical
 // federation fetch` writes their elements and relations into the folder's
-// .radical/federation.json. A read of the folder adds them to the model
+// .state/federation.json. A read of the folder adds them to the model
 // (withOtherModels); the serializer, and every other save here (ownModel),
 // leaves them out. Studio never fetches.
 
@@ -159,7 +161,7 @@ export interface OtherModels {
   depsError: string | null
   /** The other models as fetched; null when none were. */
   fetched: FederationFile | null
-  /** A .radical/federation.json is there that this version does not read. */
+  /** A .state/federation.json is there that this version does not read. */
   fetchedUnreadable: boolean
 }
 
@@ -368,6 +370,10 @@ function fileUnreadable(id: string, file: string, reason: string): never {
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
  *  that is there but does not parse is a DocumentUnreadableError. */
+/** Where a browser folder model opened by its repository keeps the handle of
+ *  the repository's .radical/, for the files beside the model (radical.json). */
+const repositoryKey = (id: string): string => `${id}:repository`
+
 /** Folder models renamed in Studio whose radical.md has the old name until
  *  the write of the new one: a read meanwhile keeps the new name. */
 const renamedFolders = new Set<string>()
@@ -955,17 +961,22 @@ export interface DocumentsAPI {
    *  differed, once they are listed (stale: load it afresh). Not stale for
    *  any other document. */
   verifyOpened(id: string): Promise<{ stale: boolean }>
-  /** Writes a folder model's view index (`.radical/cache/views.json`). */
+  /** Writes a folder model's view index (`.state/cache/views.json`). */
   writeViewIndex(id: string, content: string): Promise<boolean>
   /** What `radical check` keeps beside an md-folder model (test results,
    *  measurements, check.json, reviews.json), each null when it is not there;
    *  all null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
    *  folder before its access is back). */
-  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null } | null>
+  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null } | null>
   /** Writes check.json beside an md-folder model; throws when the document
    *  is no folder or its folder cannot be written. */
   writeCheckConfig(id: string, content: string): Promise<void>
+  /** Whether Studio can write the repository's .radical/radical.json of a
+   *  folder model (the desktop, or a browser folder opened by its repository). */
+  canWriteRepositoryFile(id: string): Promise<boolean>
+  /** Writes it; throws where Studio cannot reach it. */
+  writeRepositoryFile(id: string, content: string): Promise<void>
 
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
@@ -1172,9 +1183,11 @@ export const documents: DocumentsAPI = {
       webSessions.delete(id)
       webDiscussionStores.delete(id)
       void removeHandle(id)
+      void removeHandle(repositoryKey(id))
     } else if (removed?.source === 'fs' && !removed.filePath) {
       connectedWebHandles.delete(id)
       void removeHandle(id)
+      void removeHandle(repositoryKey(id))
     }
     if (idx.activeId === id) idx.activeId = idx.docs[0]?.id ?? null
     writeIndex(idx)
@@ -1356,16 +1369,20 @@ export const documents: DocumentsAPI = {
 
     // ── Web: File System Access API directory picker → handle in IndexedDB. ──
     if (webFolderSupported()) {
-      const handle = await pickWebDirectory()
-      if (!handle) return null
+      const picked = await pickWebDirectory()
+      if (!picked) return null
+      const { model: handle, radical: repository } = await openedFolder(picked)
       const idx = readIndex()
       const meta: DocumentMeta = {
         id: uid(),
-        name: handle.name || 'model',
+        // A repository picked gives the model its name; its radical.md does
+        // once it is read.
+        name: (handle === picked || picked.name === '.radical' ? handle.name : picked.name) || 'model',
         source: 'md',
         lastModified: Date.now(),
       }
       await saveHandle(meta.id, handle)
+      if (repository) await saveHandle(repositoryKey(meta.id), repository)
       connectedWebHandles.add(meta.id)
       webSessions.delete(meta.id)
       idx.docs.push(meta)
@@ -1414,6 +1431,7 @@ export const documents: DocumentsAPI = {
     webSessions.delete(id)
     webDiscussionStores.delete(id)
     void removeHandle(id)
+    void removeHandle(repositoryKey(id))
     notify()
     return meta
   },
@@ -1471,6 +1489,9 @@ export const documents: DocumentsAPI = {
     const ok = await verifyPermission(handle, 'readwrite', true)
     if (!ok) return false
     connectedWebHandles.add(id)
+    // The repository's .radical/ too, read only: its radical.json.
+    const repository = await loadHandle(repositoryKey(id)).catch(() => null)
+    if (repository) await verifyPermission(repository, 'read', true)
     return true
   },
 
@@ -1582,15 +1603,40 @@ export const documents: DocumentsAPI = {
 
   async readCheckFiles(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null }
+    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null, repository: null }
     const h = host()
     if (meta.folderPath && h.readCheckFiles) {
       const res = await h.readCheckFiles(meta.folderPath)
-      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null } : null
+      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null, repository: res.repository ?? null } : null
     }
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
-    return handle ? readCheckFilesFromHandle(handle) : null
+    // A model opened by its repository reads the repository's files too.
+    return handle ? readCheckFilesFromHandle(handle, await loadHandle(repositoryKey(id)).catch(() => null)) : null
+  },
+
+  async canWriteRepositoryFile(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return false
+    const h = host()
+    if (meta.folderPath) return !!h.writeRepositoryFile
+    // A browser folder opened by its repository holds the repository's .radical/.
+    return !h.readFolder && connectedWebHandles.has(id) && !!(await loadHandle(repositoryKey(id)).catch(() => null))
+  },
+
+  async writeRepositoryFile(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') throw new Error('Only a model kept in a folder has a repository.')
+    const h = host()
+    if (meta.folderPath && h.writeRepositoryFile) {
+      const res = await h.writeRepositoryFile(meta.folderPath, content)
+      if (!res.success) throw new Error(res.error ?? '.radical/radical.json could not be written.')
+      return
+    }
+    const repository = await loadHandle(repositoryKey(id)).catch(() => null)
+    if (!repository) throw new Error('Studio cannot reach the repository\'s .radical/radical.json: open the model by its repository.')
+    if (!(await verifyPermission(repository, 'readwrite', true))) throw new Error('Studio may not write the repository\'s .radical/radical.json.')
+    await writeRepositoryFileToHandle(repository, content)
   },
 
   async writeCheckConfig(id, content) {

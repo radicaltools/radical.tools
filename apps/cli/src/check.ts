@@ -1,16 +1,21 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
-import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
+import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 import { composeFolder, describeDeps, federationOthers } from './federation'
+import { repositorySensors } from './repositorySensors'
+import { REVIEWS_FILE as REPOSITORY_REVIEWS, mappingRoot, missingCodePaths, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
+import { modelFolderArg } from './modelFolder'
+import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -25,7 +30,7 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       XML), or a directory of them (.json and .xml files); repeat
                       for more. The tests that scenarios and fitness functions
                       name are looked up in them. The test cases read are kept
-                      in the model folder's .radical/test-results.json for Studio
+                      in the model folder's .state/test-results.json for Studio
   --from-ci           read the test reports of CI instead: those of the latest
                       completed runs of the nearest commit in HEAD's history
                       that CI ran (a commit merged from a pull request stands
@@ -43,7 +48,7 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --metrics <path>    a radical-metrics/1 file (radical sense --out), or a
                       directory of them (.json files); repeat for more. They
                       are added to what radical sense keeps in the model
-                      folder's .radical/measurements.json, which is read
+                      folder's .state/measurements.json, which is read
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
                       the latest measurement each matches. The reviews
@@ -155,7 +160,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 0
   }
 
-  const folder = positionals[0] ?? '.'
+  const folder = await modelFolderArg(positionals[0], io.cwd)
   let root: string
   let files
   try {
@@ -180,6 +185,22 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
+  // Where the repository builds the model's elements, and which of those
+  // paths it does not have.
+  let repository: RepositoryMapping | null
+  try {
+    const mapping = await readRepositoryMapping(root)
+    repository = mapping && {
+      file: relative(io.cwd, mapping.file),
+      implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
+      verifies: mapping.verifies,
+      ...(mapping.tests ? { tests: mapping.tests } : {}),
+      ...(mapping.ci ? { ci: mapping.ci } : {}),
+    }
+  } catch (error) {
+    io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
+    return 2
+  }
   let tests: TestCase[] | undefined
   // Results that are not this run's: from CI, or kept from a later commit.
   let testsReadAt: string | undefined
@@ -187,12 +208,13 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   if (fromCi) {
     const say = (text: string) => { if (!values.quiet) io.err(text) }
     const resultsPath = join(root, TEST_RESULTS_FILE)
-    const existing = await readFile(resultsPath, 'utf8').then(parseTestResults, () => null)
+    const existing = parseTestResults(await readEditorStateFile(root, TEST_RESULTS_FILE) ?? '')
     const gh = io.gh ?? ghCli(io.env ?? process.env)
     let got
     try {
       got = await withFetchLock(root, async () => {
-        const source = await findCiRuns(root, gh, config.ci?.artifacts)
+        // CI's artifacts: the repository's .radical/radical.json says, else check.json.
+        const source = await findCiRuns(root, gh, repository?.ci?.artifacts ?? config.ci?.artifacts)
         if (await readLater(root, existing, source.commit)) return { source, kept: existing! }
         if (sameRuns(existing, source)) return { source, cases: existing!.cases, reports: existing!.reports }
         return { source, ...await downloadCiReports(root, gh, source) }
@@ -241,8 +263,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   // What radical sense kept, with the files --metrics names added.
-  const storePath = join(root, MEASUREMENTS_FILE)
-  const stored = await readFile(storePath, 'utf8').then(parseMeasurementStore, () => null)
+  const kept = await readEditorStateFile(root, MEASUREMENTS_FILE)
+  const stored = kept === null ? null : parseMeasurementStore(kept)
   let measurements: Measurement[] | undefined = stored ?? undefined
   if (values.metrics?.length) {
     const read: Measurement[] = []
@@ -253,16 +275,19 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       return 2
     }
     measurements = mergeMeasurements(stored ?? [], read)
-    await writeBeside(storePath, serializeMeasurementStore(measurements))
+    await writeBeside(join(root, MEASUREMENTS_FILE), serializeMeasurementStore(measurements))
   }
 
   // The reviews of manual fitness functions, kept in git beside the model.
-  const reviewsText = await readFile(join(root, REVIEWS_FILE), 'utf8').catch(() => null)
-  if (reviewsText !== null) {
+  // The reviews of manual fitness functions: the repository's
+  // .radical/reviews.json, and the model folder's while it is not moved.
+  for (const [where, path] of [[REPOSITORY_REVIEWS, join(await mappingRoot(root), REPOSITORY_REVIEWS)], [REVIEWS_FILE, join(root, REVIEWS_FILE)]]) {
+    const reviewsText = await readFile(path, 'utf8').catch(() => null)
+    if (reviewsText === null) continue
     try {
       measurements = [...(measurements ?? []), ...reviewMeasurements(parseReviewsFile(reviewsText))]
     } catch (error) {
-      io.err(`Cannot read ${REVIEWS_FILE}: ${(error as Error).message}`)
+      io.err(`Cannot read ${where}: ${(error as Error).message}`)
       return 2
     }
   }
@@ -289,7 +314,19 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 2
   }
   const others = federation ? federationOthers(files, federation.fetched) : undefined
-  const result = runCheck(files, config, { ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // The repository's own sensors, which a measure line may name too.
+  let sensors
+  try {
+    const found = await repositorySensors(root)
+    sensors = found ? { file: relative(io.cwd, found.file), names: Object.keys(found.sensors) } : null
+  } catch (error) {
+    io.err(`Cannot read the repository's sensors: ${(error as Error).message}`)
+    return 2
+  }
+  // Code paths the model's descriptions name that the repository lacks.
+  let missingPaths: Record<string, string[]> = {}
+  try { missingPaths = await missingCodePaths(await mappingRoot(root), deserializeFromMdFolder(files).data.nodes) } catch { /* the folder's own rules say what is wrong */ }
+  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
@@ -342,7 +379,7 @@ async function reportFiles(paths: string[], cwd: string, pattern = /\.(json|xml)
 export async function writeBeside(path: string, content: string): Promise<void> {
   const dir = dirname(path)
   await mkdir(dir, { recursive: true })
-  if (basename(dir) === SELECTION_DIR) {
+  if (basename(dir) === STATE_DIR) {
     await writeFile(join(dir, '.gitignore'), SELECTION_GITIGNORE_CONTENT, { flag: 'wx' }).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== 'EEXIST') throw error
     })

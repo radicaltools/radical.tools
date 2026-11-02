@@ -9,6 +9,8 @@ import { HARDEN_USAGE, hardenCommand } from './harden'
 import { EXPLORE_USAGE, exploreCommand } from './explore'
 import { SETUP_USAGE, setupCommand } from './setup'
 import { SENSE_USAGE, senseCommand } from './sense'
+import { IMPLEMENT_USAGE, implementCommand } from './implement'
+import { VERIFY_USAGE, verifyCommand } from './verify'
 import { displayVersion } from '@radical/common/version'
 
 const USAGE = `Usage: radical <command> [options]
@@ -20,6 +22,12 @@ Commands:
   check [folder]   check a Radical Markdown model folder (radical check --help)
   sense <adapter>  measure with a sensor adapter, for the model's metric
                    conditions (radical sense --help)
+  implement <element> --path <folder>
+                   say where the repository builds an element of the model,
+                   in .radical/radical.json (radical implement --help)
+  verify <scenario> --test "<file> › <title>"
+                   bind a test to a scenario or fitness function of the
+                   model, in .radical/radical.json (radical verify --help)
   diff [folder]    what changed in the model since its version in git
                    (radical diff --help)
   hooks install    git hooks that keep the base Studio compares with
@@ -32,7 +40,7 @@ Commands:
   federation <open|sync|watch> [folder]
                    compose the model with the models its deps.json names,
                    and carry its own changes back (radical federation --help)
-  fuzz [plan]      run the fuzz files crucible.json lists (Radical Crucible;
+  fuzz [plan]      run the fuzz files .radical/crucible/crucible.json lists (Radical Crucible;
                    radical fuzz --help)
   harden <finding> turn a finding into a test, and gate a test: it fails
                    without the fix and passes with it every time
@@ -49,6 +57,8 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'setup') return setupCommand(rest, io)
   if (command === 'check') return checkCommand(rest, io)
   if (command === 'sense') return senseCommand(rest, io)
+  if (command === 'implement') return implementCommand(rest, io)
+  if (command === 'verify') return verifyCommand(rest, io)
   if (command === 'diff') return diffCommand(rest, io)
   if (command === 'hooks') return hooksCommand(rest, io)
   if (command === 'discussions') return discussionsCommand(rest, io)
@@ -59,7 +69,7 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'explore') return exploreCommand(rest, io)
   if (command === '--version' || command === '-v') { io.out(displayVersion()); return 0 }
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
-    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'federation' ? FEDERATION_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
+    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'implement' ? IMPLEMENT_USAGE : rest[0] === 'verify' ? VERIFY_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'federation' ? FEDERATION_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
     return 0
   }
   io.err(`Unknown command: ${command}\n\n${USAGE}`)

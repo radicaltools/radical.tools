@@ -13,17 +13,17 @@
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel, milestoneViews, originOf } from '../model'
-import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
-import { computeEvidence, type Evidence } from './evidence'
+import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
+import { computeEvidence, withBoundTests, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
-export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
+export { CHECK_RULES, verifiedHere, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
-export { computeEvidence, conditionResults, conditionsOf, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
+export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
 export { METRICS_FORMAT, REVIEW_METRIC, convertUnit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
 export { REVIEWS_FILE, REVIEWS_FORMAT, addReview, parseReviewsFile, reviewMeasurements, type Review, type ReviewsFile } from './reviews'
 export { SENSOR_NAMES, commandWords, isSensorName, parseMeasure, type MeasureLine } from './sensors'
@@ -123,7 +123,7 @@ export interface CheckOptions {
    *  that read test outcomes find nothing and there is no evidence. */
   tests?: TestCase[]
   /** When `tests` were read, when they are results kept from an earlier
-   *  run (.radical/test-results.json): a test they lack, and a goal they
+   *  run (.state/test-results.json): a test they lack, and a goal they
    *  leave unmet, are warnings naming that time. */
   testsReadAt?: string
   /** The Hub's concern packs (concerns.ts), for concern-unaddressed. */
@@ -133,6 +133,16 @@ export interface CheckOptions {
   measurements?: Measurement[]
   /** When the conditions are evaluated, for max_age (ms since the epoch). */
   now?: number
+  /** The sensors of the repository's .radical/sensors/sensors.json, null
+   *  when it has none; without them a measure line may name any sensor
+   *  (Studio). */
+  sensors?: { file: string; names: string[] } | null
+  /** The repository's .radical/radical.json, as the CLI reads it; without
+   *  it repository-mapping checks nothing (Studio). */
+  repository?: RepositoryMapping | null
+  /** By element, the paths from the repository's root its description
+   *  names that the repository does not have (the CLI). */
+  missingPaths?: Record<string, string[]>
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
   /** The event the check runs on (pull-request in the gate): what runs on
@@ -246,14 +256,49 @@ interface ModelCheck {
  *  origin, in a federation) are checked with it, so what points at them
  *  holds; what is found about them, and their share of the metrics, is
  *  their own model's. */
+/** The rules' settings with the repository's test files (its
+ *  .radical/radical.json "tests") for test-unbound, over check.json's. */
+export function withRepositorySettings(rules: Record<string, RuleSetting>, tests: { include?: string[]; exclude?: string[] } | undefined): Record<string, RuleSetting> {
+  if (!tests?.include && !tests?.exclude) return rules
+  const own = rules['test-unbound']
+  const base = typeof own === 'string' ? { severity: own } : own ?? {}
+  return { ...rules, 'test-unbound': { ...base, ...(tests.include ? { include: tests.include } : {}), ...(tests.exclude ? { exclude: tests.exclude } : {}) } as RuleSetting }
+}
+
+/** `config` without the repository's settings (test-unbound's include and
+ *  exclude, ci): what the model's check.json keeps when they go to the
+ *  repository's .radical/radical.json. */
+export function withoutRepositorySettings(config: CheckConfig): CheckConfig {
+  const { ci: _ci, ...rest } = config
+  const unbound = rest.rules?.['test-unbound']
+  if (typeof unbound !== 'object') return rest
+  const { include: _include, exclude: _exclude, ...kept } = unbound
+  const rules = { ...rest.rules }
+  if (Object.keys(kept).length) rules['test-unbound'] = kept as RuleSetting
+  else delete rules['test-unbound']
+  return { ...rest, rules }
+}
+
+/** The repository's settings a check.json holds. */
+function settingsInModel(config: CheckConfig): string[] {
+  const unbound = config.rules?.['test-unbound']
+  return [
+    ...(typeof unbound === 'object' && (unbound.include?.length || unbound.exclude?.length) ? ['test-unbound include and exclude'] : []),
+    ...(config.ci?.artifacts?.length ? ['ci artifacts'] : []),
+  ]
+}
+
 function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
   const found: Array<RuleFinding & { rule: string }> = []
+  // The tests .radical/radical.json binds count as each node's conditions.
+  data = { ...data, nodes: withBoundTests(data.nodes, options.repository?.verifies) }
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations, data.snapshots ?? [])
     .forEach((finding) => found.push({ rule: STALE_REFERENCE, ...finding }))
   const settings = {
-    metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
+    metamodel: documentMetamodel(data.metamodel, data.nodes), settings: withRepositorySettings(config.rules ?? {}, options.repository?.tests),
+    settingsInModel: settingsInModel(config),
     ...(options.tests ? { tests: options.tests } : {}),
     ...(options.tests && options.testsReadAt ? { testsReadAt: options.testsReadAt } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
@@ -261,6 +306,9 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.baseline ? { baseline: options.baseline } : {}),
     ...(options.trigger ? { trigger: options.trigger } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
+    ...(options.sensors !== undefined ? { sensors: options.sensors } : {}),
+    ...(options.repository !== undefined ? { repository: options.repository } : {}),
+    ...(options.missingPaths ? { missingPaths: options.missingPaths } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))
@@ -272,7 +320,9 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
       if (!(finding.nodeId && theirs.has(finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
     })
   }
-  const evidence = options.tests || options.measurements ? computeEvidence(ownModel) : undefined
+  // On the whole model: another model's fitness function counts where its
+  // decision constrains this model's elements.
+  const evidence = options.tests || options.measurements ? computeEvidence(model) : undefined
   const goals = measureGoals({ model: ownModel, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
   goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
   return {

@@ -9,9 +9,9 @@ import { HUB_PORT } from '../../playwright.config'
 
 // The Inspector perspective shows what radical check says about a model
 // kept in a folder: the rules run on the model as it is, the test results
-// come from .radical/test-results.json, which `radical check --report`
+// come from .state/test-results.json, which `radical check --report`
 // writes beside the model, and what sensors measured from
-// .radical/measurements.json, which `radical sense` keeps there. Its tabs: Overview (the scores and what
+// .state/measurements.json, which `radical sense` keeps there. Its tabs: Overview (the scores and what
 // needs attention), Model, Implementation (what the tests say), This branch (with a base beside the
 // model) and Settings (the folder's check.json); its header says how old the evidence is.
 
@@ -57,7 +57,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(inspector).toHaveAttribute('title', /no check report or measurements beside this model/)
 
   // radical check --report wrote one in which the scenario's test failed.
-  await folder.write('.radical/test-results.json', results('failed'))
+  await folder.write('.state/test-results.json', results('failed'))
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await expect(inspector.locator('.insp-count .e')).toHaveText('✖ 1')
 
@@ -103,7 +103,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(studio.node('req')).toHaveClass(/selected/)
 
   // The test passes in the next run: the model is verified, no errors.
-  await folder.write('.radical/test-results.json', results('passed'))
+  await folder.write('.state/test-results.json', results('passed'))
   await expect(inspector.locator('.insp-count .e')).toHaveCount(0, { timeout: 10_000 })
   await inspector.click()
   await expect(page.locator('.insp-verdict')).toHaveText(/No errors/)
@@ -133,8 +133,8 @@ test('the Inspector opens on Overview with what needs attention, and each findin
     views: [MODEL.views![0], { id: 'v-spec', name: 'Specification', nodeIds: ['need', 'req', 'sc', 'refund', 'adr'], positions: {} }],
   }
   for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
-  await folder.write('.radical/test-results.json', results('failed'))
-  await folder.write('.radical/base.json', serializeModelBase({ commit: '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90', described: 'merge base with origin/main', branch: 'feat/refunds', nodes: MODEL.nodes, relations: MODEL.relations }))
+  await folder.write('.state/test-results.json', results('failed'))
+  await folder.write('.state/base.json', serializeModelBase({ commit: '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90', described: 'merge base with origin/main', branch: 'feat/refunds', nodes: MODEL.nodes, relations: MODEL.relations }))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -212,7 +212,7 @@ test('the Inspector header says how old the test results are, and how to read th
   await page.goto('/')
   for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
   const readAt = new Date(Date.now() - 8 * 86400e3)
-  await folder.write('.radical/test-results.json', serializeTestResults([{ file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed' }], ['reports/unit.json', 'reports/e2e.json'], readAt))
+  await folder.write('.state/test-results.json', serializeTestResults([{ file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed' }], ['reports/unit.json', 'reports/e2e.json'], readAt))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -268,7 +268,7 @@ test('the Overview tells an ADR without a fitness function from one whose fitnes
   }
   for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
   // Test results, in which the layers test failed; nothing measured.
-  await folder.write('.radical/test-results.json', serializeTestResults([{ file: '/repo/tests/layers.test.ts', title: ['layers hold'], status: 'failed' }], ['reports/unit.json']))
+  await folder.write('.state/test-results.json', serializeTestResults([{ file: '/repo/tests/layers.test.ts', title: ['layers hold'], status: 'failed' }], ['reports/unit.json']))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -336,7 +336,7 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
   // radical sense measured the latency, too slow, two hours ago; nothing
   // measured the error rate. No test report: the measurements alone open it.
   const at = new Date(Date.now() - 2 * 3600e3).toISOString()
-  await folder.write('.radical/measurements.json', serializeMeasurementStore([
+  await folder.write('.state/measurements.json', serializeMeasurementStore([
     { metric: 'checkout.latency.p95', value: 0.42, unit: 's', labels: { env: 'staging' }, source: 'json', at },
   ]))
   const inspector = page.getByRole('button', { name: /^Inspector/ })
@@ -358,7 +358,7 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
 
   // Measured again, both within their thresholds: the decision is verified.
   const now = new Date().toISOString()
-  await folder.write('.radical/measurements.json', serializeMeasurementStore([
+  await folder.write('.state/measurements.json', serializeMeasurementStore([
     { metric: 'checkout.errors.rate', value: 0.2, unit: '%', labels: { env: 'staging' }, source: 'json', at: now },
     { metric: 'checkout.latency.p95', value: 210, unit: 'ms', labels: { env: 'staging' }, source: 'json', at: now },
   ]))
@@ -372,7 +372,7 @@ test('a deep link opens the Inspector at once, and only with all it reads', asyn
   await folder.install()
   await page.goto('/')
   for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
-  await folder.write('.radical/test-results.json', results('failed'))
+  await folder.write('.state/test-results.json', results('failed'))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -402,7 +402,7 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   await page.goto('/')
   for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
   await folder.write('check.json', JSON.stringify({ rules: { 'requirement-without-scenario': { severity: 'error', max: 3 } } }, null, 2) + '\n')
-  await folder.write('.radical/test-results.json', results('passed'))
+  await folder.write('.state/test-results.json', results('passed'))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -429,7 +429,7 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   await page.getByRole('spinbutton', { name: 'Goal for Scenarios that name a check' }).fill('90')
   await page.locator('.insp-diff summary').click()
   await expect(page.locator('.insp-diff pre')).toContainText('+   "goals": {')
-  await page.getByRole('button', { name: 'Save to check.json' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.insp-savebar')).toHaveCount(0)
 
   const saved = JSON.parse((await folder.files())['check.json'])
@@ -448,7 +448,7 @@ test('Settings edits wait for Save on another tab and after Back, and the tab sa
   await folder.install()
   await page.goto('/')
   for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
-  await folder.write('.radical/test-results.json', results('passed'))
+  await folder.write('.state/test-results.json', results('passed'))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -486,7 +486,7 @@ test('Settings count stale references as the check does, and leave the rules on 
   const model = { ...MODEL, views: [...MODEL.views!, { id: 'v-gone', name: 'Gone', nodeIds: ['nobody'], positions: {} }] }
   for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
   await folder.write('check.json', JSON.stringify({ rules: { 'folder-not-a-node': { severity: 'error', max: 1 }, 'stale-reference': { max: 2 } } }, null, 2) + '\n')
-  await folder.write('.radical/test-results.json', results('passed'))
+  await folder.write('.state/test-results.json', results('passed'))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
@@ -537,7 +537,7 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
     views: [{ id: 'v-shop', name: 'Shop', nodeIds: [], positions: {} }],
   }
   for (const [path, content] of Object.entries(serializeToMdFolder(shop, 'Shop'))) await folder.write(path, content)
-  await folder.write('.radical/test-results.json', results('passed'))
+  await folder.write('.state/test-results.json', results('passed'))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()

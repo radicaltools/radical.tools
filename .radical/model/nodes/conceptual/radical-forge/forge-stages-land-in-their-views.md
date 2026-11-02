@@ -1,0 +1,8 @@
+---
+id: "4ae9de15-ef14-4092-bcac-a3a6dd9b5b74"
+type: "scenario"
+label: "Forge stages land in their views"
+given: "a governance model and AI configured"
+then: "the need and the requirements are on a Conceptual view, beside each other in a block wider than tall, held in a grid of 3 columns; the fitness functions are alone on a new Governance view, which is on screen, and the wizard asks how to arrange them"
+when: "the user starts Radical Forge with the Layer canvases structure, generates five requirements, keeps them in a grid, runs Smart Layout, then generates two fitness functions"
+---

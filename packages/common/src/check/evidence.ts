@@ -8,9 +8,10 @@
 // own files.
 
 import type { C4Node } from '../c4'
+import { originOf } from '../model'
 import type { CheckModel } from './rules'
 import { findTests, outcomeOf, type TestId, type TestStatus } from './reports'
-import { evaluateMetric, parseCombine, parseConditions, parseMaxAge, type Combine, type Condition, type Measurement } from './metrics'
+import { evaluateMetric, parseCombine, parseCondition, parseConditions, parseMaxAge, type Combine, type Condition, type Measurement } from './metrics'
 
 /** A test id's outcome; `not-found` when its file ran but no test has its
  *  title, `not-run` when no report has its file. */
@@ -48,6 +49,12 @@ export interface EvidenceEntry {
   conditions?: ConditionResult[]
   /** For a requirement or ADR: the scenarios or fitness functions behind its status. */
   by?: string[]
+  /** For a fitness function measured for each element its ADR constrains:
+   *  each such element of the model, with its outcome. */
+  elements?: Array<{ id: string; label: string; status: CheckedStatus; conditions: ConditionResult[] }>
+  /** For a fitness function of another model (a federation), judged here on
+   *  the model's own elements: that model. */
+  origin?: string
 }
 
 export interface Evidence {
@@ -63,7 +70,28 @@ export interface Evidence {
 export const TESTED_TYPES = ['scenario', 'fitness-fn'] as const
 
 type Props = Record<string, unknown>
-export const conditionsOf = (node: C4Node): Condition[] => parseConditions((node as unknown as Props).metrics)
+/** Where the check's copy of a node keeps the tests the repository's
+ *  .radical/radical.json binds to it (ADR Tests are bound outside the model). */
+export const BOUND_TESTS = 'boundTests'
+
+/** The nodes with the tests `verifies` binds to each, for the check: its
+ *  conditions are its Metrics and those tests. */
+export function withBoundTests<T extends C4Node>(nodes: T[], verifies: Array<{ element: string; tests: string[] }> | undefined): T[] {
+  if (!verifies?.length) return nodes
+  const bound = new Map<string, string[]>()
+  for (const v of verifies) bound.set(v.element, [...bound.get(v.element) ?? [], ...v.tests])
+  return nodes.map((n) => (bound.has(n.id) ? { ...n, [BOUND_TESTS]: bound.get(n.id) } : n))
+}
+
+/** A node's conditions: its Metrics' lines, and a `test(<id>) passed` for
+ *  each test bound to it. */
+export const conditionsOf = (node: C4Node): Condition[] => {
+  const bound = (node as unknown as Props)[BOUND_TESTS]
+  return [
+    ...parseConditions((node as unknown as Props).metrics),
+    ...(Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []),
+  ]
+}
 
 /** The tests a node's test() conditions name. */
 export const testIdsOf = (node: C4Node): TestId[] =>
@@ -82,13 +110,15 @@ export function testOutcomes(node: C4Node, model: CheckModel): Array<{ id: TestI
 /** Each condition of `node` with its outcome, from the test reports and the
  *  measurements. A metric condition of an element whose max_age cannot be
  *  read is evaluated without one (metric-invalid reports the max_age). */
-export function conditionResults(node: C4Node, model: CheckModel): ConditionResult[] {
+export function conditionResults(node: C4Node, model: CheckModel, element?: C4Node): ConditionResult[] {
   const maxAge = parseMaxAge((node as unknown as Props).max_age) ?? undefined
   const now = model.now ?? Date.now()
   return conditionsOf(node).map((c): ConditionResult => {
     if (c.kind === 'invalid') return { condition: c.raw, outcome: 'invalid', detail: c.problem }
     if (c.kind === 'test') return { condition: c.raw, test: c.id.raw, outcome: testOutcome(c.id, model) }
-    const e = evaluateMetric(c, model.measurements ?? [], maxAge, now, model.baseline ?? [])
+    // For one element: its measurement, which the sensor's run labelled with it.
+    const metric = element ? { ...c, labels: { ...c.labels, [ELEMENT_LABEL]: element.id } } : c
+    const e = evaluateMetric(metric, model.measurements ?? [], maxAge, now, model.baseline ?? [])
     return { condition: c.raw, outcome: e.outcome, ...(e.measurement ? { measurement: e.measurement } : {}), ...(e.detail ? { detail: e.detail } : {}) }
   })
 }
@@ -115,7 +145,44 @@ export function checkedStatus(outcomes: Array<{ outcome: ConditionOutcome }>, co
   return pending()
 }
 
+/** The label radical sense run puts on a measurement made for one element. */
+export const ELEMENT_LABEL = 'element'
+
+/** The elements a fitness function applies to: those the ADRs it implements
+ *  constrain directly. */
+export function appliedElements(model: CheckModel, ff: C4Node): C4Node[] {
+  const seen = new Set<string>()
+  return linkedNodes(model, ff.id, 'implements', 'target', 'adr')
+    .flatMap((adr) => linkedNodes(model, adr.id, 'constrains', 'target'))
+    .filter((n) => !seen.has(n.id) && !!seen.add(n.id))
+}
+
+/** The elements of the model `ff` is judged on one by one: the model's own
+ *  elements it applies to, when its sensors measured for each element (a
+ *  measurement of one of its metrics carries an element label); else none,
+ *  and it is judged once, as a whole. */
+export function measuredElements(model: CheckModel, ff: C4Node): C4Node[] {
+  if (ff.type !== 'fitness-fn') return []
+  const metrics = new Set(conditionsOf(ff).flatMap((c) => (c.kind === 'metric' ? [c.metric] : [])))
+  const perElement = (model.measurements ?? []).some((m) => metrics.has(m.metric) && ELEMENT_LABEL in m.labels)
+  return perElement ? appliedElements(model, ff).filter((n) => !originOf(n)) : []
+}
+
+/** A fitness function's metric conditions judged on one element: on the
+ *  measurements its sensors' run labelled with the element. */
+export function elementConditions(node: C4Node, model: CheckModel, element: C4Node): ConditionResult[] {
+  const metricLines = new Set(conditionsOf(node).flatMap((c) => (c.kind === 'metric' ? [c.raw] : [])))
+  return conditionResults(node, model, element).filter((r) => metricLines.has(r.condition))
+}
+
 export const combineOf = (node: C4Node): Combine => parseCombine((node as unknown as Props).combine) ?? { kind: 'all' }
+
+/** A fitness function's status from its elements': each must pass. */
+function combineElements(statuses: CheckedStatus[]): CheckedStatus {
+  if (statuses.includes('failed')) return 'failed'
+  if (statuses.every((s) => s === 'passed')) return 'passed'
+  return statuses.includes('stale') ? 'stale' : 'not-run'
+}
 
 /** The nodes of `type` that the relation `relationType` links to `id`, from
  *  their side (`from`: source of the relation). */
@@ -126,17 +193,34 @@ export function linkedNodes(model: CheckModel, id: string, relationType: string,
     .filter((n): n is C4Node => !!n && (!type || n.type === type))
 }
 
+/** What the reports and measurements say about the model's own scenarios,
+ *  fitness functions, requirements and ADRs. Another model's elements (a
+ *  federation) count only as a fitness function judged here on the model's
+ *  own elements: a standard its ADR makes theirs. */
 export function computeEvidence(model: CheckModel): Evidence {
   const nodes: Record<string, EvidenceEntry> = {}
   for (const node of Object.values(model.nodes)) {
     if (!(TESTED_TYPES as readonly string[]).includes(node.type)) continue
-    const conditions = conditionResults(node, model)
+    const origin = originOf(node)
+    const elements = measuredElements(model, node).map((element) => {
+      const conditions = elementConditions(node, model, element)
+      return { id: element.id, label: element.label, status: checkedStatus(conditions, combineOf(node)), conditions }
+    })
+    if (origin && !elements.length) continue
+    // Measured for each element, its metrics are judged per element and its
+    // tests (its own model's, never another's) once; it holds when all do.
+    const conditions = elements.length
+      ? origin ? [] : conditionResults(node, model).filter((r) => r.test)
+      : conditionResults(node, model)
+    const own = elements.length && conditions.length ? [checkedStatus(conditions)] : []
     nodes[node.id] = {
       type: node.type,
       label: node.label,
-      status: checkedStatus(conditions, combineOf(node)),
-      tests: testOutcomes(node, model).map((o) => ({ id: o.id.raw, outcome: o.outcome })),
+      status: elements.length ? combineElements([...own, ...elements.map((e) => e.status)]) : checkedStatus(conditions, combineOf(node)),
+      tests: origin ? [] : testOutcomes(node, model).map((o) => ({ id: o.id.raw, outcome: o.outcome })),
       conditions,
+      ...(elements.length ? { elements } : {}),
+      ...(origin ? { origin } : {}),
     }
   }
   const verified = (node: C4Node, checkers: C4Node[]): void => {
@@ -150,6 +234,7 @@ export function computeEvidence(model: CheckModel): Evidence {
     }
   }
   for (const node of Object.values(model.nodes)) {
+    if (originOf(node)) continue
     if (node.type === 'requirement') verified(node, linkedNodes(model, node.id, 'verifies', 'source', 'scenario'))
     else if (node.type === 'adr') verified(node, linkedNodes(model, node.id, 'implements', 'source', 'fitness-fn'))
   }

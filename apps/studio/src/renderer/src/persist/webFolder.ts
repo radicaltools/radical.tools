@@ -16,7 +16,7 @@
 // needs the same re-grant after a reload.
 
 import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
-import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
+import { OLD_STATE_DIR, STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
@@ -66,6 +66,29 @@ export async function pickWebDirectory(): Promise<FsDirHandle | null> {
   } catch {
     return null // user dismissed the picker
   }
+}
+
+/** What a picked folder opens: the model, and the repository's .radical/
+ *  folder that holds its radical.json, when there is one. The model is the
+ *  folder itself when it has a radical.md; else the .radical/model of a
+ *  repository picked (the picker hides .radical/), or of the .radical/
+ *  folder itself (a picker showing hidden folders may pick it). */
+export async function openedFolder(picked: FsDirHandle): Promise<{ model: FsDirHandle; radical: FsDirHandle | null }> {
+  const hasManifest = (dir: FsDirHandle) => dir.getFileHandle('radical.md').then(() => true, () => false)
+  const modelIn = async (radical: FsDirHandle) => {
+    // MODEL_FOLDER of @radical/node-files' repositoryLayout.
+    const model = await radical.getDirectoryHandle('model').catch(() => null)
+    return model && await hasManifest(model) ? { model, radical } : null
+  }
+  if (await hasManifest(picked)) return { model: picked, radical: null }
+  if (picked.name === '.radical') return await modelIn(picked) ?? { model: picked, radical: null }
+  const radical = await picked.getDirectoryHandle('.radical').catch(() => null)
+  return (radical && await modelIn(radical)) ?? { model: picked, radical: null }
+}
+
+/** The model a picked folder holds (see openedFolder). */
+export async function modelHandleOf(picked: FsDirHandle): Promise<FsDirHandle> {
+  return (await openedFolder(picked)).model
 }
 
 /** True when this environment can keep a model in a single file it reads and
@@ -170,7 +193,7 @@ export function handleFolderStorage(root: FsDirHandle): MdFolderStorage {
     async readCache(name) {
       if (!MODEL_CACHE_NAMES.has(name)) return null
       try {
-        let dir = await root.getDirectoryHandle(SELECTION_DIR)
+        let dir = await root.getDirectoryHandle(STATE_DIR)
         for (const part of cacheDir) dir = await dir.getDirectoryHandle(part)
         return await (await (await dir.getFileHandle(name)).getFile()).text()
       } catch {
@@ -243,21 +266,21 @@ async function writeText(dir: FsDirHandle, name: string, content: string): Promi
 }
 
 /** Writes the canvas selection file (see canvasSelection) under the model
- *  folder's `.radical/`, with the `.gitignore` that keeps it out of git. */
+ *  folder's `.state/`, with the `.gitignore` that keeps it out of git. */
 export async function writeSelectionToHandle(root: FsDirHandle, content: string): Promise<void> {
   await writeEditorStateToHandle(root, 'selection.json', content)
 }
 
-/** Writes the model's base (see modelBase) under `.radical/`, as a Forge
+/** Writes the model's base (see modelBase) under `.state/`, as a Forge
  *  run does where git saved none. */
 export async function writeModelBaseToHandle(root: FsDirHandle, content: string): Promise<void> {
   await writeEditorStateToHandle(root, 'base.json', content)
 }
 
-/** The model folder's `.radical/`, made when missing, with the
+/** The model folder's `.state/`, made when missing, with the
  *  `.gitignore` that keeps it out of version control. */
 async function editorStateDirOf(root: FsDirHandle): Promise<FsDirHandle> {
-  const dir = await root.getDirectoryHandle(SELECTION_DIR, { create: true })
+  const dir = await root.getDirectoryHandle(STATE_DIR, { create: true })
   try { await dir.getFileHandle('.gitignore') }
   catch { await writeText(dir, '.gitignore', SELECTION_GITIGNORE_CONTENT) }
   return dir
@@ -267,65 +290,73 @@ async function writeEditorStateToHandle(root: FsDirHandle, name: string, content
   await writeText(await editorStateDirOf(root), name, content)
 }
 
-/** The Forge run status file (see forgeRunStatus) under the model folder's
- *  `.radical/`, or null when there is none. */
+/** A state file (`name` under the model folder's `.state/`), or under its
+ *  old `.radical/` while `.state/` lacks it; null when there is none. */
+async function readStateFromHandle(root: FsDirHandle, name: string): Promise<string | null> {
+  for (const dirName of [STATE_DIR, OLD_STATE_DIR]) {
+    try {
+      const dir = await root.getDirectoryHandle(dirName)
+      return await (await (await dir.getFileHandle(name)).getFile()).text()
+    } catch { /* not there: the next place */ }
+  }
+  return null
+}
+
+/** The Forge run status file (see forgeRunStatus) of the model folder's
+ *  state, or null when there is none. */
 export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string | null> {
-  try {
-    const dir = await root.getDirectoryHandle(SELECTION_DIR)
-    return await (await (await dir.getFileHandle('forge-run.json')).getFile()).text()
-  } catch {
-    return null
-  }
+  return readStateFromHandle(root, 'forge-run.json')
 }
 
-/** The agent activity file (see agentActivity) under the model folder's
- *  `.radical/`, or null when there is none. */
+/** The agent activity file (see agentActivity) of the model folder's
+ *  state, or null when there is none. */
 export async function readAgentActivityFromHandle(root: FsDirHandle): Promise<string | null> {
-  try {
-    const dir = await root.getDirectoryHandle(SELECTION_DIR)
-    return await (await (await dir.getFileHandle('agent-activity.json')).getFile()).text()
-  } catch {
-    return null
-  }
+  return readStateFromHandle(root, 'agent-activity.json')
 }
 
-/** The model's base (see modelBase) under the model folder's `.radical/`,
- *  or null when there is none. */
+/** The model's base (see modelBase) of the model folder's state, or null
+ *  when there is none. */
 export async function readModelBaseFromHandle(root: FsDirHandle): Promise<string | null> {
-  try {
-    const dir = await root.getDirectoryHandle(SELECTION_DIR)
-    return await (await (await dir.getFileHandle('base.json')).getFile()).text()
-  } catch {
-    return null
-  }
+  return readStateFromHandle(root, 'base.json')
 }
 
 /** What a federation keeps beside the model: its deps.json and the other
- *  models fetched into `.radical/federation.json`; each null when there is
+ *  models fetched into `.state/federation.json`; each null when there is
  *  none. */
 export async function readFederationFromHandle(root: FsDirHandle): Promise<{ deps: string | null; federation: string | null }> {
-  const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
-    try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
-  }
-  const deps = await text(root, DEPS_FILE)
-  let dir: FsDirHandle | null = null
-  try { dir = await root.getDirectoryHandle(SELECTION_DIR) } catch { dir = null }
-  const federation = dir ? await text(dir, FEDERATION_FILE.slice(SELECTION_DIR.length + 1)) : null
-  return { deps, federation }
+  let deps: string | null
+  try { deps = await (await (await root.getFileHandle(DEPS_FILE)).getFile()).text() } catch { deps = null }
+  return { deps, federation: await readStateFromHandle(root, FEDERATION_FILE.slice(STATE_DIR.length + 1)) }
+}
+
+/** Writes the repository's radical.json into its .radical/ folder (the
+ *  handle kept), or into the .radical/ of a repository handle kept by an
+ *  earlier version. */
+export async function writeRepositoryFileToHandle(repository: FsDirHandle, content: string): Promise<void> {
+  const dir = repository.name === '.radical' ? repository : await repository.getDirectoryHandle('.radical', { create: true })
+  await writeText(dir, 'radical.json', content)
 }
 
 /** What `radical check` and `radical sense` keep beside the model:
- *  `.radical/test-results.json`, `.radical/measurements.json` and the
- *  model's check.json and reviews.json; each null when there is none. */
-export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null }> {
+ *  `.state/test-results.json`, `.state/measurements.json` and the
+ *  model's check.json and reviews.json, and with the repository's .radical/
+ *  folder (`repository`) its radical.json; each null when there is none. */
+export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: FsDirHandle | null): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null }> {
   const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
     try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
   }
-  let dir: FsDirHandle | null = null
-  try { dir = await root.getDirectoryHandle(SELECTION_DIR) } catch { dir = null }
-  const results = dir ? await text(dir, 'test-results.json') : null
-  const measurements = dir ? await text(dir, 'measurements.json') : null
-  return { results, measurements, config: await text(root, 'check.json'), reviews: await text(root, 'reviews.json') }
+  return {
+    results: await readStateFromHandle(root, 'test-results.json'),
+    measurements: await readStateFromHandle(root, 'measurements.json'),
+    config: await text(root, 'check.json'),
+    // The repository's .radical/reviews.json, else the model folder's.
+    reviews: (repository ? await text(repository.name === '.radical' ? repository : await repository.getDirectoryHandle('.radical').catch(() => repository), 'reviews.json') : null) ?? await text(root, 'reviews.json'),
+    // The repository's .radical/ beside the model: its mapping. A handle
+    // kept before .radical/ was kept is the repository's own.
+    repository: repository
+      ? await text(repository, 'radical.json') ?? await repository.getDirectoryHandle('.radical').then((dir) => text(dir, 'radical.json'), () => null)
+      : null,
+  }
 }
 
 /** Writes the model's check.json, as the Inspector's Settings save it. */

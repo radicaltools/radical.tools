@@ -316,7 +316,7 @@ describe('canvas selection', () => {
     const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
 
     await writeSelectionFile(folder, serializeSelection({ viewId: view.id, nodeIds: [mockupId, 'gone'], relationIds: [] }))
-    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(folder, '.state/.gitignore'), 'utf8')).toBe('*\n')
     const outcome = await model.call('get_selection', {})
     expect(outcome.ok).toBe(true)
     const result = JSON.parse(outcome.text)
@@ -365,9 +365,9 @@ describe('get_selection with an odd selection file', () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)
     await writeSelectionFile(folder, '{"version": 1, "updatedAt": ')
-    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json cannot be read/)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .state\/selection.json cannot be read/)
     await writeSelectionFile(folder, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), viewId: null, nodeIds: ['a'], relationIds: [] }))
-    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json was written by a newer Studio \(version 2\)/)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .state\/selection.json was written by a newer Studio \(version 2\)/)
   })
 })
 
@@ -417,10 +417,10 @@ describe('get_changes', () => {
     expect(changes.text).toMatch(/Elements changed \(1\):\n- system "Shop" \([^)]+\)\n {4}description: \(none\) → Sells books\.$/)
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
     // Without since it saves the base Studio shows: the model as committed.
-    const base = parseModelBase(await readFile(join(folder, '.radical/base.json'), 'utf8'))
+    const base = parseModelBase(await readFile(join(folder, '.state/base.json'), 'utf8'))
     expect(base).toMatchObject({ described: 'merge base with main', branch: 'main' })
     expect(base!.nodes.map((n) => n.label)).toEqual(['Shop'])
-    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(folder, '.state/.gitignore'), 'utf8')).toBe('*\n')
     expect((await model.call('get_changes', { since: 'nope' })).text).toContain('Unknown git ref "nope"')
     expect(model.tools.find((tool) => tool.name === 'get_changes')?.inputSchema).toMatchObject({ properties: { since: { type: 'string' } } })
   })
@@ -517,7 +517,7 @@ describe('warnier', () => {
 
 describe('federation', () => {
   /** Payments' model folder, with Orders (its API, its DB and a relation
-   *  between them) fetched from the model orders into .radical/federation.json. */
+   *  between them) fetched from the model orders into .state/federation.json. */
   async function fetched(): Promise<string> {
     const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-federation-'))
     folders.push(folder)
@@ -568,7 +568,7 @@ describe('federation', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   })
 
-  it('reads the other models from .radical/federation.json and writes only its own', async () => {
+  it('reads the other models from .state/federation.json and writes only its own', async () => {
     const folder = await fetched()
     const git = (...args: string[]) => promisify(execFile)('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: folder })
     await git('init', '-q', '-b', 'main')
@@ -615,6 +615,20 @@ describe('federation', () => {
     expect(views.map((v) => v.name)).toEqual(['Containers'])
     expect(views.some((v) => v.id === 'v-ord')).toBe(false)
   })
+
+  it("refuses a view of the model's own in another model's folder", async () => {
+    const folder = await fetched()
+    const model = await FolderModel.open(folder)
+    const made = await model.call('create_view', { tempId: 'v', name: 'Mine', folder: 'orders/Logical' })
+    expect(made.ok).toBe(false)
+    expect(made.text).toContain('The folder "orders/Logical" holds the views of the model orders (orders@abc1234), read-only')
+    expect((await model.call('create_view', { tempId: 'v', name: 'Mine', folder: 'Payments' })).ok).toBe(true)
+    const mine = JSON.parse(await readFile(join(folder, 'views.json'), 'utf8')).find((v: { name: string }) => v.name === 'Mine').id as string
+    const moved = await model.call('update_view', { id: mine, folder: 'orders' })
+    expect(moved.ok).toBe(false)
+    expect(moved.text).toContain('holds the views of the model orders')
+    expect((await model.call('update_view', { id: mine, folder: 'Payments/C4' })).ok).toBe(true)
+  })
 })
 
 describe('starting a model', () => {
@@ -656,7 +670,7 @@ describe('starting a model', () => {
     const model = await FolderModel.open(dir, { metamodel: 'c4' })
     expect((await model.call('add_node', { tempId: 'a', type: 'system', label: 'A' })).ok).toBe(true)
     for (const name of await readdir(dir)) await rm(join(dir, name), { recursive: true })
-    await mkdir(join(dir, '.radical'))
+    await mkdir(join(dir, '.state'))
     expect(await summaryOf(model)).toMatchObject({ metamodel: { id: 'c4-builtin' }, nodes: 0 })
     await rm(dir, { recursive: true })
     expect((await model.call('add_node', { tempId: 'b', type: 'system', label: 'B' })).ok).toBe(true)
@@ -1173,5 +1187,97 @@ describe('get_issues', () => {
     const bound = (await model.call('get_issues', {})).text
     expect(bound).not.toContain('Unbound decisions')
     expect(bound).not.toContain('- Authentication (conceptId concern-authentication)')
+  })
+})
+
+describe('repository mapping', () => {
+  it('says where elements are built and maps them in .radical/radical.json', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-mapping-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [
+      node('shop', 'system', 'Shop'), node('orders', 'container', 'Orders API', { parentId: 'shop' }),
+      node('billing', 'container', 'Billing API', { parentId: 'shop' }), node('checkout', 'component', 'Checkout', { parentId: 'orders' }),
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await mkdir(join(root, 'services', 'orders'), { recursive: true })
+    const model = await FolderModel.open(folder)
+
+    // Nothing mapped yet: every C4 element is built nowhere.
+    const before = JSON.parse((await model.call('get_implementation', {})).text)
+    expect(before.implements).toEqual([])
+    expect(before.builtNowhere.map((n: { id: string }) => n.id).sort()).toEqual(['billing', 'checkout', 'orders', 'shop'])
+
+    expect((await model.call('set_implementation', { id: 'shop', paths: ['.'] })).text).toBe('system "Shop" (shop) is built in . (.radical/radical.json).')
+    expect((await model.call('set_implementation', { id: 'orders', paths: ['services/orders', 'services/shared/'] })).text)
+      .toBe('container "Orders API" (orders) is built in services/orders, services/shared (.radical/radical.json). Not in the repository yet: services/shared; radical check warns until they are.')
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8')).implements).toEqual([
+      { element: 'shop', name: 'Shop', paths: ['.'] },
+      { element: 'orders', name: 'Orders API', paths: ['services/orders', 'services/shared'] },
+    ])
+    // A component without an entry is built where its container is.
+    expect((await model.call('get_implementation', { id: 'checkout' })).text)
+      .toBe('component "Checkout" (checkout) is built in services/orders, services/shared, as container "Orders API" (orders) is.')
+    expect(JSON.parse((await model.call('get_implementation', {})).text).builtNowhere).toEqual([])
+
+    expect((await model.call('set_implementation', { id: 'orders', remove: true })).text).toBe('Took container "Orders API" (orders) out of .radical/radical.json.')
+    expect((await model.call('get_implementation', { id: 'orders' })).text).toBe('container "Orders API" (orders) is built in ., as system "Shop" (shop) is.')
+    // Refused: an element the model lacks, a path outside the repository.
+    expect(await model.call('set_implementation', { id: 'gone', paths: ['x'] })).toMatchObject({ ok: false, text: 'set_implementation: no element gone in the model' })
+    expect(await model.call('set_implementation', { id: 'billing', paths: ['../elsewhere'] })).toMatchObject({ ok: false, text: 'set_implementation: ../elsewhere is outside the repository' })
+    // No model file changed.
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(expect.objectContaining({ 'radical.md': expect.any(String) }))
+  })
+})
+
+describe('test bindings', () => {
+  it('lists the scenarios the repository verifies, binds their tests, and get_changes names them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-verify-'))
+    folders.push(root)
+    const git = (...args: string[]) => promisify(execFile)('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: root })
+    await git('init', '-q')
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [
+      node('shop', 'system', 'Shop'), node('api', 'container', 'Orders API', { parentId: 'shop' }),
+      node('pay', 'requirement', 'Pay', { ears_type: 'ubiquitous', action: 'The API shall take payments' }),
+      node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' }),
+    ], relations: [
+      { id: 'sat', relationType: 'satisfies', sourceId: 'api', targetId: 'pay' },
+      { id: 'ver', relationType: 'verifies', sourceId: 's-pay', targetId: 'pay' },
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await writeFile(join(root, '.radical', 'radical.json'), JSON.stringify({ implements: [{ element: 'api', name: 'Orders API', paths: ['services/orders'] }] }))
+    await git('add', '-A')
+    await git('commit', '-q', '-m', 'model')
+    const model = await FolderModel.open(folder)
+
+    expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([{ id: 's-pay', label: 'Pays' }])
+    expect((await model.call('get_verification', { id: 's-pay' })).text).toBe('.radical/radical.json binds no test to scenario "Pays" (s-pay): bind its tests with set_verification.')
+    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] })).text)
+      .toBe('scenario "Pays" (s-pay) is checked by 2 test(s) (.radical/radical.json).')
+    expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([])
+    // The mapping of elements is kept beside the tests.
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8'))).toEqual({
+      implements: [{ element: 'api', name: 'Orders API', paths: ['services/orders'] }],
+      verifies: [{ element: 's-pay', name: 'Pays', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] }],
+    })
+    // Only a scenario or fitness function is checked by tests.
+    expect(await model.call('set_verification', { id: 'api', tests: ['x'] })).toMatchObject({ ok: false, text: 'set_verification: container "Orders API" (api) is no scenario or fitness function; only those are checked by tests' })
+
+    // A changed scenario comes with its tests.
+    expect((await model.call('update_node', { id: 's-pay', properties: { then: 'paid and receipted' } })).ok).toBe(true)
+    expect((await model.call('get_changes', { since: 'HEAD' })).text).toContain('    tests (.radical/radical.json): \n      tests/pay.test.ts › pays\n      tests/pay.test.ts › declines')
+    expect((await model.call('set_verification', { id: 's-pay', remove: true })).text).toBe('Took scenario "Pays" (s-pay) out of .radical/radical.json.')
   })
 })

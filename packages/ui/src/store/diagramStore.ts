@@ -62,6 +62,7 @@ import {
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
+import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
@@ -1804,7 +1805,7 @@ function atDefaultPositions(nodes: readonly C4Node[], positions: Record<string, 
 // ─── Milestones in a federation ──────────────────────────────────────────────
 // A milestone keeps the model's own elements and relations, and the commit
 // of each other model fetched when it was made (DiagramSnapshot.otherModels);
-// the other models' elements are fetched (.radical/federation.json), never
+// the other models' elements are fetched (.state/federation.json), never
 // kept. Shown, it has them as they were at those commits (otherModelsAt).
 
 /** Elements or relations without the other models' of a federation: what a
@@ -3426,10 +3427,18 @@ interface DiagramStore {
 
   // ── actions: snapshots (versions / milestones) ──
   snapshots: DiagramSnapshot[]
-  /** The other models of a federation as last read (.radical/federation.json,
+  /** The other models of a federation as last read (.state/federation.json,
    *  DiagramData.federation): what a milestone shows of them at its commits.
    *  Never saved. */
   federation: FederationFile | null
+  /** Where the repository builds the model's elements and which of its tests
+   *  check the scenarios and fitness functions, from its .radical/radical.json
+   *  beside the model; null when Studio cannot read one (no repository, or a
+   *  browser folder opened without it). Never saved. */
+  repository: RepositoryFile | null
+  /** Each scenario's and fitness function's tests with their outcomes in the
+   *  test results Studio has (the Inspector's check); null without. */
+  testOutcomes: Record<string, Array<{ id: string; outcome: string }>> | null
   /** ID of the milestone currently loaded onto the canvas (null = live HEAD). */
   activeSnapshotId: string | null
   /** Backup of the live HEAD state, kept while a milestone is loaded. Its
@@ -4500,6 +4509,8 @@ export const useDiagramStore = create<DiagramStore>()(
       canRedo: false,
       snapshots: initSnapshots,
       federation: persisted?.federation ?? null,
+      repository: null,
+      testOutcomes: null,
       activeSnapshotId: null,
       liveBackup: null,
       milestoneDirty: false,
@@ -9969,6 +9980,10 @@ const LAYOUT_CHANGES = {
 } as const satisfies Partial<Record<keyof DiagramStore, number | null>>
 /** The actions that change the views in a folder, named by its path. */
 const FOLDER_CHANGES = ['renameViewFolder', 'moveViewFolder'] as const satisfies ReadonlyArray<keyof DiagramStore>
+/** The actions that put a view of this model into a folder: the index of
+ *  the folder among their arguments. Another model's folder, and every
+ *  folder in it, holds that model's views only (viewFolderRefusal). */
+const INTO_FOLDER = { setViewFolder: 1, saveExploration: 1 } as const satisfies Partial<Record<keyof DiagramStore, number>>
 
 {
   const s = useDiagramStore.getState()
@@ -9982,8 +9997,14 @@ const FOLDER_CHANGES = ['renameViewFolder', 'moveViewFolder'] as const satisfies
     return [name, (...args: unknown[]) => (refuse(refusal(args)) ? refused : action(...args))] as const
   }
   const viewOf = (id: unknown) => (typeof id === 'string' ? useDiagramStore.getState().views[id] : undefined)
+  const views = () => useDiagramStore.getState().views
+  const intoFolder = (name: keyof DiagramStore, args: unknown[]): string | null => {
+    const at = (INTO_FOLDER as Partial<Record<keyof DiagramStore, number>>)[name]
+    return at === undefined ? null : model.viewFolderRefusal(views(), args[at] as string | null)
+  }
   const guarded = [
-    ...VIEW_CHANGES.map((name) => guard(name, (args) => model.viewRefusal(viewOf(args[0])), name === 'applyViewpoint' ? false : undefined)),
+    ...VIEW_CHANGES.map((name) => guard(name, (args) => model.viewRefusal(viewOf(args[0])) ?? intoFolder(name, args), name === 'applyViewpoint' ? false : undefined)),
+    guard('saveExploration', (args) => intoFolder('saveExploration', args), null),
     ...Object.entries(LAYOUT_CHANGES).map(([name, at]) => guard(name as keyof DiagramStore, (args) => {
       const st = useDiagramStore.getState()
       const view = at !== null && args[at] ? viewOf(args[at]) : otherModelViewShown(st)
@@ -9992,8 +10013,11 @@ const FOLDER_CHANGES = ['renameViewFolder', 'moveViewFolder'] as const satisfies
       return model.viewRefusal(view)
     }, name === 'addAlignment' || name === 'addGrid' ? null : undefined)),
     ...FOLDER_CHANGES.map((name) => guard(name, (args) => {
-      const theirs = Object.values(useDiagramStore.getState().views).find((v) => model.originOf(v) && isInViewFolder(v, String(args[0])))
-      return theirs ? model.viewRefusal(theirs) : null
+      const theirs = Object.values(views()).find((v) => model.originOf(v) && isInViewFolder(v, String(args[0])))
+      if (theirs) return model.viewRefusal(theirs)
+      // Nor is a folder of this model renamed into another model's.
+      const to = name === 'renameViewFolder' ? viewFolderRenameTarget(Object.values(views()), String(args[0]), String(args[1])) : null
+      return model.viewFolderRefusal(views(), args[0] as string) ?? (to ? model.viewFolderRefusal(views(), to) : null)
     }, name === 'renameViewFolder' ? null : undefined)),
   ]
   useDiagramStore.setState(Object.fromEntries(guarded) as Partial<DiagramStore>)

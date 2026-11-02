@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { COPIES, MARK, PNGS } from './generate-icons.mjs'
+import { COPIES, FAVICON_LINK, LOGO, LOGO_PAGES, MARK, PAGES, PNGS, TOUCH_ICON_LINK } from './generate-icons.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -22,13 +22,11 @@ describe('one mark everywhere', () => {
   })
 
   it('links the favicon from every page and shows the mark as the logo', () => {
-    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/studio/src/renderer/index.html', 'apps/hub/index.html']) {
-      expect(read(page), page).toMatch(/<link rel="icon" href="(\.\/|\.\.\/)?favicon\.svg" type="image\/svg\+xml" \/>/)
-      expect(read(page), page).toMatch(/<link rel="apple-touch-icon" href="(\.\/|\.\.\/)?apple-touch-icon\.png" \/>/)
+    for (const page of PAGES) {
+      expect(read(page), page).toMatch(FAVICON_LINK)
+      expect(read(page), page).toMatch(TOUCH_ICON_LINK)
     }
-    for (const page of ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/hub/src/SiteNav.tsx']) {
-      expect(read(page), page).toMatch(/<img class(Name)?="site-nav-mark" src="(\.\/|\.\.\/)?favicon\.svg"/)
-    }
+    for (const page of LOGO_PAGES) expect(read(page), page).toMatch(LOGO)
     expect(read('apps/studio/src/renderer/src/components/WelcomeScreen.tsx')).toContain("from '../radical-mark.svg?url'")
     expect(existsSync(join(ROOT, 'tools/generate-icon.js'))).toBe(false)
   })

@@ -1,0 +1,8 @@
+---
+id: "2f779eb4-2a74-4f92-9776-a93a56ed0593"
+type: "scenario"
+label: "Export view as SVG"
+given: "the bookstore sample is open on the System context view"
+then: "an .svg file is downloaded that contains Customer, Bookstore, Payment Provider and the browses and orders relation label"
+when: "the user chooses Export as SVG… under Export in the activity rail's Settings menu"
+---

@@ -13,7 +13,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { changeWork } from '@radical/common/branchChanges'
-import { compareCheckConfig, defaultSeverity } from '@radical/common/check'
+import { compareCheckConfig, defaultSeverity, withBoundTests } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
@@ -66,9 +66,11 @@ export function Inspector(): React.ReactElement {
     const baseNodes = Object.fromEntries(Object.keys(branch.changes.nodes).filter((id) => branch.baseModel!.nodes[id]).map((id) => [id, branch.baseModel!.nodes[id]]))
     return { nodes: branch.changes.nodes, baseNodes }
   }, [branch.changes, branch.baseModel])
+  // The tests the repository's .radical/radical.json binds are each one's.
+  const verifies = useDiagramStore((s) => s.repository?.verifies)
   const work = useMemo(() => branch.changes && branch.baseModel && branch.model
-    ? changeWork(branch.changes, branch.baseModel, branch.model, metamodel, results?.cases, measurements ?? undefined)
-    : null, [branch.changes, branch.baseModel, branch.model, metamodel, results, measurements])
+    ? changeWork(branch.changes, branch.baseModel, { ...branch.model, nodes: Object.fromEntries(withBoundTests(Object.values(branch.model.nodes), verifies).map((n) => [n.id, n])) }, metamodel, results?.cases, measurements ?? undefined)
+    : null, [branch.changes, branch.baseModel, branch.model, metamodel, results, measurements, verifies])
   const branchIds = useMemo(() => branch.changes && branch.base ? new Set(Object.keys(branch.changes.nodes)) : null, [branch.changes, branch.base])
 
   if (!check) return <div className="insp"><div className="insp-main"><p className="insp-muted">Checking the model…</p></div></div>

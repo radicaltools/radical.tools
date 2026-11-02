@@ -8,7 +8,7 @@ import { serializeTestResults, type TestCase } from '@radical/common/check'
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 
 // Changes on branch: Studio compares a folder model with the base the CLI or
-// the MCP server saved beside it (.radical/base.json, the model where the
+// the MCP server saved beside it (.state/base.json, the model where the
 // branch left main) and shows the changes on the canvas, in the list of
 // views, on the properties card and in the Inspector. Studio has no git: the
 // tests write the base file as radical diff --save-base would.
@@ -58,7 +58,7 @@ const ARCH_BASE = base([
 ], [])
 
 test('the changes since the base show on the canvas, in the list of views and on the card', async ({ page, studio }) => {
-  await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
+  await openFolder(page, studio, ARCH, { '.state/base.json': ARCH_BASE })
 
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   // Three elements and the relation Checkout API → Fraud check.
@@ -133,7 +133,7 @@ test('a removed element is drawn inside its container on a view laid out its own
   }
   // Legacy billing gone from every list, as a deletion leaves it.
   model.views = model.views!.map((v) => ({ ...v, nodeIds: v.nodeIds.filter((id) => id !== 'legacy') }))
-  await openFolder(page, studio, model, { '.radical/base.json': ARCH_BASE })
+  await openFolder(page, studio, model, { '.state/base.json': ARCH_BASE })
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   // Three elements and the relation Checkout API → Fraud check.
   await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
@@ -163,7 +163,7 @@ test('a removed element is drawn inside its container on a view laid out its own
 
 test('a base saved since HEAD says so', async ({ page, studio }) => {
   const sinceHead = serializeModelBase({ commit: COMMIT, described: 'HEAD', branch: 'main', nodes: JSON.parse(ARCH_BASE).nodes, relations: [] })
-  await openFolder(page, studio, ARCH, { '.radical/base.json': sinceHead })
+  await openFolder(page, studio, ARCH, { '.state/base.json': sinceHead })
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   // Three elements and the relation Checkout API → Fraud check.
   await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
@@ -177,7 +177,7 @@ test('a base saved since HEAD says so', async ({ page, studio }) => {
 })
 
 test('the Inspector lists every change since the base, and a click leads to the element', async ({ page, studio }) => {
-  await openFolder(page, studio, ARCH, { '.radical/base.json': ARCH_BASE })
+  await openFolder(page, studio, ARCH, { '.state/base.json': ARCH_BASE })
   // No test report, but a base: the Inspector has the branch's changes to show.
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
@@ -239,7 +239,7 @@ test('the Inspector lists every change since the base, and a click leads to the 
 test('a branch that only adds a relation counts it', async ({ page, studio }) => {
   // The toolbar counted elements only: 0, and "0 elements changed".
   const nodes = ARCH.nodes.filter((n) => n.id !== 'fraud')
-  await openFolder(page, studio, { ...ARCH, nodes, relations: [rel('r1', 'interacts', 'api', 'need')], views: [] }, { '.radical/base.json': base(nodes, []) })
+  await openFolder(page, studio, { ...ARCH, nodes, relations: [rel('r1', 'interacts', 'api', 'need')], views: [] }, { '.state/base.json': base(nodes, []) })
   const button = page.getByRole('button', { name: /^Changes on branch/ })
   await expect(button.locator('.branch-count')).toHaveText('1', { timeout: 10_000 })
   await button.hover()
@@ -262,7 +262,7 @@ test('with a milestone open, the Inspector lists the changes of the model as it 
     ].map((n) => [n.id, n])),
     relations: {},
   }
-  await openFolder(page, studio, { ...ARCH, snapshots: [milestone] }, { '.radical/base.json': ARCH_BASE })
+  await openFolder(page, studio, { ...ARCH, snapshots: [milestone] }, { '.state/base.json': ARCH_BASE })
   await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).click()
   await expect(page).toHaveURL(/\/s\/m-v1/)
@@ -311,7 +311,7 @@ const SPEC_RESULTS = serializeTestResults([
 ], ['reports/unit.json'])
 
 test('the Inspector lists this change with what the tests say', async ({ page, studio }) => {
-  await openFolder(page, studio, SPEC_NOW, { '.radical/base.json': SPEC_BASE, '.radical/test-results.json': SPEC_RESULTS })
+  await openFolder(page, studio, SPEC_NOW, { '.state/base.json': SPEC_BASE, '.state/test-results.json': SPEC_RESULTS })
 
   const inspector = page.getByRole('button', { name: /^Inspector/ })
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
@@ -364,7 +364,7 @@ test('without a base the button says how to save one, and an old base is marked'
   await expect(help).toBeHidden()
 
   // A base saved two days ago, on another branch.
-  await folder.write('.radical/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
+  await folder.write('.state/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
   await expect(button.locator('.branch-count')).toHaveText('⚠ 4', { timeout: 10_000 })
   await button.hover()
   await expect(page.getByRole('tooltip')).toContainText('old base, saved 2 days ago on feat/inspector-tabs')
@@ -377,7 +377,7 @@ test('without a base the button says how to save one, and an old base is marked'
   await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
 
   // A file that is no base counts as none.
-  await folder.write('.radical/base.json', '{ "version": 1 }')
+  await folder.write('.state/base.json', '{ "version": 1 }')
   await expect(button).toHaveClass(/unavailable/, { timeout: 10_000 })
   await expect(button.locator('.branch-count')).toHaveCount(0)
   // Neither a report nor a base: nothing to inspect.
@@ -414,7 +414,7 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
   await expect(page.locator('.forge-stage-result')).toBeVisible()
 
   // The model as it was before the run, as a Forge run's base.
-  const saved = parseModelBase((await folder.files())['.radical/base.json'])!
+  const saved = parseModelBase((await folder.files())['.state/base.json'])!
   expect(saved).toMatchObject({ source: 'forge', commit: '' })
   expect(saved.nodes.map((n) => n.id).sort()).toEqual(['api', 'fraud', 'need', 'shop'])
   // The run's need and requirement are what changed.

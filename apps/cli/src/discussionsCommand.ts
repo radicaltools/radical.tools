@@ -1,3 +1,4 @@
+import { modelFolderArg } from './modelFolder'
 import { realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -59,7 +60,7 @@ export async function discussionsCommand(args: string[], io: Io): Promise<number
     if ((values.bind && values.retry) || ((values.bind || values.retry) && command !== 'sync')) throw new Error('Use one recovery operation with sync.')
     const exclusions = values.exclude ?? []
     if (exclusions.some((e) => !/^(local:[0-9a-f-]{36}|remote:\d+)$/i.test(e))) throw new Error('Exclusions must be local:<thread-uuid> or remote:<comment-id>.')
-    const root = await realpath(resolve(io.cwd, positionals[0] ?? '.'))
+    const root = await realpath(resolve(io.cwd, await modelFolderArg(positionals[0], io.cwd)))
     if (values.apply) release = await lockSync(root)
     const file = new JournalFile(root), journal = await file.load()
     if (command === 'status') {

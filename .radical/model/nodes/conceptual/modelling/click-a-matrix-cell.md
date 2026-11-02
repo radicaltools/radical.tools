@@ -1,0 +1,8 @@
+---
+id: "b5ae57ff-99f9-4c18-8e50-a8ff76ea6e8b"
+type: "scenario"
+label: "Click a matrix cell"
+given: "a matrix view of the bookstore, with the calls relation already selected, on a canvas view or by a click on its cell in Viewer"
+then: "the relation is selected and stays in the model; a second click on the same cell removes it; the popup of a cell with several relations stays in the window, and goes when the matrix scrolls"
+when: "the user clicks the relation's marked cell once in Designer"
+---

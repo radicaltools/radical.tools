@@ -2,7 +2,7 @@
 //
 // A model folder's deps.json names the models it depends on, and
 // `radical federation fetch` writes their elements into the folder's
-// .radical/federation.json, which Studio shows beside the model's own
+// .state/federation.json, which Studio shows beside the model's own
 // (documentStore). Studio never fetches: opened without them, or with a
 // deps.json that does not read, a model says so once per open, naming the
 // command that fetches them. The toolbar's button lists them with their
@@ -23,7 +23,7 @@ export function otherModelsNotice(others: OtherModels): { message: string; sever
   if (others.depsError) return { message: `${others.depsError} The models it names cannot be shown.`, severity: 'warning' }
   const names = others.deps?.dependencies.map((d) => d.name) ?? []
   if (!names.length) return null
-  if (others.fetchedUnreadable) return { message: `The other models fetched into .radical/federation.json do not read in this version of Studio. ${FETCH} again to see them.`, severity: 'warning' }
+  if (others.fetchedUnreadable) return { message: `The other models fetched into .state/federation.json do not read in this version of Studio. ${FETCH} again to see them.`, severity: 'warning' }
   if (others.fetched) return null
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
   return { message: `This model depends on ${list}, which are not fetched yet. ${FETCH} to see them.`, severity: 'info' }
@@ -57,12 +57,16 @@ export interface OtherModelsSummary {
 
 /** The other models a model depends on, with the versions deps.json pins
  *  and those fetched, and what is wrong; null for a model with no deps.json. */
+/** What was fetched: the short commit, after the version latest resolved to. */
+const fetchedShown = (got: { commit: string; resolved?: string }): string =>
+  got.resolved ? `${got.resolved} · ${got.commit.slice(0, 7)}` : got.commit.slice(0, 7)
+
 export function otherModelsSummary(others: OtherModels): OtherModelsSummary | null {
   if (others.depsError) return { rows: [], problems: [others.depsError] }
   if (!others.deps) return null
   const file = others.fetched
   const problems: string[] = []
-  if (others.fetchedUnreadable) problems.push('The other models fetched into .radical/federation.json do not read in this version of Studio.')
+  if (others.fetchedUnreadable) problems.push('The other models fetched into .state/federation.json do not read in this version of Studio.')
   else if (!file) problems.push('Nothing is fetched yet.')
   const rows: OtherModelRow[] = others.deps.dependencies.map((dep) => {
     const got = file?.dependencies.find((d) => d.name === dep.name && !d.via)
@@ -78,12 +82,12 @@ export function otherModelsSummary(others: OtherModels): OtherModelsSummary | nu
       problems.push(`${dep.name} is pinned to ${dep.repo} but fetched from ${got.repo}.`)
       return { name: dep.name, pinned: dep.ref, fetched: got.commit.slice(0, 7), status: 'pinned-anew' }
     }
-    return { name: dep.name, pinned: dep.ref, fetched: got.commit.slice(0, 7), status: 'ok' }
+    return { name: dep.name, pinned: dep.ref, fetched: fetchedShown(got), status: 'ok' }
   })
   // The models fetched through another, each after the one that names it
   // (and the others it names).
   for (const got of file?.dependencies.filter((d) => d.via) ?? []) {
-    const row: OtherModelRow = { name: got.name, pinned: got.ref, fetched: got.commit.slice(0, 7), via: got.via, status: 'ok' }
+    const row: OtherModelRow = { name: got.name, pinned: got.ref, fetched: fetchedShown(got), via: got.via, status: 'ok' }
     const parent = rows.findIndex((r) => r.name === got.via)
     if (parent < 0) { rows.push(row); continue }
     let at = parent + 1

@@ -3,7 +3,10 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { inspectorMeasurements } from '../src/renderer/src/persistence/inspector'
 import {
   handleFolderStorage,
+  modelHandleOf,
+  openedFolder,
   readCheckFilesFromHandle,
+  readModelBaseFromHandle,
   writeSelectionToHandle,
   type FsDirHandle,
   type FsFileHandle,
@@ -130,10 +133,55 @@ describe('webFolder read/write', () => {
     await s.write({ 'radical.md': 'x' })
     await writeSelectionToHandle(root, '{"nodeIds":["a"]}')
     await writeSelectionToHandle(root, '{"nodeIds":["b"]}')
-    const dir = root.children.get('.radical') as FakeDir
+    const dir = root.children.get('.state') as FakeDir
     expect((dir.children.get('selection.json') as FakeFile).data).toBe('{"nodeIds":["b"]}')
     expect((dir.children.get('.gitignore') as FakeFile).data).toBe('*\n')
     expect(await s.poll()).toEqual([])
+  })
+})
+
+describe('a repository laid out with .radical/', () => {
+  it('opens the model of a .radical folder picked, and reads its mapping', async () => {
+    const radical = new FakeDir('.radical')
+    const model = await radical.getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    radical.children.set('radical.json', new FakeFile('{ "implements": [] }'))
+    expect(await openedFolder(radical)).toEqual({ model, radical })
+    expect((await readCheckFilesFromHandle(model, radical)).repository).toBe('{ "implements": [] }')
+    // A folder of another name with a model/ in it is no .radical/.
+    const other = new FakeDir('notes')
+    other.children.set('model', model)
+    expect(await openedFolder(other)).toEqual({ model: other, radical: null })
+  })
+
+  it('reads the repository\'s mapping through the repository picked', async () => {
+    const repo = new FakeDir('shop')
+    const radical = await repo.getDirectoryHandle('.radical', { create: true }) as FakeDir
+    const model = await radical.getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    radical.children.set('radical.json', new FakeFile('{ "implements": [] }'))
+    expect((await readCheckFilesFromHandle(model, repo)).repository).toBe('{ "implements": [] }')
+    // Opened on the model folder alone, the browser cannot reach it.
+    expect((await readCheckFilesFromHandle(model)).repository).toBeNull()
+  })
+
+  it('opens the model of a repository picked, and reads state the old .radical/ still has', async () => {
+    const repo = new FakeDir('shop')
+    const model = await (await repo.getDirectoryHandle('.radical', { create: true })).getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    expect(await modelHandleOf(repo)).toBe(model)
+    expect(await modelHandleOf(model)).toBe(model)
+    const other = new FakeDir('notes')
+    expect(await modelHandleOf(other)).toBe(other)
+
+    const old = await model.getDirectoryHandle('.radical', { create: true }) as FakeDir
+    old.children.set('test-results.json', new FakeFile('old results'))
+    old.children.set('base.json', new FakeFile('old base'))
+    expect((await readCheckFilesFromHandle(model)).results).toBe('old results')
+    expect(await readModelBaseFromHandle(model)).toBe('old base')
+    const state = await model.getDirectoryHandle('.state', { create: true }) as FakeDir
+    state.children.set('base.json', new FakeFile('new base'))
+    expect(await readModelBaseFromHandle(model)).toBe('new base')
   })
 })
 
@@ -145,7 +193,7 @@ describe('the files beside the model, for the Inspector', () => {
     root.children.set('check.json', new FakeFile('{}'))
     root.children.set('reviews.json', new FakeFile(REVIEWS))
     const files = await readCheckFilesFromHandle(root)
-    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS })
+    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS, repository: null })
     expect(inspectorMeasurements(files.measurements ?? '', files.reviews ?? '')).toEqual([
       { metric: 'review', value: 1, labels: { name: 'threat-model' }, source: 'review', at: '2026-10-30T10:00:00.000Z', context: { by: 'ana' } },
     ])

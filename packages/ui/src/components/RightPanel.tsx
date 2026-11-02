@@ -16,7 +16,8 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
-import { originModel, originOf } from '@radical/common/model'
+import { originModel, originOf, otherModelFolder } from '@radical/common/model'
+import { builtIn, implementCommand, testsBoundTo, verifyCommand } from '@radical/common/repositoryMapping'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
@@ -799,7 +800,8 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
   const labels = useNodeLabels()
   const setViewFolder = useDiagramStore((s) => s.setViewFolder)
   const allViews = useDiagramStore((s) => s.views)
-  const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)), [allViews])
+  // Not the other models' folders (a federation): this model's views stay out of them.
+  const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)).filter((f) => !otherModelFolder(allViews, f)), [allViews])
   const [editingFolder, setEditingFolder] = useState(false)
   const setViewEdgeStyle = useDiagramStore((s) => s.setViewEdgeStyle)
   const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
@@ -1600,18 +1602,23 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
 
   const renderFolder = (folder: ViewFolder): React.ReactNode => {
     const open = !closed.has(folder.path)
+    // Another model's folder (a federation), or one in it: that model's
+    // views, fetched and read-only; its top folder names the model.
+    const origin = otherModelFolder(views, folder.path)
+    const theirs = origin ? originModel(origin) : null
     return (
       <div key={`folder:${folder.path}`} className="lp-folder">
-        <div className={`lp-folder-row${open ? ' open' : ''}${flashFolder === folder.path ? ' lp-folder-found' : ''}`} data-folder-path={folder.path}>
+        <div className={`lp-folder-row${open ? ' open' : ''}${theirs ? ' other-model' : ''}${flashFolder === folder.path ? ' lp-folder-found' : ''}`} data-folder-path={folder.path}>
           <button
             className="lp-folder-toggle"
             onClick={() => toggleFolder(folder.path)}
             aria-expanded={open}
-            title={folder.path}
+            title={theirs ? `${theirs} · fetched, read-only` : folder.path}
           >
             <span className="lp-folder-chevron"><Icon.ChevronRight /></span>
             <span className="lp-folder-icon">{open ? <Icon.FolderOpen /> : <Icon.FolderClosed />}</span>
             <span className="lp-folder-name">{folder.name}</span>
+            {theirs && !folder.path.includes('/') && <span className="lp-view-origin">{theirs}</span>}
             <span className="lp-folder-count">{folder.count}</span>
           </button>
           {!readOnly && onOpenFolder && (
@@ -2594,6 +2601,94 @@ function useViewsShowing(nodeId: string): DiagramView[] {
   return shown
 }
 
+/** Where the repository builds the element, from its .radical/radical.json:
+ *  its own paths or its nearest mapped ancestor's, named; for one built
+ *  nowhere it says, the radical implement command that maps it. Nothing
+ *  when Studio cannot read the file. */
+function ElementBuiltIn({ nodeId }: { nodeId: string }) {
+  const mapping = useDiagramStore((s) => s.repository?.implements ?? null)
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const [copied, setCopied] = useState(false)
+  const node = c4Nodes[nodeId]
+  if (!mapping || !node) return null
+  const found = builtIn(mapping, nodeId, (id) => c4Nodes[id]?.parentId)
+  const from = found && found.from !== nodeId ? c4Nodes[found.from] : undefined
+  const command = implementCommand(Object.values(c4Nodes), node)
+  const copy = () => {
+    void navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => {})
+  }
+  return (
+    <section className="pp-section" aria-label="Built in">
+      <div className="pp-section-title">Built in</div>
+      {found
+        ? (
+          <p className="pp-built-in">
+            {found.paths.map((p, i) => <React.Fragment key={p}>{i > 0 && ', '}<code>{p}</code></React.Fragment>)}
+            {from && <span className="pp-built-in-from"> · as <NodeLink id={from.id} label={from.label} /></span>}
+          </p>
+        )
+        : (
+          <div className="pp-built-in-none">
+            <p>The repository's .radical/radical.json says nowhere. To say where:</p>
+            <div className="pp-built-in-command">
+              <code>{command}</code>
+              <button type="button" className="pp-head-btn" onClick={copy} title="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+            </div>
+          </div>
+        )}
+    </section>
+  )
+}
+
+/** A test's outcome, as the card says it. */
+const TEST_OUTCOME_LABEL: Record<string, string> = { passed: 'passed', failed: 'failed', skipped: 'skipped', 'not-found': 'gone', 'not-run': 'not run' }
+
+/** The tests the repository's .radical/radical.json binds to a scenario or
+ *  fitness function, each with its outcome in the test results Studio has;
+ *  for one with none, the radical verify command that binds one. Nothing
+ *  when Studio cannot read the file. */
+function ElementTests({ nodeId }: { nodeId: string }) {
+  const repository = useDiagramStore((s) => s.repository)
+  const outcomes = useDiagramStore((s) => s.testOutcomes?.[nodeId])
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const [copied, setCopied] = useState(false)
+  const node = c4Nodes[nodeId]
+  if (!repository || !node) return null
+  const tests = testsBoundTo(repository.verifies, nodeId)
+  const command = verifyCommand(Object.values(c4Nodes), node)
+  const copy = () => {
+    void navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => {})
+  }
+  return (
+    <section className="pp-section" aria-label="Tests">
+      <div className="pp-section-title">Tests · {tests.length}</div>
+      {tests.length
+        ? (
+          <ul className="pp-tests">
+            {tests.map((t) => {
+              const outcome = outcomes?.find((o) => o.id === t)?.outcome
+              return (
+                <li key={t}>
+                  <code>{t}</code>
+                  {outcome && <span className={`pp-test-outcome ${outcome}`}>{TEST_OUTCOME_LABEL[outcome] ?? outcome}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        )
+        : (
+          <div className="pp-built-in-none">
+            <p>The repository's .radical/radical.json binds no test to it. To bind one:</p>
+            <div className="pp-built-in-command">
+              <code>{command}</code>
+              <button type="button" className="pp-head-btn" onClick={copy} title="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+            </div>
+          </div>
+        )}
+    </section>
+  )
+}
+
 /** The card's Views: every view that shows the element, the open one
  *  marked; a click opens it with the element selected and in sight. */
 function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: string) => void }) {
@@ -2789,6 +2884,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
         )}
         <div className="pp-foot">
           <div className="pp-foot-scroll">
+            {node.type === 'scenario' || node.type === 'fitness-fn' ? <ElementTests nodeId={node.id} /> : <ElementBuiltIn nodeId={node.id} />}
             <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
             {!readOnly && <NodeActions nodeId={node.id} />}
           </div>

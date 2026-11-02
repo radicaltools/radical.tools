@@ -11,6 +11,9 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, pinLauncher, placeOf, sameEntry, shown, type Client, type ClientId } from './agentConfig'
 import { statusCommand } from './status'
 import { hooksCommand } from './hooks'
+import { MOVES, moveToRadical } from './moveLayout'
+import { moveTestsOut, testsNamedIn } from './moveTests'
+import { MODEL_FOLDER, RADICAL_DIR, findModelFolder, mappingRoot, oldLayout, repositoryRoot } from '@radical/node-files/repositoryLayout'
 import { addDependencies, describeDeps, fetchFederation, latestRef, parseDependsOn, readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, type Dependency, type Deps } from '@radical/common/federation'
 import type { Io } from './check'
@@ -39,9 +42,14 @@ Connects your coding agents to a Radical model folder, step by step:
 
 In a terminal it asks each question with its default; press Enter to take
 it. Otherwise (or with --yes) it asks nothing and takes the options and the
-defaults: the folder architecture, the agents it finds installed.
+defaults: the folder .radical/model, the agents it finds installed.
+In a repository laid out the old way (a model in architecture/,
+radical.sensors.json or crucible.json at its root) it first offers to move
+them into .radical/ with git mv, pointing .mcp.json and the hooks at the
+moved model.
 
-  folder              the model folder (default: architecture)
+  folder              the model folder (default: the repository's
+                      .radical/model, or the model it finds)
   --client <id>       an agent to connect, more than once for several:
                       ${CLIENT_IDS.join(', ')}
                       (default: the ones found installed)
@@ -52,8 +60,10 @@ defaults: the folder architecture, the agents it finds installed.
                       a model this one depends on, more than once for several;
                       the repository is a git address or a path relative to
                       the model folder, the version defaults to its newest
-                      version tag (else its default branch), the model folder
-                      to architecture
+                      version tag (else its default branch); latest follows
+                      the newest version tag at each fetch; the model folder
+                      defaults to .radical/model (architecture/ in a
+                      repository laid out the old way)
   --no-hooks          leave the git hooks alone
   --no-check          end without the checks of --status
   --dry-run           print what it would change and write nothing
@@ -105,9 +115,9 @@ async function otherModels(root: string, folderArg: string, specs: string[], ask
       if (!name) break
       const repo = (await ask('    Its git repository, an address or a path from the model folder: ')).trim()
       if (!repo) { io.out('    - no repository: left out'); continue }
-      const path = (await ask('    The model folder in it [architecture]: ')).trim() || 'architecture'
+      const path = (await ask(`    The model folder in it [${MODEL_FOLDER}]: `)).trim() || MODEL_FOLDER
       const offered = await latestRef(repo, existsSync(root) ? root : io.cwd)
-      const ref = (await ask(`    Version [${offered}]: `)).trim() || offered
+      const ref = (await ask(`    Version, or latest to follow its releases [${offered}]: `)).trim() || offered
       added.push({ name, repo, path, ref })
     }
   }
@@ -121,7 +131,10 @@ async function otherModels(root: string, folderArg: string, specs: string[], ask
     return false
   }
   try {
-    const name = existing?.name ?? (basename(root) === 'architecture' ? basename(dirname(root)) : basename(root))
+    // Named after the repository when the folder is its model (.radical/model,
+    // or architecture/ of the old layout).
+    const up = dirname(root)
+    const name = existing?.name ?? (basename(up) === RADICAL_DIR ? basename(dirname(up)) : basename(root) === 'architecture' ? basename(up) : basename(root))
     await addDependencies(root, added, name.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[^A-Za-z0-9]+/, '') || 'model')
     for (const dep of added) io.out(`  + ${dep.name} (${dep.repo} at ${dep.ref}) in ${DEPS_FILE}`)
     const fetched = await fetchFederation(root)
@@ -198,7 +211,16 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
 
   // ── 2. The model folder ──
   io.out('2/6 Model folder')
-  const folderArg = positionals[0] ?? await answer('  Model folder', 'architecture')
+  // A repository laid out the old way moves into .radical/ first.
+  const repo = positionals[0] === undefined ? await repositoryRoot(io.cwd) : null
+  const old = repo ? await oldLayout(repo) : []
+  if (repo && old.length) {
+    if (!(await confirm(`  ${old.join(', ')} ${old.length === 1 ? 'is' : 'are'} where Radical kept its files before .radical/. Move ${old.length === 1 ? 'it' : 'them'} into .radical/ (git mv)?`))) io.out('  - left where it is: radical setup moves it later')
+    else if (dry) io.out(`  would move ${old.map((part) => `${part} to ${MOVES[part]}`).join(', ')}`)
+    else for (const line of await moveToRadical(repo, old)) io.out(`  + ${line}`)
+  }
+  const found = await findModelFolder(io.cwd)
+  const folderArg = positionals[0] ?? await answer('  Model folder', relative(io.cwd, found ?? resolve(repo ?? io.cwd, MODEL_FOLDER)) || '.')
   const folder = resolve(io.cwd, folderArg)
   let entries: string[] | null
   try { entries = await readdir(folder) } catch (error) {
@@ -223,6 +245,14 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
     return 2
   } else {
     io.out(`  ✓ ${folderArg} holds a model`)
+  }
+  // A model naming its tests in Metrics: they move to .radical/radical.json.
+  const named = !empty ? await testsNamedIn(folder).catch(() => 0) : 0
+  if (named) {
+    const what = `${named} scenario${named === 1 ? '' : 's'} and fitness function${named === 1 ? '' : 's'}`
+    if (!(await confirm(`  ${what} name their tests in the model. Move them into .radical/radical.json?`))) io.out('  - left in the model: radical setup moves them later')
+    else if (dry) io.out(`  would move the tests of ${what} into .radical/radical.json`)
+    else for (const line of await moveTestsOut(folder, await mappingRoot(folder))) io.out(`  + ${line}`)
   }
   const real = existsSync(folder) ? await realpath(folder) : folder
   const git = async (...gitArgs: string[]) => (await exec('git', gitArgs, { cwd: existsSync(real) ? real : io.cwd, windowsHide: true })).stdout.trim()
@@ -250,14 +280,14 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
     }
     if (!dry && place.launcher.endsWith('.sh')) await chmod(place.launcher, 0o755).catch(() => undefined)
   }
-  const found = CLIENTS.filter((client) => client.installed(place))
+  const installed = CLIENTS.filter((client) => client.installed(place))
   let chosen: Client[]
   if (values.client?.length) chosen = CLIENTS.filter((client) => values.client!.includes(client.id))
   else if (ask) {
-    CLIENTS.forEach((client, i) => io.out(`  ${i + 1}. ${client.label.padEnd(15)}${shown(client.file(place), place)}${found.includes(client) ? '  (found)' : ''}`))
-    const picked = await answer('  Agents to connect, by number', found.map((client) => CLIENTS.indexOf(client) + 1).join(' ') || 'none')
+    CLIENTS.forEach((client, i) => io.out(`  ${i + 1}. ${client.label.padEnd(15)}${shown(client.file(place), place)}${installed.includes(client) ? '  (found)' : ''}`))
+    const picked = await answer('  Agents to connect, by number', installed.map((client) => CLIENTS.indexOf(client) + 1).join(' ') || 'none')
     chosen = picked === 'none' ? [] : CLIENTS.filter((_, i) => picked.split(/[\s,]+/).includes(String(i + 1)))
-  } else chosen = found
+  } else chosen = installed
   if (!chosen.length) io.out('  - no agent chosen: radical setup --client <id> connects one later')
   if (chosen.some((client) => client.scope === 'user') && !npxBesideNode(place)) {
     io.out(`  ! no npx beside ${place.execPath}: the agents started from the Dock will look for npx on their own PATH`)

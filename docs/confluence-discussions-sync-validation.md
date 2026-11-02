@@ -77,3 +77,13 @@ The architecture evidence check reports 62 errors and 554 warnings, including
 failed tests and missing evidence from E2E specs outside the 16 targeted tests.
 No baselines or goals were changed to hide these results. The PR is a draft
 pending CI/review of those broader checks.
+
+
+## Main-layout migration (2026-11-02)
+
+Merge resolution follows main's move to `.radical/model` and keeps verification
+bindings in `.radical/radical.json`, outside model records. Discussion commands
+use the shared model-folder discovery helper; explicit model paths still work.
+The 73 sync/publication tests, CLI typecheck and packaged CLI checks pass.
+The three merged implementation/verification tests encounter Windows path
+separator assertions; no behavior in those commands was changed by this merge.

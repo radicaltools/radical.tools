@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util'
 import { nextFindingId, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import type { SurveyRecord } from '@radical/crucible'
 import type { Io } from './check'
+import { crucibleConfig } from './modelFolder'
 
 export const FUZZ_USAGE = `Usage: radical fuzz [plan] [options]
 
@@ -26,13 +27,15 @@ test runner, with the plan's settings.
   --no-shrink         report the first failure as found
   --report <dir>      write a Vitest JSON report of each file into the
                       directory, for radical check --report
-  --config <file>     the Crucible settings (default: crucible.json in the
-                      working directory)
+  --config <file>     the Crucible settings (default: the repository's
+                      .radical/crucible/crucible.json, or crucible.json of the old
+                      layout, found from the working directory up)
 
-crucible.json names the fuzz files and the findings folder:
-  { "findings": "crucible/findings",
+.radical/crucible/crucible.json names the fuzz files and the findings folder:
+  { "findings": ".radical/crucible/findings",
     "fuzz": [{ "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }] }
-Paths are from the folder crucible.json is in. A file runs with
+Paths are from the repository's root (from the folder crucible.json is in,
+in the old layout). A file runs with
 \`npx vitest run <file>\` in its cwd, or with its "command" (a list).
 
 Exit status: 0 every file passed, 1 one failed, 2 radical fuzz could not run.`
@@ -51,7 +54,7 @@ interface CrucibleConfig {
 }
 
 /** The settings in crucible.json, or why they cannot be used. */
-function readConfig(file: string): CrucibleConfig | string {
+function readConfig(file: string, findings: string): CrucibleConfig | string {
   if (!existsSync(file)) return `No ${file}: it lists the fuzz files (radical fuzz --help).`
   let raw: unknown
   try { raw = JSON.parse(readFileSync(file, 'utf8')) } catch (error) { return `${file} is no JSON: ${(error as Error).message}` }
@@ -59,7 +62,7 @@ function readConfig(file: string): CrucibleConfig | string {
   if (!Array.isArray(config.fuzz) || !config.fuzz.length || !config.fuzz.every((e) => e && typeof e.file === 'string' && (e.command === undefined || (Array.isArray(e.command) && e.command.length > 0)))) {
     return `${file} lists no fuzz files: "fuzz" is a list of { "file", "cwd"?, "command"? }.`
   }
-  return { findings: typeof config.findings === 'string' ? config.findings : 'crucible/findings', fuzz: config.fuzz }
+  return { findings: typeof config.findings === 'string' ? config.findings : findings, fuzz: config.fuzz }
 }
 
 /** Runs `radical fuzz` with `args` (after the command name); returns the exit status. */
@@ -96,10 +99,9 @@ export async function fuzzCommand(args: string[], io: Io): Promise<number> {
     io.err(`${badNumber ? `--${badNumber[0]} takes a whole number.\n\n` : !['ci', 'night'].includes(plan) ? `Unknown plan ${plan}: ci or night.\n\n` : ''}${FUZZ_USAGE}`)
     return 2
   }
-  const configFile = resolve(io.cwd, values.config ?? 'crucible.json')
-  const config = readConfig(configFile)
+  const { file: configFile, root, findings } = await crucibleConfig(values.config, io.cwd)
+  const config = readConfig(configFile, findings)
   if (typeof config === 'string') { io.err(config); return 2 }
-  const root = dirname(configFile)
   const findingsDir = resolve(root, config.findings)
 
   // What every file runs with.

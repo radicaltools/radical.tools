@@ -1,0 +1,8 @@
+---
+id: "8e6cb8ff-9dd0-4927-b439-e9e001b29599"
+type: "scenario"
+label: "Move into descendant refused"
+given: "a container with a child selected"
+then: "a notification refuses the move and the tree is unchanged"
+when: "Studio is asked to move the container into its own child"
+---

@@ -2,22 +2,22 @@
 //
 // check.json in the model folder holds the project's rule settings, so the
 // CLI, Studio and CI check alike; it goes into git with the model.
-// .radical/test-results.json holds the test cases of the last run read with
+// .state/test-results.json holds the test cases of the last run read with
 // --report, or downloaded from CI with --from-ci, for Studio to work out what
-// they say about the model as it is edited; .radical/measurements.json holds
-// what sensors measured. Like the rest of .radical/ they stay out of git: a
+// they say about the model as it is edited; .state/measurements.json holds
+// what sensors measured. Like the rest of .state/ they stay out of git: a
 // commit cannot hold the results of its own tests.
 
-import { SELECTION_DIR } from '../formats/canvasSelection'
+import { STATE_DIR } from '../formats/canvasSelection'
 import { stripBom } from '../formats/mdFolder'
 import type { CheckConfig } from './index'
 import type { TestCase, TestStatus } from './reports'
 
 export const CHECK_CONFIG_FILE = 'check.json'
-export const TEST_RESULTS_FILE = `${SELECTION_DIR}/test-results.json`
+export const TEST_RESULTS_FILE = `${STATE_DIR}/test-results.json`
 /** The latest measurement of each metric and labels, as `radical sense`
  *  and `radical check --metrics` keep them for Studio (metrics.ts). */
-export const MEASUREMENTS_FILE = `${SELECTION_DIR}/measurements.json`
+export const MEASUREMENTS_FILE = `${STATE_DIR}/measurements.json`
 
 /** A CI run whose artifacts held test reports. */
 export interface CiRun {

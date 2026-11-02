@@ -14,12 +14,12 @@ afterEach(async () => {
 describe('readCheckFiles', () => {
   it('reads the model\'s reviews.json beside check.json and the files under .radical', async () => {
     dir = await mkdtemp(join(tmpdir(), 'radical-check-files-'))
-    await mkdir(join(dir, '.radical'))
-    await writeFile(join(dir, '.radical', 'test-results.json'), 'results')
-    await writeFile(join(dir, '.radical', 'measurements.json'), 'measurements')
+    await mkdir(join(dir, '.state'))
+    await writeFile(join(dir, '.state', 'test-results.json'), 'results')
+    await writeFile(join(dir, '.state', 'measurements.json'), 'measurements')
     await writeFile(join(dir, 'check.json'), '{}')
     await writeFile(join(dir, 'reviews.json'), 'reviews')
-    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', config: '{}', reviews: 'reviews' })
+    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', config: '{}', reviews: 'reviews', repository: null })
   })
 
   it('gives null for a reviews.json that is not there, and refuses a symlinked one', async () => {

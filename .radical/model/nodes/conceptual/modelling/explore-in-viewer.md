@@ -1,0 +1,8 @@
+---
+id: "27e47629-f2d6-453f-808e-b335d207add5"
+type: "scenario"
+label: "Explore in Viewer"
+given: "the sample model in Viewer with milestone v1 shown"
+then: "the exploration shows the element and its neighbours in v1, then in the live model; it offers no Save as view; nothing is saved and Designer's undo history is unchanged"
+when: "the user chooses Explore on an element's properties card, clicks its +, then shows Current (live)"
+---

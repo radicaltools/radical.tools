@@ -8,9 +8,11 @@
 // someone types (a requirement comes before its scenario).
 
 import type { C4Node, C4Relation } from '../c4'
+import { originOf } from '../model'
+import { builtIn } from '../repositoryMapping'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
-import { conditionResults, conditionsOf, linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type TestOutcome } from './evidence'
-import { formatAge, parseCombine, parseMaxAge, type Measurement } from './metrics'
+import { conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
+import { formatAge, parseCombine, parseConditions, parseMaxAge, type Measurement } from './metrics'
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
@@ -56,6 +58,13 @@ export interface CheckModel {
   /** The measurements passed in; the metric rules that read values run only
    *  with them. */
   measurements?: Measurement[]
+  /** The sensors of the repository's radical.sensors.json (its path and
+   *  their names), null when it has none; not given, a measure line may
+   *  name any sensor besides the built-in ones. */
+  sensors?: { file: string; names: string[] } | null
+  /** The repository's .radical/radical.json (its path and entries, each with
+   *  the paths the repository lacks); not given, nothing checks it. */
+  repository?: RepositoryMapping | null
   /** Earlier measurements a condition against a baseline compares with
    *  (the median of the latest seven of its metric). */
   baseline?: Measurement[]
@@ -64,6 +73,12 @@ export interface CheckModel {
   now?: number
   /** The config's rule settings, for rules that take options. */
   settings?: Record<string, import('./index').RuleSetting>
+  /** By element, the paths from the repository's root its description names
+   *  that the repository does not have (the CLI works them out). */
+  missingPaths?: Record<string, string[]>
+  /** The repository's settings check.json holds (that belong in
+   *  .radical/radical.json): "test-unbound include", "ci artifacts". */
+  settingsInModel?: string[]
   /** The Hub's concern packs, for concern-unaddressed; without them it
    *  finds nothing. */
   concerns?: ConcernPack[]
@@ -71,6 +86,18 @@ export interface CheckModel {
    *  condition of a fitness function that runs on another one, or
    *  continually, is not reported when nothing measured it. */
   trigger?: string
+}
+
+/** What a repository's .radical/radical.json maps, as radical check reads it:
+ *  each element with its paths and those of them the repository lacks. */
+export interface RepositoryMapping {
+  file: string
+  implements: Array<{ element: string; name?: string; paths: string[]; missing: string[] }>
+  /** The tests it binds to scenarios and fitness functions. */
+  verifies?: Array<{ element: string; name?: string; tests: string[] }>
+  /** The test files test-unbound reads, and CI's artifacts. */
+  tests?: { include?: string[]; exclude?: string[] }
+  ci?: { artifacts?: string[] }
 }
 
 export interface CheckRule {
@@ -124,6 +151,8 @@ function unlinked(model: CheckModel, type: string, relation: string, end: 'in' |
 const quote = (n: C4Node): string => `"${n.label}"`
 
 const TYPE_NAME: Record<string, string> = { scenario: 'Scenario', 'fitness-fn': 'Fitness function' }
+/** A node's type as a message names it: Scenario, Fitness function, else its type. */
+const TYPE_LABEL = (node: C4Node): string => TYPE_NAME[node.type] ?? node.type.charAt(0).toUpperCase() + node.type.slice(1)
 
 /** What a failing check of `node` takes down with it: the requirements a
  *  scenario verifies, the ADRs a fitness function implements. */
@@ -174,17 +203,68 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
       .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
       .filter((n) => outcome !== 'not-run' || runsOn(n, model.trigger))
       .flatMap((node) => {
+        const seen = (r: ConditionResult): string => {
+          const m = r.measurement
+          return m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
+        }
+        const elements = measuredElements(model, node)
+        if (elements.length) {
+          // Measured for each element its decision constrains: a finding per
+          // element, on the element when the fitness function is another
+          // model's (a standard its decision makes this model's).
+          const origin = originOf(node)
+          return elements.flatMap((element) => elementConditions(node, model, element)
+            .filter((r) => r.outcome === outcome)
+            .map((r) => ({
+              nodeId: origin ? element.id : node.id,
+              message: `${message(node, r.condition, seen(r), r.detail).replace(/\.$/, '')} for ${TYPE_NAME[element.type] ?? element.type} ${quote(element)}${origin ? ` (a fitness function of ${origin})` : ''}.`,
+              ...(origin ? { relatedIds: [node.id] } : outcome === 'failed' ? { relatedIds: [element.id] } : {}),
+            })))
+        }
         const metricLines = new Set(conditionsOf(node).filter((c) => c.kind === 'metric').map((c) => c.raw))
         return conditionResults(node, model)
           .filter((r) => r.outcome === outcome && metricLines.has(r.condition))
           .map((r) => {
-            const m = r.measurement
-            const seen = m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
             const related = outcome === 'failed' ? affectedBy(model, node).map((n) => n.id) : []
-            return { nodeId: node.id, message: message(node, r.condition, seen, r.detail), ...(related.length ? { relatedIds: related } : {}) }
+            return { nodeId: node.id, message: message(node, r.condition, seen(r), r.detail), ...(related.length ? { relatedIds: related } : {}) }
           })
       })
   }
+}
+
+/** Whether `scenario` is the repository's to verify: a requirement it
+ *  verifies is satisfied by an element .radical/radical.json says the
+ *  repository builds (or a part of one). */
+export function verifiedHere(model: CheckModel, scenario: C4Node): boolean {
+  const mapped = model.repository?.implements
+  if (!mapped?.length || originOf(scenario)) return false
+  return linkedNodes(model, scenario.id, 'verifies', 'target', 'requirement')
+    .some((req) => linkedNodes(model, req.id, 'satisfies', 'source').some((el) => builtIn(mapped, el.id, (id) => model.nodes[id]?.parentId)))
+}
+
+/** Where .radical/radical.json and the model or the repository part: an
+ *  element the model lacks, another name, a path that is not there. */
+function repositoryMapping(model: CheckModel): RuleFinding[] {
+  const mapping = model.repository
+  if (!mapping) return []
+  return mapping.implements.flatMap((entry) => {
+    const node = model.nodes[entry.element]
+    if (!node) return [{ message: `${mapping.file}: ${entry.name ? `"${entry.name}" (${entry.element})` : entry.element} is no element of the model.` }]
+    // On the element, unless it is another model's: that model cannot fix it.
+    const on = originOf(node) ? {} : { nodeId: node.id }
+    const found: RuleFinding[] = []
+    if (entry.name !== undefined && entry.name !== node.label) found.push({ ...on, message: `${mapping.file}: ${entry.element} is named "${entry.name}"; the model calls it ${quote(node)}.` })
+    for (const path of entry.missing) found.push({ ...on, message: `${mapping.file}: ${quote(node)} is built in ${path}, which the repository does not have.` })
+    return found
+  }).concat((mapping.verifies ?? []).flatMap((entry) => {
+    const node = model.nodes[entry.element]
+    if (!node) return [{ message: `${mapping.file}: tests bound to ${entry.name ? `"${entry.name}" (${entry.element})` : entry.element}, which is no element of the model.` }]
+    const on = originOf(node) ? {} : { nodeId: node.id }
+    const found: RuleFinding[] = []
+    if (!(TESTED_TYPES as readonly string[]).includes(node.type)) found.push({ ...on, message: `${mapping.file}: tests bound to ${node.type} ${quote(node)}; only a scenario or a fitness function is checked by tests.` })
+    if (entry.name !== undefined && entry.name !== node.label) found.push({ ...on, message: `${mapping.file}: ${entry.element} is named "${entry.name}"; the model calls it ${quote(node)}.` })
+    return found
+  }))
 }
 
 /** What in a node's checks cannot be read: lines that are no condition,
@@ -357,11 +437,30 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-without-metrics',
-    description: 'Every scenario states what checks it (property `metrics`, one condition per line: `test(<file> › <title>) passed` or `<metric>{<labels>} <op> <number> [unit]`).',
+    description: 'Every scenario has what checks it: tests the repository\'s .radical/radical.json binds to it, or metric conditions (property `metrics`, one per line: `<metric>{<labels>} <op> <number> [unit]`). One the repository must verify is scenario-not-verified-here\'s.',
     severity: 'warning',
     dimension: 'traceability',
-    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length)
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && !verifiedHere(model, n))
       .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} names no check.` })),
+  },
+  {
+    id: 'scenario-not-verified-here',
+    description: 'With the repository\'s .radical/radical.json (the CLI): every scenario of a requirement an element the repository builds satisfies has tests the file binds to it, or metric conditions.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && verifiedHere(model, n))
+      .map((n) => ({ nodeId: n.id, message: `Scenario ${quote(n)} is this repository's to verify (an element it builds satisfies its requirement), and ${model.repository!.file} binds no test to it: radical verify ${n.id} --test "<file> › <title>".` })),
+  },
+  {
+    id: 'model-names-tests',
+    description: 'A scenario or fitness function names no test in its Metrics: the repository binds its tests in .radical/radical.json (radical setup moves them there). A test named in Metrics still counts.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => Object.values(model.nodes).filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type) && !originOf(n))
+      .flatMap((n) => {
+        const named = parseConditions((n as unknown as Props).metrics).filter((c) => c.kind === 'test').length
+        return named ? [{ nodeId: n.id, message: `${TYPE_NAME[n.type]} ${quote(n)} names ${named} test${named === 1 ? '' : 's'} in its Metrics; ${named === 1 ? 'it belongs' : 'they belong'} in .radical/radical.json (radical setup moves them).` }] : []
+      }),
   },
   {
     id: 'fitness-fn-without-metrics',
@@ -386,12 +485,53 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-measure-invalid',
-    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}).`,
+    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's .radical/sensors/sensors.json.`,
     severity: 'error',
     dimension: 'completeness',
+    run: (model) => model.sensors === undefined ? [] : nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
+      .filter((line) => !isSensorName(line.sensor) && !model.sensors?.names.includes(line.sensor))
+      .map((line) => ({
+        nodeId: n.id,
+        message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}, ${model.sensors
+          ? `${model.sensors.file} ${model.sensors.names.length ? model.sensors.names.join(', ') : 'none'}`
+          : 'and the repository has no .radical/sensors/sensors.json'}.`,
+      }))),
+  },
+  {
+    id: 'repository-mapping',
+    description: 'With the repository\'s .radical/radical.json (the CLI): each entry names an element of the model, its own or another model\'s of the federation, under the element\'s name, with paths the repository has; tests are bound to scenarios and fitness functions.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: repositoryMapping,
+  },
+  {
+    id: 'repository-settings-in-model',
+    description: 'The model\'s check.json holds the model\'s rules and goals; the repository\'s test files (test-unbound\'s include and exclude) and CI\'s artifacts belong in .radical/radical.json ("tests", "ci"). Those in check.json are still read.',
+    severity: 'warning',
+    dimension: 'completeness',
+    run: (model) => (model.settingsInModel ?? []).map((what) => ({
+      path: 'check.json',
+      message: `check.json holds the repository's ${what}; ${what.startsWith('ci') ? 'they belong in .radical/radical.json ("ci": { "artifacts": [...] })' : 'it belongs in .radical/radical.json ("tests": { "include": [...], "exclude": [...] })'}.`,
+    })),
+  },
+  {
+    id: 'description-path-missing',
+    description: 'With the repository (the CLI): a path from the repository\'s root an element\'s description names (apps/cli/src/sense.ts) is in the repository; one that is gone tells of code that moved.',
+    severity: 'warning',
+    dimension: 'consistency',
+    run: (model) => Object.entries(model.missingPaths ?? {}).flatMap(([id, paths]) => {
+      const node = model.nodes[id]
+      return node && paths.length ? [{ nodeId: id, message: `${TYPE_LABEL(node)} ${quote(node)} names ${paths.join(', ')}, which the repository does not have.` }] : []
+    }),
+  },
+  {
+    id: 'measure-with-arguments',
+    description: 'A fitness function\'s measure lines name sensors only: an adapter\'s arguments (files, options of the repository) belong to a sensor of .radical/sensors/sensors.json ({ "adapter": "playwright", "args": [...] }). A line with arguments still runs.',
+    severity: 'warning',
+    dimension: 'completeness',
     run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
-      .filter((line) => !isSensorName(line.sensor))
-      .map((line) => ({ nodeId: n.id, message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}.` }))),
+      .filter((line) => line.args.length > 0)
+      .map((line) => ({ nodeId: n.id, message: `Fitness function ${quote(n)}: measure "${line.raw}" has the repository's arguments; name a sensor of .radical/sensors/sensors.json that holds them ({ "adapter": "${line.sensor}", "args": [...] }).` }))),
   },
   {
     id: 'metric-invalid',

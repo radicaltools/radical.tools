@@ -228,6 +228,17 @@ describe('journaled sync', () => {
 })
 
 describe('managed tree and CLI integration', () => {
+  it('discovers the repository model for status without creating discussion files', async () => {
+    const d = await folder(), model = join(d, '.radical', 'model')
+    await mkdir(model, { recursive: true })
+    await writeFile(join(model, 'radical.md'), serializeToMdFolder({ nodes: [], relations: [] }, 'Discovery')['radical.md'])
+    let output = '', error = ''
+    expect(await main(['discussions', 'confluence', 'status'], { cwd: d, out: (s) => { output += s }, err: (s) => { error += s } })).toBe(0)
+    expect(JSON.parse(output)).toEqual({ connected: false })
+    expect(error).toBe('')
+    expect(await readdir(model)).toEqual(['radical.md'])
+  })
+
   const view: DiagramView = { id: 'wiki', name: 'Wiki', kind: 'wiki', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }] }] } }
   const data: DiagramData = { metamodel: builtInGovernanceMetamodel(), views: [view], nodes: ['first', 'second'].map((id) => ({ id, type: 'requirement', label: 'Same name', x: 0, y: 0, width: 200, height: 100, collapsed: false, action: 'work' })), relations: [] }
   const document = exportWiki(data, view, {})

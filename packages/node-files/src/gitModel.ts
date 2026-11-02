@@ -8,6 +8,8 @@ import type { ModelCopy } from '@radical/common/model'
 import type { DiagramData } from '@radical/common/c4'
 import { MODEL_BASE_FILE, serializeModelBase } from '@radical/common/formats/modelBase'
 import { writeEditorStateFile } from './selectionFile'
+import { readRepositoryMapping } from './repositoryLayout'
+import { testsBoundTo } from '@radical/common/repositoryMapping'
 
 const exec = promisify(execFile)
 
@@ -142,7 +144,7 @@ export interface ModelChangesSince {
 }
 
 export interface ChangesOptions {
-  /** Also write the model at the base to .radical/base.json, for Studio. */
+  /** Also write the model at the base to .state/base.json, for Studio. */
   saveBase?: boolean
 }
 
@@ -169,6 +171,13 @@ export async function modelChangesSince(folder: string, current: Pick<DiagramDat
   const before: ModelCopy = { nodes: byId(old.nodes), relations: byId(old.relations) }
   const after: ModelCopy = { nodes: byId(current.nodes), relations: byId(current.relations) }
   const report = modelChangeReport(before, after)
+  // A scenario's or fitness function's tests, where the repository binds them.
+  const mapping = await readRepositoryMapping(folder).catch(() => null)
+  if (mapping) {
+    for (const change of [...report.elements.added, ...report.elements.changed, ...report.elements.removed]) {
+      if (change.type === 'scenario' || change.type === 'fitness-fn') change.tests = testsBoundTo(mapping.verifies, change.id)
+    }
+  }
   const short = base.commit.slice(0, 7)
   const where = base.commit.startsWith(base.described) ? short : `${base.described} (${short})`
   const count = (group: { added: unknown[]; changed: unknown[]; removed: unknown[] }, noun: string) =>

@@ -1,0 +1,8 @@
+---
+id: "0165f89b-a8c3-44aa-9dad-41f5de8f60da"
+type: "scenario"
+label: "Traceability chain on requirements"
+given: "the sample model's Requirements Register, its Filter open in the view's properties; and a model of two domains, needs, requirements and scenarios"
+then: "the table shows 3 needs at the top, Four-eyes approval under one and Same signatory cannot approve twice under it, as does the Structure tree, where a click opens the scenario's properties; the fold hides and shows the need's requirements; the filter counts 7 in and hides the ubiquitous requirements until or brings them back; after the reload the three levels are there and Reset removes them; with Need or Requirement the roots are 13 with the scenario under its requirement, 3 again without the or; the engine builds, filters, joins, orders and suggests as its tests say, reads chains in older files, and agents set chains with create_view and update_view; an element that stores no value, or an empty one, is filtered, counted, suggested and ordered as its type's default, so Repeat is 1 keeps the 9 steps"
+when: "the user starts with Need, adds Refined into → Requirement and Verified by → Scenario, folds and unfolds Corporate treasurer feedback, filters the requirements to event-driven and adds or ubiquitous, reloads and resets; and, separately, starts with Need or Requirement, adds Verified by → Scenario and removes the or"
+---

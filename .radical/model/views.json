@@ -1,0 +1,4456 @@
+[
+  {
+    "edgeStyle": "orthogonal",
+    "folder": "Conceptual",
+    "id": "19b35d39-93b5-460c-9a33-8ac682f2e814",
+    "kind": "static",
+    "layoutConstraints": [],
+    "name": "Domain map",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "domain"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "04ded13f-e1a2-4f8a-9333-a2964708e377": {
+        "height": 3406.666666666667,
+        "width": 3500.728888887943,
+        "x": 872.5,
+        "y": 760
+      },
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1850.900390625,
+        "width": 1262.5,
+        "x": 0,
+        "y": 0
+      },
+      "0e257a03-914f-4e5b-a842-c0811fb6e01c": {
+        "height": 6279.566666666667,
+        "width": 3768.50399980678,
+        "x": 564.1669921875,
+        "y": 1331
+      },
+      "34d283c6-4a68-45eb-a01c-1d438bb9d805": {
+        "height": 840.325,
+        "width": 1508.746666666667,
+        "x": 407.8603515625,
+        "y": 1600.900390625
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 5193.657516253677,
+        "width": 13342.5884611067,
+        "x": 872.5,
+        "y": 1070
+      },
+      "52d309eb-0fc1-4e14-b580-6c1e75e452e8": {
+        "height": 1464.7500000000002,
+        "width": 2100.3066666666664,
+        "x": 872.5,
+        "y": 1600.900390625
+      },
+      "5c521cfe-f793-4900-9ebf-60caf53c54aa": {
+        "height": 230,
+        "width": 6140,
+        "x": 0,
+        "y": 0
+      },
+      "64ca6112-45d2-4729-b17e-bcdb952da389": {
+        "height": 840.325,
+        "width": 1631.3733333333325,
+        "x": 407.8603515625,
+        "y": 1070
+      },
+      "6d7250bb-fb38-4bb7-afff-a3a09017b17a": {
+        "height": 3005.4333333333325,
+        "width": 1047.8133333333335,
+        "x": 407.8603515625,
+        "y": 761
+      },
+      "83d68252-97e0-4961-8541-4fb30e1dd772": {
+        "height": 5236.316666666667,
+        "width": 3333.928888887478,
+        "x": 665.845703125,
+        "y": 427.5
+      },
+      "942e9364-a1a5-450b-a153-741fe9b42e48": {
+        "height": 3048.6104166666664,
+        "width": 3581.7253330875164,
+        "x": 400,
+        "y": 0
+      },
+      "ed0a90d5-2ada-4e1a-a534-2b77eb3860df": {
+        "height": 840.325,
+        "width": 1614.9946666666647,
+        "x": 872.5,
+        "y": 0
+      }
+    },
+    "viewpoint": "domain-map",
+    "viewport": {
+      "x": 361.8275545334016,
+      "y": 148.76728457587313,
+      "zoom": 0.39141744672169526
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "9f9f82c8-0c3d-4ea0-95c2-d47f15e2c0d7",
+    "kind": "static",
+    "layoutConstraints": [
+      {
+        "id": "6d8a01d7-6f76-4967-b5ee-e880cb6e6bb0",
+        "nodeIds": [
+          "9dc0edb5-9373-46b0-9afb-ba2f5337babe",
+          "43213e4f-bd51-4a2a-8863-27cf6d046a9b"
+        ],
+        "type": "pin"
+      }
+    ],
+    "name": "Domain model",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1620.9404296875,
+        "width": 39888.517578125,
+        "x": 543.837890625,
+        "y": 280
+      },
+      "0e257a03-914f-4e5b-a842-c0811fb6e01c": {
+        "height": 305.2822265625,
+        "width": 527.5869140625,
+        "x": 344.943359375,
+        "y": 300.1767578125
+      },
+      "0f45402b-f686-4fe7-82e3-951587e20eba": {
+        "height": 56,
+        "width": 170,
+        "x": 846.3515625,
+        "y": 131.494140625
+      },
+      "12e863d8-7353-479e-a50c-02cfb1887c70": {
+        "height": 56,
+        "width": 170,
+        "x": 327.5869140625,
+        "y": 219.2822265625
+      },
+      "17cb0911-19b2-48ac-8770-4d5f0fb3c20c": {
+        "height": 56,
+        "width": 170,
+        "x": 330.26171875,
+        "y": 282.63671875
+      },
+      "18315c1a-d5b3-433f-8751-b6354e1cdab0": {
+        "height": 56,
+        "width": 170,
+        "x": 577.3056640625,
+        "y": 483.130859375
+      },
+      "21a69842-c76a-4d61-84b6-41c18d22cd6f": {
+        "height": 56,
+        "width": 170,
+        "x": 644.716796875,
+        "y": 0
+      },
+      "27f210c4-914c-40a3-b7dc-1c3cb0907bd1": {
+        "height": 56,
+        "width": 170,
+        "x": 902.494140625,
+        "y": 238.134765625
+      },
+      "34d283c6-4a68-45eb-a01c-1d438bb9d805": {
+        "height": 220,
+        "width": 689.1953125,
+        "x": 1409.3818359375,
+        "y": 548.0234375
+      },
+      "3c2004be-ac2a-4281-92e1-129e943b3afd": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 84.1767578125
+      },
+      "43213e4f-bd51-4a2a-8863-27cf6d046a9b": {
+        "height": 56,
+        "width": 170,
+        "x": 489.1953125,
+        "y": 103.130859375
+      },
+      "4d0eb572-e91d-4ec6-b538-8e4b4261f8e8": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 224.5673828125
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 569.130859375,
+        "width": 1102.494140625,
+        "x": 544,
+        "y": 1021.8095703125
+      },
+      "53d6d7ea-930b-47cc-a7d5-9f7dfe17ee45": {
+        "height": 56,
+        "width": 170,
+        "x": 172.09765625,
+        "y": 0
+      },
+      "5c521cfe-f793-4900-9ebf-60caf53c54aa": {
+        "height": 220,
+        "width": 390,
+        "x": 39468.517578125,
+        "y": 92
+      },
+      "5ff37b0e-5627-48ce-863f-8a8f81d00797": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 0
+      },
+      "60311ef2-c6ee-4cea-81f7-c7573b9edf49": {
+        "height": 56,
+        "width": 170,
+        "x": 235.2421875,
+        "y": 172.46484375
+      },
+      "60a37a79-3fb4-435d-82c9-87ec3582f2f8": {
+        "height": 56,
+        "width": 170,
+        "x": 344.9599609375,
+        "y": 25.8115234375
+      },
+      "6d7250bb-fb38-4bb7-afff-a3a09017b17a": {
+        "height": 220,
+        "width": 360,
+        "x": 0,
+        "y": 778.775390625
+      },
+      "8dbe05a6-81ed-435c-9c1f-b0f57095598c": {
+        "height": 56,
+        "width": 170,
+        "x": 190,
+        "y": 0
+      },
+      "942e9364-a1a5-450b-a153-741fe9b42e48": {
+        "height": 220,
+        "width": 360,
+        "x": 922.5302734375,
+        "y": 0
+      },
+      "9dc0edb5-9373-46b0-9afb-ba2f5337babe": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 0
+      },
+      "c418e5c5-cfe3-4cce-9166-31f29ab2c86c": {
+        "height": 56,
+        "width": 170,
+        "x": 515.3037109375,
+        "y": 153.841796875
+      },
+      "c588f90b-630c-4c0a-9118-c880208cee3e": {
+        "height": 56,
+        "width": 170,
+        "x": 210,
+        "y": 0
+      },
+      "c683d1ba-a4c4-4faa-9248-249e4df27dbf": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 0
+      },
+      "cc7c679d-9419-422e-9747-cf061ba927b6": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 107.7998046875
+      },
+      "dab95365-8c91-4cae-b130-0b5d985b43fc": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 0
+      }
+    },
+    "viewpoint": "domain-model",
+    "viewport": {
+      "x": 124.8945982311111,
+      "y": 0.9911534833927362,
+      "zoom": 0.5814523900899581
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "kind": "static",
+    "name": "Entities of a domain",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "domain-entities"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "0d0cf490-a264-4afd-b68d-608d7a819470",
+    "kind": "table",
+    "name": "Traceability",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "need"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "requirement"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "derives"
+              }
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "scenario"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "verifies"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "traceability",
+    "viewport": {
+      "x": 288.5203680411703,
+      "y": 271.5096106867605,
+      "zoom": 0.05384249666023513
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "931040f7-377f-4640-81e7-ec43272edbc1",
+    "kind": "wiki",
+    "name": "Specification",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "need"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "requirement"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "derives"
+              }
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "scenario"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "verifies"
+              }
+            },
+            {
+              "types": [
+                "mockup"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "illustrates"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "specification",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    },
+    "wikiFocusId": "6ea1e526-9670-442a-ab5d-ebafda655b53"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "6a213ee4-71ed-486c-b099-5c5b09171ad0",
+    "kind": "table",
+    "name": "Entity lifecycles",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "direction": "in",
+              "has": true,
+              "kind": "relation",
+              "relationType": "lifecycle-of"
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "state-machine"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "lifecycle-of"
+              }
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "via": {
+                "direction": "in",
+                "relationType": "implements"
+              }
+            },
+            {
+              "types": [
+                "scenario"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "verifies"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "entity-lifecycles",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "01730259-5a41-46c6-96a0-b7a9323e339d",
+    "kind": "static",
+    "name": "State machine",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "state-machine",
+                "state",
+                "pseudostate",
+                "event"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "lifecycle-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "state-machine"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "d85765ed-1a41-421a-a69e-f4fe98080e2d",
+    "kind": "table",
+    "name": "Event catalogue",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "event"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "via": {
+                "direction": "in",
+                "relationType": "emits"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "event-catalogue",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "519f249d-08ad-4c0e-826e-4a11f9951b55",
+    "kind": "warnier",
+    "name": "Process",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "process"
+  },
+  {
+    "folder": "Logical",
+    "id": "2eed5ab9-724a-4db4-9e44-5929b98094fe",
+    "kind": "static",
+    "layoutConstraints": [],
+    "name": "System context",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9": {
+        "height": 260,
+        "width": 360,
+        "x": 605.796875,
+        "y": 211
+      },
+      "34eb49b2-25b0-47cc-acc8-acd1240f41e5": {
+        "height": 260,
+        "width": 360,
+        "x": 456.7685546875,
+        "y": 955.400390625
+      },
+      "7f0b17a3-f89a-4ace-b540-3ad12e1d6f33": {
+        "height": 260,
+        "width": 360,
+        "x": 1547.7685546875,
+        "y": 211
+      },
+      "8a320840-3b2e-4c74-be5a-f6423445b993": {
+        "height": 260,
+        "width": 360,
+        "x": 0,
+        "y": 828.76171875
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 2305.2,
+        "width": 1729.2000000000003,
+        "x": 774.208984375,
+        "y": 635.400390625
+      },
+      "984afb23-9553-4ada-aea9-318b97228ce7": {
+        "height": 260,
+        "width": 360,
+        "x": 1547.7685546875,
+        "y": 955.400390625
+      },
+      "c1c3c2ce-497e-4ebb-806f-c5beb9fa9815": {
+        "height": 170,
+        "width": 150,
+        "x": 401,
+        "y": 0
+      },
+      "c20893c8-b656-41b9-aac3-3fb9e6e3469c": {
+        "height": 260,
+        "width": 360,
+        "x": 1136.7685546875,
+        "y": 211
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1546.3994140625,
+        "width": 1937.7685546875,
+        "x": 401,
+        "y": 0
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 401,
+        "y": 640.400390625
+      },
+      "e10e9643-1947-4007-8c96-40ba2dd3a773": {
+        "height": 260,
+        "width": 360,
+        "x": 0,
+        "y": 211
+      },
+      "f2d51835-1d89-4283-a8b9-6f3b3e060f05": {
+        "height": 260,
+        "width": 360,
+        "x": 1547.7685546875,
+        "y": 595.400390625
+      },
+      "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0": {
+        "height": 260,
+        "width": 360,
+        "x": 734.208984375,
+        "y": 1256.3994140625
+      }
+    },
+    "viewpoint": "system-context",
+    "viewport": {
+      "x": 436.81478187717687,
+      "y": 249.6301540947021,
+      "zoom": 0.6218466376129042
+    }
+  },
+  {
+    "folder": "Logical",
+    "id": "311a2a56-6f84-4d34-8611-51949c23e4a6",
+    "kind": "static",
+    "name": "Containers of a system",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "system-containers"
+  },
+  {
+    "folder": "Logical",
+    "id": "41c92e94-db4c-412b-bd99-620514dd8c2f",
+    "kind": "static",
+    "layoutConstraints": [],
+    "name": "Components",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component",
+                "database",
+                "queue"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "024d390d-832f-4258-8ca2-89530b50877e": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9784579196712,
+        "y": 55.98049449461314
+      },
+      "03d6d7e6-d633-43bb-a5bb-b1583813ece6": {
+        "height": 120,
+        "width": 200,
+        "x": 55.97845691967177,
+        "y": 431.0144912844621
+      },
+      "08c445dd-e14d-47dd-b4b1-1776a539dcbc": {
+        "height": 120,
+        "width": 200,
+        "x": 55.978456919672226,
+        "y": 693.9681354065187
+      },
+      "08e414ea-974c-4a75-8bef-9fd30d3cfaf4": {
+        "height": 120,
+        "width": 200,
+        "x": 895.9784599196714,
+        "y": 326.7243533135811
+      },
+      "0af45fb7-1a0a-48d6-a284-1d8af52a44a1": {
+        "height": 120,
+        "width": 200,
+        "x": 240,
+        "y": 516.208984375
+      },
+      "0dd058ca-b674-4a65-8b4e-07d87e50a5b0": {
+        "height": 120,
+        "width": 200,
+        "x": 896.32421875,
+        "y": 560.0302734375
+      },
+      "0f2bd2dc-9024-4a47-ab42-8acb021a3591": {
+        "height": 120,
+        "width": 200,
+        "x": 1116.32421875,
+        "y": 120
+      },
+      "11089086-6caa-4bd8-b5a4-2f6b58e0b96c": {
+        "height": 120,
+        "width": 200,
+        "x": 1341.4111328125,
+        "y": 560.0302734375
+      },
+      "15700a5d-75a0-4f03-be4f-78f596580088": {
+        "height": 120,
+        "width": 200,
+        "x": 615.9784589196715,
+        "y": 255.98049549461302
+      },
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 350.0009765625,
+        "width": 1808.255859375,
+        "x": 401.8037109375,
+        "y": 766
+      },
+      "20711de8-53e9-42d9-9b91-42327d4b2551": {
+        "height": 120,
+        "width": 200,
+        "x": 615.9784589196715,
+        "y": 702.6467481201917
+      },
+      "21970ab4-f4b1-4215-9f92-6e56d9648013": {
+        "height": 120,
+        "width": 200,
+        "x": 895.9784599196719,
+        "y": 55.98049449461314
+      },
+      "3027b577-5042-4975-a7cf-0aad08adb14f": {
+        "height": 120,
+        "width": 200,
+        "x": 676.32421875,
+        "y": 297.599609375
+      },
+      "32793ee9-a939-498b-a71e-77831ce7ef4c": {
+        "height": 120,
+        "width": 200,
+        "x": 55.978456919672226,
+        "y": 55.98049449461314
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 516.171875,
+        "y": 0
+      },
+      "3e50e9e6-6eb4-4176-ae96-39ec7f10e575": {
+        "height": 120,
+        "width": 200,
+        "x": 55.978456919672226,
+        "y": 255.98049549461257
+      },
+      "3ee58343-871e-42c0-a3f8-f290ad4619b4": {
+        "height": 120,
+        "width": 200,
+        "x": 0,
+        "y": 200.0009765625
+      },
+      "43a5a0b6-073d-4a5d-be64-9ff5cd99303a": {
+        "height": 120,
+        "width": 200,
+        "x": 615.9784589196715,
+        "y": 55.98049449461314
+      },
+      "449165ce-6dc3-4ce4-9b0a-52921c39245d": {
+        "height": 120,
+        "width": 200,
+        "x": 289.8553130859932,
+        "y": 55.98049449461314
+      },
+      "44fbd164-6749-44bd-9c78-c4661649dd23": {
+        "height": 120,
+        "width": 200,
+        "x": 335.97845791967256,
+        "y": 255.98049549461302
+      },
+      "45c95a3b-968d-4b77-8fc3-94af06de5087": {
+        "height": 120,
+        "width": 200,
+        "x": 615.9784589196715,
+        "y": 457.9140642561533
+      },
+      "49fa95f2-b9ea-4884-9372-581264580278": {
+        "height": 441.388671875,
+        "width": 240,
+        "x": 661.8037109375,
+        "y": 1390.798828125
+      },
+      "524d63c4-9a7b-4a79-b14f-11c2c2475a1e": {
+        "height": 120,
+        "width": 200,
+        "x": 1335.9784599196719,
+        "y": 55.98049449461314
+      },
+      "5440fe6d-8ae5-4c57-858d-41a4e1c087c9": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9619161795081,
+        "y": 55.98049449461223
+      },
+      "55cd24b4-b12b-4508-994b-de05fd43ce69": {
+        "height": 120,
+        "width": 200,
+        "x": 335.97845791967256,
+        "y": 55.980494494612685
+      },
+      "60fb9531-8072-4f6d-804d-4a00a373a6ba": {
+        "height": 200,
+        "width": 300,
+        "x": 571.50390625,
+        "y": 281.94921875
+      },
+      "67072b4e-8c08-43f1-a10b-98fb314dccb5": {
+        "height": 120,
+        "width": 200,
+        "x": 676.32421875,
+        "y": 447.822265625
+      },
+      "67e8199c-9c68-4ca4-9cbe-28b449acf5a4": {
+        "height": 120,
+        "width": 200,
+        "x": 1115.9784599196719,
+        "y": 120
+      },
+      "6a9e1c2b-cb04-4d65-93d7-758ba97867ea": {
+        "height": 120,
+        "width": 200,
+        "x": 280,
+        "y": 200.0009765625
+      },
+      "6d563737-4cfb-4ccd-993e-2f1c5deaf753": {
+        "height": 120,
+        "width": 200,
+        "x": 335.97845791967256,
+        "y": 455.9804964946129
+      },
+      "700904a2-cba3-4b18-aa76-522dd2f141e9": {
+        "height": 120,
+        "width": 200,
+        "x": 55.978456919672226,
+        "y": 55.980494494612685
+      },
+      "72ab7d8a-0466-44d3-a97b-8a5675f2dbed": {
+        "height": 120,
+        "width": 200,
+        "x": 0,
+        "y": 0.0009765625
+      },
+      "731e69c8-4e87-44fd-ab1a-196edfb83008": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd": {
+        "height": 120,
+        "width": 200,
+        "x": 335.97845791967256,
+        "y": 855.9804984946122
+      },
+      "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+        "height": 140,
+        "width": 210,
+        "x": 676.8037109375,
+        "y": 1209.7998046875
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 140,
+        "width": 210,
+        "x": 0,
+        "y": 956.0009765625
+      },
+      "811927c5-4edd-41c1-9f8d-c3e4aec08ba9": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9784579196721,
+        "y": 55.98049449461314
+      },
+      "85565274-ba9a-4907-bd77-8df441930b28": {
+        "height": 120,
+        "width": 200,
+        "x": 2051.1640625,
+        "y": 433.54296875
+      },
+      "85905679-2235-47b3-8321-b7ef18209b9b": {
+        "height": 120,
+        "width": 200,
+        "x": 1776.32421875,
+        "y": 433.54296875
+      },
+      "8893c05a-20ad-4bc0-9003-3876600411bb": {
+        "height": 120,
+        "width": 200,
+        "x": 605.978458919672,
+        "y": 55.98049449461314
+      },
+      "88f411d4-5ba5-4620-a32b-933cc622a5a0": {
+        "height": 120,
+        "width": 200,
+        "x": 55.96191517950774,
+        "y": 55.98049449461223
+      },
+      "8976767a-65f3-4b1e-b5c3-db5d61409d0f": {
+        "height": 120,
+        "width": 200,
+        "x": 55.978456919672226,
+        "y": 437.7342582554511
+      },
+      "8c66e024-79f9-42d0-86cd-843cefd2a7ef": {
+        "height": 700.0302734375,
+        "width": 2271.1640625,
+        "x": 1083.7353515625,
+        "y": 11.93359375
+      },
+      "8c78dee7-eb8a-4d4f-bc18-187edbb4f172": {
+        "height": 120,
+        "width": 200,
+        "x": 182.87269447797462,
+        "y": 1055.9804994946126
+      },
+      "9617df9e-ab47-46c4-920c-4347b186eb0d": {
+        "height": 200,
+        "width": 300,
+        "x": 128.1328125,
+        "y": 496.693359375
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1862.1875,
+        "width": 3384.8994140625,
+        "x": 0,
+        "y": 0
+      },
+      "a8f54fd7-75fb-4914-a888-6499f4175f0e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 260
+      },
+      "b4439db7-fc44-49fb-8036-07aa2954f838": {
+        "height": 120,
+        "width": 200,
+        "x": 55.97845691967177,
+        "y": 55.98049449461314
+      },
+      "b66354fc-6237-40a6-bd7d-3ecd3dd64a1e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 301.388671875
+      },
+      "bdcfe019-e771-4c56-ba74-0ea611571502": {
+        "height": 120,
+        "width": 200,
+        "x": 1116.32421875,
+        "y": 297.599609375
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1892.1875,
+        "width": 3414.8994140625,
+        "x": 0,
+        "y": 0
+      },
+      "c30ac05e-a63a-4deb-b024-b5f5d3577181": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9784579196719,
+        "y": 438.89060532882877
+      },
+      "c681fcc0-29ea-49b4-827a-2b2db809a513": {
+        "height": 200,
+        "width": 300,
+        "x": 661.8115234375,
+        "y": 496.693359375
+      },
+      "ca07e33c-43dc-48fc-b0aa-8bda8f97864e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086": {
+        "height": 120,
+        "width": 200,
+        "x": 335.97845791967256,
+        "y": 655.9804974946119
+      },
+      "cdefa455-5e6f-4395-8261-f61398610d02": {
+        "height": 120,
+        "width": 200,
+        "x": 1578.255859375,
+        "y": 200.0009765625
+      },
+      "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa": {
+        "height": 120,
+        "width": 200,
+        "x": 280.0078125,
+        "y": 0.0009765625
+      },
+      "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e": {
+        "height": 120,
+        "width": 200,
+        "x": 555.9784579196726,
+        "y": 120
+      },
+      "d77d54b5-7c84-4c51-acd3-c63696271146": {
+        "height": 120,
+        "width": 200,
+        "x": 1512.32421875,
+        "y": 297.599609375
+      },
+      "e6de1ab9-cff0-402b-a114-9b37b7c33dc5": {
+        "height": 120,
+        "width": 200,
+        "x": 378.0405539148833,
+        "y": 255.98049549461211
+      },
+      "eff2f9a4-1743-4db0-937d-2d94e6d7f68a": {
+        "height": 120,
+        "width": 200,
+        "x": 591.265625,
+        "y": 0
+      },
+      "f45e2e8b-035a-4029-8e61-febe4cdf1025": {
+        "height": 120,
+        "width": 200,
+        "x": 356.74113648014645,
+        "y": 255.98049549461257
+      },
+      "f53d7ad3-d926-404d-9341-9cb61722979d": {
+        "height": 120,
+        "width": 200,
+        "x": 98.04055291488294,
+        "y": 255.98049549461211
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 560,
+        "y": 200.0009765625
+      }
+    },
+    "viewpoint": "components",
+    "viewport": {
+      "x": -614.4699212259445,
+      "y": -586.472302864709,
+      "zoom": 0.78607056857674
+    }
+  },
+  {
+    "folder": "Logical",
+    "id": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "kind": "static",
+    "name": "Components of a container",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "container-components"
+  },
+  {
+    "folder": "Logical",
+    "id": "f0183512-e3b7-4ad2-bd81-5a60cd78e1e3",
+    "kind": "matrix",
+    "name": "Container dependencies",
+    "nodeIds": [],
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "database",
+                "queue"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "container-dependencies",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Logical",
+    "id": "a344e06a-4a47-4c3f-8775-00cddd0927fd",
+    "kind": "table",
+    "name": "Domain realisation",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "domain"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "contains": true
+              }
+            },
+            {
+              "via": {
+                "direction": "in",
+                "relationType": "realises"
+              }
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "via": {
+                "direction": "in",
+                "relationType": "realises"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "domain-realisation",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Logical",
+    "id": "fa42edbd-3989-4abb-ba88-aa86ff105603",
+    "kind": "table",
+    "name": "Responsibilities",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "direction": "out",
+              "has": true,
+              "kind": "relation",
+              "relationType": "satisfies"
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "system",
+                "container",
+                "webapp",
+                "component",
+                "database",
+                "queue"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "requirement"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "satisfies"
+              }
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "scenario"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "verifies"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "responsibilities",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Governance",
+    "id": "0bfefc16-17a2-4525-a464-429d05d1c1fb",
+    "kind": "table",
+    "name": "Decisions",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "adr"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "fitness-fn"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "implements"
+              }
+            },
+            {
+              "via": {
+                "direction": "out",
+                "relationType": "constrains"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "decisions",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Governance",
+    "id": "d42200ac-724e-46fe-af66-69cc37af65ac",
+    "kind": "wiki",
+    "name": "Decision log",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "adr"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "adr"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "supersedes"
+              }
+            }
+          ]
+        }
+      ],
+      "sort": {
+        "by": "property",
+        "desc": true,
+        "key": "date"
+      }
+    },
+    "positions": {},
+    "viewpoint": "decision-log",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    },
+    "wikiFocusId": "4f7ff47a-0c10-4b47-ad58-a1a2111b738c",
+    "wikiPageMode": "single"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "61294408-1007-4111-80de-6fc56d0ad08c",
+    "kind": "static",
+    "name": "Agent access",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "64ca6112-45d2-4729-b17e-bcdb952da389",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1856.9401861095448,
+        "width": 2364.576712072501,
+        "x": 395.8381035126108,
+        "y": 132
+      },
+      "64ca6112-45d2-4729-b17e-bcdb952da389": {
+        "height": 840.325,
+        "width": 1631.3733333333325,
+        "x": 534.1600000000001,
+        "y": 1130
+      }
+    },
+    "subject": "64ca6112-45d2-4729-b17e-bcdb952da389",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -1305.4281918368447,
+      "y": -2278.1288135593218,
+      "zoom": 2.1152542372881356
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "16a9ce27-27f5-4e4e-b8ea-0b8ee9a3c973",
+    "kind": "static",
+    "name": "AI assistant",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "ed0a90d5-2ada-4e1a-a534-2b77eb3860df",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1856.9401861095448,
+        "width": 2364.576712072501,
+        "x": 395.8381035126108,
+        "y": 132
+      },
+      "ed0a90d5-2ada-4e1a-a534-2b77eb3860df": {
+        "height": 840.325,
+        "width": 1614.9946666666647,
+        "x": 1383.4800000000005,
+        "y": 320
+      }
+    },
+    "subject": "ed0a90d5-2ada-4e1a-a534-2b77eb3860df",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -3101.9559206504046,
+      "y": -564.7728813559322,
+      "zoom": 2.1152542372881356
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "817b6c85-a4a2-4917-99d2-ddfae8ecca58",
+    "kind": "static",
+    "name": "Architecture Hub",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "6d7250bb-fb38-4bb7-afff-a3a09017b17a",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1856.9401861095448,
+        "width": 2364.576712072501,
+        "x": 395.8381035126108,
+        "y": 132
+      },
+      "6d7250bb-fb38-4bb7-afff-a3a09017b17a": {
+        "height": 360,
+        "width": 520,
+        "x": 118,
+        "y": 806.7754413297721
+      },
+      "9dc0edb5-9373-46b0-9afb-ba2f5337babe": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      }
+    },
+    "subject": "6d7250bb-fb38-4bb7-afff-a3a09017b17a",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -236.3002558047383,
+      "y": -1224.823822536488,
+      "zoom": 1.6525423728813562
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "220fd2ce-d9c8-4189-bed9-4c7bb6529c3b",
+    "kind": "static",
+    "name": "Check",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "34d283c6-4a68-45eb-a01c-1d438bb9d805",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 590.7490234375,
+        "width": 908.8623046875,
+        "x": 90,
+        "y": 160
+      },
+      "34d283c6-4a68-45eb-a01c-1d438bb9d805": {
+        "height": 302,
+        "width": 420,
+        "x": 458.8623046875,
+        "y": 0
+      },
+      "43213e4f-bd51-4a2a-8863-27cf6d046a9b": {
+        "height": 56,
+        "width": 170,
+        "x": 220,
+        "y": 120
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 220,
+        "width": 360,
+        "x": 0,
+        "y": 340.7490234375
+      },
+      "60a37a79-3fb4-435d-82c9-87ec3582f2f8": {
+        "height": 56,
+        "width": 170,
+        "x": 0,
+        "y": 0
+      },
+      "c588f90b-630c-4c0a-9118-c880208cee3e": {
+        "height": 56,
+        "width": 170,
+        "x": 220,
+        "y": 216
+      },
+      "dab95365-8c91-4cae-b130-0b5d985b43fc": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      }
+    },
+    "subject": "34d283c6-4a68-45eb-a01c-1d438bb9d805",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": 362.01649141254904,
+      "y": 262.409635049555,
+      "zoom": 1.0089738960475931
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "dfe6e5a5-79d6-4565-b8c0-88fb28cfae61",
+    "kind": "static",
+    "name": "History and presenting",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "52d309eb-0fc1-4e14-b580-6c1e75e452e8",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 730.7487015608357,
+        "width": 1258.862465625875,
+        "x": 30,
+        "y": 40
+      },
+      "52d309eb-0fc1-4e14-b580-6c1e75e452e8": {
+        "height": 1464.7500000000002,
+        "width": 2100.3066666666664,
+        "x": 998.8,
+        "y": 1080
+      }
+    },
+    "subject": "52d309eb-0fc1-4e14-b580-6c1e75e452e8",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -1514.419322033898,
+      "y": -1977.7627118644068,
+      "zoom": 2.1152542372881356
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "f5e32d33-8113-4878-9389-6fdd5ccb3c89",
+    "kind": "static",
+    "name": "Layout",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "04ded13f-e1a2-4f8a-9333-a2964708e377",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "04ded13f-e1a2-4f8a-9333-a2964708e377": {
+        "height": 3406.666666666667,
+        "width": 3500.728888887943,
+        "x": 1472.96,
+        "y": 980.9000000000001
+      },
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 730.7487015608357,
+        "width": 1258.862465625875,
+        "x": 30,
+        "y": 40
+      }
+    },
+    "subject": "04ded13f-e1a2-4f8a-9333-a2964708e377",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -2517.3882711864408,
+      "y": -1768.1410169491528,
+      "zoom": 2.1152542372881356
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "31d5a5ac-8b54-4f77-a576-1af7dea224f7",
+    "kind": "static",
+    "name": "Metamodel",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "0e257a03-914f-4e5b-a842-c0811fb6e01c",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 624.5476971440303,
+        "width": 752.9907098738132,
+        "x": 0,
+        "y": 0
+      },
+      "0e257a03-914f-4e5b-a842-c0811fb6e01c": {
+        "height": 474.54769714403034,
+        "width": 692.9907098738132,
+        "x": 30,
+        "y": 120
+      },
+      "12e863d8-7353-479e-a50c-02cfb1887c70": {
+        "height": 56,
+        "width": 170,
+        "x": 492.9907098738132,
+        "y": 158.3167601150771
+      },
+      "3c2004be-ac2a-4281-92e1-129e943b3afd": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      },
+      "53d6d7ea-930b-47cc-a7d5-9f7dfe17ee45": {
+        "height": 56,
+        "width": 170,
+        "x": 99.2409749894938,
+        "y": 388.54769714403034
+      }
+    },
+    "subject": "0e257a03-914f-4e5b-a842-c0811fb6e01c",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": 514.7776321073469,
+      "y": 123.21984725112759,
+      "zoom": 1.4016703286580767
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "08f7bfe4-7fa8-4adc-94ef-8331230b6dcd",
+    "kind": "static",
+    "name": "Modelling",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "4dd09e43-c313-4300-b9f2-d9f937b789bf",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1523.9622215207592,
+        "width": 1594.2458623202624,
+        "x": 30,
+        "y": 40
+      },
+      "0e257a03-914f-4e5b-a842-c0811fb6e01c": {
+        "height": 360,
+        "width": 520,
+        "x": 30,
+        "y": 120
+      },
+      "0f45402b-f686-4fe7-82e3-951587e20eba": {
+        "height": 56,
+        "width": 170,
+        "x": 1076.494407470766,
+        "y": 385.39007134962316
+      },
+      "12e863d8-7353-479e-a50c-02cfb1887c70": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      },
+      "17cb0911-19b2-48ac-8770-4d5f0fb3c20c": {
+        "height": 56,
+        "width": 170,
+        "x": 461.84628851464277,
+        "y": 399.26245289958536
+      },
+      "18315c1a-d5b3-433f-8751-b6354e1cdab0": {
+        "height": 56,
+        "width": 170,
+        "x": 851.5029215173544,
+        "y": 832.2122215207592
+      },
+      "21a69842-c76a-4d61-84b6-41c18d22cd6f": {
+        "height": 56,
+        "width": 170,
+        "x": 695.8965006020541,
+        "y": 154.35997393697633
+      },
+      "27f210c4-914c-40a3-b7dc-1c3cb0907bd1": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 275.50581050093285
+      },
+      "4d0eb572-e91d-4ec6-b538-8e4b4261f8e8": {
+        "height": 56,
+        "width": 170,
+        "x": 1189.2458623202624,
+        "y": 120
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 918.2122215207592,
+        "width": 1389.2458623202624,
+        "x": 175,
+        "y": 575.75
+      },
+      "60311ef2-c6ee-4cea-81f7-c7573b9edf49": {
+        "height": 56,
+        "width": 170,
+        "x": 331.9754465187857,
+        "y": 282.02566282055017
+      },
+      "60a37a79-3fb4-435d-82c9-87ec3582f2f8": {
+        "height": 56,
+        "width": 170,
+        "x": 397.32661679011653,
+        "y": 120.40417658537606
+      },
+      "6d7250bb-fb38-4bb7-afff-a3a09017b17a": {
+        "height": 360,
+        "width": 520,
+        "x": 570,
+        "y": 163.94999999999993
+      },
+      "9dc0edb5-9373-46b0-9afb-ba2f5337babe": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      },
+      "c418e5c5-cfe3-4cce-9166-31f29ab2c86c": {
+        "height": 56,
+        "width": 170,
+        "x": 640.9183528771761,
+        "y": 303.90077541265043
+      }
+    },
+    "subject": "4dd09e43-c313-4300-b9f2-d9f937b789bf",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": 461.8781067541545,
+      "y": -1.3399238783762257,
+      "zoom": 0.6894740325453022
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "06dec926-74b0-4df6-96a5-4291aafa1fb5",
+    "kind": "static",
+    "name": "Radical Forge",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "942e9364-a1a5-450b-a153-741fe9b42e48",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 921.8,
+        "width": 710.6622014233276,
+        "x": 30,
+        "y": 40
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 360,
+        "width": 520,
+        "x": 30,
+        "y": 120
+      },
+      "60a37a79-3fb4-435d-82c9-87ec3582f2f8": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      },
+      "942e9364-a1a5-450b-a153-741fe9b42e48": {
+        "height": 360,
+        "width": 650.6622014233276,
+        "x": 30,
+        "y": 531.8
+      },
+      "c683d1ba-a4c4-4faa-9248-249e4df27dbf": {
+        "height": 56,
+        "width": 170,
+        "x": 450.66220142332753,
+        "y": 184.9899356380902
+      },
+      "cc7c679d-9419-422e-9747-cf061ba927b6": {
+        "height": 56,
+        "width": 170,
+        "x": 30,
+        "y": 120
+      }
+    },
+    "subject": "942e9364-a1a5-450b-a153-741fe9b42e48",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": 605.1350914685296,
+      "y": -63.71868554028845,
+      "zoom": 1.1350366158446747
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "7f3e2f15-9794-4a96-a39f-ab39c8ee3dcc",
+    "kind": "static",
+    "name": "Storage and platforms",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "83d68252-97e0-4961-8541-4fb30e1dd772",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 921.8,
+        "width": 710.6622014233276,
+        "x": 30,
+        "y": 40
+      },
+      "83d68252-97e0-4961-8541-4fb30e1dd772": {
+        "height": 5236.316666666667,
+        "width": 3333.928888887478,
+        "x": 690.4664278846158,
+        "y": 560
+      }
+    },
+    "subject": "83d68252-97e0-4961-8541-4fb30e1dd772",
+    "viewpoint": "domain-entities",
+    "viewport": {
+      "x": -862.2154271186448,
+      "y": -877.8305084745762,
+      "zoom": 2.1152542372881356
+    }
+  },
+  {
+    "folder": "Governance",
+    "id": "a00c59b0-d3dd-4b02-8d19-fcf49426f8e7",
+    "kind": "table",
+    "name": "Fitness functions",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "fitness-fn"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "adr"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "implements"
+              }
+            },
+            {
+              "via": {
+                "direction": "out",
+                "relationType": "constrains"
+              }
+            }
+          ]
+        }
+      ],
+      "sort": {
+        "by": "property",
+        "key": "category"
+      }
+    },
+    "positions": {},
+    "viewpoint": "fitness-functions",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "edgeStyle": "orthogonal",
+    "expandedNodeIds": [],
+    "folder": "Logical",
+    "id": "44c1375a-09e1-4cb8-9a35-208db0dc2f2f",
+    "kind": "static",
+    "layoutConstraints": [],
+    "name": "radical.tools",
+    "nodeIds": [],
+    "partOf": "311a2a56-6f84-4d34-8611-51949c23e4a6",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "974cc763-a121-4f53-a92d-18a64562a0c9",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9": {
+        "height": 260,
+        "width": 360,
+        "x": 1435.1318359375,
+        "y": 370.25
+      },
+      "34eb49b2-25b0-47cc-acc8-acd1240f41e5": {
+        "height": 260,
+        "width": 360,
+        "x": 0,
+        "y": 1382.8310546875
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 815.7333984375,
+        "y": 433.5751953125
+      },
+      "49fa95f2-b9ea-4884-9372-581264580278": {
+        "height": 260,
+        "width": 639.8400000000001,
+        "x": 30,
+        "y": 658
+      },
+      "60fb9531-8072-4f6d-804d-4a00a373a6ba": {
+        "height": 200,
+        "width": 300,
+        "x": 379.7333984375,
+        "y": 418.5751953125
+      },
+      "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+        "height": 140,
+        "width": 210,
+        "x": 394.7333984375,
+        "y": 658
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 140,
+        "width": 210,
+        "x": 859.2001953125,
+        "y": 658
+      },
+      "7f0b17a3-f89a-4ace-b540-3ad12e1d6f33": {
+        "height": 260,
+        "width": 360,
+        "x": 1966.103515625,
+        "y": 0
+      },
+      "8c66e024-79f9-42d0-86cd-843cefd2a7ef": {
+        "height": 260,
+        "width": 680,
+        "x": 545.68359375,
+        "y": 120
+      },
+      "9617df9e-ab47-46c4-920c-4347b186eb0d": {
+        "height": 200,
+        "width": 300,
+        "x": 995.68359375,
+        "y": 878.5751953125
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1068.5751953125,
+        "width": 1265.68359375,
+        "x": 682.71875,
+        "y": 784.8310546875
+      },
+      "984afb23-9553-4ada-aea9-318b97228ce7": {
+        "height": 260,
+        "width": 360,
+        "x": 579.560546875,
+        "y": 425.3173828125
+      },
+      "c1c3c2ce-497e-4ebb-806f-c5beb9fa9815": {
+        "height": 170,
+        "width": 150,
+        "x": 1107.4521484375,
+        "y": 301
+      },
+      "c20893c8-b656-41b9-aac3-3fb9e6e3469c": {
+        "height": 260,
+        "width": 360,
+        "x": 1966.103515625,
+        "y": 370.25
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 2129.005859375,
+        "width": 2437.916015625,
+        "x": 0,
+        "y": 359.513671875
+      },
+      "c681fcc0-29ea-49b4-827a-2b2db809a513": {
+        "height": 200,
+        "width": 300,
+        "x": 995.68359375,
+        "y": 120
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 1107.4521484375,
+        "y": 1929.005859375
+      },
+      "e10e9643-1947-4007-8c96-40ba2dd3a773": {
+        "height": 260,
+        "width": 360,
+        "x": 1168.40234375,
+        "y": 0
+      },
+      "f2d51835-1d89-4283-a8b9-6f3b3e060f05": {
+        "height": 260,
+        "width": 360,
+        "x": 1135.560546875,
+        "y": 0
+      },
+      "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0": {
+        "height": 260,
+        "width": 360,
+        "x": 2047.916015625,
+        "y": 1382.8310546875
+      }
+    },
+    "subject": "974cc763-a121-4f53-a92d-18a64562a0c9",
+    "viewpoint": "system-containers",
+    "viewport": {
+      "x": 605.2037424893938,
+      "y": 138.5598857180185,
+      "zoom": 0.3694501281094753
+    }
+  },
+  {
+    "folder": "Governance",
+    "id": "05f92b93-6dd3-45a2-b8d1-70bcd0b6bf43",
+    "kind": "table",
+    "name": "Requirement coverage",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "ways": [
+            {
+              "types": [
+                "requirement"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "via": {
+                "direction": "in",
+                "relationType": "satisfies"
+              }
+            },
+            {
+              "types": [
+                "scenario"
+              ],
+              "via": {
+                "direction": "in",
+                "relationType": "verifies"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "requirement-coverage",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [
+      "7a893e48-dc84-4f06-a189-e507c7427e3a"
+    ],
+    "folder": "Logical",
+    "id": "ed81f61e-ee25-4535-8ba8-ed3fdc4d151b",
+    "kind": "static",
+    "name": "Architecture Hub",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "03d6d7e6-d633-43bb-a5bb-b1583813ece6": {
+        "height": 120,
+        "width": 200,
+        "x": 50,
+        "y": 487.4
+      },
+      "08e414ea-974c-4a75-8bef-9fd30d3cfaf4": {
+        "height": 120,
+        "width": 200,
+        "x": 895.9784599196714,
+        "y": 326.7243533135811
+      },
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 441.79999999999995,
+        "width": 593.04,
+        "x": 478.88,
+        "y": 846.8
+      },
+      "34eb49b2-25b0-47cc-acc8-acd1240f41e5": {
+        "height": 260,
+        "width": 360,
+        "x": 709.44,
+        "y": 120
+      },
+      "3ee58343-871e-42c0-a3f8-f290ad4619b4": {
+        "height": 120,
+        "width": 200,
+        "x": 363.04,
+        "y": 150.9
+      },
+      "43a5a0b6-073d-4a5d-be64-9ff5cd99303a": {
+        "height": 120,
+        "width": 200,
+        "x": 615.9784589196715,
+        "y": 55.98049449461314
+      },
+      "49fa95f2-b9ea-4884-9372-581264580278": {
+        "height": 260,
+        "width": 240,
+        "x": 30,
+        "y": 258.40000000000003
+      },
+      "6a9e1c2b-cb04-4d65-93d7-758ba97867ea": {
+        "height": 120,
+        "width": 200,
+        "x": 30,
+        "y": 291.79999999999995
+      },
+      "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+        "height": 627.4,
+        "width": 824.44,
+        "x": 488.88,
+        "y": 120
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 140,
+        "width": 210,
+        "x": 50,
+        "y": 888.4000000000001
+      },
+      "811927c5-4edd-41c1-9f8d-c3e4aec08ba9": {
+        "height": 120,
+        "width": 200,
+        "x": 185.55999999999997,
+        "y": 291.8
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1318.6,
+        "width": 1343.3200000000002,
+        "x": 398.88,
+        "y": 566.1
+      },
+      "984afb23-9553-4ada-aea9-318b97228ce7": {
+        "height": 260,
+        "width": 360,
+        "x": 119.44000000000003,
+        "y": 206.7
+      },
+      "b4439db7-fc44-49fb-8036-07aa2954f838": {
+        "height": 120,
+        "width": 200,
+        "x": 604.44,
+        "y": 243.06666666666666
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1914.6999999999998,
+        "width": 1772.2000000000003,
+        "x": 30,
+        "y": 40
+      },
+      "c30ac05e-a63a-4deb-b024-b5f5d3577181": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "ca07e33c-43dc-48fc-b0aa-8bda8f97864e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 30,
+        "y": 657.6
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 86.96,
+        "y": 120
+      }
+    },
+    "subject": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": -103.46736361707349,
+      "y": -49.614891048415075,
+      "zoom": 0.7254207610338639
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [],
+    "folder": "Logical",
+    "id": "38ccf554-03fd-4807-b429-522b1c46a127",
+    "kind": "static",
+    "name": "CLI",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "0af45fb7-1a0a-48d6-a284-1d8af52a44a1": {
+        "height": 120,
+        "width": 200,
+        "x": 860,
+        "y": 120
+      },
+      "0dd058ca-b674-4a65-8b4e-07d87e50a5b0": {
+        "height": 120,
+        "width": 200,
+        "x": 1665.8017578125,
+        "y": 366.900390625
+      },
+      "0f2bd2dc-9024-4a47-ab42-8acb021a3591": {
+        "height": 120,
+        "width": 200,
+        "x": 240,
+        "y": 416.900390625
+      },
+      "11089086-6caa-4bd8-b5a4-2f6b58e0b96c": {
+        "height": 120,
+        "width": 200,
+        "x": 2274.83984375,
+        "y": 176.900390625
+      },
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 236.7548828125,
+        "width": 1104.259765625,
+        "x": 860,
+        "y": 249.875
+      },
+      "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9": {
+        "height": 260,
+        "width": 360,
+        "x": 688.8525390625,
+        "y": 85
+      },
+      "3027b577-5042-4975-a7cf-0aad08adb14f": {
+        "height": 120,
+        "width": 200,
+        "x": 240,
+        "y": 260
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 316.71875,
+        "y": 331.6298828125
+      },
+      "67072b4e-8c08-43f1-a10b-98fb314dccb5": {
+        "height": 120,
+        "width": 200,
+        "x": 1848.9775390625,
+        "y": 176.900390625
+      },
+      "731e69c8-4e87-44fd-ab1a-196edfb83008": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "85565274-ba9a-4907-bd77-8df441930b28": {
+        "height": 120,
+        "width": 200,
+        "x": 1134.83984375,
+        "y": 366.900390625
+      },
+      "85905679-2235-47b3-8321-b7ef18209b9b": {
+        "height": 120,
+        "width": 200,
+        "x": 860,
+        "y": 366.900390625
+      },
+      "8a320840-3b2e-4c74-be5a-f6423445b993": {
+        "height": 260,
+        "width": 360,
+        "x": 2747.271484375,
+        "y": 1141.5869140625
+      },
+      "8c66e024-79f9-42d0-86cd-843cefd2a7ef": {
+        "height": 556.900390625,
+        "width": 2494.83984375,
+        "x": 0,
+        "y": 527.4130859375
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1114.3134765625,
+        "width": 2524.83984375,
+        "x": 163.8447265625,
+        "y": 465.7236328125
+      },
+      "a8f54fd7-75fb-4914-a888-6499f4175f0e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 260
+      },
+      "bdcfe019-e771-4c56-ba74-0ea611571502": {
+        "height": 120,
+        "width": 200,
+        "x": 605.0078125,
+        "y": 260
+      },
+      "c1c3c2ce-497e-4ebb-806f-c5beb9fa9815": {
+        "height": 170,
+        "width": 150,
+        "x": 0,
+        "y": 130
+      },
+      "c20893c8-b656-41b9-aac3-3fb9e6e3469c": {
+        "height": 260,
+        "width": 360,
+        "x": 1231.2646484375,
+        "y": 0
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1610.037109375,
+        "width": 3137.271484375,
+        "x": 0,
+        "y": 0
+      },
+      "c681fcc0-29ea-49b4-827a-2b2db809a513": {
+        "height": 200,
+        "width": 300,
+        "x": 585.0078125,
+        "y": 0
+      },
+      "cdefa455-5e6f-4395-8261-f61398610d02": {
+        "height": 120,
+        "width": 200,
+        "x": 874.259765625,
+        "y": 0
+      },
+      "d77d54b5-7c84-4c51-acd3-c63696271146": {
+        "height": 120,
+        "width": 200,
+        "x": 1580,
+        "y": 176.900390625
+      },
+      "e10e9643-1947-4007-8c96-40ba2dd3a773": {
+        "height": 260,
+        "width": 360,
+        "x": 1231.2646484375,
+        "y": 1639.912109375
+      },
+      "eff2f9a4-1743-4db0-937d-2d94e6d7f68a": {
+        "height": 120,
+        "width": 200,
+        "x": 0,
+        "y": 86.7548828125
+      },
+      "f2d51835-1d89-4283-a8b9-6f3b3e060f05": {
+        "height": 260,
+        "width": 360,
+        "x": 238.9775390625,
+        "y": 0
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 287.419921875,
+        "y": 0
+      }
+    },
+    "subject": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 907.3384397020601,
+      "y": 194.44376701570502,
+      "zoom": 0.5582692476648056
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [
+      "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+    ],
+    "folder": "Logical",
+    "id": "58fc00d1-2483-437a-a907-83714a836ef2",
+    "kind": "static",
+    "name": "Desktop app",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 571.7931124145605,
+        "width": 788.4624917311446,
+        "x": 1145.0466763080476,
+        "y": 1012.0671384442825
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 1230.7116645119827,
+        "y": 795.5646765644882
+      },
+      "5440fe6d-8ae5-4c57-858d-41a4e1c087c9": {
+        "height": 120,
+        "width": 200,
+        "x": 387.33285641860783,
+        "y": 284.26779783448114
+      },
+      "60fb9531-8072-4f6d-804d-4a00a373a6ba": {
+        "height": 637.0659442903531,
+        "width": 814.5599453707259,
+        "x": 30,
+        "y": 195.71655429261966
+      },
+      "72ab7d8a-0466-44d3-a97b-8a5675f2dbed": {
+        "height": 120,
+        "width": 200,
+        "x": 402.9889749335202,
+        "y": 156.14905034968174
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 140,
+        "width": 210,
+        "x": 1359.2199721512563,
+        "y": 120
+      },
+      "88f411d4-5ba5-4620-a32b-933cc622a5a0": {
+        "height": 120,
+        "width": 200,
+        "x": 594.5599453707259,
+        "y": 497.06594429035306
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1613.8602508588428,
+        "width": 1963.5091680391922,
+        "x": 220,
+        "y": 483.90000000000003
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 2127.760250858843,
+        "width": 2213.5091680391924,
+        "x": 30,
+        "y": 40
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 620,
+        "y": 120
+      },
+      "e6de1ab9-cff0-402b-a114-9b37b7c33dc5": {
+        "height": 120,
+        "width": 200,
+        "x": 212.47521143692506,
+        "y": 120
+      },
+      "eff2f9a4-1743-4db0-937d-2d94e6d7f68a": {
+        "height": 120,
+        "width": 200,
+        "x": 30,
+        "y": 120
+      },
+      "f2d51835-1d89-4283-a8b9-6f3b3e060f05": {
+        "height": 260,
+        "width": 360,
+        "x": 30,
+        "y": 124.5
+      },
+      "f53d7ad3-d926-404d-9341-9cb61722979d": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 456.259099695292
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 558.4624917311446,
+        "y": 421.7931124145604
+      }
+    },
+    "subject": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 509.8970187215201,
+      "y": 85.56185020472617,
+      "zoom": 0.4812295236619951
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [
+      "c681fcc0-29ea-49b4-827a-2b2db809a513"
+    ],
+    "folder": "Logical",
+    "id": "caf944a1-7153-4cff-86c2-c20bb0dc53bd",
+    "kind": "static",
+    "name": "MCP server",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 552.375,
+        "width": 510.05078125,
+        "x": 0,
+        "y": 271.0361328125
+      },
+      "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9": {
+        "height": 260,
+        "width": 360,
+        "x": 611.05078125,
+        "y": 0
+      },
+      "3027b577-5042-4975-a7cf-0aad08adb14f": {
+        "height": 120,
+        "width": 200,
+        "x": 0,
+        "y": 0
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 285.05078125,
+        "y": 92.3994140625
+      },
+      "55cd24b4-b12b-4508-994b-de05fd43ce69": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 522.072265625
+      },
+      "6a9e1c2b-cb04-4d65-93d7-758ba97867ea": {
+        "height": 120,
+        "width": 200,
+        "x": 280.05078125,
+        "y": 0
+      },
+      "700904a2-cba3-4b18-aa76-522dd2f141e9": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "8c66e024-79f9-42d0-86cd-843cefd2a7ef": {
+        "height": 160,
+        "width": 240,
+        "x": 0,
+        "y": 97.3994140625
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 853.4111328125,
+        "width": 941.05078125,
+        "x": 0,
+        "y": 346.2001953125
+      },
+      "c20893c8-b656-41b9-aac3-3fb9e6e3469c": {
+        "height": 260,
+        "width": 360,
+        "x": 1164.3232421875,
+        "y": 0
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1229.611328125,
+        "width": 1554.3232421875,
+        "x": 0,
+        "y": 0
+      },
+      "c681fcc0-29ea-49b4-827a-2b2db809a513": {
+        "height": 662.072265625,
+        "width": 240,
+        "x": 671.05078125,
+        "y": 0
+      },
+      "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa": {
+        "height": 120,
+        "width": 200,
+        "x": 0,
+        "y": 251.0361328125
+      },
+      "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 271.0361328125
+      },
+      "eff2f9a4-1743-4db0-937d-2d94e6d7f68a": {
+        "height": 120,
+        "width": 200,
+        "x": 280,
+        "y": 402.375
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 280,
+        "y": 201.1875
+      }
+    },
+    "subject": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 160.61105313215944,
+      "y": 64.22304001784505,
+      "zoom": 0.7204977700923019
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+    ],
+    "folder": "Logical",
+    "id": "ccedc642-5426-43f0-bbac-d3fdc5b109ec",
+    "kind": "static",
+    "name": "Studio",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "024d390d-832f-4258-8ca2-89530b50877e": {
+        "height": 120,
+        "width": 200,
+        "x": 1823.874862217236,
+        "y": 438.7109537106875
+      },
+      "08c445dd-e14d-47dd-b4b1-1776a539dcbc": {
+        "height": 120,
+        "width": 200,
+        "x": 2099.5101909061395,
+        "y": 851.88133110808
+      },
+      "08e414ea-974c-4a75-8bef-9fd30d3cfaf4": {
+        "height": 120,
+        "width": 200,
+        "x": 1309.31580361384,
+        "y": 120
+      },
+      "15700a5d-75a0-4f03-be4f-78f596580088": {
+        "height": 120,
+        "width": 200,
+        "x": 1220.1254299447446,
+        "y": 351.0134401374759
+      },
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 774.8369743475952,
+        "width": 1513.631929041288,
+        "x": 635.2796627337106,
+        "y": 386.7556900197485
+      },
+      "20711de8-53e9-42d9-9b91-42327d4b2551": {
+        "height": 120,
+        "width": 200,
+        "x": 1004.5113419684519,
+        "y": 1166.6427156874872
+      },
+      "21970ab4-f4b1-4215-9f92-6e56d9648013": {
+        "height": 120,
+        "width": 200,
+        "x": 980.324058748468,
+        "y": 402.58382407201793
+      },
+      "32793ee9-a939-498b-a71e-77831ce7ef4c": {
+        "height": 120,
+        "width": 200,
+        "x": 438.67725373772635,
+        "y": 157.77955633813025
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 2168.9115917749987,
+        "y": 1077.0445663181126
+      },
+      "3ee58343-871e-42c0-a3f8-f290ad4619b4": {
+        "height": 120,
+        "width": 200,
+        "x": 300.34588810900345,
+        "y": 349.62206382648367
+      },
+      "43a5a0b6-073d-4a5d-be64-9ff5cd99303a": {
+        "height": 120,
+        "width": 200,
+        "x": 561.7145838688783,
+        "y": 414.6894494178121
+      },
+      "44fbd164-6749-44bd-9c78-c4661649dd23": {
+        "height": 120,
+        "width": 200,
+        "x": 424.52796045103463,
+        "y": 1522.58848303182
+      },
+      "45c95a3b-968d-4b77-8fc3-94af06de5087": {
+        "height": 120,
+        "width": 200,
+        "x": 2242.731815172486,
+        "y": 348.94432622591984
+      },
+      "524d63c4-9a7b-4a79-b14f-11c2c2475a1e": {
+        "height": 120,
+        "width": 200,
+        "x": 1334.4158500174913,
+        "y": 504.0770889523311
+      },
+      "60fb9531-8072-4f6d-804d-4a00a373a6ba": {
+        "height": 200,
+        "width": 300,
+        "x": 2856.7606985513357,
+        "y": 1057.4548255421896
+      },
+      "67e8199c-9c68-4ca4-9cbe-28b449acf5a4": {
+        "height": 120,
+        "width": 200,
+        "x": 1444.614789601489,
+        "y": 309.2183673141775
+      },
+      "6a9e1c2b-cb04-4d65-93d7-758ba97867ea": {
+        "height": 120,
+        "width": 200,
+        "x": 624.280213408623,
+        "y": 485.3466791230992
+      },
+      "6d563737-4cfb-4ccd-993e-2f1c5deaf753": {
+        "height": 120,
+        "width": 200,
+        "x": 1677.3494206923806,
+        "y": 843.7165692784592
+      },
+      "72ab7d8a-0466-44d3-a97b-8a5675f2dbed": {
+        "height": 120,
+        "width": 200,
+        "x": 30,
+        "y": 425.9611100653517
+      },
+      "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd": {
+        "height": 120,
+        "width": 200,
+        "x": 350.1427477686694,
+        "y": 777.5279531916117
+      },
+      "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+        "height": 140,
+        "width": 210,
+        "x": 222.6571999222176,
+        "y": 120
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 1716.4246361291118,
+        "width": 2824.6464183877597,
+        "x": 200.0369244756306,
+        "y": 1274.6548255421897
+      },
+      "811927c5-4edd-41c1-9f8d-c3e4aec08ba9": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9784579196721,
+        "y": 55.98049449461314
+      },
+      "8893c05a-20ad-4bc0-9003-3876600411bb": {
+        "height": 120,
+        "width": 200,
+        "x": 605.978458919672,
+        "y": 55.98049449461314
+      },
+      "8976767a-65f3-4b1e-b5c3-db5d61409d0f": {
+        "height": 120,
+        "width": 200,
+        "x": 1683.8112383836065,
+        "y": 214.46434950847419
+      },
+      "8c78dee7-eb8a-4d4f-bc18-187edbb4f172": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 1576.4246361291118
+      },
+      "9617df9e-ab47-46c4-920c-4347b186eb0d": {
+        "height": 200,
+        "width": 300,
+        "x": 30,
+        "y": 3048.2794616713018
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 3238.2794616713018,
+        "width": 3126.7606985513357,
+        "x": 358.8782224827058,
+        "y": 669.7077949534057
+      },
+      "984afb23-9553-4ada-aea9-318b97228ce7": {
+        "height": 260,
+        "width": 360,
+        "x": 1664.8563603673902,
+        "y": 120
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 3937.9872566247077,
+        "width": 3515.6389210340417,
+        "x": 30,
+        "y": 40
+      },
+      "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086": {
+        "height": 120,
+        "width": 200,
+        "x": 2604.6464183877597,
+        "y": 1483.2472967930762
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 30,
+        "y": 493.45548536817137
+      },
+      "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa": {
+        "height": 120,
+        "width": 200,
+        "x": 318.3842561645505,
+        "y": 624.8369743475952
+      },
+      "e6de1ab9-cff0-402b-a114-9b37b7c33dc5": {
+        "height": 120,
+        "width": 200,
+        "x": 378.0405539148833,
+        "y": 255.98049549461211
+      },
+      "fe8297c1-fd3c-43e0-80cd-6a5d6224bad0": {
+        "height": 260,
+        "width": 360,
+        "x": 2550.4589015916927,
+        "y": 142.19736067359855
+      },
+      "ff9c535a-4924-4b30-b055-0a329c542dea": {
+        "height": 120,
+        "width": 200,
+        "x": 1283.631929041288,
+        "y": 120
+      }
+    },
+    "subject": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 567.0131186431264,
+      "y": 66.12713200723726,
+      "zoom": 0.27153210960926105
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [
+      "9617df9e-ab47-46c4-920c-4347b186eb0d"
+    ],
+    "folder": "Logical",
+    "id": "a003493f-236d-4de1-85a1-f86b843f669f",
+    "kind": "static",
+    "name": "VS Code extension",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "1b325efd-3003-4633-94ed-73d17d6f4ea4": {
+        "height": 360,
+        "width": 520,
+        "x": 30,
+        "y": 755.7126268498848
+      },
+      "38ef3bc6-f81d-4d7e-b942-bdb21e743db5": {
+        "height": 130,
+        "width": 190,
+        "x": 964.9353836785921,
+        "y": 120
+      },
+      "3e50e9e6-6eb4-4176-ae96-39ec7f10e575": {
+        "height": 120,
+        "width": 200,
+        "x": 211.88255792310585,
+        "y": 486.80103490359596
+      },
+      "449165ce-6dc3-4ce4-9b0a-52921c39245d": {
+        "height": 120,
+        "width": 200,
+        "x": 853.6609488706669,
+        "y": 330.5100720986956
+      },
+      "72ab7d8a-0466-44d3-a97b-8a5675f2dbed": {
+        "height": 120,
+        "width": 200,
+        "x": 30,
+        "y": 120
+      },
+      "7ab5d665-387a-42c1-9aa6-55815b1f55f7": {
+        "height": 140,
+        "width": 210,
+        "x": 280.03940315413706,
+        "y": 357.7971769908751
+      },
+      "7f0b17a3-f89a-4ace-b540-3ad12e1d6f33": {
+        "height": 260,
+        "width": 360,
+        "x": 1998.1399999999999,
+        "y": 124.50000000000003
+      },
+      "8893c05a-20ad-4bc0-9003-3876600411bb": {
+        "height": 120,
+        "width": 200,
+        "x": 20,
+        "y": 120
+      },
+      "9617df9e-ab47-46c4-920c-4347b186eb0d": {
+        "height": 626.801034903596,
+        "width": 1073.6609488706667,
+        "x": 948.4804714966066,
+        "y": 618.8074249004562
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 1275.6084598040522,
+        "width": 2052.1414203672734,
+        "x": 30,
+        "y": 483.9
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1789.508459804052,
+        "width": 2388.14,
+        "x": 0,
+        "y": 0
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 44.069999999999936,
+        "y": 120
+      },
+      "f45e2e8b-035a-4029-8e61-febe4cdf1025": {
+        "height": 120,
+        "width": 200,
+        "x": 585.6468454303046,
+        "y": 170.10166104476923
+      }
+    },
+    "subject": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 544.2127308934603,
+      "y": 81.96742955521665,
+      "zoom": 0.6609505561374741
+    }
+  },
+  {
+    "collapsedNodeIds": [],
+    "expandedNodeIds": [],
+    "folder": "Logical",
+    "id": "4e930c91-4e4d-4858-b22c-3bb223d4d122",
+    "kind": "static",
+    "name": "Website and manual",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "49fa95f2-b9ea-4884-9372-581264580278",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "34eb49b2-25b0-47cc-acc8-acd1240f41e5": {
+        "height": 260,
+        "width": 360,
+        "x": 1116.0802553234075,
+        "y": 59.99353652266569
+      },
+      "49fa95f2-b9ea-4884-9372-581264580278": {
+        "height": 395.7887497855626,
+        "width": 276.0530536943834,
+        "x": 82,
+        "y": 302.42179519299214
+      },
+      "7a893e48-dc84-4f06-a189-e507c7427e3a": {
+        "height": 140,
+        "width": 210,
+        "x": 180.334107185039,
+        "y": 57.81918737772935
+      },
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 728.2105449785547,
+        "width": 420.334107185039,
+        "x": 530.000003,
+        "y": 340.000002
+      },
+      "984afb23-9553-4ada-aea9-318b97228ce7": {
+        "height": 260,
+        "width": 360,
+        "x": 60.051057984181284,
+        "y": 108.02807806100816
+      },
+      "b66354fc-6237-40a6-bd7d-3ecd3dd64a1e": {
+        "height": 120,
+        "width": 200,
+        "x": 56.05305369438338,
+        "y": 255.78874978556257
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 1098.2105469785547,
+        "width": 1506.0802553234075,
+        "x": 17.66920487846494,
+        "y": 108.31342941329046
+      },
+      "c30ac05e-a63a-4deb-b024-b5f5d3577181": {
+        "height": 120,
+        "width": 200,
+        "x": 335.9784579196719,
+        "y": 438.89060532882877
+      },
+      "ca07e33c-43dc-48fc-b0aa-8bda8f97864e": {
+        "height": 120,
+        "width": 200,
+        "x": 56.05305369438338,
+        "y": 55.788748785562575
+      },
+      "d2a497cb-e146-41c0-a9f7-490b3bbb5cf4": {
+        "height": 170,
+        "width": 150,
+        "x": 587.5576077256245,
+        "y": 59.96339357364033
+      }
+    },
+    "subject": "49fa95f2-b9ea-4884-9372-581264580278",
+    "viewpoint": "container-components",
+    "viewport": {
+      "x": 436.55356781394903,
+      "y": 149.52372911215247,
+      "zoom": 0.7127241628236322
+    }
+  },
+  {
+    "folder": "Governance",
+    "id": "72a54b79-160b-4c96-8375-2c8a8584074c",
+    "kind": "table",
+    "name": "Requirement gaps",
+    "nodeIds": [],
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "direction": "in",
+              "has": false,
+              "kind": "relation",
+              "relationType": "verifies"
+            },
+            {
+              "direction": "in",
+              "has": false,
+              "join": "or",
+              "kind": "relation",
+              "relationType": "satisfies"
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "requirement"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "viewpoint": "requirement-gaps",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "5a842171-7463-4a23-8194-8f82ce88e522",
+    "kind": "static",
+    "name": "Folder model in Studio",
+    "nodeIds": [],
+    "partOf": "01730259-5a41-46c6-96a0-b7a9323e339d",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "d4fa1d4a-8211-4364-9ad5-37e6cacc2b3a",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "state-machine",
+                "state",
+                "pseudostate",
+                "event"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "lifecycle-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1341.2,
+        "width": 1600,
+        "x": 30,
+        "y": 40
+      },
+      "08af041e-a24f-471a-a8dc-3c10211e9ef1": {
+        "height": 52,
+        "width": 170,
+        "x": 115.10399999999981,
+        "y": 176.30000000000004
+      },
+      "15bea124-adf9-4fec-8eba-c2b24aff173c": {
+        "height": 52,
+        "width": 170,
+        "x": 312.82399999999984,
+        "y": 176.30000000000004
+      },
+      "4558588a-3615-4845-844c-c028624c36be": {
+        "height": 52,
+        "width": 170,
+        "x": 201.10399999999981,
+        "y": 360.3
+      },
+      "4dd09e43-c313-4300-b9f2-d9f937b789bf": {
+        "height": 1191.2,
+        "width": 1540,
+        "x": 30,
+        "y": 120
+      },
+      "60a37a79-3fb4-435d-82c9-87ec3582f2f8": {
+        "height": 56,
+        "width": 170,
+        "x": 1340,
+        "y": 120
+      },
+      "6381d529-b885-450b-bc4b-96478fb9e1e0": {
+        "height": 220,
+        "width": 320,
+        "x": 508.9639999999998,
+        "y": 192
+      },
+      "689b7c68-f590-4547-af31-521bfedbb5b8": {
+        "height": 52,
+        "width": 170,
+        "x": 745.1039999999998,
+        "y": 120
+      },
+      "799d43a7-ce01-44cf-b769-6524a0d3a39d": {
+        "height": 36,
+        "width": 36,
+        "x": 30,
+        "y": 733.3000000000001
+      },
+      "7efce68f-bd69-410e-94e8-8dca70d59159": {
+        "height": 52,
+        "width": 170,
+        "x": 955.1039999999998,
+        "y": 176.30000000000004
+      },
+      "83929c31-bf87-49c4-82d6-631bedb658f8": {
+        "height": 52,
+        "width": 170,
+        "x": 1165.1039999999998,
+        "y": 176.30000000000004
+      },
+      "8821fc35-4eb4-49ab-b196-827ada439082": {
+        "height": 52,
+        "width": 170,
+        "x": 115.10399999999981,
+        "y": 268.3
+      },
+      "8a0f9acb-2cb8-4383-b5fa-584026da9922": {
+        "height": 220,
+        "width": 320,
+        "x": 568.24,
+        "y": 453.59999999999997
+      },
+      "9babf663-7f12-4168-aed2-c469894c1803": {
+        "height": 52,
+        "width": 170,
+        "x": 318.9639999999998,
+        "y": 268.3
+      },
+      "d4fa1d4a-8211-4364-9ad5-37e6cacc2b3a": {
+        "height": 943.6,
+        "width": 1399.92,
+        "x": 30,
+        "y": 217.60000000000002
+      },
+      "eec58f63-e7a7-4883-bb80-6b50eff34a2a": {
+        "height": 220,
+        "width": 320,
+        "x": 173.92000000000002,
+        "y": 641.3000000000001
+      },
+      "f34c5e36-0985-47f4-9031-168cd9d2d70b": {
+        "height": 220,
+        "width": 320,
+        "x": 1049.92,
+        "y": 360.3
+      },
+      "fcb6508c-a6aa-4116-b9b1-284246a8cea2": {
+        "height": 220,
+        "width": 320,
+        "x": 622,
+        "y": 693.6
+      }
+    },
+    "subject": "d4fa1d4a-8211-4364-9ad5-37e6cacc2b3a",
+    "viewpoint": "state-machine",
+    "viewport": {
+      "x": 378.08090487846175,
+      "y": -16.88425006542593,
+      "zoom": 0.8005049338813713
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "546d9ad9-ea00-4364-87ab-a21c1bc52761",
+    "kind": "static",
+    "name": "Forge run lifecycle",
+    "nodeIds": [],
+    "partOf": "01730259-5a41-46c6-96a0-b7a9323e339d",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "state-machine",
+                "state",
+                "pseudostate",
+                "event"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "lifecycle-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 1590.9999999999998,
+        "width": 2396,
+        "x": 30,
+        "y": 40
+      },
+      "0c7320ff-82a9-441c-a268-4943e2848f84": {
+        "height": 52,
+        "width": 170,
+        "x": 390,
+        "y": 187.79999999999998
+      },
+      "3a88d0b1-67cd-4781-8b30-8afc2216e964": {
+        "height": 52,
+        "width": 170,
+        "x": 1456,
+        "y": 187.79999999999998
+      },
+      "554f5654-2141-4f3c-ac65-15c319776f35": {
+        "height": 220,
+        "width": 320,
+        "x": 86,
+        "y": 194.40000000000003
+      },
+      "6a870be5-b9d9-449e-9384-e994d25f70e8": {
+        "height": 52,
+        "width": 170,
+        "x": 1666,
+        "y": 187.79999999999998
+      },
+      "74eb8423-2bd9-4aef-9e5c-bb7f7b1ccd4d": {
+        "height": 52,
+        "width": 170,
+        "x": 1036,
+        "y": 120
+      },
+      "942e9364-a1a5-450b-a153-741fe9b42e48": {
+        "height": 1440.9999999999998,
+        "width": 2336,
+        "x": 30,
+        "y": 120
+      },
+      "9625b700-8584-475a-bc9b-b607c42d504d": {
+        "height": 52,
+        "width": 170,
+        "x": 1876,
+        "y": 187.79999999999998
+      },
+      "99e6e487-841f-4780-8027-30efb1cb7b54": {
+        "height": 220,
+        "width": 320,
+        "x": 567.76,
+        "y": 391.8
+      },
+      "9a7e0e56-4010-447b-8ae4-59ea7507e676": {
+        "height": 36,
+        "width": 36,
+        "x": 750,
+        "y": 187.79999999999998
+      },
+      "ac88d41d-2dd6-427d-9ed5-fb3541100ebc": {
+        "height": 220,
+        "width": 320,
+        "x": 826,
+        "y": 192
+      },
+      "b140b8c9-5989-44f1-a389-157107a29b01": {
+        "height": 220,
+        "width": 320,
+        "x": 30,
+        "y": 187.79999999999998
+      },
+      "b2bb3490-6932-4840-954b-8fb603b9f2d1": {
+        "height": 36,
+        "width": 36,
+        "x": 30,
+        "y": 286.40000000000003
+      },
+      "cc7c679d-9419-422e-9747-cf061ba927b6": {
+        "height": 56,
+        "width": 170,
+        "x": 2136,
+        "y": 120
+      },
+      "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49": {
+        "height": 641.8,
+        "width": 1223.2533333333333,
+        "x": 30,
+        "y": 511.4
+      },
+      "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6": {
+        "height": 1183.1999999999998,
+        "width": 2076,
+        "x": 30,
+        "y": 227.8
+      },
+      "e6b212a6-4c49-4c2d-92e0-f275c7a8c714": {
+        "height": 220,
+        "width": 320,
+        "x": 873.2533333333333,
+        "y": 120
+      },
+      "e75c7208-e119-4ebd-95a8-0640072d8980": {
+        "height": 52,
+        "width": 170,
+        "x": 1246,
+        "y": 187.79999999999998
+      }
+    },
+    "subject": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6",
+    "viewpoint": "state-machine",
+    "viewport": {
+      "x": 340.16451818254154,
+      "y": 94.67468369539279,
+      "zoom": 0.5719344314474417
+    }
+  },
+  {
+    "folder": "Conceptual",
+    "id": "a016b445-fe0c-47f9-8be6-a01b4dccf679",
+    "kind": "warnier",
+    "name": "Change the architecture",
+    "nodeIds": [],
+    "partOf": "519f249d-08ad-4c0e-826e-4a11f9951b55",
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "f5c6ade3-a10c-4037-a2c0-2e4647b8f8c8",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "subject": "f5c6ade3-a10c-4037-a2c0-2e4647b8f8c8",
+    "viewpoint": "process"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "2294ec1d-4262-4732-af5d-2708f0805e8f",
+    "kind": "warnier",
+    "name": "Keep the branch base",
+    "nodeIds": [],
+    "partOf": "519f249d-08ad-4c0e-826e-4a11f9951b55",
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "1a614a6b-6030-4998-9e01-fed4a59eeea9",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "subject": "1a614a6b-6030-4998-9e01-fed4a59eeea9",
+    "viewpoint": "process"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "54cc03e6-4d2d-405d-b4f1-5746133a7dd9",
+    "kind": "warnier",
+    "name": "Check the architecture in CI",
+    "nodeIds": [],
+    "partOf": "519f249d-08ad-4c0e-826e-4a11f9951b55",
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "7adfbacd-5a81-4285-b20f-07df859c9d0b",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "subject": "7adfbacd-5a81-4285-b20f-07df859c9d0b",
+    "viewpoint": "process"
+  },
+  {
+    "folder": "Conceptual",
+    "id": "af8f8af6-2d87-4baa-a659-203ec6c12e80",
+    "kind": "warnier",
+    "name": "Run Radical Forge",
+    "nodeIds": [],
+    "partOf": "519f249d-08ad-4c0e-826e-4a11f9951b55",
+    "pipeline": {
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "891a5219-56c7-4022-8218-0e681f0723ce",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "process",
+                "step"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "subject": "891a5219-56c7-4022-8218-0e681f0723ce",
+    "viewpoint": "process"
+  },
+  {
+    "expandedNodeIds": [
+      "5c521cfe-f793-4900-9ebf-60caf53c54aa"
+    ],
+    "folder": "Conceptual",
+    "id": "0bed180a-9728-4436-b53a-f4604937c085",
+    "kind": "static",
+    "name": "Crucible",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "5c521cfe-f793-4900-9ebf-60caf53c54aa",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {},
+    "subject": "5c521cfe-f793-4900-9ebf-60caf53c54aa",
+    "viewpoint": "domain-entities"
+  }
+]

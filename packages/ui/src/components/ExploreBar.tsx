@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeViewFolder } from '@radical/common/c4'
+import { otherModelFolder } from '@radical/common/model'
 import { onExploration, useDiagramStore } from '../store/diagramStore'
 import { editingControl } from './editingControl'
 
@@ -21,7 +22,8 @@ export function ExploreBar(): React.ReactElement | null {
   })
   const [saving, setSaving] = useState<{ name: string; folder: string } | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
-  const folders = useMemo(() => [...new Set(Object.values(views).map((v) => normalizeViewFolder(v.folder)).filter(Boolean))].sort(), [views])
+  // Not the other models' folders (a federation): this model's views stay out of them.
+  const folders = useMemo(() => [...new Set(Object.values(views).map((v) => normalizeViewFolder(v.folder)).filter((f) => f && !otherModelFolder(views, f)))].sort(), [views])
   // Another exploration, or none: what was being typed for the last goes.
   const explorationId = exploration?.id
   useEffect(() => { setSaving(null) }, [explorationId])

@@ -36,7 +36,7 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
       node('req', 'requirement', 'Pay', { action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › pays) passed\ntest(e2e/pay.spec.ts › pays in the browser) passed' }),
+      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't' }),
     ],
     relations: [{ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'req' }],
   }, 'Shop')
@@ -44,6 +44,9 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
     await mkdir(dirname(join(cwd, 'model', path)), { recursive: true })
     await writeFile(join(cwd, 'model', path), content)
   }
+  // The repository binds the scenario's tests.
+  await mkdir(join(cwd, '.radical'), { recursive: true })
+  await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ implements: [], verifies: [{ element: 'sc', name: 'Paying', tests: ['src/pay.test.ts › pays', 'e2e/pay.spec.ts › pays in the browser'] }] }))
   await git(cwd, 'add', '.')
   await git(cwd, 'commit', '-q', '-m', 'model')
   await git(cwd, 'commit', '-q', '--allow-empty', '-m', 'Pay (#7)')
@@ -106,7 +109,7 @@ async function run(cwd: string, gh: Gh | undefined, ...args: string[]) {
   return { code, out, err }
 }
 
-const results = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8'))
+const results = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8'))
 
 describe('radical check --from-ci', () => {
   it('reads the reports of the nearest commit CI ran, a squash merge standing for its pull request', async () => {
@@ -134,18 +137,28 @@ describe('radical check --from-ci', () => {
     expect((await results(cwd)).ci.behind).toBe(3)
   })
 
+  it('downloads the artifacts .radical/radical.json names', async () => {
+    const { cwd, merged } = await repository()
+    const file = JSON.parse(await readFile(join(cwd, '.radical', 'radical.json'), 'utf8'))
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ ...file, ci: { artifacts: ['test-reports'] } }))
+    const calls: string[][] = []
+    expect((await run(cwd, fakeGh(merged, calls), 'check', 'model', '--from-ci')).code).toBe(0)
+    // GitHub is asked for those artifacts by name.
+    expect(calls.filter(([c, path]) => c === 'api' && path.includes('/actions/artifacts?')).map(([, path]) => /name=([\w-]+)/.exec(path)?.[1])).toEqual(['test-reports'])
+  })
+
   it('keeps results read at a later commit', async () => {
     const { cwd, merged, head } = await repository()
     await writeFile(join(cwd, 'local.json'), report('src/pay.test.ts', 'pays', 'failed'))
     await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'local.json')
     expect(await results(cwd)).toMatchObject({ commit: head, reports: ['local.json'] })
-    const before = await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')
+    const before = await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')
 
     const checked = await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci')
     expect(checked.err).toContain(`Kept the test results read with --report at ${head.slice(0, 7)}: CI's (run 11 (pull request #7)) are of ${merged.slice(0, 7)}, before it.`)
     // The check reads the results kept.
     expect(checked.code).toBe(1)
-    expect(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')).toBe(before)
+    expect(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')).toBe(before)
 
     // Results read at an earlier commit give way.
     await git(cwd, 'checkout', '-q', `${merged}~1`)

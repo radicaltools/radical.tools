@@ -1,0 +1,8 @@
+---
+id: "e7748fb1-8e03-4c4e-bae9-e4b077acf784"
+type: "scenario"
+label: "Fit All animates"
+given: "a canvas that registered its animated and instant fit functions"
+then: "the animated fit runs once and the instant one does not"
+when: "Fit All is called"
+---

@@ -12,8 +12,10 @@ import { CLIENTS, expanded, folderOf, isRadicalServer, launcherOf, launcherPath,
 import { hooksSaveBase } from './hooks'
 import type { Io } from './check'
 import { readDependencies } from './federation'
-import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile } from '@radical/common/federation'
+import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
+import { findModelFolder, oldLayout, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
+import { testsNamedIn } from './moveTests'
 
 const exec = promisify(execFile)
 
@@ -95,11 +97,11 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
   const warn = (text: string) => io.out(`  ! ${text}`)
   const fail = (text: string) => { problems++; io.out(`  ✗ ${text}`) }
 
-  // The folder: the one named, else the working directory or architecture in
-  // it when it is a model.
+  // The folder: the one named, else the working directory when it is a
+  // model, the repository's .radical/model, or architecture/ of the
+  // old layout.
   const named = options.folder
-  const candidate = named !== undefined ? resolve(io.cwd, named)
-    : ['.', 'architecture'].map((path) => resolve(io.cwd, path)).find((path) => existsSync(resolve(path, 'radical.md')))
+  const candidate = named !== undefined ? resolve(io.cwd, named) : await findModelFolder(io.cwd) ?? undefined
   const folder = candidate ? await realpath(candidate).catch(() => candidate) : null
   const git = async (cwd: string, ...gitArgs: string[]) => (await exec('git', gitArgs, { cwd, windowsHide: true })).stdout.trim()
   const topOf = async (dir: string) => {
@@ -141,7 +143,7 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
               const got = fetched.dependencies.find((d) => d.name === dep.name)
               if (!got) warn(`depends on ${dep.name} (${dep.ref}), not fetched: radical federation fetch ${shown(folder, place)}`)
               else if (got.ref !== dep.ref || got.repo !== dep.repo) warn(`depends on ${dep.name} at ${dep.ref}, fetched at ${got.ref}: radical federation fetch ${shown(folder, place)}`)
-              else ok(`depends on ${dep.name} at ${dep.ref}, fetched (${originFor(dep.name, got.commit)})`)
+              else ok(`depends on ${dep.name} at ${refShown(got)}, fetched (${originFor(dep.name, got.commit)})`)
             }
           }
         }
@@ -150,6 +152,13 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
       }
       if (!top) warn('is not in a git repository: Studio\'s Changes on branch and radical diff need one')
       else {
+        const old = await oldLayout(top)
+        if (old.length) warn(`${old.join(', ')} ${old.length === 1 ? 'is' : 'are'} where Radical kept its files before .radical/: radical setup moves ${old.length === 1 ? 'it' : 'them'} into .radical/`)
+        const named = await testsNamedIn(folder).catch(() => 0)
+        if (named) warn(`${named} scenario${named === 1 ? '' : 's'} and fitness function${named === 1 ? '' : 's'} name their tests in the model: radical setup moves them into .radical/radical.json`)
+        // Where the repository builds the model's elements, for its sensors.
+        const mapping = await readRepositoryMapping(folder).catch((error: Error) => { fail(`its repository's mapping does not read: ${error.message}`); return undefined })
+        if (mapping) ok(`${shown(mapping.file, place)} maps ${mapping.implements.length} element${mapping.implements.length === 1 ? '' : 's'} to the repository's code`)
         const hooksDir = resolve(folder, await git(folder, 'rev-parse', '--git-path', 'hooks'))
         const fromTop = relative(top, folder).replace(/\\/g, '/')
         if (await hooksSaveBase(hooksDir, fromTop)) ok('the git hooks save its base for Studio\'s Changes on branch')
