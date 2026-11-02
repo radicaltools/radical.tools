@@ -7,7 +7,7 @@ characteristic: "performance-efficiency"
 combine: "all"
 invocation: "automated"
 max_age: "3d"
-measure: "playwright tests/studio/scale.spec.ts --cwd apps/e2e --project studio --env SCALE_MODEL=../../.radical/model --env SCALE_COPIES=14 --env SCALE_REOPEN=1 --label model=radical-x14"
+measure: "studio-scale"
 metrics: |
   studio.open_ms{model=radical-x14} <= 11000 ms
   studio.open_cached_ms{model=radical-x14} <= 7000 ms
