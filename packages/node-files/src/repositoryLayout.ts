@@ -65,9 +65,11 @@ export async function findModelFolder(cwd: string): Promise<string | null> {
 }
 
 /** The model a folder picked to open holds: the folder itself when it is
- *  one, else its .radical/model (an open dialog hides .radical/). */
+ *  one, else the .radical/model of a repository picked (an open dialog
+ *  hides .radical/), or of the .radical/ folder itself. */
 export async function repositoryModel(picked: string): Promise<string> {
   if (await isModel(picked)) return picked
+  if (basename(resolve(picked)) === RADICAL_DIR && await isModel(join(picked, 'model'))) return join(picked, 'model')
   return await isModel(join(picked, MODEL_FOLDER)) ? join(picked, MODEL_FOLDER) : picked
 }
 
@@ -112,6 +114,14 @@ export async function oldLayout(root: string): Promise<string[]> {
 /** The repository's mapping of the model's elements to its code (ADR The
  *  repository maps the model to its code). */
 export { REPOSITORY_FILE, elementPaths, type MappedElement }
+
+/** The root whose .radical/radical.json maps the model in `folder`: the
+ *  repository's, else the folder .radical/ is in (for .radical/model),
+ *  else the model folder's parent. */
+export async function mappingRoot(folder: string): Promise<string> {
+  const at = resolve(folder)
+  return await repositoryRoot(at) ?? (basename(dirname(at)) === RADICAL_DIR ? dirname(dirname(at)) : dirname(at))
+}
 
 /** The repository's .radical/radical.json, found from `from` up to the
  *  repository's root: the file, the root its paths are from and what it

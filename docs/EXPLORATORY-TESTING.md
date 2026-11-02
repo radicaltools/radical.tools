@@ -176,7 +176,7 @@ Do not walk the same path twice in a row. Each run, choose differently.
   count from the search bar ("N nodes · M relations"), not the edges.
   The MCP server does not start on a folder with malformed JSON, and
   Studio names the file and saves nothing until it reads again.
-- Each MCP write marks `.radical/agent-activity.json`, and Studio holds
+- Each MCP write marks `.state/agent-activity.json`, and Studio holds
   its own saves for 15 s after it ("An agent is editing this model").
   Wait it out before reading Studio's save from the folder, and do not
   carry a fresh mark into a new page. Writing the mark by hand stands in

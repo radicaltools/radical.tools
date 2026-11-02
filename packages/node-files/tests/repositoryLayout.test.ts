@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { elementPaths, findModelFolder, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
+import { elementPaths, findModelFolder, repositoryModel, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
@@ -34,6 +34,10 @@ describe('repository layout', () => {
     // Crucible's paths are from the repository's root, not from .radical/.
     expect(crucibleRoot(join(root, '.radical/crucible/crucible.json'))).toBe(root)
     expect(await oldLayout(root)).toEqual([])
+    // A folder picked to open: the repository, or its .radical/ itself.
+    expect(await repositoryModel(root)).toBe(join(root, '.radical/model'))
+    expect(await repositoryModel(join(root, '.radical'))).toBe(join(root, '.radical/model'))
+    expect(await repositoryModel(join(root, 'other'))).toBe(join(root, 'other'))
   })
 
   it('falls back to the old layout', async () => {

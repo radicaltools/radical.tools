@@ -68,19 +68,27 @@ export async function pickWebDirectory(): Promise<FsDirHandle | null> {
   }
 }
 
-/** The model a picked folder holds: the folder itself when it has a
- *  radical.md, else its .radical/model when that has one (the
- *  picker hides .radical/, so a repository is picked instead). */
-export async function modelHandleOf(picked: FsDirHandle): Promise<FsDirHandle> {
+/** What a picked folder opens: the model, and the repository's .radical/
+ *  folder that holds its radical.json, when there is one. The model is the
+ *  folder itself when it has a radical.md; else the .radical/model of a
+ *  repository picked (the picker hides .radical/), or of the .radical/
+ *  folder itself (a picker showing hidden folders may pick it). */
+export async function openedFolder(picked: FsDirHandle): Promise<{ model: FsDirHandle; radical: FsDirHandle | null }> {
   const hasManifest = (dir: FsDirHandle) => dir.getFileHandle('radical.md').then(() => true, () => false)
-  if (await hasManifest(picked)) return picked
-  try {
+  const modelIn = async (radical: FsDirHandle) => {
     // MODEL_FOLDER of @radical/node-files' repositoryLayout.
-    const model = await (await picked.getDirectoryHandle('.radical')).getDirectoryHandle('model')
-    return await hasManifest(model) ? model : picked
-  } catch {
-    return picked
+    const model = await radical.getDirectoryHandle('model').catch(() => null)
+    return model && await hasManifest(model) ? { model, radical } : null
   }
+  if (await hasManifest(picked)) return { model: picked, radical: null }
+  if (picked.name === '.radical') return await modelIn(picked) ?? { model: picked, radical: null }
+  const radical = await picked.getDirectoryHandle('.radical').catch(() => null)
+  return (radical && await modelIn(radical)) ?? { model: picked, radical: null }
+}
+
+/** The model a picked folder holds (see openedFolder). */
+export async function modelHandleOf(picked: FsDirHandle): Promise<FsDirHandle> {
+  return (await openedFolder(picked)).model
 }
 
 /** True when this environment can keep a model in a single file it reads and
@@ -323,8 +331,8 @@ export async function readFederationFromHandle(root: FsDirHandle): Promise<{ dep
 
 /** What `radical check` and `radical sense` keep beside the model:
  *  `.state/test-results.json`, `.state/measurements.json` and the
- *  model's check.json and reviews.json, and with the repository picked
- *  (`repository`) its .radical/radical.json; each null when there is none. */
+ *  model's check.json and reviews.json, and with the repository's .radical/
+ *  folder (`repository`) its radical.json; each null when there is none. */
 export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: FsDirHandle | null): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null }> {
   const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
     try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
@@ -334,8 +342,11 @@ export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: F
     measurements: await readStateFromHandle(root, 'measurements.json'),
     config: await text(root, 'check.json'),
     reviews: await text(root, 'reviews.json'),
-    // The repository picked to open its .radical/model: its mapping.
-    repository: repository ? await repository.getDirectoryHandle('.radical').then((dir) => text(dir, 'radical.json'), () => null) : null,
+    // The repository's .radical/ beside the model: its mapping. A handle
+    // kept before .radical/ was kept is the repository's own.
+    repository: repository
+      ? await text(repository, 'radical.json') ?? await repository.getDirectoryHandle('.radical').then((dir) => text(dir, 'radical.json'), () => null)
+      : null,
   }
 }
 

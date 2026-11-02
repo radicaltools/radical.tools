@@ -57,3 +57,21 @@ test('the card says where an element is built, for a repository opened', async (
   await expect(builtIn).toContainText('radical implement "Legacy" --path <folder>')
   await expect(builtIn.getByRole('button', { name: 'Copy' })).toBeVisible()
 })
+
+test('the card says where an element is built, for a .radical folder opened', async ({ page, studio }) => {
+  // A picker that shows hidden folders may pick .radical/ itself.
+  const folder = new ModelFolder(page, '.radical')
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(SHOP, 'shop'))) await folder.write(`model/${path}`, content)
+  await folder.write('radical.json', MAPPING)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await studio.designer()
+  await page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: 'Everything' }) }).click()
+
+  await studio.node('api').dblclick()
+  await expect(studio.properties.getByRole('region', { name: 'Built in' })).toHaveText(/Built in\s*services\/orders-api$/)
+})
