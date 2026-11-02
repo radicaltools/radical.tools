@@ -267,6 +267,25 @@ export function viewRefusal(view: Pick<DiagramView, 'name' | 'origin'> | undefin
   return view && origin ? readOnlyError(`The view "${view.name}"`, origin).replace(/\.$/, ', or copy it into this model to change the copy.') : null
 }
 
+/** The origin of the other model whose view folder `folder` is, or sits
+ *  in: a federation brings each model's views into a folder named after it. */
+export function otherModelFolder(views: Record<string, Pick<DiagramView, 'origin'>>, folder: string | null | undefined): string | undefined {
+  const root = normalizeViewFolder(folder).split('/')[0]
+  if (!root) return undefined
+  for (const view of Object.values(views)) {
+    const origin = originOf(view)
+    if (origin && originModel(origin) === root) return origin
+  }
+  return undefined
+}
+
+/** Why a view of the model's own cannot go into `folder`, or null: another
+ *  model's folder, and every folder in it, is that model's and read-only. */
+export function viewFolderRefusal(views: Record<string, Pick<DiagramView, 'origin'>>, folder: string | null | undefined): string | null {
+  const origin = otherModelFolder(views, folder)
+  return origin ? `The folder "${normalizeViewFolder(folder)}" holds the views of the model ${originModel(origin)} (${origin}), read-only: put the view in a folder of this model.` : null
+}
+
 /** Copies another model's view into the model as its own: editable, in the
  *  folder it has in its model, with its list, filter and places. It keeps
  *  its name, or, when the model has a view of that name, gets the model's

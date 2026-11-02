@@ -615,6 +615,20 @@ describe('federation', () => {
     expect(views.map((v) => v.name)).toEqual(['Containers'])
     expect(views.some((v) => v.id === 'v-ord')).toBe(false)
   })
+
+  it("refuses a view of the model's own in another model's folder", async () => {
+    const folder = await fetched()
+    const model = await FolderModel.open(folder)
+    const made = await model.call('create_view', { tempId: 'v', name: 'Mine', folder: 'orders/Logical' })
+    expect(made.ok).toBe(false)
+    expect(made.text).toContain('The folder "orders/Logical" holds the views of the model orders (orders@abc1234), read-only')
+    expect((await model.call('create_view', { tempId: 'v', name: 'Mine', folder: 'Payments' })).ok).toBe(true)
+    const mine = JSON.parse(await readFile(join(folder, 'views.json'), 'utf8')).find((v: { name: string }) => v.name === 'Mine').id as string
+    const moved = await model.call('update_view', { id: mine, folder: 'orders' })
+    expect(moved.ok).toBe(false)
+    expect(moved.text).toContain('holds the views of the model orders')
+    expect((await model.call('update_view', { id: mine, folder: 'Payments/C4' })).ok).toBe(true)
+  })
 })
 
 describe('starting a model', () => {

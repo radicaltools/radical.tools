@@ -5,7 +5,7 @@
 // Studio's AI (QuickSearch chat, Radical Forge) and the MCP server share it.
 
 import type { Metamodel } from '../../metamodel'
-import { viewRefusal } from '../../model'
+import { viewFolderRefusal, viewRefusal } from '../../model'
 import { buildAlignmentToolHandlers, buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
 export { noCanvasLayout } from './layoutTools'
 import { buildMetamodelToolDefs, buildMetamodelToolHandlers } from './metamodelTools'
@@ -87,6 +87,12 @@ const VIEW_TOOLS: Record<string, 'id' | 'viewId'> = {
 /** Another model's view (a federation) is shown, not changed: a tool that
  *  would change it is refused before it runs, as an edit of its elements is. */
 function otherModelViewRefusal(name: string, input: unknown, ctx: ToolRunContext): string | null {
+  // Nor is its folder: no view of the model's own goes into it.
+  const folder = (name === 'create_view' || name === 'update_view') && input && typeof input === 'object' ? (input as Record<string, unknown>).folder : undefined
+  if (typeof folder === 'string') {
+    const refused = viewFolderRefusal(ctx.diagram.getViews?.() ?? {}, folder)
+    if (refused) return refused
+  }
   const field = VIEW_TOOLS[name]
   const raw = field && input && typeof input === 'object' ? (input as Record<string, unknown>)[field] : undefined
   if (typeof raw !== 'string' || !raw) return null

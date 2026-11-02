@@ -16,7 +16,7 @@ import { viewShownNodes } from '@radical/common/viewPipeline'
 import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
-import { originModel, originOf } from '@radical/common/model'
+import { originModel, originOf, otherModelFolder } from '@radical/common/model'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
@@ -799,7 +799,8 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
   const labels = useNodeLabels()
   const setViewFolder = useDiagramStore((s) => s.setViewFolder)
   const allViews = useDiagramStore((s) => s.views)
-  const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)), [allViews])
+  // Not the other models' folders (a federation): this model's views stay out of them.
+  const folderPaths = useMemo(() => viewFolderPaths(Object.values(allViews)).filter((f) => !otherModelFolder(allViews, f)), [allViews])
   const [editingFolder, setEditingFolder] = useState(false)
   const setViewEdgeStyle = useDiagramStore((s) => s.setViewEdgeStyle)
   const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
@@ -1600,18 +1601,23 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
 
   const renderFolder = (folder: ViewFolder): React.ReactNode => {
     const open = !closed.has(folder.path)
+    // Another model's folder (a federation), or one in it: that model's
+    // views, fetched and read-only; its top folder names the model.
+    const origin = otherModelFolder(views, folder.path)
+    const theirs = origin ? originModel(origin) : null
     return (
       <div key={`folder:${folder.path}`} className="lp-folder">
-        <div className={`lp-folder-row${open ? ' open' : ''}${flashFolder === folder.path ? ' lp-folder-found' : ''}`} data-folder-path={folder.path}>
+        <div className={`lp-folder-row${open ? ' open' : ''}${theirs ? ' other-model' : ''}${flashFolder === folder.path ? ' lp-folder-found' : ''}`} data-folder-path={folder.path}>
           <button
             className="lp-folder-toggle"
             onClick={() => toggleFolder(folder.path)}
             aria-expanded={open}
-            title={folder.path}
+            title={theirs ? `${theirs} · fetched, read-only` : folder.path}
           >
             <span className="lp-folder-chevron"><Icon.ChevronRight /></span>
             <span className="lp-folder-icon">{open ? <Icon.FolderOpen /> : <Icon.FolderClosed />}</span>
             <span className="lp-folder-name">{folder.name}</span>
+            {theirs && !folder.path.includes('/') && <span className="lp-view-origin">{theirs}</span>}
             <span className="lp-folder-count">{folder.count}</span>
           </button>
           {!readOnly && onOpenFolder && (

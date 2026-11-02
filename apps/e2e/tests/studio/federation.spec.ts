@@ -327,3 +327,44 @@ test('the toolbar lists the other models, their versions, and what to fetch', as
   await folder.remove('deps.json')
   await expect(page.locator('.app-brand-switch').getByRole('button', { name: /other model/ })).toHaveCount(0, { timeout: 10_000 })
 })
+
+test('another model\'s folder is marked and read-only', async ({ page, studio }) => {
+  await openComposed(page, studio, 'Landscape')
+
+  // orders' folder and the one in it: fetched, read-only; the top one names the model.
+  const orders = page.locator('.lp-folder-row[data-folder-path="orders"]')
+  const logical = page.locator('.lp-folder-row[data-folder-path="orders/Logical"]')
+  for (const row of [orders, logical]) {
+    await expect(row).toHaveClass(/other-model/)
+    await expect(row.locator('.lp-folder-toggle')).toHaveAttribute('title', 'orders · fetched, read-only')
+  }
+  await expect(orders.locator('.lp-view-origin')).toHaveText('orders')
+  await expect(logical.locator('.lp-view-origin')).toHaveCount(0)
+  await expect(page.locator('.lp-folder-row[data-folder-path="Mine"]')).toHaveCount(0)
+
+  // Nothing is made, renamed or moved there.
+  await expect(page.getByRole('button', { name: /New view here/ })).toHaveCount(0)
+  await orders.getByTitle('Folder properties').click()
+  await expect(page.getByTitle('Rename folder')).toHaveCount(0)
+  await page.getByRole('button', { name: '◀ Back' }).click()
+
+  // payments' own view is not put into it: not offered, and refused when typed.
+  const landscape = page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: 'Landscape' }) })
+  await landscape.getByTitle('View properties').click()
+  await page.getByRole('button', { name: 'Move to folder' }).click()
+  await expect(page.locator('.lp-folder-choice', { hasText: 'orders' })).toHaveCount(0)
+  await page.getByLabel('Folder', { exact: true }).fill('orders/Logical')
+  await page.getByLabel('Folder', { exact: true }).press('Enter')
+  await expect(page.getByRole('region', { name: 'Notifications' })).toContainText('The folder "orders/Logical" holds the views of the model orders')
+  await expect(page.locator('.rp-pane .props-field', { hasText: 'No folder' })).toHaveCount(1)
+  await expect(page.locator('.lp-folder', { has: orders }).locator('.lp-view-card', { hasText: 'Landscape' })).toHaveCount(0)
+
+  // A folder of its own takes it.
+  await page.getByRole('button', { name: 'Move to folder' }).click()
+  await page.getByLabel('Folder', { exact: true }).fill('Mine')
+  await page.getByLabel('Folder', { exact: true }).press('Enter')
+  await page.getByRole('button', { name: '◀ Back' }).click()
+  const mine = page.locator('.lp-folder-row[data-folder-path="Mine"]')
+  await expect(mine).not.toHaveClass(/other-model/)
+  await expect(page.locator('.lp-folder', { has: mine }).locator('.lp-view-card', { hasText: 'Landscape' })).toHaveCount(1)
+})
