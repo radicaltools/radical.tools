@@ -46,12 +46,13 @@ const fetched = (label = 'Orders'): string => serializeFederationFile({
 } satisfies FederationFile)
 
 /** Opens the payments folder (`own`) in Studio, in Designer, on the view
- *  named, with the other models `federation` fetched (null: none fetched). */
-async function openComposed(page: Page, studio: Studio, view: string, { own = PAYMENTS, federation = fetched() }: { own?: DiagramData; federation?: string | null } = {}): Promise<ModelFolder> {
+ *  named, with its `deps` and the other models `federation` fetched (null:
+ *  none fetched). */
+async function openComposed(page: Page, studio: Studio, view: string, { own = PAYMENTS, deps = DEPS, federation = fetched() }: { own?: DiagramData; deps?: string; federation?: string | null } = {}): Promise<ModelFolder> {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
-  const files = { ...serializeToMdFolder(own, 'payments'), 'deps.json': DEPS, ...(federation ? { '.radical/federation.json': federation } : {}) }
+  const files = { ...serializeToMdFolder(own, 'payments'), 'deps.json': deps, ...(federation ? { '.radical/federation.json': federation } : {}) }
   for (const [path, content] of Object.entries(files)) await folder.write(path, content)
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
@@ -278,4 +279,51 @@ test('a milestone shows the other models as they were when it was made', async (
     .toContainText('This milestone was made with orders at abc1234, which is not fetched. Run radical federation fetch in the model folder to see it.')
   await expect(studio.node('pay')).toBeVisible()
   await expect(studio.node('ord-api')).toHaveCount(0)
+})
+
+test('the toolbar lists the other models, their versions, and what to fetch', async ({ page, studio }) => {
+  // payments pins orders at main and billing at v2.0.0; billing was fetched
+  // at v1.0.0, before the pin moved, and stock came through orders.
+  const pins = [
+    { name: 'orders', repo: '../orders', path: 'architecture', ref: 'main' },
+    { name: 'billing', repo: '../billing', path: 'architecture', ref: 'v2.0.0' },
+  ]
+  const file = JSON.parse(fetched()) as FederationFile
+  file.dependencies = [
+    { ...pins[0], commit: 'abc1234def' },
+    { ...pins[1], ref: 'v1.0.0', commit: 'fed9876abc' },
+    { name: 'stock', repo: '../stock', path: 'architecture', ref: 'v3.0.0', commit: '77ab1200aa', via: 'orders' },
+  ]
+  const folder = await openComposed(page, studio, 'Landscape', { deps: JSON.stringify({ name: 'payments', dependencies: pins }), federation: serializeFederationFile(file) })
+
+  // Beside the model's name: a problem with what is fetched.
+  const button = page.locator('.app-brand-switch').getByRole('button', { name: /^2 other models/ })
+  await expect(button).toContainText('⚠ 1')
+
+  // Opened: each model with its pin and what is fetched, stock under orders.
+  await button.click()
+  const pop = page.getByRole('dialog', { name: 'Other models' })
+  await expect(pop).toContainText('This model depends on 2 other models')
+  await expect(pop).toContainText('Fetched by the command line into .radical/federation.json, just now.')
+  const rows = pop.locator('tbody tr')
+  await expect(rows).toHaveText([/^orders\s*main\s*abc1234\s*✓$/, /^↳ stock via orders\s*v3.0.0\s*77ab120\s*✓$/, /^billing\s*v2.0.0\s*v1.0.0\s*⚠$/])
+  await expect(rows.nth(2)).toHaveClass('warn')
+  await expect(pop).toContainText('⚠ billing is pinned at v2.0.0 but v1.0.0 is fetched.')
+  await expect(pop).toContainText('Fetch again in the repository:')
+  await expect(pop.locator('.branch-cmd code')).toHaveText('radical federation fetch')
+  await page.keyboard.press('Escape')
+  await expect(pop).toHaveCount(0)
+
+  // A model clicked opens its folder of views on the left.
+  const ordersFolder = page.locator('.lp-folder-row[data-folder-path="orders"] .lp-folder-toggle')
+  await ordersFolder.click()
+  await expect(ordersFolder).toHaveAttribute('aria-expanded', 'false')
+  await button.click()
+  await pop.getByRole('button', { name: 'orders', exact: true }).click()
+  await expect(ordersFolder).toHaveAttribute('aria-expanded', 'true')
+  await expect(pop).toHaveCount(0)
+
+  // A model with no deps.json has no button.
+  await folder.remove('deps.json')
+  await expect(page.locator('.app-brand-switch').getByRole('button', { name: /other model/ })).toHaveCount(0, { timeout: 10_000 })
 })
