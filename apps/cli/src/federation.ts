@@ -5,7 +5,7 @@ import { parseArgs, promisify } from 'node:util'
 import type { DiagramData, DiagramSnapshot, DiagramView } from '@radical/common/c4'
 import { originOf } from '@radical/common/model'
 import {
-  DEPS_FILE, FEDERATION_FILE, composeFederation, originFor, otherModelView, parseDeps, serializeFederationFile,
+  DEPS_FILE, FEDERATION_FILE, LATEST, composeFederation, refShown, originFor, otherModelView, parseDeps, serializeFederationFile,
   type Dependency, type Deps, type FederationFile, type FetchedDependency,
 } from '@radical/common/federation'
 import { deserializeFromMdFolder, type FolderFiles } from '@radical/common/formats/mdFolder'
@@ -32,7 +32,8 @@ radical hooks install runs it after a checkout, a commit, a pull and a rebase.
 
 ${DEPS_FILE}: { "name": "<this model>", "dependencies": [ { "name": "orders",
 "repo": "<git address, or a path relative to the model folder>", "path":
-"<the model folder in that repository>", "ref": "<branch, tag or commit>" } ] }
+"<the model folder in that repository>", "ref": "<branch, tag, commit, or
+latest: the newest version tag, else the default branch, at each fetch>" } ] }
 
 Exit status: 0 fetched (or nothing to fetch), 2 it could not run.`
 
@@ -90,8 +91,10 @@ async function fetchAll(root: string, deps: Deps): Promise<{ fetched: FetchedDep
       chosen.set(dep.name, { ref: dep.ref, where, via: via ?? deps.name })
       named.set(where, dep.name)
       sources.set(dep.name, { dep, home: home ?? root })
-      const got = await fetchDependency(dep, home ?? root)
-      fetched.push(via ? { ...got, via } : got)
+      // latest follows the releases: the newest version tag, at this fetch.
+      const resolved = dep.ref === LATEST ? await latestRef(dep.repo, home ?? root) : undefined
+      const got = await fetchDependency(resolved ? { ...dep, ref: resolved } : dep, home ?? root)
+      fetched.push({ ...got, ref: dep.ref, ...(resolved ? { resolved } : {}), ...(via ? { via } : {}) })
       for (const child of got.deps?.dependencies ?? []) next.push({ dep: child, home: got.home, via: dep.name })
     }
     level = next
@@ -208,7 +211,7 @@ export async function readDependencies(root: string): Promise<Deps | null> {
 
 /** The dependencies with their commits, for a line of output. */
 export const describeDeps = (fetched: FetchedDependency[]): string =>
-  fetched.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${d.ref})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
+  fetched.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${refShown(d)})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
 
 /** Fetches the dependencies of the model folder at `root` and writes them
  *  into its FEDERATION_FILE: null when it has no deps.json. */
@@ -245,8 +248,8 @@ export async function fetchFederation(root: string): Promise<{ fetched: FetchedD
     version: 2,
     name: read.deps.name,
     fetchedAt: new Date().toISOString(),
-    dependencies: fetched.map(({ name, repo, path, ref, commit, via, deps }) => ({
-      name, repo, path, ref, commit, ...(via ? { via } : {}), ...(deps?.dependencies.length ? { dependsOn: deps.dependencies.map((d) => d.name) } : {}),
+    dependencies: fetched.map(({ name, repo, path, ref, commit, via, deps, resolved }) => ({
+      name, repo, path, ref, commit, ...(resolved ? { resolved } : {}), ...(via ? { via } : {}), ...(deps?.dependencies.length ? { dependsOn: deps.dependencies.map((d) => d.name) } : {}),
     })),
     notes: all,
     nodes: others.nodes,

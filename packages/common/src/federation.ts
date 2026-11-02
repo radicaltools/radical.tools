@@ -65,9 +65,15 @@ export function parseDeps(text: string): Deps {
   return { name, dependencies: deps }
 }
 
+/** The ref that follows a repository's releases: its newest version tag
+ *  (v1.10.0 after v1.2.0), else its default branch, resolved at each fetch. */
+export const LATEST = 'latest'
+
 /** A dependency as fetched: the commit its ref named, and its model then. */
 export interface FetchedDependency extends Dependency {
   commit: string
+  /** For the ref latest: the tag or branch it resolved to. */
+  resolved?: string
   data: Pick<DiagramData, 'nodes' | 'relations' | 'views'>
   /** Its own deps.json at that commit, when it has one. */
   deps?: Deps
@@ -140,7 +146,7 @@ export interface FederationFile {
   fetchedAt: string
   /** Each model fetched, at the commit its pin named; `via` names the model
    *  whose deps.json pinned it, absent for this model's own. */
-  dependencies: Array<Dependency & { commit: string; via?: string; dependsOn?: string[] }>
+  dependencies: Array<Dependency & { commit: string; via?: string; dependsOn?: string[]; resolved?: string }>
   /** What was left out: a pin farther away, an id two models have. */
   notes: string[]
   nodes: C4Node[]
@@ -239,4 +245,7 @@ export function otherModelView(view: DiagramView, origin: string): DiagramView |
 
 /** The dependencies with their commits, for a line of output. */
 export const describeFetched = (deps: FederationFile['dependencies']): string =>
-  deps.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${d.ref})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
+  deps.map((d) => `${originFor(d.name, d.commit)}${d.ref === d.commit ? '' : ` (${refShown(d)})`}${d.via ? ` via ${d.via}` : ''}`).join(', ')
+
+/** A pin as fetched: its ref, and for latest what it resolved to. */
+export const refShown = (d: { ref: string; resolved?: string }): string => (d.resolved ? `${d.ref} → ${d.resolved}` : d.ref)

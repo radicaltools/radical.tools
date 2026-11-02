@@ -15,4 +15,5 @@ After the merge, asked how to set up an example (one model of the organisation's
 Asked what happens with cycles: tried on two repositories, a cycle where both name each other alike works, but when another model names this one differently, this model fetched itself as another model. The product owner asked for the fix in a pull request of its own.
 Asked whether Studio shows that an open model is a federation (it did only through the dashed elements, the view folders and the notices), the product owner accepted a mock-up: a button beside the model's name, after Changes on branch, with the number of other models or a warning, opening the list of them with their versions.
 Looking at the demo of four models in Studio, the product owner asked that the folders of the federated models be marked too, and read-only: no view of the model's own may be added to them.
+Asked whether a dependency can point at the latest version, the product owner chose a ref latest: the repository's newest version tag (else its default branch), resolved at each fetch.
 Translated from Polish.

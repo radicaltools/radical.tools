@@ -920,7 +920,7 @@ radical check architecture --metrics reports/metrics --trigger pull-request</cod
 <pre class="code"><code>radical sense review "Security review" --passed --by jane --note "threat model of 2.4"</code></pre>
         <p>An adapter for another tool is one module in the radicaltools repository; see <code>radical sense --list</code> for the ones there are. The conditions, adapters and file format are in the <a href="reference.html#metrics">Reference</a>.</p>
         <h3 id="federation">Federation: one model across many repositories</h3>
-        <p>Each repository keeps the model of what it implements, next to its code, and names the models it depends on in <code>deps.json</code> in the model folder: for each its name, its git repository (an address, or a path relative to the model folder), the model folder in that repository and the ref it is pinned to. A pinned ref is changed in a pull request like code, so everyone sees the same versions.</p>
+        <p>Each repository keeps the model of what it implements, next to its code, and names the models it depends on in <code>deps.json</code> in the model folder: for each its name, its git repository (an address, or a path relative to the model folder), the model folder in that repository and the ref it is pinned to. A pinned ref is changed in a pull request like code, so everyone sees the same versions. A branch follows its newest commit; <code>latest</code> follows the repository's releases: its newest version tag (<code>v1.10.0</code> after <code>v1.2.0</code>), or its default branch when it has none, taken at each fetch, which names the version it took (<code>latest → v1.10.0</code>).</p>
 <pre class="code"><code>{
   "name": "payments",
   "dependencies": [

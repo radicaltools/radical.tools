@@ -52,8 +52,9 @@ defaults: the folder architecture, the agents it finds installed.
                       a model this one depends on, more than once for several;
                       the repository is a git address or a path relative to
                       the model folder, the version defaults to its newest
-                      version tag (else its default branch), the model folder
-                      to architecture
+                      version tag (else its default branch); latest follows
+                      the newest version tag at each fetch; the model folder
+                      defaults to architecture
   --no-hooks          leave the git hooks alone
   --no-check          end without the checks of --status
   --dry-run           print what it would change and write nothing
@@ -107,7 +108,7 @@ async function otherModels(root: string, folderArg: string, specs: string[], ask
       if (!repo) { io.out('    - no repository: left out'); continue }
       const path = (await ask('    The model folder in it [architecture]: ')).trim() || 'architecture'
       const offered = await latestRef(repo, existsSync(root) ? root : io.cwd)
-      const ref = (await ask(`    Version [${offered}]: `)).trim() || offered
+      const ref = (await ask(`    Version, or latest to follow its releases [${offered}]: `)).trim() || offered
       added.push({ name, repo, path, ref })
     }
   }

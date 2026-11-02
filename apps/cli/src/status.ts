@@ -12,7 +12,7 @@ import { CLIENTS, expanded, folderOf, isRadicalServer, launcherOf, launcherPath,
 import { hooksSaveBase } from './hooks'
 import type { Io } from './check'
 import { readDependencies } from './federation'
-import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile } from '@radical/common/federation'
+import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
 
 const exec = promisify(execFile)
@@ -141,7 +141,7 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
               const got = fetched.dependencies.find((d) => d.name === dep.name)
               if (!got) warn(`depends on ${dep.name} (${dep.ref}), not fetched: radical federation fetch ${shown(folder, place)}`)
               else if (got.ref !== dep.ref || got.repo !== dep.repo) warn(`depends on ${dep.name} at ${dep.ref}, fetched at ${got.ref}: radical federation fetch ${shown(folder, place)}`)
-              else ok(`depends on ${dep.name} at ${dep.ref}, fetched (${originFor(dep.name, got.commit)})`)
+              else ok(`depends on ${dep.name} at ${refShown(got)}, fetched (${originFor(dep.name, got.commit)})`)
             }
           }
         }
