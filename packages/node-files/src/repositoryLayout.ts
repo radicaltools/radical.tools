@@ -5,10 +5,10 @@
 // The old layout is still read: a model folder at the root (architecture/),
 // radical.sensors.json and crucible.json there.
 
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { MD_MANIFEST_FILE } from '@radical/common/formats/mdFolder'
-import { REPOSITORY_FILE, elementPaths, parseRepositoryFile, type MappedElement, type VerifiedElement } from '@radical/common/repositoryMapping'
+import { REPOSITORY_FILE, elementPaths, parseRepositoryFile, type MappedElement, type RepositoryFile } from '@radical/common/repositoryMapping'
 
 /** The folder of everything Radical keeps in a repository. */
 export const RADICAL_DIR = '.radical'
@@ -28,6 +28,11 @@ export const CRUCIBLE_FINDINGS = `${RADICAL_DIR}/crucible/findings`
 export const CRUCIBLE_ROUNDS = `${RADICAL_DIR}/crucible/rounds`
 export const OLD_CRUCIBLE_FINDINGS = 'crucible/findings'
 export const OLD_CRUCIBLE_ROUNDS = '.crucible/rounds'
+/** The reviews of manual fitness functions (in git), from the repository's
+ *  root; the model folder's reviews.json is where they were before. */
+export const REVIEWS_FILE = `${RADICAL_DIR}/reviews.json`
+export const OLD_REVIEWS_FILE = `${MODEL_FOLDER}/reviews.json`
+
 /** The model's state out of git, and where the old layout had it. */
 export const MODEL_STATE = `${MODEL_FOLDER}/.state`
 export const OLD_MODEL_STATE = `${OLD_MODEL_FOLDER}/.radical`
@@ -106,6 +111,7 @@ export async function oldLayout(root: string): Promise<string[]> {
   // Out of git, so left behind when a pull moved the rest: Crucible's rounds
   // (their numbers go on) and the model's state.
   if (await exists(join(root, OLD_CRUCIBLE_ROUNDS)) && !(await exists(join(root, CRUCIBLE_ROUNDS)))) found.push(OLD_CRUCIBLE_ROUNDS)
+  if (await isFile(join(root, OLD_REVIEWS_FILE)) && !(await exists(join(root, REVIEWS_FILE)))) found.push(OLD_REVIEWS_FILE)
   if (!found.includes(OLD_MODEL_FOLDER) && await exists(join(root, OLD_MODEL_STATE)) && !(await isModel(join(root, OLD_MODEL_FOLDER)))
     && await isModel(join(root, MODEL_FOLDER)) && !(await exists(join(root, MODEL_STATE)))) found.push(OLD_MODEL_STATE)
   return found
@@ -126,8 +132,38 @@ export async function mappingRoot(folder: string): Promise<string> {
 /** The repository's .radical/radical.json, found from `from` up to the
  *  repository's root: the file, the root its paths are from, what it maps
  *  and the tests it binds; null without one. Throws, naming the file, when it does not read. */
-export async function readRepositoryMapping(from: string): Promise<{ file: string; root: string; implements: MappedElement[]; verifies: VerifiedElement[] } | null> {
+export async function readRepositoryMapping(from: string): Promise<({ file: string; root: string } & RepositoryFile) | null> {
   const found = await findRepositoryFile(from, REPOSITORY_FILE, REPOSITORY_FILE)
   if (!found) return null
   return { file: found.path, root: repositoryFileRoot(found.path), ...parseRepositoryFile(await readFile(found.path, 'utf8'), found.path) }
+}
+
+/** A path from the repository's root in a text: segments joined by "/", at
+ *  least one, no URL, no ~, no glob or placeholder. */
+const CODE_PATH = /(?<![\w.\/~:@<{*-])(\.?[\w@-][\w.@-]*(?:\/[\w.@-]+)+)\/?/g
+
+/** Folders of what a build or a run makes, not of the repository's code. */
+const MADE = new Set(['out', 'dist', 'node_modules', 'coverage', '.state'])
+
+/** By element, the paths from the repository's root its description names
+ *  that the repository does not have: a path counts when its first folder is
+ *  one the repository has at its root (apps/…, packages/…), so a path from
+ *  elsewhere (.state/…, dist/…) is left alone, as are a placeholder
+ *  (F-NNNN.md), what a build makes (out/, dist/) and a need, which keeps
+ *  what was said as it was said. */
+export async function missingCodePaths(root: string, nodes: Array<{ id: string; type?: string; description?: unknown }>): Promise<Record<string, string[]>> {
+  const top = new Set((await readdir(root, { withFileTypes: true }).catch(() => [])).filter((e) => e.isDirectory() && e.name !== 'node_modules').map((e) => e.name))
+  const missing: Record<string, string[]> = {}
+  for (const node of nodes) {
+    if (typeof node.description !== 'string' || node.type === 'need') continue
+    const gone = new Set<string>()
+    for (const match of node.description.matchAll(CODE_PATH)) {
+      const path = match[1].replace(/\.+$/, '')
+      const parts = path.split('/')
+      if (!top.has(parts[0]) || parts.some((p) => MADE.has(p) || /N{3,}|X{3,}/.test(p)) || await exists(join(root, path))) continue
+      gone.add(path)
+    }
+    if (gone.size) missing[node.id] = [...gone]
+  }
+  return missing
 }

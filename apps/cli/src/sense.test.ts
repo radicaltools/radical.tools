@@ -71,14 +71,15 @@ describe('radical sense', () => {
     expect((await run(cwd, 'sense', 'run', '--trigger', 'weekly', '--folder', 'model', '--out', 'metrics')).out).toContain('No automated fitness function triggered on weekly has a measure.')
   })
 
-  it('records a review in reviews.json beside the model, kept in git', async () => {
+  it('records a review in the repository\'s .radical/reviews.json, kept in git', async () => {
     const cwd = await workspace()
     const at = new Date('2026-10-30T10:00:00Z')
     const main1 = await main(['sense', 'review', 'Security review', '--passed', '--by', 'tzajac', '--note', 'threat model of the release', '--folder', 'model'], { cwd, out: () => {}, err: () => {} })
     expect(main1).toBe(0)
     const { senseCommand } = await import('./sense')
     expect(await senseCommand(['review', 'Security review', '--failed', '--by', 'auditor', '--folder', 'model'], { cwd, out: () => {}, err: () => {} }, () => at)).toBe(0)
-    const file = JSON.parse(await readFile(join(cwd, 'model/reviews.json'), 'utf8'))
+    // The workspace holds no repository: the folder that holds the model is its root.
+    const file = JSON.parse(await readFile(join(cwd, '.radical/reviews.json'), 'utf8'))
     expect(file).toMatchObject({ format: 'radical-reviews', version: 1 })
     expect(file.reviews.map((r: { result: string; by: string }) => [r.result, r.by])).toEqual([['passed', 'tzajac'], ['failed', 'auditor']])
     expect(file.reviews[0].note).toBe('threat model of the release')
@@ -214,6 +215,16 @@ describe('radical sense run', () => {
     expect(result.err).toBe('')
     expect(JSON.parse(await readFile(join(cwd, 'paths-pay-api.json'), 'utf8'))).toEqual(['apps/api'])
     expect(JSON.parse(await readFile(join(cwd, 'paths-refund-api.json'), 'utf8'))).toEqual(['.'])
+  })
+
+  it('runs a repository\'s sensor that names an adapter with its arguments, for each element', async () => {
+    const cwd = await repository({ figures: { adapter: 'json', args: ['figures.json', '--metric', 'openapi.operations=ops'] } }, 'figures')
+    await writeFile(join(cwd, 'figures.json'), JSON.stringify({ ops: 12 }))
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(result.code).toBe(0)
+    const measured = JSON.parse(await readFile(join(cwd, 'metrics', 'apis-described-in-openapi-refunds-api.json'), 'utf8'))
+    expect(measured).toMatchObject({ source: 'json', measurements: [{ metric: 'openapi.operations', value: 12, labels: { element: 'refund-api' } }] })
   })
 
   it('runs a repository\'s sensor from the repository\'s root, its file in .radical/sensors/', async () => {

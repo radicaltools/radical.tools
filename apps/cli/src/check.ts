@@ -13,8 +13,9 @@ import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catal
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 import { composeFolder, describeDeps, federationOthers } from './federation'
 import { repositorySensors } from './repositorySensors'
-import { readRepositoryMapping } from '@radical/node-files/repositoryLayout'
+import { REVIEWS_FILE as REPOSITORY_REVIEWS, mappingRoot, missingCodePaths, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
+import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -184,6 +185,22 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
+  // Where the repository builds the model's elements, and which of those
+  // paths it does not have.
+  let repository: RepositoryMapping | null
+  try {
+    const mapping = await readRepositoryMapping(root)
+    repository = mapping && {
+      file: relative(io.cwd, mapping.file),
+      implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
+      verifies: mapping.verifies,
+      ...(mapping.tests ? { tests: mapping.tests } : {}),
+      ...(mapping.ci ? { ci: mapping.ci } : {}),
+    }
+  } catch (error) {
+    io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
+    return 2
+  }
   let tests: TestCase[] | undefined
   // Results that are not this run's: from CI, or kept from a later commit.
   let testsReadAt: string | undefined
@@ -196,7 +213,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     let got
     try {
       got = await withFetchLock(root, async () => {
-        const source = await findCiRuns(root, gh, config.ci?.artifacts)
+        // CI's artifacts: the repository's .radical/radical.json says, else check.json.
+        const source = await findCiRuns(root, gh, repository?.ci?.artifacts ?? config.ci?.artifacts)
         if (await readLater(root, existing, source.commit)) return { source, kept: existing! }
         if (sameRuns(existing, source)) return { source, cases: existing!.cases, reports: existing!.reports }
         return { source, ...await downloadCiReports(root, gh, source) }
@@ -261,12 +279,15 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   // The reviews of manual fitness functions, kept in git beside the model.
-  const reviewsText = await readFile(join(root, REVIEWS_FILE), 'utf8').catch(() => null)
-  if (reviewsText !== null) {
+  // The reviews of manual fitness functions: the repository's
+  // .radical/reviews.json, and the model folder's while it is not moved.
+  for (const [where, path] of [[REPOSITORY_REVIEWS, join(await mappingRoot(root), REPOSITORY_REVIEWS)], [REVIEWS_FILE, join(root, REVIEWS_FILE)]]) {
+    const reviewsText = await readFile(path, 'utf8').catch(() => null)
+    if (reviewsText === null) continue
     try {
       measurements = [...(measurements ?? []), ...reviewMeasurements(parseReviewsFile(reviewsText))]
     } catch (error) {
-      io.err(`Cannot read ${REVIEWS_FILE}: ${(error as Error).message}`)
+      io.err(`Cannot read ${where}: ${(error as Error).message}`)
       return 2
     }
   }
@@ -302,21 +323,10 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     io.err(`Cannot read the repository's sensors: ${(error as Error).message}`)
     return 2
   }
-  // Where the repository builds the model's elements, and which of those
-  // paths it does not have.
-  let repository: RepositoryMapping | null
-  try {
-    const mapping = await readRepositoryMapping(root)
-    repository = mapping && {
-      file: relative(io.cwd, mapping.file),
-      implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
-      verifies: mapping.verifies,
-    }
-  } catch (error) {
-    io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
-    return 2
-  }
-  const result = runCheck(files, config, { sensors, repository, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // Code paths the model's descriptions name that the repository lacks.
+  let missingPaths: Record<string, string[]> = {}
+  try { missingPaths = await missingCodePaths(await mappingRoot(root), deserializeFromMdFolder(files).data.nodes) } catch { /* the folder's own rules say what is wrong */ }
+  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so

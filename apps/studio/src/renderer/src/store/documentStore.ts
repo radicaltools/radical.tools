@@ -54,6 +54,7 @@ import {
   writeModelBaseToHandle,
   readCheckFilesFromHandle,
   writeCheckConfigToHandle,
+  writeRepositoryFileToHandle,
 } from '../persist/webFolder'
 
 const LS_INDEX_KEY = 'radical-docs-index'
@@ -971,6 +972,11 @@ export interface DocumentsAPI {
   /** Writes check.json beside an md-folder model; throws when the document
    *  is no folder or its folder cannot be written. */
   writeCheckConfig(id: string, content: string): Promise<void>
+  /** Whether Studio can write the repository's .radical/radical.json of a
+   *  folder model (the desktop, or a browser folder opened by its repository). */
+  canWriteRepositoryFile(id: string): Promise<boolean>
+  /** Writes it; throws where Studio cannot reach it. */
+  writeRepositoryFile(id: string, content: string): Promise<void>
 
   /** Convenience: ensure there's at least one document; create an empty LS
    *  doc if the index is empty. Returns the active doc. */
@@ -1607,6 +1613,30 @@ export const documents: DocumentsAPI = {
     const handle = await loadHandle(id)
     // A model opened by its repository reads the repository's files too.
     return handle ? readCheckFilesFromHandle(handle, await loadHandle(repositoryKey(id)).catch(() => null)) : null
+  },
+
+  async canWriteRepositoryFile(id) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') return false
+    const h = host()
+    if (meta.folderPath) return !!h.writeRepositoryFile
+    // A browser folder opened by its repository holds the repository's .radical/.
+    return !h.readFolder && connectedWebHandles.has(id) && !!(await loadHandle(repositoryKey(id)).catch(() => null))
+  },
+
+  async writeRepositoryFile(id, content) {
+    const meta = readIndex().docs.find((d) => d.id === id)
+    if (meta?.source !== 'md') throw new Error('Only a model kept in a folder has a repository.')
+    const h = host()
+    if (meta.folderPath && h.writeRepositoryFile) {
+      const res = await h.writeRepositoryFile(meta.folderPath, content)
+      if (!res.success) throw new Error(res.error ?? '.radical/radical.json could not be written.')
+      return
+    }
+    const repository = await loadHandle(repositoryKey(id)).catch(() => null)
+    if (!repository) throw new Error('Studio cannot reach the repository\'s .radical/radical.json: open the model by its repository.')
+    if (!(await verifyPermission(repository, 'readwrite', true))) throw new Error('Studio may not write the repository\'s .radical/radical.json.')
+    await writeRepositoryFileToHandle(repository, content)
   },
 
   async writeCheckConfig(id, content) {

@@ -137,6 +137,16 @@ describe('radical check --from-ci', () => {
     expect((await results(cwd)).ci.behind).toBe(3)
   })
 
+  it('downloads the artifacts .radical/radical.json names', async () => {
+    const { cwd, merged } = await repository()
+    const file = JSON.parse(await readFile(join(cwd, '.radical', 'radical.json'), 'utf8'))
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ ...file, ci: { artifacts: ['test-reports'] } }))
+    const calls: string[][] = []
+    expect((await run(cwd, fakeGh(merged, calls), 'check', 'model', '--from-ci')).code).toBe(0)
+    // GitHub is asked for those artifacts by name.
+    expect(calls.filter(([c, path]) => c === 'api' && path.includes('/actions/artifacts?')).map(([, path]) => /name=([\w-]+)/.exec(path)?.[1])).toEqual(['test-reports'])
+  })
+
   it('keeps results read at a later commit', async () => {
     const { cwd, merged, head } = await repository()
     await writeFile(join(cwd, 'local.json'), report('src/pay.test.ts', 'pays', 'failed'))

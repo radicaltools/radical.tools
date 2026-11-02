@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { elementPaths, findModelFolder, repositoryModel, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
+import { elementPaths, findModelFolder, missingCodePaths, repositoryModel, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
@@ -73,5 +73,18 @@ describe('repository mapping', () => {
     expect(await readRepositoryMapping(await repository(['src/']))).toBeNull()
     await writeFile(join(root, '.radical/radical.json'), '{ "implements": [{ "paths": [] }] }')
     await expect(readRepositoryMapping(root)).rejects.toThrow('implements[0] needs "element" (an id) and "paths" (a list of folders)')
+  })
+})
+
+describe('code paths in descriptions', () => {
+  it('finds the paths from the repository\'s root a description names that the repository lacks', async () => {
+    const root = await repository(['apps/api/src/main.ts', 'docs/', '.radical/model/radical.md'])
+    const nodes = [
+      { id: 'api', type: 'container', description: 'Starts in apps/api/src/main.ts. Its old entry apps/api/src/server.ts went; see docs/API.md.' },
+      { id: 'ok', type: 'component', description: 'Reads .state/base.json, https://example.com/apps/x.ts, ~/.radical/node, dist/index.js and apps/api/out/x.js.' },
+      { id: 'note', type: 'need', description: 'Something in apps/gone/x.ts once.' },
+      { id: 'finding', type: 'component', description: 'Writes .radical/crucible/findings/F-NNNN.md.' },
+    ]
+    expect(await missingCodePaths(root, nodes)).toEqual({ api: ['apps/api/src/server.ts', 'docs/API.md'] })
   })
 })

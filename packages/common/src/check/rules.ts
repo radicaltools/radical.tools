@@ -73,6 +73,12 @@ export interface CheckModel {
   now?: number
   /** The config's rule settings, for rules that take options. */
   settings?: Record<string, import('./index').RuleSetting>
+  /** By element, the paths from the repository's root its description names
+   *  that the repository does not have (the CLI works them out). */
+  missingPaths?: Record<string, string[]>
+  /** The repository's settings check.json holds (that belong in
+   *  .radical/radical.json): "test-unbound include", "ci artifacts". */
+  settingsInModel?: string[]
   /** The Hub's concern packs, for concern-unaddressed; without them it
    *  finds nothing. */
   concerns?: ConcernPack[]
@@ -89,6 +95,9 @@ export interface RepositoryMapping {
   implements: Array<{ element: string; name?: string; paths: string[]; missing: string[] }>
   /** The tests it binds to scenarios and fitness functions. */
   verifies?: Array<{ element: string; name?: string; tests: string[] }>
+  /** The test files test-unbound reads, and CI's artifacts. */
+  tests?: { include?: string[]; exclude?: string[] }
+  ci?: { artifacts?: string[] }
 }
 
 export interface CheckRule {
@@ -142,6 +151,8 @@ function unlinked(model: CheckModel, type: string, relation: string, end: 'in' |
 const quote = (n: C4Node): string => `"${n.label}"`
 
 const TYPE_NAME: Record<string, string> = { scenario: 'Scenario', 'fitness-fn': 'Fitness function' }
+/** A node's type as a message names it: Scenario, Fitness function, else its type. */
+const TYPE_LABEL = (node: C4Node): string => TYPE_NAME[node.type] ?? node.type.charAt(0).toUpperCase() + node.type.slice(1)
 
 /** What a failing check of `node` takes down with it: the requirements a
  *  scenario verifies, the ADRs a fitness function implements. */
@@ -492,6 +503,35 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'traceability',
     run: repositoryMapping,
+  },
+  {
+    id: 'repository-settings-in-model',
+    description: 'The model\'s check.json holds the model\'s rules and goals; the repository\'s test files (test-unbound\'s include and exclude) and CI\'s artifacts belong in .radical/radical.json ("tests", "ci"). Those in check.json are still read.',
+    severity: 'warning',
+    dimension: 'completeness',
+    run: (model) => (model.settingsInModel ?? []).map((what) => ({
+      path: 'check.json',
+      message: `check.json holds the repository's ${what}; ${what.startsWith('ci') ? 'they belong in .radical/radical.json ("ci": { "artifacts": [...] })' : 'it belongs in .radical/radical.json ("tests": { "include": [...], "exclude": [...] })'}.`,
+    })),
+  },
+  {
+    id: 'description-path-missing',
+    description: 'With the repository (the CLI): a path from the repository\'s root an element\'s description names (apps/cli/src/sense.ts) is in the repository; one that is gone tells of code that moved.',
+    severity: 'warning',
+    dimension: 'consistency',
+    run: (model) => Object.entries(model.missingPaths ?? {}).flatMap(([id, paths]) => {
+      const node = model.nodes[id]
+      return node && paths.length ? [{ nodeId: id, message: `${TYPE_LABEL(node)} ${quote(node)} names ${paths.join(', ')}, which the repository does not have.` }] : []
+    }),
+  },
+  {
+    id: 'measure-with-arguments',
+    description: 'A fitness function\'s measure lines name sensors only: an adapter\'s arguments (files, options of the repository) belong to a sensor of .radical/sensors/sensors.json ({ "adapter": "playwright", "args": [...] }). A line with arguments still runs.',
+    severity: 'warning',
+    dimension: 'completeness',
+    run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
+      .filter((line) => line.args.length > 0)
+      .map((line) => ({ nodeId: n.id, message: `Fitness function ${quote(n)}: measure "${line.raw}" has the repository's arguments; name a sensor of .radical/sensors/sensors.json that holds them ({ "adapter": "${line.sensor}", "args": [...] }).` }))),
   },
   {
     id: 'metric-invalid',

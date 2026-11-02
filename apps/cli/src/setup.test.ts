@@ -183,6 +183,22 @@ describe('radical setup', () => {
     expect(await readFile(join(w.repo, '.git', 'hooks', 'post-checkout'), 'utf8')).toContain(HOOK_MARKER)
   })
 
+  it('moves the model folder\'s reviews into .radical/reviews.json', async () => {
+    const w = await world()
+    const folder = join(w.repo, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const reviews = JSON.stringify({ format: 'radical-reviews', version: 1, reviews: [{ name: 'Threat model', result: 'passed', by: 'ana', at: '2026-11-01T10:00:00Z' }] })
+    await writeFile(join(folder, 'reviews.json'), reviews)
+    expect((await run(w, ['setup', '--status', '--no-start'])).out).toContain('! .radical/model/reviews.json is where Radical kept its files before .radical/')
+    const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
+    expect(moved.out).toContain('+ moved .radical/model/reviews.json to .radical/reviews.json')
+    expect(await readFile(join(w.repo, '.radical', 'reviews.json'), 'utf8')).toBe(reviews)
+    expect(existsSync(join(folder, 'reviews.json'))).toBe(false)
+  })
+
   it('moves the tests a model names into .radical/radical.json', async () => {
     const w = await world()
     const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}) =>
