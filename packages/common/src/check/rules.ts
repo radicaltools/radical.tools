@@ -8,8 +8,9 @@
 // someone types (a requirement comes before its scenario).
 
 import type { C4Node, C4Relation } from '../c4'
+import { originOf } from '../model'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
-import { conditionResults, conditionsOf, linkedNodes, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type TestOutcome } from './evidence'
+import { conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
 import { formatAge, parseCombine, parseMaxAge, type Measurement } from './metrics'
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
@@ -174,14 +175,30 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
       .filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type))
       .filter((n) => outcome !== 'not-run' || runsOn(n, model.trigger))
       .flatMap((node) => {
+        const seen = (r: ConditionResult): string => {
+          const m = r.measurement
+          return m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
+        }
+        const elements = measuredElements(model, node)
+        if (elements.length) {
+          // Measured for each element its decision constrains: a finding per
+          // element, on the element when the fitness function is another
+          // model's (a standard its decision makes this model's).
+          const origin = originOf(node)
+          return elements.flatMap((element) => elementConditions(node, model, element)
+            .filter((r) => r.outcome === outcome)
+            .map((r) => ({
+              nodeId: origin ? element.id : node.id,
+              message: `${message(node, r.condition, seen(r), r.detail).replace(/\.$/, '')} for ${TYPE_NAME[element.type] ?? element.type} ${quote(element)}${origin ? ` (a fitness function of ${origin})` : ''}.`,
+              ...(origin ? { relatedIds: [node.id] } : outcome === 'failed' ? { relatedIds: [element.id] } : {}),
+            })))
+        }
         const metricLines = new Set(conditionsOf(node).filter((c) => c.kind === 'metric').map((c) => c.raw))
         return conditionResults(node, model)
           .filter((r) => r.outcome === outcome && metricLines.has(r.condition))
           .map((r) => {
-            const m = r.measurement
-            const seen = m ? ` (${m.value}${m.unit ? ` ${m.unit}` : ''} from ${m.source}, ${formatAge((model.now ?? Date.now()) - Date.parse(m.at))} ago)` : ''
             const related = outcome === 'failed' ? affectedBy(model, node).map((n) => n.id) : []
-            return { nodeId: node.id, message: message(node, r.condition, seen, r.detail), ...(related.length ? { relatedIds: related } : {}) }
+            return { nodeId: node.id, message: message(node, r.condition, seen(r), r.detail), ...(related.length ? { relatedIds: related } : {}) }
           })
       })
   }

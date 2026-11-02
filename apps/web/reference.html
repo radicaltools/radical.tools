@@ -428,7 +428,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
               <tr><td><code>command [--name m] -- &lt;cmd&gt;</code></td><td>Runs the command; measures <code>m.exit_code</code> and <code>m.duration</code> (s). Its output goes to stderr.</td></tr>
               <tr><td><code>json &lt;file&gt; --metric m=&lt;path&gt;[@unit]</code></td><td>Reads a number from a JSON file by dotted keys with <code>[index]</code>, or a JSON pointer starting with <code>/</code>; repeat for more.</td></tr>
               <tr><td><code>playwright &lt;spec&gt; [--cwd d] [--project p] [--env K=V] [--runner cmd]</code></td><td>Runs Playwright on the spec (default runner <code>npx playwright test</code>) with <code>RADICAL_METRICS_DIR</code> set, and measures what the <code>radical-metrics/1</code> files the spec writes there hold.</td></tr>
-              <tr><td><code>run --trigger &lt;event&gt; --out &lt;dir&gt;</code></td><td>Runs every line of the measure of each automated fitness function triggered on the event, each with its adapter, into one file a line in the directory. Names each line it could not measure, and exits 2 then.</td></tr>
+              <tr><td><code>run --trigger &lt;event&gt; --out &lt;dir&gt;</code></td><td>Runs every line of the measure of each automated fitness function triggered on the event, each with its adapter, into one file a line in the directory. Names each line it could not measure, and exits 2 then. A line that names a sensor of the repository's <code>radical.sensors.json</code> runs its command once for each of the model's elements the fitness function's ADR constrains (also an ADR of a model in <code>deps.json</code>), with <code>--context &lt;json&gt;</code>; it measures <code>&lt;sensor&gt;.exit_code</code> and <code>&lt;sensor&gt;.duration</code> labelled <code>element=&lt;id&gt;</code>, and what the command writes to <code>metricsOut</code>.</td></tr>
               <tr><td><code>review &lt;name&gt; --passed|--failed --by &lt;who&gt;</code></td><td>Adds a person's review, with <code>--note</code>, to the model folder's <code>reviews.json</code>, kept in git; <code>review(&lt;name&gt;) passed</code> reads the latest.</td></tr>
               <tr><td><code>--folder &lt;dir&gt;</code></td><td>The model folder. Default: the working directory. What is measured goes into its <code>.radical/measurements.json</code>, the latest of each metric and labels.</td></tr>
               <tr><td><code>--out &lt;file&gt;</code></td><td>Writes a <code>radical-metrics/1</code> file instead, for <code>radical check --metrics</code> in another job.</td></tr>
@@ -441,6 +441,15 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
 <pre class="code"><code>{ "format": "radical-metrics", "version": 1, "source": "json", "at": "2026-10-29T10:00:00Z",
   "context": { "commit": "a370b95" },
   "measurements": [{ "metric": "api.latency.p95", "value": 287, "unit": "ms", "labels": { "env": "staging" } }] }</code></pre>
+        <p>A repository's own sensors, in <code>radical.sensors.json</code> at its root (or nearer the model folder): a name and its command, a string or a list of words. The command's <code>--context</code>:</p>
+<pre class="code"><code>{ "sensors": { "openapi": { "command": "node tools/check-openapi.mjs" } } }
+
+{ "fitnessFunction": { "id": "…", "label": "APIs described in OpenAPI", "model": "standards", "properties": { "measure": "openapi", … } },
+  "adr": { "id": "…", "label": "APIs are described in OpenAPI", "model": "standards" },
+  "element": { "id": "…", "label": "Payments API", "type": "container", "technology": "Node",
+               "parent": { "id": "…", "label": "Payments", "type": "system" }, "properties": { … } },
+  "metricsOut": "reports/metrics/apis-described-in-openapi-payments-api.sensor.json" }</code></pre>
+        <p>Measured for each element, a fitness function is judged for each element apart (its metric conditions on the measurements labelled with the element) and passes when it passes for all; its findings name the element, and another model's fitness function is this model's evidence only where it was measured here, its findings on the element.</p>
         <p>An adapter for another tool is one module in <code>apps/cli/src/sensors/</code> of the radicaltools repository, listed in its registry with a fixture of the tool's real output; the contract test runs every adapter on its fixture. Models from before Metrics are read with each test in a <code>test(…) passed</code> line and a threshold at the end of the description.</p>
       </section>
 
