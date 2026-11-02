@@ -369,6 +369,10 @@ function fileUnreadable(id: string, file: string, reason: string): never {
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
  *  that is there but does not parse is a DocumentUnreadableError. */
+/** Where a browser folder model opened by its repository keeps the
+ *  repository's handle, for the files beside the model (.radical/radical.json). */
+const repositoryKey = (id: string): string => `${id}:repository`
+
 /** Folder models renamed in Studio whose radical.md has the old name until
  *  the write of the new one: a read meanwhile keeps the new name. */
 const renamedFolders = new Set<string>()
@@ -963,7 +967,7 @@ export interface DocumentsAPI {
    *  all null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
    *  folder before its access is back). */
-  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null } | null>
+  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null } | null>
   /** Writes check.json beside an md-folder model; throws when the document
    *  is no folder or its folder cannot be written. */
   writeCheckConfig(id: string, content: string): Promise<void>
@@ -1173,9 +1177,11 @@ export const documents: DocumentsAPI = {
       webSessions.delete(id)
       webDiscussionStores.delete(id)
       void removeHandle(id)
+      void removeHandle(repositoryKey(id))
     } else if (removed?.source === 'fs' && !removed.filePath) {
       connectedWebHandles.delete(id)
       void removeHandle(id)
+      void removeHandle(repositoryKey(id))
     }
     if (idx.activeId === id) idx.activeId = idx.docs[0]?.id ?? null
     writeIndex(idx)
@@ -1360,6 +1366,7 @@ export const documents: DocumentsAPI = {
       const picked = await pickWebDirectory()
       if (!picked) return null
       const handle = await modelHandleOf(picked)
+      const repository = handle === picked ? null : picked
       const idx = readIndex()
       const meta: DocumentMeta = {
         id: uid(),
@@ -1369,6 +1376,7 @@ export const documents: DocumentsAPI = {
         lastModified: Date.now(),
       }
       await saveHandle(meta.id, handle)
+      if (repository) await saveHandle(repositoryKey(meta.id), repository)
       connectedWebHandles.add(meta.id)
       webSessions.delete(meta.id)
       idx.docs.push(meta)
@@ -1417,6 +1425,7 @@ export const documents: DocumentsAPI = {
     webSessions.delete(id)
     webDiscussionStores.delete(id)
     void removeHandle(id)
+    void removeHandle(repositoryKey(id))
     notify()
     return meta
   },
@@ -1585,15 +1594,16 @@ export const documents: DocumentsAPI = {
 
   async readCheckFiles(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null }
+    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null, repository: null }
     const h = host()
     if (meta.folderPath && h.readCheckFiles) {
       const res = await h.readCheckFiles(meta.folderPath)
-      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null } : null
+      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null, repository: res.repository ?? null } : null
     }
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)
-    return handle ? readCheckFilesFromHandle(handle) : null
+    // A model opened by its repository reads the repository's files too.
+    return handle ? readCheckFilesFromHandle(handle, await loadHandle(repositoryKey(id)).catch(() => null)) : null
   },
 
   async writeCheckConfig(id, content) {

@@ -13,14 +13,14 @@
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel, milestoneViews, originOf } from '../model'
-import { CHECK_RULES, type CheckSeverity, type RuleFinding } from './rules'
+import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
 import { computeEvidence, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
-export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
+export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { ELEMENT_LABEL, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
@@ -133,9 +133,13 @@ export interface CheckOptions {
   measurements?: Measurement[]
   /** When the conditions are evaluated, for max_age (ms since the epoch). */
   now?: number
-  /** The sensors of the repository's radical.sensors.json, null when it has
-   *  none; without them a measure line may name any sensor (Studio). */
+  /** The sensors of the repository's .radical/sensors/sensors.json, null
+   *  when it has none; without them a measure line may name any sensor
+   *  (Studio). */
   sensors?: { file: string; names: string[] } | null
+  /** The repository's .radical/radical.json, as the CLI reads it; without
+   *  it repository-mapping checks nothing (Studio). */
+  repository?: RepositoryMapping | null
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
   /** The event the check runs on (pull-request in the gate): what runs on
@@ -265,6 +269,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.trigger ? { trigger: options.trigger } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
     ...(options.sensors !== undefined ? { sensors: options.sensors } : {}),
+    ...(options.repository !== undefined ? { repository: options.repository } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))

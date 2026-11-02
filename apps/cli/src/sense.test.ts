@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { C4Node, C4Relation } from '@radical/common/c4'
@@ -140,7 +140,7 @@ const relation = (id: string, relationType: string, sourceId: string, targetId: 
 
 /** A model whose ADR constrains two of the three containers of a system,
  *  with a fitness function measured by the repository's sensor `openapi`,
- *  in a repository (a .git) whose .radical/sensors.json has `sensors`. */
+ *  in a repository (a .git) whose .radical/sensors/sensors.json has `sensors`. */
 async function repository(sensors: Record<string, unknown>, measure = 'openapi --strict'): Promise<string> {
   const cwd = await modelWith([
     element('pay', 'system', 'Payments'),
@@ -151,8 +151,8 @@ async function repository(sensors: Record<string, unknown>, measure = 'openapi -
     fitness('ff', 'APIs described in OpenAPI', { cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', measure, metrics: 'openapi.exit_code == 0' }),
   ], [relation('i', 'implements', 'ff', 'adr'), relation('c1', 'constrains', 'adr', 'pay-api'), relation('c2', 'constrains', 'adr', 'refund-api')])
   await mkdir(join(cwd, '.git'))
-  await mkdir(join(cwd, '.radical'))
-  await writeFile(join(cwd, '.radical', 'sensors.json'), JSON.stringify({ sensors }))
+  await mkdir(join(cwd, '.radical', 'sensors'), { recursive: true })
+  await writeFile(join(cwd, '.radical', 'sensors', 'sensors.json'), JSON.stringify({ sensors }))
   return cwd
 }
 
@@ -197,6 +197,33 @@ describe('radical sense run', () => {
     const cwd = await repository({ other: { command: 'node -v' } }, 'openapi')
     const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
     expect(result.code).toBe(2)
-    expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, '.radical', 'sensors.json')}.`)
+    expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, '.radical', 'sensors', 'sensors.json')}.`)
+  })
+
+  it('gives a repository\'s sensor the element\'s paths from .radical/radical.json', async () => {
+    const script = `const fs = require('fs'); const c = JSON.parse(process.argv[process.argv.indexOf('--context') + 1]);
+      fs.writeFileSync('paths-' + c.element.id + '.json', JSON.stringify(c.element.paths))`
+    const cwd = await repository({ openapi: { command: [process.execPath, '-e', script, '--'] } })
+    // The system is built from the root, the Payments API in apps/api; the
+    // Refunds API has no entry, so it is built where its system is.
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ implements: [
+      { element: 'pay', name: 'Payments', paths: ['.'] },
+      { element: 'pay-api', name: 'Payments API', paths: ['apps/api'] },
+    ] }))
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(JSON.parse(await readFile(join(cwd, 'paths-pay-api.json'), 'utf8'))).toEqual(['apps/api'])
+    expect(JSON.parse(await readFile(join(cwd, 'paths-refund-api.json'), 'utf8'))).toEqual(['.'])
+  })
+
+  it('runs a repository\'s sensor from the repository\'s root, its file in .radical/sensors/', async () => {
+    // A script beside sensors.json, named from the root, that says where it ran.
+    const cwd = await repository({ openapi: { command: 'node .radical/sensors/where.mjs' } })
+    await writeFile(join(cwd, '.radical', 'sensors', 'where.mjs'), "import { writeFileSync } from 'node:fs'\nwriteFileSync('ran-in.txt', process.cwd())\n")
+    await mkdir(join(cwd, 'apps', 'web'), { recursive: true })
+    const result = await run(join(cwd, 'apps', 'web'), 'sense', 'run', '--trigger', 'pull-request', '--folder', '../../model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(result.code).toBe(0)
+    expect(await realpath(await readFile(join(cwd, 'ran-in.txt'), 'utf8'))).toBe(await realpath(cwd))
   })
 })

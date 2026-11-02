@@ -1,14 +1,15 @@
 import { readFile } from 'node:fs/promises'
 import { commandWords } from '@radical/common/check'
-import { OLD_SENSORS_FILE, SENSORS_FILE, findRepositoryFile } from '@radical/node-files/repositoryLayout'
+import { OLD_SENSORS_FILE, SENSORS_FILE, findRepositoryFile, repositoryFileRoot } from '@radical/node-files/repositoryLayout'
 
 export { SENSORS_FILE }
 
-/** The repository's sensors: in .radical/sensors.json, or radical.sensors.json
- *  at the root of the old layout, the nearest from the model folder up to
- *  the repository's root; none without one. Each names its command:
+/** The repository's sensors: in .radical/sensors/sensors.json, or
+ *  radical.sensors.json at the root of the old layout, the nearest from the
+ *  model folder up to the repository's root; none without one. Each names
+ *  its command, run from `root` (the repository's root):
  *  `{ "sensors": { "<name>": { "command": "<command line>" } } }`. */
-export async function repositorySensors(folder: string): Promise<{ file: string; sensors: Record<string, string[]> } | null> {
+export async function repositorySensors(folder: string): Promise<{ file: string; root: string; sensors: Record<string, string[]> } | null> {
   const found = await findRepositoryFile(folder, SENSORS_FILE, OLD_SENSORS_FILE)
   if (!found) return null
   const file = found.path
@@ -23,5 +24,5 @@ export async function repositorySensors(folder: string): Promise<{ file: string;
     if (!words.length) throw new Error(`${file}: sensor ${name} has no command`)
     sensors[name] = words
   }
-  return { file, sensors }
+  return { file, root: repositoryFileRoot(file), sensors }
 }

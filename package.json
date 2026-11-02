@@ -22,7 +22,7 @@
     "start": "npm run start -w radical-model",
     "dist": "npm run dist -w radical-model",
     "test": "npm run test --workspaces --if-present && npm run test:tools",
-    "test:tools": "vitest run --dir tools",
+    "test:tools": "vitest run tools/ .radical/sensors/",
     "test:reports": "node tools/test-reports.mjs",
     "test:watch": "npm run test:watch -w radical-model",
     "e2e": "npm run build:web && npm run build:hub && npm run e2e -w @radical/e2e",

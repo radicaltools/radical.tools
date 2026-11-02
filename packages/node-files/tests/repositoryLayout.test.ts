@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { findModelFolder, findRepositoryFile, oldLayout, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
+import { elementPaths, findModelFolder, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
@@ -23,14 +23,14 @@ async function repository(files: string[]): Promise<string> {
 
 describe('repository layout', () => {
   it('finds the model in .radical/model from any folder of the repository', async () => {
-    const root = await repository(['.radical/model/radical.md', '.radical/sensors.json', '.radical/crucible/crucible.json', 'apps/web/src/', 'other/radical.md'])
+    const root = await repository(['.radical/model/radical.md', '.radical/sensors/sensors.json', '.radical/crucible/crucible.json', 'apps/web/src/', 'other/radical.md'])
     expect(await repositoryRoot(join(root, 'apps/web/src'))).toBe(root)
     expect(await findModelFolder(join(root, 'apps/web/src'))).toBe(join(root, '.radical/model'))
     expect(await findModelFolder(root)).toBe(join(root, '.radical/model'))
     // A working directory that is a model folder is that one.
     expect(await findModelFolder(join(root, 'other'))).toBe(join(root, 'other'))
-    expect(await findRepositoryFile(join(root, '.radical/model'), '.radical/sensors.json', 'radical.sensors.json'))
-      .toEqual({ path: join(root, '.radical/sensors.json'), root, old: false })
+    expect(await findRepositoryFile(join(root, '.radical/model'), '.radical/sensors/sensors.json', 'radical.sensors.json'))
+      .toEqual({ path: join(root, '.radical/sensors/sensors.json'), root, old: false })
     // Crucible's paths are from the repository's root, not from .radical/.
     expect(crucibleRoot(join(root, '.radical/crucible/crucible.json'))).toBe(root)
     expect(await oldLayout(root)).toEqual([])
@@ -39,7 +39,7 @@ describe('repository layout', () => {
   it('falls back to the old layout', async () => {
     const root = await repository(['architecture/radical.md', 'radical.sensors.json', 'crucible.json', 'crucible/findings/', 'apps/'])
     expect(await findModelFolder(join(root, 'apps'))).toBe(join(root, 'architecture'))
-    expect(await findRepositoryFile(join(root, 'architecture'), '.radical/sensors.json', 'radical.sensors.json'))
+    expect(await findRepositoryFile(join(root, 'architecture'), '.radical/sensors/sensors.json', 'radical.sensors.json'))
       .toEqual({ path: join(root, 'radical.sensors.json'), root, old: true })
     expect(crucibleRoot(join(root, 'crucible.json'))).toBe(root)
     expect(await oldLayout(root)).toEqual(['architecture', 'radical.sensors.json', 'crucible.json', 'crucible/findings'])
@@ -49,5 +49,25 @@ describe('repository layout', () => {
     // Without a model anywhere, none.
     const empty = await repository(['src/'])
     expect(await findModelFolder(join(empty, 'src'))).toBeNull()
+  })
+})
+
+describe('repository mapping', () => {
+  it('gives an element its own paths, else its nearest mapped ancestor\'s', async () => {
+    const root = await repository(['.radical/model/radical.md', 'apps/api/', 'src/'])
+    await writeFile(join(root, '.radical/radical.json'), JSON.stringify({ implements: [
+      { element: 'shop', name: 'Shop', paths: ['.'] },
+      { element: 'api', name: 'Orders API', paths: ['apps/api'] },
+    ] }))
+    const mapping = (await readRepositoryMapping(join(root, 'src')))!
+    expect(mapping.file).toBe(join(root, '.radical/radical.json'))
+    expect(mapping.root).toBe(root)
+    const parent: Record<string, string> = { api: 'shop', checkout: 'api', web: 'shop' }
+    const paths = (id: string) => elementPaths(mapping.implements, id, (at) => parent[at])
+    expect([paths('api'), paths('checkout'), paths('web'), paths('elsewhere')]).toEqual([['apps/api'], ['apps/api'], ['.'], []])
+    // None in a repository without one; one that does not read is named.
+    expect(await readRepositoryMapping(await repository(['src/']))).toBeNull()
+    await writeFile(join(root, '.radical/radical.json'), '{ "implements": [{ "paths": [] }] }')
+    await expect(readRepositoryMapping(root)).rejects.toThrow('implements[0] needs "element" (an id) and "paths" (a list of folders)')
   })
 })

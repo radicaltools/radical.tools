@@ -207,12 +207,12 @@ describe('radical setup', () => {
     const moved = await run(w, ['setup', '--yes', '--no-hooks', '--no-check', '--client', 'claude-code'])
     expect(moved.err).toBe('')
     expect(moved.code).toBe(0)
-    for (const line of ['+ moved architecture to .radical/model', '+ moved radical.sensors.json to .radical/sensors.json', '+ moved crucible.json to .radical/crucible/crucible.json',
+    for (const line of ['+ moved architecture to .radical/model', '+ moved radical.sensors.json to .radical/sensors/sensors.json', '+ moved crucible.json to .radical/crucible/crucible.json',
       '+ moved crucible/findings to .radical/crucible/findings', '+ renamed the model\'s .radical/ to .state/', '+ pointed .radical/crucible/crucible.json at the new places', '+ pointed .mcp.json at .radical/model',
       '✓ .radical/model holds a model']) expect(moved.out).toContain(line)
     // Moved with git mv, so their history follows them.
     const renames = (await git('status', '--porcelain')).stdout.split('\n').filter((line) => line.startsWith('R'))
-    expect(renames).toEqual(expect.arrayContaining(['R  radical.sensors.json -> .radical/sensors.json', 'RM crucible.json -> .radical/crucible/crucible.json', 'R  architecture/radical.md -> .radical/model/radical.md']))
+    expect(renames).toEqual(expect.arrayContaining(['R  radical.sensors.json -> .radical/sensors/sensors.json', 'RM crucible.json -> .radical/crucible/crucible.json', 'R  architecture/radical.md -> .radical/model/radical.md']))
     expect(await readFile(join(w.repo, '.radical', 'model', '.state', 'base.json'), 'utf8')).toBe('base')
     expect(JSON.parse(await readFile(join(w.repo, '.radical', 'crucible', 'crucible.json'), 'utf8')).findings).toBe('.radical/crucible/findings')
     expect(await readFile(join(w.repo, '.radical', 'crucible', 'findings', 'F-0001', 'finding.md'), 'utf8')).toBe('a finding')

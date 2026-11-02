@@ -1,13 +1,14 @@
 // Where Radical keeps its files in a repository (ADR Radical in one .radical
 // folder): one .radical/ at the repository's root holds the model
-// (.radical/model), the repository's sensors (.radical/sensors.json) and
+// (.radical/model), the repository's sensors (.radical/sensors/) and
 // Radical Crucible (.radical/crucible/): its plan, findings and rounds.
 // The old layout is still read: a model folder at the root (architecture/),
 // radical.sensors.json and crucible.json there.
 
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { MD_MANIFEST_FILE } from '@radical/common/formats/mdFolder'
+import { REPOSITORY_FILE, elementPaths, parseRepositoryMapping, type MappedElement } from '@radical/common/repositoryMapping'
 
 /** The folder of everything Radical keeps in a repository. */
 export const RADICAL_DIR = '.radical'
@@ -15,8 +16,9 @@ export const RADICAL_DIR = '.radical'
 export const MODEL_FOLDER = `${RADICAL_DIR}/model`
 /** The model folder of the old layout. */
 export const OLD_MODEL_FOLDER = 'architecture'
-/** The repository's sensors, and where the old layout had them. */
-export const SENSORS_FILE = `${RADICAL_DIR}/sensors.json`
+/** The repository's sensors (their scripts beside them), and where the old
+ *  layout had them. */
+export const SENSORS_FILE = `${RADICAL_DIR}/sensors/sensors.json`
 export const OLD_SENSORS_FILE = 'radical.sensors.json'
 /** Crucible's plan, and where the old layout had it. */
 export const CRUCIBLE_FILE = `${RADICAL_DIR}/crucible/crucible.json`
@@ -105,4 +107,17 @@ export async function oldLayout(root: string): Promise<string[]> {
   if (!found.includes(OLD_MODEL_FOLDER) && await exists(join(root, OLD_MODEL_STATE)) && !(await isModel(join(root, OLD_MODEL_FOLDER)))
     && await isModel(join(root, MODEL_FOLDER)) && !(await exists(join(root, MODEL_STATE)))) found.push(OLD_MODEL_STATE)
   return found
+}
+
+/** The repository's mapping of the model's elements to its code (ADR The
+ *  repository maps the model to its code). */
+export { REPOSITORY_FILE, elementPaths, type MappedElement }
+
+/** The repository's .radical/radical.json, found from `from` up to the
+ *  repository's root: the file, the root its paths are from and what it
+ *  maps; null without one. Throws, naming the file, when it does not read. */
+export async function readRepositoryMapping(from: string): Promise<{ file: string; root: string; implements: MappedElement[] } | null> {
+  const found = await findRepositoryFile(from, REPOSITORY_FILE, REPOSITORY_FILE)
+  if (!found) return null
+  return { file: found.path, root: repositoryFileRoot(found.path), implements: parseRepositoryMapping(await readFile(found.path, 'utf8'), found.path) }
 }

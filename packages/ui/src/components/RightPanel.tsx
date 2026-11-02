@@ -17,6 +17,7 @@ import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { originModel, originOf, otherModelFolder } from '@radical/common/model'
+import { builtIn, implementCommand } from '@radical/common/repositoryMapping'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
@@ -2600,6 +2601,45 @@ function useViewsShowing(nodeId: string): DiagramView[] {
   return shown
 }
 
+/** Where the repository builds the element, from its .radical/radical.json:
+ *  its own paths or its nearest mapped ancestor's, named; for one built
+ *  nowhere it says, the radical implement command that maps it. Nothing
+ *  when Studio cannot read the file. */
+function ElementBuiltIn({ nodeId }: { nodeId: string }) {
+  const mapping = useDiagramStore((s) => s.repositoryMapping)
+  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const [copied, setCopied] = useState(false)
+  const node = c4Nodes[nodeId]
+  if (!mapping || !node) return null
+  const found = builtIn(mapping, nodeId, (id) => c4Nodes[id]?.parentId)
+  const from = found && found.from !== nodeId ? c4Nodes[found.from] : undefined
+  const command = implementCommand(Object.values(c4Nodes), node)
+  const copy = () => {
+    void navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => {})
+  }
+  return (
+    <section className="pp-section" aria-label="Built in">
+      <div className="pp-section-title">Built in</div>
+      {found
+        ? (
+          <p className="pp-built-in">
+            {found.paths.map((p, i) => <React.Fragment key={p}>{i > 0 && ', '}<code>{p}</code></React.Fragment>)}
+            {from && <span className="pp-built-in-from"> · as <NodeLink id={from.id} label={from.label} /></span>}
+          </p>
+        )
+        : (
+          <div className="pp-built-in-none">
+            <p>The repository's .radical/radical.json says nowhere. To say where:</p>
+            <div className="pp-built-in-command">
+              <code>{command}</code>
+              <button type="button" className="pp-head-btn" onClick={copy} title="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+            </div>
+          </div>
+        )}
+    </section>
+  )
+}
+
 /** The card's Views: every view that shows the element, the open one
  *  marked; a click opens it with the element selected and in sight. */
 function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: string) => void }) {
@@ -2795,6 +2835,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
         )}
         <div className="pp-foot">
           <div className="pp-foot-scroll">
+            <ElementBuiltIn nodeId={node.id} />
             <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
             {!readOnly && <NodeActions nodeId={node.id} />}
           </div>

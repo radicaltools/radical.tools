@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -13,6 +13,7 @@ import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catal
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 import { composeFolder, describeDeps, federationOthers } from './federation'
 import { repositorySensors } from './repositorySensors'
+import { readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
@@ -301,7 +302,20 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     io.err(`Cannot read the repository's sensors: ${(error as Error).message}`)
     return 2
   }
-  const result = runCheck(files, config, { sensors, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // Where the repository builds the model's elements, and which of those
+  // paths it does not have.
+  let repository: RepositoryMapping | null
+  try {
+    const mapping = await readRepositoryMapping(root)
+    repository = mapping && {
+      file: relative(io.cwd, mapping.file),
+      implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
+    }
+  } catch (error) {
+    io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
+    return 2
+  }
+  const result = runCheck(files, config, { sensors, repository, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so

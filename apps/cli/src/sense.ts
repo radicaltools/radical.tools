@@ -10,6 +10,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { writeBeside, type Io } from './check'
 import { SENSORS_FILE, repositorySensors } from './repositorySensors'
+import { elementPaths, readRepositoryMapping, type MappedElement } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
 import { composeFolder, federationOthers } from './federation'
 import { SENSOR_ADAPTERS, sensorAdapter } from './sensors/registry'
@@ -35,9 +36,10 @@ automated fitness function triggered on <event> (pull-request, nightly,
 weekly, release, deploy), with its adapter, into one radical-metrics/1 file
 a line in <dir>. It names each line it could not measure. A line may name a
 sensor of the repository's ${SENSORS_FILE} instead of an adapter: its
-command runs once for each of the model's elements the fitness function's
-ADR constrains (also an ADR of a model it depends on, deps.json), with
---context <json> (the fitness function, the ADR, the element, metricsOut: a
+command runs from the repository's root once for each of the model's
+elements the fitness function's ADR constrains (also an ADR of a model it
+depends on, deps.json), with --context <json> (the fitness function, the
+ADR, the element with its paths from .radical/radical.json, metricsOut: a
 file it may write radical-metrics/1 measurements to), measured as
 <sensor>.exit_code and <sensor>.duration labelled element=<id>.
 
@@ -82,7 +84,9 @@ function properties(node: C4Node): Record<string, unknown> {
 export interface SensorContext {
   fitnessFunction: { id: string; label: string; model: string; properties: Record<string, unknown> }
   adr: { id: string; label: string; model: string } | null
-  element: { id: string; label: string; type: string; technology: string | null; parent: { id: string; label: string; type: string } | null; properties: Record<string, unknown> } | null
+  /** `paths`: where the repository builds it, from .radical/radical.json
+   *  (its nearest mapped ancestor's), from the repository's root. */
+  element: { id: string; label: string; type: string; technology: string | null; parent: { id: string; label: string; type: string } | null; paths: string[]; properties: Record<string, unknown> } | null
   /** A file the sensor may write radical-metrics/1 measurements to. */
   metricsOut: string
 }
@@ -90,7 +94,7 @@ export interface SensorContext {
 const slug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'fitness-function'
 
 /** The fitness functions' elements and the context their sensors get. */
-function sensorModel(data: Pick<DiagramData, 'nodes' | 'relations'>, name: string) {
+function sensorModel(data: Pick<DiagramData, 'nodes' | 'relations'>, name: string, mapped: MappedElement[]) {
   const nodes = Object.fromEntries(data.nodes.map((n) => [n.id, n]))
   const check = { nodes, relations: Object.fromEntries(data.relations.map((r) => [r.id, r])) }
   const modelOf = (n: C4Node): string => { const o = originOf(n); return o ? originModel(o) : name }
@@ -109,6 +113,7 @@ function sensorModel(data: Pick<DiagramData, 'nodes' | 'relations'>, name: strin
           id: element.id, label: element.label, type: element.type,
           technology: typeof (element as { technology?: unknown }).technology === 'string' ? (element as { technology: string }).technology : null,
           parent: parent ? { id: parent.id, label: parent.label, type: parent.type } : null,
+          paths: elementPaths(mapped, element.id, (id) => nodes[id]?.parentId),
           properties: properties(element),
         } : null,
         metricsOut,
@@ -142,7 +147,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
     const federation = await composeFolder(folder)
     const others = federation ? federationOthers(files, federation.fetched) : null
     nodes = [...own.nodes, ...others?.nodes ?? []]
-    model = sensorModel({ nodes, relations: [...own.relations, ...others?.relations ?? []] }, federation?.deps.name || basename(folder))
+    model = sensorModel({ nodes, relations: [...own.relations, ...others?.relations ?? []] }, federation?.deps.name || basename(folder), (await readRepositoryMapping(folder))?.implements ?? [])
     sensors = await repositorySensors(folder)
   } catch (error) {
     io.err(`Cannot read the model folder ${named}: ${(error as Error).message}`)
@@ -153,9 +158,9 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
   const extra = (context ?? []).flatMap((c) => ['--context', c])
   let failed = 0
   let ran = 0
-  const measure = async (node: C4Node, line: { raw: string }, file: string, args: string[], what = ''): Promise<boolean> => {
+  const measure = async (node: C4Node, line: { raw: string }, file: string, args: string[], what = '', cwd = io.cwd): Promise<boolean> => {
     const errors: string[] = []
-    const code = await senseCommand(args, { ...io, err: (text) => { errors.push(text); io.err(text) } }, now)
+    const code = await senseCommand(args, { ...io, cwd, err: (text) => { errors.push(text); io.err(text) } }, now)
     if (code === 0) io.out(`${node.label}: measured "${line.raw}"${what} into ${file}`)
     else io.err(`${node.label}: cannot measure "${line.raw}"${what}: ${errors[0]?.split('\n')[0] ?? `exit status ${code}`}`)
     return code === 0
@@ -179,7 +184,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
           const sensorContext = model.context(node, element, metricsOut)
           const labels = element ? ['--label', `${ELEMENT_LABEL}=${element.id}`] : []
           const ok = await measure(node, line, file, ['command', '--name', line.sensor, '--out', file, ...labels, ...extra, '--', ...sensor, ...line.args, '--context', JSON.stringify(sensorContext)],
-            element ? ` for ${element.label}` : '')
+            element ? ` for ${element.label}` : '', sensors!.root)
           if (!ok) { failed++; continue }
           // What the sensor measured itself, labelled with the element as
           // its exit code is.

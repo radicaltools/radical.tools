@@ -19,7 +19,7 @@ describe('readCheckFiles', () => {
     await writeFile(join(dir, '.state', 'measurements.json'), 'measurements')
     await writeFile(join(dir, 'check.json'), '{}')
     await writeFile(join(dir, 'reviews.json'), 'reviews')
-    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', config: '{}', reviews: 'reviews' })
+    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', config: '{}', reviews: 'reviews', repository: null })
   })
 
   it('gives null for a reviews.json that is not there, and refuses a symlinked one', async () => {

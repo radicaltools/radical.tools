@@ -17,16 +17,16 @@
 // Imports are read with TypeScript's own pre-processor, not regular
 // expressions, so strings and JSX text are never mistaken for imports.
 //
-// It is also the sensor workspaces of .radical/sensors.json: with the
+// It is also the sensor workspaces of .radical/sensors/sensors.json: with the
 // --context radical sense run gives it, it checks only the workspaces that
-// build the element (tools/sensors/elements.mjs).
+// build the element (its paths in .radical/radical.json).
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { measuredElement, sensorContext } from './sensors/elements.mjs'
+import { measuredElement, sensorContext, workspacesOf } from '../.radical/sensors/context.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -71,7 +71,8 @@ const byName = new Map(workspaces.map((w) => [w.name, w]))
 const context = sensorContext()
 const element = context ? measuredElement(context) : null
 /** The workspaces checked: all, or the ones that build the element. */
-const checked = !element || element.workspaces === '*' ? workspaces : workspaces.filter((w) => element.workspaces.includes(rel(w.dir)))
+const scope = element ? workspacesOf(element) : '*'
+const checked = scope === '*' ? workspaces : workspaces.filter((w) => scope.includes(rel(w.dir)))
 const workspaceOf = (file) => workspaces.find((w) => file === w.dir || file.startsWith(w.dir + sep))
 
 const declaredDeps = (pkg) => new Set([

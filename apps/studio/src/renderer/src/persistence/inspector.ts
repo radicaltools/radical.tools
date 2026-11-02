@@ -13,6 +13,7 @@
 
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
+import { parseRepositoryMapping } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -139,6 +140,7 @@ if (typeof window !== 'undefined') {
   let lastResults = ''
   let lastMeasurements = ''
   let lastReviews = ''
+  let lastRepository: string | null = null
 
   const poll = async (): Promise<void> => {
     const id = documents.getActiveId()
@@ -146,6 +148,8 @@ if (typeof window !== 'undefined') {
       polledFor = id
       filesReadFor = null
       lastResults = lastConfig = lastMeasurements = lastReviews = ''
+      lastRepository = null
+      useDiagramStore.setState({ repositoryMapping: null })
       useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
     }
     if (!id) return
@@ -157,6 +161,14 @@ if (typeof window !== 'undefined') {
     const configText = files.config ?? ''
     const measurementsText = files.measurements ?? ''
     const reviewsText = files.reviews ?? ''
+    // Where the repository builds the model's elements, for the card; none
+    // shown while the file does not read.
+    if (files.repository !== lastRepository) {
+      lastRepository = files.repository
+      let mapping = null
+      try { mapping = files.repository === null ? null : parseRepositoryMapping(files.repository) } catch { mapping = null }
+      useDiagramStore.setState({ repositoryMapping: mapping })
+    }
     if (filesReadFor === id && resultsText === lastResults && configText === lastConfig && measurementsText === lastMeasurements && reviewsText === lastReviews) return
     filesReadFor = id
     // The concern packs, once, for a model that has a check report or

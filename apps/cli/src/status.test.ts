@@ -38,6 +38,23 @@ async function run(cwd: string, home: string, args: string[]) {
 }
 
 describe('radical setup --status', () => {
+  it('shows how many elements .radical/radical.json maps', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
+    dirs.push(root)
+    const folder = join(root, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await exec('git', ['init', '-q'], { cwd: root })
+    await writeFile(join(root, '.radical', 'radical.json'), JSON.stringify({ implements: [{ element: 'a', paths: ['apps/a'] }, { element: 'b', paths: ['apps/b'] }] }))
+    const shown = await run(root, join(root, 'home'), ['setup', '--status', '--no-start'])
+    expect(shown.out).toContain('✓ .radical/radical.json maps 2 elements to the repository\'s code')
+    await writeFile(join(root, '.radical', 'radical.json'), JSON.stringify({ implements: [{ element: 'a' }] }))
+    expect((await run(root, join(root, 'home'), ['setup', '--status', '--no-start'])).out)
+      .toMatch(/✗ its repository's mapping does not read: .*radical\.json: implements\[0\] needs "element" \(an id\) and "paths" \(a list of folders\)/)
+  })
+
   it('reports what works and what stops the agent, and starts the servers for the folder', async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
     dirs.push(root)

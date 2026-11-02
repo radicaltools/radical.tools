@@ -13,6 +13,7 @@
     "./modelChanges": "./src/modelChanges.ts",
     "./modelMerge": "./src/modelMerge.ts",
     "./federation": "./src/federation.ts",
+    "./repositoryMapping": "./src/repositoryMapping.ts",
     "./branchChanges": "./src/branchChanges.ts",
     "./viewPipeline": "./src/viewPipeline.ts",
     "./relationRules": "./src/relationRules.ts",

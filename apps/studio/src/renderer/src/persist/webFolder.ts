@@ -323,8 +323,9 @@ export async function readFederationFromHandle(root: FsDirHandle): Promise<{ dep
 
 /** What `radical check` and `radical sense` keep beside the model:
  *  `.state/test-results.json`, `.state/measurements.json` and the
- *  model's check.json and reviews.json; each null when there is none. */
-export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null }> {
+ *  model's check.json and reviews.json, and with the repository picked
+ *  (`repository`) its .radical/radical.json; each null when there is none. */
+export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: FsDirHandle | null): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null }> {
   const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
     try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
   }
@@ -333,6 +334,8 @@ export async function readCheckFilesFromHandle(root: FsDirHandle): Promise<{ res
     measurements: await readStateFromHandle(root, 'measurements.json'),
     config: await text(root, 'check.json'),
     reviews: await text(root, 'reviews.json'),
+    // The repository picked to open its .radical/model: its mapping.
+    repository: repository ? await repository.getDirectoryHandle('.radical').then((dir) => text(dir, 'radical.json'), () => null) : null,
   }
 }
 

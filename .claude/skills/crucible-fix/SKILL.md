@@ -22,7 +22,9 @@ place.
 
 For each group: `git worktree add ../rd-fix-<g> -b fix/<round>-<g>` from the
 branch the round tested, and `npm ci` in it. Write one shared brief and one
-file per group (its findings, the decisions that stand). The brief says:
+file per group (its findings, the decisions that stand) into
+`.radical/crucible/rounds/fix-<round>/` (out of git, beside the round's own
+folder; `BRIEF.md` and `group-<g>.md`). The brief says:
 
 - work only in your worktree; never in the main checkout or another one;
 - per finding: write the test first (a unit test where the bug lives in the

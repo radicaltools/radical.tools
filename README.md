@@ -200,7 +200,7 @@ packages/
                   npm run build:packs), their validation and the Vite plugin
                   that serves and bundles them for the Hub and Studio
   node-files/     @radical/node-files: model folders on disk for Node (MCP, CLI)
-.radical/         The architecture model of radical.tools itself (architecture/), checked in CI; sensors, Crucible
+.radical/         The architecture model of radical.tools itself (model/), checked in CI; where its elements are built (radical.json), its sensors, Crucible
 infra/            Terraform: AWS S3 + CloudFront + Route53 + IAM (OIDC)
 tools/            Repo-wide scripts (check-workspaces.mjs, test-reports.mjs, generate-icons.mjs)
 docs/             Architecture notes and improvement log
