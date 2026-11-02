@@ -19,7 +19,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { zoomIdentity } from 'd3-zoom'
 import { lowDetailAt } from '../store/canvasDetail'
-import { useDiagramStore, viewById, milestoneOnCanvas, editsModel } from '../store/diagramStore'
+import { useDiagramStore, viewById, milestoneOnCanvas, editsModel, editsShownView, otherModelViewShown } from '../store/diagramStore'
 import { openCard } from '../store/showInView'
 import { paletteCover, propertiesPanelCover } from './propertiesCover'
 import { withDetail, PersonNode, SystemNode, ContainerNode, ComponentNode, DatabaseNode, WebAppNode, QueueNode, DomainNode, GroupNode, AdrNode, FitnessFnNode, NeedNode, RequirementNode, ScenarioNode, BlueprintNode, MockupNode, StateMachineNode, StateNode, PseudostateNode, EventNode, EntityNode, ProcessNode, StepNode, GenericNode } from './nodes/C4Nodes'
@@ -379,7 +379,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // Both viewer AND presenter must be layout-read-only — the saved
   // positions/sizes are part of the document and should not drift just
   // because someone is browsing or presenting it.
-  const isViewMode = appMode !== 'designer'
+  // Another model's view (a federation) is drawn as Viewer draws: nothing
+  // dropped, connected or deleted on it, as nothing of it is this model's.
+  const onOtherModelView = useDiagramStore((s) => !!otherModelViewShown(s))
+  const isViewMode = appMode !== 'designer' || onOtherModelView
   const presentationActive = useDiagramStore((s) => s.presentationActive)
   // A presentation offers no Discuss menu: one open when it started stayed
   // over the slide and kept the arrows and Space from it (F-0087).
@@ -1374,7 +1377,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       // Viewer and Presenter do not edit: the key only adds the element to
       // the selection or takes it out (no line, no pills, no relation or
       // nesting, which were shown there and lost on the way back).
-      if (!editsModel(state)) {
+      if (!editsShownView(state)) {
         selectOnlyRef.current = nodeId
         if (target.closest('.react-flow__node')?.classList.contains('parent')) boxFromRef.current = { x: e.clientX, y: e.clientY }
         return
@@ -1748,7 +1751,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // the view's filter draws it (connectTypes).
   // An end of a relation dragged with the key held: where it can go, its
   // other end staying (marked as the source).
-  const edits = editsModel({ appMode, presentationActive })
+  const edits = editsModel({ appMode, presentationActive }) && !onOtherModelView
   const relink = relinking && modifierHeld && edits ? relinking : null
   const relinkRelation = relink ? useDiagramStore.getState().c4Relations[relink.relationId] : undefined
   const connectFrom = relinkRelation
@@ -2147,7 +2150,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
  *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
 export function Canvas({ smartLayoutNote, onDiscuss, nodeDiscussions }: { smartLayoutNote?: string } & DiscussionCanvasProps = {}): React.ReactElement {
   const presenting = useDiagramStore((s) => s.presentationActive)
-  const showPalette = useDiagramStore((s) => s.appMode === 'designer') && !presenting
+  const showPalette = useDiagramStore((s) => s.appMode === 'designer' && !otherModelViewShown(s)) && !presenting
   // One element around both, whether the palette shows or not: switching
   // modes must not mount the canvas again.
   return (

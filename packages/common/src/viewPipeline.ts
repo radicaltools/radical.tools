@@ -639,9 +639,25 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
     const hit = shownCache.get(view.nodeIds)
     if (hit && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty && sameForChain(hit.nodes, nodes, chainKeys(view.pipeline))) return hit.shown
   }
-  const shown = computeShownNodes(view, nodes, relations)
+  // Another model's view (a federation) shows what it shows in its own
+  // repository: that model's elements and those of the models it depends on.
+  let shown: Set<string> | undefined
+  if (view.originScope) {
+    const [scoped, scopedRelations] = scopedTo(view.originScope, nodes, relations)
+    // One that shows every element shows every element of its models.
+    shown = computeShownNodes(view, scoped, scopedRelations) ?? new Set(Object.keys(scoped))
+  } else shown = computeShownNodes(view, nodes, relations)
   if (cacheable) shownCache.set(view.nodeIds, { nodes, relations, pipeline: view.pipeline, kind: view.kind, empty: view.empty, shown })
   return shown
+}
+
+/** The elements and relations of the models named (by their origin). */
+function scopedTo(scope: string[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): [Record<string, C4Node>, Record<string, C4Relation>] {
+  const inScope = (item: { origin?: string }) => !!item.origin && scope.includes(item.origin.slice(0, item.origin.lastIndexOf('@')))
+  return [
+    Object.fromEntries(Object.entries(nodes).filter(([, n]) => inScope(n))),
+    Object.fromEntries(Object.entries(relations).filter(([, r]) => inScope(r))),
+  ]
 }
 
 /** What viewShownNodes answered for a view's node list, and from what. */

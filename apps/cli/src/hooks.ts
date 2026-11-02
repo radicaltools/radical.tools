@@ -15,7 +15,8 @@ post-rewrite git hooks that saves the model folder's base (radical diff
 Studio shows the changes of the branch checked out without anyone running
 it; then it starts radical check --from-ci --quiet in the background, which
 fetches the test results of CI for the commit checked out and does nothing
-without the GitHub CLI. The line goes right after the hook's first line, where an exit or an
+without the GitHub CLI, and radical federation fetch, which fetches the other
+models a deps.json names and does nothing without one. The line goes right after the hook's first line, where an exit or an
 exec further down cannot skip it, and what the hooks already do stays. Each
 model folder has a line of its own; running it again adds nothing, but
 brings the line up to date when the CLI or node has moved. A hook written
@@ -109,9 +110,10 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     const viaLauncher = launcher !== null && !launcher.startsWith('..') && !isAbsolute(launcher)
     const command = viaLauncher ? `sh ${quote(launcher)}`
       : viaNpx ? `npx -y ${cliPackage()}` : io.cli ? `${io.cli.node} ${quote(inRepo ? fromTop : script!)}` : io.command ?? 'radical'
-    // The fetch is a command of its own: a CLI built before --from-ci, in
-    // another worktree, still saves the base.
-    const run = `${command} diff ${folderArg} --save-base --quiet </dev/null || true; ${command} check ${folderArg} --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true`
+    // Each fetch is a command of its own: a CLI built before --from-ci or
+    // federation fetch, in another worktree, still saves the base. The
+    // other models are fetched only for a model with a deps.json.
+    const run = `${command} diff ${folderArg} --save-base --quiet </dev/null || true; ${command} check ${folderArg} --from-ci --quiet --detach </dev/null >/dev/null 2>&1 || true; ${command} federation fetch ${folderArg} --quiet --detach </dev/null >/dev/null 2>&1 || true`
     const line = inRepo && !viaLauncher
       ? `if [ -f ${quote(fromTop)} ]; then ${run}; else echo ${quote(`radical hooks: ${fromTop} is not in this working tree, so the base of ${relative(top, root) || '.'} was not saved; build the CLI there, or install the hooks again.`)} >&2; fi`
       : run
@@ -153,7 +155,7 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
     if (foreign.length) {
       io.err(`radical hooks: ${foreign.join(', ')} in ${where} ${foreign.length > 1 ? 'are' : 'is'} not a sh script, so no line was added. `
         + `Make ${foreign.length > 1 ? 'each' : 'it'} run this sh command from the top of the repository, ignoring its exit status: `
-        + `${command} diff ${folderArg} --save-base --quiet, then ${command} check ${folderArg} --from-ci --quiet --detach`)
+        + `${command} diff ${folderArg} --save-base --quiet, then ${command} check ${folderArg} --from-ci --quiet --detach and ${command} federation fetch ${folderArg} --quiet --detach`)
       return 2
     }
     if (!written.length && !updated.length) io.out('The hooks already save the base; nothing changed.')

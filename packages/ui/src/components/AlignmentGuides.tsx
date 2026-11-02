@@ -1,7 +1,7 @@
 import React from 'react'
 import { useStore, type Node } from 'reactflow'
 import { constraintLines, pinnedNodeIds, type LayoutConstraint } from '@radical/common/c4'
-import { activeLayoutConstraints, useDiagramStore } from '../store/diagramStore'
+import { activeLayoutConstraints, otherModelViewShown, useDiagramStore } from '../store/diagramStore'
 import { editingControl } from './editingControl'
 
 /**
@@ -22,7 +22,7 @@ import { editingControl } from './editingControl'
  */
 export function AlignmentGuides(): React.ReactElement | null {
   const constraints = useDiagramStore(activeLayoutConstraints)
-  const designer = useDiagramStore((s) => s.appMode === 'designer' && !s.presentationActive)
+  const designer = useDiagramStore((s) => s.appMode === 'designer' && !s.presentationActive && !otherModelViewShown(s))
   if (!designer || constraints.length === 0) return null
   return <Guides constraints={constraints} />
 }

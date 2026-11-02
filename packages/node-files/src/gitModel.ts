@@ -80,7 +80,7 @@ export async function readModelAtCommit(folder: string, commit: string, from?: s
 }
 
 /** The blobs' contents, read with one `git cat-file --batch`. */
-function catFiles(cwd: string, shas: string[]): Promise<string[]> {
+export function catFiles(cwd: string, shas: string[]): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['cat-file', '--batch'], { cwd, windowsHide: true })
     const chunks: Buffer[] = []

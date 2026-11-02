@@ -10,7 +10,8 @@ import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { writeSelectionFile } from '@radical/node-files/selectionFile'
+import { writeEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { FEDERATION_FILE, serializeFederationFile } from '@radical/common/federation'
 import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
@@ -511,6 +512,108 @@ describe('warnier', () => {
     const summary = (await model.call('get_model_summary', {})).text
     expect(summary).toContain('Process (Warnier)')
     expect(model.tools.find((tool) => tool.name === 'update_view')?.inputSchema).toMatchObject({ properties: { kind: { enum: expect.arrayContaining(['warnier']) } } })
+  })
+})
+
+describe('federation', () => {
+  /** Payments' model folder, with Orders (its API, its DB and a relation
+   *  between them) fetched from the model orders into .radical/federation.json. */
+  async function fetched(): Promise<string> {
+    const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-federation-'))
+    folders.push(folder)
+    const origin = 'orders@abc1234'
+    const at = (id: string, type: string, label: string, extra: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...extra }) as never
+    const files = serializeToMdFolder({
+      metamodel: builtInGovernanceMetamodel(),
+      nodes: [at('pay', 'system', 'Payments')],
+      relations: [],
+    }, 'payments')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await writeFile(join(folder, 'deps.json'), JSON.stringify({ name: 'payments', dependencies: [{ name: 'orders', repo: '../orders', path: 'architecture', ref: 'main' }] }))
+    await writeEditorStateFile(folder, FEDERATION_FILE, serializeFederationFile({
+      version: 2, name: 'payments', fetchedAt: '2026-11-01T10:00:00Z', notes: [],
+      dependencies: [{ name: 'orders', repo: '../orders', path: 'architecture', ref: 'main', commit: 'abc1234def5678' }],
+      nodes: [
+        at('ord', 'system', 'Orders', { origin }),
+        at('api', 'container', 'Orders API', { parentId: 'ord', origin }),
+        at('db', 'container', 'Orders DB', { parentId: 'ord', origin }),
+      ],
+      relations: [{ id: 'r-ext', sourceId: 'api', targetId: 'db', origin }],
+      views: [{ id: 'v-ord', name: 'Containers', nodeIds: ['api', 'db'], positions: {}, origin }],
+    }))
+    return folder
+  }
+
+  it('refuses edits to another model\'s elements and relations, naming the model, and allows relations to them', async () => {
+    const folder = await fetched()
+    const model = await FolderModel.open(folder)
+    const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    const refusals = [
+      await model.call('update_node', { id: 'ord', description: 'Takes orders.' }),
+      await model.call('update_node', { id: 'ord', label: 'Orders 2' }),
+      await model.call('move_node', { id: 'api', parentId: null }),
+      await model.call('delete_node', { id: 'db' }),
+      await model.call('add_node', { tempId: 'billing', type: 'container', label: 'Billing', parentId: 'ord' }),
+      await model.call('update_relation', { id: 'r-ext', label: 'reads' }),
+      await model.call('delete_relation', { id: 'r-ext' }),
+    ]
+    for (const result of refusals) {
+      expect(result.ok, result.text).toBe(false)
+      expect(result.text).toMatch(/the model orders \(orders@abc1234\)/)
+    }
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
+  })
+
+  it('reads the other models from .radical/federation.json and writes only its own', async () => {
+    const folder = await fetched()
+    const git = (...args: string[]) => promisify(execFile)('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: folder })
+    await git('init', '-q', '-b', 'main')
+    await git('add', '.')
+    await git('commit', '-q', '-m', 'payments')
+    const model = await FolderModel.open(folder)
+    expect((await model.call('search_model', { query: 'GET NODE ord' })).text).toContain('"origin":"orders@abc1234"')
+
+    const relation = await model.call('add_relation', { sourceId: 'pay', targetId: 'ord', label: 'reads orders' })
+    expect(relation.ok, relation.text).toBe(true)
+    expect((await model.call('update_node', { id: 'pay', label: 'Payments 2' })).ok).toBe(true)
+    expect((await model.call('smart_layout', {})).ok).toBe(true)
+    const files = await new MdFolderSession(diskFolderStorage(folder)).readAll()
+    // The folder holds the model's own: no file of Orders, its relation not in relations.json.
+    expect(Object.keys(files).filter((path) => path.startsWith('nodes/'))).toEqual(['nodes/payments-2/_index.md'])
+    const saved = deserializeFromMdFolder(files).data
+    expect(saved.relations).toEqual([expect.objectContaining({ sourceId: 'pay', targetId: 'ord', label: 'reads orders' })])
+    expect(saved.relations[0].origin).toBeUndefined()
+    // The model's changes are its own: Orders is no element added.
+    const changes = (await model.call('get_changes', { since: 'HEAD' })).text
+    expect(changes).toContain('Elements: 0 added, 1 changed, 0 removed. Relations: 1 added')
+    expect(changes).not.toContain('Orders API')
+    expect((await model.call('get_issues', {})).text).toMatch(/^No issues/)
+  })
+
+  it("lists another model's view and refuses changes to it", async () => {
+    const folder = await fetched()
+    const model = await FolderModel.open(folder)
+    const summary = (await model.call('get_model_summary', {})).text
+    expect(summary).toContain('{"id":"v-ord","name":"Containers","kind":"static","folder":"orders"}')
+    const refusals = [
+      await model.call('update_view', { id: 'v-ord', name: 'Mine' }),
+      await model.call('set_view_nodes', { viewId: 'v-ord', nodeIds: ['pay'] }),
+      await model.call('smart_layout', { viewId: 'v-ord' }),
+      await model.call('delete_view', { id: 'v-ord' }),
+    ]
+    for (const result of refusals) {
+      expect(result.ok, result.text).toBe(false)
+      expect(result.text).toContain('The view "Containers" belongs to the model orders (orders@abc1234)')
+    }
+    // Writing the model's own leaves it out of views.json.
+    expect((await model.call('create_view', { tempId: 'v', name: 'Containers' })).ok).toBe(true)
+    const views = JSON.parse(await readFile(join(folder, 'views.json'), 'utf8')) as Array<{ id: string; name: string }>
+    expect(views.map((v) => v.name)).toEqual(['Containers'])
+    expect(views.some((v) => v.id === 'v-ord')).toBe(false)
   })
 })
 

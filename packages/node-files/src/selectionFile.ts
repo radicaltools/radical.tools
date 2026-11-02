@@ -6,6 +6,7 @@ import {
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
+import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 
 /** Refuses a symlinked `.radical`, which could redirect the write elsewhere. */
 async function selectionDir(root: string, create: boolean): Promise<string | null> {
@@ -92,6 +93,15 @@ export async function readCheckFiles(root: string): Promise<{ results: string | 
   const config = await readModelFile(root, CHECK_CONFIG_FILE)
   const reviews = await readModelFile(root, REVIEWS_FILE)
   return { results, measurements, config, reviews }
+}
+
+/** What a federation keeps beside a model for Studio: its own deps.json
+ *  (kept in git) and the other models `radical federation fetch` wrote into
+ *  `.radical/federation.json`; null for one that is not there. */
+export async function readFederationFiles(root: string): Promise<{ deps: string | null; federation: string | null }> {
+  const deps = await readModelFile(root, DEPS_FILE)
+  const federation = await readEditorStateFile(root, FEDERATION_FILE)
+  return { deps, federation }
 }
 
 /** Writes the model's check.json (the Inspector's settings). Refuses a

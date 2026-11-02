@@ -5,7 +5,7 @@ import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'f
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { readCheckFiles, readEditorStateFile, writeCheckConfig, writeEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
+import { readCheckFiles, readEditorStateFile, readFederationFiles, writeCheckConfig, writeEditorStateFile, writeSelectionFile } from '@radical/node-files/selectionFile'
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
@@ -267,6 +267,17 @@ app.whenReady().then(() => {
   ipcMain.handle('folder:read-model-base', async (_event, folderPath: string) => {
     try {
       return { success: true, content: await readEditorStateFile(folderPath, MODEL_BASE_FILE) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // The models this one depends on (deps.json) and those fetched of them
+  // (.radical/federation.json, written by radical federation fetch), shown
+  // beside the model's own and never written here.
+  ipcMain.handle('folder:read-federation', async (_event, folderPath: string) => {
+    try {
+      return { success: true, ...(await readFederationFiles(folderPath)) }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

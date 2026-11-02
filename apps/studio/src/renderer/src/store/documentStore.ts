@@ -10,6 +10,8 @@
 
 import { create } from 'zustand'
 import type { DiagramData } from '@radical/common/c4'
+import { ownModel } from '@radical/common/model'
+import { parseDeps, parseFederationFile, withOtherModels, type Deps, type FederationFile } from '@radical/common/federation'
 import { host } from '../platform/host'
 import { forgetViewCameras } from '@radical/ui/store/viewCameras'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
@@ -47,6 +49,7 @@ import {
   readForgeRunFromHandle,
   readAgentActivityFromHandle,
   readModelBaseFromHandle,
+  readFederationFromHandle,
   writeModelBaseToHandle,
   readCheckFilesFromHandle,
   writeCheckConfigToHandle,
@@ -134,6 +137,94 @@ function webSession(id: string, handle: FsDirHandle): MdFolderSession {
     webSessions.set(id, session)
   }
   return session
+}
+
+// ─── The other models of a federation ────────────────────────────────────────
+// A folder model's deps.json names the models it depends on; `radical
+// federation fetch` writes their elements and relations into the folder's
+// .radical/federation.json. A read of the folder adds them to the model
+// (withOtherModels); the serializer, and every other save here (ownModel),
+// leaves them out. Studio never fetches.
+
+/** How often the federation files of a watched folder model are read: the
+ *  folder's own polling skips them (a dot path, a file the format does not
+ *  own). */
+const FEDERATION_POLL_MS = 2500
+
+/** What a folder model's last read found of its federation. */
+export interface OtherModels {
+  /** The models its deps.json names; null without one (or one that does not read). */
+  deps: Deps | null
+  /** Why its deps.json does not read, when it does not. */
+  depsError: string | null
+  /** The other models as fetched; null when none were. */
+  fetched: FederationFile | null
+  /** A .radical/federation.json is there that this version does not read. */
+  fetchedUnreadable: boolean
+}
+
+interface FederationTexts { deps: string | null; federation: string | null }
+
+const NO_OTHER_MODELS: OtherModels = { deps: null, depsError: null, fetched: null, fetchedUnreadable: false }
+
+/** Per folder document, the federation files its last read found, as text
+ *  (what the poll compares) and as read. */
+const federations = new Map<string, { texts: FederationTexts; read: OtherModels }>()
+
+/** The federation files beside a folder model, or null when the folder
+ *  cannot be read (a browser folder before its access is back). */
+async function readFederationTexts(id: string): Promise<FederationTexts | null> {
+  const meta = readIndex().docs.find((d) => d.id === id)
+  if (meta?.source !== 'md') return null
+  const h = host()
+  if (meta.folderPath && h.readFederation) {
+    const res = await h.readFederation(meta.folderPath)
+    return res.success ? { deps: res.deps ?? null, federation: res.federation ?? null } : null
+  }
+  if (h.readFolder || !connectedWebHandles.has(id)) return null
+  const handle = await loadHandle(id)
+  return handle ? readFederationFromHandle(handle) : null
+}
+
+/** The model read from document `id`'s folder with the other models its
+ *  federation file holds, remembering what was found (otherModels). A
+ *  federation file that does not read while one did before is taken for one
+ *  a fetch is writing: the models read before stay until it is whole, or a
+ *  save in between left their places out of the views. */
+function withFederation(id: string, data: DiagramData | null, texts: FederationTexts | null): DiagramData | null {
+  const found = texts ?? { deps: null, federation: null }
+  let deps: Deps | null = null
+  let depsError: string | null = null
+  if (found.deps !== null) {
+    try { deps = parseDeps(found.deps) } catch (e) { depsError = (e as Error).message }
+  }
+  const parsed = parseFederationFile(found.federation)
+  const unreadable = found.federation !== null && !parsed
+  const fetched = parsed ?? (unreadable ? federations.get(id)?.read.fetched ?? null : null)
+  federations.set(id, { texts: found, read: { deps, depsError, fetched, fetchedUnreadable: unreadable && !fetched } })
+  return data ? withOtherModels(data, fetched) : null
+}
+
+/** Reads a watched folder model's federation files every FEDERATION_POLL_MS
+ *  while it has a deps.json: when they differ from what its last read found
+ *  (a fetch), the document reloads as for an outside edit, its unsaved edits
+ *  merged in. Returns the function that stops. */
+function followFederation(id: string): () => void {
+  let busy = false
+  const timer = setInterval(() => {
+    const last = federations.get(id)
+    if (busy || last?.texts.deps == null) return
+    busy = true
+    void readFederationTexts(id).then((now) => {
+      const seen = federations.get(id)
+      if (!now || !seen || (now.deps === seen.texts.deps && now.federation === seen.texts.federation)) return
+      // Once: the reload records them again, and a reload held back (a
+      // drag, a slide show) is not asked for at every poll meanwhile.
+      seen.texts = now
+      notifyExternalChange(id)
+    }).catch(() => { /* read again at the next poll */ }).finally(() => { busy = false })
+  }, FEDERATION_POLL_MS)
+  return () => clearInterval(timer)
 }
 
 export type DocumentSource = 'ls' | 'fs' | 'md'
@@ -317,7 +408,10 @@ export class StorageFullError extends Error {
 function writeLSPayload(id: string, data: DiagramData): boolean {
   if (typeof localStorage === 'undefined') return true
   try {
-    localStorage.setItem(lsKeyFor(id), JSON.stringify(data))
+    // A folder model moved to the browser, or one kept there as a copy,
+    // keeps only its own elements: the other models' are fetched beside a
+    // folder, not part of the model.
+    localStorage.setItem(lsKeyFor(id), JSON.stringify(ownModel(data)))
     return true
   } catch (e) {
     console.warn('[documentStore] writeLSPayload failed:', e)
@@ -357,8 +451,10 @@ function isWebDiskDoc(meta: DocumentMeta | undefined): boolean {
 }
 
 /** Pretty JSON, as every model file is written. */
+/** A model as a file holds it: only its own elements, not the other models'
+ *  of a federation, which are fetched beside a folder. */
 function modelJson(data: DiagramData): string {
-  return JSON.stringify(data, null, 2)
+  return JSON.stringify(ownModel(data), null, 2)
 }
 
 /** A suggested file name for a model. */
@@ -533,8 +629,7 @@ async function writeDocument(id: string, data: DiagramData): Promise<void> {
   const meta = idx.docs.find(d => d.id === id)
   if (!meta) return
   if (meta.source === 'fs' && meta.filePath && h.writeFile) {
-    const json = JSON.stringify(data, null, 2)
-    const res = await h.writeFile(meta.filePath, json)
+    const res = await h.writeFile(meta.filePath, modelJson(data))
     if (!res.success) {
       console.warn('[documentStore] FS write failed for', meta.filePath, res.error)
       return
@@ -852,6 +947,10 @@ export interface DocumentsAPI {
   /** Writes the model's base beside a folder model; false when it is no
    *  folder model or the write failed. */
   writeModelBase(id: string, content: string): Promise<boolean>
+  /** What the last read of a folder model found of its federation: the
+   *  models its deps.json names and the ones fetched of them. Nothing for
+   *  any other document. */
+  otherModels(id: string): OtherModels
   /** For a folder model opened as its cache had it: whether its files
    *  differed, once they are listed (stale: load it afresh). Not stale for
    *  any other document. */
@@ -995,11 +1094,13 @@ export const documents: DocumentsAPI = {
       return readFileModel(id, handle.name, content)
     }
     if (meta.source === 'md' && meta.folderPath && h.readFolder) {
-      const [res, index] = await Promise.all([h.readFolder(meta.folderPath), h.readViewIndex?.(meta.folderPath)])
+      const [res, index, federation] = await Promise.all([h.readFolder(meta.folderPath), h.readViewIndex?.(meta.folderPath), readFederationTexts(id).catch(() => null)])
       if (!res.success || !res.files) return null
       if (Object.keys(res.files).length === 0) return null // empty/new folder
       presetViewIndex(readViewIndex(index?.content))
-      return readFolderModel(id, res.files)
+      // The other models are added before the store gets the model: a view
+      // keeps places only of the elements the model has.
+      return withFederation(id, readFolderModel(id, res.files), federation)
     }
     if (meta.source === 'md' && !h.readFolder && webFolderSupported()) {
       const handle = await loadHandle(id)
@@ -1008,15 +1109,16 @@ export const documents: DocumentsAPI = {
       connectedWebHandles.add(id)
       let files: FolderFiles
       let index: string | null
+      let federation: FederationTexts | null
       try {
         const session = webSession(id, handle)
-        ;[files, index] = await Promise.all([session.readAll(), session.readCacheFile('views.json')])
+        ;[files, index, federation] = await Promise.all([session.readAll(), session.readCacheFile('views.json'), readFederationFromHandle(handle)])
       } catch { return null }
       if (Object.keys(files).length === 0) return null // empty/new folder
       // The views of a model of the structure the index was made for are
       // taken from it (ADR Model cache beside the model).
       presetViewIndex(readViewIndex(index))
-      return readFolderModel(id, files)
+      return withFederation(id, readFolderModel(id, files), federation)
     }
     return null
   },
@@ -1161,7 +1263,7 @@ export const documents: DocumentsAPI = {
 
   async saveAsFile(id, data, downloadOverride) {
     const h = host()
-    const json = JSON.stringify(data, null, 2)
+    const json = modelJson(data)
 
     // ── Electron path: native Save dialog returns an absolute path; we
     //    convert the doc into FS-backed and drop any LS payload.
@@ -1440,6 +1542,10 @@ export const documents: DocumentsAPI = {
     return handle ? readModelBaseFromHandle(handle) : null
   },
 
+  otherModels(id) {
+    return federations.get(id)?.read ?? NO_OTHER_MODELS
+  },
+
   async verifyOpened(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
     if (meta?.source !== 'md') return { stale: false }
@@ -1526,7 +1632,9 @@ export const documents: DocumentsAPI = {
     if (meta?.source !== 'md') return () => {}
     const h = host()
     externalChangeListeners.set(id, onExternalChange)
+    const stopFederation = followFederation(id)
     const stopListening = (): void => {
+      stopFederation()
       if (externalChangeListeners.get(id) === onExternalChange) externalChangeListeners.delete(id)
     }
 

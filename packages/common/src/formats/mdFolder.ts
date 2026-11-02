@@ -31,7 +31,7 @@ import type {
 } from '../c4'
 import { NODE_SIZES, isContainerType } from '../c4'
 import type { Metamodel } from '../metamodel'
-import { modelValue } from '../model'
+import { modelValue, ownModel } from '../model'
 
 /** File map: relative POSIX path → UTF-8 file content. */
 export type FolderFiles = Record<string, string>
@@ -286,7 +286,10 @@ export interface SerializeMdFolderResult {
 
 /** `serializeToMdFolder`, also reporting where each node's file landed —
  *  paths move when a node is renamed, re-parented or gains its first child. */
-export function serializeToMdFolderWithPaths(data: DiagramData, modelName?: string): SerializeMdFolderResult {
+export function serializeToMdFolderWithPaths(model: DiagramData, modelName?: string): SerializeMdFolderResult {
+  // Another model's elements (a federation) are never written here: they
+  // come from .radical/federation.json, which radical federation fetch writes.
+  const data = ownModel(model)
   const files: FolderFiles = {}
   const nodePaths: Record<string, string> = {}
   const layout: LayoutSidecar = { nodes: {} }

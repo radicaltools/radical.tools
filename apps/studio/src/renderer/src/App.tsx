@@ -16,6 +16,7 @@ import { MetamodelEditor } from './components/MetamodelEditor'
 import { Inspector } from './components/Inspector'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
 import { MilestoneChip } from '@radical/ui/components/MilestoneChip'
+import { OtherModelViewBar } from '@radical/ui/components/OtherModelViewBar'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
 import { SelectionActionBar } from '@radical/ui/components/SelectionActions'
 import { QuickSearch } from './components/QuickSearch'
@@ -153,6 +154,11 @@ function AppInner(): React.ReactElement {
           corner; the other views have it at the bottom left of theirs. */}
       {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
         <MilestoneChip style={{ gridArea: 'canvas', justifySelf: 'start', alignSelf: 'end', margin: 10, position: 'relative', zIndex: 7 }} />
+      )}
+      {/* Another model's view (a federation), of any view type: whose it
+          is, read-only, and Copy to this model. */}
+      {!isPresenting && !isInspector && (isDesigner || isViewer) && (
+        <OtherModelViewBar style={{ gridArea: 'canvas', justifySelf: 'center', alignSelf: 'start', margin: 8, position: 'relative', zIndex: 7 }} />
       )}
       {!isPresenting && isDesigner && <RightPanel />}
       {!isPresenting && isViewer && <RightPanel readOnly />}

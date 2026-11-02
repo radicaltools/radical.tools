@@ -25,7 +25,8 @@ import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radic
 import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
-import { documentMetamodel } from '@radical/common/model'
+import { documentMetamodel, ownModel } from '@radical/common/model'
+import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
 
@@ -405,7 +406,10 @@ export class FolderModel {
       // before the call ends: nothing of a call goes on after its answer.
       await session.cacheWritten()
       checkFiles(before)
-      const data = deserializeFromMdFolder(before).data
+      // The other models a deps.json names, as radical federation fetch
+      // wrote them: shown and related to, never written back (the
+      // serializer leaves out what has an origin).
+      const data = withOtherModels(deserializeFromMdFolder(before).data, parseFederationFile(await readEditorStateFile(this.folder, FEDERATION_FILE)))
       checkData(data)
       // Older folders kept every node's position in each view; a view keeps
       // those it draws, so the first write trims views.json.
@@ -527,7 +531,7 @@ export class FolderModel {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }
         // The default base is the one Studio shows: keep its copy fresh.
-        return { ok: true, text: (await modelChangesSince(this.folder, data, since, { saveBase: since === undefined })).text }
+        return { ok: true, text: (await modelChangesSince(this.folder, ownModel(data), since, { saveBase: since === undefined })).text }
       }
       priorTempIds = new Map(this.tempIds)
       const ctx: ToolRunContext = {
@@ -552,7 +556,7 @@ export class FolderModel {
         return { ok: false, text: facade.lastError ?? result.resultText }
       }
       // A run starting on a folder git saved no base for: the model before it.
-      const forgeBase = name === 'forge_start' ? forgeModelBase(data.nodes, data.relations) : null
+      const forgeBase = name === 'forge_start' ? forgeModelBase(ownModel(data).nodes, ownModel(data).relations) : null
       if (READ_ONLY.has(name) || result.readOnly) {
         result.commit?.()
         if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()

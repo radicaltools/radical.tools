@@ -951,6 +951,16 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 /* A sequence's fields, under the card's head: the card's own margins. */
 .right-panel .props-content.props-sequence { padding: 12px 16px 14px; gap: 12px; }
 .right-panel .props-content > .props-empty { margin: 24px 16px; }
+/* Another model's element or relation (a federation): read-only. */
+.pp-other-model {
+  margin: 0 16px 8px;
+  padding: 6px 10px;
+  border: 1px dashed var(--text-muted);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, var(--text-muted));
+}
+.pp-other-model code { font-size: 11px; }
 .pp-section { padding: 12px 16px; border-bottom: 1px solid var(--border-color-subtle, color-mix(in srgb, var(--border-color) 60%, transparent)); }
 .pp-section:last-child { border-bottom: none; }
 .pp-section-title {
@@ -4427,6 +4437,61 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ⊕ or + in a process's or step's header: how the steps inside it happen. */
 .proc-sign { font-size: 14px; font-weight: 700; line-height: 1; letter-spacing: 0; text-transform: none; }
 
+
+/* Its row in a table: the model it comes from, beside its name. */
+.tv-origin {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px dashed var(--text-muted);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+/* Its card in the list of views: the model it comes from, on a line of its own. */
+.lp-card-origin {
+  margin-top: 2px; font-size: 10.5px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.lp-view-origin {
+  padding: 0 5px;
+  border: 1px dashed var(--text-muted);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+/* Over another model's view, and in its properties: whose it is, and Copy
+   to this model. */
+.other-model-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px 4px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px dashed var(--text-muted);
+  border-radius: 4px;
+}
+.other-model-bar strong, .pp-other-model strong { color: var(--text-primary); }
+.other-model-bar code { font-size: 10px; }
+.pp-other-model .other-model-copy { display: block; margin-top: 6px; }
+.other-model-copy {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+/* An element of another model of a federation: dashed, read-only. */
+.rf-node-other-model {
+  outline: 2px dashed var(--text-muted);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
 .milestone-diff-stat.added   { color: var(--success); }
 .milestone-diff-stat.changed { color: var(--warning, #d97706); }
 .milestone-diff-stat.removed { color: var(--danger); }

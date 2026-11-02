@@ -5,6 +5,7 @@
 // Studio's AI (QuickSearch chat, Radical Forge) and the MCP server share it.
 
 import type { Metamodel } from '../../metamodel'
+import { viewRefusal } from '../../model'
 import { buildAlignmentToolHandlers, buildLayoutToolDefs, buildLayoutToolHandlers } from './layoutTools'
 export { noCanvasLayout } from './layoutTools'
 import { buildMetamodelToolDefs, buildMetamodelToolHandlers } from './metamodelTools'
@@ -68,11 +69,28 @@ export function hasTool(name: string): boolean {
 export async function runTool(name: string, input: unknown, ctx: ToolRunContext): Promise<ToolResult> {
   const handler = ASYNC.get(name) ?? SYNC.get(name)
   if (!handler) return { ok: false, resultText: `Unknown tool "${name}"` }
+  const refused = otherModelViewRefusal(name, input, ctx)
+  if (refused) return { ok: false, resultText: `${name}: ${refused}` }
   try {
     return await handler(input, ctx)
   } catch (err) {
     return { ok: false, resultText: (err as Error).message }
   }
+}
+
+/** The tools that change one view, and the field that names it. */
+const VIEW_TOOLS: Record<string, 'id' | 'viewId'> = {
+  update_view: 'id', delete_view: 'id', set_view_nodes: 'viewId', smart_layout: 'viewId',
+  align_nodes: 'viewId', grid_nodes: 'viewId', remove_alignment: 'viewId',
+}
+
+/** Another model's view (a federation) is shown, not changed: a tool that
+ *  would change it is refused before it runs, as an edit of its elements is. */
+function otherModelViewRefusal(name: string, input: unknown, ctx: ToolRunContext): string | null {
+  const field = VIEW_TOOLS[name]
+  const raw = field && input && typeof input === 'object' ? (input as Record<string, unknown>)[field] : undefined
+  if (typeof raw !== 'string' || !raw) return null
+  return viewRefusal(ctx.diagram.getViews?.()[ctx.resolveId(raw)])
 }
 
 export type { AsyncToolHandler, ToolDef, ToolHandler, ToolRunContext, ToolResult } from './types'

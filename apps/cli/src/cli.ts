@@ -1,6 +1,7 @@
 import { DISCUSSIONS_USAGE, discussionsCommand } from './discussionsCommand'
 import { CHECK_USAGE, checkCommand, type Io } from './check'
 import { DIFF_USAGE, diffCommand } from './diff'
+import { FEDERATION_USAGE, federationCommand } from './federation'
 import { HOOKS_USAGE, hooksCommand } from './hooks'
 import { EXPORT_USAGE, exportCommand } from './confluence'
 import { FUZZ_USAGE, fuzzCommand } from './fuzz'
@@ -28,6 +29,9 @@ Commands:
                    (radical export confluence --help)
   discussions confluence connect|sync|status [folder]
                    preview or sync managed wiki footer discussions
+  federation <open|sync|watch> [folder]
+                   compose the model with the models its deps.json names,
+                   and carry its own changes back (radical federation --help)
   fuzz [plan]      run the fuzz files crucible.json lists (Radical Crucible;
                    radical fuzz --help)
   harden <finding> turn a finding into a test, and gate a test: it fails
@@ -49,12 +53,13 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'hooks') return hooksCommand(rest, io)
   if (command === 'discussions') return discussionsCommand(rest, io)
   if (command === 'export') return exportCommand(rest, io)
+  if (command === 'federation') return federationCommand(rest, io)
   if (command === 'fuzz') return fuzzCommand(rest, io)
   if (command === 'harden') return hardenCommand(rest, io)
   if (command === 'explore') return exploreCommand(rest, io)
   if (command === '--version' || command === '-v') { io.out(displayVersion()); return 0 }
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
-    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
+    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'federation' ? FEDERATION_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
     return 0
   }
   io.err(`Unknown command: ${command}\n\n${USAGE}`)

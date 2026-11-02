@@ -123,4 +123,46 @@ describe('radical setup --status', () => {
     expect(mixed.err).toContain('--status changes nothing')
     expect((await run(repo, home, ['status'])).code).toBe(2)
   })
+
+  it('shows the models this one depends on, and warns when they are not fetched or pinned anew', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
+    dirs.push(root)
+    const write = async (folder: string, name: string) => {
+      for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, name))) {
+        await mkdir(dirname(join(folder, path)), { recursive: true })
+        await writeFile(join(folder, path), content)
+      }
+    }
+    const git = (cwd: string, ...args: string[]) => exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd })
+    const standards = join(root, 'standards')
+    await mkdir(standards)
+    await git(standards, 'init', '-q', '-b', 'main')
+    await write(join(standards, 'architecture'), 'standards')
+    await git(standards, 'add', '-A')
+    await git(standards, 'commit', '-q', '-m', 'v1')
+    await git(standards, 'tag', 'v1.0.0')
+    await git(standards, 'tag', 'v2.0.0')
+    const repo = join(root, 'repo')
+    const home = join(root, 'home')
+    const folder = join(repo, 'architecture')
+    await mkdir(home, { recursive: true })
+    await mkdir(repo)
+    await exec('git', ['init', '-q'], { cwd: repo })
+    await write(folder, 'payments')
+    const pin = (ref: string) => writeFile(join(folder, 'deps.json'), JSON.stringify({ name: 'payments', dependencies: [{ name: 'standards', repo: '../../standards', path: 'architecture', ref }] }))
+    await pin('v1.0.0')
+    const cache = process.env.RADICAL_CACHE
+    process.env.RADICAL_CACHE = join(root, 'cache')
+    try {
+      const status = async () => (await run(repo, home, ['setup', '--status', 'architecture', '--no-start'])).out
+      expect(await status()).toContain('! depends on standards, not fetched: radical federation fetch architecture')
+      expect((await run(repo, home, ['federation', 'fetch', 'architecture'])).code).toBe(0)
+      expect(await status()).toMatch(/✓ depends on standards at v1\.0\.0, fetched \(standards@\w{7}\)/)
+      await pin('v2.0.0')
+      expect(await status()).toContain('! depends on standards at v2.0.0, fetched at v1.0.0: radical federation fetch architecture')
+    } finally {
+      if (cache === undefined) delete process.env.RADICAL_CACHE
+      else process.env.RADICAL_CACHE = cache
+    }
+  })
 })

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { useDiagramStore } from '../store/diagramStore'
+import { otherModelViewShown, useDiagramStore } from '../store/diagramStore'
 import { useCardOpen, useShowRequest } from '../store/showInView'
 import {
   GROUP_TYPE,
@@ -48,7 +48,7 @@ import {
 import { wikiDepthOf, type ViewFilter, type ViewSort } from '@radical/common/c4'
 import { addChoices, chainTypes, type AddChoice, linkCandidates, newElementFilters, pipelineOf, sortNodes, viewShownNodes } from '@radical/common/viewPipeline'
 import { newLinkFit, relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
-import { parentCandidates as movableInto } from '@radical/common/model'
+import { originOf, parentCandidates as movableInto } from '@radical/common/model'
 import { createWikiDocument, type WikiBlock, type WikiDerivedFact, type WikiDocument, type WikiRelationGroup } from '@radical/common/wikiDocument'
 import { editingControl } from './editingControl'
 
@@ -432,9 +432,11 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
   const setWikiPageMode = useDiagramStore((s) => s.setWikiPageMode)
   const appMode = useDiagramStore((s) => s.appMode)
 
-  // Read-only out of Designer, and on a slide played from it (F5).
+  // Read-only out of Designer, on a slide played from it (F5), and on
+  // another model's view (a federation).
   const presenting = useDiagramStore((s) => s.presentationActive)
-  const readOnly = appMode !== 'designer' || presenting
+  const otherModels = useDiagramStore((s) => !!otherModelViewShown(s))
+  const readOnly = appMode !== 'designer' || presenting || otherModels
   const discussNode = presenting ? undefined : onDiscuss
   const typeMeta = useTypeMeta()
 
@@ -758,7 +760,9 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
     if (node && discussNode) items.push({ id: 'discuss', label: 'Discuss', onSelect: () => discussNode(node.id) })
     if (readOnly) return { items }
     const relation = target.relation
-    if (relation) {
+    // Another model's element or relation (a federation) is shown, not edited.
+    const theirs = relation ? !!originOf(c4Relations[relation.id]) : !!originOf(node)
+    if (relation && !theirs) {
       items.push({
         id: 'relation-edit',
         label: 'Edit relationship',
@@ -789,15 +793,18 @@ export function WikiView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void }
           },
         })
       }
-      items.push({
-        id: 'facts',
-        label: 'Edit facts',
-        onSelect: () => {
-          if (focusId !== node.id) goTo(node.id)
-          setFactsFor(node.id)
-        },
-      })
-      items.push({ id: 'delete', label: 'Delete', danger: true, separated: true, onSelect: () => deleteNode(node.id) })
+      // Another model's element is shown, not edited: it keeps Open and links.
+      if (!theirs) {
+        items.push({
+          id: 'facts',
+          label: 'Edit facts',
+          onSelect: () => {
+            if (focusId !== node.id) goTo(node.id)
+            setFactsFor(node.id)
+          },
+        })
+        items.push({ id: 'delete', label: 'Delete', danger: true, separated: true, onSelect: () => deleteNode(node.id) })
+      }
     }
     return { items }
   }
@@ -2083,7 +2090,7 @@ function WikiElementPage({
   updateRelation,
   onNavigate,
   onDeleteRelation,
-  readOnly,
+  readOnly: pageReadOnly,
   typeMeta,
   pageMode,
   level = 1,
@@ -2123,6 +2130,8 @@ function WikiElementPage({
    *  are not written again under it. */
   above?: string[]
 }): React.ReactElement {
+  // Another model's element (a federation) is shown, not edited.
+  const readOnly = pageReadOnly || !!originOf(node)
   const embedded = level > 1
   const actions = useWikiActions()
   const articleRef = useRef<HTMLElement | null>(null)
@@ -2334,7 +2343,7 @@ function WikiElementPage({
             metamodel={metamodel}
             typeMeta={typeMeta}
             onNavigate={onNavigate}
-            writeUnder={node}
+            writeUnder={originOf(node) ? undefined : node}
             starters={embedded ? 'chapter' : 'page'}
             renderChapter={expandChildren ? (c, chapterLevel) => (
               <WikiElementPage
@@ -2727,7 +2736,7 @@ function WikiRelationLine({
   relation,
   nodes,
   metamodel,
-  readOnly,
+  readOnly: lineReadOnly,
   onNavigate,
   updateRelation,
   onDeleteRelation,
@@ -2744,6 +2753,8 @@ function WikiRelationLine({
   onDeleteRelation: (id: string) => void
   typeMeta: TypeMeta
 }): React.ReactElement {
+  // Another model's relation (a federation) is shown, not edited.
+  const readOnly = lineReadOnly || !!originOf(relation)
   const relTypeDef = relation.relationType
     ? metamodel?.relationTypes[relation.relationType]
     : undefined

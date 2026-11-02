@@ -11,6 +11,8 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CLIENTS, CLIENT_IDS, entryFor, mcpPackage, npxBesideNode, pinLauncher, placeOf, sameEntry, shown, type Client, type ClientId } from './agentConfig'
 import { statusCommand } from './status'
 import { hooksCommand } from './hooks'
+import { addDependencies, describeDeps, fetchFederation, latestRef, parseDependsOn, readDependencies } from './federation'
+import { DEPS_FILE, FEDERATION_FILE, type Dependency, type Deps } from '@radical/common/federation'
 import type { Io } from './check'
 
 const exec = promisify(execFile)
@@ -24,12 +26,16 @@ export const SETUP_USAGE = `Usage: radical setup [folder] [options]
 Connects your coding agents to a Radical model folder, step by step:
   1. Node      checks the version
   2. Folder    a missing or empty folder becomes a new model
-  3. Agents    adds the MCP server for the folder to each agent's
+  3. Other models
+               the models this one depends on (a federation): their names,
+               repositories, model folders and versions go into deps.json,
+               and radical federation fetch fetches them
+  4. Agents    adds the MCP server for the folder to each agent's
                configuration, pinned to this version (other entries stay)
-  4. Hooks     the hooks that save the model's base for Studio's Changes on
+  5. Hooks     the hooks that save the model's base for Studio's Changes on
                branch (radical hooks install); outside a git repository it
                asks, in a terminal, to start one in the working directory
-  5. Check     the checks of --status for the folder
+  6. Check     the checks of --status for the folder
 
 In a terminal it asks each question with its default; press Enter to take
 it. Otherwise (or with --yes) it asks nothing and takes the options and the
@@ -42,6 +48,12 @@ defaults: the folder architecture, the agents it finds installed.
   --metamodel <name>  the metamodel of a new model: radical (C4 with domains
                       and governance, default) or c4
   --name <name>       the server's name in the configurations (default: radical)
+  --depends-on <name>=<repository>[#<version>[:<model folder>]]
+                      a model this one depends on, more than once for several;
+                      the repository is a git address or a path relative to
+                      the model folder, the version defaults to its newest
+                      version tag (else its default branch), the model folder
+                      to architecture
   --no-hooks          leave the git hooks alone
   --no-check          end without the checks of --status
   --dry-run           print what it would change and write nothing
@@ -70,6 +82,60 @@ with the Node.js the launcher finds or downloaded.
 Exit status: 0 set up and checked (with --status: nothing is broken), 1 a
 step or a check failed, 2 it could not run.`
 
+/** Step 3: the models the folder's model depends on. Asks in a terminal,
+ *  or takes `specs` (--depends-on); writes deps.json, keeping what it names,
+ *  and fetches them. Returns true when something failed. */
+async function otherModels(root: string, folderArg: string, specs: string[], ask: Io['ask'], dry: boolean, io: Io): Promise<boolean> {
+  let existing: Deps | null = null
+  try { existing = existsSync(root) ? await readDependencies(root) : null } catch (error) {
+    io.out(`  ✗ ${DEPS_FILE} does not read: ${(error as Error).message}`)
+    return true
+  }
+  for (const dep of existing?.dependencies ?? []) io.out(`  ✓ depends on ${dep.name} (${dep.repo} at ${dep.ref})`)
+  const added: Dependency[] = []
+  try {
+    for (const spec of specs) added.push(parseDependsOn(spec))
+  } catch (error) {
+    io.out(`  ✗ ${(error as Error).message}`)
+    return true
+  }
+  if (!specs.length && ask) {
+    for (;;) {
+      const name = (await ask(`  ${added.length || existing?.dependencies.length ? 'Another model' : 'A model'} this one depends on, by name (Enter: ${added.length || existing?.dependencies.length ? 'no more' : 'none'}): `)).trim()
+      if (!name) break
+      const repo = (await ask('    Its git repository, an address or a path from the model folder: ')).trim()
+      if (!repo) { io.out('    - no repository: left out'); continue }
+      const path = (await ask('    The model folder in it [architecture]: ')).trim() || 'architecture'
+      const offered = await latestRef(repo, existsSync(root) ? root : io.cwd)
+      const ref = (await ask(`    Version [${offered}]: `)).trim() || offered
+      added.push({ name, repo, path, ref })
+    }
+  }
+  if (!added.length) {
+    if (!existing?.dependencies.length) io.out('  - none: radical setup --depends-on <name>=<repository> adds one later')
+    return false
+  }
+  for (const dep of added) if (!dep.ref) dep.ref = await latestRef(dep.repo, existsSync(root) ? root : io.cwd)
+  if (dry) {
+    for (const dep of added) io.out(`  would add ${dep.name} (${dep.repo} at ${dep.ref}, ${dep.path}) to ${DEPS_FILE} and fetch it`)
+    return false
+  }
+  try {
+    const name = existing?.name ?? (basename(root) === 'architecture' ? basename(dirname(root)) : basename(root))
+    await addDependencies(root, added, name.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[^A-Za-z0-9]+/, '') || 'model')
+    for (const dep of added) io.out(`  + ${dep.name} (${dep.repo} at ${dep.ref}) in ${DEPS_FILE}`)
+    const fetched = await fetchFederation(root)
+    if (fetched) {
+      io.out(`  + fetched ${describeDeps(fetched.fetched) || 'nothing'} into ${FEDERATION_FILE}: ${fetched.nodes} elements`)
+      for (const note of fetched.notes) io.out(`  ! ${note}`)
+    }
+    return false
+  } catch (error) {
+    io.out(`  ✗ ${(error as Error).message}; radical federation fetch ${folderArg} tries again`)
+    return true
+  }
+}
+
 /** Runs `radical setup` with `args` (after the command name); returns the exit status. */
 export async function setupCommand(args: string[], io: Io): Promise<number> {
   let parsed
@@ -86,6 +152,7 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
         status: { type: 'boolean', default: false },
         'no-start': { type: 'boolean', default: false },
         timeout: { type: 'string', default: '120' },
+        'depends-on': { type: 'string', multiple: true },
         'dry-run': { type: 'boolean', default: false },
         yes: { type: 'boolean', short: 'y', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -106,7 +173,7 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   if (!(timeout > 0)) { io.err(SETUP_USAGE); return 2 }
   const check = (folder?: string) => statusCommand({ folder, start: !values['no-start'], timeoutMs: timeout * 1000 }, io)
   if (values.status) {
-    if (values.client || values.metamodel || values['dry-run'] || values['no-hooks'] || values['no-check']) {
+    if (values.client || values.metamodel || values['depends-on'] || values['dry-run'] || values['no-hooks'] || values['no-check']) {
       io.err(`radical setup: --status changes nothing; it takes a folder, --no-start and --timeout.\n\n${SETUP_USAGE}`)
       return 2
     }
@@ -121,7 +188,7 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   let failed = false
 
   // ── 1. Node ──
-  io.out('1/5 Node')
+  io.out('1/6 Node')
   const [major, minor] = process.versions.node.split('.').map(Number)
   if (major < 20 || (major === 20 && minor < 11)) {
     io.err(`radical setup: Node.js ${process.versions.node} is too old: the MCP server needs 20.11 or later (https://nodejs.org).`)
@@ -130,7 +197,7 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   io.out(`  ✓ Node.js ${process.versions.node}`)
 
   // ── 2. The model folder ──
-  io.out('2/5 Model folder')
+  io.out('2/6 Model folder')
   const folderArg = positionals[0] ?? await answer('  Model folder', 'architecture')
   const folder = resolve(io.cwd, folderArg)
   let entries: string[] | null
@@ -162,8 +229,12 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
   let top = await git('rev-parse', '--show-toplevel').then((path) => realpath(path), () => null)
   const place = placeOf(io, top ?? await realpath(io.cwd))
 
-  // ── 3. The agents ──
-  io.out('3/5 Agents')
+  // ── 3. The other models it depends on (a federation) ──
+  io.out('3/6 Other models')
+  if (await otherModels(real, folderArg, values['depends-on'] ?? [], ask, dry, io)) failed = true
+
+  // ── 4. The agents ──
+  io.out('4/6 Agents')
   if (place.launcher) {
     // The project keeps its launcher at this version, as the agents' servers.
     const release = releaseOf(io.version ?? buildInfo().version)
@@ -222,8 +293,8 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
-  // ── 4. The git hooks ──
-  io.out('4/5 Git hooks')
+  // ── 5. The git hooks ──
+  io.out('5/6 Git hooks')
   if (!top && !values['no-hooks'] && ask && await confirm('  Not in a git repository. Start one here (git init)?')) {
     if (dry) io.out('  would run: git init')
     else {
@@ -241,8 +312,8 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
     if ((await hooksCommand(['install', relative(io.cwd, real) || '.'], hooksIo)) !== 0) failed = true
   }
 
-  // ── 5. Check ──
-  io.out('5/5 Check')
+  // ── 6. Check ──
+  io.out('6/6 Check')
   if (dry) { io.out('  - dry run: nothing was written'); return failed ? 1 : 0 }
   if (values['no-check']) io.out('  - skipped (--no-check); radical setup --status checks it later')
   const code = values['no-check'] ? 0 : await check(relative(io.cwd, real) || '.')

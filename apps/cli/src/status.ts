@@ -11,6 +11,9 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { CLIENTS, expanded, folderOf, isRadicalServer, launcherOf, launcherPath, onPath, pinnedVersion, placeOf, shown, type Client, type Place, type ServerEntry } from './agentConfig'
 import { hooksSaveBase } from './hooks'
 import type { Io } from './check'
+import { readDependencies } from './federation'
+import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile } from '@radical/common/federation'
+import { readEditorStateFile } from '@radical/node-files/selectionFile'
 
 const exec = promisify(execFile)
 
@@ -126,6 +129,24 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
         ok(`reads as a model: ${data.nodes.length} elements, ${data.relations.length} relations, ${data.views?.length ?? 0} views`)
       } catch (error) {
         fail(`does not read as a model: ${(error as Error).message}`)
+      }
+      // The other models it depends on (a federation): fetched, and at the versions deps.json pins.
+      try {
+        const deps = await readDependencies(folder)
+        if (deps?.dependencies.length) {
+          const fetched = parseFederationFile(await readEditorStateFile(folder, FEDERATION_FILE).catch(() => null))
+          if (!fetched) warn(`depends on ${deps.dependencies.map((d) => d.name).join(', ')}, not fetched: radical federation fetch ${shown(folder, place)}`)
+          else {
+            for (const dep of deps.dependencies) {
+              const got = fetched.dependencies.find((d) => d.name === dep.name)
+              if (!got) warn(`depends on ${dep.name} (${dep.ref}), not fetched: radical federation fetch ${shown(folder, place)}`)
+              else if (got.ref !== dep.ref || got.repo !== dep.repo) warn(`depends on ${dep.name} at ${dep.ref}, fetched at ${got.ref}: radical federation fetch ${shown(folder, place)}`)
+              else ok(`depends on ${dep.name} at ${dep.ref}, fetched (${originFor(dep.name, got.commit)})`)
+            }
+          }
+        }
+      } catch (error) {
+        fail(`its ${DEPS_FILE} does not read: ${(error as Error).message}`)
       }
       if (!top) warn('is not in a git repository: Studio\'s Changes on branch and radical diff need one')
       else {
