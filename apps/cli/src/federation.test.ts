@@ -257,4 +257,50 @@ describe('transitive dependencies', () => {
     expect(json.federation.find((d) => d.name === 'orders')).toEqual(expect.objectContaining({ ref: 'v2' }))
     expect(json.federation.find((d) => d.name === 'orders')?.via).toBeUndefined()
   })
+
+  it('knows the model itself and one model under two names by repository and model folder', async () => {
+    const top = await mkdtemp(join(tmpdir(), 'radical-federation-'))
+    dirs.push(top)
+    const repo = async (name: string, nodes: C4Node[], deps?: (home: string) => object) => {
+      const dir = join(top, name)
+      await mkdir(dir)
+      await git(dir, 'init', '-q', '-b', 'main')
+      const home = join(dir, 'architecture')
+      await writeModel(home, { nodes, relations: [] }, name)
+      if (deps) await writeFile(join(home, 'deps.json'), JSON.stringify(deps(home)))
+      await git(dir, 'add', '.')
+      await git(dir, 'commit', '-q', '-m', name)
+      return { dir, home }
+    }
+    const orders = await repo('orders', [node('ord', 'system', 'Orders')])
+    const paymentsHome = join(top, 'payments', 'architecture')
+    // billing names orders "ordering", and payments "pay-svc": the same
+    // repositories and model folders payments names otherwise.
+    const billing = await repo('billing', [node('bill', 'system', 'Billing')], (home) => ({
+      name: 'billing',
+      dependencies: [
+        { name: 'ordering', repo: relative(home, orders.dir), path: 'architecture', ref: 'main' },
+        { name: 'pay-svc', repo: relative(home, join(top, 'payments')), path: './architecture/', ref: 'main' },
+        // Its address, written as https where its remote is ssh.
+        { name: 'pay-https', repo: 'https://GitHub.com/acme/payments.git', path: 'architecture', ref: 'main' },
+      ],
+    }))
+    const payments = await repo('payments', [node('pay', 'system', 'Payments')], (home) => ({
+      name: 'payments',
+      dependencies: [
+        { name: 'billing', repo: relative(home, billing.dir), path: 'architecture', ref: 'main' },
+        { name: 'orders', repo: relative(home, orders.dir), path: 'architecture', ref: 'main' },
+      ],
+    }))
+    await git(payments.dir, 'remote', 'add', 'origin', 'git@github.com:acme/payments.git')
+    const fetched = await run(paymentsHome, ['federation', 'fetch'])
+    expect(fetched.err).toBe('')
+    expect(fetched.code).toBe(0)
+    expect(fetched.out).toContain('Note: pay-https: billing names this model so; left out, as a dependency back to it.')
+    expect(fetched.out).toContain('Note: ordering: billing names the model orders so (the same repository and model folder); fetched once, as orders.')
+    expect(fetched.out).toContain('Note: pay-svc: billing names this model so; left out, as a dependency back to it.')
+    const file = parseFederationFile(await readFile(join(paymentsHome, '.radical/federation.json'), 'utf8'))!
+    expect(file.dependencies.map((d) => d.name)).toEqual(['billing', 'orders'])
+    expect(file.nodes.map((n) => n.id).sort()).toEqual(['bill', 'ord'])
+  })
 })
