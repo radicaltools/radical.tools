@@ -5,14 +5,6 @@ label: "Plain-file round-trip"
 cadence: "triggered"
 characteristic: "compatibility"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/mdFolderPersistence.test.ts › md-folder persistence) passed
-  test(apps/studio/tests/mdFolderDocument.test.ts › documents — md-folder backend) passed
-  test(apps/studio/tests/diskFolderStorage.test.ts › diskFolderStorage › round-trips a model and ignores everything that is not one) passed
-  test(apps/e2e/tests/studio/files.spec.ts › Open → File… keeps the model in the file and saves changes to it) passed
-  test(apps/e2e/tests/studio/files.spec.ts › New model can keep the model in a file) passed
-  test(apps/e2e/tests/studio/folders.spec.ts › save as folder writes one Markdown file per element) passed
-  test(apps/e2e/tests/studio/folders.spec.ts › a folder-backed model survives a reload) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

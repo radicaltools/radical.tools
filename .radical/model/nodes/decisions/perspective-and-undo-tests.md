@@ -5,12 +5,6 @@ label: "Perspective and undo tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/ui/tests/perspectiveMilestones.test.ts) passed
-  test(packages/ui/tests/undoSteps.test.ts) passed
-  test(apps/studio/tests/viewerSandbox.test.ts) passed
-  test(apps/e2e/tests/studio/editing.spec.ts) passed
-  test(apps/e2e/tests/studio/physics.spec.ts › a milestone picked in Viewer is not the one Designer edits) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

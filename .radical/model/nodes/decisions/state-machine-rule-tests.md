@@ -5,12 +5,6 @@ label: "State machine rule tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/stateMachine.test.ts) passed
-  test(packages/common/tests/aiDocumentTools.test.ts › reference properties through the tools) passed
-  test(packages/layout/tests/edgeLabels.test.ts › relationLabelLines) passed
-  test(apps/mcp/src/folderModel.test.ts › state machines over MCP) passed
-  test(apps/e2e/tests/studio/state-machines.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

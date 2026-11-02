@@ -5,10 +5,6 @@ label: "One .radical folder tests"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(packages/node-files/tests/repositoryLayout.test.ts) passed
-  test(packages/node-files/tests/stateDir.test.ts) passed
-  test(apps/cli/src/setup.test.ts › radical setup › moves a repository laid out the old way into .radical) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

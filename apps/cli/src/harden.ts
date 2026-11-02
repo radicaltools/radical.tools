@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util'
 import { findingTestName, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import type { Io } from './check'
 import { crucibleConfig } from './modelFolder'
+import { verifyCommand } from './verify'
 
 export const HARDEN_USAGE = `Usage: radical harden <finding> [--scenario <name>]
        radical harden --gate (<finding> | --test "<file> › <name>") [options]
@@ -15,9 +16,10 @@ Turns a finding into a test bound to the model (Radical Crucible).
   <finding>           a finding of the findings folder (F-0003): a fuzz
                       finding is hardened by its own steps, replayed as the
                       test "<fuzz file> › <id> stays fixed: <title>"; the
-                      finding is marked hardened with that test, and the test
-                      condition is printed for the scenario's Metrics
-  --scenario <name>   the scenario the test proves, kept in the finding
+                      finding is marked hardened with that test
+  --scenario <name>   the scenario the test proves, kept in the finding; the
+                      test is bound to it in the repository's
+                      .radical/radical.json (radical verify)
 
   --gate              checks a test before it is bound: with the source files
                       changed since the base set back to it, it must fail;
@@ -139,10 +141,13 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
     const test = `${finding!.file} › ${findingTestName(finding!)}`
     writeFinding(findingsDir, { ...finding!, status: 'hardened', test, ...(values.scenario ? { scenario: values.scenario } : {}) })
     io.out(`${finding!.id} is hardened: its fuzz file replays its steps as`)
-    io.out(`  test(${test}) passed`)
-    io.out(values.scenario
-      ? `Add that line to the Metrics of scenario "${values.scenario}" (the model's files are left as they are).`
-      : 'Add that line to the Metrics of the scenario it proves (--scenario keeps its name in the finding).')
+    io.out(`  ${test}`)
+    const bind = `radical verify "${values.scenario ?? '<scenario>'}" --test "${test}"`
+    if (!values.scenario) { io.out(`Bind it to the scenario it proves: ${bind}`); return 0 }
+    // Bound to the scenario in .radical/radical.json where the model has it.
+    const said: string[] = []
+    const bound = await verifyCommand([values.scenario, '--test', test], { ...io, cwd: root, out: (t) => said.push(t), err: (t) => said.push(t) })
+    io.out(bound === 0 ? said.join('\n') : `Not bound to scenario "${values.scenario}" (${said[0]?.split('\n')[0] ?? 'no model'}): ${bind}`)
     return 0
   }
 

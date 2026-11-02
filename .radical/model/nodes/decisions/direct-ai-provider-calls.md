@@ -5,9 +5,6 @@ label: "Direct AI provider calls"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(apps/studio/tests/aiProviders.test.ts › AI providers) passed
-  test(apps/studio/tests/aiSettings.test.ts › aiReady) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

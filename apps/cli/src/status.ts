@@ -15,6 +15,7 @@ import { readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { findModelFolder, oldLayout, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
+import { testsNamedIn } from './moveTests'
 
 const exec = promisify(execFile)
 
@@ -153,6 +154,8 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
       else {
         const old = await oldLayout(top)
         if (old.length) warn(`${old.join(', ')} ${old.length === 1 ? 'is' : 'are'} where Radical kept its files before .radical/: radical setup moves ${old.length === 1 ? 'it' : 'them'} into .radical/`)
+        const named = await testsNamedIn(folder).catch(() => 0)
+        if (named) warn(`${named} scenario${named === 1 ? '' : 's'} and fitness function${named === 1 ? '' : 's'} name their tests in the model: radical setup moves them into .radical/radical.json`)
         // Where the repository builds the model's elements, for its sensors.
         const mapping = await readRepositoryMapping(folder).catch((error: Error) => { fail(`its repository's mapping does not read: ${error.message}`); return undefined })
         if (mapping) ok(`${shown(mapping.file, place)} maps ${mapping.implements.length} element${mapping.implements.length === 1 ? '' : 's'} to the repository's code`)

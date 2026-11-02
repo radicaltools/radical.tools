@@ -5,7 +5,6 @@ label: "Group placement tests"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: "test(packages/common/tests/c4Containment.test.ts › what a group may hold) passed"
 scope: "atomic"
 trigger: "pull-request"
 ---

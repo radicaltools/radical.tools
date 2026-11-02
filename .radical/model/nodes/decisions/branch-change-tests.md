@@ -5,10 +5,6 @@ label: "Branch change tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/branchChanges.test.ts) passed
-  test(apps/cli/src/hooks.test.ts) passed
-  test(apps/e2e/tests/studio/branch-changes.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

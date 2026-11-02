@@ -5,7 +5,6 @@ label: "Concern packs pass check"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: "test(packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack imported and bound passes radical check) passed"
 scope: "atomic"
 trigger: "pull-request"
 ---

@@ -5,15 +5,6 @@ label: "Folder cache stays derived"
 cadence: "triggered"
 characteristic: "reliability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › reads only the files changed since, and names them in changes.json, so the next read reads none) passed
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › keeps up with what the session writes) passed
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › writes model.json again once more files than changes.json can stand differ from it) passed
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › is rebuilt when it is broken or of another version, and the folder is read whole) passed
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › leaves out a changes.json made for another model.json) passed
-  test(packages/common/tests/modelCache.test.ts › a model folder's cache › is not needed: a folder whose cache cannot be written still opens) passed
-  test(packages/node-files/tests/diskFolderStorage.test.ts › diskFolderStorage › keeps the folder in .state/cache/model.json, opens from it, and writes it again when it is gone) passed
-  test(packages/common/tests/modelCache.test.ts › opening a folder as its cache has it › says which files differ when they changed since, and the next read has them as they are) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

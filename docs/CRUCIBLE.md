@@ -162,8 +162,9 @@ For a finding of a fuzz file, the test is its own steps:
 `radical harden F-0003 --scenario "Undo is exact"` marks it hardened, and from
 then on the fuzz file replays its shrunk sequence as a test case of its own
 (`F-0003 stays fixed: …`), once, without the known failures, so it fails until
-the bug is fixed. The command prints the `test(…) passed` line to add to the
-scenario's Metrics; it never changes the model's files. A finding from an exploration has
+the bug is fixed. With `--scenario` it binds that test to the scenario in the
+repository's `.radical/radical.json` (as `radical verify` does); it never
+changes the model's files. A finding from an exploration has
 no steps to replay: its test is written by hand, then gated.
 
 `radical harden --gate` checks a test before it is bound, the way a fix should

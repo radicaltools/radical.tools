@@ -5,11 +5,6 @@ label: "Need type tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/needType.test.ts › need node type (governance preset)) passed
-  test(packages/common/tests/mdFolderPersistence.test.ts › md-folder persistence › stores a need's free text as the Markdown body of its file) passed
-  test(apps/e2e/tests/studio/need.spec.ts › on the governance bookstore) passed
-  test(apps/e2e/tests/studio/need.spec.ts › needs nest under a broader need: a tree in the table's chain, and Add child on its wiki page) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

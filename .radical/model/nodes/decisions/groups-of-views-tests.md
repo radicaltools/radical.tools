@@ -5,11 +5,6 @@ label: "Groups of views tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/viewpoints.test.ts › viewpoint subjects) passed
-  test(packages/common/tests/viewpoints.test.ts › built-in viewpoints of one element) passed
-  test(packages/common/tests/forgeViews.test.ts › radical structure › makes a group of views of each state machine, process, system, container and domain, which a later element joins) passed
-  test(apps/e2e/tests/studio/viewpoints.spec.ts › a viewpoint that draws one element makes a group with a view of each, which a new element joins) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

@@ -5,10 +5,6 @@ label: "Canvas selection tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/studio/tests/canvasSelection.test.ts) passed
-  test(apps/studio/tests/webFolder.test.ts) passed
-  test(apps/mcp/src/folderModel.test.ts › canvas selection) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

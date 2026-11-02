@@ -26,7 +26,8 @@ import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, apply
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
-import { REPOSITORY_FILE, builtIn, parseRepositoryMapping, serializeRepositoryMapping, type MappedElement } from '@radical/common/repositoryMapping'
+import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
+import { conditionsOf, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -36,7 +37,7 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -83,6 +84,29 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
         id: { type: 'string', description: 'The element (an id or a tempId), this model\'s or another\'s of its federation.' },
         paths: { type: 'array', items: { type: 'string' }, description: 'The folders that build it, from the repository\'s root (e.g. "apps/cli"; "." for the whole repository).' },
         remove: { type: 'boolean', description: 'Take the element\'s entry out instead.' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_verification',
+    description: 'Which of the repository\'s tests check the model\'s scenarios and fitness functions, from its .radical/radical.json ("verifies"; test ids as Vitest and Playwright print them, from the repository\'s root). With id: the tests bound to that scenario or fitness function. Without: every entry, and the scenarios this repository must verify (an element it builds satisfies their requirement) that have no test bound and no metric condition. Tests are never named in the model: bind them with set_verification when you write them.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The scenario or fitness function (an id or a tempId). Omit it for every entry.' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_verification',
+    description: 'Binds tests of the repository to a scenario or fitness function of the model, in its .radical/radical.json, which radical check, the Inspector and Studio read: it passes when every test bound to it passed and its metric conditions hold. tests (ids as "<file> › <describe> › <title>", or "<file>" for every test in it, from the repository\'s root) replace its tests; remove: true takes the entry out. Call it for each test you write for a scenario. It changes no model file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The scenario or fitness function (an id or a tempId).' },
+        tests: { type: 'array', items: { type: 'string' }, description: 'The tests that check it.' },
+        remove: { type: 'boolean', description: 'Take its entry out instead.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -464,6 +488,64 @@ export class FolderModel {
 
   /** The canvas selection Studio wrote into the folder, resolved against
    *  the model as it is now. */
+  /** get_verification and set_verification: the tests the repository's
+   *  .radical/radical.json binds (ADR Tests are bound outside the model). */
+  private async verification(name: string, input: unknown, data: DiagramData): Promise<CallOutcome> {
+    const { id, tests, remove } = (input ?? {}) as { id?: unknown; tests?: unknown; remove?: unknown }
+    const nodes = new Map(data.nodes.map((n) => [n.id, n]))
+    const named = (n: C4Node) => `${n.type} "${n.label}" (${n.id})`
+    const file = join(await mappingRoot(this.folder), REPOSITORY_FILE)
+    let repository: RepositoryFile
+    try {
+      repository = await readFile(file, 'utf8').then((text) => parseRepositoryFile(text), (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return { implements: [], verifies: [] }
+        throw error
+      })
+    } catch (error) {
+      return { ok: false, text: `${name}: ${(error as Error).message}` }
+    }
+    if (id !== undefined && typeof id !== 'string') return { ok: false, text: `${name}: id must be a scenario's or fitness function's id` }
+    const node = typeof id === 'string' ? nodes.get(this.tempIds.get(id) ?? id) : undefined
+    if (id !== undefined && !node) return { ok: false, text: `${name}: no element ${id} in the model` }
+    if (node && node.type !== 'scenario' && node.type !== 'fitness-fn') return { ok: false, text: `${name}: ${named(node)} is no scenario or fitness function; only those are checked by tests` }
+
+    if (name === 'get_verification') {
+      if (node) {
+        const bound = testsBoundTo(repository.verifies, node.id)
+        return { ok: true, text: bound.length ? `${named(node)} is checked by:\n${bound.map((t) => `- ${t}`).join('\n')}` : `${REPOSITORY_FILE} binds no test to ${named(node)}: bind its tests with set_verification.` }
+      }
+      const model: CheckModel = {
+        nodes: Object.fromEntries(withBoundTests(data.nodes, repository.verifies).map((n) => [n.id, n])),
+        relations: Object.fromEntries(data.relations.map((r) => [r.id, r])),
+        metamodel: documentMetamodel(data.metamodel, data.nodes),
+        repository: { file: REPOSITORY_FILE, implements: repository.implements.map((m) => ({ ...m, missing: [] })), verifies: repository.verifies },
+      }
+      const unverified = Object.values(model.nodes).filter((n) => n.type === 'scenario' && !conditionsOf(n).length && verifiedHere(model, n))
+      return { ok: true, text: JSON.stringify({
+        file: REPOSITORY_FILE,
+        verifies: repository.verifies.map((v) => ({ ...v, ...(nodes.has(v.element) ? {} : { unknown: 'no element of the model has this id' }) })),
+        toVerify: unverified.map((n) => ({ id: n.id, label: n.label })),
+      }, null, 2) }
+    }
+
+    if (!node) return { ok: false, text: 'set_verification: id is required' }
+    const at = repository.verifies.findIndex((v) => v.element === node.id)
+    if (remove === true) {
+      if (at < 0) return { ok: true, text: `${REPOSITORY_FILE} has no entry for ${named(node)}.` }
+      repository.verifies.splice(at, 1)
+    } else {
+      if (!Array.isArray(tests) || !tests.length || !tests.every((t) => typeof t === 'string' && t.trim())) {
+        return { ok: false, text: 'set_verification: tests must be a list of test ids ("<file> › <title>"), or remove: true' }
+      }
+      const entry = { element: node.id, name: node.label, tests: [...new Set((tests as string[]).map((t) => t.trim()))] }
+      if (at < 0) repository.verifies.push(entry)
+      else repository.verifies[at] = entry
+    }
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, serializeRepositoryFile(repository))
+    return { ok: true, text: remove === true ? `Took ${named(node)} out of ${REPOSITORY_FILE}.` : `${named(node)} is checked by ${testsBoundTo(repository.verifies, node.id).length} test(s) (${REPOSITORY_FILE}).` }
+  }
+
   /** get_implementation and set_implementation: the repository's
    *  .radical/radical.json (ADR The repository maps the model to its code). */
   private async implementation(name: string, input: unknown, data: DiagramData): Promise<CallOutcome> {
@@ -473,15 +555,16 @@ export class FolderModel {
     const named = (n: C4Node) => `${n.type} "${n.label}" (${n.id})`
     const root = await mappingRoot(this.folder)
     const file = join(root, REPOSITORY_FILE)
-    let mapped: MappedElement[]
+    let repository: RepositoryFile
     try {
-      mapped = await readFile(file, 'utf8').then((text) => parseRepositoryMapping(text), (error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return []
+      repository = await readFile(file, 'utf8').then((text) => parseRepositoryFile(text), (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return { implements: [], verifies: [] }
         throw error
       })
     } catch (error) {
       return { ok: false, text: `${name}: ${(error as Error).message}` }
     }
+    const mapped = repository.implements
     if (id !== undefined && typeof id !== 'string') return { ok: false, text: `${name}: id must be an element's id` }
     const node = typeof id === 'string' ? nodes.get(this.tempIds.get(id) ?? id) : undefined
     if (id !== undefined && !node) return { ok: false, text: `${name}: no element ${id} in the model` }
@@ -506,7 +589,7 @@ export class FolderModel {
     if (remove === true) {
       if (at < 0) return { ok: true, text: `${REPOSITORY_FILE} has no entry for ${named(node)}.` }
       mapped.splice(at, 1)
-      await writeFile(file, serializeRepositoryMapping(mapped))
+      await writeFile(file, serializeRepositoryFile(repository))
       return { ok: true, text: `Took ${named(node)} out of ${REPOSITORY_FILE}.` }
     }
     if (!Array.isArray(paths) || !paths.length || !paths.every((p) => typeof p === 'string' && p.trim())) {
@@ -519,7 +602,7 @@ export class FolderModel {
     if (at < 0) mapped.push(entry)
     else mapped[at] = entry
     await mkdir(dirname(file), { recursive: true })
-    await writeFile(file, serializeRepositoryMapping(mapped))
+    await writeFile(file, serializeRepositoryFile(repository))
     const missing = (await Promise.all(clean.map(async (p) => (await stat(join(root, p)).then(() => true, () => false)) ? null : p))).filter((p): p is string => p !== null)
     return { ok: true, text: `${named(node)} is built in ${clean.join(', ')} (${REPOSITORY_FILE}).${missing.length ? ` Not in the repository yet: ${missing.join(', ')}; radical check warns until they are.` : ''}` }
   }
@@ -616,6 +699,7 @@ export class FolderModel {
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
+      if (name === 'get_verification' || name === 'set_verification') return await this.verification(name, input, data)
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }

@@ -5,10 +5,6 @@ label: "Inspector tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/studio/tests/inspector.test.ts) passed
-  test(apps/studio/tests/inspectorSettings.test.ts) passed
-  test(apps/e2e/tests/studio/inspector.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

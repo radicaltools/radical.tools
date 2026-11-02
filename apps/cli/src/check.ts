@@ -310,6 +310,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     repository = mapping && {
       file: relative(io.cwd, mapping.file),
       implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
+      verifies: mapping.verifies,
     }
   } catch (error) {
     io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)

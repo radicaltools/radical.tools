@@ -2,6 +2,7 @@ import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
+import { serializeTestResults } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 
 // A repository says where it builds the model's elements in its
@@ -74,4 +75,41 @@ test('the card says where an element is built, for a .radical folder opened', as
 
   await studio.node('api').dblclick()
   await expect(studio.properties.getByRole('region', { name: 'Built in' })).toHaveText(/Built in\s*services\/orders-api$/)
+})
+
+test('the card of a scenario lists its tests', async ({ page, studio }) => {
+  const scenarios: DiagramData = {
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      node('pays', 'scenario', 'Pays', { x: 40, y: 40, given: 'a cart', when: 'paying', then: 'paid' }),
+      node('quotes', 'scenario', 'Quotes', { x: 400, y: 40, given: 'a cart', when: 'quoting', then: 'quoted' }),
+    ],
+    relations: [],
+    views: [{ id: 'v-sc', name: 'Scenarios', nodeIds: ['pays', 'quotes'], positions: {} }],
+  }
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(scenarios, 'shop'))) await folder.write(`.radical/model/${path}`, content)
+  await folder.write('.radical/radical.json', JSON.stringify({ implements: [], verifies: [
+    { element: 'pays', name: 'Pays', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] },
+  ] }))
+  // The test results radical check kept beside the model: one of the two ran.
+  await folder.write('.radical/model/.state/test-results.json', serializeTestResults(
+    [{ file: 'tests/pay.test.ts', title: ['pays'], status: 'passed' }], ['reports/vitest.json'], new Date()))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await studio.designer()
+  await page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: 'Scenarios' }) }).click()
+
+  const tests = studio.properties.getByRole('region', { name: 'Tests' })
+  await studio.node('pays').dblclick()
+  await expect(tests.locator('.pp-section-title')).toHaveText('Tests · 2')
+  await expect(tests.locator('li')).toHaveText(['tests/pay.test.ts › payspassed', 'tests/pay.test.ts › declinesgone'])
+
+  await page.keyboard.press('Escape')
+  await studio.node('quotes').dblclick()
+  await expect(tests).toContainText('radical verify "Quotes" --test "<file> › <title>"')
 })

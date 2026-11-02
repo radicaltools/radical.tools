@@ -5,10 +5,6 @@ label: "Warnier tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/warnier.test.ts) passed
-  test(apps/mcp/src/folderModel.test.ts › warnier) passed
-  test(apps/e2e/tests/studio/warnier.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

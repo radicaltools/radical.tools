@@ -5,11 +5,6 @@ label: "Fitness function classification tests"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/fitnessClassification.test.ts › fitness function classification › gives a fitness function the dimensions of Building Evolutionary Architectures) passed
-  test(packages/common/tests/fitnessClassification.test.ts › fitness function classification › classifies a fitness function saved with a category, and leaves empty what the category cannot tell) passed
-  test(packages/common/tests/fitnessClassification.test.ts › fitness function classification › reports a fitness function that lacks a dimension, naming the ones it lacks) passed
-  test(packages/common/tests/fitnessClassification.test.ts › fitness function classification › reports a measure line that names no sensor) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

@@ -5,7 +5,6 @@ label: "E2E regression"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: "test(apps/e2e/tests) passed"
 scope: "holistic"
 trigger: "pull-request"
 ---

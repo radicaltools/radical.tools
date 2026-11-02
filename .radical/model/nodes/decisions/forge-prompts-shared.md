@@ -5,10 +5,6 @@ label: "Forge prompts shared"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(apps/mcp/src/forge.test.ts) passed
-  test(packages/common/tests/forgePrompts.test.ts) passed
-  test(packages/common/tests/forgeClarify.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

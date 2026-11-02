@@ -6,9 +6,7 @@ cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
 measure: "brand-mark"
-metrics: |
-  brand-mark.exit_code == 0
-  test(tools/brand.test.mjs) passed
+metrics: "brand-mark.exit_code == 0"
 scope: "atomic"
 trigger: "pull-request"
 ---

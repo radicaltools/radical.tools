@@ -5,11 +5,6 @@ label: "Forge refinement tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/forgeRefinements.test.ts) passed
-  test(packages/common/tests/forgeProposals.test.ts) passed
-  test(apps/mcp/src/forge.test.ts › asks the user before each refinement, applies what they accept, and regenerate undoes it) passed
-  test(apps/e2e/tests/studio/forge.spec.ts › Forge asks before it refines an earlier stage and applies only what the user accepts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

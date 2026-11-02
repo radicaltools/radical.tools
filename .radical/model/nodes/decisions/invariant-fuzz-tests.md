@@ -5,7 +5,6 @@ label: "Invariant fuzz tests"
 cadence: "triggered"
 characteristic: "reliability"
 invocation: "automated"
-metrics: "test(packages/ui/tests/invariants.test.ts) passed"
 scope: "atomic"
 trigger: "pull-request"
 ---

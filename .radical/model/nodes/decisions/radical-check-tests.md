@@ -5,11 +5,6 @@ label: "radical check tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/check.test.ts) passed
-  test(packages/common/tests/checkReports.test.ts) passed
-  test(packages/common/tests/checkGoals.test.ts) passed
-  test(apps/cli/src/cli.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

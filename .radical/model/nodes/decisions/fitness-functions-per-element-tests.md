@@ -5,10 +5,6 @@ label: "Fitness functions per element tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/cli/src/sense.test.ts › radical sense run › runs a sensor of radical.sensors.json once per element its decision constrains, with the context) passed
-  test(packages/common/tests/fitnessPerElement.test.ts) passed
-  test(.radical/sensors/sensors.test.mjs) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

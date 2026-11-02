@@ -5,10 +5,6 @@ label: "Setup and status tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/cli/src/setup.test.ts) passed
-  test(apps/cli/src/status.test.ts) passed
-  test(apps/cli/src/launcher.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

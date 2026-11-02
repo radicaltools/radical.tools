@@ -5,9 +5,6 @@ label: "Preset fork on edit"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/aiDocumentTools.test.ts › metamodel tools › copy a preset on the first edit, and the copy survives reloading) passed
-  test(packages/ui/tests/model.test.ts › metamodel edits on a built-in preset › work on a custom copy, so reloading keeps them) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

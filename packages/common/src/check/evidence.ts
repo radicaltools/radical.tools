@@ -11,7 +11,7 @@ import type { C4Node } from '../c4'
 import { originOf } from '../model'
 import type { CheckModel } from './rules'
 import { findTests, outcomeOf, type TestId, type TestStatus } from './reports'
-import { evaluateMetric, parseCombine, parseConditions, parseMaxAge, type Combine, type Condition, type Measurement } from './metrics'
+import { evaluateMetric, parseCombine, parseCondition, parseConditions, parseMaxAge, type Combine, type Condition, type Measurement } from './metrics'
 
 /** A test id's outcome; `not-found` when its file ran but no test has its
  *  title, `not-run` when no report has its file. */
@@ -70,7 +70,28 @@ export interface Evidence {
 export const TESTED_TYPES = ['scenario', 'fitness-fn'] as const
 
 type Props = Record<string, unknown>
-export const conditionsOf = (node: C4Node): Condition[] => parseConditions((node as unknown as Props).metrics)
+/** Where the check's copy of a node keeps the tests the repository's
+ *  .radical/radical.json binds to it (ADR Tests are bound outside the model). */
+export const BOUND_TESTS = 'boundTests'
+
+/** The nodes with the tests `verifies` binds to each, for the check: its
+ *  conditions are its Metrics and those tests. */
+export function withBoundTests<T extends C4Node>(nodes: T[], verifies: Array<{ element: string; tests: string[] }> | undefined): T[] {
+  if (!verifies?.length) return nodes
+  const bound = new Map<string, string[]>()
+  for (const v of verifies) bound.set(v.element, [...bound.get(v.element) ?? [], ...v.tests])
+  return nodes.map((n) => (bound.has(n.id) ? { ...n, [BOUND_TESTS]: bound.get(n.id) } : n))
+}
+
+/** A node's conditions: its Metrics' lines, and a `test(<id>) passed` for
+ *  each test bound to it. */
+export const conditionsOf = (node: C4Node): Condition[] => {
+  const bound = (node as unknown as Props)[BOUND_TESTS]
+  return [
+    ...parseConditions((node as unknown as Props).metrics),
+    ...(Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []),
+  ]
+}
 
 /** The tests a node's test() conditions name. */
 export const testIdsOf = (node: C4Node): TestId[] =>

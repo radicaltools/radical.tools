@@ -62,7 +62,7 @@ import {
 import { processFlow } from '@radical/common/warnier'
 import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
-import type { MappedElement } from '@radical/common/repositoryMapping'
+import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
 import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
@@ -3431,10 +3431,14 @@ interface DiagramStore {
    *  DiagramData.federation): what a milestone shows of them at its commits.
    *  Never saved. */
   federation: FederationFile | null
-  /** Where the repository builds the model's elements, from its
-   *  .radical/radical.json beside the model; null when Studio cannot read
-   *  one (no repository, or a browser folder opened without it). Never saved. */
-  repositoryMapping: MappedElement[] | null
+  /** Where the repository builds the model's elements and which of its tests
+   *  check the scenarios and fitness functions, from its .radical/radical.json
+   *  beside the model; null when Studio cannot read one (no repository, or a
+   *  browser folder opened without it). Never saved. */
+  repository: RepositoryFile | null
+  /** Each scenario's and fitness function's tests with their outcomes in the
+   *  test results Studio has (the Inspector's check); null without. */
+  testOutcomes: Record<string, Array<{ id: string; outcome: string }>> | null
   /** ID of the milestone currently loaded onto the canvas (null = live HEAD). */
   activeSnapshotId: string | null
   /** Backup of the live HEAD state, kept while a milestone is loaded. Its
@@ -4505,7 +4509,8 @@ export const useDiagramStore = create<DiagramStore>()(
       canRedo: false,
       snapshots: initSnapshots,
       federation: persisted?.federation ?? null,
-      repositoryMapping: null,
+      repository: null,
+      testOutcomes: null,
       activeSnapshotId: null,
       liveBackup: null,
       milestoneDirty: false,

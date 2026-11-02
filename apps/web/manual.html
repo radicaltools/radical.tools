@@ -906,8 +906,10 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
         </ul>
         <h3 id="cli-sense">Sensors</h3>
         <p>A fitness function often rests on more than one tool: a load test, a script, a production metric. Each scenario and fitness function says when it passes in its <strong>Metrics</strong>, one condition per line. A sensor only measures; the condition in the model holds the threshold, so a tool can be swapped without touching the model.</p>
-<pre class="code"><code>test(tests/architecture.test.ts › no cycles) passed
-workspaces.exit_code == 0
+        <p>The tests that check a scenario or fitness function are not in the model either: the repository binds them in <code>.radical/radical.json</code>, and it passes when every test bound to it passed and its Metrics hold. A moved test changes that file, not the model, and in a model shared by many repositories each binds its own. <code>radical check</code> warns about a scenario the repository must verify (an element it builds satisfies its requirement) with nothing that checks it.</p>
+<pre class="code"><code>radical verify "Pays by card" --test "tests/pay.test.ts › pays"</code></pre>
+        <p>Your agent does the same over MCP (<code>set_verification</code>) when it writes a test for a scenario, and the scenario's card in Studio lists its tests with what they did in the last run. A model from before, with <code>test(…) passed</code> lines in its Metrics, still checks: <code>radical setup</code> moves them into the file.</p>
+<pre class="code"><code>workspaces.exit_code == 0
 api.latency.p95{env=staging} &lt;= 300 ms
 api.latency.p95{env=staging} &lt;= baseline + 20%</code></pre>
         <p>A limit can also be stated against earlier measurements: <code>baseline</code> is the median of the latest seven given with <code>radical check --baseline</code> (a nightly run hands on its last seven nights), so one slow run neither fails it nor moves it. Keep an absolute limit beside it, for a slow drift the median follows.</p>

@@ -6,9 +6,7 @@ cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
 measure: "product-version"
-metrics: |
-  product-version.exit_code == 0
-  test(tools/release.test.mjs › the CLI, the MCP server, the Desktop app and the VS Code extension carry one version) passed
+metrics: "product-version.exit_code == 0"
 scope: "atomic"
 trigger: "pull-request"
 ---
