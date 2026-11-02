@@ -14,7 +14,7 @@ import type { Io } from './check'
 import { readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
-import { findModelFolder, oldLayout } from '@radical/node-files/repositoryLayout'
+import { findModelFolder, oldLayout, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 
 const exec = promisify(execFile)
 
@@ -153,6 +153,9 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
       else {
         const old = await oldLayout(top)
         if (old.length) warn(`${old.join(', ')} ${old.length === 1 ? 'is' : 'are'} where Radical kept its files before .radical/: radical setup moves ${old.length === 1 ? 'it' : 'them'} into .radical/`)
+        // Where the repository builds the model's elements, for its sensors.
+        const mapping = await readRepositoryMapping(folder).catch((error: Error) => { fail(`its repository's mapping does not read: ${error.message}`); return undefined })
+        if (mapping) ok(`${shown(mapping.file, place)} maps ${mapping.implements.length} element${mapping.implements.length === 1 ? '' : 's'} to the repository's code`)
         const hooksDir = resolve(folder, await git(folder, 'rev-parse', '--git-path', 'hooks'))
         const fromTop = relative(top, folder).replace(/\\/g, '/')
         if (await hooksSaveBase(hooksDir, fromTop)) ok('the git hooks save its base for Studio\'s Changes on branch')

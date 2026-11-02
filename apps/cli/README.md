@@ -203,6 +203,25 @@ Exit status: 0 exported/published, 2 could not export/publish. Credentials
 are not accepted as command-line arguments or included in error output.
 The transport follows Atlassian's [Cloud page API](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/).
 
+## radical implement
+
+Says where the repository builds an element of the model, in
+`.radical/radical.json`, which the repository's sensors (`element.paths` in
+their `--context`), `radical check` and Studio's element card read.
+
+```sh
+radical implement "Orders API" --path services/orders-api
+radical implement 8c66e024-… --path apps/cli --path apps/cli-shared
+radical implement "Orders API"            # where it is built
+radical implement "Orders API" --remove
+```
+
+The element is its id or its name (an element of another model of the
+federation, as fetched, too); a name two elements share needs the id. Paths
+are from the working directory and kept from the repository's root; they
+replace the element's paths. An element without an entry is built where its
+nearest parent with one is.
+
 ## radical diff
 
 ```sh

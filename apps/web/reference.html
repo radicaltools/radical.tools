@@ -325,6 +325,7 @@
               <tr><td><strong>Concerns</strong></td><td><code>concern-unaddressed</code>: a concern a pack finds in the model that no accepted ADR marked with it covers. <code>concern-unbound</code>: an accepted ADR marked with a concern that constrains no element.</td></tr>
               <tr><td><strong>Decisions</strong></td><td>An accepted ADR no fitness function implements; one without date, context, decision or consequences; a superseded status and Supersedes links that disagree; a fitness function that implements no ADR and constrains nothing; one without its characteristic, scope, cadence (with its event or time) or invocation (<code>fitness-fn-unclassified</code>).</td></tr>
               <tr><td><strong>Checks</strong></td><td>A scenario or fitness function whose metrics name no check; a metrics line that is no condition, a unit that does not convert, a combine or max age that does not read (<code>metric-invalid</code>, an error); a measure line that names no sensor, neither an adapter nor one of the repository's <code>.radical/sensors/sensors.json</code> (<code>fitness-fn-measure-invalid</code>, an error, in the CLI only). With measurements: a condition that does not hold (<code>metric-failed</code>, an error), one whose latest measurement is older than its max age (<code>metric-stale</code>), one nothing measured (<code>metric-not-measured</code>). With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
+              <tr><td><strong>The repository</strong></td><td><code>repository-mapping</code> (a warning, the CLI only): an entry of <code>.radical/radical.json</code> whose element no model of the federation has, whose name is not the element's, or whose path the repository does not have.</td></tr>
               <tr><td><strong>The folder</strong></td><td>A missing <code>radical.md</code>, a JSON file that does not parse, git conflict markers, a node file without id or type, two files with one id (errors); views, sequences or slides that point at something gone.</td></tr>
               <tr><td><strong>Goals</strong></td><td><code>goal-unmet</code>: a metric below the share <code>check.json</code> asks for (requirements with a scenario, accepted ADRs with a fitness function, requirements verified, scenarios passing, …).</td></tr>
             </tbody>
@@ -447,7 +448,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
 { "fitnessFunction": { "id": "…", "label": "APIs described in OpenAPI", "model": "standards", "properties": { "measure": "openapi", … } },
   "adr": { "id": "…", "label": "APIs are described in OpenAPI", "model": "standards" },
   "element": { "id": "…", "label": "Payments API", "type": "container", "technology": "Node",
-               "parent": { "id": "…", "label": "Payments", "type": "system" }, "properties": { … } },
+               "parent": { "id": "…", "label": "Payments", "type": "system" }, "paths": ["services/payments-api"], "properties": { … } },
   "metricsOut": "reports/metrics/apis-described-in-openapi-payments-api.sensor.json" }</code></pre>
         <p>Measured for each element, a fitness function is judged for each element apart (its metric conditions on the measurements labelled with the element) and passes when it passes for all; its findings name the element, and another model's fitness function is this model's evidence only where it was measured here, its findings on the element.</p>
         <p>An adapter for another tool is one module in <code>apps/cli/src/sensors/</code> of the radicaltools repository, listed in its registry with a fixture of the tool's real output; the contract test runs every adapter on its fixture. Models from before Metrics are read with each test in a <code>test(…) passed</code> line and a threshold at the end of the description.</p>
@@ -603,6 +604,7 @@ radical-mcp --version</code></pre>
 ├─ .mcp.json                  <span class="cm"># the agents' MCP servers (Claude Code reads it here)</span>
 └─ .radical/
    ├─ model/                  <span class="cm"># the model folder (below)</span>
+   ├─ radical.json            <span class="cm"># the elements this repository builds, and the folders that build them</span>
    ├─ sensors/
    │  ├─ sensors.json         <span class="cm"># the repository's own sensors, for radical sense run</span>
    │  └─ *.mjs                <span class="cm"># the scripts only they run; commands run from the repository's root</span>
@@ -611,6 +613,11 @@ radical-mcp --version</code></pre>
    │  ├─ findings/            <span class="cm"># Crucible's findings, in git</span>
    │  └─ rounds/              <span class="cm"># exploratory rounds, out of git</span>
    └─ .gitignore</code></pre>
+        <p><code>.radical/radical.json</code> says which elements of the model the repository builds, and where: each entry an element's id (its own model's, or another's of the federation), its name for people, and its paths from the repository's root. An element without an entry is built where its nearest parent with one is. A repository's sensor gets them in <code>--context</code> as <code>element.paths</code>; <code>radical check</code> warns about an entry that drifted from the model or the repository (<code>repository-mapping</code>), and <code>radical setup --status</code> says how many elements it maps.</p>
+<pre class="code"><code>{ "implements": [
+    { "element": "8c66e024-…", "name": "CLI", "paths": ["apps/cli"] },
+    { "element": "60fb9531-…", "name": "Desktop app", "paths": ["apps/studio/src/main", "apps/studio/build"] } ] }</code></pre>
+        <p><code>radical implement &lt;element&gt; --path &lt;folder&gt;</code> writes an entry: the element by its id or its name (a name two elements share needs the id), the folders from the working directory, kept from the repository's root; more <code>--path</code> for more, and they replace the element's paths. <code>--remove</code> takes it out; with neither, it says where the element is built. On an element's card Studio shows the same, its paths or its nearest parent's, and for one the file maps nowhere the command to copy. Studio reads the file when it opened the model by its repository (or on the desktop); opened on the model folder alone, a browser cannot reach it.</p>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/
 ├─ radical.md                 <span class="cm"># manifest</span>

@@ -61,6 +61,9 @@ export interface CheckModel {
    *  their names), null when it has none; not given, a measure line may
    *  name any sensor besides the built-in ones. */
   sensors?: { file: string; names: string[] } | null
+  /** The repository's .radical/radical.json (its path and entries, each with
+   *  the paths the repository lacks); not given, nothing checks it. */
+  repository?: RepositoryMapping | null
   /** Earlier measurements a condition against a baseline compares with
    *  (the median of the latest seven of its metric). */
   baseline?: Measurement[]
@@ -76,6 +79,13 @@ export interface CheckModel {
    *  condition of a fitness function that runs on another one, or
    *  continually, is not reported when nothing measured it. */
   trigger?: string
+}
+
+/** What a repository's .radical/radical.json maps, as radical check reads it:
+ *  each element with its paths and those of them the repository lacks. */
+export interface RepositoryMapping {
+  file: string
+  implements: Array<{ element: string; name?: string; paths: string[]; missing: string[] }>
 }
 
 export interface CheckRule {
@@ -206,6 +216,23 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
           })
       })
   }
+}
+
+/** Where .radical/radical.json and the model or the repository part: an
+ *  element the model lacks, another name, a path that is not there. */
+function repositoryMapping(model: CheckModel): RuleFinding[] {
+  const mapping = model.repository
+  if (!mapping) return []
+  return mapping.implements.flatMap((entry) => {
+    const node = model.nodes[entry.element]
+    if (!node) return [{ message: `${mapping.file}: ${entry.name ? `"${entry.name}" (${entry.element})` : entry.element} is no element of the model.` }]
+    // On the element, unless it is another model's: that model cannot fix it.
+    const on = originOf(node) ? {} : { nodeId: node.id }
+    const found: RuleFinding[] = []
+    if (entry.name !== undefined && entry.name !== node.label) found.push({ ...on, message: `${mapping.file}: ${entry.element} is named "${entry.name}"; the model calls it ${quote(node)}.` })
+    for (const path of entry.missing) found.push({ ...on, message: `${mapping.file}: ${quote(node)} is built in ${path}, which the repository does not have.` })
+    return found
+  })
 }
 
 /** What in a node's checks cannot be read: lines that are no condition,
@@ -418,6 +445,13 @@ export const CHECK_RULES: CheckRule[] = [
           ? `${model.sensors.file} ${model.sensors.names.length ? model.sensors.names.join(', ') : 'none'}`
           : 'and the repository has no .radical/sensors/sensors.json'}.`,
       }))),
+  },
+  {
+    id: 'repository-mapping',
+    description: 'With the repository\'s .radical/radical.json (the CLI): each entry names an element of the model, its own or another model\'s of the federation, under the element\'s name, with paths the repository has.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: repositoryMapping,
   },
   {
     id: 'metric-invalid',

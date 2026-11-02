@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { findModelFolder, findRepositoryFile, oldLayout, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
+import { elementPaths, findModelFolder, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
@@ -49,5 +49,25 @@ describe('repository layout', () => {
     // Without a model anywhere, none.
     const empty = await repository(['src/'])
     expect(await findModelFolder(join(empty, 'src'))).toBeNull()
+  })
+})
+
+describe('repository mapping', () => {
+  it('gives an element its own paths, else its nearest mapped ancestor\'s', async () => {
+    const root = await repository(['.radical/model/radical.md', 'apps/api/', 'src/'])
+    await writeFile(join(root, '.radical/radical.json'), JSON.stringify({ implements: [
+      { element: 'shop', name: 'Shop', paths: ['.'] },
+      { element: 'api', name: 'Orders API', paths: ['apps/api'] },
+    ] }))
+    const mapping = (await readRepositoryMapping(join(root, 'src')))!
+    expect(mapping.file).toBe(join(root, '.radical/radical.json'))
+    expect(mapping.root).toBe(root)
+    const parent: Record<string, string> = { api: 'shop', checkout: 'api', web: 'shop' }
+    const paths = (id: string) => elementPaths(mapping.implements, id, (at) => parent[at])
+    expect([paths('api'), paths('checkout'), paths('web'), paths('elsewhere')]).toEqual([['apps/api'], ['apps/api'], ['.'], []])
+    // None in a repository without one; one that does not read is named.
+    expect(await readRepositoryMapping(await repository(['src/']))).toBeNull()
+    await writeFile(join(root, '.radical/radical.json'), '{ "implements": [{ "paths": [] }] }')
+    await expect(readRepositoryMapping(root)).rejects.toThrow('implements[0] needs "element" (an id) and "paths" (a list of folders)')
   })
 })

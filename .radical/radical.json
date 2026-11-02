@@ -1,0 +1,19 @@
+{
+  "implements": [
+    { "element": "974cc763-a121-4f53-a92d-18a64562a0c9", "name": "radical.tools", "paths": ["."] },
+    { "element": "8c66e024-79f9-42d0-86cd-843cefd2a7ef", "name": "CLI", "paths": ["apps/cli"] },
+    { "element": "c681fcc0-29ea-49b4-827a-2b2db809a513", "name": "MCP server", "paths": ["apps/mcp"] },
+    { "element": "7ab5d665-387a-42c1-9aa6-55815b1f55f7", "name": "Studio", "paths": ["apps/studio/src/renderer"] },
+    { "element": "60fb9531-8072-4f6d-804d-4a00a373a6ba", "name": "Desktop app", "paths": ["apps/studio/src/main", "apps/studio/src/preload", "apps/studio/build"] },
+    { "element": "9617df9e-ab47-46c4-920c-4347b186eb0d", "name": "VS Code extension", "paths": ["apps/vscode"] },
+    { "element": "49fa95f2-b9ea-4884-9372-581264580278", "name": "Website and manual", "paths": ["apps/web"] },
+    { "element": "7a893e48-dc84-4f06-a189-e507c7427e3a", "name": "Architecture Hub", "paths": ["apps/hub"] },
+    { "element": "ff9c535a-4924-4b30-b055-0a329c542dea", "name": "@radical/common", "paths": ["packages/common"] },
+    { "element": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a", "name": "@radical/node-files", "paths": ["packages/node-files"] },
+    { "element": "3ee58343-871e-42c0-a3f8-f290ad4619b4", "name": "@radical/ui", "paths": ["packages/ui"] },
+    { "element": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa", "name": "@radical/layout", "paths": ["packages/layout"] },
+    { "element": "cdefa455-5e6f-4395-8261-f61398610d02", "name": "@radical/crucible", "paths": ["packages/crucible"] },
+    { "element": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed", "name": "@radical/host-bridge", "paths": ["packages/host-bridge"] },
+    { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] }
+  ]
+}

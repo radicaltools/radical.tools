@@ -200,6 +200,22 @@ describe('radical sense run', () => {
     expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, '.radical', 'sensors', 'sensors.json')}.`)
   })
 
+  it('gives a repository\'s sensor the element\'s paths from .radical/radical.json', async () => {
+    const script = `const fs = require('fs'); const c = JSON.parse(process.argv[process.argv.indexOf('--context') + 1]);
+      fs.writeFileSync('paths-' + c.element.id + '.json', JSON.stringify(c.element.paths))`
+    const cwd = await repository({ openapi: { command: [process.execPath, '-e', script, '--'] } })
+    // The system is built from the root, the Payments API in apps/api; the
+    // Refunds API has no entry, so it is built where its system is.
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ implements: [
+      { element: 'pay', name: 'Payments', paths: ['.'] },
+      { element: 'pay-api', name: 'Payments API', paths: ['apps/api'] },
+    ] }))
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(JSON.parse(await readFile(join(cwd, 'paths-pay-api.json'), 'utf8'))).toEqual(['apps/api'])
+    expect(JSON.parse(await readFile(join(cwd, 'paths-refund-api.json'), 'utf8'))).toEqual(['.'])
+  })
+
   it('runs a repository\'s sensor from the repository\'s root, its file in .radical/sensors/', async () => {
     // A script beside sensors.json, named from the root, that says where it ran.
     const cwd = await repository({ openapi: { command: 'node .radical/sensors/where.mjs' } })

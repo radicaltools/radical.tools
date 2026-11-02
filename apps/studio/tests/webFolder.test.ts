@@ -140,6 +140,17 @@ describe('webFolder read/write', () => {
 })
 
 describe('a repository laid out with .radical/', () => {
+  it('reads the repository\'s mapping through the repository picked', async () => {
+    const repo = new FakeDir('shop')
+    const radical = await repo.getDirectoryHandle('.radical', { create: true }) as FakeDir
+    const model = await radical.getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    radical.children.set('radical.json', new FakeFile('{ "implements": [] }'))
+    expect((await readCheckFilesFromHandle(model, repo)).repository).toBe('{ "implements": [] }')
+    // Opened on the model folder alone, the browser cannot reach it.
+    expect((await readCheckFilesFromHandle(model)).repository).toBeNull()
+  })
+
   it('opens the model of a repository picked, and reads state the old .radical/ still has', async () => {
     const repo = new FakeDir('shop')
     const model = await (await repo.getDirectoryHandle('.radical', { create: true })).getDirectoryHandle('model', { create: true }) as FakeDir
@@ -168,7 +179,7 @@ describe('the files beside the model, for the Inspector', () => {
     root.children.set('check.json', new FakeFile('{}'))
     root.children.set('reviews.json', new FakeFile(REVIEWS))
     const files = await readCheckFilesFromHandle(root)
-    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS })
+    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS, repository: null })
     expect(inspectorMeasurements(files.measurements ?? '', files.reviews ?? '')).toEqual([
       { metric: 'review', value: 1, labels: { name: 'threat-model' }, source: 'review', at: '2026-10-30T10:00:00.000Z', context: { by: 'ana' } },
     ])

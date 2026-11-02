@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PRODUCT_PACKAGES, productVersions } from '../../tools/release.mjs'
-import { fail, measuredElement, sensorContext } from './elements.mjs'
+import { fail, measuredElement, sensorContext, workspacesOf } from './context.mjs'
 
 const element = measuredElement(sensorContext())
 const versions = productVersions()
@@ -15,7 +15,8 @@ const counts = new Map()
 for (const v of Object.values(versions)) counts.set(v, (counts.get(v) ?? 0) + 1)
 const [product] = [...counts].sort((a, b) => b[1] - a[1])[0]
 
-const dirs = element.workspaces === '*' ? PRODUCT_PACKAGES : element.workspaces
+const workspaces = workspacesOf(element)
+const dirs = workspaces === '*' ? PRODUCT_PACKAGES : workspaces
 const problems = dirs.flatMap((dir) => {
   if (PRODUCT_PACKAGES.includes(dir)) return versions[dir] === product ? [] : [`${dir}/package.json carries ${versions[dir]}, the other released packages ${product}`]
   const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '../..', dir, 'package.json'), 'utf8'))
