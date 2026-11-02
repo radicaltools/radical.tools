@@ -324,7 +324,7 @@
               <tr><td><strong>Requirements</strong></td><td>A requirement without the clauses its EARS type needs; one no scenario verifies; one nothing satisfies; one that derives from nothing; a need no requirement derives from; a scenario that verifies nothing.</td></tr>
               <tr><td><strong>Concerns</strong></td><td><code>concern-unaddressed</code>: a concern a pack finds in the model that no accepted ADR marked with it covers. <code>concern-unbound</code>: an accepted ADR marked with a concern that constrains no element.</td></tr>
               <tr><td><strong>Decisions</strong></td><td>An accepted ADR no fitness function implements; one without date, context, decision or consequences; a superseded status and Supersedes links that disagree; a fitness function that implements no ADR and constrains nothing; one without its characteristic, scope, cadence (with its event or time) or invocation (<code>fitness-fn-unclassified</code>).</td></tr>
-              <tr><td><strong>Checks</strong></td><td>A scenario or fitness function whose metrics name no check; a metrics line that is no condition, a unit that does not convert, a combine or max age that does not read (<code>metric-invalid</code>, an error); a measure line that names no sensor, neither an adapter nor one of the repository's <code>radical.sensors.json</code> (<code>fitness-fn-measure-invalid</code>, an error, in the CLI only). With measurements: a condition that does not hold (<code>metric-failed</code>, an error), one whose latest measurement is older than its max age (<code>metric-stale</code>), one nothing measured (<code>metric-not-measured</code>). With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
+              <tr><td><strong>Checks</strong></td><td>A scenario or fitness function whose metrics name no check; a metrics line that is no condition, a unit that does not convert, a combine or max age that does not read (<code>metric-invalid</code>, an error); a measure line that names no sensor, neither an adapter nor one of the repository's <code>.radical/sensors.json</code> (<code>fitness-fn-measure-invalid</code>, an error, in the CLI only). With measurements: a condition that does not hold (<code>metric-failed</code>, an error), one whose latest measurement is older than its max age (<code>metric-stale</code>), one nothing measured (<code>metric-not-measured</code>). With reports: a named test that failed or is missing (errors), was skipped, or whose file did not run; with an include, tests the model does not name (<code>test-unbound</code>).</td></tr>
               <tr><td><strong>The folder</strong></td><td>A missing <code>radical.md</code>, a JSON file that does not parse, git conflict markers, a node file without id or type, two files with one id (errors); views, sequences or slides that point at something gone.</td></tr>
               <tr><td><strong>Goals</strong></td><td><code>goal-unmet</code>: a metric below the share <code>check.json</code> asks for (requirements with a scenario, accepted ADRs with a fitness function, requirements verified, scenarios passing, …).</td></tr>
             </tbody>
@@ -345,11 +345,11 @@
               <tr><td><code>[folder]</code></td><td>The model folder. Default: the working directory.</td></tr>
               <tr><td><code>--config &lt;file&gt;</code></td><td>Rule settings. Default: <code>check.json</code> in the model folder.</td></tr>
               <tr><td><code>--format text|json|github</code></td><td>Plain text (default), JSON, or GitHub Actions annotations.</td></tr>
-              <tr><td><code>--report &lt;path&gt;</code></td><td>A test report (Vitest or Jest JSON, Playwright JSON, JUnit XML) or a directory of them; repeat for more. The test cases read are kept in <code>.radical/test-results.json</code> for the Inspector. A report with no test case stops the check with status 2.</td></tr>
-              <tr><td><code>--from-ci</code></td><td>Reads the test reports of CI instead of <code>--report</code>: those of the latest completed GitHub Actions runs of the nearest commit in HEAD's history that CI tested (a commit merged from a pull request stands for the pull request's head), downloaded with the GitHub CLI (<code>gh</code>, signed in). The artifacts read are <code>check.json</code>'s <code>"ci": { "artifacts": [&hellip;] }</code>, or every artifact of the run. They are kept in <code>.radical/test-results.json</code> with the commit and runs they come from, unless the results there were read with <code>--report</code> at that commit or a later one.</td></tr>
+              <tr><td><code>--report &lt;path&gt;</code></td><td>A test report (Vitest or Jest JSON, Playwright JSON, JUnit XML) or a directory of them; repeat for more. The test cases read are kept in <code>.state/test-results.json</code> for the Inspector. A report with no test case stops the check with status 2.</td></tr>
+              <tr><td><code>--from-ci</code></td><td>Reads the test reports of CI instead of <code>--report</code>: those of the latest completed GitHub Actions runs of the nearest commit in HEAD's history that CI tested (a commit merged from a pull request stands for the pull request's head), downloaded with the GitHub CLI (<code>gh</code>, signed in). The artifacts read are <code>check.json</code>'s <code>"ci": { "artifacts": [&hellip;] }</code>, or every artifact of the run. They are kept in <code>.state/test-results.json</code> with the commit and runs they come from, unless the results there were read with <code>--report</code> at that commit or a later one.</td></tr>
               <tr><td><code>--quiet</code></td><td>Prints nothing.</td></tr>
               <tr><td><code>--detach</code></td><td>Starts the same check in the background and returns at once; the git hooks run <code>--from-ci --quiet --detach</code>.</td></tr>
-              <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.radical/measurements.json</code>, which the check reads without the option too. The reviews in the model folder's <code>reviews.json</code> are read as measurements as well.</td></tr>
+              <tr><td><code>--metrics &lt;path&gt;</code></td><td>A <code>radical-metrics/1</code> file (<code>radical sense --out</code>) or a directory of them; repeat for more. Added to <code>.state/measurements.json</code>, which the check reads without the option too. The reviews in the model folder's <code>reviews.json</code> are read as measurements as well.</td></tr>
               <tr><td><code>--baseline &lt;path&gt;</code></td><td>Earlier <code>radical-metrics/1</code> files, or a directory of them, that a condition against a baseline compares with (the median of the latest seven of its metric). Read only; never kept beside the model.</td></tr>
               <tr><td><code>--trigger &lt;event&gt;</code></td><td>The event the check runs on (<code>pull-request</code> in the gate): a metric condition of a fitness function that runs on another event, or continually, is not reported when nothing measured it.</td></tr>
               <tr><td><code>--alone</code></td><td>With a <code>deps.json</code>: checks the folder without the models it names. Without it, the model is checked with them, fetched at their pinned refs (see <a href="manual.html#federation">Federation</a>).</td></tr>
@@ -392,7 +392,7 @@
         </div>
         <p>Units of one kind convert: <code>ns us ms s min h d</code>, and <code>B KB MB GB TB KiB MiB GiB TiB</code>; other units must match. A condition or a measurement without a unit compares the numbers as they are.</p>
         <h3>radical federation</h3>
-        <p>Fetches the models a model folder's <code>deps.json</code> names, and theirs, into <code>.radical/federation.json</code> (see <a href="manual.html#federation">Federation</a>). Repositories are cached in <code>$RADICAL_CACHE</code>, else the user's cache directory.</p>
+        <p>Fetches the models a model folder's <code>deps.json</code> names, and theirs, into <code>.state/federation.json</code> (see <a href="manual.html#federation">Federation</a>). Repositories are cached in <code>$RADICAL_CACHE</code>, else the user's cache directory.</p>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Option</th><th>What it does</th></tr></thead>
@@ -428,9 +428,9 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
               <tr><td><code>command [--name m] -- &lt;cmd&gt;</code></td><td>Runs the command; measures <code>m.exit_code</code> and <code>m.duration</code> (s). Its output goes to stderr.</td></tr>
               <tr><td><code>json &lt;file&gt; --metric m=&lt;path&gt;[@unit]</code></td><td>Reads a number from a JSON file by dotted keys with <code>[index]</code>, or a JSON pointer starting with <code>/</code>; repeat for more.</td></tr>
               <tr><td><code>playwright &lt;spec&gt; [--cwd d] [--project p] [--env K=V] [--runner cmd]</code></td><td>Runs Playwright on the spec (default runner <code>npx playwright test</code>) with <code>RADICAL_METRICS_DIR</code> set, and measures what the <code>radical-metrics/1</code> files the spec writes there hold.</td></tr>
-              <tr><td><code>run --trigger &lt;event&gt; --out &lt;dir&gt;</code></td><td>Runs every line of the measure of each automated fitness function triggered on the event, each with its adapter, into one file a line in the directory. Names each line it could not measure, and exits 2 then. A line that names a sensor of the repository's <code>radical.sensors.json</code> runs its command once for each of the model's elements the fitness function's ADR constrains (also an ADR of a model in <code>deps.json</code>), with <code>--context &lt;json&gt;</code>; it measures <code>&lt;sensor&gt;.exit_code</code> and <code>&lt;sensor&gt;.duration</code> labelled <code>element=&lt;id&gt;</code>, and what the command writes to <code>metricsOut</code>.</td></tr>
+              <tr><td><code>run --trigger &lt;event&gt; --out &lt;dir&gt;</code></td><td>Runs every line of the measure of each automated fitness function triggered on the event, each with its adapter, into one file a line in the directory. Names each line it could not measure, and exits 2 then. A line that names a sensor of the repository's <code>.radical/sensors.json</code> runs its command once for each of the model's elements the fitness function's ADR constrains (also an ADR of a model in <code>deps.json</code>), with <code>--context &lt;json&gt;</code>; it measures <code>&lt;sensor&gt;.exit_code</code> and <code>&lt;sensor&gt;.duration</code> labelled <code>element=&lt;id&gt;</code>, and what the command writes to <code>metricsOut</code>.</td></tr>
               <tr><td><code>review &lt;name&gt; --passed|--failed --by &lt;who&gt;</code></td><td>Adds a person's review, with <code>--note</code>, to the model folder's <code>reviews.json</code>, kept in git; <code>review(&lt;name&gt;) passed</code> reads the latest.</td></tr>
-              <tr><td><code>--folder &lt;dir&gt;</code></td><td>The model folder. Default: the working directory. What is measured goes into its <code>.radical/measurements.json</code>, the latest of each metric and labels.</td></tr>
+              <tr><td><code>--folder &lt;dir&gt;</code></td><td>The model folder. Default: the working directory. What is measured goes into its <code>.state/measurements.json</code>, the latest of each metric and labels.</td></tr>
               <tr><td><code>--out &lt;file&gt;</code></td><td>Writes a <code>radical-metrics/1</code> file instead, for <code>radical check --metrics</code> in another job.</td></tr>
               <tr><td><code>--label k=v</code> · <code>--context k=v</code></td><td>A label conditions match (<code>env=staging</code>), or where it was measured (a commit), shown only. Repeat for more.</td></tr>
               <tr><td><code>--list</code></td><td>Lists the adapters.</td></tr>
@@ -441,7 +441,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
 <pre class="code"><code>{ "format": "radical-metrics", "version": 1, "source": "json", "at": "2026-10-29T10:00:00Z",
   "context": { "commit": "a370b95" },
   "measurements": [{ "metric": "api.latency.p95", "value": 287, "unit": "ms", "labels": { "env": "staging" } }] }</code></pre>
-        <p>A repository's own sensors, in <code>radical.sensors.json</code> at its root (or nearer the model folder): a name and its command, a string or a list of words. The command's <code>--context</code>:</p>
+        <p>A repository's own sensors, in <code>.radical/sensors.json</code> at its root (or nearer the model folder): a name and its command, a string or a list of words. The command's <code>--context</code>:</p>
 <pre class="code"><code>{ "sensors": { "openapi": { "command": "node tools/check-openapi.mjs" } } }
 
 { "fitnessFunction": { "id": "…", "label": "APIs described in OpenAPI", "model": "standards", "properties": { "measure": "openapi", … } },
@@ -456,7 +456,7 @@ radical sense review &lt;name&gt; --passed|--failed --by &lt;who&gt; [--note &lt
       <section class="doc-section" id="base">
         <h2>Changes on branch</h2>
         <p><code>radical diff &lt;folder&gt;</code> prints the elements and relations added, removed and changed since the branch left <code>main</code>, with old and new values. Views and layout are left out. <code>--since &lt;ref&gt;</code> compares with another commit, tag or branch.</p>
-        <p>The <strong>base</strong> is the model at <code>git merge-base HEAD origin/main</code>, saved to <code>.radical/base.json</code>. Studio reads the file every few seconds and compares the model with it as you edit. Only the command line and the MCP server save it:</p>
+        <p>The <strong>base</strong> is the model at <code>git merge-base HEAD origin/main</code>, saved to <code>.state/base.json</code>. Studio reads the file every few seconds and compares the model with it as you edit. Only the command line and the MCP server save it:</p>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Saves the base</th><th>Through</th></tr></thead>
@@ -504,14 +504,14 @@ npx @radicaltools/cli setup architecture --client claude-code --client codex --y
           <table class="doc-table">
             <thead><tr><th>Option</th><th>What it does</th></tr></thead>
             <tbody>
-              <tr><td><code>[folder]</code></td><td>The model folder. Default: <code>architecture</code>.</td></tr>
+              <tr><td><code>[folder]</code></td><td>The model folder. Default: the repository's <code>.radical/model</code> (or the model it finds there or in <code>architecture</code> of the old layout).</td></tr>
               <tr><td><code>--client &lt;id&gt;</code></td><td>An agent to connect: <code>claude-code</code>, <code>claude-desktop</code>, <code>codex</code>, <code>cursor</code>, <code>vscode</code>; repeat for more. Default: the ones found installed.</td></tr>
               <tr><td><code>--metamodel radical|c4</code></td><td>The metamodel of a new model. Default: <code>radical</code>.</td></tr>
               <tr><td><code>--name &lt;name&gt;</code></td><td>The server's name in the configurations. Default: <code>radical</code>. A name per folder connects several models to one agent: <code>radical setup payments/architecture --name radical-payments</code>; the agent sees each server's tools under its name.</td></tr>
-              <tr><td><code>--depends-on &lt;name&gt;=&lt;repository&gt;[#&lt;version&gt;[:&lt;model folder&gt;]]</code></td><td>A model this one depends on, added to <code>deps.json</code> and fetched; repeat for more. The repository is a git address or a path relative to the model folder; the version defaults to its newest version tag (<code>v1.10.0</code> after <code>v1.2.0</code>), else its default branch; the model folder to <code>architecture</code>. In a terminal setup asks for them instead. Those <code>deps.json</code> names already stay.</td></tr>
+              <tr><td><code>--depends-on &lt;name&gt;=&lt;repository&gt;[#&lt;version&gt;[:&lt;model folder&gt;]]</code></td><td>A model this one depends on, added to <code>deps.json</code> and fetched; repeat for more. The repository is a git address or a path relative to the model folder; the version defaults to its newest version tag (<code>v1.10.0</code> after <code>v1.2.0</code>), else its default branch; the model folder to <code>.radical/model</code> (<code>architecture</code> in a repository laid out the old way). In a terminal setup asks for them instead. Those <code>deps.json</code> names already stay.</td></tr>
               <tr><td><code>--no-hooks</code></td><td>Leaves the git hooks alone.</td></tr>
               <tr><td><code>--no-check</code></td><td>Ends without the checks.</td></tr>
-              <tr><td><code>--status</code></td><td>Changes nothing: only the checks, for the folder named, else the working directory or <code>architecture</code> in it when it holds a model, else every server configured.</td></tr>
+              <tr><td><code>--status</code></td><td>Changes nothing: only the checks, for the folder named, else the working directory when it is a model, else the repository's <code>.radical/model</code> (or <code>architecture</code> of the old layout), else every server configured.</td></tr>
               <tr><td><code>--no-start</code></td><td>Checks the configurations without starting a server.</td></tr>
               <tr><td><code>--timeout &lt;s&gt;</code></td><td>Seconds a server has to answer. Default: 120, as npx may download the package first.</td></tr>
               <tr><td><code>--dry-run</code></td><td>Prints every change and writes nothing.</td></tr>
@@ -575,7 +575,7 @@ radical-mcp --version</code></pre>
           <li>Writes go through the same schemas and metamodel rules as Studio. An invalid parent, type or pair is refused with a message; warnings come back with the result. A tool reports success only after the files are written.</li>
           <li>A reference such as a transition's event takes an element's id, or a <code>tempId</code> from the same session.</li>
           <li>Changing a built-in metamodel saves a <em>-custom</em> copy and re-announces the tools with the new types.</li>
-          <li>The server keeps a Forge run in <code>.radical/forge-run.json</code>, and refuses direct writes to earlier stages while a proposal waits. In Claude Code, <code>/mcp__radical-folder__forge</code> starts a run.</li>
+          <li>The server keeps a Forge run in <code>.state/forge-run.json</code>, and refuses direct writes to earlier stages while a proposal waits. In Claude Code, <code>/mcp__radical-folder__forge</code> starts a run.</li>
         </ul>
       </section>
 
@@ -583,8 +583,8 @@ radical-mcp --version</code></pre>
         <h2>Editing beside an agent</h2>
         <p>Studio and an agent can work on one folder at the same time; neither overwrites the other.</p>
         <ul>
-          <li><strong>Turns.</strong> After each write the server marks the folder as being written (<code>.radical/agent-activity.json</code>) for 15 seconds. Studio holds its saves meanwhile, keeps your edits on top of the agent's, and saves them when the agent pauses. A reload keeps them in the browser until the folder has them.</li>
-          <li><strong>Merges.</strong> Changes are merged element by element and field by field. Where both sides changed one value, what is in the folder is kept and a notice names it. What one side deleted stays deleted, with what the other side built on it, and the notice names that too. Two agents on one folder take turns through <code>.radical/write.lock</code>.</li>
+          <li><strong>Turns.</strong> After each write the server marks the folder as being written (<code>.state/agent-activity.json</code>) for 15 seconds. Studio holds its saves meanwhile, keeps your edits on top of the agent's, and saves them when the agent pauses. A reload keeps them in the browser until the folder has them.</li>
+          <li><strong>Merges.</strong> Changes are merged element by element and field by field. Where both sides changed one value, what is in the folder is kept and a notice names it. What one side deleted stays deleted, with what the other side built on it, and the notice names that too. Two agents on one folder take turns through <code>.state/write.lock</code>.</li>
           <li><strong>What stays.</strong> An agent's change leaves your view, selection, camera and milestone as they were. While you drag, the change waits for the drop; while a presentation plays, until it stops.</li>
           <li><strong>Undo.</strong> Your Undo and Redo take back your own steps only. Where a step meets a value or an element the agent changed since, the agent's version stays and a notice names it.</li>
           <li><strong>Files.</strong> A file that does not read as a model (conflict markers, a trailing comma) is never merged over: Studio says which file and saves nothing until it reads again.</li>
@@ -597,6 +597,18 @@ radical-mcp --version</code></pre>
         <h2>File formats</h2>
         <h3>.radical (JSON)</h3>
         <p>One file: <code>nodes</code>, <code>relations</code>, <code>sequences</code>, <code>views</code> (positions, camera and layout constraints per view), <code>defaultEdgeStyle</code>, <code>snapshots</code> (milestones), <code>presentations</code>, the <code>metamodel</code> and Hub template records. Older <code>.c4.json</code> files open unchanged.</p>
+        <h3>In a repository</h3>
+        <p>Everything Radical keeps in a repository is in <code>.radical/</code> at its root. The CLI, the MCP server and Crucible find it from any folder of the repository, so they need no folder named. A repository laid out before it (a model in <code>architecture/</code>, <code>radical.sensors.json</code> and <code>crucible.json</code> at the root) is still read; <code>radical setup</code> offers to move it with <code>git mv</code>, and <code>radical setup --status</code> warns about it.</p>
+<pre class="code"><code>repository/
+├─ .mcp.json                  <span class="cm"># the agents' MCP servers (Claude Code reads it here)</span>
+└─ .radical/
+   ├─ model/                  <span class="cm"># the model folder (below)</span>
+   ├─ sensors.json            <span class="cm"># the repository's own sensors, for radical sense run</span>
+   ├─ crucible/
+   │  ├─ crucible.json        <span class="cm"># Radical Crucible's plan; its paths are from the repository's root</span>
+   │  ├─ findings/            <span class="cm"># Crucible's findings, in git</span>
+   │  └─ rounds/              <span class="cm"># exploratory rounds, out of git</span>
+   └─ .gitignore</code></pre>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/
 ├─ radical.md                 <span class="cm"># manifest</span>
@@ -613,7 +625,7 @@ radical-mcp --version</code></pre>
 ├─ _layout.json               <span class="cm"># positions, camera, line style — the only noisy file</span>
 ├─ check.json                 <span class="cm"># optional: rule settings for radical check and the Inspector</span>
 ├─ reviews.json               <span class="cm"># optional: reviews of manual fitness functions, from radical sense review</span>
-└─ .radical/                  <span class="cm"># editor state, kept out of git by its own .gitignore</span>
+└─ .state/                    <span class="cm"># editor state, kept out of git by its own .gitignore (.radical/ before; still read)</span>
    ├─ selection.json          <span class="cm"># what is selected in Studio, for the MCP server</span>
    ├─ base.json               <span class="cm"># the model where the branch left main</span>
    ├─ forge-run.json          <span class="cm"># where an agent's Forge run stands</span>
@@ -625,7 +637,7 @@ radical-mcp --version</code></pre>
           <li>Each <code>.md</code> has YAML front-matter (<code>id</code>, <code>type</code>, <code>label</code>, then the properties, sorted) and the description as body. Hierarchy is the directory tree.</li>
           <li>Output is deterministic: sorted keys, stable file names. A file is named after its element and keeps its name until the element is renamed or moved; two of one name are <code>orders-db.md</code> and <code>orders-db-2.md</code>.</li>
           <li>Edit the files by hand or through the MCP server; Studio picks them up and merges what you have not saved yet. A file with a byte-order mark reads as any other.</li>
-          <li>The files are the model; <code>.radical/cache/</code> only repeats them: <code>model.json</code> each file with its modification time and size, <code>changes.json</code> the files saved or read since, <code>views.json</code> the elements each view shows for the model's structure. Studio opens a folder from it at once and lists the files right after, loading afresh what changed while it was closed; the MCP server takes from it each file that has not changed and reads only the others, and the CLI reads it when it is there. Deleting it is always safe.</li>
+          <li>The files are the model; <code>.state/cache/</code> only repeats them: <code>model.json</code> each file with its modification time and size, <code>changes.json</code> the files saved or read since, <code>views.json</code> the elements each view shows for the model's structure. Studio opens a folder from it at once and lists the files right after, loading afresh what changed while it was closed; the MCP server takes from it each file that has not changed and reads only the others, and the CLI reads it when it is there. Deleting it is always safe.</li>
         </ul>
       </section>
 

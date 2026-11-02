@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import { parseTestReport, type CiRun, type CiSource, type TestCase, type TestResults } from '@radical/common/check'
-import { SELECTION_DIR } from '@radical/common/formats/canvasSelection'
+import { STATE_DIR } from '@radical/common/formats/canvasSelection'
 
 const exec = promisify(execFile)
 
@@ -179,7 +179,7 @@ export async function readLater(root: string, results: TestResults | null, commi
 /** Holds the folder's fetch lock while `work` runs; null when another fetch
  *  holds it (a lock older than ten minutes was left by one that died). */
 export async function withFetchLock<T>(root: string, work: () => Promise<T>): Promise<T | null> {
-  const path = join(root, SELECTION_DIR, 'ci-fetch.lock')
+  const path = join(root, STATE_DIR, 'ci-fetch.lock')
   await mkdir(dirname(path), { recursive: true })
   const take = () => open(path, 'wx').then((h) => h.close().then(() => true), (e: NodeJS.ErrnoException) => {
     if (e.code === 'EEXIST') return false

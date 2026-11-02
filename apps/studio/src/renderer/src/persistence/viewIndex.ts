@@ -1,7 +1,7 @@
 // ─── View index ──────────────────────────────────────────────────────────────
 //
 // What each view's filter gives, for the model's structure, kept in the
-// folder's cache (.radical/cache/views.json) so the next open takes it from
+// folder's cache (.state/cache/views.json) so the next open takes it from
 // there instead of running the filters (ADR Model cache beside the model).
 // Written a moment after a folder model opens or changes, when the index
 // read with it is of another structure or lacks a view; the views are

@@ -1,6 +1,6 @@
 // ─── Model cache ─────────────────────────────────────────────────────────────
 //
-// A model folder's files kept in .radical/cache/ (ADR Model cache beside the
+// A model folder's files kept in .state/cache/ (ADR Model cache beside the
 // model), so a folder opens by reading a few files and then only the files
 // whose stamp moved:
 //
@@ -14,10 +14,10 @@
 // It is derived, never the source; deleting it is always safe, and whatever
 // reads the folder writes it again (MdFolderSession).
 
-import { SELECTION_DIR } from './canvasSelection'
+import { STATE_DIR } from './canvasSelection'
 
 /** Where a folder keeps its cache, relative to the folder. */
-export const MODEL_CACHE_DIR = `${SELECTION_DIR}/cache`
+export const MODEL_CACHE_DIR = `${STATE_DIR}/cache`
 export const MODEL_CACHE_FILE = `${MODEL_CACHE_DIR}/model.json`
 
 /** The files of the cache. */

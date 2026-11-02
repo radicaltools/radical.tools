@@ -10,6 +10,7 @@ import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
 import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 import { DiskDiscussions } from '@radical/node-files/discussions'
+import { repositoryModel } from '@radical/node-files/repositoryLayout'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
 
 const discussionFolders = new Map<string, DiskDiscussions>()
@@ -188,7 +189,8 @@ app.whenReady().then(() => {
       properties: ['openDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return { success: false }
-    const folderPath = result.filePaths[0]
+    // A repository picked (its .radical/ hidden in the dialog) opens its model.
+    const folderPath = await repositoryModel(result.filePaths[0])
     try {
       const files = await folderSession(folderPath).readAll()
       return { success: true, folderPath, files }
@@ -273,7 +275,7 @@ app.whenReady().then(() => {
   })
 
   // The models this one depends on (deps.json) and those fetched of them
-  // (.radical/federation.json, written by radical federation fetch), shown
+  // (.state/federation.json, written by radical federation fetch), shown
   // beside the model's own and never written here.
   ipcMain.handle('folder:read-federation', async (_event, folderPath: string) => {
     try {

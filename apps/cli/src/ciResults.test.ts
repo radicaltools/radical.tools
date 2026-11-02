@@ -106,7 +106,7 @@ async function run(cwd: string, gh: Gh | undefined, ...args: string[]) {
   return { code, out, err }
 }
 
-const results = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8'))
+const results = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8'))
 
 describe('radical check --from-ci', () => {
   it('reads the reports of the nearest commit CI ran, a squash merge standing for its pull request', async () => {
@@ -139,13 +139,13 @@ describe('radical check --from-ci', () => {
     await writeFile(join(cwd, 'local.json'), report('src/pay.test.ts', 'pays', 'failed'))
     await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'local.json')
     expect(await results(cwd)).toMatchObject({ commit: head, reports: ['local.json'] })
-    const before = await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')
+    const before = await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')
 
     const checked = await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci')
     expect(checked.err).toContain(`Kept the test results read with --report at ${head.slice(0, 7)}: CI's (run 11 (pull request #7)) are of ${merged.slice(0, 7)}, before it.`)
     // The check reads the results kept.
     expect(checked.code).toBe(1)
-    expect(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')).toBe(before)
+    expect(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')).toBe(before)
 
     // Results read at an earlier commit give way.
     await git(cwd, 'checkout', '-q', `${merged}~1`)

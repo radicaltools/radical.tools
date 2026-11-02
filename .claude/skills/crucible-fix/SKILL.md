@@ -1,6 +1,6 @@
 ---
 name: crucible-fix
-description: Fix a set of Radical Crucible findings (crucible/findings, or items of docs/IMPROVEMENTS.md) with agents in parallel git worktrees, each fix with a test that fails without it, gated by radical harden. Use when the user asks to fix the findings of a round, "popraw wszystkie", or to fix several open findings at once.
+description: Fix a set of Radical Crucible findings (.radical/crucible/findings, or items of docs/IMPROVEMENTS.md) with agents in parallel git worktrees, each fix with a test that fails without it, gated by radical harden. Use when the user asks to fix the findings of a round, "popraw wszystkie", or to fix several open findings at once.
 ---
 
 # A fix round
@@ -34,7 +34,7 @@ file per group (its findings, the decisions that stand). The brief says:
   never needs a stash (never use git stash); name a test with its describe
   blocks as the report does (`<file> › <describe> › <name>`); an e2e test's
   gate rebuilds the web and Hub builds before each run (the runner's `build`
-  in `crucible.json`) and runs the runs at once as one Playwright run, so it
+  in `.radical/crucible/crucible.json`) and runs the runs at once as one Playwright run, so it
   takes minutes, and it takes the e2e lock like any e2e run;
 - remove the finding's KNOWN entry from the fuzz file with the fix, and run
   the fuzzer more (`node apps/cli/dist/index.js fuzz night --world <model> --runs 300`):
@@ -42,7 +42,7 @@ file per group (its findings, the decisions that stand). The brief says:
 - e2e tests one worktree at a time, through a lock
   (`until mkdir "$LOCK"; do sleep 10; done` … `rm -rf "$LOCK"`): the suite
   uses fixed ports;
-- do not edit `architecture/` or the findings: report model texts that should
+- do not edit `.radical/model/` or the findings: report model texts that should
   change, and one sentence per finding for its file;
 - commit on your branch; the final message is the report.
 

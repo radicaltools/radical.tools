@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MdFolderSession, type MdFolderStorage } from '../src/formats/mdFolderSync'
 import { MODEL_CACHE_VERSION, readModelCache, writeModelCache, type ModelCacheName } from '../src/formats/modelCache'
 
-// A folder's cache in .radical/cache/ (ADR Model cache beside the model): a
+// A folder's cache in .state/cache/ (ADR Model cache beside the model): a
 // folder opens from it, reads only the files whose stamp moved, keeps it up
 // with what it writes and reads (changes.json), and writes model.json again
 // when it is missing, broken or well out of date.

@@ -51,14 +51,14 @@ describe('diskFolderStorage', () => {
       expect(names).toEqual(expect.arrayContaining([`A ${round}`, `B ${round}`]))
     }
     // The turn is not kept once the writes are done.
-    expect(await readdir(join(dir, '.radical'))).not.toContain('write.lock')
+    expect(await readdir(join(dir, '.state'))).not.toContain('write.lock')
   })
 
   it('takes over a turn left by a process that is gone', async () => {
     dir = await mkdtemp(join(tmpdir(), 'radical-stale-'))
-    await mkdir(join(dir, '.radical'))
+    await mkdir(join(dir, '.state'))
     // No process has this id (it is above every system's limit).
-    await writeFile(join(dir, '.radical', 'write.lock'), `${2 ** 31 - 2} ${Date.now()} x\n`)
+    await writeFile(join(dir, '.state', 'write.lock'), `${2 ** 31 - 2} ${Date.now()} x\n`)
     const started = Date.now()
     expect(await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })).toEqual({ ok: true })
     expect(Date.now() - started).toBeLessThan(1000)
@@ -69,21 +69,21 @@ describe('diskFolderStorage', () => {
     dir = await mkdtemp(join(tmpdir(), 'radical-garbage-'))
     await new MdFolderSession(diskFolderStorage(dir)).write({ 'radical.md': 'm' })
     for (const text of ['garbage\n', '']) {
-      await writeFile(join(dir, '.radical', 'write.lock'), text)
+      await writeFile(join(dir, '.state', 'write.lock'), text)
       const started = Date.now()
       expect(await new MdFolderSession(diskFolderStorage(dir)).readAll()).toEqual({ 'radical.md': 'm' })
       expect(Date.now() - started).toBeLessThan(3000)
     }
   }, 10_000)
 
-  it('reads a folder it may not write, .radical/ and all', async () => {
+  it('reads a folder it may not write, .state/ and all', async () => {
     // A checkout mounted read-only, or another user's folder: radical check
-    // and radical diff exited 2 with EACCES on .radical/write.lock, and the
+    // and radical diff exited 2 with EACCES on .state/write.lock, and the
     // MCP server did not start.
     dir = await mkdtemp(join(tmpdir(), 'radical-readonly-'))
     const model: DiagramData = { nodes: [], relations: [] }
     await new MdFolderSession(diskFolderStorage(dir)).write(serializeToMdFolder(model, 'model'))
-    await chmod(join(dir, '.radical'), 0o555)
+    await chmod(join(dir, '.state'), 0o555)
     await chmod(dir, 0o555)
     try {
       const files = await new MdFolderSession(diskFolderStorage(dir)).readAll()
@@ -92,10 +92,10 @@ describe('diskFolderStorage', () => {
       await expect(new MdFolderSession(diskFolderStorage(dir)).write({ ...files, 'radical.md': files['radical.md'] + 'x' })).rejects.toThrow(/EACCES|EPERM/)
     } finally {
       await chmod(dir, 0o755)
-      await chmod(join(dir, '.radical'), 0o755)
+      await chmod(join(dir, '.state'), 0o755)
     }
   })
-  it('keeps the folder in .radical/cache/model.json, opens from it, and writes it again when it is gone', async () => {
+  it('keeps the folder in .state/cache/model.json, opens from it, and writes it again when it is gone', async () => {
     dir = await mkdtemp(join(tmpdir(), 'radical-cache-'))
     const data: DiagramData = { nodes: [{ id: 'a', type: 'system', label: 'Shop', x: 0, y: 0, width: 240, height: 140, collapsed: false }], relations: [] }
     const files = serializeToMdFolder(data, 'Shop')
@@ -110,10 +110,10 @@ describe('diskFolderStorage', () => {
       return read
     }
     expect(await open()).toEqual(files)
-    const cacheFile = join(dir, '.radical', 'cache', 'model.json')
+    const cacheFile = join(dir, '.state', 'cache', 'model.json')
     const cache = JSON.parse(await readFile(cacheFile, 'utf-8'))
     expect(Object.keys(cache.files).sort()).toEqual(Object.keys(files).sort())
-    expect(await readdir(join(dir, '.radical', 'cache'))).toEqual(['model.json'])
+    expect(await readdir(join(dir, '.state', 'cache'))).toEqual(['model.json'])
 
     // A file whose stamp the cache has comes from the cache, not the disk.
     const path = Object.keys(files).find((p) => p.startsWith('nodes/'))!
@@ -122,7 +122,7 @@ describe('diskFolderStorage', () => {
     expect((await open())[path]).toBe('from the cache')
 
     // Gone: the folder is read whole, and the cache written again.
-    await rm(join(dir, '.radical', 'cache'), { recursive: true })
+    await rm(join(dir, '.state', 'cache'), { recursive: true })
     expect(await open()).toEqual(files)
     expect(JSON.parse(await readFile(cacheFile, 'utf-8')).files[path].content).toBe(files[path])
   })

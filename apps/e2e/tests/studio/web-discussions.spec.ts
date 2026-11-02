@@ -28,7 +28,7 @@ async function discuss(page: Page, nodeId = 'customer', label = 'Customer') {
   await page.getByRole('menuitem', { name: 'Discuss', exact: true }).click()
   return page.getByRole('dialog', { name: label, exact: true })
 }
-const modelFiles = (files: Record<string, string>) => Object.fromEntries(Object.entries(files).filter(([name]) => name !== 'discussions.json' && !name.startsWith('.discussions.') && !name.startsWith('.radical/')))
+const modelFiles = (files: Record<string, string>) => Object.fromEntries(Object.entries(files).filter(([name]) => name !== 'discussions.json' && !name.startsWith('.discussions.') && !name.startsWith('.state/')))
 
 test('node discussion corner icons open the right panel, persist after resolution and refresh while closed', async ({ page, studio }) => {
   await moveToFolder(page)

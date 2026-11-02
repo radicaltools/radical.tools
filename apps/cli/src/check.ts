@@ -6,12 +6,14 @@ import { parseArgs } from 'node:util'
 import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
-import { SELECTION_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
+import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { CATALOGUE_DIR, concernPacksOf, readCatalogue } from '@radical/hub-catalogue'
 import { CiError, downloadCiReports, findCiRuns, ghCli, headOf, readLater, sameRuns, withFetchLock, type Gh } from './ciResults'
 import { composeFolder, describeDeps, federationOthers } from './federation'
 import { repositorySensors } from './repositorySensors'
+import { modelFolderArg } from './modelFolder'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -26,7 +28,7 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
                       XML), or a directory of them (.json and .xml files); repeat
                       for more. The tests that scenarios and fitness functions
                       name are looked up in them. The test cases read are kept
-                      in the model folder's .radical/test-results.json for Studio
+                      in the model folder's .state/test-results.json for Studio
   --from-ci           read the test reports of CI instead: those of the latest
                       completed runs of the nearest commit in HEAD's history
                       that CI ran (a commit merged from a pull request stands
@@ -44,7 +46,7 @@ is complete (requirements have scenarios, accepted ADRs fitness functions, …).
   --metrics <path>    a radical-metrics/1 file (radical sense --out), or a
                       directory of them (.json files); repeat for more. They
                       are added to what radical sense keeps in the model
-                      folder's .radical/measurements.json, which is read
+                      folder's .state/measurements.json, which is read
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
                       the latest measurement each matches. The reviews
@@ -156,7 +158,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 0
   }
 
-  const folder = positionals[0] ?? '.'
+  const folder = await modelFolderArg(positionals[0], io.cwd)
   let root: string
   let files
   try {
@@ -188,7 +190,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   if (fromCi) {
     const say = (text: string) => { if (!values.quiet) io.err(text) }
     const resultsPath = join(root, TEST_RESULTS_FILE)
-    const existing = await readFile(resultsPath, 'utf8').then(parseTestResults, () => null)
+    const existing = parseTestResults(await readEditorStateFile(root, TEST_RESULTS_FILE) ?? '')
     const gh = io.gh ?? ghCli(io.env ?? process.env)
     let got
     try {
@@ -242,8 +244,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
 
   // What radical sense kept, with the files --metrics names added.
-  const storePath = join(root, MEASUREMENTS_FILE)
-  const stored = await readFile(storePath, 'utf8').then(parseMeasurementStore, () => null)
+  const kept = await readEditorStateFile(root, MEASUREMENTS_FILE)
+  const stored = kept === null ? null : parseMeasurementStore(kept)
   let measurements: Measurement[] | undefined = stored ?? undefined
   if (values.metrics?.length) {
     const read: Measurement[] = []
@@ -254,7 +256,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       return 2
     }
     measurements = mergeMeasurements(stored ?? [], read)
-    await writeBeside(storePath, serializeMeasurementStore(measurements))
+    await writeBeside(join(root, MEASUREMENTS_FILE), serializeMeasurementStore(measurements))
   }
 
   // The reviews of manual fitness functions, kept in git beside the model.
@@ -352,7 +354,7 @@ async function reportFiles(paths: string[], cwd: string, pattern = /\.(json|xml)
 export async function writeBeside(path: string, content: string): Promise<void> {
   const dir = dirname(path)
   await mkdir(dir, { recursive: true })
-  if (basename(dir) === SELECTION_DIR) {
+  if (basename(dir) === STATE_DIR) {
     await writeFile(join(dir, '.gitignore'), SELECTION_GITIGNORE_CONTENT, { flag: 'wx' }).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== 'EEXIST') throw error
     })

@@ -288,7 +288,7 @@ export interface SerializeMdFolderResult {
  *  paths move when a node is renamed, re-parented or gains its first child. */
 export function serializeToMdFolderWithPaths(model: DiagramData, modelName?: string): SerializeMdFolderResult {
   // Another model's elements (a federation) are never written here: they
-  // come from .radical/federation.json, which radical federation fetch writes.
+  // come from .state/federation.json, which radical federation fetch writes.
   const data = ownModel(model)
   const files: FolderFiles = {}
   const nodePaths: Record<string, string> = {}

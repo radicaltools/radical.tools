@@ -123,7 +123,7 @@ export interface CheckOptions {
    *  that read test outcomes find nothing and there is no evidence. */
   tests?: TestCase[]
   /** When `tests` were read, when they are results kept from an earlier
-   *  run (.radical/test-results.json): a test they lack, and a goal they
+   *  run (.state/test-results.json): a test they lack, and a goal they
    *  leave unmet, are warnings naming that time. */
   testsReadAt?: string
   /** The Hub's concern packs (concerns.ts), for concern-unaddressed. */

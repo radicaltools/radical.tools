@@ -42,8 +42,12 @@ apps/e2e/blob-report/
 apps/e2e/all-blob-reports/
 
 # What Studio and radical check keep beside the architecture model (canvas
-# selection, Forge run status, test results); the model itself is committed.
-/architecture/.radical/
+# selection, Forge run status, test results) in its .state/, and in the
+# .radical/ of versions before it; the model itself is committed. Each has a
+# .gitignore of its own too.
+/.radical/model/.state/
+/.radical/model/.radical/
 
-# Radical Crucible: exploratory rounds (radical explore prepare)
+# Radical Crucible: exploratory rounds (radical explore prepare) are ignored by
+# .radical/.gitignore; .crucible/ is where they were before .radical/.
 .crucible/

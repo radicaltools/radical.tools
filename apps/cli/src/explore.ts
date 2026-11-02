@@ -6,6 +6,8 @@ import { parseArgs } from 'node:util'
 import { nextFindingId, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import { diffCommand } from './diff'
 import type { Io } from './check'
+import { crucibleConfig } from './modelFolder'
+import { CRUCIBLE_FINDINGS, CRUCIBLE_ROUNDS, OLD_CRUCIBLE_ROUNDS } from '@radical/node-files/repositoryLayout'
 
 export const EXPLORE_USAGE = `Usage: radical explore prepare --runs <n> [--areas "<a>;<b>"] [options]
        radical explore verify <run> "<script> [args]"…
@@ -16,7 +18,7 @@ describes, each run in its own area. radical explore prepares the round and
 checks what comes back; the agent session starts the agents
 (.claude/skills/crucible-explore).
 
-  prepare             builds the project once (crucible.json's explore.build),
+  prepare             builds the project once (.radical/crucible/crucible.json's explore.build),
                       copies what runs need into the round's folder, and
                       writes the brief (BRIEF.md: the project's brief, the
                       commit, what changed since the last round in the code
@@ -36,10 +38,10 @@ checks what comes back; the agent session starts the agents
                       screenshot; warns about a script that names the
                       round's absolute paths
 
-  --config <file>     the Crucible settings (default: crucible.json)
+  --config <file>     the Crucible settings (default: .radical/crucible/crucible.json)
 
-crucible.json's "explore": { "rounds": ".crucible/rounds", "brief": "…",
-"known": […], "model": "architecture", "build": [[…], …], "copy": { "name":
+.radical/crucible/crucible.json's "explore": { "rounds": ".radical/crucible/rounds",
+"brief": "…", "known": […], "model": ".radical/model", "build": [[…], …], "copy": { "name":
 "path" }, "serve": { "cwd": "…", "command": [… "{port}" … "{build}/name" …] },
 "ports": 4500, "rules": […] }. A run NN has the ports <ports>+NN (the app),
 +100+NN (the hub) and +200+NN (other). "serve" can be a list of servers,
@@ -106,7 +108,7 @@ interface ReportedFinding {
   question?: boolean
 }
 
-function readSettings(file: string): Settings | string {
+function readSettings({ file, root, findings }: { file: string; root: string; findings: string }): Settings | string {
   if (!existsSync(file)) return `No ${file}: its "explore" settings say how to build, copy and serve the project (radical explore --help).`
   let raw: Record<string, unknown>
   try { raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown> } catch (error) { return `${file} is no JSON: ${(error as Error).message}` }
@@ -114,10 +116,10 @@ function readSettings(file: string): Settings | string {
   if (!e || typeof e !== 'object') return `${file} has no "explore" settings (radical explore --help).`
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
   return {
-    root: dirname(file),
-    findings: typeof raw.findings === 'string' ? raw.findings : 'crucible/findings',
+    root,
+    findings: typeof raw.findings === 'string' ? raw.findings : findings,
     explore: {
-      rounds: typeof e.rounds === 'string' ? e.rounds : '.crucible/rounds',
+      rounds: typeof e.rounds === 'string' ? e.rounds : findings === CRUCIBLE_FINDINGS ? CRUCIBLE_ROUNDS : OLD_CRUCIBLE_ROUNDS,
       brief: typeof e.brief === 'string' ? e.brief : undefined,
       known: strings(e.known),
       model: typeof e.model === 'string' ? e.model : undefined,
@@ -156,7 +158,7 @@ export async function exploreCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   const [sub, ...rest] = positionals
   if (values.help || !sub) { io.out(EXPLORE_USAGE); return sub || values.help ? 0 : 2 }
-  const settings = readSettings(resolve(io.cwd, values.config ?? 'crucible.json'))
+  const settings = readSettings(await crucibleConfig(values.config, io.cwd))
   if (typeof settings === 'string') { io.err(settings); return 2 }
   if (sub === 'prepare') {
     const runs = Number(values.runs)
@@ -275,7 +277,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
     `- The build of ${commit}: \`${dir}/build\`${Object.keys(explore.copy).length ? ` (${Object.keys(explore.copy).join(', ')})` : ''}.`,
     ...(explore.serve.length ? [`- Serve it for your run with the command${explore.serve.length === 1 ? '' : 's'} in your prompt.`] : []),
     '- Your folder and your ports are in your prompt: a run NN has the ports of NN. Write scripts, screenshots and notes only in your folder.',
-    `- Scripts name no absolute path: a finding's script is copied into \`${settings.findings}/F-NNNN/\` with the helpers it imports and must run from there too. Find the repository by walking up from the script's own folder to \`crucible.json\`, and take your ports and anything of the round's folder as arguments.`,
+    `- Scripts name no absolute path: a finding's script is copied into \`${settings.findings}/F-NNNN/\` with the helpers it imports and must run from there too. Find the repository by walking up from the script's own folder to the one that holds \`.radical/crucible/crucible.json\`, and take your ports and anything of the round's folder as arguments.`,
     `- ${count} run${count === 1 ? '' : 's'} share this machine: keep one browser open at a time and close it when a script ends; do not run the project's whole test suites.`,
     '',
     '## Rules',

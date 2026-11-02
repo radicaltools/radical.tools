@@ -81,7 +81,7 @@ export function serializeMetricsFile(file: Omit<MetricsFile, 'format' | 'version
   return JSON.stringify({ format: METRICS_FORMAT, version: 1, ...file }, null, 2) + '\n'
 }
 
-/** The measurements kept beside a model (.radical/measurements.json). */
+/** The measurements kept beside a model (.state/measurements.json). */
 export interface MeasurementStore {
   version: 1
   measurements: Measurement[]

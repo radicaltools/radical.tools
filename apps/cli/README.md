@@ -24,7 +24,7 @@ Connects your coding agents to a model folder, step by step:
 
 ```sh
 npx @radicaltools/cli setup            # asks for the folder, the agents and the hooks
-npx @radicaltools/cli setup architecture --client claude-code --client codex --yes
+npx @radicaltools/cli setup --client claude-code --client codex --yes
 ```
 
 No Node.js yet? Start from an empty folder with the launcher, which finds Node.js or
@@ -40,7 +40,7 @@ The launcher (`radical.sh`, `radical.cmd`) takes Node.js 20.11 or later with `np
 beside it from the `PATH`, else from `~/.radical/node`. With neither, it asks (or takes
 `--yes`) and downloads the latest Node.js 24 for the platform from nodejs.org into
 `~/.radical/node`, checked against its SHA-256 sum. It runs any command:
-`sh radical.sh check architecture`, and `sh radical.sh mcp --folder …` runs the MCP
+`sh radical.sh check`, and `sh radical.sh mcp --folder …` runs the MCP
 server without asking anything. `radical setup` run through it pins its version line
 (`default_version`, `DEFAULT_VERSION` in `radical.cmd`) to the CLI's, makes `radical.sh`
 executable, and has every agent and the git hooks start the server and the CLI through
@@ -132,9 +132,9 @@ publishes it through the Confluence adapter.
 Find a view and preview it without Confluence credentials:
 
 ```sh
-radical export confluence architecture --list-views
-radical export confluence architecture --view "Specification" --format html --output wiki-preview.html
-radical export confluence architecture --view "Specification" --format markdown --output wiki.md
+radical export confluence --list-views
+radical export confluence --view "Specification" --format html --output wiki-preview.html
+radical export confluence --view "Specification" --format markdown --output wiki.md
 ```
 
 `--view` accepts an exact view ID or an unambiguous name. `--format storage`
@@ -148,7 +148,7 @@ To publish to Confluence Cloud, set `CONFLUENCE_URL`, `CONFLUENCE_EMAIL` and
 `CONFLUENCE_API_TOKEN` in your shell or CI secret environment, then run:
 
 ```sh
-radical export confluence architecture --view "Specification" --publish --space-id 123 --parent-id 456
+radical export confluence --view "Specification" --publish --space-id 123 --parent-id 456
 ```
 
 Use the numeric space ID, not its key. `--parent-id` is optional. `--url` can
@@ -178,7 +178,7 @@ To move an existing managed export under another page, pass its root page
 ID with `--parent-id`; its children follow it:
 
 ```sh
-radical export confluence architecture --view "Specification" --publish --page-id 789 --parent-id 456
+radical export confluence --view "Specification" --publish --page-id 789 --parent-id 456
 ```
 
 Use a destination parent in the same Confluence space. Changing the view's
@@ -259,7 +259,7 @@ the git command. A hook written in another language than sh (Python, say)
 is left as it is: the command exits 2 and says what to call from it.
 It runs the CLI that installed it, with the `node` on the PATH, else the one
 that installed it. In this repository `npm run hooks` builds the CLI,
-installs the hooks for `architecture/` and saves its base once.
+installs the hooks for `.radical/model/` and saves its base once.
 
 ## radical federation
 
@@ -274,7 +274,7 @@ depends on in `deps.json`:
 {
   "name": "payments",
   "dependencies": [
-    { "name": "orders", "repo": "git@github.com:acme/orders.git", "path": "architecture", "ref": "v2.3.0" }
+    { "name": "orders", "repo": "git@github.com:acme/orders.git", "path": ".radical/model", "ref": "v2.3.0" }
   ]
 }
 ```
@@ -423,7 +423,7 @@ directory of them (its .json and .xml files), and may be repeated.
 In this repository `npm run test:reports` runs every workspace's tests and
 leaves a report per workspace in `reports/`, the e2e suite adds
 `reports/e2e.json`, and `npm run check:architecture` checks the local
-`architecture/` model against them. CI keeps `reports/` as the
+`.radical/model/` model against them. CI keeps `reports/` as the
 `test-reports` artifact (and `reports/e2e.json` in `e2e-report`). A named
 test that failed or is gone from the report of its file (renamed, deleted)
 is an error; one that was skipped, or whose file no report has, a warning.
@@ -528,18 +528,18 @@ threshold. Pull requests welcome.
 ## radical fuzz
 
 Runs a project's fuzz files (Radical Crucible): tests that do random sequences
-of actions to a system and check its rules after every step. `crucible.json`
+of actions to a system and check its rules after every step. `.radical/crucible/crucible.json`
 in the working directory lists them, and the folder findings go to:
 
 ```json
 {
-  "findings": "crucible/findings",
+  "findings": ".radical/crucible/findings",
   "fuzz": [{ "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }]
 }
 ```
 
 Each file runs with `npx vitest run <file>` in its `cwd`, or with its own
-`command` (a list). Paths are from the folder `crucible.json` is in.
+`command` (a list). Paths are from the repository's root.
 
 ```sh
 radical fuzz                    # plan ci: each file's fixed seeds and runs
@@ -552,7 +552,7 @@ radical fuzz --report reports   # a Vitest JSON report per file, for radical che
 
 `--survey` goes on after each failure and writes each one whose signature (its
 rule, its last action and the shape of what differs, with the ids taken out) no
-finding has yet as `crucible/findings/F-NNNN.md`, status `open`, with the
+finding has yet as `.radical/crucible/findings/F-NNNN.md`, status `open`, with the
 world, seed, path and length that replay it, the steps and what differs.
 `--no-known` lets the fuzz files' known failures filter nothing, `--no-shrink`
 reports the first failure as found.
@@ -585,11 +585,11 @@ in the finding; it does not change the model's files.
 `--gate` checks a test before it is bound: with the source files changed since
 the base (default: the merge base with `origin/main`) set back to it, the test
 must fail; put back, it must pass; and it must pass `--runs` runs at once
-(default 5). Tests, findings and `crucible.json` are not set back, and the
+(default 5). Tests, findings and `.radical/crucible/crucible.json` are not set back, and the
 working tree is left as it was (files are copied aside, never stashed), also
 when the gate is interrupted: Ctrl+C, `kill` or a closed terminal stops the
 test, puts the changed files back and ends with exit status 2. A test
-runs through the runner `crucible.json` gives for its folder, else with
+runs through the runner `.radical/crucible/crucible.json` gives for its folder, else with
 `npx vitest run <file> -t <name>` in the file's package:
 
 ```json
@@ -600,7 +600,7 @@ runs through the runner `crucible.json` gives for its folder, else with
                            "--repeat-each", "{runs}", "--workers", "{runs}", "--reporter", "line"] }] }
 ```
 
-A runner's `build` (commands run from `crucible.json`'s folder) is made before
+A runner's `build` (commands run from the repository's root) is made before
 the run without the fix and before the run with it, so a test of a build (an
 e2e test) runs on what the files are at each step; its `repeat` (with
 `{runs}`) makes the runs at once one run of that command, for runs that
@@ -620,18 +620,18 @@ checks what comes back; a coding agent's session starts the agents.
 ```sh
 radical explore prepare --runs 5 --areas "layout under edits; milestones and undo"
 radical explore verify 70 "f1-row.mjs 2" "f2-undo.mjs"
-radical explore record .crucible/rounds/round-70-74/run-70/REPORT.md
+radical explore record .radical/crucible/rounds/round-70-74/run-70/REPORT.md
 ```
 
 `prepare` builds the project once, copies what the runs need into
-`.crucible/rounds/round-<from>-<to>/build`, and gives each run a folder, its
+`.radical/crucible/rounds/round-<from>-<to>/build`, and gives each run a folder, its
 ports (`<ports>+NN`, `+100+NN`, `+200+NN`) and a `PROMPT.md` with its area;
 `BRIEF.md` names the commit, the commits and the model elements changed since
 the last round (by area), the open findings, the setup, the rules and the
 report's JSON form. `--since`, `--from` and `--no-build` change what it
 counts from, the first run's number and whether it builds. The brief asks
 that scripts name no absolute path (they find the repository by walking up to
-`crucible.json`), since a finding's script is copied out of the round.
+`.radical/crucible/crucible.json`), since a finding's script is copied out of the round.
 `verify` serves a run's build on its ports (each server `serve` lists, on the
 run's port it names: `app`, `hub` or `other`), runs its scripts from its
 folder and stops the servers. `record` writes a report's findings (`open`, or
@@ -641,8 +641,8 @@ absolute paths.
 
 ```json
 { "explore": {
-    "rounds": ".crucible/rounds", "brief": "docs/EXPLORATORY-TESTING.md",
-    "known": ["docs/IMPROVEMENTS.md"], "model": "architecture",
+    "rounds": ".radical/crucible/rounds", "brief": "docs/EXPLORATORY-TESTING.md",
+    "known": ["docs/IMPROVEMENTS.md"], "model": ".radical/model",
     "build": [["npm", "run", "build:web"]],
     "copy": { "renderer": "apps/studio/out/renderer" },
     "serve": [

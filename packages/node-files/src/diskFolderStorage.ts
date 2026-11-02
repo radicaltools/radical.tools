@@ -4,11 +4,11 @@ import { lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'no
 import { dirname, join, resolve, sep } from 'node:path'
 import { isMdFolderModelPath, stripBom } from '@radical/common/formats/mdFolder'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
-import { SELECTION_DIR } from '@radical/common/formats/canvasSelection'
+import { STATE_DIR } from '@radical/common/formats/canvasSelection'
 import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { editorStateDir, readEditorStateFile } from './selectionFile'
 
-/** The folder's write turn, under `.radical/`: the id of the process that
+/** The folder's write turn, under `.state/`: the id of the process that
  *  holds it, when it took it, and a token of its own. */
 const WRITE_LOCK = 'write.lock'
 /** How long a writer waits for its turn before it gives up. */
@@ -44,16 +44,16 @@ const READ_ONLY = new Set(['EACCES', 'EPERM', 'EROFS'])
 
 /** Takes the write turn of the model folder at `base`: a lock file made
  *  only when there is none (O_EXCL), so of two processes one waits. To
- *  read, a folder without `.radical/` has no writer to wait for (one makes
+ *  read, a folder without `.state/` has no writer to wait for (one makes
  *  it first), and is left without one; nor is one taken where this process
  *  may not write (a read-only checkout): it reads once no writer holds it. */
 async function takeWriteTurn(base: string, forRead = false): Promise<() => Promise<void>> {
-  if (forRead && !(await lstat(join(base, SELECTION_DIR)).then(() => true, () => false))) return async () => {}
+  if (forRead && !(await lstat(join(base, STATE_DIR)).then(() => true, () => false))) return async () => {}
   try {
     return await takeTurn(base, forRead)
   } catch (error) {
     if (!forRead || !READ_ONLY.has((error as NodeJS.ErrnoException).code ?? '')) throw error
-    await waitForWriter(join(base, SELECTION_DIR, WRITE_LOCK))
+    await waitForWriter(join(base, STATE_DIR, WRITE_LOCK))
     return async () => {}
   }
 }
@@ -71,7 +71,7 @@ async function waitForWriter(file: string): Promise<void> {
 
 async function takeTurn(base: string, forRead = false): Promise<() => Promise<void>> {
   const file = join(await editorStateDir(base), WRITE_LOCK)
-  if (await lstat(file).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: .radical/${WRITE_LOCK}`)
+  if (await lstat(file).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink in model path: ${STATE_DIR}/${WRITE_LOCK}`)
   const mine = `${process.pid} ${Date.now()} ${randomUUID()}\n`
   const deadline = Date.now() + LOCK_WAIT_MS
   for (;;) {
@@ -92,7 +92,7 @@ async function takeTurn(base: string, forRead = false): Promise<() => Promise<vo
       continue
     }
     if (Date.now() > deadline) {
-      throw new Error(`Another program has been writing this model folder for ${LOCK_WAIT_MS / 1000} s (.radical/${WRITE_LOCK}); ${forRead ? 'the folder was not read' : 'nothing was written'}. Try again.`)
+      throw new Error(`Another program has been writing this model folder for ${LOCK_WAIT_MS / 1000} s (${STATE_DIR}/${WRITE_LOCK}); ${forRead ? 'the folder was not read' : 'nothing was written'}. Try again.`)
     }
     await sleep(10 + Math.random() * 30)
   }

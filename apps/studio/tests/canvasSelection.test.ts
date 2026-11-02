@@ -1,5 +1,5 @@
 // The canvas selection reaches the active md-folder document's folder
-// (.radical/selection.json), where the MCP server's get_selection reads it.
+// (.state/selection.json), where the MCP server's get_selection reads it.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { documents } from '../src/renderer/src/store/documentStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'

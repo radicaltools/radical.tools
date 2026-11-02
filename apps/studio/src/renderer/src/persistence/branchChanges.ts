@@ -2,7 +2,7 @@
 //
 // Studio has no git. The CLI (radical diff --save-base, the git hooks) and
 // the MCP server (get_changes) save the model as it was where the branch
-// left main in the folder's .radical/base.json; Studio polls that file for
+// left main in the folder's .state/base.json; Studio polls that file for
 // the active md-folder document, as inspector.ts polls the test results,
 // and compares the model with it as it is edited (branchChanges from
 // @radical/common, the comparison the CLI runs). Changes on branch shows

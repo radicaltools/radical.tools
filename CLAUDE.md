@@ -2,17 +2,17 @@
 
 ## Architecture model
 
-`architecture/` is the architecture of radical.tools itself, kept as a Radical
+`.radical/model/` is the architecture of radical.tools itself, kept as a Radical
 Markdown-folder model (Radical metamodel): containers, shared packages,
 ADRs, fitness functions, needs and requirements, a domain model and its state
 machines. It is committed with the code, and CI checks it: the "Architecture
-model" job runs `radical check architecture` against the run's test reports,
-with the rules, baselines and goals in `architecture/check.json`, and fails on an
+model" job runs `radical check` against the run's test reports,
+with the rules, baselines and goals in `.radical/model/check.json`, and fails on an
 error. Claude Code reaches it through the project MCP server
 `radical-architecture` (`.mcp.json`), which needs
 `npm run build -w @radicaltools/mcp` once after cloning and after MCP changes.
 Studio can open the same folder. `npm run hooks` (once after cloning, and again
-after CLI changes) adds git hooks that save `architecture/.radical/base.json`
+after CLI changes) adds git hooks that save `.radical/model/.state/base.json`
 after every checkout, commit, pull and rebase, so Studio's Changes on branch and the
 Inspector's Changes tab show the branch's model changes.
 

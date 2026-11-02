@@ -29,7 +29,7 @@ Commands:
   federation <open|sync|watch> [folder]
                    compose the model with the models its deps.json names,
                    and carry its own changes back (radical federation --help)
-  fuzz [plan]      run the fuzz files crucible.json lists (Radical Crucible;
+  fuzz [plan]      run the fuzz files .radical/crucible/crucible.json lists (Radical Crucible;
                    radical fuzz --help)
   harden <finding> turn a finding into a test, and gate a test: it fails
                    without the fix and passes with it every time

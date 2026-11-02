@@ -316,7 +316,7 @@ describe('canvas selection', () => {
     const before = await new MdFolderSession(diskFolderStorage(folder)).readAll()
 
     await writeSelectionFile(folder, serializeSelection({ viewId: view.id, nodeIds: [mockupId, 'gone'], relationIds: [] }))
-    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(folder, '.state/.gitignore'), 'utf8')).toBe('*\n')
     const outcome = await model.call('get_selection', {})
     expect(outcome.ok).toBe(true)
     const result = JSON.parse(outcome.text)
@@ -365,9 +365,9 @@ describe('get_selection with an odd selection file', () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)
     await writeSelectionFile(folder, '{"version": 1, "updatedAt": ')
-    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json cannot be read/)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .state\/selection.json cannot be read/)
     await writeSelectionFile(folder, JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), viewId: null, nodeIds: ['a'], relationIds: [] }))
-    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .radical\/selection.json was written by a newer Studio \(version 2\)/)
+    expect((await model.call('get_selection', {})).text).toMatch(/^No selection: .state\/selection.json was written by a newer Studio \(version 2\)/)
   })
 })
 
@@ -417,10 +417,10 @@ describe('get_changes', () => {
     expect(changes.text).toMatch(/Elements changed \(1\):\n- system "Shop" \([^)]+\)\n {4}description: \(none\) → Sells books\.$/)
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
     // Without since it saves the base Studio shows: the model as committed.
-    const base = parseModelBase(await readFile(join(folder, '.radical/base.json'), 'utf8'))
+    const base = parseModelBase(await readFile(join(folder, '.state/base.json'), 'utf8'))
     expect(base).toMatchObject({ described: 'merge base with main', branch: 'main' })
     expect(base!.nodes.map((n) => n.label)).toEqual(['Shop'])
-    expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(folder, '.state/.gitignore'), 'utf8')).toBe('*\n')
     expect((await model.call('get_changes', { since: 'nope' })).text).toContain('Unknown git ref "nope"')
     expect(model.tools.find((tool) => tool.name === 'get_changes')?.inputSchema).toMatchObject({ properties: { since: { type: 'string' } } })
   })
@@ -517,7 +517,7 @@ describe('warnier', () => {
 
 describe('federation', () => {
   /** Payments' model folder, with Orders (its API, its DB and a relation
-   *  between them) fetched from the model orders into .radical/federation.json. */
+   *  between them) fetched from the model orders into .state/federation.json. */
   async function fetched(): Promise<string> {
     const folder = await mkdtemp(join(tmpdir(), 'radical-mcp-federation-'))
     folders.push(folder)
@@ -568,7 +568,7 @@ describe('federation', () => {
     expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(before)
   })
 
-  it('reads the other models from .radical/federation.json and writes only its own', async () => {
+  it('reads the other models from .state/federation.json and writes only its own', async () => {
     const folder = await fetched()
     const git = (...args: string[]) => promisify(execFile)('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd: folder })
     await git('init', '-q', '-b', 'main')
@@ -670,7 +670,7 @@ describe('starting a model', () => {
     const model = await FolderModel.open(dir, { metamodel: 'c4' })
     expect((await model.call('add_node', { tempId: 'a', type: 'system', label: 'A' })).ok).toBe(true)
     for (const name of await readdir(dir)) await rm(join(dir, name), { recursive: true })
-    await mkdir(join(dir, '.radical'))
+    await mkdir(join(dir, '.state'))
     expect(await summaryOf(model)).toMatchObject({ metamodel: { id: 'c4-builtin' }, nodes: 0 })
     await rm(dir, { recursive: true })
     expect((await model.call('add_node', { tempId: 'b', type: 'system', label: 'B' })).ok).toBe(true)

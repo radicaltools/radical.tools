@@ -91,7 +91,7 @@ async function repos(options: { ownRelation?: boolean } = {}) {
   await deps(pinned)
   await git(payments, 'add', '.')
   await git(payments, 'commit', '-q', '-m', 'payments model')
-  return { orders, payments, home, composed: join(home, '.radical/federation'), pinned, deps }
+  return { orders, payments, home, composed: join(home, '.state/federation'), pinned, deps }
 }
 
 async function run(cwd: string, args: string[], signal?: AbortSignal): Promise<{ code: number; out: string; err: string }> {
@@ -110,7 +110,7 @@ async function until(what: string, test: () => Promise<boolean>, ms = 8000): Pro
 }
 
 describe('radical federation', () => {
-  it('fetches the other models with their origin into .radical/federation.json', async () => {
+  it('fetches the other models with their origin into .state/federation.json', async () => {
     const { home, pinned } = await repos({ ownRelation: true })
     const short = pinned.slice(0, 7)
     const before = await readFolder(home)
@@ -118,16 +118,16 @@ describe('radical federation', () => {
     const fetched = await run(home, ['federation', 'fetch'])
     expect(fetched.err).toBe('')
     expect(fetched.code).toBe(0)
-    expect(fetched.out).toBe(`Fetched orders@${short} (${pinned}): 2 elements into .radical/federation.json.\n`.replace(` (${pinned})`, ''))
-    const file = parseFederationFile(await readFile(join(home, '.radical/federation.json'), 'utf8'))!
+    expect(fetched.out).toBe(`Fetched orders@${short} (${pinned}): 2 elements into .state/federation.json.\n`.replace(` (${pinned})`, ''))
+    const file = parseFederationFile(await readFile(join(home, '.state/federation.json'), 'utf8'))!
     expect(file).toMatchObject({ version: 2, name: 'payments', notes: [] })
     expect(file.dependencies).toEqual([{ name: 'orders', repo: expect.any(String), path: 'architecture', ref: pinned, commit: pinned }])
     expect(file.nodes.map((n) => [n.id, n.origin]).sort()).toEqual([['cust', `orders@${short}`], ['ord', `orders@${short}`]])
     expect(file.relations.map((r) => [r.id, r.origin])).toEqual([['r-buys', `orders@${short}`]])
     expect(file.views).toEqual([expect.objectContaining({ id: 'v-ord', name: 'Landscape', folder: 'Context', origin: `orders@${short}` })])
-    // The model's own files are as they were, and .radical/ stays out of git.
+    // The model's own files are as they were, and .state/ stays out of git.
     expect(await readFolder(home)).toEqual(before)
-    expect(await readFile(join(home, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(home, '.state/.gitignore'), 'utf8')).toBe('*\n')
     expect((await git(home, 'status', '--porcelain')).stdout).toBe('')
     // Read with the folder, the relation to Orders holds.
     const data = withOtherModels(await readModel(home), file)
@@ -180,7 +180,7 @@ describe('radical federation', () => {
     const fetched = await run(home, ['federation', 'fetch'])
     expect(fetched.err).toBe('')
     expect(fetched.code).toBe(0)
-    const file = parseFederationFile(await readFile(join(home, '.radical/federation.json'), 'utf8'))!
+    const file = parseFederationFile(await readFile(join(home, '.state/federation.json'), 'utf8'))!
     expect(file.nodes.map((n) => n.label), fetched.out).toContain('Order Service')
     const old = `orders@${pinned.slice(0, 7)}`
     expect(file.atCommits?.[old]?.nodes.find((n) => n.id === 'ord')).toMatchObject({ label: 'Orders', origin: old })
@@ -206,7 +206,7 @@ describe('radical federation', () => {
     const first = await run(home, ['federation', 'fetch'])
     expect(first.code).toBe(0)
     expect(first.out).toContain(`Fetched orders@${tenth.slice(0, 7)} (latest → v1.10.0)`)
-    const read = async () => parseFederationFile(await readFile(join(home, '.radical/federation.json'), 'utf8'))!
+    const read = async () => parseFederationFile(await readFile(join(home, '.state/federation.json'), 'utf8'))!
     expect((await read()).dependencies[0]).toMatchObject({ ref: 'latest', resolved: 'v1.10.0', commit: tenth })
     expect((await read()).nodes.find((n) => n.id === 'ord')?.label).toBe('Orders 1.10')
 
@@ -328,7 +328,7 @@ describe('transitive dependencies', () => {
     expect(fetched.out).toContain('Note: pay-https: billing names this model so; left out, as a dependency back to it.')
     expect(fetched.out).toContain('Note: ordering: billing names the model orders so (the same repository and model folder); fetched once, as orders.')
     expect(fetched.out).toContain('Note: pay-svc: billing names this model so; left out, as a dependency back to it.')
-    const file = parseFederationFile(await readFile(join(paymentsHome, '.radical/federation.json'), 'utf8'))!
+    const file = parseFederationFile(await readFile(join(paymentsHome, '.state/federation.json'), 'utf8'))!
     expect(file.dependencies.map((d) => d.name)).toEqual(['billing', 'orders'])
     expect(file.nodes.map((n) => n.id).sort()).toEqual(['bill', 'ord'])
   })

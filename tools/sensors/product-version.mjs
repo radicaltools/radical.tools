@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sensor product-version (radical.sensors.json), for the fitness function
+// Sensor product-version (.radical/sensors.json), for the fitness function
 // One product version: the element's released package carries the version
 // the other released packages carry; an internal package is private, never
 // released on its own. Run by radical sense run, once per element.

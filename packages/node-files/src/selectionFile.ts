@@ -1,18 +1,19 @@
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import {
-  SELECTION_DIR, SELECTION_FILE, SELECTION_GITIGNORE, SELECTION_GITIGNORE_CONTENT,
-  parseSelection, type CanvasSelection,
+  OLD_STATE_DIR, STATE_DIR, SELECTION_FILE, SELECTION_GITIGNORE, SELECTION_GITIGNORE_CONTENT,
+  oldStatePath, parseSelection, type CanvasSelection,
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 
-/** Refuses a symlinked `.radical`, which could redirect the write elsewhere. */
-async function selectionDir(root: string, create: boolean): Promise<string | null> {
-  const dir = join(resolve(root), SELECTION_DIR)
+/** Refuses a symlinked `.state` (or old `.radical`), which could redirect
+ *  the write elsewhere. */
+async function selectionDir(root: string, create: boolean, name = STATE_DIR): Promise<string | null> {
+  const dir = join(resolve(root), name)
   try {
-    if ((await lstat(dir)).isSymbolicLink()) throw new Error(`symlink in model path: ${SELECTION_DIR}`)
+    if ((await lstat(dir)).isSymbolicLink()) throw new Error(`symlink in model path: ${name}`)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     if (!create) return null
@@ -23,7 +24,7 @@ async function selectionDir(root: string, create: boolean): Promise<string | nul
   return dir
 }
 
-/** The model folder's `.radical/` directory, made when missing, with the
+/** The model folder's `.state/` directory, made when missing, with the
  *  `.gitignore` that keeps it out of version control. */
 export async function editorStateDir(root: string): Promise<string> {
   const dir = (await selectionDir(root, true))!
@@ -33,7 +34,7 @@ export async function editorStateDir(root: string): Promise<string> {
   return dir
 }
 
-/** Writes an editor-state file under `.radical/` in a model folder (`path`
+/** Writes an editor-state file under `.state/` in a model folder (`path`
  *  relative to the folder), with the `.gitignore` that keeps the directory
  *  out of version control. */
 export async function writeEditorStateFile(root: string, path: string, content: string): Promise<void> {
@@ -43,11 +44,16 @@ export async function writeEditorStateFile(root: string, path: string, content: 
   await writeFile(file, content, 'utf-8')
 }
 
-/** An editor-state file under `.radical/`, or null when there is none. */
+/** An editor-state file under `.state/`, or under the folder's old
+ *  `.radical/` while `.state/` lacks it; null when there is none. */
 export async function readEditorStateFile(root: string, path: string): Promise<string | null> {
-  if (!(await selectionDir(root, false))) return null
-  try { return await readFile(join(resolve(root), path), 'utf-8') }
-  catch { return null }
+  if (await selectionDir(root, false)) {
+    const text = await readFile(join(resolve(root), path), 'utf-8').catch(() => null)
+    if (text !== null) return text
+  }
+  const old = oldStatePath(path)
+  if (old === path || !(await selectionDir(root, false, OLD_STATE_DIR))) return null
+  return readFile(join(resolve(root), old), 'utf-8').catch(() => null)
 }
 
 /** Writes Studio's canvas selection (see canvasSelection) into a model folder,
@@ -74,7 +80,7 @@ export async function readForgeRunFile(root: string): Promise<ForgeRunStatus | n
   return text === null ? null : parseForgeRun(text)
 }
 
-/** A file of the model folder itself (not under `.radical/`); null when it
+/** A file of the model folder itself (not under `.state/`); null when it
  *  is not there or is a symlink, which could point anywhere. */
 async function readModelFile(root: string, name: string): Promise<string | null> {
   const path = join(resolve(root), name)
@@ -84,7 +90,7 @@ async function readModelFile(root: string, name: string): Promise<string | null>
 }
 
 /** What `radical check` and `radical sense` keep beside a model for Studio:
- *  the test results and the measurements under `.radical/`, and the model's
+ *  the test results and the measurements under `.state/`, and the model's
  *  own check.json and reviews.json (the reviews of its manual fitness
  *  functions, kept in git); null for one that is not there. */
 export async function readCheckFiles(root: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null }> {
@@ -97,7 +103,7 @@ export async function readCheckFiles(root: string): Promise<{ results: string | 
 
 /** What a federation keeps beside a model for Studio: its own deps.json
  *  (kept in git) and the other models `radical federation fetch` wrote into
- *  `.radical/federation.json`; null for one that is not there. */
+ *  `.state/federation.json`; null for one that is not there. */
 export async function readFederationFiles(root: string): Promise<{ deps: string | null; federation: string | null }> {
   const deps = await readModelFile(root, DEPS_FILE)
   const federation = await readEditorStateFile(root, FEDERATION_FILE)

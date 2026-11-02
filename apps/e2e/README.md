@@ -130,8 +130,8 @@ screenshots of the manual (`apps/web/screenshots/<name>-light.png` and
 `npm run docs:screenshots` from the root after a UI change (`-- -g wiki` for
 one figure), look at the images, and commit them with the manual. Unlike the
 suite, they load web fonts and come from macOS. The Inspector figures read the
-repository's own `architecture/` model and the test results
-`npm run check:architecture` left in `architecture/.radical/`. Two more come
+repository's own `.radical/model/` model and the test results
+`npm run check:architecture` left in `.radical/model/.state/`. Two more come
 from the same run: README's `screenshots/demo.gif` (a recording of the
 sample's views, turned into a GIF by `ffmpeg`, which must be on the PATH) and
 `apps/web/social-preview.png`, the repo's social preview and the site's

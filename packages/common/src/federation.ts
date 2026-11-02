@@ -4,7 +4,7 @@
 // deps.json the models it depends on. `radical federation fetch` fetches
 // them (theirs too) and writes their elements and relations, each marked
 // with its origin ("orders@abc1234"), into the model folder's
-// .radical/federation.json. Studio and the MCP server open the model folder
+// .state/federation.json. Studio and the MCP server open the model folder
 // itself, add those (withOtherModels) and never write them back (ownModel in
 // model.ts, applied by the serializer); every change to them is refused
 // (model.ts, originOf). Fetching from git is the CLI's (node-files/gitDeps);
@@ -12,12 +12,13 @@
 
 import { normalizeViewFolder, type C4Node, type C4Relation, type DiagramData, type DiagramView, type ModelPin } from './c4'
 import { originModel, originOf } from './model'
+import { STATE_DIR } from './formats/canvasSelection'
 
 /** The file in a model folder that names its dependencies. */
 export const DEPS_FILE = 'deps.json'
 /** The other models' elements and relations as fetched, inside the model
  *  folder and out of git (FederationFile). */
-export const FEDERATION_FILE = '.radical/federation.json'
+export const FEDERATION_FILE = `${STATE_DIR}/federation.json`
 
 export interface Dependency {
   /** The model's name, as its elements' origin names it. */
@@ -234,7 +235,7 @@ export function otherModelsAt(file: FederationFile | null, pins: ModelPin[] | un
   return { nodes, relations: relations.filter((r) => ids.has(r.sourceId) && ids.has(r.targetId)), missing }
 }
 
-/** Another model's view as it is kept in .radical/federation.json: what it
+/** Another model's view as it is kept in .state/federation.json: what it
  *  shows, its filter, places and settings, without what this model cannot
  *  have of it (its sequence, its exploration). */
 export function otherModelView(view: DiagramView, origin: string): DiagramView | null {

@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
 import { buildInfo, releaseOf } from '@radical/common/version'
 import type { Io } from './check'
+import { modelFolderArg } from './modelFolder'
 
 const exec = promisify(execFile)
 
@@ -50,7 +51,7 @@ function isShHook(text: string): boolean {
 
 /** `lines` without the marked line that saves the base of `folder` (as
  *  quoted in the hook), and where it was (-1 when it was not there). */
-function withoutLine(lines: string[], folder: string): { lines: string[]; at: number } {
+export function withoutLine(lines: string[], folder: string): { lines: string[]; at: number } {
   const at = lines.findIndex((text, i) => text === HOOK_MARKER && lines[i + 1]?.includes(` diff ${folder} --save-base`))
   return at < 0 ? { lines, at } : { lines: [...lines.slice(0, at), ...lines.slice(at + 2)], at }
 }
@@ -79,8 +80,9 @@ export async function hooksCommand(args: string[], io: Io): Promise<number> {
   }
   const { values, positionals } = parsed
   if (values.help) { io.out(HOOKS_USAGE); return 0 }
-  const [action, folder = '.', ...rest] = positionals
+  const [action, named, ...rest] = positionals
   if (action !== 'install' || rest.length) { io.err(HOOKS_USAGE); return 2 }
+  const folder = await modelFolderArg(named, io.cwd)
   try {
     const root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')

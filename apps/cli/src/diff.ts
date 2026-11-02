@@ -6,6 +6,7 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
 import type { Io } from './check'
+import { modelFolderArg } from './modelFolder'
 
 export const DIFF_USAGE = `Usage: radical diff [folder] [options]
 
@@ -19,7 +20,7 @@ folding are left out. The MCP server's get_changes tool gives the same list.
   --since <ref>       the git branch, tag or commit to compare with (default:
                       the merge base with the default branch, origin/main)
   --format <format>   text (default) or json
-  --save-base         also save the model at the base to .radical/base.json in
+  --save-base         also save the model at the base to .state/base.json in
                       the folder, for Studio to show the changes (radical hooks
                       install keeps it fresh)
   --quiet             with --save-base: print nothing
@@ -51,14 +52,14 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
     io.err(DIFF_USAGE)
     return 2
   }
-  const folder = positionals[0] ?? '.'
+  const folder = await modelFolderArg(positionals[0], io.cwd)
   try {
     const root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
     const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()).data
     const changes = await modelChangesSince(root, data, values.since, { saveBase: values['save-base'] })
     if (values.quiet && values['save-base']) return 0
-    if (values['save-base']) io.err(`Saved the base (${changes.base.commit.slice(0, 7)}) to ${folder}/.radical/base.json.`)
+    if (values['save-base']) io.err(`Saved the base (${changes.base.commit.slice(0, 7)}) to ${folder}/.state/base.json.`)
     io.out(values.format === 'json'
       ? JSON.stringify({ base: changes.base, ...changes.report }, null, 2)
       : changes.text)

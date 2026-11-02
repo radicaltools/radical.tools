@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isMdFolderModelPath, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { DEPS_FILE, parseDeps, type Dependency, type FetchedDependency } from '@radical/common/federation'
 import { catFiles } from './gitModel'
+import { MODEL_FOLDER, OLD_MODEL_FOLDER } from './repositoryLayout'
 
 const exec = promisify(execFile)
 
@@ -123,13 +124,17 @@ export async function fetchDependency(dep: Dependency, home: string, options: Fe
     const commit = options.commit
       ? await gitOk(dir, ['rev-parse', '--verify', '--quiet', `${options.commit}^{commit}`]) ?? await fetchRef(dir, { ...dep, ref: options.commit })
       : await fetchRef(dir, dep)
-    const { [DEPS_FILE]: depsText, ...files } = await modelFilesAt(dir, commit, dep.path)
+    // A repository laid out the old way has its model in architecture/.
+    let path = dep.path
+    let found = await modelFilesAt(dir, commit, path)
+    if (!Object.keys(found).length && path === MODEL_FOLDER) found = await modelFilesAt(dir, commit, path = OLD_MODEL_FOLDER)
+    const { [DEPS_FILE]: depsText, ...files } = found
     if (!Object.keys(files).length) throw new Error(`no model folder "${dep.path}" at ${dep.ref} (${commit.slice(0, 7)})`)
     const { nodes, relations, views } = deserializeFromMdFolder(files).data
     // Its own dependencies, for a federation composed transitively; a repo
     // path in them is relative to its model folder, known only on disk.
     const deps = depsText === undefined ? undefined : parseDeps(depsText)
-    const home = isAddress(address) ? undefined : join(address, dep.path)
+    const home = isAddress(address) ? undefined : join(address, path)
     return { ...dep, commit, data: { nodes, relations, ...(views ? { views } : {}) }, ...(deps ? { deps } : {}), ...(home ? { home } : {}) }
   } catch (error) {
     throw new Error(`dependency ${dep.name} (${dep.repo} at ${dep.ref}): ${(error as Error).message}`)

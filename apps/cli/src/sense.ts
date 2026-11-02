@@ -7,8 +7,10 @@ import { MD_MANIFEST_FILE, deserializeFromMdFolder } from '@radical/common/forma
 import { originModel, originOf } from '@radical/common/model'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
+import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { writeBeside, type Io } from './check'
 import { SENSORS_FILE, repositorySensors } from './repositorySensors'
+import { modelFolderArg } from './modelFolder'
 import { composeFolder, federationOthers } from './federation'
 import { SENSOR_ADAPTERS, sensorAdapter } from './sensors/registry'
 
@@ -17,7 +19,7 @@ export const SENSE_USAGE = `Usage: radical sense <adapter> [input] [options]
        radical sense review <name> --passed|--failed --by <who> [--note <text>] [--folder <dir>]
 
 Measures with one sensor adapter and keeps what it measured beside the model,
-in .radical/measurements.json, for radical check and Studio's Inspector. A
+in .state/measurements.json, for radical check and Studio's Inspector. A
 sensor only measures: the conditions in the model's metrics judge the values.
 
   --folder <dir>      the model folder (default: the working directory)
@@ -127,7 +129,8 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
   }
   const { trigger, out, folder: given, context } = parsed.values
   if (!trigger || !out) { io.err(SENSE_USAGE); return 2 }
-  const folder = resolve(io.cwd, given ?? '.')
+  const named = await modelFolderArg(given, io.cwd)
+  const folder = resolve(io.cwd, named)
   let nodes
   let model
   let sensors
@@ -142,7 +145,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
     model = sensorModel({ nodes, relations: [...own.relations, ...others?.relations ?? []] }, federation?.deps.name || basename(folder))
     sensors = await repositorySensors(folder)
   } catch (error) {
-    io.err(`Cannot read the model folder ${given ?? '.'}: ${(error as Error).message}`)
+    io.err(`Cannot read the model folder ${named}: ${(error as Error).message}`)
     return 2
   }
   const fields = (n: unknown): Record<string, unknown> => n as Record<string, unknown>
@@ -200,7 +203,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
       const file = join(resolve(io.cwd, out), `${base}.json`)
       if (!isSensorName(line.sensor)) {
         failed++
-        io.err(`${node.label}: cannot measure "${line.raw}": no sensor ${line.sensor}, neither an adapter (radical sense --list) nor in ${sensors ? sensors.file : `a ${SENSORS_FILE} of the repository`}.`)
+        io.err(`${node.label}: cannot measure "${line.raw}": no sensor ${line.sensor}, neither an adapter (radical sense --list) nor in ${sensors ? sensors.file : `the repository's ${SENSORS_FILE}`}.`)
         continue
       }
       // The run's own options before the line's words, which may end in
@@ -227,7 +230,7 @@ async function reviewCommand(args: string[], io: Io, now: () => Date): Promise<n
     io.err(`radical sense review needs the name of what was reviewed, one of --passed and --failed, and --by.\n\n${SENSE_USAGE}`)
     return 2
   }
-  const folder = resolve(io.cwd, values.folder ?? '.')
+  const folder = resolve(io.cwd, await modelFolderArg(values.folder, io.cwd))
   if (!(await stat(join(folder, MD_MANIFEST_FILE)).then((s) => s.isFile(), () => false))) {
     io.err(`${values.folder ?? 'The working directory'} is no model folder (no ${MD_MANIFEST_FILE}); name one with --folder.`)
     return 2
@@ -309,13 +312,13 @@ export async function senseCommand(args: string[], io: Io, now: () => Date = () 
   if (typeof values.out === 'string') {
     await writeBeside(resolve(io.cwd, values.out), text)
   } else {
-    const folder = resolve(io.cwd, typeof values.folder === 'string' ? values.folder : '.')
+    const folder = resolve(io.cwd, await modelFolderArg(typeof values.folder === 'string' ? values.folder : undefined, io.cwd))
     if (!(await stat(join(folder, MD_MANIFEST_FILE)).then((s) => s.isFile(), () => false))) {
       io.err(`${typeof values.folder === 'string' ? values.folder : 'The working directory'} is no model folder (no ${MD_MANIFEST_FILE}); name one with --folder, or write a file with --out.`)
       return 2
     }
     const store = join(folder, MEASUREMENTS_FILE)
-    const existing = await readFile(store, 'utf8').then(parseMeasurementStore, () => [])
+    const existing = parseMeasurementStore(await readEditorStateFile(folder, MEASUREMENTS_FILE) ?? '')
     await writeBeside(store, serializeMeasurementStore(mergeMeasurements(existing, parseMetricsFile(text, adapter.name))))
   }
   for (const m of measured) io.out(`${m.metric} ${m.value}${m.unit ? ` ${m.unit}` : ''}`)

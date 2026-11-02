@@ -17,7 +17,7 @@ const run = (state: ForgeRunStatus['state'], statuses: Record<string, ForgeRunSt
 
 describe('agent Forge run status file', () => {
   it('lives next to the canvas selection and round-trips', () => {
-    expect(FORGE_RUN_FILE).toBe('.radical/forge-run.json')
+    expect(FORGE_RUN_FILE).toBe('.state/forge-run.json')
     const status = run('active', { requirements: 'done', domain: 'generating' })
     expect(status).toMatchObject({ version: 1, client: 'claude-code', updatedAt: at.toISOString(), state: 'active' })
     expect(status.stages).toHaveLength(FORGE_STAGES.length)

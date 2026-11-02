@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { findingTestName, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import type { Io } from './check'
+import { crucibleConfig } from './modelFolder'
 
 export const HARDEN_USAGE = `Usage: radical harden <finding> [--scenario <name>]
        radical harden --gate (<finding> | --test "<file> › <name>") [options]
@@ -23,19 +24,19 @@ Turns a finding into a test bound to the model (Radical Crucible).
                       with them put back, it must pass; and it must pass
                       several runs at once. The working tree is left as it was,
                       also when the gate is interrupted (Ctrl+C, kill)
-  --test "<f> › <n>"  the test to gate: a file from the folder crucible.json
-                      is in, and the test's title (its describe blocks too:
+  --test "<f> › <n>"  the test to gate: a file from the repository's root
+                      (where .radical/ is), and the test's title (its describe blocks too:
                       "<file> › <describe> › <name>")
   --base <ref>        the commit without the fix (default: the merge base
                       with origin/main, else main)
   --runs <n>          runs at once for the flakiness check (default 5)
-  --config <file>     the Crucible settings (default: crucible.json)
+  --config <file>     the Crucible settings (default: .radical/crucible/crucible.json)
 
 A test runs through the runner crucible.json gives for its folder
 ("runners": [{ "files": "apps/e2e/", "cwd": "apps/e2e",
 "command": ["npx", "playwright", "test", "{file}", "-g", "{name}"] }]),
 else with npx vitest run {file} -t {name} in the file's package. A runner's
-"build" (commands run from crucible.json's folder) is made before the run
+"build" (commands run from the repository's root) is made before the run
 without the fix and before the run with it, for a test of a build; its
 "repeat" (with {runs}) makes the runs at once one run, for a runner whose
 runs cannot go side by side (fixed ports). Tests, findings and
@@ -72,14 +73,14 @@ interface TestRun {
 }
 
 /** Files the gate never sets back: tests, findings, Crucible's settings. */
-const NOT_A_FIX = /(^|\/)(tests?|__tests__|e2e)\/|\.(test|spec)\.[cm]?[jt]sx?$|^crucible\/|^crucible\.json$/
+const NOT_A_FIX = /(^|\/)(tests?|__tests__|e2e)\/|\.(test|spec)\.[cm]?[jt]sx?$|^crucible\/|^crucible\.json$|^\.radical\/crucible(\.json$|\/)/
 
-function readConfig(file: string): HardenConfig | string {
-  if (!existsSync(file)) return { findings: 'crucible/findings', fuzz: [], runners: [] }
+function readConfig(file: string, findings: string): HardenConfig | string {
+  if (!existsSync(file)) return { findings, fuzz: [], runners: [] }
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<HardenConfig>
     return {
-      findings: typeof raw.findings === 'string' ? raw.findings : 'crucible/findings',
+      findings: typeof raw.findings === 'string' ? raw.findings : findings,
       fuzz: Array.isArray(raw.fuzz) ? raw.fuzz : [],
       runners: Array.isArray(raw.runners) ? raw.runners.filter((r) => r && typeof r.files === 'string' && Array.isArray(r.command) && r.command.length > 0
         && (r.build === undefined || (Array.isArray(r.build) && r.build.every((b) => Array.isArray(b) && b.length > 0)))
@@ -119,10 +120,9 @@ export async function hardenCommand(args: string[], io: Io): Promise<number> {
     io.err(HARDEN_USAGE)
     return 2
   }
-  const configFile = resolve(io.cwd, values.config ?? 'crucible.json')
-  const config = readConfig(configFile)
+  const { file: configFile, root, findings } = await crucibleConfig(values.config, io.cwd)
+  const config = readConfig(configFile, findings)
   if (typeof config === 'string') { io.err(config); return 2 }
-  const root = dirname(configFile)
   const findingsDir = resolve(root, config.findings)
 
   let finding: Finding | undefined

@@ -210,7 +210,7 @@ test('an edit made while an agent writes the folder survives a reload', async ({
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
   // The agent's mark: Studio holds its saves for 15 s.
-  await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code'))
+  await folder.write('.state/agent-activity.json', serializeAgentActivity('claude-code'))
   await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
@@ -228,7 +228,7 @@ test('an agent mark far ahead of Studio\'s clock holds the saves for one period,
   // (item 237).
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/payment-provider/_index.md')
-  await folder.write('.radical/agent-activity.json', serializeAgentActivity('claude-code', Date.now() + 3_600_000))
+  await folder.write('.state/agent-activity.json', serializeAgentActivity('claude-code', Date.now() + 3_600_000))
   await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect(page.getByText(/An agent is editing this model/)).toBeVisible()
@@ -424,7 +424,7 @@ test('New model on the welcome screen can keep the model in a folder', async ({ 
 test('an agent\'s Forge run on the folder makes the Forge button pulse and opens read only', async ({ page }) => {
   await saveAsFolder(page)
   const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review']
-  const write = (state: string, statuses: Record<string, string>, asking?: string): Promise<void> => folder.write('.radical/forge-run.json', JSON.stringify({
+  const write = (state: string, statuses: Record<string, string>, asking?: string): Promise<void> => folder.write('.state/forge-run.json', JSON.stringify({
     version: 1,
     client: 'claude-code',
     need: { id: 'n1', label: 'Click & collect' },
@@ -609,13 +609,13 @@ test('a folder opened from its cache shows what changed while Studio was closed,
   await saveAsFolder(page)
   await page.reload()
   await studio.ready()
-  await expect.poll(async () => (await folder.paths()).includes('.radical/cache/model.json'), { timeout: 10_000 }).toBe(true)
+  await expect.poll(async () => (await folder.paths()).includes('.state/cache/model.json'), { timeout: 10_000 }).toBe(true)
   // A save of Studio's goes into the cache too.
   await studio.designer()
   await studio.node('payments').dblclick()
   await rename(page, 'Payment Provider', 'Card Gateway')
   await expect.poll(async () => (await folder.files())['nodes/card-gateway/_index.md'] ?? '').toContain('Card Gateway')
-  await expect.poll(async () => (await folder.files())['.radical/cache/changes.json'] ?? '').toContain('Card Gateway')
+  await expect.poll(async () => (await folder.files())['.state/cache/changes.json'] ?? '').toContain('Card Gateway')
   const before = await studio.boxes()
 
   // Closed (a page of the same origin that is not Studio); meanwhile the

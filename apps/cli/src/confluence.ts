@@ -8,6 +8,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { exportWiki, type WikiExport } from './wikiExport'
 import { publishTree } from './confluenceTree'
 import type { Io } from './check'
+import { modelFolderArg } from './modelFolder'
 
 export const EXPORT_USAGE = `Usage: radical export confluence [folder] --view <id-or-name> [options]
 
@@ -144,7 +145,7 @@ export async function exportCommand(args: string[], io: Io): Promise<number> {
     for (const key of ['space-id', 'parent-id', 'page-id'] as const) if (values[key] !== undefined && !/^\d+$/.test(values[key]!)) throw new Error(`--${key} must be a numeric Confluence ID.`)
     if (values['parent-id'] && !values['space-id'] && !values['page-id']) throw new Error('--parent-id requires --space-id or --page-id.')
     if (!values.publish && (values['space-id'] || values['page-id'] || values['parent-id'] || values.url)) throw new Error('Add --publish to use a Confluence destination, or omit destination options for a local export.')
-    const root = await realpath(resolve(io.cwd, positionals[0] ?? '.'))
+    const root = await realpath(resolve(io.cwd, await modelFolderArg(positionals[0], io.cwd)))
     const files = await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()
     if (!isValidMdFolderManifest(files['radical.md'])) throw new Error('Not a Radical Markdown model folder: missing or invalid radical.md.')
     const data = deserializeFromMdFolder(files).data

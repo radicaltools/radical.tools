@@ -1,7 +1,7 @@
-// Where the elements of architecture/ are built in this repository: the
+// Where the elements of .radical/model/ are built in this repository: the
 // mapping of the model onto the code, which the model leaves to the
 // repository (ADR Fitness functions measure each element their decision
-// constrains). The sensors of radical.sensors.json get an element in
+// constrains). The sensors of .radical/sensors.json get an element in
 // --context and look it up here. Keyed by element id; the label is for
 // people. A sensor fails for an element missing here, naming it.
 

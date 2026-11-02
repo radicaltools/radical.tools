@@ -17,7 +17,7 @@
 // Imports are read with TypeScript's own pre-processor, not regular
 // expressions, so strings and JSX text are never mistaken for imports.
 //
-// It is also the sensor workspaces of radical.sensors.json: with the
+// It is also the sensor workspaces of .radical/sensors.json: with the
 // --context radical sense run gives it, it checks only the workspaces that
 // build the element (tools/sensors/elements.mjs).
 

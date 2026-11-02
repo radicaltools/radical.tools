@@ -2,7 +2,7 @@
 //
 // With the model changed first, the change is the work to do. Everything
 // that changed in the model since the base the CLI or the MCP server saved
-// beside it (.radical/base.json): each element added, changed and removed,
+// beside it (.state/base.json): each element added, changed and removed,
 // where it sits, its changed fields by their labels with the old and new
 // value, and for the requirements and ADRs among them what the last test
 // report says (changeWork in @radical/common), with how many of the new

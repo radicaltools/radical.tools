@@ -1804,7 +1804,7 @@ function atDefaultPositions(nodes: readonly C4Node[], positions: Record<string, 
 // ─── Milestones in a federation ──────────────────────────────────────────────
 // A milestone keeps the model's own elements and relations, and the commit
 // of each other model fetched when it was made (DiagramSnapshot.otherModels);
-// the other models' elements are fetched (.radical/federation.json), never
+// the other models' elements are fetched (.state/federation.json), never
 // kept. Shown, it has them as they were at those commits (otherModelsAt).
 
 /** Elements or relations without the other models' of a federation: what a
@@ -3426,7 +3426,7 @@ interface DiagramStore {
 
   // ── actions: snapshots (versions / milestones) ──
   snapshots: DiagramSnapshot[]
-  /** The other models of a federation as last read (.radical/federation.json,
+  /** The other models of a federation as last read (.state/federation.json,
    *  DiagramData.federation): what a milestone shows of them at its commits.
    *  Never saved. */
   federation: FederationFile | null

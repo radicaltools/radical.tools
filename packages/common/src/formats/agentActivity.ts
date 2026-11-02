@@ -8,13 +8,13 @@
 // writers that take turns rarely meet in one file, and when they do the
 // three-way merge on write (mergeMdFolderFiles) keeps both.
 //
-// It lives under `.radical/` with the canvas selection, which the md-folder
-// format never lists or watches and `.radical/.gitignore` keeps out of
+// It lives under `.state/` with the canvas selection, which the md-folder
+// format never lists or watches and `.state/.gitignore` keeps out of
 // version control.
 
-import { SELECTION_DIR } from './canvasSelection'
+import { STATE_DIR } from './canvasSelection'
 
-export const AGENT_ACTIVITY_FILE = `${SELECTION_DIR}/agent-activity.json`
+export const AGENT_ACTIVITY_FILE = `${STATE_DIR}/agent-activity.json`
 
 /** How long after its last write an agent counts as writing: long enough to
  *  span the pause between two tool calls, short enough that Studio saves

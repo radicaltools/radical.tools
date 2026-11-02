@@ -142,7 +142,7 @@ export interface ModelChangesSince {
 }
 
 export interface ChangesOptions {
-  /** Also write the model at the base to .radical/base.json, for Studio. */
+  /** Also write the model at the base to .state/base.json, for Studio. */
   saveBase?: boolean
 }
 

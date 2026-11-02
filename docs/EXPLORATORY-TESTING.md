@@ -19,7 +19,7 @@ you reproduced **twice from a fresh page**, and that is not already known.
 
 Not a finding:
 
-- anything in `crucible/findings/` (the findings since Radical Crucible), in
+- anything in `.radical/crucible/findings/` (the findings since Radical Crucible), in
   `docs/IMPROVEMENTS.md` (earlier runs are under "Found by exploratory
   runs") or in `apps/e2e/tests/studio/known-issues.spec.ts`. The repository
   has no GitHub issues;
@@ -227,7 +227,7 @@ no run has been (each run lists what it did not cover).
 One report per run, as your final message (a run started as a subagent
 cannot write a file). It ends with one JSON block, the form the round brief
 gives, from which the maintainer's session records your findings in
-`crucible/findings/` after re-running each script (`radical explore verify`,
+`.radical/crucible/findings/` after re-running each script (`radical explore verify`,
 `radical explore record`). For each finding:
 
 - **Title**: what is wrong, as the user would say it.
@@ -235,9 +235,9 @@ gives, from which the maintainer's session records your findings in
 - **Steps**: the shortest sequence that shows it, from a named model, and
   the script that runs it (`node <script> [args]` from your run's folder
   while your server runs; helpers it imports from your folder are copied
-  with it). The copy runs from `crucible/findings/F-NNNN/`, so the script
+  with it). The copy runs from `.radical/crucible/findings/F-NNNN/`, so the script
   names no absolute path: it finds the repository by walking up from its
-  own folder to `crucible.json`, and takes ports and the round's folder as
+  own folder to `.radical/crucible/crucible.json`, and takes ports and the round's folder as
   arguments.
 - **Expected / actual**, with numbers where there are any (positions,
   counts) and a screenshot (its path in your folder, in the JSON block's
