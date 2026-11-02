@@ -17,6 +17,10 @@
       "iconPath": "M8 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 12.5C3 10.01 5.24 8 8 8s5 2.01 5 4.5V14H3v-1.5Z",
       "id": "person",
       "label": "Person",
+      "layout": {
+        "role": "actor",
+        "side": "top"
+      },
       "properties": [
         {
           "key": "description",
@@ -149,6 +153,10 @@
       "iconPath": "M8 1C4.7 1 2 2.3 2 4v8c0 1.7 2.7 3 6 3s6-1.3 6-3V4c0-1.7-2.7-3-6-3ZM2 4c0 1.7 2.7 3 6 3s6-1.3 6-3",
       "id": "database",
       "label": "Database",
+      "layout": {
+        "role": "store",
+        "side": "right"
+      },
       "properties": [
         {
           "key": "description",
@@ -219,6 +227,9 @@
       "iconPath": "M4 3a3 2 0 1 0 0 4h8a3 2 0 1 0 0-4H4Zm-2 5.5a3 2 0 0 0 4 0v-1a3 2 0 0 1-4 0v1Zm10 0a3 2 0 0 0 4 0v-1a3 2 0 0 1-4 0v1Z",
       "id": "queue",
       "label": "Queue",
+      "layout": {
+        "role": "broker"
+      },
       "properties": [
         {
           "key": "description",
@@ -279,6 +290,9 @@
       "iconPath": "M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Zm1.5 1A.5.5 0 0 0 3 5v6a.5.5 0 0 0 .5.5h9A.5.5 0 0 0 13 11V5a.5.5 0 0 0-.5-.5h-9ZM5 7h2v2H5V7Zm4 0h2v2H9V7Z",
       "id": "domain",
       "label": "Domain",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "description",
@@ -319,6 +333,9 @@
       "iconPath": "M3 2.5A1.5 1.5 0 0 1 4.5 1h7A1.5 1.5 0 0 1 13 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5v-11ZM4.5 2a.5.5 0 0 0-.5.5V5h8V2.5a.5.5 0 0 0-.5-.5h-7ZM12 6H4v1.5h8V6Zm0 2.5H4V10h8V8.5Zm0 2.5H4v2.5c0 .28.22.5.5.5h7a.5.5 0 0 0 .5-.5V11Z",
       "id": "entity",
       "label": "Entity",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "default": "aggregate-root",
@@ -355,6 +372,10 @@
       "iconPath": "M4.5 1C3.67 1 3 1.67 3 2.5v11c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6L9 1H4.5ZM9 2l3 3.5H9V2ZM5 8h6v1H5V8Zm0 2.5h6v1H5v-1Zm0 2.5h3.5v1H5V13Z",
       "id": "adr",
       "label": "ADR",
+      "layout": {
+        "role": "note",
+        "side": "left"
+      },
       "properties": [
         {
           "default": "proposed",
@@ -392,6 +413,11 @@
           "key": "alternatives",
           "label": "Alternatives considered",
           "type": "textarea"
+        },
+        {
+          "key": "concern",
+          "label": "Concern (Hub)",
+          "type": "text"
         }
       ],
       "width": 180,
@@ -478,6 +504,10 @@
       "iconPath": "M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 1.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9ZM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm0 1a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z",
       "id": "fitness-fn",
       "label": "Fitness Function",
+      "layout": {
+        "role": "note",
+        "side": "left"
+      },
       "properties": [
         {
           "key": "description",
@@ -591,17 +621,30 @@
           {
             "fields": [
               "label",
-              "characteristic"
+              "characteristic",
+              "scope"
             ],
-            "help": "Name the architectural characteristic this function protects, e.g. \"Checkout p95 latency\".",
+            "help": "Name what this function protects, e.g. \"Checkout p95 latency\", and the ISO/IEC 25010 characteristic it is part of. Atomic checks one part in one context (a unit test, a linter rule); holistic checks how several parts behave together (latency under load).",
             "kind": "fields",
-            "title": "Name & category"
+            "title": "Name & characteristic"
           },
           {
             "fields": [
-              "description"
+              "cadence",
+              "trigger",
+              "every",
+              "invocation"
             ],
-            "help": "How is the characteristic measured — a test, a metric, a static check?",
+            "help": "Triggered runs on an event (a pull request, every night, a release); continual runs all the time (monitoring in production); temporal falls due after a time (every 90 days). Manual means a person reviews it and records the result with radical sense review.",
+            "kind": "fields",
+            "title": "When it runs"
+          },
+          {
+            "fields": [
+              "description",
+              "measure"
+            ],
+            "help": "How is the characteristic measured? Measure names a sensor and its arguments, one per line, e.g. \"playwright tests/load.spec.ts --label env=staging\"; leave it empty for tests the pull-request gate already runs.",
             "kind": "fields",
             "title": "What it measures"
           },
@@ -609,7 +652,7 @@
             "fields": [
               "metrics"
             ],
-            "help": "When does it pass? Give a concrete threshold, e.g. \"p95 < 300 ms\".",
+            "help": "When does it pass? One condition per line: a measured value and its threshold, e.g. \"checkout.latency.p95{env=prod} <= 300 ms\", or a test that has to pass, e.g. \"test(tests/architecture.test.ts › no cycles) passed\".",
             "kind": "fields",
             "title": "Success criteria"
           },
@@ -649,6 +692,9 @@
       "iconPath": "M3 2a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 3 12h1.5v2.5L8 12h5a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 13 2H3Zm1.5 3h7v1h-7V5Zm0 2.5h5v1h-5v-1Z",
       "id": "need",
       "label": "Need",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "description",
@@ -732,6 +778,10 @@
       "iconPath": "M5 1a1 1 0 0 0-1 1H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1a1 1 0 0 0-1-1H5Zm0 1h6v1H5V2ZM4 5.5h1.5v1.5H4V5.5Zm3 .25h5v1H7v-1ZM4 9h1.5v1.5H4V9Zm3 .25h5v1H7v-1Z",
       "id": "requirement",
       "label": "Requirement",
+      "layout": {
+        "role": "note",
+        "side": "left"
+      },
       "properties": [
         {
           "default": "ubiquitous",
@@ -900,6 +950,10 @@
       "iconPath": "M3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3Zm3.5 2.5 5 3.5-5 3.5v-7Z",
       "id": "scenario",
       "label": "Scenario",
+      "layout": {
+        "role": "note",
+        "side": "left"
+      },
       "properties": [
         {
           "key": "given",
@@ -1001,6 +1055,9 @@
       "iconPath": "M2 2h12v12H2V2Zm1 1v2h2V3H3Zm3 0v2h2V3H6Zm3 0v2h2V3H9Zm3 0v2h1V3h-1ZM3 6v2h2V6H3Zm3 0v2h2V6H6Zm3 0v2h2V6H9Zm3 0v2h1V6h-1ZM3 9v2h2V9H3Zm3 0v2h2V9H6Zm3 0v2h2V9H9Zm3 0v2h1V9h-1ZM3 12v1h2v-1H3Zm3 0v1h2v-1H6Zm3 0v1h2v-1H9Zm3 0v1h1v-1h-1Z",
       "id": "blueprint",
       "label": "Blueprint",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "description",
@@ -1049,6 +1106,9 @@
       "iconPath": "M2 2.5A1.5 1.5 0 0 1 3.5 1h9A1.5 1.5 0 0 1 14 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-11ZM3 5v8.5c0 .28.22.5.5.5h9a.5.5 0 0 0 .5-.5V5H3Zm1 1.5h8v2H4v-2Zm0 3h3.5V13H4V9.5Zm4.5 0H12v1H8.5v-1Zm0 2H12v1H8.5v-1Z",
       "id": "mockup",
       "label": "Mockup",
+      "layout": {
+        "role": "screen"
+      },
       "properties": [
         {
           "key": "description",
@@ -1122,6 +1182,9 @@
       "iconPath": "M1 3.5A1.5 1.5 0 0 1 2.5 2h3A1.5 1.5 0 0 1 7 3.5v2A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-2Zm8 7A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v2a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 12.5v-2ZM3.5 8h1v3h2.8v-1l2 1.5-2 1.5v-1H3.5V8Z",
       "id": "state-machine",
       "label": "State Machine",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "description",
@@ -1147,6 +1210,15 @@
       "iconPath": "M3.5 3h9A2.5 2.5 0 0 1 15 5.5v5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 10.5v-5A2.5 2.5 0 0 1 3.5 3Zm0 1.5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-9Z",
       "id": "state",
       "label": "State",
+      "layout": {
+        "byProperty": {
+          "key": "kind",
+          "roles": {
+            "final": "end"
+          }
+        },
+        "role": "element"
+      },
       "properties": [
         {
           "default": "normal",
@@ -1216,6 +1288,15 @@
       "iconPath": "M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z",
       "id": "pseudostate",
       "label": "Pseudostate",
+      "layout": {
+        "byProperty": {
+          "key": "kind",
+          "roles": {
+            "initial": "start"
+          }
+        },
+        "role": "element"
+      },
       "properties": [
         {
           "default": "initial",
@@ -1248,6 +1329,10 @@
       "iconPath": "M9.5 1 3 9h4l-1 6 6.5-8h-4l1-6Z",
       "id": "event",
       "label": "Event",
+      "layout": {
+        "role": "note",
+        "side": "left"
+      },
       "properties": [
         {
           "default": "external",
@@ -1290,6 +1375,9 @@
       "iconPath": "M5 2c-1.1 0-2 .9-2 2v2.2c0 .5-.3.8-.8.8H1.5v2h.7c.5 0 .8.3.8.8V12c0 1.1.9 2 2 2h.5v-1.5H5c-.3 0-.5-.2-.5-.5V9.5c0-.9-.4-1.6-1-2 .6-.4 1-1.1 1-2V4c0-.3.2-.5.5-.5h.5V2H5Zm3 1.5h7V5H8V3.5Zm0 3.75h7v1.5H8v-1.5ZM8 11h7v1.5H8V11Z",
       "id": "process",
       "label": "Process",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "order",
@@ -1331,6 +1419,9 @@
       "iconPath": "M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Zm1.5 0v7h9v-7h-9Zm1 2.75h3.8V5.5L11 8l-2.7 2.5V8.75H4.5v-1.5Z",
       "id": "step",
       "label": "Step",
+      "layout": {
+        "role": "element"
+      },
       "properties": [
         {
           "key": "order",
@@ -1378,7 +1469,9 @@
     "interacts": {
       "allowedPairs": [
         {
+          "forwardLabel": "Interacts with",
           "from": "person",
+          "inverseLabel": "Interacts with",
           "to": "person"
         },
         {
@@ -1398,7 +1491,9 @@
           "to": "component"
         },
         {
+          "forwardLabel": "Delivers to",
           "from": "system",
+          "inverseLabel": "Receives from",
           "to": "person"
         },
         {
@@ -1426,7 +1521,9 @@
           "to": "component"
         },
         {
+          "forwardLabel": "Delivers to",
           "from": "container",
+          "inverseLabel": "Receives from",
           "to": "person"
         },
         {
@@ -1454,7 +1551,9 @@
           "to": "component"
         },
         {
+          "forwardLabel": "Delivers to",
           "from": "webapp",
+          "inverseLabel": "Receives from",
           "to": "person"
         },
         {
@@ -1524,6 +1623,9 @@
       "id": "interacts",
       "inverseLabel": "Used by",
       "label": "Interacts",
+      "layout": {
+        "flow": "forward"
+      },
       "properties": [
         {
           "key": "technology",
@@ -1564,6 +1666,9 @@
       "id": "realises",
       "inverseLabel": "Realised by",
       "label": "Realises",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     },
     "part-of": {
@@ -1579,6 +1684,10 @@
       "id": "part-of",
       "inverseLabel": "Made up of",
       "label": "Part of",
+      "layout": {
+        "axis": "vertical",
+        "flow": "reverse"
+      },
       "properties": []
     },
     "references": {
@@ -1594,6 +1703,10 @@
       "id": "references",
       "inverseLabel": "Referenced by",
       "label": "References",
+      "layout": {
+        "axis": "horizontal",
+        "flow": "side"
+      },
       "properties": [
         {
           "default": "one",
@@ -1624,6 +1737,9 @@
       "id": "depends-on",
       "inverseLabel": "Depended on by",
       "label": "Depends on",
+      "layout": {
+        "flow": "forward"
+      },
       "properties": [
         {
           "key": "description",
@@ -1645,6 +1761,10 @@
       "id": "partnership",
       "inverseLabel": "Partners with",
       "label": "Partnership",
+      "layout": {
+        "axis": "horizontal",
+        "flow": "side"
+      },
       "properties": [
         {
           "default": "partnership",
@@ -1771,9 +1891,13 @@
       "builtin": true,
       "color": "#dc2626",
       "description": "The decision, check or requirement applies to the target element.",
+      "governance": true,
       "id": "constrains",
       "inverseLabel": "Constrained by",
       "label": "Constrains",
+      "layout": {
+        "flow": "side"
+      },
       "properties": [
         {
           "key": "description",
@@ -1792,9 +1916,13 @@
       "builtin": true,
       "color": "#f59e0b",
       "description": "The newer decision replaces the older one.",
+      "governance": true,
       "id": "supersedes",
       "inverseLabel": "Superseded by",
       "label": "Supersedes",
+      "layout": {
+        "flow": "forward"
+      },
       "properties": []
     },
     "implements": {
@@ -1823,9 +1951,13 @@
       "builtin": true,
       "color": "#7c3aed",
       "description": "A fitness function checks that a decision still holds; a C4 element runs a state machine.",
+      "governance": true,
       "id": "implements",
       "inverseLabel": "Implemented by",
       "label": "Implements",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     },
     "satisfies": {
@@ -1878,9 +2010,13 @@
       "builtin": true,
       "color": "#0891b2",
       "description": "The element is what makes the requirement true.",
+      "governance": true,
       "id": "satisfies",
       "inverseLabel": "Satisfied by",
       "label": "Satisfies",
+      "layout": {
+        "flow": "side"
+      },
       "properties": [
         {
           "key": "description",
@@ -1907,9 +2043,14 @@
       "builtin": true,
       "color": "#0d9488",
       "description": "A requirement turns stakeholder input into a shall-statement or refines a broader requirement; a need sits inside a broader need.",
+      "governance": true,
       "id": "derives",
       "inverseLabel": "Refined into",
       "label": "Derives from",
+      "layout": {
+        "axis": "vertical",
+        "flow": "reverse"
+      },
       "properties": []
     },
     "traces-to": {
@@ -1926,9 +2067,14 @@
       "builtin": true,
       "color": "#06b6d4",
       "description": "The decision the requirement led to, or the check that keeps it.",
+      "governance": true,
       "id": "traces-to",
       "inverseLabel": "Traced from",
       "label": "Traces to",
+      "layout": {
+        "axis": "vertical",
+        "flow": "reverse"
+      },
       "properties": []
     },
     "verifies": {
@@ -1949,9 +2095,14 @@
       "builtin": true,
       "color": "#16a34a",
       "description": "The scenario is the acceptance test of the requirement or state machine.",
+      "governance": true,
       "id": "verifies",
       "inverseLabel": "Verified by",
       "label": "Verifies",
+      "layout": {
+        "axis": "vertical",
+        "flow": "reverse"
+      },
       "properties": []
     },
     "illustrates": {
@@ -1972,9 +2123,13 @@
       "builtin": true,
       "color": "#db2777",
       "description": "The screen shows the requirement being met, the step of the scenario, or what the user sees in the state.",
+      "governance": true,
       "id": "illustrates",
       "inverseLabel": "Illustrated by",
       "label": "Illustrates",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     },
     "presented-by": {
@@ -1999,9 +2154,13 @@
       "builtin": true,
       "color": "#be185d",
       "description": "The part of the architecture that renders the screen.",
+      "governance": true,
       "id": "presented-by",
       "inverseLabel": "Presents",
       "label": "Presented by",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     },
     "navigates-to": {
@@ -2017,6 +2176,10 @@
       "id": "navigates-to",
       "inverseLabel": "Reached from",
       "label": "Navigates to",
+      "layout": {
+        "axis": "horizontal",
+        "flow": "forward"
+      },
       "properties": [
         {
           "key": "description",
@@ -2051,6 +2214,10 @@
       "id": "transition",
       "inverseLabel": "Entered from",
       "label": "Transition",
+      "layout": {
+        "axis": "vertical",
+        "flow": "forward"
+      },
       "properties": [
         {
           "key": "event",
@@ -2100,6 +2267,9 @@
       "id": "lifecycle-of",
       "inverseLabel": "Lifecycle modelled by",
       "label": "Lifecycle of",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     },
     "emits": {
@@ -2143,6 +2313,9 @@
       "id": "emits",
       "inverseLabel": "Emitted by",
       "label": "Emits",
+      "layout": {
+        "flow": "side"
+      },
       "properties": [
         {
           "default": "entry",
@@ -2186,6 +2359,9 @@
       "id": "performed-by",
       "inverseLabel": "Performs",
       "label": "Performed by",
+      "layout": {
+        "flow": "side"
+      },
       "properties": []
     }
   },

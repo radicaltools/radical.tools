@@ -13,4 +13,4 @@ scope: "atomic"
 trigger: "pull-request"
 ---
 
-apps/cli/src/sense.test.ts (per-element runs with --context, unknown sensors) and packages/common/tests/fitnessPerElement.test.ts (per-element evaluation, a fetched standard). .radical/sensors/sensors.test.mjs checks this repository's own use: every element a fitness function measures with a sensor of .radical/sensors/sensors.json has a place in .radical/sensors/elements.mjs, and each sensor names an element it has none for.
+apps/cli/src/sense.test.ts (per-element runs with --context, unknown sensors) and packages/common/tests/fitnessPerElement.test.ts (per-element evaluation, a fetched standard). .radical/sensors/sensors.test.mjs checks this repository's own use: every element a fitness function measures with a sensor of .radical/sensors/sensors.json has paths in .radical/radical.json, and each sensor names an element it has none for.
