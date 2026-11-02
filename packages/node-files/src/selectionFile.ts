@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import {
   OLD_STATE_DIR, STATE_DIR, SELECTION_FILE, SELECTION_GITIGNORE, SELECTION_GITIGNORE_CONTENT,
   oldStatePath, parseSelection, type CanvasSelection,
@@ -8,7 +8,7 @@ import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/com
 import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 import { REPOSITORY_FILE } from '@radical/common/repositoryMapping'
-import { findRepositoryFile } from './repositoryLayout'
+import { REVIEWS_FILE as REPOSITORY_REVIEWS, findRepositoryFile, mappingRoot } from './repositoryLayout'
 
 /** Refuses a symlinked `.state` (or old `.radical`), which could redirect
  *  the write elsewhere. */
@@ -100,7 +100,8 @@ export async function readCheckFiles(root: string): Promise<{ results: string | 
   const results = await readEditorStateFile(root, TEST_RESULTS_FILE)
   const measurements = await readEditorStateFile(root, MEASUREMENTS_FILE)
   const config = await readModelFile(root, CHECK_CONFIG_FILE)
-  const reviews = await readModelFile(root, REVIEWS_FILE)
+  // The repository's .radical/reviews.json, else the model folder's.
+  const reviews = await readFile(join(await mappingRoot(root), REPOSITORY_REVIEWS), 'utf-8').catch(() => null) ?? await readModelFile(root, REVIEWS_FILE)
   // Where the repository builds the model's elements, for the card.
   const found = await findRepositoryFile(root, REPOSITORY_FILE, REPOSITORY_FILE)
   const repository = found ? await readFile(found.path, 'utf-8').catch(() => null) : null
@@ -114,6 +115,17 @@ export async function readFederationFiles(root: string): Promise<{ deps: string 
   const deps = await readModelFile(root, DEPS_FILE)
   const federation = await readEditorStateFile(root, FEDERATION_FILE)
   return { deps, federation }
+}
+
+/** Writes the repository's .radical/radical.json for the model in `root`:
+ *  the one readCheckFiles reads, else a new one in the repository's
+ *  .radical/. Refuses a symlink, which could redirect the write. */
+export async function writeRepositoryFile(root: string, content: string): Promise<void> {
+  const found = await findRepositoryFile(root, REPOSITORY_FILE, REPOSITORY_FILE)
+  const path = found?.path ?? join(await mappingRoot(root), REPOSITORY_FILE)
+  if (await lstat(path).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink: ${path}`)
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, content, 'utf-8')
 }
 
 /** Writes the model's check.json (the Inspector's settings). Refuses a

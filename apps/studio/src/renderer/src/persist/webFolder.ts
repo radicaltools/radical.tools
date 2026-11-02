@@ -329,6 +329,14 @@ export async function readFederationFromHandle(root: FsDirHandle): Promise<{ dep
   return { deps, federation: await readStateFromHandle(root, FEDERATION_FILE.slice(STATE_DIR.length + 1)) }
 }
 
+/** Writes the repository's radical.json into its .radical/ folder (the
+ *  handle kept), or into the .radical/ of a repository handle kept by an
+ *  earlier version. */
+export async function writeRepositoryFileToHandle(repository: FsDirHandle, content: string): Promise<void> {
+  const dir = repository.name === '.radical' ? repository : await repository.getDirectoryHandle('.radical', { create: true })
+  await writeText(dir, 'radical.json', content)
+}
+
 /** What `radical check` and `radical sense` keep beside the model:
  *  `.state/test-results.json`, `.state/measurements.json` and the
  *  model's check.json and reviews.json, and with the repository's .radical/
@@ -341,7 +349,8 @@ export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: F
     results: await readStateFromHandle(root, 'test-results.json'),
     measurements: await readStateFromHandle(root, 'measurements.json'),
     config: await text(root, 'check.json'),
-    reviews: await text(root, 'reviews.json'),
+    // The repository's .radical/reviews.json, else the model folder's.
+    reviews: (repository ? await text(repository.name === '.radical' ? repository : await repository.getDirectoryHandle('.radical').catch(() => repository), 'reviews.json') : null) ?? await text(root, 'reviews.json'),
     // The repository's .radical/ beside the model: its mapping. A handle
     // kept before .radical/ was kept is the repository's own.
     repository: repository

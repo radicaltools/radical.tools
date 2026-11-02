@@ -429,7 +429,7 @@ test('Settings save goals and rules to check.json, and say when a change loosens
   await page.getByRole('spinbutton', { name: 'Goal for Scenarios that name a check' }).fill('90')
   await page.locator('.insp-diff summary').click()
   await expect(page.locator('.insp-diff pre')).toContainText('+   "goals": {')
-  await page.getByRole('button', { name: 'Save to check.json' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.insp-savebar')).toHaveCount(0)
 
   const saved = JSON.parse((await folder.files())['check.json'])

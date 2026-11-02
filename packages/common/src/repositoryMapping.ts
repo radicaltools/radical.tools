@@ -29,10 +29,16 @@ export interface VerifiedElement {
   tests: string[]
 }
 
-/** What a .radical/radical.json says. */
+/** What a .radical/radical.json says: besides the mapping, the repository's
+ *  own settings of the check (ADR The model folder holds nothing of the
+ *  repository): the test files every test of which a scenario or fitness
+ *  function must check (test-unbound), and CI's artifacts that hold the
+ *  test reports (radical check --from-ci). */
 export interface RepositoryFile {
   implements: MappedElement[]
   verifies: VerifiedElement[]
+  tests?: { include?: string[]; exclude?: string[] }
+  ci?: { artifacts?: string[] }
 }
 
 /** A list of strings, or one string as a list of one. */
@@ -49,7 +55,25 @@ export function parseRepositoryFile(text: string, file = REPOSITORY_FILE): Repos
     return value as Array<Record<string, unknown>>
   }
   const name = (e: Record<string, unknown>) => (typeof e?.name === 'string' ? { name: e.name } : {})
+  const settings = (key: string, lists: string[]): Record<string, string[]> | undefined => {
+    const value = (raw as Record<string, unknown>)?.[key]
+    if (value === undefined) return undefined
+    if (!value || typeof value !== 'object') throw new Error(`${file}: "${key}" is no object`)
+    const out: Record<string, string[]> = {}
+    for (const list of lists) {
+      const v = (value as Record<string, unknown>)[list]
+      if (v === undefined) continue
+      const got = strings(v)
+      if (!got) throw new Error(`${file}: "${key}.${list}" is no list`)
+      out[list] = got
+    }
+    return out
+  }
+  const tests = settings('tests', ['include', 'exclude'])
+  const ci = settings('ci', ['artifacts'])
   return {
+    ...(tests ? { tests } : {}),
+    ...(ci ? { ci } : {}),
     implements: list('implements').map((e, i): MappedElement => {
       const paths = strings(e?.paths)
       if (typeof e?.element !== 'string' || !e.element || !paths) throw new Error(`${file}: implements[${i}] needs "element" (an id) and "paths" (a list of folders)`)
@@ -75,7 +99,12 @@ export function serializeRepositoryFile(file: RepositoryFile): string {
   const implemented = file.implements.map((m) => `    { ${head(m)}, "paths": [${m.paths.map((p) => JSON.stringify(p)).join(', ')}] }`)
   const verified = file.verifies.map((v) => `    { ${head(v)}, "tests": [${v.tests.length ? `\n${v.tests.map((t) => `      ${JSON.stringify(t)}`).join(',\n')}\n    ` : ''}] }`)
   const section = (key: string, lines: string[]) => `  "${key}": [${lines.length ? `\n${lines.join(',\n')}\n  ` : ''}]`
-  return `{\n${section('implements', implemented)}${file.verifies.length ? `,\n${section('verifies', verified)}` : ''}\n}\n`
+  const inline = (v: object) => `{ ${Object.entries(v).map(([k, list]) => `${JSON.stringify(k)}: [${(list as string[]).map((x) => JSON.stringify(x)).join(', ')}]`).join(', ')} }`
+  const settings = [
+    ...(file.tests ? [`  "tests": ${inline(file.tests)}`] : []),
+    ...(file.ci ? [`  "ci": ${inline(file.ci)}`] : []),
+  ]
+  return `{\n${[...settings, section('implements', implemented), ...(file.verifies.length ? [section('verifies', verified)] : [])].join(',\n')}\n}\n`
 }
 
 /** The tests the file binds to element `id`. */

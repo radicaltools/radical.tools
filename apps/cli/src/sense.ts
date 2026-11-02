@@ -10,7 +10,7 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { writeBeside, type Io } from './check'
 import { SENSORS_FILE, repositorySensors } from './repositorySensors'
-import { elementPaths, readRepositoryMapping, type MappedElement } from '@radical/node-files/repositoryLayout'
+import { REVIEWS_FILE as REPOSITORY_REVIEWS, elementPaths, mappingRoot, readRepositoryMapping, type MappedElement } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
 import { composeFolder, federationOthers } from './federation'
 import { SENSOR_ADAPTERS, sensorAdapter } from './sensors/registry'
@@ -183,8 +183,11 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
           await rm(metricsOut, { force: true })
           const sensorContext = model.context(node, element, metricsOut)
           const labels = element ? ['--label', `${ELEMENT_LABEL}=${element.id}`] : []
-          const ok = await measure(node, line, file, ['command', '--name', line.sensor, '--out', file, ...labels, ...extra, '--', ...sensor, ...line.args, '--context', JSON.stringify(sensorContext)],
-            element ? ` for ${element.label}` : '', sensors!.root)
+          // A command gets the context; an adapter, its arguments.
+          const args = 'adapter' in sensor
+            ? [sensor.adapter, '--out', file, ...labels, ...extra, ...sensor.args, ...line.args]
+            : ['command', '--name', line.sensor, '--out', file, ...labels, ...extra, '--', ...sensor.command, ...line.args, '--context', JSON.stringify(sensorContext)]
+          const ok = await measure(node, line, file, args, element ? ` for ${element.label}` : '', sensors!.root)
           if (!ok) { failed++; continue }
           // What the sensor measured itself, labelled with the element as
           // its exit code is.
@@ -240,7 +243,8 @@ async function reviewCommand(args: string[], io: Io, now: () => Date): Promise<n
     io.err(`${values.folder ?? 'The working directory'} is no model folder (no ${MD_MANIFEST_FILE}); name one with --folder.`)
     return 2
   }
-  const path = join(folder, REVIEWS_FILE)
+  // In the repository's .radical/reviews.json, beside how it meets the model.
+  const path = join(await mappingRoot(folder), REPOSITORY_REVIEWS)
   const existing = await readFile(path, 'utf8').catch(() => undefined)
   const result = values.passed ? 'passed' : 'failed'
   let text
@@ -250,8 +254,9 @@ async function reviewCommand(args: string[], io: Io, now: () => Date): Promise<n
     io.err(`Cannot read ${REVIEWS_FILE}: ${(error as Error).message}`)
     return 2
   }
+  await mkdir(dirname(path), { recursive: true })
   await writeFile(path, text, 'utf8')
-  io.out(`Recorded in ${REVIEWS_FILE}: ${name} ${result}, by ${values.by.trim()}. Commit it with the model.`)
+  io.out(`Recorded in ${REPOSITORY_REVIEWS}: ${name} ${result}, by ${values.by.trim()}. Commit it.`)
   return 0
 }
 

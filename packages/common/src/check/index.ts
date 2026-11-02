@@ -140,6 +140,9 @@ export interface CheckOptions {
   /** The repository's .radical/radical.json, as the CLI reads it; without
    *  it repository-mapping checks nothing (Studio). */
   repository?: RepositoryMapping | null
+  /** By element, the paths from the repository's root its description
+   *  names that the repository does not have (the CLI). */
+  missingPaths?: Record<string, string[]>
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
   /** The event the check runs on (pull-request in the gate): what runs on
@@ -253,6 +256,38 @@ interface ModelCheck {
  *  origin, in a federation) are checked with it, so what points at them
  *  holds; what is found about them, and their share of the metrics, is
  *  their own model's. */
+/** The rules' settings with the repository's test files (its
+ *  .radical/radical.json "tests") for test-unbound, over check.json's. */
+export function withRepositorySettings(rules: Record<string, RuleSetting>, tests: { include?: string[]; exclude?: string[] } | undefined): Record<string, RuleSetting> {
+  if (!tests?.include && !tests?.exclude) return rules
+  const own = rules['test-unbound']
+  const base = typeof own === 'string' ? { severity: own } : own ?? {}
+  return { ...rules, 'test-unbound': { ...base, ...(tests.include ? { include: tests.include } : {}), ...(tests.exclude ? { exclude: tests.exclude } : {}) } as RuleSetting }
+}
+
+/** `config` without the repository's settings (test-unbound's include and
+ *  exclude, ci): what the model's check.json keeps when they go to the
+ *  repository's .radical/radical.json. */
+export function withoutRepositorySettings(config: CheckConfig): CheckConfig {
+  const { ci: _ci, ...rest } = config
+  const unbound = rest.rules?.['test-unbound']
+  if (typeof unbound !== 'object') return rest
+  const { include: _include, exclude: _exclude, ...kept } = unbound
+  const rules = { ...rest.rules }
+  if (Object.keys(kept).length) rules['test-unbound'] = kept as RuleSetting
+  else delete rules['test-unbound']
+  return { ...rest, rules }
+}
+
+/** The repository's settings a check.json holds. */
+function settingsInModel(config: CheckConfig): string[] {
+  const unbound = config.rules?.['test-unbound']
+  return [
+    ...(typeof unbound === 'object' && (unbound.include?.length || unbound.exclude?.length) ? ['test-unbound include and exclude'] : []),
+    ...(config.ci?.artifacts?.length ? ['ci artifacts'] : []),
+  ]
+}
+
 function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig): ModelCheck {
   const found: Array<RuleFinding & { rule: string }> = []
   // The tests .radical/radical.json binds count as each node's conditions.
@@ -262,7 +297,8 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations, data.snapshots ?? [])
     .forEach((finding) => found.push({ rule: STALE_REFERENCE, ...finding }))
   const settings = {
-    metamodel: documentMetamodel(data.metamodel, data.nodes), settings: config.rules ?? {},
+    metamodel: documentMetamodel(data.metamodel, data.nodes), settings: withRepositorySettings(config.rules ?? {}, options.repository?.tests),
+    settingsInModel: settingsInModel(config),
     ...(options.tests ? { tests: options.tests } : {}),
     ...(options.tests && options.testsReadAt ? { testsReadAt: options.testsReadAt } : {}),
     ...(options.concerns ? { concerns: options.concerns } : {}),
@@ -272,6 +308,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.now !== undefined ? { now: options.now } : {}),
     ...(options.sensors !== undefined ? { sensors: options.sensors } : {}),
     ...(options.repository !== undefined ? { repository: options.repository } : {}),
+    ...(options.missingPaths ? { missingPaths: options.missingPaths } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))

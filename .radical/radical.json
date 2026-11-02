@@ -1,4 +1,6 @@
 {
+  "tests": { "include": ["apps/e2e/**"], "exclude": ["**/known-issues.spec.ts", "**/bench.spec.ts", "**/scale.spec.ts"] },
+  "ci": { "artifacts": ["test-reports", "e2e-report"] },
   "implements": [
     { "element": "974cc763-a121-4f53-a92d-18a64562a0c9", "name": "radical.tools", "paths": ["."] },
     { "element": "8c66e024-79f9-42d0-86cd-843cefd2a7ef", "name": "CLI", "paths": ["apps/cli"] },
@@ -280,8 +282,8 @@
       "packages/common/tests/fitnessClassification.test.ts › fitness function classification › leaves out of a pull-request check the fitness functions that run on another trigger"
     ] },
     { "element": "1a5d8e73-5188-432a-9e36-884f71e6134b", "name": "A review passes a manual function", "tests": [
-      "apps/cli/src/sense.test.ts › radical sense › records a review in reviews.json beside the model, kept in git",
-      "packages/common/tests/fitnessClassification.test.ts › fitness function classification › evaluates a review condition against the latest review of the fitness function"
+      "packages/common/tests/fitnessClassification.test.ts › fitness function classification › evaluates a review condition against the latest review of the fitness function",
+      "apps/cli/src/sense.test.ts › radical sense › records a review in the repository's .radical/reviews.json, kept in git"
     ] },
     { "element": "22903dd6-402f-4059-99d2-f9e08f6c25b0", "name": "A spec writes its metrics", "tests": [
       "apps/cli/src/sensors/contract.test.ts › sensor adapters › playwright: writes radical-metrics/1 from its fixture and judges no value"
@@ -2938,6 +2940,27 @@
       "apps/cli/src/harden.test.ts › radical harden › binds the hardened test to its scenario in .radical/radical.json",
       "apps/mcp/src/folderModel.test.ts › test bindings",
       "apps/e2e/tests/studio/repository-mapping.spec.ts › the card of a scenario lists its tests"
+    ] },
+    { "element": "629af494-bc49-417d-bf54-6f0f6c4d1cf4", "name": "An adapter run as a repository sensor", "tests": [
+      "apps/cli/src/sense.test.ts › radical sense run › runs a repository's sensor that names an adapter with its arguments, for each element",
+      "packages/common/tests/separation.test.ts › the model folder holds nothing of the repository › warns about a measure line with the repository's arguments"
+    ] },
+    { "element": "efb0caf0-781e-4ca4-88ac-74cfe8eaa4c6", "name": "Repository settings read and written", "tests": [
+      "packages/common/tests/separation.test.ts › the model folder holds nothing of the repository › reads the repository's test files from radical.json and warns about such settings in check.json",
+      "apps/cli/src/ciResults.test.ts › radical check --from-ci › downloads the artifacts .radical/radical.json names",
+      "apps/e2e/tests/studio/repository-mapping.spec.ts › Settings save the repository's test files to .radical/radical.json"
+    ] },
+    { "element": "12fd43b1-4980-42bc-84c2-723cfdf8cdf0", "name": "Reviews kept beside the repository", "tests": [
+      "apps/cli/src/sense.test.ts › radical sense › records a review in the repository's .radical/reviews.json, kept in git",
+      "apps/cli/src/setup.test.ts › radical setup › moves the model folder's reviews into .radical/reviews.json"
+    ] },
+    { "element": "06d30521-78c7-42a2-8d45-4b7d8453a172", "name": "A stale code path warned about", "tests": [
+      "packages/node-files/tests/repositoryLayout.test.ts › code paths in descriptions",
+      "packages/common/tests/separation.test.ts › the model folder holds nothing of the repository › warns about a description naming a path the repository does not have"
+    ] },
+    { "element": "3528e5fe-533c-4ba6-88fc-bd435a571317", "name": "Model separation tests", "tests": [
+      "packages/common/tests/separation.test.ts",
+      "packages/node-files/tests/repositoryLayout.test.ts › code paths in descriptions"
     ] }
   ]
 }

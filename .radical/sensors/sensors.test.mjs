@@ -21,7 +21,7 @@ describe('repository sensors', () => {
     const nodes = Object.fromEntries(data.nodes.map((n) => [n.id, n]))
     const model = { nodes, relations: Object.fromEntries(data.relations.map((r) => [r.id, r])) }
     const measured = data.nodes.filter((n) => n.type === 'fitness-fn' && parseMeasure(n.measure).some((line) => SENSORS[line.sensor]))
-    expect(measured.map((n) => n.label).sort()).toEqual(['Installable npm packages', 'One mark everywhere', 'One product version', 'Workspace boundaries'])
+    expect(measured.map((n) => n.label).sort()).toEqual(['Installable npm packages', 'Large model stays responsive', 'One mark everywhere', 'One product version', 'Workspace boundaries'])
     const mapped = (await readRepositoryMapping(ROOT)).implements
     const paths = (e) => elementPaths(mapped, e.id, (id) => nodes[id]?.parentId)
     const missing = measured.flatMap((ff) => appliedElements(model, ff)).filter((e) => !paths(e).length).map((e) => `${e.label} (${e.id})`)
@@ -33,7 +33,9 @@ describe('repository sensors', () => {
 
   it('fails for an element the repository gives no paths, naming it', () => {
     const context = JSON.stringify({ element: { id: 'nowhere', label: 'Billing API', type: 'container', paths: [] } })
-    for (const name of Object.keys(SENSORS)) {
+    // The sensors that are this repository's scripts (an adapter's own
+    // arguments say where it looks).
+    for (const name of Object.keys(SENSORS).filter((n) => SENSORS[n].command)) {
       const [command, ...args] = SENSORS[name].command.split(' ')
       const run = spawnSync(command, [...args, '--context', context], { cwd: ROOT, encoding: 'utf8' })
       expect([name, run.status, run.stderr.trim()]).toEqual([name, 2, 'no paths for container "Billing API" (nowhere) in .radical/radical.json'])

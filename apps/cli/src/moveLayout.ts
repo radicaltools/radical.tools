@@ -10,7 +10,7 @@ import { promisify } from 'node:util'
 import { OLD_STATE_DIR, STATE_DIR } from '@radical/common/formats/canvasSelection'
 import {
   CRUCIBLE_FILE, CRUCIBLE_FINDINGS, CRUCIBLE_ROUNDS, MODEL_FOLDER, MODEL_STATE, OLD_CRUCIBLE_FILE, OLD_CRUCIBLE_FINDINGS,
-  OLD_CRUCIBLE_ROUNDS, OLD_MODEL_FOLDER, OLD_MODEL_STATE, OLD_SENSORS_FILE, RADICAL_DIR, SENSORS_FILE,
+  OLD_CRUCIBLE_ROUNDS, OLD_MODEL_FOLDER, OLD_MODEL_STATE, OLD_REVIEWS_FILE, OLD_SENSORS_FILE, RADICAL_DIR, REVIEWS_FILE, SENSORS_FILE,
 } from '@radical/node-files/repositoryLayout'
 import { HOOK_NAMES, quote, withoutLine } from './hooks'
 
@@ -24,6 +24,7 @@ export const MOVES: Record<string, string> = {
   [OLD_CRUCIBLE_FINDINGS]: CRUCIBLE_FINDINGS,
   [OLD_CRUCIBLE_ROUNDS]: CRUCIBLE_ROUNDS,
   [OLD_MODEL_STATE]: MODEL_STATE,
+  [OLD_REVIEWS_FILE]: REVIEWS_FILE,
 }
 
 /** What .radical/.gitignore keeps out of git: Crucible's rounds. */

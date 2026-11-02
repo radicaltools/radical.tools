@@ -29,15 +29,7 @@
       "max": 2
     },
     "test-unbound": {
-      "severity": "warning",
-      "include": [
-        "apps/e2e/**"
-      ],
-      "exclude": [
-        "**/known-issues.spec.ts",
-        "**/bench.spec.ts",
-        "**/scale.spec.ts"
-      ]
+      "severity": "warning"
     }
   },
   "goals": {
@@ -53,11 +45,5 @@
     "tests-bound": {
       "min": 100
     }
-  },
-  "ci": {
-    "artifacts": [
-      "test-reports",
-      "e2e-report"
-    ]
   }
 }

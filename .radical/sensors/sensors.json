@@ -1,8 +1,20 @@
 {
   "sensors": {
-    "workspaces": { "command": "node tools/check-workspaces.mjs" },
-    "product-version": { "command": "node .radical/sensors/product-version.mjs" },
-    "npm-package": { "command": "node .radical/sensors/npm-package.mjs" },
-    "brand-mark": { "command": "node .radical/sensors/brand-mark.mjs" }
+    "workspaces": {
+      "command": "node tools/check-workspaces.mjs"
+    },
+    "product-version": {
+      "command": "node .radical/sensors/product-version.mjs"
+    },
+    "npm-package": {
+      "command": "node .radical/sensors/npm-package.mjs"
+    },
+    "brand-mark": {
+      "command": "node .radical/sensors/brand-mark.mjs"
+    },
+    "studio-scale": {
+      "adapter": "playwright",
+      "args": ["tests/studio/scale.spec.ts", "--cwd", "apps/e2e", "--project", "studio", "--env", "SCALE_MODEL=../../.radical/model", "--env", "SCALE_COPIES=14", "--env", "SCALE_REOPEN=1", "--label", "model=radical-x14"]
+    }
   }
 }

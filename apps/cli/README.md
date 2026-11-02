@@ -404,10 +404,13 @@ its meaning as the model grows.
 names. It looks only at the files its `include` matches, so that unit tests of
 internals stay out of it; a scenario has to name a test by its title or its
 describe block, since a fitness function that names a whole file or directory
-(`apps/e2e/tests`) is an umbrella over many behaviours:
+(`apps/e2e/tests`) is an umbrella over many behaviours. The files are the
+repository's, so they are set in its `.radical/radical.json`, and the rule's
+severity in the model's `check.json` (one there from before still counts,
+with the warning `repository-settings-in-model`):
 
 ```json
-{ "rules": { "test-unbound": { "severity": "warning", "include": ["apps/e2e/**"], "exclude": ["**/known-issues.spec.ts"] } } }
+{ "tests": { "include": ["apps/e2e/**"], "exclude": ["**/known-issues.spec.ts"] } }
 ```
 
 `--verbose` and the Inspector list the titles of those tests.
@@ -483,7 +486,8 @@ HEAD's first-parent history that a completed GitHub Actions run tested; a
 commit merged from a pull request (a squash merge has no run of its own)
 stands for the pull request's head. For each artifact it takes the latest
 completed run that kept it, downloads it, and reads the `.json` and `.xml`
-test reports in it. Which artifacts hold reports is set in `check.json`:
+test reports in it. Which artifacts hold reports is set in the repository's
+`.radical/radical.json` (`check.json`'s still counts):
 
 ```json
 { "ci": { "artifacts": ["test-reports", "e2e-report"] } }

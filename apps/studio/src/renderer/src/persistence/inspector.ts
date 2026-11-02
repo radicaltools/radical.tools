@@ -12,8 +12,8 @@
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults } from '@radical/common/check'
-import { REPOSITORY_FILE, parseRepositoryFile } from '@radical/common/repositoryMapping'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withoutRepositorySettings } from '@radical/common/check'
+import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
@@ -88,9 +88,23 @@ export const serializeCheckConfig = (config: CheckConfig): string => JSON.string
 
 /** Saves `config` as the active document's check.json and checks the model
  *  with it at once, without waiting for the next poll to read it back. */
-export async function saveCheckConfig(config: CheckConfig): Promise<void> {
+export async function saveCheckConfig(edited: CheckConfig): Promise<void> {
   const id = documents.getActiveId()
   if (!id) throw new Error('No model is open.')
+  // The repository's settings (test files, CI's artifacts) go to its
+  // .radical/radical.json where Studio can write it; else they stay in
+  // check.json, which is still read.
+  let config = edited
+  const repository = useDiagramStore.getState().repository
+  if (repository && await documents.canWriteRepositoryFile(id)) {
+    const unbound = edited.rules?.['test-unbound']
+    const lists = typeof unbound === 'object' ? { ...(unbound.include?.length ? { include: unbound.include } : {}), ...(unbound.exclude?.length ? { exclude: unbound.exclude } : {}) } : {}
+    const { tests: _tests, ci: _ci, ...rest } = repository
+    const next: RepositoryFile = { ...rest, ...(Object.keys(lists).length ? { tests: lists } : {}), ...(edited.ci?.artifacts?.length ? { ci: { artifacts: edited.ci.artifacts } } : {}) }
+    await documents.writeRepositoryFile(id, serializeRepositoryFile(next))
+    useDiagramStore.setState({ repository: next })
+    config = withoutRepositorySettings(edited)
+  }
   const text = serializeCheckConfig(config)
   await documents.writeCheckConfig(id, text)
   if (documents.getActiveId() !== id) return
@@ -134,7 +148,7 @@ function recheck(): void {
   // The tests the repository's .radical/radical.json binds count as each
   // scenario's and fitness function's.
   const repo = useDiagramStore.getState().repository
-  const repository = repo ? { file: REPOSITORY_FILE, implements: repo.implements.map((m) => ({ ...m, missing: [] })), verifies: repo.verifies } : undefined
+  const repository = repo ? { file: REPOSITORY_FILE, implements: repo.implements.map((m) => ({ ...m, missing: [] })), verifies: repo.verifies, ...(repo.tests ? { tests: repo.tests } : {}), ...(repo.ci ? { ci: repo.ci } : {}) } : undefined
   const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns, ...(repository ? { repository } : {}) })
   useInspectorStore.setState({ check })
   // Each one's tests with their outcomes, for the element's card.

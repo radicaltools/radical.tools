@@ -30,6 +30,7 @@ const api = {
   writeViewIndex: (folderPath, content) => ipcRenderer.invoke('folder:write-view-index', folderPath, content),
   readCheckFiles: (folderPath) => ipcRenderer.invoke('folder:read-check-files', folderPath),
   writeCheckConfig: (folderPath, content) => ipcRenderer.invoke('folder:write-check-config', folderPath, content),
+  writeRepositoryFile: (folderPath, content) => ipcRenderer.invoke('folder:write-repository-file', folderPath, content),
   getWatchedPath: () => ipcRenderer.invoke('file:getWatchedPath'),
   onFileChanged: (listener) => {
     ipcRenderer.on('file:external-change', (_event, data) => listener(data as FileChange))

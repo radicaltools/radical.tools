@@ -113,3 +113,28 @@ test('the card of a scenario lists its tests', async ({ page, studio }) => {
   await studio.node('quotes').dblclick()
   await expect(tests).toContainText('radical verify "Quotes" --test "<file> › <title>"')
 })
+
+test('Settings save the repository\'s test files to .radical/radical.json', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(SHOP, 'shop'))) await folder.write(`.radical/model/${path}`, content)
+  // check.json still holds the repository's test files, as before .radical/radical.json did.
+  await folder.write('.radical/model/check.json', JSON.stringify({ rules: { 'test-unbound': { severity: 'warning', include: ['apps/e2e/**'] } } }, null, 2) + '\n')
+  await folder.write('.radical/radical.json', MAPPING)
+  await folder.write('.radical/model/.state/test-results.json', serializeTestResults([{ file: 'apps/e2e/a.spec.ts', title: ['a'], status: 'passed' }], ['reports/e2e.json'], new Date()))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /^Settings/ }).click()
+
+  await page.getByRole('textbox', { name: 'Add to Include' }).fill('apps/web/**')
+  await page.getByRole('textbox', { name: 'Add to Include' }).press('Enter')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.locator('.insp-savebar')).toHaveCount(0)
+  await expect.poll(async () => JSON.parse((await folder.files())['.radical/radical.json']).tests).toEqual({ include: ['apps/e2e/**', 'apps/web/**'] })
+  // The mapping stays; check.json keeps only the model's rule.
+  expect(JSON.parse((await folder.files())['.radical/radical.json']).implements).toHaveLength(2)
+  expect(JSON.parse((await folder.files())['.radical/model/check.json']).rules['test-unbound']).toEqual({ severity: 'warning' })
+})

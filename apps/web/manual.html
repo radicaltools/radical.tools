@@ -916,10 +916,12 @@ api.latency.p95{env=staging} &lt;= baseline + 20%</code></pre>
         <p><code>radical sense</code> runs one adapter and keeps what it measured beside the model, or writes it to a file with <code>--out</code> for the job that runs the check:</p>
 <pre class="code"><code>radical sense command --name workspaces -- node tools/check-workspaces.mjs
 radical sense json k6-summary.json --metric 'api.latency.p95=/metrics/http_req_duration/p(95)@ms' --label env=staging</code></pre>
-        <p>What to run belongs to the fitness function: its <strong>Measure</strong> holds such lines, and its <strong>Cadence</strong> says when. A workflow then only says when it runs, and runs what the model measures:</p>
+        <p>What to measure belongs to the fitness function: its <strong>Measure</strong> names a sensor, and its <strong>Cadence</strong> says when. Which tool runs, with which files and options, is the repository's: a sensor of <code>.radical/sensors/sensors.json</code> names a command, or one of the adapters and its arguments, so the model carries no path of the repository:</p>
+<pre class="code"><code>{ "sensors": { "studio-scale": { "adapter": "playwright", "args": ["tests/studio/scale.spec.ts", "--cwd", "apps/e2e"] } } }</code></pre>
+        <p>A workflow then only says when it runs, and runs what the model measures:</p>
 <pre class="code"><code>radical sense run --trigger nightly --out reports/metrics
 radical check --metrics reports/metrics --trigger pull-request</code></pre>
-        <p>A fitness function added with a sensor <code>radical sense</code> has is run the next night, with no change to the workflow; <code>--trigger</code> keeps the gate from asking for what runs at night. A manual one is a review a person records, kept in git beside the model:</p>
+        <p>A fitness function added with a sensor <code>radical sense</code> has is run the next night, with no change to the workflow; <code>--trigger</code> keeps the gate from asking for what runs at night. A manual one is a review a person records, kept in git in the repository's <code>.radical/reviews.json</code>:</p>
 <pre class="code"><code>radical sense review "Security review" --passed --by jane --note "threat model of 2.4"</code></pre>
         <p>An adapter for another tool is one module in the radicaltools repository; see <code>radical sense --list</code> for the ones there are. The conditions, adapters and file format are in the <a href="reference.html#metrics">Reference</a>.</p>
         <h3 id="federation">Federation: one model across many repositories</h3>
