@@ -1552,6 +1552,11 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 /* Folders in Radical's blue, so they stand out from the views in them. */
 .lp-folder-icon { display: inline-flex; color: var(--accent); }
 .lp-folder-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Another model's folder (a federation), and the folders in it: a dashed
+   outline for the filled icon, as its views are marked; fetched, read-only. */
+.lp-folder-row.other-model .lp-folder-icon { color: var(--text-muted); }
+.lp-folder-row.other-model .lp-folder-icon path { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-dasharray: 2.4 1.6; }
+.lp-folder-row.other-model .lp-view-origin { margin-right: 4px; }
 .lp-folder-count {
   color: var(--text-muted); font-size: 11px; font-weight: 500;
   font-variant-numeric: tabular-nums;
