@@ -5,6 +5,8 @@ import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { BranchChangesButton } from './BranchChanges'
+import { OtherModelsButton } from './OtherModels'
+import { useOtherModelsStore } from '../persistence/otherModels'
 import { NavHistory } from './NavHistory'
 import { useInspectorStore } from '../persistence/inspector'
 import { useBranchStore } from '../persistence/branchChanges'
@@ -729,6 +731,8 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
 export function Toolbar(): React.ReactElement {
   // The perspective drawn, which a link still waiting for its document sets.
   const appMode = useShownMode()
+  // A federation: the other models are listed beside the model in every perspective.
+  const dependsOnOthers = useOtherModelsStore((s) => !!s.summary)
   const setStoreMode = useDiagramStore((s) => s.setAppMode)
   // Picking a perspective wins over a link still waiting.
   const setAppMode = useCallback((mode: Parameters<typeof setStoreMode>[0]) => { dropPendingMode(); setStoreMode(mode) }, [setStoreMode])
@@ -962,7 +966,8 @@ export function Toolbar(): React.ReactElement {
         activeDocSource={activeDoc?.source ?? null}
         // The model's state on the branch, beside its name; not in the
         // Inspector, which lists the changes itself and has no canvas to mark.
-        branch={appMode !== 'inspector' && <BranchChangesButton />}
+        // Then the other models it depends on (a federation), everywhere.
+        branch={(appMode !== 'inspector' || dependsOnOthers) && <>{appMode !== 'inspector' && <BranchChangesButton />}<OtherModelsButton /></>}
         connectionModifier={connectionModifier}
         setConnectionModifier={setConnectionModifier}
         themePref={themePref}
