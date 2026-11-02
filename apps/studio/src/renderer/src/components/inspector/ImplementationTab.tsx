@@ -42,7 +42,7 @@ const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' 
 /** Why a scenario or fitness function does not count as passing. */
 function reason(e: EvidenceEntry): string {
   if (e.status === 'no-checks') return 'names no check'
-  const off = (e.conditions ?? []).filter((c) => c.outcome !== 'passed')
+  const off = [...e.conditions ?? [], ...(e.elements ?? []).flatMap((el) => el.conditions)].filter((c) => c.outcome !== 'passed')
   const kinds = [...new Set(off.map((c) => `${c.test ? 'test' : 'metric'}:${c.outcome}`))]
   const say: Record<string, string> = {
     'test:failed': 'a test failed', 'test:not-found': 'a test is gone', 'test:skipped': 'its test was skipped', 'test:not-run': 'no report has its test',
@@ -76,8 +76,10 @@ export function ImplementationTab({ check, ctx, relations, onSettings }: {
       .filter((r) => r.sourceId === id && (r.relationType === 'verifies' || r.relationType === 'implements'))
       .map((r) => r.targetId).filter((t) => ctx.nodes[t] && !PASSING.has(statusOf(t) ?? ''))
     const order = ['failed', 'stale', 'not-run', 'no-checks']
+    // A fitness function measured for each element its ADR constrains (a
+    // standard of another model too) names the elements it fails for.
     const attention = entries.filter(([, e]) => (e.type === 'scenario' || e.type === 'fitness-fn') && e.status !== 'passed')
-      .map(([id, e]) => ({ id, e, leaves: leaves(id) }))
+      .map(([id, e]) => ({ id, e, leaves: e.origin ? [] : leaves(id), off: (e.elements ?? []).filter((el) => el.status !== 'passed') }))
       .sort((a, b) => order.indexOf(a.e.status) - order.indexOf(b.e.status) || b.leaves.length - a.leaves.length || Number(b.e.type === 'fitness-fn') - Number(a.e.type === 'fitness-fn'))
     const adrsWithout = Object.values(ctx.nodes).filter((n: C4Node) => n.type === 'adr' && (n as unknown as Record<string, unknown>).status === 'accepted'
       && !Object.values(relations).some((r) => r.relationType === 'implements' && r.targetId === n.id && ctx.nodes[r.sourceId]?.type === 'fitness-fn')).map((n) => n.id)
@@ -165,9 +167,10 @@ export function ImplementationTab({ check, ctx, relations, onSettings }: {
           <p className="insp-lede">Scenarios and fitness functions that do not pass, and what they leave unverified.</p>
           <div className="insp-panel insp-attn">
             {view.attention.length === 0 && view.adrsWithout.length === 0 && <p className="insp-muted insp-pad">Every scenario and fitness function passed.</p>}
-            {attentionShown.map(({ id, e, leaves }) => (
+            {attentionShown.map(({ id, e, leaves, off }) => (
               <div key={id} className="insp-attn-item">
                 <div className="insp-chips"><span className={`insp-pill ${PILL[e.status]?.[0] ?? 'none'}`}>{PILL[e.status]?.[1] ?? e.status}</span><Chip id={id} ctx={ctx} /><span className="insp-muted">{reason(e)}</span></div>
+                {off.length > 0 && <div className="insp-chips insp-muted" data-testid="insp-ff-elements">Not passing for {off.map((el) => <Chip key={el.id} id={el.id} ctx={ctx} />)}{e.origin && <> · a standard of {e.origin}</>}</div>}
                 {leaves.length > 0 && <div className="insp-chips insp-muted">Leaves unverified {leaves.map((l) => <Chip key={l} id={l} ctx={ctx} />)}</div>}
               </div>
             ))}

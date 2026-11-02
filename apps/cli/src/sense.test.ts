@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { C4Node } from '@radical/common/c4'
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { MD_MANIFEST_FILE, serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { main } from './cli'
@@ -32,10 +32,10 @@ const fitness = (id: string, label: string, props: Record<string, unknown>): C4N
   ({ id, type: 'fitness-fn', label, x: 0, y: 0, width: 180, height: 52, collapsed: false, ...props }) as unknown as C4Node
 
 /** A working directory with a model folder `model/` holding `nodes`. */
-async function modelWith(nodes: C4Node[]): Promise<string> {
+async function modelWith(nodes: C4Node[], relations: C4Relation[] = []): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'radical-sense-run-'))
   dirs.push(cwd)
-  const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes, relations: [] }, 'Test')
+  const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes, relations }, 'Test')
   for (const [path, content] of Object.entries(files)) {
     await mkdir(dirname(join(cwd, 'model', path)), { recursive: true })
     await writeFile(join(cwd, 'model', path), content)
@@ -57,7 +57,7 @@ describe('radical sense', () => {
     const result = await run(cwd, 'sense', 'run', '--trigger', 'nightly', '--folder', 'model', '--out', 'metrics', '--context', 'commit=abc')
     // The lighthouse line names no sensor: the run says so and exits 2.
     expect(result.code).toBe(2)
-    expect(result.err).toContain('Night check: cannot measure "lighthouse report.json": no sensor lighthouse.')
+    expect(result.err).toContain('Night check: cannot measure "lighthouse report.json": no sensor lighthouse,')
     expect(result.out).toContain('Night check: measured "command --name ok')
     const ok = JSON.parse(await readFile(join(cwd, 'metrics/night-check-1.json'), 'utf8'))
     expect(ok).toMatchObject({ source: 'command', context: { commit: 'abc' } })
@@ -131,5 +131,71 @@ describe('radical sense', () => {
     await expect(readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8')).rejects.toThrow()
     const list = await run(cwd, 'sense', '--list')
     expect(list.out).toContain('command           runs a command')
+  })
+})
+
+const element = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+  ({ id, type, label, x: 0, y: 0, width: 180, height: 52, collapsed: false, ...props }) as unknown as C4Node
+const relation = (id: string, relationType: string, sourceId: string, targetId: string): C4Relation => ({ id, relationType, sourceId, targetId })
+
+/** A model whose ADR constrains two of the three containers of a system,
+ *  with a fitness function measured by the repository's sensor `openapi`,
+ *  in a repository (a .git) whose radical.sensors.json has `sensors`. */
+async function repository(sensors: Record<string, unknown>, measure = 'openapi --strict'): Promise<string> {
+  const cwd = await modelWith([
+    element('pay', 'system', 'Payments'),
+    element('pay-api', 'container', 'Payments API', { parentId: 'pay', technology: 'Node' }),
+    element('refund-api', 'container', 'Refunds API', { parentId: 'pay' }),
+    element('worker', 'container', 'Ledger worker', { parentId: 'pay' }),
+    element('adr', 'adr', 'APIs are described in OpenAPI', { status: 'accepted', date: '2026-11-02', context: 'c', decision: 'd', consequences: 'q' }),
+    fitness('ff', 'APIs described in OpenAPI', { cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', measure, metrics: 'openapi.exit_code == 0' }),
+  ], [relation('i', 'implements', 'ff', 'adr'), relation('c1', 'constrains', 'adr', 'pay-api'), relation('c2', 'constrains', 'adr', 'refund-api')])
+  await mkdir(join(cwd, '.git'))
+  await writeFile(join(cwd, 'radical.sensors.json'), JSON.stringify({ sensors }))
+  return cwd
+}
+
+describe('radical sense run', () => {
+  it('runs a sensor of radical.sensors.json once per element its decision constrains, with the context', async () => {
+    // The sensor keeps its arguments, fails for the Refunds API and writes a
+    // measurement of its own to metricsOut for the Payments API.
+    const script = `const fs = require('fs'); const i = process.argv.indexOf('--context'); const c = JSON.parse(process.argv[i + 1]);
+      fs.writeFileSync('seen-' + c.element.id + '.json', JSON.stringify({ args: process.argv.slice(1, i), context: c }));
+      if (c.element.id === 'pay-api') fs.writeFileSync(c.metricsOut, JSON.stringify({ format: 'radical-metrics', version: 1, source: 'x', at: new Date().toISOString(), measurements: [{ metric: 'openapi.operations', value: 12 }] }));
+      process.exit(c.element.id === 'refund-api' ? 1 : 0)`
+    const cwd = await repository({ openapi: { command: [process.execPath, '-e', script, '--'] } })
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(result.code).toBe(0)
+    expect(result.out).toContain('APIs described in OpenAPI: measured "openapi --strict" for Payments API into')
+
+    const seen = JSON.parse(await readFile(join(cwd, 'seen-pay-api.json'), 'utf8'))
+    expect(seen.args).toEqual(['--strict'])
+    expect(seen.context).toMatchObject({
+      fitnessFunction: { id: 'ff', label: 'APIs described in OpenAPI', model: 'model', properties: { measure: 'openapi --strict', trigger: 'pull-request' } },
+      adr: { id: 'adr', label: 'APIs are described in OpenAPI', model: 'model' },
+      element: { id: 'pay-api', label: 'Payments API', type: 'container', technology: 'Node', parent: { id: 'pay', label: 'Payments', type: 'system' } },
+    })
+    // Only the elements the ADR constrains.
+    await expect(readFile(join(cwd, 'seen-worker.json'), 'utf8')).rejects.toThrow()
+
+    const measured = async (file: string) => JSON.parse(await readFile(join(cwd, 'metrics', file), 'utf8')).measurements
+      .map((m: { metric: string; value: number; labels?: Record<string, string> }) => [m.metric, m.value, m.labels])
+    expect((await measured('apis-described-in-openapi-refunds-api.json'))[0]).toEqual(['openapi.exit_code', 1, { element: 'refund-api' }])
+    expect((await measured('apis-described-in-openapi-payments-api.json'))[0]).toEqual(['openapi.exit_code', 0, { element: 'pay-api' }])
+    expect(await measured('apis-described-in-openapi-payments-api.sensor.json')).toEqual([['openapi.operations', 12, { element: 'pay-api' }]])
+
+    // radical check judges the fitness function on each element.
+    await run(cwd, 'check', 'model', '--metrics', 'metrics', '--evidence', 'evidence.json')
+    const ev = JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8')).nodes
+    expect(ev.ff.elements.map((e: { id: string; status: string }) => [e.id, e.status])).toEqual([['pay-api', 'passed'], ['refund-api', 'failed']])
+    expect(ev.adr.status).toBe('broken')
+  })
+
+  it('names a sensor neither built in nor in radical.sensors.json', async () => {
+    const cwd = await repository({ other: { command: 'node -v' } }, 'openapi')
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.code).toBe(2)
+    expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, 'radical.sensors.json')}.`)
   })
 })

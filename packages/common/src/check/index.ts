@@ -23,7 +23,7 @@ import type { ConcernPack } from '../concerns'
 export { CHECK_RULES, type CheckRule, type CheckSeverity, type CheckModel, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
-export { computeEvidence, conditionResults, conditionsOf, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
+export { ELEMENT_LABEL, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
 export { METRICS_FORMAT, REVIEW_METRIC, convertUnit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
 export { REVIEWS_FILE, REVIEWS_FORMAT, addReview, parseReviewsFile, reviewMeasurements, type Review, type ReviewsFile } from './reviews'
 export { SENSOR_NAMES, commandWords, isSensorName, parseMeasure, type MeasureLine } from './sensors'
@@ -272,7 +272,9 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
       if (!(finding.nodeId && theirs.has(finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
     })
   }
-  const evidence = options.tests || options.measurements ? computeEvidence(ownModel) : undefined
+  // On the whole model: another model's fitness function counts where its
+  // decision constrains this model's elements.
+  const evidence = options.tests || options.measurements ? computeEvidence(model) : undefined
   const goals = measureGoals({ model: ownModel, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
   goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
   return {
