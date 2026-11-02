@@ -5,10 +5,6 @@ label: "Model change tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/modelChanges.test.ts › model changes) passed
-  test(apps/cli/src/diff.test.ts › radical diff) passed
-  test(apps/mcp/src/folderModel.test.ts › get_changes) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

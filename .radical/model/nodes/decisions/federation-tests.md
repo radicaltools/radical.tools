@@ -5,11 +5,6 @@ label: "Federation tests"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/federation.test.ts) passed
-  test(apps/cli/src/federation.test.ts) passed
-  test(apps/mcp/src/folderModel.test.ts › federation) passed
-  test(apps/e2e/tests/studio/federation.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

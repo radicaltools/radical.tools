@@ -5,11 +5,6 @@ label: "Agent Forge status tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/forgeRunStatus.test.ts) passed
-  test(apps/mcp/src/forge.test.ts › tells Studio where the run stands through .state/forge-run.json) passed
-  test(apps/mcp/src/forge.test.ts › marks an unfinished run closed when the client goes away) passed
-  test(apps/e2e/tests/studio/folders.spec.ts › an agent's Forge run on the folder makes the Forge button pulse and opens read only) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

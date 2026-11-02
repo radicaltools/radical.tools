@@ -5,12 +5,6 @@ label: "Forge view tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/e2e/tests/studio/forge.spec.ts) passed
-  test(apps/mcp/src/forge.test.ts) passed
-  test(packages/common/tests/forgeViews.test.ts) passed
-  test(packages/layout/tests/geometry.test.ts › createBatchPlacer) passed
-  test(apps/studio/tests/aiRunner.test.ts › places a run's new nodes beside the canvas in a block that grows sideways, and the next run beside that) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

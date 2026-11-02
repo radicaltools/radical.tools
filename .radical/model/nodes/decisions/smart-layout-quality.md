@@ -5,7 +5,6 @@ label: "Smart Layout quality"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: "test(packages/layout/tests/smartLayoutScoring.test.mjs) passed"
 scope: "holistic"
 trigger: "pull-request"
 ---

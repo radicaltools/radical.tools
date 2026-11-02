@@ -5,9 +5,6 @@ label: "New model views tests"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/viewStructure.test.ts) passed
-  test(apps/e2e/tests/studio/boot.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

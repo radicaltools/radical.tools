@@ -4,7 +4,6 @@ type: "scenario"
 label: "Positions restored per view"
 gherkin: "And the outgoing view keeps the positions it had"
 given: "two views whose elements were arranged differently"
-metrics: "test(packages/ui/tests/views.test.ts › applies incoming view positions onto c4Nodes when switching) passed"
 then: "the incoming view's saved positions are applied to the elements"
 when: "the user switches from one view to the other in the Designer perspective"
 ---

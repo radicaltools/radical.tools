@@ -5,10 +5,6 @@ label: "Navigation history tests"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: |
-  test(apps/studio/tests/route.test.ts) passed
-  test(apps/studio/tests/navHistory.test.ts) passed
-  test(apps/e2e/tests/studio/history.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

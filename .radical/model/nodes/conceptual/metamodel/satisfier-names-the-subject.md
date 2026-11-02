@@ -4,7 +4,6 @@ type: "scenario"
 label: "Satisfier names the subject"
 gherkin: "And without a Satisfies relation the subject is \"the system\""
 given: "the Payment Service satisfies an event-driven requirement with trigger and action filled"
-metrics: "test(packages/common/tests/earsSentence.test.ts › returns source label from satisfies relation) passed"
 then: "its sentence reads \"When <trigger>, Payment Service shall <action>.\""
 when: "the requirement is shown on the canvas"
 ---

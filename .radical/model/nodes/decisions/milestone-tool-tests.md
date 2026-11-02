@@ -5,10 +5,6 @@ label: "Milestone tool tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/aiDocumentTools.test.ts › milestone tools) passed
-  test(packages/common/tests/aiDocumentTools.test.ts › compareModels) passed
-  test(apps/mcp/src/folderModel.test.ts › milestones) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

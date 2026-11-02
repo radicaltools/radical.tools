@@ -5,10 +5,6 @@ label: "Packs meet the standard"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack has a trigger that parses, questions and a connected slice) passed
-  test(packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack meets the standard, and every group has packs) passed
-  test(packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › specProblems: every requirement is checked by a fitness function imported with it, or says why not) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

@@ -5,10 +5,6 @@ label: "Wiki publication tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/wikiDocument.test.ts) passed
-  test(apps/cli/src/confluence.test.ts) passed
-  test(apps/e2e/tests/studio/wiki.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

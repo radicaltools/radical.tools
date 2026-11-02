@@ -5,9 +5,6 @@ label: "Convention tests"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: |
-  test(packages/layout/tests/tidy/conventions.test.ts) passed
-  test(packages/common/tests/layoutHints.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

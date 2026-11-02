@@ -5,9 +5,6 @@ label: "Built-in metamodel tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(packages/ui/tests/model.test.ts › built-in metamodels) passed
-  test(apps/e2e/tests/studio/boot.spec.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

@@ -5,12 +5,6 @@ label: "Calm drag tests"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: |
-  test(packages/ui/tests/calmDrag.test.ts) passed
-  test(apps/mcp/src/folderModel.test.ts › long Smart Layout runs › unpins the view it lays out whole; round a selection the pinned elements stay, pinned) passed
-  test(apps/e2e/tests/studio/physics.spec.ts › a drag moves only the dragged node, and the drop pins it) passed
-  test(apps/e2e/tests/studio/physics.spec.ts › a drop onto a node pushes that node clear and nothing else) passed
-  test(apps/e2e/tests/studio/physics.spec.ts › a drag with Cmd held lets the physics move the surroundings) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

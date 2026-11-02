@@ -5,14 +5,6 @@ label: "Folder writes merge"
 cadence: "triggered"
 characteristic: "reliability"
 invocation: "automated"
-metrics: |
-  test(packages/common/tests/modelMerge.test.ts › mergeModels) passed
-  test(packages/common/tests/mdFolderSync.test.ts › MdFolderSession) passed
-  test(apps/studio/tests/diskFolderStorage.test.ts › diskFolderStorage › detects an outside edit and will not overwrite it) passed
-  test(apps/studio/tests/webFolder.test.ts › webFolder read/write › notices a file edited outside the app and refuses to overwrite it) passed
-  test(apps/studio/tests/mdFolderWatch.test.ts › md-folder documents follow outside edits) passed
-  test(apps/mcp/src/folderModel.test.ts › folder-backed MCP model › merges an edit made in the folder since the call started) passed
-  test(apps/e2e/tests/studio/folders.spec.ts › an edit made outside the app shows up on the canvas) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

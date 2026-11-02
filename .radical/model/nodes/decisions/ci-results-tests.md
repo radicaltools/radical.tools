@@ -5,9 +5,6 @@ label: "CI results tests"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: |
-  test(apps/cli/src/ciResults.test.ts) passed
-  test(apps/cli/src/hooks.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

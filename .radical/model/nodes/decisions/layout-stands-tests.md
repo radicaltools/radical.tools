@@ -5,10 +5,6 @@ label: "Layout stands tests"
 cadence: "triggered"
 characteristic: "interaction-capability"
 invocation: "automated"
-metrics: |
-  test(packages/layout/tests/liveColaRest.test.ts) passed
-  test(packages/layout/tests/groupHoldPhysics.test.ts) passed
-  test(packages/layout/tests/smartLayout.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

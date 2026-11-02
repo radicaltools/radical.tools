@@ -5,7 +5,6 @@ label: "Facade parity"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: "test(apps/studio/tests/modelFacadeParity.test.ts) passed"
 scope: "atomic"
 trigger: "pull-request"
 ---

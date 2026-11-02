@@ -5,9 +5,6 @@ label: "Sensor contract"
 cadence: "triggered"
 characteristic: "compatibility"
 invocation: "automated"
-metrics: |
-  test(apps/cli/src/sensors/contract.test.ts) passed
-  test(packages/common/tests/checkMetrics.test.ts) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

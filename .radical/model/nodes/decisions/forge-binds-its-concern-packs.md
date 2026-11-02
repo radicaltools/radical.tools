@@ -5,7 +5,6 @@ label: "Forge binds its concern packs"
 cadence: "triggered"
 characteristic: "functional-suitability"
 invocation: "automated"
-metrics: "test(apps/mcp/src/forge.test.ts › concern packs in a Forge run › imports the picked packs whole in Requirements and binds them after C4) passed"
 scope: "atomic"
 trigger: "pull-request"
 ---
