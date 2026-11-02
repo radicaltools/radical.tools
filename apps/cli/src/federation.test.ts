@@ -187,6 +187,35 @@ describe('radical federation', () => {
     expect(otherModelsAt(file, [{ name: 'orders', commit: pinned }]).nodes.find((n) => n.id === 'ord')?.label).toBe('Orders')
   })
 
+  it('fetches latest as the newest version tag, and says which', async () => {
+    const { orders, home, deps } = await repos()
+    const at = async (tag: string | null, label: string) => {
+      const model = await readModel(join(orders, 'architecture'))
+      await writeModel(join(orders, 'architecture'), { ...model, nodes: model.nodes.map((n) => (n.id === 'ord' ? { ...n, label } : n)) }, 'orders')
+      await git(orders, 'add', '-A')
+      await git(orders, 'commit', '-q', '-m', label)
+      if (tag) await git(orders, 'tag', tag)
+      return head(orders)
+    }
+    await at('v1.2.0', 'Orders 1.2')
+    const tenth = await at('v1.10.0', 'Orders 1.10')
+    await at(null, 'Orders unreleased')
+    await deps('latest')
+
+    // The newest version tag by number, not the newest commit on main.
+    const first = await run(home, ['federation', 'fetch'])
+    expect(first.code).toBe(0)
+    expect(first.out).toContain(`Fetched orders@${tenth.slice(0, 7)} (latest → v1.10.0)`)
+    const read = async () => parseFederationFile(await readFile(join(home, '.radical/federation.json'), 'utf8'))!
+    expect((await read()).dependencies[0]).toMatchObject({ ref: 'latest', resolved: 'v1.10.0', commit: tenth })
+    expect((await read()).nodes.find((n) => n.id === 'ord')?.label).toBe('Orders 1.10')
+
+    // A release later, the next fetch follows it.
+    const eleventh = await at('v1.11.0', 'Orders 1.11')
+    expect((await run(home, ['federation', 'fetch'])).out).toContain(`Fetched orders@${eleventh.slice(0, 7)} (latest → v1.11.0)`)
+    expect((await read()).nodes.find((n) => n.id === 'ord')?.label).toBe('Orders 1.11')
+  })
+
   it('says what is wrong with a dependency it cannot fetch', async () => {
     const { home, deps } = await repos()
     await deps('no-such-branch')

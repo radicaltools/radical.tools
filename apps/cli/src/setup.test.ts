@@ -196,7 +196,7 @@ describe('radical setup', () => {
       '    Its git repository, an address or a path from the model folder: ',
       '    The model folder in it [architecture]: ',
       // The newest version tag, by number: v1.10.0 after v1.2.0.
-      '    Version [v1.10.0]: ',
+      '    Version, or latest to follow its releases [v1.10.0]: ',
       '  Another model this one depends on, by name (Enter: no more): ',
     ])
     const folder = join(w.repo, 'architecture')

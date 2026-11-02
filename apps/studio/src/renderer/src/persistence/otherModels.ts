@@ -57,6 +57,10 @@ export interface OtherModelsSummary {
 
 /** The other models a model depends on, with the versions deps.json pins
  *  and those fetched, and what is wrong; null for a model with no deps.json. */
+/** What was fetched: the short commit, after the version latest resolved to. */
+const fetchedShown = (got: { commit: string; resolved?: string }): string =>
+  got.resolved ? `${got.resolved} · ${got.commit.slice(0, 7)}` : got.commit.slice(0, 7)
+
 export function otherModelsSummary(others: OtherModels): OtherModelsSummary | null {
   if (others.depsError) return { rows: [], problems: [others.depsError] }
   if (!others.deps) return null
@@ -78,12 +82,12 @@ export function otherModelsSummary(others: OtherModels): OtherModelsSummary | nu
       problems.push(`${dep.name} is pinned to ${dep.repo} but fetched from ${got.repo}.`)
       return { name: dep.name, pinned: dep.ref, fetched: got.commit.slice(0, 7), status: 'pinned-anew' }
     }
-    return { name: dep.name, pinned: dep.ref, fetched: got.commit.slice(0, 7), status: 'ok' }
+    return { name: dep.name, pinned: dep.ref, fetched: fetchedShown(got), status: 'ok' }
   })
   // The models fetched through another, each after the one that names it
   // (and the others it names).
   for (const got of file?.dependencies.filter((d) => d.via) ?? []) {
-    const row: OtherModelRow = { name: got.name, pinned: got.ref, fetched: got.commit.slice(0, 7), via: got.via, status: 'ok' }
+    const row: OtherModelRow = { name: got.name, pinned: got.ref, fetched: fetchedShown(got), via: got.via, status: 'ok' }
     const parent = rows.findIndex((r) => r.name === got.via)
     if (parent < 0) { rows.push(row); continue }
     let at = parent + 1
