@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2-beta.1] - 2026-11-02
+
 ### Added
 - Studio shows that a model is a federation: a button beside the model's name, after *Changes on branch*, counts the other models it depends on (or shows ⚠ and the number of problems); opened, it lists each with the version `deps.json` pins and the commit fetched, the ones fetched through another indented, when they were fetched, a model not fetched or fetched at another version than pinned with `radical federation fetch` to copy, and a click on a model opens its folder of views
 - `radical setup` sets up a federation: a step *Other models* asks for the models this one depends on (name, repository, model folder, version, offering the repository's newest version tag, else its default branch), writes `deps.json`, keeping what it names, and fetches them; without a terminal `--depends-on <name>=<repository>[#<version>[:<model folder>]]` names them. `radical setup --status` lists them and warns when they are not fetched, or fetched at another version than `deps.json` pins
@@ -351,6 +353,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.2-beta.1...HEAD
+[0.3.2-beta.1]: https://github.com/radicaltools/radical.tools/compare/v0.3.1...v0.3.2-beta.1
 [0.3.1]: https://github.com/radicaltools/radical.tools/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/radicaltools/radical.tools/releases/tag/v0.3.0
