@@ -9,6 +9,7 @@ export interface DiscussionComment {
   body: string
   createdAt: string
   email?: string
+  confluence?: { accountId: string; displayName?: string; url: string; reviewRequired?: boolean }
 }
 
 export interface DiscussionThread {
@@ -19,7 +20,7 @@ export interface DiscussionThread {
   comments: DiscussionComment[]
 }
 
-export interface Discussions { threads: DiscussionThread[] }
+export interface Discussions { version?: 2; threads: DiscussionThread[] }
 
 export type NodeDiscussionCounts = Readonly<Record<string, { readonly total: number; readonly open: number }>>
 
@@ -36,6 +37,7 @@ export function countNodeDiscussions(store: Discussions | null): NodeDiscussionC
 
 export type DiscussionAction =
   | { kind: 'createThread'; thread: DiscussionThread }
+  | { kind: 'importReply'; threadId: string; nodeId: string; parent: DiscussionComment; comment: DiscussionComment }
   | { kind: 'addReply'; threadId: string; nodeId: string; parent: DiscussionComment; comment: DiscussionComment }
   | { kind: 'setResolved'; threadId: string; expected: string; resolved: boolean }
 
@@ -55,7 +57,8 @@ const nonempty = (value: unknown): value is string => typeof value === 'string' 
 
 /** Reject unknown structures rather than silently dropping information. */
 export function validateDiscussions(value: unknown): asserts value is Discussions {
-  const store = record(value, ['threads'])
+  const store = record(value, ['threads'], ['version'])
+  requireValue(store.version === undefined || store.version === 2, 'unsupported version; upgrade Studio before opening this file')
   requireValue(Array.isArray(store.threads), 'threads must be an array')
   const ids = new Set<string>()
   const takeId = (id: unknown): void => {
@@ -69,12 +72,22 @@ export function validateDiscussions(value: unknown): asserts value is Discussion
     requireValue(Array.isArray(thread.comments) && thread.comments.length > 0, 'thread needs a root')
     const parents = new Map<string, string | null>()
     for (const rawComment of thread.comments) {
-      const comment = record(rawComment, ['id', 'parentCommentId', 'body', 'createdAt'], ['email'])
+      const comment = record(rawComment, ['id', 'parentCommentId', 'body', 'createdAt'], ['email', 'confluence'])
       takeId(comment.id)
       requireValue(comment.parentCommentId === null || (typeof comment.parentCommentId === 'string' && uuid.test(comment.parentCommentId)), 'invalid parent ID')
       requireValue(nonempty(comment.body), 'empty comment')
       requireValue(typeof comment.createdAt === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(comment.createdAt) && Number.isFinite(Date.parse(comment.createdAt)) && new Date(comment.createdAt).toISOString() === comment.createdAt, 'invalid UTC timestamp')
       requireValue(!Object.prototype.hasOwnProperty.call(comment, 'email') || nonempty(comment.email), 'invalid email')
+      if (comment.confluence !== undefined) {
+        requireValue(store.version === 2, 'Confluence provenance requires version 2; older Studio cannot read this file')
+        const source = record(comment.confluence, ['accountId', 'url'], ['displayName', 'reviewRequired'])
+        requireValue(nonempty(source.accountId), 'invalid Confluence author')
+        requireValue(source.displayName === undefined || nonempty(source.displayName), 'invalid display name')
+        requireValue(source.reviewRequired === undefined || typeof source.reviewRequired === 'boolean', 'invalid review flag')
+        let url: URL
+        try { url = new URL(String(source.url)) } catch { throw new Error('Invalid discussions: source URL') }
+        requireValue(url.protocol === 'https:' && !url.username && !url.password, 'unsafe Confluence link')
+      }
       parents.set(comment.id as string, comment.parentCommentId as string | null)
     }
     requireValue((thread.comments[0] as DiscussionComment).parentCommentId === null && [...parents.values()].filter((p) => p === null).length === 1, 'expected exactly one first root')
@@ -101,7 +114,7 @@ export function parseDiscussions(text: string): Discussions {
 }
 
 export const threadState = (thread: DiscussionThread): string => JSON.stringify(thread)
-const sameComment = (a: DiscussionComment, b: DiscussionComment): boolean => a.id === b.id && a.parentCommentId === b.parentCommentId && a.body === b.body && a.createdAt === b.createdAt && a.email === b.email
+const sameComment = (a: DiscussionComment, b: DiscussionComment): boolean => a.id === b.id && a.parentCommentId === b.parentCommentId && a.body === b.body && a.createdAt === b.createdAt && a.email === b.email && JSON.stringify(a.confluence) === JSON.stringify(b.confluence)
 
 /** Check IDs after an uncertain create, without replaying the action. */
 export function submissionState(store: Discussions, action: DiscussionAction): 'missing' | 'matching' | 'conflict' {
@@ -112,7 +125,7 @@ export function submissionState(store: Discussions, action: DiscussionAction): '
   const owner = store.threads.find((t) => t.comments.some((c) => c.id === comment.id))
   if (!owner && (action.kind !== 'createThread' || !thread)) return 'missing'
   if (!thread || owner !== thread) return 'conflict'
-  if (action.kind === 'addReply' && thread.nodeId !== action.nodeId) return 'conflict'
+  if ((action.kind === 'addReply' || action.kind === 'importReply') && thread.nodeId !== action.nodeId) return 'conflict'
   if (action.kind === 'createThread' && (thread.nodeId !== action.thread.nodeId || thread.nodeLabelAtCreation !== action.thread.nodeLabelAtCreation)) return 'conflict'
   const found = thread.comments.find((c) => c.id === comment.id)
   return found && sameComment(found, comment) ? 'matching' : 'conflict'
@@ -122,8 +135,9 @@ export function submissionState(store: Discussions, action: DiscussionAction): '
 export function applyDiscussionAction(store: Discussions, action: DiscussionAction): Discussions {
   validateDiscussions(store)
   const next: Discussions = JSON.parse(JSON.stringify(store))
+  if (action.kind !== 'setResolved' && (action.kind === 'createThread' ? action.thread.comments[0] : action.comment).confluence) next.version = 2
   if (action.kind === 'createThread') {
-    validateDiscussions({ threads: [action.thread] })
+    validateDiscussions({ ...(next.version ? { version: next.version } : {}), threads: [action.thread] })
     requireValue(action.thread.comments.length === 1 && !action.thread.resolved, 'new thread must contain one open root')
     if (submissionState(store, action) !== 'missing') throw new DiscussionConflict('Submission already exists. Refresh and review it.')
     next.threads.push(JSON.parse(JSON.stringify(action.thread)))
@@ -136,7 +150,10 @@ export function applyDiscussionAction(store: Discussions, action: DiscussionActi
       thread.resolved = action.resolved
     } else {
       const parent = thread.comments.find((c) => c.id === action.comment.parentCommentId)
-      if (thread.resolved || thread.nodeId !== action.nodeId || !parent || !sameComment(parent, action.parent)) throw new DiscussionConflict('Thread changed or was resolved. Review it and choose Reply again; your draft is kept.')
+      if ((thread.resolved && action.kind !== 'importReply') || thread.nodeId !== action.nodeId || !parent || !sameComment(parent, action.parent)) throw new DiscussionConflict('Thread changed or was resolved. Review it and choose Reply again; your draft is kept.')
+      if (action.kind === 'importReply') {
+        requireValue(!!action.comment.confluence, 'import requires provenance')
+      }
       thread.comments.push(JSON.parse(JSON.stringify(action.comment)))
     }
   }

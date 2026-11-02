@@ -65,8 +65,11 @@ describe('desktop discussion storage', () => {
     await adapter.act({ ...reply(t), parent: first.comment, comment: { ...first.comment, id: randomUUID(), parentCommentId: first.comment.id, body: 'Nested reply' } })
     expect(await model.readAll()).toEqual(before)
     const text = await readFile(join(dir, 'discussions.json'), 'utf8')
+    const syncFiles = ['discussions-confluence-sync.json', 'discussions-confluence-connection.json']
+    for (const name of syncFiles) await writeFile(join(dir, name), 'durable sync state')
     await model.write(serializeToMdFolder({ nodes: [], relations: [], snapshots: [] }, 'renamed'), mergeMdFolderFiles)
     expect(await readFile(join(dir, 'discussions.json'), 'utf8')).toBe(text)
+    for (const name of syncFiles) expect(await readFile(join(dir, name), 'utf8')).toBe('durable sync state')
     const loaded = await new DiskDiscussions(dir).load()
     expect(loaded.threads[0].comments).toHaveLength(3)
     expect(loaded.threads[0].comments[2].parentCommentId).toBe(first.comment.id)

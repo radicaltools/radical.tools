@@ -43,31 +43,7 @@ export async function publishTree(document: WikiExport, options: PublishOptions,
   let spaceId = options.spaceId
   if (!spaceId) spaceId = ((await api(`/pages/${landing.id}`)) as Page).spaceId
   if (!spaceId || !/^\d+$/.test(spaceId)) throw new Error('Confluence returned an invalid destination space.')
-  const mapping: Mapping = Object.create(null)
-  const properties = new Map<string, Property>()
-  let next: string | undefined = `/pages/${landing.id}/properties?limit=100`
-  const seen = new Set<string>()
-  while (next) {
-    if (seen.has(next)) throw new Error('Confluence repeated a property-list cursor.')
-    seen.add(next)
-    const list = await api(next) as { results: Property[]; _links?: { next?: string } }
-    if (!Array.isArray(list.results)) throw new Error('Confluence returned an invalid publication mapping.')
-    for (const p of list.results) {
-      if (!p.key.startsWith(PREFIX)) continue
-      if (p.value?.schema !== 1 || p.value.viewId !== document.viewId || !p.value.pages || typeof p.value.pages !== 'object') throw new Error('The publication mapping belongs to a different wiki or has an unsupported format.')
-      for (const [id, entry] of Object.entries(p.value.pages)) {
-        if (!entry || typeof entry.id !== 'string' || !/^\d+$/.test(entry.id) || typeof entry.title !== 'string' || PREFIX + bucketOf(id) !== p.key) throw new Error('Confluence publication mapping is invalid.')
-        mapping[id] = entry
-      }
-      properties.set(p.key, p)
-    }
-    next = undefined
-    if (list._links?.next) {
-      const url = new URL(list._links.next, base)
-      if (url.origin !== new URL(base).origin || url.pathname !== `/wiki/api/v2/pages/${landing.id}/properties`) throw new Error('Confluence returned an unexpected mapping pagination URL.')
-      next = url.pathname.slice('/wiki/api/v2'.length) + url.search
-    }
-  }
+  const { mapping, properties } = await readPublicationMapping(api, base, landing.id, document.viewId)
   const dirty = new Set<string>()
   const checkpoint = async () => {
     for (const key of [...dirty]) {
@@ -183,4 +159,38 @@ export async function publishTree(document: WikiExport, options: PublishOptions,
   const stale = Object.keys(mapping).filter((id) => !pageByNode.has(id)).length
   if (stale) progress(`Confluence tree: ${stale} previously exported pages are no longer in this view; they were kept.`)
   return { ...landing, created, updated, unchanged, pageCount: plan.pages.length + 1 }
+}
+
+/** Read-only access shared by publication and discussion sync. */
+export async function readPublicationMapping(api: (path: string) => Promise<unknown>, base: string, landingId: string, viewId: string) {
+  const mapping: Mapping = Object.create(null)
+  const properties = new Map<string, Property>()
+  let next: string | undefined = `/pages/${landingId}/properties?limit=100`
+  const seen = new Set<string>()
+  while (next) {
+    if (seen.has(next)) throw new Error('Confluence repeated a property-list cursor.')
+    seen.add(next)
+    const list = await api(next) as { results: Property[]; _links?: { next?: string } }
+    if (!Array.isArray(list.results)) throw new Error('Confluence returned an invalid publication mapping.')
+    for (const p of list.results) {
+      if (typeof p.key !== 'string') throw new Error('Invalid publication property.')
+      if (!p.key.startsWith(PREFIX)) continue
+      if (properties.has(p.key)) throw new Error('Duplicate publication mapping bucket.')
+      if (p.value?.schema !== 1 || p.value.viewId !== viewId || !p.value.pages || typeof p.value.pages !== 'object' || Array.isArray(p.value.pages)) throw new Error('The publication mapping belongs to a different wiki or has an unsupported format.')
+      for (const [id, entry] of Object.entries(p.value.pages)) {
+        if (!entry || typeof entry.id !== 'string' || !/^\d+$/.test(entry.id) || typeof entry.title !== 'string' || PREFIX + bucketOf(id) !== p.key) throw new Error('Confluence publication mapping is invalid.')
+        if (Object.prototype.hasOwnProperty.call(mapping, id) || entry.id === landingId) throw new Error('Duplicate or landing-page node mapping.')
+        mapping[id] = entry
+      }
+      properties.set(p.key, p)
+    }
+    next = undefined
+    if (list._links?.next) {
+      const url = new URL(list._links.next, base)
+      if (url.origin !== new URL(base).origin || url.pathname !== `/wiki/api/v2/pages/${landingId}/properties`) throw new Error('Confluence returned an unexpected mapping pagination URL.')
+      next = url.pathname.slice('/wiki/api/v2'.length) + url.search
+    }
+  }
+  if (new Set(Object.values(mapping).map((p) => p.id)).size !== Object.keys(mapping).length) throw new Error('Publication maps multiple nodes to one page. Review the mapping.')
+  return { mapping, properties }
 }

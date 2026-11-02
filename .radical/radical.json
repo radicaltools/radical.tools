@@ -19,6 +19,13 @@
     { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] }
   ],
   "verifies": [
+    { "element": "1c0c7414-2092-4c70-a233-51bd95a280cc", "name": "Recover interrupted discussion sync", "tests": [
+      "apps/cli/src/discussionSync.test.ts",
+      "apps/studio/tests/webDiscussions.test.ts"
+    ] },
+    { "element": "fb938ddb-8a50-4d70-884a-da3786b5cb79", "name": "Discussion sync roundtrip", "tests": [
+      "apps/cli/src/discussionSync.test.ts"
+    ] },
     { "element": "1da9874e-1735-4ace-aeb0-775c3ec9f55c", "name": "Agent adds custom type", "tests": [
       "apps/mcp/src/catalogueTools.test.ts › copies a built-in metamodel on the first edit, persists it and refreshes tool schemas"
     ] },
@@ -2931,7 +2938,8 @@
     { "element": "94c18c56-18fe-4a49-94e8-f1f2004c6760", "name": "Wiki publication tests", "tests": [
       "packages/common/tests/wikiDocument.test.ts",
       "apps/cli/src/confluence.test.ts",
-      "apps/e2e/tests/studio/wiki.spec.ts"
+      "apps/e2e/tests/studio/wiki.spec.ts",
+      "apps/cli/src/discussionSync.test.ts"
     ] },
     { "element": "6a410138-d231-4ccf-98cb-78185404dff7", "name": "Tests outside the model tests", "tests": [
       "packages/common/tests/verifies.test.ts",
