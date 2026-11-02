@@ -602,11 +602,12 @@ radical-mcp --version</code></pre>
 <pre class="code"><code>repository/
 ├─ .mcp.json                  <span class="cm"># the agents' MCP servers (Claude Code reads it here)</span>
 └─ .radical/
-   ├─ architecture/           <span class="cm"># the model folder (below)</span>
+   ├─ model/                  <span class="cm"># the model folder (below)</span>
    ├─ sensors.json            <span class="cm"># the repository's own sensors, for radical sense run</span>
-   ├─ crucible.json           <span class="cm"># Radical Crucible's plan; its paths are from the repository's root</span>
-   ├─ crucible/findings/      <span class="cm"># Crucible's findings, in git</span>
-   ├─ crucible/rounds/        <span class="cm"># exploratory rounds, out of git</span>
+   ├─ crucible/
+   │  ├─ crucible.json        <span class="cm"># Radical Crucible's plan; its paths are from the repository's root</span>
+   │  ├─ findings/            <span class="cm"># Crucible's findings, in git</span>
+   │  └─ rounds/              <span class="cm"># exploratory rounds, out of git</span>
    └─ .gitignore</code></pre>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/
