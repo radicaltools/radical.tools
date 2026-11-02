@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sensor npm-package (radical.sensors.json), for the fitness function
+// Sensor npm-package (.radical/sensors.json), for the fitness function
 // Installable npm packages: npm run test:package of each workspace the
 // element is built in, which packs it, installs the archive outside the
 // monorepo and runs it. Run by radical sense run, once per element.

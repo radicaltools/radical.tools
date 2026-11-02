@@ -4,7 +4,7 @@
 // rules about the model run here, on the model as it is edited (checkModel
 // from @radical/common, the code the CLI runs). What the tests say comes
 // from the last `radical check --report`: the CLI keeps the test cases in
-// the model folder's .radical/test-results.json, and the project's rule
+// the model folder's .state/test-results.json, and the project's rule
 // settings are the folder's check.json. The reviews of its manual fitness
 // functions (reviews.json, `radical sense review`) are measurements too.
 // They are polled for the active

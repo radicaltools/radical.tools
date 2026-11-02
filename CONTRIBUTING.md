@@ -52,7 +52,7 @@ packages/
   host-bridge/    — @radical/host-bridge: Studio ↔ host contract (Electron, VS Code, browser)
   hub-catalogue/  — @radical/hub-catalogue: the Hub's concern packs (specs, built .radical files), their standard, Vite plugin
   node-files/     — @radical/node-files: model folders on disk for Node (MCP, CLI)
-architecture/     — the architecture model of radical.tools itself, checked in CI
+.radical/        — the architecture model (.radical/model/), sensors and Crucible of radical.tools itself, checked in CI
 ```
 
 ## Workspace boundaries
@@ -71,7 +71,7 @@ architecture/     — the architecture model of radical.tools itself, checked in
 ## Daily workflow (for maintainers)
 
 The `main` branch is protected — direct pushes are rejected. All changes go through a PR.
-CI (`Type-check & Test`, `E2E` and `Architecture model`) must pass before merging. The last runs `radical check` on `architecture/` with the test reports: a change that alters behaviour updates the model (requirements, scenarios and the tests they name). Run `npm run test:reports` and `npm run check:architecture` locally first. A change to the UI also updates the manual (`apps/web/manual.html`) and its screenshots (`npm run docs:screenshots`).
+CI (`Type-check & Test`, `E2E` and `Architecture model`) must pass before merging. The last runs `radical check` on `.radical/model/` with the test reports: a change that alters behaviour updates the model (requirements, scenarios and the tests they name). Run `npm run test:reports` and `npm run check:architecture` locally first. A change to the UI also updates the manual (`apps/web/manual.html`) and its screenshots (`npm run docs:screenshots`).
 
 Recommended git aliases (set up once globally):
 

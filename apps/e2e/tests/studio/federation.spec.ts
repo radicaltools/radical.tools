@@ -8,7 +8,7 @@ import type { C4Node, DiagramData } from '@radical/common/c4'
 
 // A federation: a model folder's deps.json names the models it depends on,
 // and radical federation fetch writes their elements, each marked with its
-// origin (<name>@<commit>), into the folder's .radical/federation.json.
+// origin (<name>@<commit>), into the folder's .state/federation.json.
 // Studio opens the model folder itself and shows them beside its own,
 // dashed and read-only, and writes only its own back. The test writes the
 // folder as git and the CLI would.
@@ -32,7 +32,7 @@ const PAYMENTS: DiagramData = {
 
 const DEPS = JSON.stringify({ name: 'payments', dependencies: [{ name: 'orders', repo: '../orders', path: 'architecture', ref: 'main' }] }, null, 2)
 
-/** .radical/federation.json as radical federation fetch writes it, with Orders named `label`. */
+/** .state/federation.json as radical federation fetch writes it, with Orders named `label`. */
 const fetched = (label = 'Orders'): string => serializeFederationFile({
   version: 2,
   name: 'payments',
@@ -52,7 +52,7 @@ async function openComposed(page: Page, studio: Studio, view: string, { own = PA
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
-  const files = { ...serializeToMdFolder(own, 'payments'), 'deps.json': deps, ...(federation ? { '.radical/federation.json': federation } : {}) }
+  const files = { ...serializeToMdFolder(own, 'payments'), 'deps.json': deps, ...(federation ? { '.state/federation.json': federation } : {}) }
   for (const [path, content] of Object.entries(files)) await folder.write(path, content)
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
@@ -90,10 +90,10 @@ test('an element of another model is marked and cannot be changed', async ({ pag
   await expect(page.getByRole('region', { name: 'Notifications' })).toContainText('"Orders" belongs to the model orders (orders@abc1234)')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(studio.node('ord')).toBeVisible()
-  // It is not written into the folder: it stays in .radical/federation.json.
+  // It is not written into the folder: it stays in .state/federation.json.
   const files = await folder.files()
   expect(nodeFileOf(files, 'Orders')).toBe(false)
-  expect(files['.radical/federation.json']).toContain('"label": "Orders"')
+  expect(files['.state/federation.json']).toContain('"label": "Orders"')
 
   // This model's element is edited as ever.
   await studio.node('pay').dblclick()
@@ -147,13 +147,13 @@ test('edits stay the model\'s own, and a new fetch reaches the open model', asyn
   await expect.poll(async () => nodeFileOf(await folder.files(), 'Payments v2'), { timeout: 10_000 }).toBe(true)
   const files = await folder.files()
   expect(nodeFileOf(files, 'Orders')).toBe(false)
-  expect(Object.entries(files).some(([path, text]) => !path.startsWith('.radical/') && text.includes('orders@abc1234'))).toBe(false)
+  expect(Object.entries(files).some(([path, text]) => !path.startsWith('.state/') && text.includes('orders@abc1234'))).toBe(false)
   expect(JSON.parse(files['relations.json'])).toEqual([expect.objectContaining({ id: 'r-reads', sourceId: 'pay', targetId: 'ord' })])
   // Its place on the view is kept, as the model's layout keeps it.
   expect(JSON.parse(files['views.json']).find((v: { id: string }) => v.id === 'v-landscape').nodeIds).toContain('ord')
 
   // A new fetch: Studio shows the other model as fetched now, the edit kept.
-  await folder.write('.radical/federation.json', fetched('Orders v2'))
+  await folder.write('.state/federation.json', fetched('Orders v2'))
   await expect(studio.node('ord')).toContainText('Orders v2', { timeout: 10_000 })
   await expect(studio.node('ord')).toHaveClass(/rf-node-other-model/)
   await expect(studio.node('pay')).toContainText('Payments v2')
@@ -259,7 +259,7 @@ test('a milestone shows the other models as they were when it was made', async (
 
   // orders is fetched again at B, Orders API renamed; A is kept for the milestone.
   const atA = JSON.parse(ordersAt(A, 'Orders API')) as FederationFile
-  await folder.write('.radical/federation.json', ordersAt(B, 'Orders Gateway', { atCommits: { 'orders@abc1234': { nodes: atA.nodes, relations: [] } } }))
+  await folder.write('.state/federation.json', ordersAt(B, 'Orders Gateway', { atCommits: { 'orders@abc1234': { nodes: atA.nodes, relations: [] } } }))
   await expect(studio.node('ord-api')).toContainText('Orders Gateway', { timeout: 10_000 })
 
   // As-is shows orders as it was at A, the line to it too.
@@ -272,7 +272,7 @@ test('a milestone shows the other models as they were when it was made', async (
   await expect(studio.node('ord-api')).toContainText('Orders Gateway')
 
   // Without A fetched, As-is shows payments' own and says how to fetch it.
-  await folder.write('.radical/federation.json', ordersAt(B, 'Orders Gateway v2'))
+  await folder.write('.state/federation.json', ordersAt(B, 'Orders Gateway v2'))
   await expect(studio.node('ord-api')).toContainText('Orders Gateway v2', { timeout: 10_000 })
   await page.locator('.lp-snap-card', { hasText: 'As-is' }).click()
   await expect(page.getByRole('region', { name: 'Notifications' }))
@@ -304,7 +304,7 @@ test('the toolbar lists the other models, their versions, and what to fetch', as
   await button.click()
   const pop = page.getByRole('dialog', { name: 'Other models' })
   await expect(pop).toContainText('This model depends on 2 other models')
-  await expect(pop).toContainText('Fetched by the command line into .radical/federation.json, just now.')
+  await expect(pop).toContainText('Fetched by the command line into .state/federation.json, just now.')
   const rows = pop.locator('tbody tr')
   await expect(rows).toHaveText([/^orders\s*main\s*abc1234\s*✓$/, /^↳ stock via orders\s*v3.0.0\s*77ab120\s*✓$/, /^billing\s*v2.0.0\s*v1.0.0\s*⚠$/])
   await expect(rows.nth(2)).toHaveClass('warn')

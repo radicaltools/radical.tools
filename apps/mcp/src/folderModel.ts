@@ -54,7 +54,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_changes',
-    description: 'What changed in the model since its version in git: the elements and relations added, removed and changed, uncommitted edits included, each changed field with its old and new value, and each element with its place in the model and its relations (the component that satisfies a requirement, the ADRs that constrain it, the scenarios and the tests they name). Only the model is compared; views, positions, sizes and folding are left out. Call it when you are asked to implement what was changed in the model, and again before you report the work as done. It writes no model file; without since it saves the base to .radical/base.json, for Studio to show the same changes.',
+    description: 'What changed in the model since its version in git: the elements and relations added, removed and changed, uncommitted edits included, each changed field with its old and new value, and each element with its place in the model and its relations (the component that satisfies a requirement, the ADRs that constrain it, the scenarios and the tests they name). Only the model is compared; views, positions, sizes and folding are left out. Call it when you are asked to implement what was changed in the model, and again before you report the work as done. It writes no model file; without since it saves the base to .state/base.json, for Studio to show the same changes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -368,7 +368,7 @@ export class FolderModel {
     try {
       if (!mayReplaceWithForgeBase(await readEditorStateFile(this.folder, MODEL_BASE_FILE))) return ''
       await writeEditorStateFile(this.folder, MODEL_BASE_FILE, content)
-      return '\n\nSaved the model as it was before this run to .radical/base.json (no base from git): Studio\'s Changes on branch shows what the run changes.'
+      return '\n\nSaved the model as it was before this run to .state/base.json (no base from git): Studio\'s Changes on branch shows what the run changes.'
     } catch {
       return ''
     }

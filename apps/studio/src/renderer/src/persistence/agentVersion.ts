@@ -1,7 +1,7 @@
 // ─── Agent on another version ────────────────────────────────────────────────
 //
 // An agent writing the open folder over MCP records its server's product
-// version in .radical/agent-activity.json (agentActivity). Each time Studio
+// version in .state/agent-activity.json (agentActivity). Each time Studio
 // loads a change made outside it, it reads that file, and when the server is
 // of another version than Studio's it says so once per model and version:
 // builds of different versions may read and write the model differently (a

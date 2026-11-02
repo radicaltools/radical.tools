@@ -170,14 +170,14 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
       await expect.poll(() => page.evaluate(async ([name, file]) => {
         try {
           const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
-          const handle = await (await (await root.getDirectoryHandle('.radical')).getDirectoryHandle('cache')).getFileHandle(file)
+          const handle = await (await (await root.getDirectoryHandle('.state')).getDirectoryHandle('cache')).getFileHandle(file)
           return (await handle.getFile()).size
         } catch { return 0 }
       }, [folder.name, file] as const), { timeout: 600_000, intervals: [500] }).toBeGreaterThan(100)
     }
     if (process.env.SCALE_NO_CACHE) await page.evaluate(async (name) => {
       const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
-      await (await root.getDirectoryHandle('.radical')).removeEntry('cache', { recursive: true })
+      await (await root.getDirectoryHandle('.state')).removeEntry('cache', { recursive: true })
     }, folder.name)
     await page.goto('/')
     await page.getByRole('button', { name: 'Open', exact: true }).click()

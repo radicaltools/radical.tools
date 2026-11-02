@@ -1,0 +1,43 @@
+{
+  "findings": ".radical/crucible/findings",
+  "fuzz": [
+    { "file": "packages/ui/tests/invariants.test.ts", "cwd": "packages/ui" }
+  ],
+  "runners": [
+    {
+      "files": "apps/e2e/", "cwd": "apps/e2e", "command": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--reporter", "line"],
+      "build": [["npm", "run", "build:web"], ["npm", "run", "build:hub"]],
+      "repeat": ["npx", "playwright", "test", "{file}", "-g", "{name}", "--repeat-each", "{runs}", "--workers", "{runs}", "--reporter", "line"]
+    }
+  ],
+  "explore": {
+    "rounds": ".radical/crucible/rounds",
+    "brief": "docs/EXPLORATORY-TESTING.md",
+    "known": ["docs/IMPROVEMENTS.md", "apps/e2e/tests/studio/known-issues.spec.ts"],
+    "model": ".radical/model",
+    "build": [
+      ["npm", "run", "build:web"],
+      ["npm", "run", "build:hub"],
+      ["npm", "run", "build", "-w", "@radicaltools/mcp"],
+      ["npm", "run", "build", "-w", "@radicaltools/cli"]
+    ],
+    "copy": { "renderer": "apps/studio/out/renderer", "hub": "apps/hub/out" },
+    "serve": [
+      {
+        "cwd": "apps/studio",
+        "command": ["npx", "vite", "preview", "--config", "vite.web.config.ts", "--port", "{port}", "--strictPort", "--outDir", "{build}/renderer"]
+      },
+      {
+        "cwd": "apps/hub",
+        "command": ["npx", "vite", "preview", "--port", "{hubPort}", "--strictPort", "--outDir", "{build}/hub"],
+        "port": "hub"
+      }
+    ],
+    "ports": 4500,
+    "rules": [
+      "The MCP server and the CLI are built in the repository (apps/mcp/dist/index.js, apps/cli/dist/index.js); drive the MCP server with your own stdio client on a folder in your run's folder.",
+      "Do not use the radical-architecture or radical-folder MCP tools in your session: they edit real folders.",
+      "Do not touch model folders outside your run's folder: copy .radical/model/ or /Volumes/data/Dev/injury/architecture into it first."
+    ]
+  }
+}

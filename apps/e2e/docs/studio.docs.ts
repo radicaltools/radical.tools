@@ -14,7 +14,7 @@ import { SHOTS_DIR, calm, expect, test } from './shots'
 // and the social preview are at the end.
 
 const SAMPLE = readFileSync(fileURLToPath(new URL('../../studio/src/renderer/src/store/fintechSampleData.json', import.meta.url)), 'utf8')
-const ARCHITECTURE = fileURLToPath(new URL('../../../architecture/', import.meta.url))
+const ARCHITECTURE = fileURLToPath(new URL('../../../.radical/model/', import.meta.url))
 
 // Bookstore, kept in a browser folder through the real File System Access API.
 test('discussions', async ({ page, studio, shot }) => {
@@ -456,8 +456,8 @@ test('inspector', async ({ page, shot }) => {
     }
   }
   walk(ARCHITECTURE)
-  test.skip(!files['.radical/test-results.json'], 'run npm run check:architecture first')
-  delete files['.radical/selection.json']
+  test.skip(!files['.state/test-results.json'], 'run npm run check:architecture first')
+  delete files['.state/selection.json']
 
   await page.addInitScript(() => {
     ;(window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> })

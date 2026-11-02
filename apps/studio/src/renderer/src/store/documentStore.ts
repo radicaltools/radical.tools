@@ -34,6 +34,7 @@ import {
   webFolderSupported,
   webFileSupported,
   pickWebDirectory,
+  modelHandleOf,
   pickWebFileToOpen,
   pickWebFileToSave,
   readFileHandle,
@@ -142,7 +143,7 @@ function webSession(id: string, handle: FsDirHandle): MdFolderSession {
 // ─── The other models of a federation ────────────────────────────────────────
 // A folder model's deps.json names the models it depends on; `radical
 // federation fetch` writes their elements and relations into the folder's
-// .radical/federation.json. A read of the folder adds them to the model
+// .state/federation.json. A read of the folder adds them to the model
 // (withOtherModels); the serializer, and every other save here (ownModel),
 // leaves them out. Studio never fetches.
 
@@ -159,7 +160,7 @@ export interface OtherModels {
   depsError: string | null
   /** The other models as fetched; null when none were. */
   fetched: FederationFile | null
-  /** A .radical/federation.json is there that this version does not read. */
+  /** A .state/federation.json is there that this version does not read. */
   fetchedUnreadable: boolean
 }
 
@@ -955,7 +956,7 @@ export interface DocumentsAPI {
    *  differed, once they are listed (stale: load it afresh). Not stale for
    *  any other document. */
   verifyOpened(id: string): Promise<{ stale: boolean }>
-  /** Writes a folder model's view index (`.radical/cache/views.json`). */
+  /** Writes a folder model's view index (`.state/cache/views.json`). */
   writeViewIndex(id: string, content: string): Promise<boolean>
   /** What `radical check` keeps beside an md-folder model (test results,
    *  measurements, check.json, reviews.json), each null when it is not there;
@@ -1356,12 +1357,14 @@ export const documents: DocumentsAPI = {
 
     // ── Web: File System Access API directory picker → handle in IndexedDB. ──
     if (webFolderSupported()) {
-      const handle = await pickWebDirectory()
-      if (!handle) return null
+      const picked = await pickWebDirectory()
+      if (!picked) return null
+      const handle = await modelHandleOf(picked)
       const idx = readIndex()
       const meta: DocumentMeta = {
         id: uid(),
-        name: handle.name || 'model',
+        // A repository picked gives the model its name.
+        name: (handle === picked ? handle.name : picked.name) || 'model',
         source: 'md',
         lastModified: Date.now(),
       }

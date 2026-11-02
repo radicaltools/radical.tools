@@ -3,7 +3,9 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { inspectorMeasurements } from '../src/renderer/src/persistence/inspector'
 import {
   handleFolderStorage,
+  modelHandleOf,
   readCheckFilesFromHandle,
+  readModelBaseFromHandle,
   writeSelectionToHandle,
   type FsDirHandle,
   type FsFileHandle,
@@ -130,10 +132,31 @@ describe('webFolder read/write', () => {
     await s.write({ 'radical.md': 'x' })
     await writeSelectionToHandle(root, '{"nodeIds":["a"]}')
     await writeSelectionToHandle(root, '{"nodeIds":["b"]}')
-    const dir = root.children.get('.radical') as FakeDir
+    const dir = root.children.get('.state') as FakeDir
     expect((dir.children.get('selection.json') as FakeFile).data).toBe('{"nodeIds":["b"]}')
     expect((dir.children.get('.gitignore') as FakeFile).data).toBe('*\n')
     expect(await s.poll()).toEqual([])
+  })
+})
+
+describe('a repository laid out with .radical/', () => {
+  it('opens the model of a repository picked, and reads state the old .radical/ still has', async () => {
+    const repo = new FakeDir('shop')
+    const model = await (await repo.getDirectoryHandle('.radical', { create: true })).getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    expect(await modelHandleOf(repo)).toBe(model)
+    expect(await modelHandleOf(model)).toBe(model)
+    const other = new FakeDir('notes')
+    expect(await modelHandleOf(other)).toBe(other)
+
+    const old = await model.getDirectoryHandle('.radical', { create: true }) as FakeDir
+    old.children.set('test-results.json', new FakeFile('old results'))
+    old.children.set('base.json', new FakeFile('old base'))
+    expect((await readCheckFilesFromHandle(model)).results).toBe('old results')
+    expect(await readModelBaseFromHandle(model)).toBe('old base')
+    const state = await model.getDirectoryHandle('.state', { create: true }) as FakeDir
+    state.children.set('base.json', new FakeFile('new base'))
+    expect(await readModelBaseFromHandle(model)).toBe('new base')
   })
 })
 

@@ -91,14 +91,14 @@ describe('radical diff', () => {
     const { code, out, err } = await run(cwd, 'diff', 'model', '--save-base')
     expect(code).toBe(0)
     expect(out).toContain('action: take the payment → take the payment within 2 seconds')
-    expect(err).toMatch(/Saved the base \([0-9a-f]{7}\) to model\/\.radical\/base\.json\./)
-    const base = parseModelBase(await readFile(join(cwd, 'model/.radical/base.json'), 'utf8'))
+    expect(err).toMatch(/Saved the base \([0-9a-f]{7}\) to model\/\.state\/base\.json\./)
+    const base = parseModelBase(await readFile(join(cwd, 'model/.state/base.json'), 'utf8'))
     expect(base).toMatchObject({ version: 1, described: 'merge base with main', branch: 'feature' })
     expect(base!.commit).toMatch(/^[0-9a-f]{40}$/)
     // The model as it was at the base, positions included for the ghosts.
     expect(base!.nodes.find((n) => n.id === 'req')).toMatchObject({ action: 'take the payment', x: 0, width: 200 })
     expect(base!.relations.map((r) => r.id).sort()).toEqual(['r1', 'r2'])
-    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(cwd, 'model/.state/.gitignore'), 'utf8')).toBe('*\n')
     expect(await readFile(join(cwd, 'model/nodes/pay.md'), 'utf8')).toBe(before)
     expect((await git(cwd, 'status', '--porcelain', '--', 'model/.radical')).stdout).toBe('')
     // --quiet prints nothing.

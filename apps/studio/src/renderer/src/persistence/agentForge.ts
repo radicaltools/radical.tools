@@ -1,7 +1,7 @@
 // ─── Agent Forge run → Studio ────────────────────────────────────────────────
 //
 // An agent running Radical Forge over MCP on the same model folder writes
-// where the run stands to `.radical/forge-run.json` (see forgeRunStatus).
+// where the run stands to `.state/forge-run.json` (see forgeRunStatus).
 // This polls that file for the active md-folder document so the Forge button
 // can pulse and open a read-only view of the run. Nothing here talks back to
 // the agent.

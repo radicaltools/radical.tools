@@ -4,14 +4,17 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
 import { FORGE_PROCEDURE } from './forge'
 import { displayVersion } from '@radical/common/version'
+import { findModelFolder } from '@radical/node-files/repositoryLayout'
 
-const USAGE = `Usage: radical-mcp --folder <model-folder> [--metamodel ${Object.keys(PRESETS).join('|')}]
+const USAGE = `Usage: radical-mcp [--folder <model-folder>] [--metamodel ${Object.keys(PRESETS).join('|')}]
   --folder     the Markdown model folder, absolute or relative to the working directory;
-               a missing or empty folder becomes a new model
+               a missing or empty folder becomes a new model. Without it: the
+               working directory when it is a model folder, else the
+               repository's .radical/model (or architecture/ of the old layout)
   --metamodel  the metamodel of a new model (default: radical)
   --version    print the version`
 
-function parseArgs(args: string[]): { folder: string } & OpenOptions {
+function parseArgs(args: string[]): { folder?: string } & OpenOptions {
   const values = new Map<string, string>()
   for (let i = 0; i < args.length; i += 2) {
     const [flag, value] = [args[i], args[i + 1]]
@@ -20,7 +23,7 @@ function parseArgs(args: string[]): { folder: string } & OpenOptions {
   }
   const folder = values.get('--folder')
   const metamodel = values.get('--metamodel')
-  if (!folder || (metamodel !== undefined && !(metamodel in PRESETS))) throw new Error(USAGE)
+  if (metamodel !== undefined && !(metamodel in PRESETS)) throw new Error(USAGE)
   return { folder, metamodel: metamodel as OpenOptions['metamodel'] }
 }
 
@@ -96,7 +99,9 @@ async function main(): Promise<void> {
     process.stdout.write(`${displayVersion()}\n`)
     return
   }
-  const { folder, metamodel } = parseArgs(args)
+  const { folder: named, metamodel } = parseArgs(args)
+  const folder = named ?? await findModelFolder(process.cwd())
+  if (!folder) throw new Error(`No model folder here or in .radical/model of the repository.\n${USAGE}`)
   const model = await FolderModel.open(folder, { metamodel })
   const server = new McpServer({ name: 'radical-folder', version: displayVersion() }, { instructions: INSTRUCTIONS })
   const registered = new Map<string, RegisteredTool>()

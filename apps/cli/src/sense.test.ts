@@ -83,14 +83,14 @@ describe('radical sense', () => {
     expect(file.reviews.map((r: { result: string; by: string }) => [r.result, r.by])).toEqual([['passed', 'tzajac'], ['failed', 'auditor']])
     expect(file.reviews[0].note).toBe('threat model of the release')
     expect(file.reviews[1].at).toBe(at.toISOString())
-    // Not in .radical/, which git ignores.
-    await expect(readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8')).rejects.toThrow()
+    // Not in .state/, which git ignores.
+    await expect(readFile(join(cwd, 'model/.state/measurements.json'), 'utf8')).rejects.toThrow()
     const wrong = await run(cwd, 'sense', 'review', 'Security review', '--passed', '--folder', 'model')
     expect(wrong.code).toBe(2)
     expect(wrong.err).toContain('needs the name of what was reviewed, one of --passed and --failed, and --by')
   })
 
-  it('appends what an adapter measured to .radical/measurements.json, judging nothing', async () => {
+  it('appends what an adapter measured to .state/measurements.json, judging nothing', async () => {
     const cwd = await workspace()
     // 912 ms is far over any sane threshold: the sensor still exits 0.
     const json = await run(cwd, 'sense', 'json', 'summary.json', '--metric', 'api.latency.p95=/metrics/http_req_duration/p(95)@ms', '--folder', 'model', '--label', 'env=staging', '--context', 'commit=abc123')
@@ -98,16 +98,16 @@ describe('radical sense', () => {
     const command = await run(cwd, 'sense', 'command', '--folder', 'model', '--name', 'workspaces', '--', process.execPath, '-e', 'process.exit(1)')
     expect(command.code).toBe(0)
     expect(command.out).toMatch(/^workspaces\.exit_code 1\nworkspaces\.duration [\d.]+ s\n$/)
-    const store = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    const store = JSON.parse(await readFile(join(cwd, 'model/.state/measurements.json'), 'utf8'))
     expect(store.version).toBe(1)
     expect(store.measurements.map((m: { metric: string }) => m.metric)).toEqual(['api.latency.p95', 'workspaces.duration', 'workspaces.exit_code'])
     expect(store.measurements[0]).toMatchObject({ value: 912.5, unit: 'ms', labels: { env: 'staging' }, source: 'json', context: { commit: 'abc123' } })
     expect(Date.parse(store.measurements[0].at)).not.toBeNaN()
-    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(cwd, 'model/.state/.gitignore'), 'utf8')).toBe('*\n')
     // Measured again: the latest replaces it.
     await writeFile(join(cwd, 'summary.json'), JSON.stringify({ metrics: { http_req_duration: { 'p(95)': 240 } } }))
     await run(cwd, 'sense', 'json', 'summary.json', '--metric', 'api.latency.p95=/metrics/http_req_duration/p(95)@ms', '--folder', 'model', '--label', 'env=staging')
-    const again = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    const again = JSON.parse(await readFile(join(cwd, 'model/.state/measurements.json'), 'utf8'))
     expect(again.measurements.filter((m: { metric: string }) => m.metric === 'api.latency.p95').map((m: { value: number }) => m.value)).toEqual([240])
     // --out writes a radical-metrics/1 file for another job instead.
     expect((await run(cwd, 'sense', 'json', 'summary.json', '--metric', 'a.b=metrics.http_req_duration.p(95)', '--out', 'out/m.json')).code).toBe(0)
@@ -128,7 +128,7 @@ describe('radical sense', () => {
     expect(noModel.code).toBe(2)
     expect(noModel.err).toContain('is no model folder')
     expect((await run(cwd, 'sense', 'command', '--folder', 'model')).code).toBe(2)
-    await expect(readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8')).rejects.toThrow()
+    await expect(readFile(join(cwd, 'model/.state/measurements.json'), 'utf8')).rejects.toThrow()
     const list = await run(cwd, 'sense', '--list')
     expect(list.out).toContain('command           runs a command')
   })
@@ -140,7 +140,7 @@ const relation = (id: string, relationType: string, sourceId: string, targetId: 
 
 /** A model whose ADR constrains two of the three containers of a system,
  *  with a fitness function measured by the repository's sensor `openapi`,
- *  in a repository (a .git) whose radical.sensors.json has `sensors`. */
+ *  in a repository (a .git) whose .radical/sensors.json has `sensors`. */
 async function repository(sensors: Record<string, unknown>, measure = 'openapi --strict'): Promise<string> {
   const cwd = await modelWith([
     element('pay', 'system', 'Payments'),
@@ -151,7 +151,8 @@ async function repository(sensors: Record<string, unknown>, measure = 'openapi -
     fitness('ff', 'APIs described in OpenAPI', { cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', measure, metrics: 'openapi.exit_code == 0' }),
   ], [relation('i', 'implements', 'ff', 'adr'), relation('c1', 'constrains', 'adr', 'pay-api'), relation('c2', 'constrains', 'adr', 'refund-api')])
   await mkdir(join(cwd, '.git'))
-  await writeFile(join(cwd, 'radical.sensors.json'), JSON.stringify({ sensors }))
+  await mkdir(join(cwd, '.radical'))
+  await writeFile(join(cwd, '.radical', 'sensors.json'), JSON.stringify({ sensors }))
   return cwd
 }
 
@@ -196,6 +197,6 @@ describe('radical sense run', () => {
     const cwd = await repository({ other: { command: 'node -v' } }, 'openapi')
     const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
     expect(result.code).toBe(2)
-    expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, 'radical.sensors.json')}.`)
+    expect(result.err).toContain(`APIs described in OpenAPI: cannot measure "openapi": no sensor openapi, neither an adapter (radical sense --list) nor in ${join(cwd, '.radical', 'sensors.json')}.`)
   })
 })

@@ -14,6 +14,8 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { fetchDependency, isAddress, repoAddress } from '@radical/node-files/gitDeps'
 import { writeEditorStateFile } from '@radical/node-files/selectionFile'
 import type { Io } from './check'
+import { modelFolderArg } from './modelFolder'
+import { MODEL_FOLDER } from '@radical/node-files/repositoryLayout'
 
 export const FEDERATION_USAGE = `Usage: radical federation fetch [folder] [options]
 
@@ -186,9 +188,9 @@ export function parseDependsOn(spec: string): Dependency {
   const rest = spec.slice(at + 1)
   const hash = rest.lastIndexOf('#')
   const repo = hash < 0 ? rest : rest.slice(0, hash)
-  const [ref = '', path = 'architecture'] = hash < 0 ? [] : rest.slice(hash + 1).split(/:(.*)/s)
+  const [ref = '', path = MODEL_FOLDER] = hash < 0 ? [] : rest.slice(hash + 1).split(/:(.*)/s)
   if (!repo) throw new Error(`--depends-on ${spec}: the repository is missing`)
-  return { name, repo, path: path || 'architecture', ref }
+  return { name, repo, path: path || MODEL_FOLDER, ref }
 }
 
 /** The model folder's deps.json with `added` in it: a dependency of the
@@ -278,7 +280,8 @@ export async function federationCommand(args: string[], io: Io): Promise<number>
   }
   const { values, positionals } = parsed
   if (values.help) { io.out(FEDERATION_USAGE); return 0 }
-  const [action, folder = '.', ...rest] = positionals
+  const [action, named, ...rest] = positionals
+  const folder = await modelFolderArg(named, io.cwd)
   if (action !== 'fetch' || rest.length) { io.err(FEDERATION_USAGE); return 2 }
   if (values.detach) {
     if (!io.background) { io.err('radical federation fetch --detach: nothing here can start a command in the background.'); return 2 }

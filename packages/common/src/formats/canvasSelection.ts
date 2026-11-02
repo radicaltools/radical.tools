@@ -2,14 +2,22 @@
 //
 // What is selected on Studio's canvas, written into the model folder so an AI
 // client working on the same folder (the MCP server) can act on "the selected
-// element". It lives under `.radical/`, which the md-folder format never
+// element". It lives under `.state/`, which the md-folder format never
 // lists, stamps or watches, so writing it is not a model change. A
-// `.radical/.gitignore` keeps it out of version control.
+// `.state/.gitignore` keeps it out of version control.
 
-export const SELECTION_DIR = '.radical'
-export const SELECTION_FILE = `${SELECTION_DIR}/selection.json`
-export const SELECTION_GITIGNORE = `${SELECTION_DIR}/.gitignore`
-/** Everything under `.radical/` is per-user editor state. */
+/** A model folder's state out of git: the selection, the base, the cache,
+ *  the fetched models, test results, measurements, agent turns. */
+export const STATE_DIR = '.state'
+/** Where versions before ADR "Radical in one .radical folder" kept it: a
+ *  state file is still read from there while STATE_DIR lacks it. */
+export const OLD_STATE_DIR = '.radical'
+/** Where an older version kept the state file `path` (under STATE_DIR). */
+export const oldStatePath = (path: string): string =>
+  path.startsWith(`${STATE_DIR}/`) ? `${OLD_STATE_DIR}/${path.slice(STATE_DIR.length + 1)}` : path
+export const SELECTION_FILE = `${STATE_DIR}/selection.json`
+export const SELECTION_GITIGNORE = `${STATE_DIR}/.gitignore`
+/** Everything under `.state/` is per-user editor state. */
 export const SELECTION_GITIGNORE_CONTENT = '*\n'
 
 export interface CanvasSelection {

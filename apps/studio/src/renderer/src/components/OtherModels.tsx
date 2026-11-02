@@ -63,7 +63,7 @@ function OtherModelsPopover({ summary, models, onPicked }: { summary: OtherModel
     <div className="branch-pop other-models-pop" role="dialog" aria-label="Other models">
       <strong>This model depends on {models} other model{models === 1 ? '' : 's'}</strong>
       <p className="branch-muted">
-        Their elements and views are shown beside its own, read-only. Fetched by the command line into .radical/federation.json{summary.fetchedAt ? `, ${ago(summary.fetchedAt)}` : ''}.
+        Their elements and views are shown beside its own, read-only. Fetched by the command line into .state/federation.json{summary.fetchedAt ? `, ${ago(summary.fetchedAt)}` : ''}.
       </p>
       {summary.rows.length > 0 && (
         <table className="other-models-table">

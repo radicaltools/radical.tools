@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sensor brand-mark (radical.sensors.json), for the fitness function One
+// Sensor brand-mark (.radical/sensors.json), for the fitness function One
 // mark everywhere: the element's favicons and welcome mark are copies of
 // tools/brand/radical-mark.svg, its icons exist at their sizes, and its
 // pages link the favicon and show the mark. Run by radical sense run, once

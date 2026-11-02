@@ -1,4 +1,4 @@
-// The sensors of radical.sensors.json and where they find the elements
+// The sensors of .radical/sensors.json and where they find the elements
 // (tools/sensors/elements.mjs): every element a fitness function measures
 // with one of them has a place, and one without is named.
 import { describe, expect, it } from 'vitest'
@@ -12,11 +12,11 @@ import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { ELEMENTS } from './elements.mjs'
 
 const ROOT = join(import.meta.dirname, '../..')
-const SENSORS = JSON.parse(readFileSync(join(ROOT, 'radical.sensors.json'), 'utf8')).sensors
+const SENSORS = JSON.parse(readFileSync(join(ROOT, '.radical', 'sensors.json'), 'utf8')).sensors
 
 describe('repository sensors', () => {
-  it('has a place for every element a fitness function measures with a sensor of radical.sensors.json', async () => {
-    const { data } = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(join(ROOT, 'architecture')), { writeCache: false }).readAll())
+  it('has a place for every element a fitness function measures with a sensor of .radical/sensors.json', async () => {
+    const { data } = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(join(ROOT, '.radical', 'model')), { writeCache: false }).readAll())
     const model = { nodes: Object.fromEntries(data.nodes.map((n) => [n.id, n])), relations: Object.fromEntries(data.relations.map((r) => [r.id, r])) }
     const measured = data.nodes.filter((n) => n.type === 'fitness-fn' && parseMeasure(n.measure).some((line) => SENSORS[line.sensor]))
     expect(measured.map((n) => n.label).sort()).toEqual(['Installable npm packages', 'One mark everywhere', 'One product version', 'Workspace boundaries'])

@@ -5,7 +5,7 @@
 // install`) and the MCP server (every get_changes) for Studio, which has no
 // git: it compares the open model with this copy as it is edited. Only the
 // elements and relations; their positions place the ghosts of removed
-// elements and are no part of the comparison. It lives under `.radical/`,
+// elements and are no part of the comparison. It lives under `.state/`,
 // out of version control like the rest of the editor state.
 //
 // A folder git does not track never gets one that way, so Radical Forge
@@ -15,9 +15,9 @@
 
 import { migrateCheckFields } from './checksMigration'
 import type { C4Node, C4Relation } from '../c4'
-import { SELECTION_DIR } from './canvasSelection'
+import { STATE_DIR } from './canvasSelection'
 
-export const MODEL_BASE_FILE = `${SELECTION_DIR}/base.json`
+export const MODEL_BASE_FILE = `${STATE_DIR}/base.json`
 
 /** A base older than this may belong to another branch or an older main. */
 export const BASE_OLD_MS = 24 * 60 * 60 * 1000

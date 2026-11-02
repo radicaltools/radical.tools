@@ -1,7 +1,7 @@
 // ─── Canvas selection → model folder ─────────────────────────────────────────
 //
 // Writes what is selected on the canvas (and the view it is selected in) into
-// the active md-folder document's `.radical/selection.json`, so an AI client
+// the active md-folder document's `.state/selection.json`, so an AI client
 // on the same folder — the MCP server's get_selection — can act on "the
 // selected mockup". Debounced; a document the user leaves gets an empty
 // selection, so a client never acts on something no longer on screen.

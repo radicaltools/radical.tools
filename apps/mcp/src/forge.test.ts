@@ -363,7 +363,7 @@ describe('Radical Forge over MCP', () => {
       // While it waits for the answer nothing is written, and the stage stays open.
       expect(await refused(client, 'add_node', { tempId: 's3', type: 'step', label: 'Hand over', parentId: 'p' })).toContain('waits for the user\'s answer')
       expect(await refused(client, 'forge_complete_stage', { stage: 'processes', summary: 'x' })).toContain('waits for the user\'s answer')
-      let status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      let status = parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
       expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'generating', asking: true })
       expect(await refused(client, 'forge_answer_refinement', { stage: 'processes', proposal: 'p9', accept: true })).toContain('the open proposal is p1')
       const added = await call(client, 'forge_answer_refinement', { stage: 'processes', proposal: 'p1', accept: true, reply: 'Yes, and keep the two hours.' })
@@ -398,7 +398,7 @@ describe('Radical Forge over MCP', () => {
       expect(done).toContain('added scenario "Shopper notified"')
       expect(done).not.toContain('added process')
       expect(done).toContain('The user declined 1 of its 2 proposals.')
-      status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      status = parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
       expect(status.stages.find((s) => s.id === 'processes')).toMatchObject({ status: 'done', refined: 3 })
       // The stage is closed: nothing guards the model any more.
       await call(client, 'update_node', { id: notifyId, label: 'Notify when ready' })
@@ -446,7 +446,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'add_relation', { sourceId: 'sc', targetId: reqId, relationType: 'verifies' })
       const done = await call(client, 'forge_complete_stage', { stage: 'scenarios', summary: 'One scenario.' })
       expect(done).not.toContain('refined earlier stages')
-      const status = parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+      const status = parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
       expect(status.stages.find((s) => s.id === 'scenarios')?.refined ?? 0).toBe(0)
       // Regenerate takes back the stage's scenario, not the user's rename.
       await call(client, 'forge_generate', { stage: 'scenarios', regenerate: true })
@@ -460,9 +460,9 @@ describe('Radical Forge over MCP', () => {
 
   it('saves the model before the run as the base when there is none from git, and leaves a git base alone', async () => {
     const { client, folder, read } = await connect()
-    const baseFile = join(folder, '.radical/base.json')
+    const baseFile = join(folder, '.state/base.json')
     try {
-      expect(await call(client, 'forge_start', { description: BRIEF })).toContain('Saved the model as it was before this run to .radical/base.json')
+      expect(await call(client, 'forge_start', { description: BRIEF })).toContain('Saved the model as it was before this run to .state/base.json')
       let base = parseModelBase(await readFile(baseFile, 'utf8'))!
       expect(base).toMatchObject({ source: 'forge', commit: '', nodes: [], relations: [] })
 
@@ -620,14 +620,14 @@ describe('Radical Forge over MCP', () => {
     }
   }, 60_000)
 
-  it('tells Studio where the run stands through .radical/forge-run.json', async () => {
+  it('tells Studio where the run stands through .state/forge-run.json', async () => {
     const { client, folder } = await connect()
-    const status = async () => parseForgeRun(await readFile(join(folder, '.radical/forge-run.json'), 'utf8'))!
+    const status = async () => parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
     try {
       await call(client, 'forge_start', { description: BRIEF })
       expect(await status()).toMatchObject({ client: 'radical-test', state: 'active', need: { label: 'Click & collect' } })
       expect((await status()).stages.map((s) => s.status)).toEqual(Array(9).fill('pending'))
-      expect(await readFile(join(folder, '.radical/.gitignore'), 'utf8')).toBe('*\n')
+      expect(await readFile(join(folder, '.state/.gitignore'), 'utf8')).toBe('*\n')
 
       await call(client, 'forge_clarify', { stage: 'requirements' })
       expect((await status()).stages[0]).toEqual({ id: 'requirements', status: 'clarifying' })
@@ -649,7 +649,7 @@ describe('Radical Forge over MCP', () => {
     await call(client, 'forge_start', { description: BRIEF })
     await call(client, 'forge_clarify', { stage: 'requirements' })
     await client.close()
-    const file = join(folder, '.radical/forge-run.json')
+    const file = join(folder, '.state/forge-run.json')
     await expect.poll(async () => parseForgeRun(await readFile(file, 'utf8'))?.state, { timeout: 5000 }).toBe('closed')
   }, 60_000)
 

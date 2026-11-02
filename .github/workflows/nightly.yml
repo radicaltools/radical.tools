@@ -8,7 +8,7 @@ name: Nightly
 # function added to the model with a sensor radical sense has is run the next
 # night. tools/nightly-findings.ts evaluates those fitness functions'
 # conditions as radical check does, and each that does not hold (or that
-# nothing measured) becomes a finding in crucible/findings/, proposed in a
+# nothing measured) becomes a finding in .radical/crucible/findings/, proposed in a
 # bot pull request. The findings go neither into the model nor into Studio.
 #
 # A condition against a baseline (`<= baseline + 20%`) compares with the
@@ -55,7 +55,7 @@ jobs:
         continue-on-error: true
         run: >-
           node apps/cli/dist/index.js sense run --trigger nightly
-          --folder architecture --out reports/metrics
+          --out reports/metrics
           --context commit=${{ github.sha }}
 
       - name: Upload what the night measured
@@ -110,12 +110,12 @@ jobs:
         run: |
           baseline=""
           if ls history/*.json >/dev/null 2>&1; then baseline="--baseline history"; fi
-          node apps/cli/dist/index.js check architecture --metrics reports/metrics $baseline --format github || true
+          node apps/cli/dist/index.js check --metrics reports/metrics $baseline --format github || true
       - name: Findings
         run: |
           baseline=""
           if ls history/*.json >/dev/null 2>&1; then baseline="--baseline history"; fi
-          npx tsx tools/nightly-findings.ts architecture crucible/findings \
+          npx tsx tools/nightly-findings.ts .radical/model .radical/crucible/findings \
             --metrics reports/metrics $baseline --trigger nightly \
             --commit ${{ github.sha }} \
             --run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} \
@@ -142,13 +142,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.NIGHTLY_TOKEN }}
         run: |
-          if [ -z "$(git status --porcelain crucible/findings)" ]; then echo "No new findings."; exit 0; fi
+          if [ -z "$(git status --porcelain .radical/crucible/findings)" ]; then echo "No new findings."; exit 0; fi
           if [ -z "$GH_TOKEN" ]; then echo "::error::No secret NIGHTLY_TOKEN: the findings are not proposed (see the ADR Studio's speed is measured nightly)."; exit 1; fi
           branch="bot/nightly-findings-$(date -u +%Y-%m-%d)-${{ github.run_id }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add crucible/findings
+          git add .radical/crucible/findings
           git commit -m "Nightly findings $(date -u +%Y-%m-%d)"
           git push origin "$branch"
           gh pr create --base main --head "$branch" \

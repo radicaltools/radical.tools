@@ -140,14 +140,14 @@ describe('radical check', () => {
     expect(evidence.nodes.req).toMatchObject({ status: 'broken', by: ['sc'] })
 
     // The test cases are kept beside the model for Studio.
-    const results = JSON.parse(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8'))
+    const results = JSON.parse(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8'))
     expect(results).toMatchObject({ version: 1, reports: ['red.json'] })
     expect(results.cases).toHaveLength(2)
-    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    expect(await readFile(join(cwd, 'model/.state/.gitignore'), 'utf8')).toBe('*\n')
     // Into the model folder's .radical directory, made with its .gitignore.
-    await run(cwd, 'check', 'model', '--report', 'red.json', '--evidence', 'model/.radical/evidence.json')
-    expect(JSON.parse(await readFile(join(cwd, 'model/.radical/evidence.json'), 'utf8')).nodes.req.status).toBe('broken')
-    expect(await readFile(join(cwd, 'model/.radical/.gitignore'), 'utf8')).toBe('*\n')
+    await run(cwd, 'check', 'model', '--report', 'red.json', '--evidence', 'model/.state/evidence.json')
+    expect(JSON.parse(await readFile(join(cwd, 'model/.state/evidence.json'), 'utf8')).nodes.req.status).toBe('broken')
+    expect(await readFile(join(cwd, 'model/.state/.gitignore'), 'utf8')).toBe('*\n')
 
     const green = await run(cwd, 'check', 'model', '--report', 'red.json', '--report', 'green.json')
     // Either report failing the test fails it.
@@ -186,7 +186,7 @@ describe('radical check', () => {
     expect(slow.code).toBe(1)
     expect(slow.out).toContain('baseline 5000 ms, the median of 3; limit 6000 ms')
     // The baseline is read, never kept: only tonight's measurement is beside the model.
-    const store = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    const store = JSON.parse(await readFile(join(cwd, 'model/.state/measurements.json'), 'utf8'))
     expect(store.measurements.map((m: { value: number }) => m.value)).toEqual([6500])
   })
 
@@ -209,14 +209,14 @@ describe('radical check', () => {
     expect(red.out).toContain('measurements: 1')
     expect(JSON.parse(await readFile(join(cwd, 'evidence.json'), 'utf8')).nodes.adr.status).toBe('broken')
     // Kept beside the model: radical check reads it without --metrics too.
-    const store = JSON.parse(await readFile(join(cwd, 'model/.radical/measurements.json'), 'utf8'))
+    const store = JSON.parse(await readFile(join(cwd, 'model/.state/measurements.json'), 'utf8'))
     expect(store.measurements).toHaveLength(1)
     expect((await run(cwd, 'check', 'model')).code).toBe(1)
     // A later measurement replaces it.
     await writeFile(join(cwd, 'fast.json'), file(120, 'ms'))
     expect((await run(cwd, 'check', 'model', '--metrics', 'fast.json')).code).toBe(0)
     // An old one is stale, which warns and does not pass.
-    await writeFile(join(cwd, 'model/.radical/measurements.json'), JSON.stringify({ version: 1, measurements: [{ ...store.measurements[0], value: 100, unit: 'ms', at: new Date(Date.now() - 9 * 86400e3).toISOString() }] }))
+    await writeFile(join(cwd, 'model/.state/measurements.json'), JSON.stringify({ version: 1, measurements: [{ ...store.measurements[0], value: 100, unit: 'ms', at: new Date(Date.now() - 9 * 86400e3).toISOString() }] }))
     const stale = await run(cwd, 'check', 'model', '--format', 'json')
     expect(JSON.parse(stale.out).findings.map((f: { rule: string }) => f.rule)).toContain('metric-stale')
     // A file that is no radical-metrics/1 stops the check.
@@ -249,7 +249,7 @@ describe('radical check', () => {
     const cwd = await workspace()
     await writeFile(join(cwd, 'green.json'), JSON.stringify({ testResults: [{ name: `${cwd}/src/pay.test.ts`, assertionResults: [{ ancestorTitles: [], title: 'pays', status: 'passed' }] }] }))
     expect((await run(cwd, 'check', 'model', '--report', 'green.json')).code).toBe(0)
-    const kept = await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')
+    const kept = await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')
 
     await writeFile(join(cwd, 'notes.xml'), '<?xml version="1.0"?><notes><note>not a report</note></notes>')
     const xml = await run(cwd, 'check', 'model', '--report', 'notes.xml')
@@ -262,7 +262,7 @@ describe('radical check', () => {
     expect(dir.err).toContain('empty')
     // With a good report beside it, too: the check does not run on part of the input.
     expect((await run(cwd, 'check', 'model', '--report', 'green.json', '--report', 'notes.xml')).code).toBe(2)
-    expect(await readFile(join(cwd, 'model/.radical/test-results.json'), 'utf8')).toBe(kept)
+    expect(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8')).toBe(kept)
   })
 
   it('says that a goal on what the tests verify did not run without a report', async () => {

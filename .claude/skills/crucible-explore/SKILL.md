@@ -1,6 +1,6 @@
 ---
 name: crucible-explore
-description: Run an exploratory round of Radical Crucible on this repository - agents that look for bugs no test describes, each in its own area, every finding re-run before the user sees it and recorded in crucible/findings. Use when the user asks for exploratory runs, an exploratory round, agents that test the product, or "uruchom N agentów" to look for bugs.
+description: Run an exploratory round of Radical Crucible on this repository - agents that look for bugs no test describes, each in its own area, every finding re-run before the user sees it and recorded in .radical/crucible/findings. Use when the user asks for exploratory runs, an exploratory round, agents that test the product, or "uruchom N agentów" to look for bugs.
 ---
 
 # An exploratory round
@@ -24,13 +24,13 @@ node apps/cli/dist/index.js explore prepare --runs <n> --areas "<area>; <area>; 
   Test changes next to their neighbours; about half of each round used to be
   the same pattern left in another place. Give each run a different area; at
   most two findings per area are worth more than a third.
-- Runs are numbered after the last round in `.crucible/rounds/`. The rounds
+- Runs are numbered after the last round in `.radical/crucible/rounds/`. The rounds
   before Radical Crucible went up to run 69: the first time, pass
   `--from 70`.
 - The build is copied into the round's folder, so a rebuild in the checkout
   during the round changes nothing for the runs. `--no-build` copies what is
   built.
-- Read the brief it wrote (`.crucible/rounds/round-<from>-<to>/BRIEF.md`)
+- Read the brief it wrote (`.radical/crucible/rounds/round-<from>-<to>/BRIEF.md`)
   once before starting the agents.
 
 ## 2. Start the agents
@@ -63,7 +63,7 @@ node apps/cli/dist/index.js explore record <run folder>/REPORT.md
 ```
 
 Edit the report's JSON first if verification dropped or changed a finding.
-Findings go to `crucible/findings/F-NNNN.md` (open), questions with status
+Findings go to `.radical/crucible/findings/F-NNNN.md` (open), questions with status
 `question`, each with a copy of its script and screenshot. When it warns that
 a copied script names the round's absolute paths, make the copy find the
 repository by walking up from its folder. Duplicates of open findings or of

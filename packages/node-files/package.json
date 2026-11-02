@@ -8,6 +8,7 @@
     "./diskFolderStorage": "./src/diskFolderStorage.ts",
     "./gitModel": "./src/gitModel.ts",
     "./gitDeps": "./src/gitDeps.ts",
+    "./repositoryLayout": "./src/repositoryLayout.ts",
     "./selectionFile": "./src/selectionFile.ts",
     "./buildInfo": {
       "types": "./buildInfo.d.cts",

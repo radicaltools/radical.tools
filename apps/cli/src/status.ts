@@ -14,6 +14,7 @@ import type { Io } from './check'
 import { readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
+import { findModelFolder, oldLayout } from '@radical/node-files/repositoryLayout'
 
 const exec = promisify(execFile)
 
@@ -95,11 +96,11 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
   const warn = (text: string) => io.out(`  ! ${text}`)
   const fail = (text: string) => { problems++; io.out(`  ✗ ${text}`) }
 
-  // The folder: the one named, else the working directory or architecture in
-  // it when it is a model.
+  // The folder: the one named, else the working directory when it is a
+  // model, the repository's .radical/model, or architecture/ of the
+  // old layout.
   const named = options.folder
-  const candidate = named !== undefined ? resolve(io.cwd, named)
-    : ['.', 'architecture'].map((path) => resolve(io.cwd, path)).find((path) => existsSync(resolve(path, 'radical.md')))
+  const candidate = named !== undefined ? resolve(io.cwd, named) : await findModelFolder(io.cwd) ?? undefined
   const folder = candidate ? await realpath(candidate).catch(() => candidate) : null
   const git = async (cwd: string, ...gitArgs: string[]) => (await exec('git', gitArgs, { cwd, windowsHide: true })).stdout.trim()
   const topOf = async (dir: string) => {
@@ -150,6 +151,8 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
       }
       if (!top) warn('is not in a git repository: Studio\'s Changes on branch and radical diff need one')
       else {
+        const old = await oldLayout(top)
+        if (old.length) warn(`${old.join(', ')} ${old.length === 1 ? 'is' : 'are'} where Radical kept its files before .radical/: radical setup moves ${old.length === 1 ? 'it' : 'them'} into .radical/`)
         const hooksDir = resolve(folder, await git(folder, 'rev-parse', '--git-path', 'hooks'))
         const fromTop = relative(top, folder).replace(/\\/g, '/')
         if (await hooksSaveBase(hooksDir, fromTop)) ok('the git hooks save its base for Studio\'s Changes on branch')

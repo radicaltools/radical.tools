@@ -2,7 +2,7 @@
 //
 // A model folder's deps.json names the models it depends on, and
 // `radical federation fetch` writes their elements into the folder's
-// .radical/federation.json, which Studio shows beside the model's own
+// .state/federation.json, which Studio shows beside the model's own
 // (documentStore). Studio never fetches: opened without them, or with a
 // deps.json that does not read, a model says so once per open, naming the
 // command that fetches them. The toolbar's button lists them with their
@@ -23,7 +23,7 @@ export function otherModelsNotice(others: OtherModels): { message: string; sever
   if (others.depsError) return { message: `${others.depsError} The models it names cannot be shown.`, severity: 'warning' }
   const names = others.deps?.dependencies.map((d) => d.name) ?? []
   if (!names.length) return null
-  if (others.fetchedUnreadable) return { message: `The other models fetched into .radical/federation.json do not read in this version of Studio. ${FETCH} again to see them.`, severity: 'warning' }
+  if (others.fetchedUnreadable) return { message: `The other models fetched into .state/federation.json do not read in this version of Studio. ${FETCH} again to see them.`, severity: 'warning' }
   if (others.fetched) return null
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
   return { message: `This model depends on ${list}, which are not fetched yet. ${FETCH} to see them.`, severity: 'info' }
@@ -66,7 +66,7 @@ export function otherModelsSummary(others: OtherModels): OtherModelsSummary | nu
   if (!others.deps) return null
   const file = others.fetched
   const problems: string[] = []
-  if (others.fetchedUnreadable) problems.push('The other models fetched into .radical/federation.json do not read in this version of Studio.')
+  if (others.fetchedUnreadable) problems.push('The other models fetched into .state/federation.json do not read in this version of Studio.')
   else if (!file) problems.push('Nothing is fetched yet.')
   const rows: OtherModelRow[] = others.deps.dependencies.map((dep) => {
     const got = file?.dependencies.find((d) => d.name === dep.name && !d.via)
