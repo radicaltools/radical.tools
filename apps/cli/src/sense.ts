@@ -153,9 +153,9 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
   const extra = (context ?? []).flatMap((c) => ['--context', c])
   let failed = 0
   let ran = 0
-  const measure = async (node: C4Node, line: { raw: string }, file: string, args: string[], what = ''): Promise<boolean> => {
+  const measure = async (node: C4Node, line: { raw: string }, file: string, args: string[], what = '', cwd = io.cwd): Promise<boolean> => {
     const errors: string[] = []
-    const code = await senseCommand(args, { ...io, err: (text) => { errors.push(text); io.err(text) } }, now)
+    const code = await senseCommand(args, { ...io, cwd, err: (text) => { errors.push(text); io.err(text) } }, now)
     if (code === 0) io.out(`${node.label}: measured "${line.raw}"${what} into ${file}`)
     else io.err(`${node.label}: cannot measure "${line.raw}"${what}: ${errors[0]?.split('\n')[0] ?? `exit status ${code}`}`)
     return code === 0
@@ -179,7 +179,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
           const sensorContext = model.context(node, element, metricsOut)
           const labels = element ? ['--label', `${ELEMENT_LABEL}=${element.id}`] : []
           const ok = await measure(node, line, file, ['command', '--name', line.sensor, '--out', file, ...labels, ...extra, '--', ...sensor, ...line.args, '--context', JSON.stringify(sensorContext)],
-            element ? ` for ${element.label}` : '')
+            element ? ` for ${element.label}` : '', sensors!.root)
           if (!ok) { failed++; continue }
           // What the sensor measured itself, labelled with the element as
           // its exit code is.

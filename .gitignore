@@ -48,6 +48,3 @@ apps/e2e/all-blob-reports/
 /.radical/model/.state/
 /.radical/model/.radical/
 
-# Radical Crucible: exploratory rounds (radical explore prepare) are ignored by
-# .radical/.gitignore; .crucible/ is where they were before .radical/.
-.crucible/

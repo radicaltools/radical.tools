@@ -1,8 +1,0 @@
-{
-  "sensors": {
-    "workspaces": { "command": "node tools/check-workspaces.mjs" },
-    "product-version": { "command": "node tools/sensors/product-version.mjs" },
-    "npm-package": { "command": "node tools/sensors/npm-package.mjs" },
-    "brand-mark": { "command": "node tools/sensors/brand-mark.mjs" }
-  }
-}

@@ -23,14 +23,14 @@ async function repository(files: string[]): Promise<string> {
 
 describe('repository layout', () => {
   it('finds the model in .radical/model from any folder of the repository', async () => {
-    const root = await repository(['.radical/model/radical.md', '.radical/sensors.json', '.radical/crucible/crucible.json', 'apps/web/src/', 'other/radical.md'])
+    const root = await repository(['.radical/model/radical.md', '.radical/sensors/sensors.json', '.radical/crucible/crucible.json', 'apps/web/src/', 'other/radical.md'])
     expect(await repositoryRoot(join(root, 'apps/web/src'))).toBe(root)
     expect(await findModelFolder(join(root, 'apps/web/src'))).toBe(join(root, '.radical/model'))
     expect(await findModelFolder(root)).toBe(join(root, '.radical/model'))
     // A working directory that is a model folder is that one.
     expect(await findModelFolder(join(root, 'other'))).toBe(join(root, 'other'))
-    expect(await findRepositoryFile(join(root, '.radical/model'), '.radical/sensors.json', 'radical.sensors.json'))
-      .toEqual({ path: join(root, '.radical/sensors.json'), root, old: false })
+    expect(await findRepositoryFile(join(root, '.radical/model'), '.radical/sensors/sensors.json', 'radical.sensors.json'))
+      .toEqual({ path: join(root, '.radical/sensors/sensors.json'), root, old: false })
     // Crucible's paths are from the repository's root, not from .radical/.
     expect(crucibleRoot(join(root, '.radical/crucible/crucible.json'))).toBe(root)
     expect(await oldLayout(root)).toEqual([])
@@ -39,7 +39,7 @@ describe('repository layout', () => {
   it('falls back to the old layout', async () => {
     const root = await repository(['architecture/radical.md', 'radical.sensors.json', 'crucible.json', 'crucible/findings/', 'apps/'])
     expect(await findModelFolder(join(root, 'apps'))).toBe(join(root, 'architecture'))
-    expect(await findRepositoryFile(join(root, 'architecture'), '.radical/sensors.json', 'radical.sensors.json'))
+    expect(await findRepositoryFile(join(root, 'architecture'), '.radical/sensors/sensors.json', 'radical.sensors.json'))
       .toEqual({ path: join(root, 'radical.sensors.json'), root, old: true })
     expect(crucibleRoot(join(root, 'crucible.json'))).toBe(root)
     expect(await oldLayout(root)).toEqual(['architecture', 'radical.sensors.json', 'crucible.json', 'crucible/findings'])

@@ -1,6 +1,6 @@
 // Where Radical keeps its files in a repository (ADR Radical in one .radical
 // folder): one .radical/ at the repository's root holds the model
-// (.radical/model), the repository's sensors (.radical/sensors.json) and
+// (.radical/model), the repository's sensors (.radical/sensors/) and
 // Radical Crucible (.radical/crucible/): its plan, findings and rounds.
 // The old layout is still read: a model folder at the root (architecture/),
 // radical.sensors.json and crucible.json there.
@@ -15,8 +15,9 @@ export const RADICAL_DIR = '.radical'
 export const MODEL_FOLDER = `${RADICAL_DIR}/model`
 /** The model folder of the old layout. */
 export const OLD_MODEL_FOLDER = 'architecture'
-/** The repository's sensors, and where the old layout had them. */
-export const SENSORS_FILE = `${RADICAL_DIR}/sensors.json`
+/** The repository's sensors (their scripts beside them), and where the old
+ *  layout had them. */
+export const SENSORS_FILE = `${RADICAL_DIR}/sensors/sensors.json`
 export const OLD_SENSORS_FILE = 'radical.sensors.json'
 /** Crucible's plan, and where the old layout had it. */
 export const CRUCIBLE_FILE = `${RADICAL_DIR}/crucible/crucible.json`

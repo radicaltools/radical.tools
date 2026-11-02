@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Sensor brand-mark (.radical/sensors.json), for the fitness function One
+// Sensor brand-mark (.radical/sensors/sensors.json), for the fitness function One
 // mark everywhere: the element's favicons and welcome mark are copies of
 // tools/brand/radical-mark.svg, its icons exist at their sizes, and its
 // pages link the favicon and show the mark. Run by radical sense run, once
 // per element; tools/brand.test.mjs checks them all at once.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { COPIES, FAVICON_LINK, LOGO, LOGO_PAGES, MARK, PAGES, PNGS, TOUCH_ICON_LINK } from '../generate-icons.mjs'
+import { COPIES, FAVICON_LINK, LOGO, LOGO_PAGES, MARK, PAGES, PNGS, TOUCH_ICON_LINK } from '../../tools/generate-icons.mjs'
 import { fail, measuredElement, sensorContext } from './elements.mjs'
 
 const ROOT = join(import.meta.dirname, '../..')

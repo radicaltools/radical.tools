@@ -407,7 +407,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-measure-invalid',
-    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's .radical/sensors.json.`,
+    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's .radical/sensors/sensors.json.`,
     severity: 'error',
     dimension: 'completeness',
     run: (model) => model.sensors === undefined ? [] : nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
@@ -416,7 +416,7 @@ export const CHECK_RULES: CheckRule[] = [
         nodeId: n.id,
         message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}, ${model.sensors
           ? `${model.sensors.file} ${model.sensors.names.length ? model.sensors.names.join(', ') : 'none'}`
-          : 'and the repository has no .radical/sensors.json'}.`,
+          : 'and the repository has no .radical/sensors/sensors.json'}.`,
       }))),
   },
   {

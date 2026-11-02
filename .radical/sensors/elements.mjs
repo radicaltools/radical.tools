@@ -1,7 +1,7 @@
 // Where the elements of .radical/model/ are built in this repository: the
 // mapping of the model onto the code, which the model leaves to the
 // repository (ADR Fitness functions measure each element their decision
-// constrains). The sensors of .radical/sensors.json get an element in
+// constrains). The sensors of .radical/sensors/sensors.json get an element in
 // --context and look it up here. Keyed by element id; the label is for
 // people. A sensor fails for an element missing here, naming it.
 
@@ -31,7 +31,7 @@ export function measuredElement(context) {
   const element = context?.element
   if (!element) fail('no element in --context: run this sensor with radical sense run')
   const place = ELEMENTS[element.id]
-  if (!place) fail(`no place for ${element.type} "${element.label}" (${element.id}) in tools/sensors/elements.mjs`, 2)
+  if (!place) fail(`no place for ${element.type} "${element.label}" (${element.id}) in .radical/sensors/elements.mjs`, 2)
   return { ...element, ...place, folders: place.folders ?? (place.workspaces === '*' ? ['.'] : place.workspaces) }
 }
 
