@@ -5,11 +5,14 @@ label: "One mark everywhere"
 cadence: "triggered"
 characteristic: "maintainability"
 invocation: "automated"
-metrics: "test(tools/brand.test.mjs) passed"
+measure: "brand-mark"
+metrics: |
+  brand-mark.exit_code == 0
+  test(tools/brand.test.mjs) passed
 scope: "atomic"
 trigger: "pull-request"
 ---
 
-tools/brand.test.mjs: every favicon.svg (apps/web, apps/studio/src/renderer/public, apps/hub/public) is a copy of tools/brand/radical-mark.svg, the desktop, VS Code and touch icons exist at their sizes, and every page and app links the favicon.
+Measured for each element ADR One mark for radical.tools constrains: radical sense run runs the repository's sensor brand-mark (radical.sensors.json, tools/sensors/brand-mark.mjs) once per element. For the element's files (Studio's renderer, the Desktop app's build icon, the VS Code extension's icon, the website, the Hub) it fails when a favicon.svg or Studio's welcome mark is no copy of tools/brand/radical-mark.svg, an icon is missing or not at its size, or a page does not link the favicon or show the mark as its logo. tools/brand.test.mjs checks all of them at once in npm test.
 
-Threshold: Passes in CI
+Threshold: every app shows the mark on every pull request

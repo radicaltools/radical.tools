@@ -16,12 +16,17 @@
 //
 // Imports are read with TypeScript's own pre-processor, not regular
 // expressions, so strings and JSX text are never mistaken for imports.
+//
+// It is also the sensor workspaces of radical.sensors.json: with the
+// --context radical sense run gives it, it checks only the workspaces that
+// build the element (tools/sensors/elements.mjs).
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { measuredElement, sensorContext } from './sensors/elements.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -63,6 +68,10 @@ for (const pattern of rootPkg.workspaces) {
   }
 }
 const byName = new Map(workspaces.map((w) => [w.name, w]))
+const context = sensorContext()
+const element = context ? measuredElement(context) : null
+/** The workspaces checked: all, or the ones that build the element. */
+const checked = !element || element.workspaces === '*' ? workspaces : workspaces.filter((w) => element.workspaces.includes(rel(w.dir)))
 const workspaceOf = (file) => workspaces.find((w) => file === w.dir || file.startsWith(w.dir + sep))
 
 const declaredDeps = (pkg) => new Set([
@@ -73,7 +82,7 @@ const declaredDeps = (pkg) => new Set([
 
 // ── 1. Dependency direction ──────────────────────────────────────────────────
 
-for (const w of workspaces) {
+for (const w of checked) {
   for (const dep of declaredDeps(w.pkg)) {
     const target = byName.get(dep)
     if (!target) continue
@@ -102,7 +111,7 @@ function* sourceFiles(dir) {
 
 const packageName = (spec) => (spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0])
 
-for (const w of workspaces) {
+for (const w of checked) {
   const declared = declaredDeps(w.pkg)
   const hostProvided = new Set(HOST_PROVIDED[w.name] ?? [])
   for (const file of sourceFiles(w.dir)) {
@@ -150,7 +159,7 @@ for (const w of workspaces) {
 }
 
 if (errors.length) {
-  console.error(`Workspace boundary check failed (${errors.length}):\n  ${errors.join('\n  ')}`)
+  console.error(`Workspace boundary check${element ? ` of ${element.label}` : ''} failed (${errors.length}):\n  ${errors.join('\n  ')}`)
   process.exit(1)
 }
-console.log(`Workspace boundaries OK (${workspaces.length} workspaces)`)
+console.log(`Workspace boundaries OK (${checked.length} workspace${checked.length === 1 ? '' : 's'}${element ? ` of ${element.label}` : ''})`)

@@ -57,6 +57,10 @@ export interface CheckModel {
   /** The measurements passed in; the metric rules that read values run only
    *  with them. */
   measurements?: Measurement[]
+  /** The sensors of the repository's radical.sensors.json (its path and
+   *  their names), null when it has none; not given, a measure line may
+   *  name any sensor besides the built-in ones. */
+  sensors?: { file: string; names: string[] } | null
   /** Earlier measurements a condition against a baseline compares with
    *  (the median of the latest seven of its metric). */
   baseline?: Measurement[]
@@ -403,12 +407,17 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-measure-invalid',
-    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}).`,
+    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's radical.sensors.json.`,
     severity: 'error',
     dimension: 'completeness',
-    run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
-      .filter((line) => !isSensorName(line.sensor))
-      .map((line) => ({ nodeId: n.id, message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}.` }))),
+    run: (model) => model.sensors === undefined ? [] : nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
+      .filter((line) => !isSensorName(line.sensor) && !model.sensors?.names.includes(line.sensor))
+      .map((line) => ({
+        nodeId: n.id,
+        message: `Fitness function ${quote(n)}: measure "${line.raw}" names no sensor; radical sense has ${SENSOR_NAMES.join(', ')}, ${model.sensors
+          ? `${model.sensors.file} ${model.sensors.names.length ? model.sensors.names.join(', ') : 'none'}`
+          : 'and the repository has no radical.sensors.json'}.`,
+      }))),
   },
   {
     id: 'metric-invalid',

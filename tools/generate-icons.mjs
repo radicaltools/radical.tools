@@ -29,6 +29,16 @@ export const PUBLIC_DIRS = ['apps/web', 'apps/studio/src/renderer/public', 'apps
 /** Copies of the mark beside the favicons. */
 export const COPIES = [...PUBLIC_DIRS.map((dir) => `${dir}/favicon.svg`), 'apps/studio/src/renderer/src/radical-mark.svg']
 
+/** The pages that link the favicon and the touch icon. */
+export const PAGES = ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/studio/src/renderer/index.html', 'apps/hub/index.html']
+
+/** The pages and components that show the mark as the site's logo. */
+export const LOGO_PAGES = ['apps/web/index.html', 'apps/web/usecases.html', 'apps/web/manual.html', 'apps/web/reference.html', 'apps/web/blog/index.html', 'apps/web/blog/the-context-your-agent-needs-has-a-name.html', 'apps/hub/src/SiteNav.tsx']
+
+export const FAVICON_LINK = /<link rel="icon" href="(\.\/|\.\.\/)?favicon\.svg" type="image\/svg\+xml" \/>/
+export const TOUCH_ICON_LINK = /<link rel="apple-touch-icon" href="(\.\/|\.\.\/)?apple-touch-icon\.png" \/>/
+export const LOGO = /<img class(Name)?="site-nav-mark" src="(\.\/|\.\.\/)?favicon\.svg"/
+
 /** The PNGs: path, size, and the share of it the tile fills. */
 export const PNGS = [
   // macOS draws app icons on a 1024 grid with the tile at 824: the margin

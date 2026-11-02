@@ -107,9 +107,16 @@ describe('fitness function classification', () => {
       ...CLASSIFIED,
       measure: 'lighthouse report.json --label page=home\nplaywright tests/load.spec.ts --cwd apps/e2e\n# a comment\n',
     }))
-    expect(messages(data, 'fitness-fn-measure-invalid')).toEqual([
-      'Fitness function "Page speed": measure "lighthouse report.json --label page=home" names no sensor; radical sense has command, json, playwright.',
+    expect(messages(data, 'fitness-fn-measure-invalid', { sensors: null })).toEqual([
+      'Fitness function "Page speed": measure "lighthouse report.json --label page=home" names no sensor; radical sense has command, json, playwright, and the repository has no radical.sensors.json.',
     ])
+    expect(messages(data, 'fitness-fn-measure-invalid', { sensors: { file: 'radical.sensors.json', names: ['openapi'] } })).toEqual([
+      'Fitness function "Page speed": measure "lighthouse report.json --label page=home" names no sensor; radical sense has command, json, playwright, radical.sensors.json openapi.',
+    ])
+    // A sensor of the repository's radical.sensors.json is one.
+    expect(messages(data, 'fitness-fn-measure-invalid', { sensors: { file: 'radical.sensors.json', names: ['lighthouse'] } })).toEqual([])
+    // Without the repository's sensors (Studio), any name may be one.
+    expect(messages(data, 'fitness-fn-measure-invalid')).toEqual([])
   })
 
   it('leaves out of a pull-request check the fitness functions that run on another trigger', () => {

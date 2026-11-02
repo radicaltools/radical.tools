@@ -133,6 +133,9 @@ export interface CheckOptions {
   measurements?: Measurement[]
   /** When the conditions are evaluated, for max_age (ms since the epoch). */
   now?: number
+  /** The sensors of the repository's radical.sensors.json, null when it has
+   *  none; without them a measure line may name any sensor (Studio). */
+  sensors?: { file: string; names: string[] } | null
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
   /** The event the check runs on (pull-request in the gate): what runs on
@@ -261,6 +264,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.baseline ? { baseline: options.baseline } : {}),
     ...(options.trigger ? { trigger: options.trigger } : {}),
     ...(options.now !== undefined ? { now: options.now } : {}),
+    ...(options.sensors !== undefined ? { sensors: options.sensors } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))
