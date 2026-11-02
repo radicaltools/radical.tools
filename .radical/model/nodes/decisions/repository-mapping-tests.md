@@ -10,6 +10,7 @@ metrics: |
   test(packages/common/tests/repositoryMapping.test.ts) passed
   test(apps/cli/src/sense.test.ts › radical sense run › gives a repository's sensor the element's paths from .radical/radical.json) passed
   test(apps/cli/src/implement.test.ts) passed
+  test(apps/mcp/src/folderModel.test.ts › repository mapping) passed
 scope: "atomic"
 trigger: "pull-request"
 ---

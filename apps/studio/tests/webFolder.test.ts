@@ -4,6 +4,7 @@ import { inspectorMeasurements } from '../src/renderer/src/persistence/inspector
 import {
   handleFolderStorage,
   modelHandleOf,
+  openedFolder,
   readCheckFilesFromHandle,
   readModelBaseFromHandle,
   writeSelectionToHandle,
@@ -140,6 +141,19 @@ describe('webFolder read/write', () => {
 })
 
 describe('a repository laid out with .radical/', () => {
+  it('opens the model of a .radical folder picked, and reads its mapping', async () => {
+    const radical = new FakeDir('.radical')
+    const model = await radical.getDirectoryHandle('model', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    radical.children.set('radical.json', new FakeFile('{ "implements": [] }'))
+    expect(await openedFolder(radical)).toEqual({ model, radical })
+    expect((await readCheckFilesFromHandle(model, radical)).repository).toBe('{ "implements": [] }')
+    // A folder of another name with a model/ in it is no .radical/.
+    const other = new FakeDir('notes')
+    other.children.set('model', model)
+    expect(await openedFolder(other)).toEqual({ model: other, radical: null })
+  })
+
   it('reads the repository\'s mapping through the repository picked', async () => {
     const repo = new FakeDir('shop')
     const radical = await repo.getDirectoryHandle('.radical', { create: true }) as FakeDir

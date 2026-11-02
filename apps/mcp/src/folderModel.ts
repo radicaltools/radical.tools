@@ -1,5 +1,5 @@
-import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
-import { basename, resolve } from 'node:path'
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { buildToolDefs, noCanvasLayout, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
@@ -25,7 +25,9 @@ import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radic
 import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
-import { documentMetamodel, ownModel } from '@radical/common/model'
+import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
+import { REPOSITORY_FILE, builtIn, parseRepositoryMapping, serializeRepositoryMapping, type MappedElement } from '@radical/common/repositoryMapping'
+import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
@@ -34,7 +36,7 @@ import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult 
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -63,7 +65,33 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'get_implementation',
+    description: 'Where the repository builds the model\'s elements, from its .radical/radical.json (folders from the repository\'s root). With id: the element\'s folders, its own or those of its nearest ancestor with an entry, named. Without: every entry, and the C4 elements of this model (systems, containers, components, databases, web apps, queues; not external ones) built nowhere the file says. Call it to find the code of an element before you change it, and before you map the repository with set_implementation.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The element (an id or a tempId). Omit it for the whole mapping.' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_implementation',
+    description: 'Says where the repository builds an element of the model, in its .radical/radical.json, which the repository\'s sensors, radical check and Studio\'s element card read: paths, folders from the repository\'s root, replace its entry; remove: true takes the entry out. Map the containers, and the components that have folders of their own: one without an entry is built where its parent is. Look at the repository\'s folders first; radical check warns about an entry that drifts from the model or the repository. It changes no model file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The element (an id or a tempId), this model\'s or another\'s of its federation.' },
+        paths: { type: 'array', items: { type: 'string' }, description: 'The folders that build it, from the repository\'s root (e.g. "apps/cli"; "." for the whole repository).' },
+        remove: { type: 'boolean', description: 'Take the element\'s entry out instead.' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
 ]
+
+/** The C4 types get_implementation lists as built nowhere. */
+const BUILT_TYPES = new Set(['system', 'container', 'component', 'database', 'webapp', 'queue'])
 
 /** Read-only tools, for MCP annotations. */
 export const READ_ONLY_TOOLS = new Set([...READ_ONLY, ...FORGE_READ_ONLY])
@@ -436,6 +464,66 @@ export class FolderModel {
 
   /** The canvas selection Studio wrote into the folder, resolved against
    *  the model as it is now. */
+  /** get_implementation and set_implementation: the repository's
+   *  .radical/radical.json (ADR The repository maps the model to its code). */
+  private async implementation(name: string, input: unknown, data: DiagramData): Promise<CallOutcome> {
+    const { id, paths, remove } = (input ?? {}) as { id?: unknown; paths?: unknown; remove?: unknown }
+    const nodes = new Map(data.nodes.map((n) => [n.id, n]))
+    const parentOf = (at: string) => nodes.get(at)?.parentId
+    const named = (n: C4Node) => `${n.type} "${n.label}" (${n.id})`
+    const root = await mappingRoot(this.folder)
+    const file = join(root, REPOSITORY_FILE)
+    let mapped: MappedElement[]
+    try {
+      mapped = await readFile(file, 'utf8').then((text) => parseRepositoryMapping(text), (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return []
+        throw error
+      })
+    } catch (error) {
+      return { ok: false, text: `${name}: ${(error as Error).message}` }
+    }
+    if (id !== undefined && typeof id !== 'string') return { ok: false, text: `${name}: id must be an element's id` }
+    const node = typeof id === 'string' ? nodes.get(this.tempIds.get(id) ?? id) : undefined
+    if (id !== undefined && !node) return { ok: false, text: `${name}: no element ${id} in the model` }
+
+    if (name === 'get_implementation') {
+      if (node) {
+        const found = builtIn(mapped, node.id, parentOf)
+        return { ok: true, text: found
+          ? `${named(node)} is built in ${found.paths.join(', ')}${found.from === node.id ? '' : `, as ${named(nodes.get(found.from)!)} is`}.`
+          : `${named(node)} is built nowhere ${REPOSITORY_FILE} says: map it with set_implementation.` }
+      }
+      const nowhere = data.nodes.filter((n) => BUILT_TYPES.has(n.type) && !originOf(n) && !(n as { external?: boolean }).external && !builtIn(mapped, n.id, parentOf))
+      return { ok: true, text: JSON.stringify({
+        file: REPOSITORY_FILE,
+        implements: mapped.map((m) => ({ ...m, ...(nodes.has(m.element) ? {} : { unknown: 'no element of the model has this id' }) })),
+        builtNowhere: nowhere.map((n) => ({ id: n.id, type: n.type, label: n.label, parentId: n.parentId ?? null })),
+      }, null, 2) }
+    }
+
+    if (!node) return { ok: false, text: 'set_implementation: id is required' }
+    const at = mapped.findIndex((m) => m.element === node.id)
+    if (remove === true) {
+      if (at < 0) return { ok: true, text: `${REPOSITORY_FILE} has no entry for ${named(node)}.` }
+      mapped.splice(at, 1)
+      await writeFile(file, serializeRepositoryMapping(mapped))
+      return { ok: true, text: `Took ${named(node)} out of ${REPOSITORY_FILE}.` }
+    }
+    if (!Array.isArray(paths) || !paths.length || !paths.every((p) => typeof p === 'string' && p.trim())) {
+      return { ok: false, text: 'set_implementation: paths must be a list of folders from the repository\'s root, or remove: true' }
+    }
+    const clean = paths.map((p) => relative(root, resolve(root, p as string)).split('\\').join('/') || '.')
+    const outside = clean.filter((p) => p.startsWith('..') || isAbsolute(p))
+    if (outside.length) return { ok: false, text: `set_implementation: ${outside.join(', ')} ${outside.length === 1 ? 'is' : 'are'} outside the repository` }
+    const entry = { element: node.id, name: node.label, paths: clean }
+    if (at < 0) mapped.push(entry)
+    else mapped[at] = entry
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, serializeRepositoryMapping(mapped))
+    const missing = (await Promise.all(clean.map(async (p) => (await stat(join(root, p)).then(() => true, () => false)) ? null : p))).filter((p): p is string => p !== null)
+    return { ok: true, text: `${named(node)} is built in ${clean.join(', ')} (${REPOSITORY_FILE}).${missing.length ? ` Not in the repository yet: ${missing.join(', ')}; radical check warns until they are.` : ''}` }
+  }
+
   private async selection(facade: ReturnType<typeof createModelFacade>): Promise<string> {
     const text = await readEditorStateFile(this.folder, SELECTION_FILE)
     if (text === null) {
@@ -527,6 +615,7 @@ export class FolderModel {
         return { ok: true, text: [text, ...this.openConcerns(data, mm)].join('\n') }
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
+      if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }

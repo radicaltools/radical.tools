@@ -34,7 +34,7 @@ import {
   webFolderSupported,
   webFileSupported,
   pickWebDirectory,
-  modelHandleOf,
+  openedFolder,
   pickWebFileToOpen,
   pickWebFileToSave,
   readFileHandle,
@@ -369,8 +369,8 @@ function fileUnreadable(id: string, file: string, reason: string): never {
 /** The model in a folder's files, remembered as what document `id` was
  *  loaded from. Null when the files hold no model that can be read; a file
  *  that is there but does not parse is a DocumentUnreadableError. */
-/** Where a browser folder model opened by its repository keeps the
- *  repository's handle, for the files beside the model (.radical/radical.json). */
+/** Where a browser folder model opened by its repository keeps the handle of
+ *  the repository's .radical/, for the files beside the model (radical.json). */
 const repositoryKey = (id: string): string => `${id}:repository`
 
 /** Folder models renamed in Studio whose radical.md has the old name until
@@ -1365,13 +1365,13 @@ export const documents: DocumentsAPI = {
     if (webFolderSupported()) {
       const picked = await pickWebDirectory()
       if (!picked) return null
-      const handle = await modelHandleOf(picked)
-      const repository = handle === picked ? null : picked
+      const { model: handle, radical: repository } = await openedFolder(picked)
       const idx = readIndex()
       const meta: DocumentMeta = {
         id: uid(),
-        // A repository picked gives the model its name.
-        name: (handle === picked ? handle.name : picked.name) || 'model',
+        // A repository picked gives the model its name; its radical.md does
+        // once it is read.
+        name: (handle === picked || picked.name === '.radical' ? handle.name : picked.name) || 'model',
         source: 'md',
         lastModified: Date.now(),
       }
@@ -1483,6 +1483,9 @@ export const documents: DocumentsAPI = {
     const ok = await verifyPermission(handle, 'readwrite', true)
     if (!ok) return false
     connectedWebHandles.add(id)
+    // The repository's .radical/ too, read only: its radical.json.
+    const repository = await loadHandle(repositoryKey(id)).catch(() => null)
+    if (repository) await verifyPermission(repository, 'read', true)
     return true
   },
 

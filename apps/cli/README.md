@@ -242,7 +242,7 @@ change. Exit status: 0 the list was written, 2 it could not be made (not a
 git repository, an unknown ref).
 
 `--save-base` also writes the model at the base (its elements and relations,
-the commit, the branch and the time) to `.radical/base.json` in the folder,
+the commit, the branch and the time) to `.state/base.json` in the folder,
 out of git like the rest of `.radical/`. Studio has no git: it compares the
 open model with that file as it is edited and shows the changes with
 Changes on branch, in the list of views, on the properties card and in the
@@ -454,8 +454,8 @@ fitness functions, with each condition's outcome); it never writes into the
 model.
 
 With `--report` the command also keeps the test cases it read in the model
-folder's `.radical/test-results.json` (out of git, like the rest of
-`.radical/`). Studio's Inspector perspective reads them and the model's
+folder's `.state/test-results.json` (out of git, like the rest of
+`.state/`). Studio's Inspector perspective reads them and the model's
 `check.json`, and runs the same check on the model as it is edited: Model
 quality and Implementation show the result by dimension, and Settings edit
 `check.json` (goals, severities, baselines), marking a change that loosens
@@ -482,7 +482,7 @@ test reports in it. Which artifacts hold reports is set in `check.json`:
 ```
 
 (every artifact of the run without it). The results are kept in
-`.radical/test-results.json` with the commit they stand for, the runs, when
+`.state/test-results.json` with the commit they stand for, the runs, when
 each ran and how many commits HEAD is past it, which the Inspector's *Tests*
 chip shows; the same runs a second time download nothing. Results read with
 `--report` at that commit or a later one are kept, and checked. `--quiet`
@@ -507,7 +507,7 @@ condition's; units of one kind convert (ms and s, KB and MB). The element's
 be: an older one is stale, and never passes.
 
 `radical check` reads the measurements kept in the model folder's
-`.radical/measurements.json`, and with `--metrics <file|dir>` the
+`.state/measurements.json`, and with `--metrics <file|dir>` the
 radical-metrics/1 files another job wrote, which it adds there. A condition
 that does not hold is an error (`metric-failed`); a stale one
 (`metric-stale`) or one nothing measured (`metric-not-measured`) a warning;
@@ -531,7 +531,7 @@ radical sense json coverage-summary.json --metric 'coverage.lines=total.lines.pc
 - `json <file> --metric <metric>=<path>[@<unit>]`: a number from a JSON file,
   by dotted keys with `[index]` or a JSON pointer starting with `/`.
 - `--folder <dir>`: the model folder (default: the working directory); the
-  values go into its `.radical/measurements.json`, the latest of each metric
+  values go into its `.state/measurements.json`, the latest of each metric
   and labels.
 - `--out <file>`: a radical-metrics/1 file instead, for `radical check
   --metrics` in another job.

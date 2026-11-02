@@ -1189,3 +1189,49 @@ describe('get_issues', () => {
     expect(bound).not.toContain('- Authentication (conceptId concern-authentication)')
   })
 })
+
+describe('repository mapping', () => {
+  it('says where elements are built and maps them in .radical/radical.json', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-mapping-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [
+      node('shop', 'system', 'Shop'), node('orders', 'container', 'Orders API', { parentId: 'shop' }),
+      node('billing', 'container', 'Billing API', { parentId: 'shop' }), node('checkout', 'component', 'Checkout', { parentId: 'orders' }),
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await mkdir(join(root, 'services', 'orders'), { recursive: true })
+    const model = await FolderModel.open(folder)
+
+    // Nothing mapped yet: every C4 element is built nowhere.
+    const before = JSON.parse((await model.call('get_implementation', {})).text)
+    expect(before.implements).toEqual([])
+    expect(before.builtNowhere.map((n: { id: string }) => n.id).sort()).toEqual(['billing', 'checkout', 'orders', 'shop'])
+
+    expect((await model.call('set_implementation', { id: 'shop', paths: ['.'] })).text).toBe('system "Shop" (shop) is built in . (.radical/radical.json).')
+    expect((await model.call('set_implementation', { id: 'orders', paths: ['services/orders', 'services/shared/'] })).text)
+      .toBe('container "Orders API" (orders) is built in services/orders, services/shared (.radical/radical.json). Not in the repository yet: services/shared; radical check warns until they are.')
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8')).implements).toEqual([
+      { element: 'shop', name: 'Shop', paths: ['.'] },
+      { element: 'orders', name: 'Orders API', paths: ['services/orders', 'services/shared'] },
+    ])
+    // A component without an entry is built where its container is.
+    expect((await model.call('get_implementation', { id: 'checkout' })).text)
+      .toBe('component "Checkout" (checkout) is built in services/orders, services/shared, as container "Orders API" (orders) is.')
+    expect(JSON.parse((await model.call('get_implementation', {})).text).builtNowhere).toEqual([])
+
+    expect((await model.call('set_implementation', { id: 'orders', remove: true })).text).toBe('Took container "Orders API" (orders) out of .radical/radical.json.')
+    expect((await model.call('get_implementation', { id: 'orders' })).text).toBe('container "Orders API" (orders) is built in ., as system "Shop" (shop) is.')
+    // Refused: an element the model lacks, a path outside the repository.
+    expect(await model.call('set_implementation', { id: 'gone', paths: ['x'] })).toMatchObject({ ok: false, text: 'set_implementation: no element gone in the model' })
+    expect(await model.call('set_implementation', { id: 'billing', paths: ['../elsewhere'] })).toMatchObject({ ok: false, text: 'set_implementation: ../elsewhere is outside the repository' })
+    // No model file changed.
+    expect(await new MdFolderSession(diskFolderStorage(folder)).readAll()).toEqual(expect.objectContaining({ 'radical.md': expect.any(String) }))
+  })
+})
