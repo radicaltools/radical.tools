@@ -2863,7 +2863,6 @@
       "tools/brand.test.mjs"
     ] },
     { "element": "21c6ec47-bbd8-4a32-a901-c142239cf6f1", "name": "One product version", "tests": [
-      "tools/release.test.mjs › the CLI, the MCP server, the Desktop app and the VS Code extension carry one version",
       "tools/release.test.mjs › one product version › the CLI, the MCP server, the Desktop app, the VS Code extension and the Crucible engine carry one version"
     ] },
     { "element": "d8e021da-82af-4713-ad26-a3a3f456965b", "name": "One .radical folder tests", "tests": [
