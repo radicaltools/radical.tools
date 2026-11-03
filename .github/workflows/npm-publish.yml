@@ -114,6 +114,11 @@ jobs:
       - name: Check the publish command without releasing
         if: ${{ env.PUBLISHED != 'true' && env.DRY_RUN == 'true' }}
         run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance --tag "$DIST_TAG" --dry-run
+      # OIDC needs a trusted publisher, and npm sets one only on a package that exists. So the
+      # first version of a new package goes out with the repository secret NPM_TOKEN, which
+      # is deleted once the trusted publisher is set. Without the secret this is OIDC alone.
       - name: Publish the verified tarball with OIDC
         if: ${{ env.PUBLISHED != 'true' && env.DRY_RUN != 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish ./release/radicaltools-"$PACKAGE"-*.tgz --access public --provenance --tag "$DIST_TAG"
