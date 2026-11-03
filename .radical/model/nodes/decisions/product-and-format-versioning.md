@@ -19,7 +19,7 @@ context: |
   The contract users depend on most is the Markdown model folder (`radicalFormat: md-folder`, `version: 1` in radical.md). It lives in git and different builds read and write it at the same time: the CLI in CI, Studio on a laptop, the MCP server in Claude Desktop from another worktree. A newer writer can silently break an older reader, and the user cannot tell which MCP server goes with which Studio.
 date: "2026-10-20"
 decision: |
-  **1. One product version.** The CLI, the MCP server, the Desktop app, the VS Code extension and Studio on the web carry one version, the product's. A release ships every artifact at that version, also one that did not change. The packages/ workspaces stay private at 0.0.0, bundled, never published.
+  **1. One product version.** The CLI, the MCP server, the Crucible engine package, the Desktop app, the VS Code extension and Studio on the web carry one version, the product's. A release ships every artifact at that version, also one that did not change. The packages/ workspaces stay private at 0.0.0, bundled, never published themselves: what goes to npm is an app that bundles them.
   
   **2. SemVer against the public contracts of every artifact.**
   - CLI: commands, options, exit codes, the JSON output (`--format json`, `--evidence`) and the check.json schema. Removing or changing any of them is major; a new command or option is minor; a fix is patch.

@@ -114,7 +114,10 @@ sequences of actions (add, delete, drag, undo, reload, an agent's write, …)
 and checks the rules after every step (Undo gives back the state before, a
 reload changes nothing, nothing points at nothing, …).
 
-`radical fuzz` runs the fuzz files `.radical/crucible/crucible.json` lists:
+A fuzz file is written with the engine,
+[`@radicaltools/crucible`](https://www.npmjs.com/package/@radicaltools/crucible)
+(`apps/crucible` bundles `packages/crucible`). `radical fuzz` runs the fuzz files
+`.radical/crucible/crucible.json` lists:
 
 ```json
 {
