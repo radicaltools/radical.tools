@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-03
+
 ### Added
 - `@radicaltools/crucible` on npm, the engine of Radical Crucible: another project can write fuzz files with it, and `radical fuzz --survey`, `--replay` and `radical harden <finding>` work there. It carries the product version and goes out with a release tag.
 
@@ -373,7 +375,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/radicaltools/radical.tools/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/radicaltools/radical.tools/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/radicaltools/radical.tools/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/radicaltools/radical.tools/releases/tag/v0.3.0
