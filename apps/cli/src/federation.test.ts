@@ -287,6 +287,32 @@ describe('transitive dependencies', () => {
     expect(json.federation.find((d) => d.name === 'orders')?.via).toBeUndefined()
   })
 
+  it('fetches a model in .radical/model, the folder name starting with a dot', async () => {
+    const top = await mkdtemp(join(tmpdir(), 'radical-federation-'))
+    dirs.push(top)
+    const orders = join(top, 'orders')
+    await mkdir(orders)
+    await git(orders, 'init', '-q', '-b', 'main')
+    await writeModel(join(orders, '.radical/model'), { nodes: [node('ord', 'system', 'Orders')], relations: [] }, 'orders')
+    await git(orders, 'add', '.')
+    await git(orders, 'commit', '-q', '-m', 'orders model')
+    const home = join(top, 'payments', '.radical/model')
+    await writeModel(home, { nodes: [node('pay', 'system', 'Payments')], relations: [] }, 'payments')
+    await git(join(top, 'payments'), 'init', '-q', '-b', 'main')
+    await writeFile(join(home, 'deps.json'), JSON.stringify({
+      name: 'payments',
+      dependencies: [
+        { name: 'orders', repo: relative(home, orders), path: '.radical/model', ref: 'main' },
+        { name: 'ordering', repo: relative(home, orders), path: './.radical/model/', ref: 'main' },
+      ],
+    }))
+    const fetched = await run(home, ['federation', 'fetch'])
+    expect(fetched.err).toBe('')
+    expect(fetched.code).toBe(0)
+    expect(fetched.out).toContain('Note: ordering: payments names the model orders so (the same repository and model folder); fetched once, as orders.')
+    const file = parseFederationFile(await readFile(join(home, '.state/federation.json'), 'utf8'))!
+    expect(file.nodes.map((n) => n.id)).toEqual(['ord'])
+  })
   it('knows the model itself and one model under two names by repository and model folder', async () => {
     const top = await mkdtemp(join(tmpdir(), 'radical-federation-'))
     dirs.push(top)

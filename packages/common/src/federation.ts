@@ -66,6 +66,11 @@ export function parseDeps(text: string): Deps {
   return { name, dependencies: deps }
 }
 
+/** A dependency's model folder as a path from the top of its repository:
+ *  "./x/" is "x", and "." is "" (the top). A leading dot of a folder's own
+ *  name stays: ".radical/model". */
+export const folderInRepository = (path: string): string => path.replace(/^\.(?:\/|$)|\/$/g, '')
+
 /** The ref that follows a repository's releases: its newest version tag
  *  (v1.10.0 after v1.2.0), else its default branch, resolved at each fetch. */
 export const LATEST = 'latest'
