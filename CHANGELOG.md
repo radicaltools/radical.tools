@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `@radicaltools/crucible` on npm, the engine of Radical Crucible: another project can write fuzz files with it, and `radical fuzz --survey`, `--replay` and `radical harden <finding>` work there. It carries the product version and goes out with a release tag.
 
+### Fixed
+- A federation dependency in `.radical/model`, the default model folder, could not be fetched: `radical federation fetch` and `radical check` read the path as `radical/model` and said "no model folder". `./.radical/model` was the only way to write it. Now both name the same folder.
+
 ## [0.3.2] - 2026-11-02
 
 ### Added

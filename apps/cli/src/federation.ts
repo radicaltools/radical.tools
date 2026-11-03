@@ -5,7 +5,7 @@ import { parseArgs, promisify } from 'node:util'
 import type { DiagramData, DiagramSnapshot, DiagramView } from '@radical/common/c4'
 import { originOf } from '@radical/common/model'
 import {
-  DEPS_FILE, FEDERATION_FILE, LATEST, composeFederation, refShown, originFor, otherModelView, parseDeps, serializeFederationFile,
+  folderInRepository, DEPS_FILE, FEDERATION_FILE, LATEST, composeFederation, refShown, originFor, otherModelView, parseDeps, serializeFederationFile,
   type Dependency, type Deps, type FederationFile, type FetchedDependency,
 } from '@radical/common/federation'
 import { deserializeFromMdFolder, type FolderFiles } from '@radical/common/formats/mdFolder'
@@ -108,7 +108,7 @@ async function fetchAll(root: string, deps: Deps): Promise<{ fetched: FetchedDep
  *  deps.json names them (a path from its folder, an https or an ssh address). */
 async function locationOf(dep: Pick<Dependency, 'repo' | 'path'>, home: string): Promise<string> {
   const address = repoAddress(dep.repo, home)
-  const folder = dep.path.replace(/^\.\/?|\/$/g, '') || '.'
+  const folder = folderInRepository(dep.path) || '.'
   if (!isAddress(address)) return `file:${await realpath(join(address, folder)).catch(() => resolve(address, folder))}`
   return `${addressKey(address)}#${folder}`
 }

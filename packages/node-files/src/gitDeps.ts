@@ -13,7 +13,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isMdFolderModelPath, type FolderFiles } from '@radical/common/formats/mdFolder'
-import { DEPS_FILE, parseDeps, type Dependency, type FetchedDependency } from '@radical/common/federation'
+import { DEPS_FILE, folderInRepository, parseDeps, type Dependency, type FetchedDependency } from '@radical/common/federation'
 import { catFiles } from './gitModel'
 import { MODEL_FOLDER, OLD_MODEL_FOLDER } from './repositoryLayout'
 
@@ -80,7 +80,7 @@ async function fetchRef(dir: string, dep: Dependency): Promise<string> {
 
 /** The model files under `path` at `commit`, blobs fetched in one go. */
 async function modelFilesAt(dir: string, commit: string, path: string): Promise<FolderFiles> {
-  const folder = path.replace(/^\.\/?|\/$/g, '')
+  const folder = folderInRepository(path)
   const tree = folder ? `${commit}:${folder}` : `${commit}^{tree}`
   const listing = await gitOk(dir, ['ls-tree', '-r', '-z', tree])
   if (listing === null) return {}

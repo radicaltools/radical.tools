@@ -2973,6 +2973,9 @@
     ] },
     { "element": "a7c2deb1-5f86-4c06-b3ed-a26371b105b8", "name": "Fuzz file from the package", "tests": [
       "apps/crucible/tests/package.test.ts › Crucible engine package › a suite written with the package has a case per world and per rule"
+    ] },
+    { "element": "cf558ebc-3001-422c-942e-a92de2676977", "name": "A dependency in .radical/model", "tests": [
+      "apps/cli/src/federation.test.ts › transitive dependencies › fetches a model in .radical/model, the folder name starting with a dot"
     ] }
   ]
 }

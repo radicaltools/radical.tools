@@ -356,6 +356,30 @@ gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
 
+### Dogfooding (2026-11-03): three repositories in a federation
+
+From building `radical.tools.sdlc.demo.2`: company standards, a Warehouse and a Shop, each with
+its own model and repository.
+
+1. **One system across several repositories is not possible.** A repository cannot put its
+   container inside a system another repository's model owns: `parentReadOnly` in
+   `packages/common/src/model.ts` refuses it, a Markdown folder keeps a parent as the directory,
+   so a parent elsewhere has nowhere to be written, and `rules.ts` skips scenarios with an origin,
+   so a repository with no model of its own cannot verify them with its tests. Read in the code,
+   not run. The demo gave each system one repository for this reason.
+2. **A standards repository must name sensors it never runs.** `fitness-fn-measure-invalid` asks
+   for the sensor in the repository that owns the fitness function, though each repository whose
+   elements its ADR constrains measures it. The demo keeps the shared sensors there, which helps,
+   but a standard measured differently per repository would have nothing to name.
+3. **No view filter for "this model's own elements".** A table over requirements in the Shop also
+   lists the Warehouse's. The demo lists the elements by hand, so an agent has to add new rows.
+4. **A view per element group seems to take other models' elements too.** The Shop's `States`
+   folder got a second "Reservation lifecycle" beside the Warehouse's own, apparently from its
+   "State machines" group. Inferred from what appeared, not confirmed in the code.
+5. **Fitness functions of another model take metrics only.** Tests cannot be bound to them
+   (`check/evidence.ts`), so a standard checked by tests in each repository needs a sensor around
+   those tests.
+
 ### Dogfooding (2026-10-30): fitness functions classified
 
 - The first night with a relative condition gave a false finding (F-0115):
