@@ -29,10 +29,10 @@ function root(versions, changelog = CHANGELOG) {
 }
 
 describe('one product version', () => {
-  it('the CLI, the MCP server, the Desktop app and the VS Code extension carry one version', () => {
+  it('the CLI, the MCP server, the Desktop app, the VS Code extension and the Crucible engine carry one version', () => {
     // The repository itself.
     const versions = productVersions()
-    expect(Object.keys(versions)).toEqual(['apps/cli', 'apps/mcp', 'apps/studio', 'apps/vscode'])
+    expect(Object.keys(versions)).toEqual(['apps/cli', 'apps/mcp', 'apps/studio', 'apps/vscode', 'apps/crucible'])
     expect(new Set(Object.values(versions)).size).toBe(1)
     expect(productVersion()).toMatch(/^\d+\.\d+\.\d+/)
 
@@ -97,7 +97,7 @@ describe('release script', () => {
       expect(tagProblems(ready, 'v0.3.0')).toEqual([])
       expect(tagProblems(drifted, 'v0.3.0')).toEqual(['apps/mcp/package.json carries 0.2.0, not 0.3.0.'])
       expect(tagProblems(uncut, 'v0.3.0')).toEqual(['CHANGELOG.md has no section for 0.3.0.'])
-      expect(tagProblems(ready, 'v0.4.0')).toHaveLength(5)
+      expect(tagProblems(ready, 'v0.4.0')).toHaveLength(6)
     } finally {
       for (const dir of [ready, drifted, uncut]) rmSync(dir, { recursive: true, force: true })
     }

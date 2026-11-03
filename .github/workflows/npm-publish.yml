@@ -2,7 +2,7 @@ name: Publish to npm
 
 # Triggers:
 #   • Push a release tag "v*" (npm run release:tag on main, then git push origin v<version>)
-#     → verifies and publishes the CLI and the MCP server, on the dist-tag next
+#     → verifies and publishes the CLI, the MCP server and the Crucible engine, on the dist-tag next
 #       for a pre-release (v1.0.0-rc.1); a version npm already has is skipped,
 #       so a rerun publishes what is left
 #   • Manual run from the GitHub UI for one package, a dry run by default;
@@ -20,6 +20,7 @@ on:
         default: mcp
         options:
           - cli
+          - crucible
           - mcp
       dry-run:
         description: 'Validate and upload the package without publishing'
@@ -36,8 +37,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # A release tag publishes both; a manual run the package chosen.
-        package: ${{ github.event_name == 'push' && fromJSON('["cli","mcp"]') || fromJSON(format('["{0}"]', inputs.package)) }}
+        # A release tag publishes all of them; a manual run the package chosen.
+        package: ${{ github.event_name == 'push' && fromJSON('["cli","crucible","mcp"]') || fromJSON(format('["{0}"]', inputs.package)) }}
     concurrency:
       group: npm-publish-${{ matrix.package }}
       cancel-in-progress: false
@@ -56,8 +57,8 @@ jobs:
       - name: Validate the package selection
         run: |
           case "$PACKAGE" in
-            cli|mcp) ;;
-            *) echo '::error::Select cli or mcp.'; exit 1 ;;
+            cli|crucible|mcp) ;;
+            *) echo '::error::Select cli, crucible or mcp.'; exit 1 ;;
           esac
       - uses: actions/checkout@v4
         with:

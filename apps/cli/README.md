@@ -588,11 +588,10 @@ world, seed, path and length that replay it, the steps and what differs.
 `--no-known` lets the fuzz files' known failures filter nothing, `--no-shrink`
 reports the first failure as found.
 
-A fuzz file is written with the engine, `@radical/crucible`, which is not
-published yet: so far the fuzz files are this repository's own
-(`packages/ui/tests/invariants.test.ts`). It reports a test case per world and
-one per world and rule (`on the bookstore model: undoRestores holds`), which a
-scenario or a fitness function can name in its Metrics.
+A fuzz file is written with the engine,
+[`@radicaltools/crucible`](https://www.npmjs.com/package/@radicaltools/crucible). It reports
+a test case per world and one per world and rule (`on the bookstore model: undoRestores
+holds`), which `radical verify` can bind to a scenario or a fitness function.
 
 Exit status: 0 every file passed, 1 one failed, 2 radical fuzz could not run.
 

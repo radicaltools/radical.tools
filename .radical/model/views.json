@@ -4452,5 +4452,79 @@
     "positions": {},
     "subject": "5c521cfe-f793-4900-9ebf-60caf53c54aa",
     "viewpoint": "domain-entities"
+  },
+  {
+    "expandedNodeIds": [
+      "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
+    ],
+    "folder": "Logical",
+    "id": "e86ae934-472e-4c09-81e3-afbb4ecdd66c",
+    "kind": "static",
+    "name": "Crucible engine package",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 2305.2,
+        "width": 3779.9999999999995,
+        "x": 1718.613333333333,
+        "y": 759.4
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 3453.999999999999,
+        "width": 5528.613333333333,
+        "x": 1965.1500664927692,
+        "y": -12122.854791014413
+      },
+      "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3": {
+        "height": 200,
+        "width": 300,
+        "x": 3449.9999999999995,
+        "y": 120
+      }
+    },
+    "subject": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "viewpoint": "container-components"
   }
 ]

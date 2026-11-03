@@ -16,7 +16,8 @@
     { "element": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa", "name": "@radical/layout", "paths": ["packages/layout"] },
     { "element": "cdefa455-5e6f-4395-8261-f61398610d02", "name": "@radical/crucible", "paths": ["packages/crucible"] },
     { "element": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed", "name": "@radical/host-bridge", "paths": ["packages/host-bridge"] },
-    { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] }
+    { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] },
+    { "element": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3", "name": "Crucible engine package", "paths": ["apps/crucible"] }
   ],
   "verifies": [
     { "element": "1c0c7414-2092-4c70-a233-51bd95a280cc", "name": "Recover interrupted discussion sync", "tests": [
@@ -2862,7 +2863,8 @@
       "tools/brand.test.mjs"
     ] },
     { "element": "21c6ec47-bbd8-4a32-a901-c142239cf6f1", "name": "One product version", "tests": [
-      "tools/release.test.mjs › the CLI, the MCP server, the Desktop app and the VS Code extension carry one version"
+      "tools/release.test.mjs › the CLI, the MCP server, the Desktop app and the VS Code extension carry one version",
+      "tools/release.test.mjs › one product version › the CLI, the MCP server, the Desktop app, the VS Code extension and the Crucible engine carry one version"
     ] },
     { "element": "d8e021da-82af-4713-ad26-a3a3f456965b", "name": "One .radical folder tests", "tests": [
       "packages/node-files/tests/repositoryLayout.test.ts",
@@ -2969,6 +2971,9 @@
     { "element": "3528e5fe-533c-4ba6-88fc-bd435a571317", "name": "Model separation tests", "tests": [
       "packages/common/tests/separation.test.ts",
       "packages/node-files/tests/repositoryLayout.test.ts › code paths in descriptions"
+    ] },
+    { "element": "a7c2deb1-5f86-4c06-b3ed-a26371b105b8", "name": "Fuzz file from the package", "tests": [
+      "apps/crucible/tests/package.test.ts › Crucible engine package › a suite written with the package has a case per world and per rule"
     ] }
   ]
 }

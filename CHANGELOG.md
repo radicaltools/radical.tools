@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `@radicaltools/crucible` on npm, the engine of Radical Crucible: another project can write fuzz files with it, and `radical fuzz --survey`, `--replay` and `radical harden <finding>` work there. It carries the product version and goes out with a release tag.
+
 ## [0.3.2] - 2026-11-02
 
 ### Added

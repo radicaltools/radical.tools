@@ -1,0 +1,54 @@
+{
+  "name": "@radicaltools/crucible",
+  "version": "0.3.2",
+  "description": "Radical Crucible's engine: write fuzz files that radical fuzz runs, with rules checked after every step of random sequences of actions.",
+  "license": "MIT",
+  "homepage": "https://radical.tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/radicaltools/radical.tools.git",
+    "directory": "apps/crucible"
+  },
+  "bugs": "https://github.com/radicaltools/radical.tools/issues",
+  "keywords": ["fuzzing", "property-based-testing", "invariants", "fast-check", "radical", "architecture"],
+  "type": "module",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./vitest": { "types": "./dist/vitest.d.ts", "default": "./dist/vitest.js" },
+    "./findings": { "types": "./dist/findings.d.ts", "default": "./dist/findings.js" }
+  },
+  "files": ["dist", "LICENSE"],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsup",
+    "test": "vitest run",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run test:package"
+  },
+  "dependencies": {
+    "fast-check": "^4.10.2"
+  },
+  "peerDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@radical/crucible": "*",
+    "@types/node": "^22.20.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.11"
+  }
+}

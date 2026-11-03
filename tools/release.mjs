@@ -5,7 +5,7 @@
 //
 //   npm run release -- <version | major | minor | patch>
 //       On a branch (made release/v<version> when run on main): sets the
-//       version in the four package.json files and the lockfile, moves the
+//       version in the product's package.json files and the lockfile, moves the
 //       changelog's Unreleased entries under the version and today's date, and
 //       commits. Merging that pull request is the release decision.
 //   npm run release:tag
@@ -14,7 +14,7 @@
 //       vscode-publish.yml; npm-publish.yml publishes the CLI and the MCP
 //       server from main by hand.
 //   node tools/release.mjs check <tag>
-//       What the workflows a tag starts run first: the four versions are the
+//       What the workflows a tag starts run first: the versions are the
 //       tag's and the changelog has its section.
 //   node tools/release.mjs notes <version>
 //       The changelog section of a version, for the GitHub Release.
@@ -28,7 +28,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REPOSITORY = 'https://github.com/radicaltools/radical.tools'
 
 /** The released artifacts, which carry the product version. */
-export const PRODUCT_PACKAGES = ['apps/cli', 'apps/mcp', 'apps/studio', 'apps/vscode']
+export const PRODUCT_PACKAGES = ['apps/cli', 'apps/mcp', 'apps/studio', 'apps/vscode', 'apps/crucible']
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/
 
@@ -189,7 +189,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     else if (command === 'check') {
       const problems = tagProblems(ROOT, arg ?? '')
       if (problems.length) fail(problems.map((p) => `::error::${p}`).join('\n'))
-      console.log(`${arg}: the four packages carry its version and CHANGELOG.md has its section.`)
+      console.log(`${arg}: the product's packages carry its version and CHANGELOG.md has its section.`)
     } else if (command === 'notes') {
       const notes = changelogSection(readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8'), (arg ?? '').replace(/^v/, ''))
       if (notes === null) fail(`CHANGELOG.md has no section for ${arg}.`)

@@ -148,7 +148,7 @@ The tag releases everything at once:
 
 - [Release Desktop App](.github/workflows/release.yml) builds the macOS, Windows and Linux installers and drafts a GitHub Release with the version's changelog section; review it, then publish.
 - [Publish VS Code Extension](.github/workflows/vscode-publish.yml) publishes the extension to the Marketplace (not for a pre-release, which the Marketplace does not take).
-- [Publish to npm](.github/workflows/npm-publish.yml) verifies and publishes `@radicaltools/cli` and `@radicaltools/mcp`, on the dist-tag `next` for a pre-release. It refuses a tag whose commit is not on `main` and skips a version npm already has, so re-running it after a failure publishes what is left.
+- [Publish to npm](.github/workflows/npm-publish.yml) verifies and publishes `@radicaltools/cli`, `@radicaltools/mcp` and `@radicaltools/crucible`, on the dist-tag `next` for a pre-release. It refuses a tag whose commit is not on `main` and skips a version npm already has, so re-running it after a failure publishes what is left.
 
 Each first checks that all four packages carry the tag's version and the changelog has its section. Since pushing a `v*` tag publishes, keep tag creation to maintainers (a tag ruleset in the repository settings).
 
@@ -180,6 +180,7 @@ apps/
   vscode/         VS Code extension; bundles the Studio web build as its webview
   e2e/            End-to-end regression suite (Playwright) for the web builds
                   of Studio and Hub, with screenshot baselines
+  crucible/       @radicaltools/crucible: the engine fuzz files are written with
   mcp/            @radicaltools/mcp: local stdio MCP server for model folders
   cli/            @radicaltools/cli: check, diff, hooks and Confluence wiki export
                   (metamodel, completeness, the tests it names)
