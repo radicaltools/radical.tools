@@ -1,0 +1,9 @@
+---
+id: "b4ad8834-049a-4280-8fb3-9fd98c6fe2fc"
+type: "requirement"
+label: "Link by address"
+action: "the system shall link the unit to that unit as inferred, citing the address and what names the other"
+ears_type: "event-driven"
+rationale: "Services find each other by name; the name in an address is the call, whatever the language."
+trigger: "a unit's code or configuration names an address (http://orders:8080/…, lb://orders, orders:3550) whose host is the name of another unit or of a service built from one"
+---
