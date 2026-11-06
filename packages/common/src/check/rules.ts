@@ -92,6 +92,9 @@ export interface CheckModel {
  *  each element with its paths and those of them the repository lacks. */
 export interface RepositoryMapping {
   file: string
+  /** The model the file names, when it lives in a repository of its own:
+   *  this repository is then judged on its part of it. */
+  model?: { repo: string; ref?: string }
   implements: Array<{ element: string; name?: string; paths: string[]; missing: string[] }>
   /** The tests it binds to scenarios and fitness functions. */
   verifies?: Array<{ element: string; name?: string; tests: string[] }>

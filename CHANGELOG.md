@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- One system model across repositories: a repository's `.radical/radical.json` can name a model in a repository of its own (`"model": { "repo": …, "ref": … }`), checked out at `.radical/model`. `radical check` and `radical sense run` there judge the repository's part of the model, and goals count only that part. The part takes in the state machines the repository implements, and those of the entities it realises, with all in them.
+- `radical diff --part` lists only the changes of the repository's part, as it is now and as it was at the base: with `--since` the commit of the model its code has reached, what it has left to build.
+
 ## [0.3.3] - 2026-11-03
 
 ### Added

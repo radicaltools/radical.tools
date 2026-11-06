@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
-import type { C4Node, C4Relation } from '@radical/common/c4'
+import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { parseModelBase } from '@radical/common/formats/modelBase'
 import { main } from './cli'
 
@@ -145,5 +145,67 @@ describe('radical diff', () => {
     expect((await run(cwd, 'diff', 'model', '--since', '--output=x')).code).toBe(2)
     expect((await run(cwd, 'diff', 'model', '--format', 'xml')).code).toBe(2)
     expect((await run(cwd, 'diff', '--help')).out).toContain('Usage: radical diff')
+  })
+})
+
+describe('radical diff --part', () => {
+  // Two systems of one model; this repository builds the Shop.
+  const system = (shop = 'take the payment', warehouse = 'hold the goods', withShop = true): DiagramData => ({
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      node('shop', 'system', 'Shop'), node('warehouse', 'system', 'Warehouse'), node('need', 'need', 'Brief'),
+      ...(withShop ? [node('reqA', 'requirement', 'Pay', { action: shop })] : []),
+      node('reqB', 'requirement', 'Hold', { action: warehouse }),
+    ],
+    relations: [
+      ...(withShop ? [{ id: 'r1', relationType: 'satisfies', sourceId: 'shop', targetId: 'reqA' }, { id: 'r2', relationType: 'derives', sourceId: 'reqA', targetId: 'need' }] : []),
+      { id: 'r3', relationType: 'satisfies', sourceId: 'warehouse', targetId: 'reqB' }, { id: 'r4', relationType: 'derives', sourceId: 'reqB', targetId: 'need' },
+    ] as C4Relation[],
+  })
+  async function write(dir: string, data: DiagramData): Promise<void> {
+    await rm(dir, { recursive: true, force: true })
+    for (const [path, content] of Object.entries(serializeToMdFolder(data, 'Test'))) {
+      await mkdir(dirname(join(dir, path)), { recursive: true })
+      await writeFile(join(dir, path), content)
+    }
+  }
+  /** A repository whose .radical/radical.json maps the Shop, with the model in model/ on main, then a branch. */
+  async function shopRepo(): Promise<string> {
+    const cwd = await mkdtemp(join(tmpdir(), 'radical-diff-part-'))
+    dirs.push(cwd)
+    await git(cwd, 'init', '-q', '-b', 'main')
+    await write(join(cwd, 'model'), system())
+    await mkdir(join(cwd, '.radical'), { recursive: true })
+    await writeFile(join(cwd, '.radical/radical.json'), '{ "implements": [{ "element": "shop", "paths": ["."] }] }\n')
+    await git(cwd, 'add', '.')
+    await git(cwd, 'commit', '-q', '-m', 'model')
+    await git(cwd, 'checkout', '-q', '-b', 'feature')
+    return cwd
+  }
+  const changed = async (cwd: string) => {
+    const { code, out } = await run(cwd, 'diff', 'model', '--part', '--since', 'main', '--format', 'json')
+    expect(code).toBe(0)
+    const { elements } = JSON.parse(out) as { elements: Record<'added' | 'changed' | 'removed', Array<{ id: string }>> }
+    return Object.fromEntries(Object.entries(elements).map(([kind, list]) => [kind, list.map((e) => e.id)]))
+  }
+
+  it('lists the changes of the repository\'s part, and not another repository\'s', async () => {
+    const cwd = await shopRepo()
+    await write(join(cwd, 'model'), system('take the payment at once', 'hold the goods for a day'))
+    expect(await changed(cwd)).toEqual({ added: [], changed: ['reqA'], removed: [] })
+    expect((await run(cwd, 'diff', 'model', '--since', 'main')).out).toContain('Elements: 0 added, 2 changed, 0 removed.')
+  })
+
+  it('lists an element of the part that was taken out since the base', async () => {
+    const cwd = await shopRepo()
+    await write(join(cwd, 'model'), system(undefined, undefined, false))
+    expect(await changed(cwd)).toEqual({ added: [], changed: [], removed: ['reqA'] })
+  })
+
+  it('needs the repository\'s .radical/radical.json', async () => {
+    const cwd = await repo()
+    const { code, err } = await run(cwd, 'diff', 'model', '--part')
+    expect(code).toBe(2)
+    expect(err).toContain('--part needs the repository\'s .radical/radical.json')
   })
 })
