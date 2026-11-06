@@ -1,0 +1,11 @@
+{
+  "testResults": [
+    {
+      "name": "/ABSOLUTE/storefront/apps/web/tests/orders.test.js",
+      "assertionResults": [
+        { "ancestorTitles": ["orders"], "title": "shows an order", "status": "passed" },
+        { "ancestorTitles": ["orders"], "title": "places an order", "status": "failed" }
+      ]
+    }
+  ]
+}
