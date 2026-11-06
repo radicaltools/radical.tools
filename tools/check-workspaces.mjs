@@ -101,7 +101,9 @@ function* sourceFiles(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) {
-      if (!SKIP_DIRS.has(name) && !name.startsWith('.')) yield* sourceFiles(p)
+      // A folder with a package.json of its own is another project (the
+      // fixture repositories Radical Assay's tests read), not this workspace's.
+      if (!SKIP_DIRS.has(name) && !name.startsWith('.') && !existsSync(join(p, 'package.json'))) yield* sourceFiles(p)
     } else if (SOURCE_EXT.test(name) && !name.endsWith('.d.ts')) {
       yield p
     } else if (name.endsWith('.d.ts') || name.endsWith('.d.cts')) {

@@ -1,0 +1,5 @@
+Type=Exe
+Reference=*\G{1F852AFD-5C0A-46D0-8AA1-4319E8EF72C0}#1.0#0#..\Lib\ShopLib.dll#Shop Library
+Form=frmMain.frm
+Name="ShopApp"
+ExeName32="ShopApp.exe"

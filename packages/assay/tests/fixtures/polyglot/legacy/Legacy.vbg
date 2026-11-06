@@ -1,0 +1,4 @@
+VBGROUP 5.0
+StartupProject=App\App.vbp
+Project=Lib\Lib.vbp
+Project=Tests\Tests.vbp

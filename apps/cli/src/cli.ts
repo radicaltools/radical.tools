@@ -11,6 +11,7 @@ import { SETUP_USAGE, setupCommand } from './setup'
 import { SENSE_USAGE, senseCommand } from './sense'
 import { IMPLEMENT_USAGE, implementCommand } from './implement'
 import { VERIFY_USAGE, verifyCommand } from './verify'
+import { ASSAY_USAGE, assayCommand } from './assay'
 import { displayVersion } from '@radical/common/version'
 
 const USAGE = `Usage: radical <command> [options]
@@ -48,6 +49,9 @@ Commands:
   explore prepare|verify|record
                    prepare an exploratory round, run its scripts, record its
                    findings (radical explore --help)
+  assay extract <directory>…
+                   read the facts of existing code repositories, for an agent
+                   to find their model (Radical Assay; radical assay --help)
 
   --version        print the version`
 
@@ -67,9 +71,10 @@ export async function main(args: string[], io: Io): Promise<number> {
   if (command === 'fuzz') return fuzzCommand(rest, io)
   if (command === 'harden') return hardenCommand(rest, io)
   if (command === 'explore') return exploreCommand(rest, io)
+  if (command === 'assay') return assayCommand(rest, io)
   if (command === '--version' || command === '-v') { io.out(displayVersion()); return 0 }
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
-    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'implement' ? IMPLEMENT_USAGE : rest[0] === 'verify' ? VERIFY_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'federation' ? FEDERATION_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : USAGE)
+    io.out(rest[0] === 'discussions' ? DISCUSSIONS_USAGE : rest[0] === 'setup' ? SETUP_USAGE : rest[0] === 'check' ? CHECK_USAGE : rest[0] === 'sense' ? SENSE_USAGE : rest[0] === 'implement' ? IMPLEMENT_USAGE : rest[0] === 'verify' ? VERIFY_USAGE : rest[0] === 'diff' ? DIFF_USAGE : rest[0] === 'hooks' ? HOOKS_USAGE : rest[0] === 'export' ? EXPORT_USAGE : rest[0] === 'federation' ? FEDERATION_USAGE : rest[0] === 'fuzz' ? FUZZ_USAGE : rest[0] === 'harden' ? HARDEN_USAGE : rest[0] === 'explore' ? EXPLORE_USAGE : rest[0] === 'assay' ? ASSAY_USAGE : USAGE)
     return 0
   }
   io.err(`Unknown command: ${command}\n\n${USAGE}`)

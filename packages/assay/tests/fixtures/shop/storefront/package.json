@@ -1,0 +1,8 @@
+{
+  "name": "storefront",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  }
+}

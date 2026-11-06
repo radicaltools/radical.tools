@@ -1,0 +1,7 @@
+<project>
+  <parent><groupId>shop</groupId><artifactId>parent</artifactId><version>1</version></parent>
+  <artifactId>orders-service</artifactId>
+  <dependencies>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+  </dependencies>
+</project>

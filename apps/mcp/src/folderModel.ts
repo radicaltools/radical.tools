@@ -32,6 +32,7 @@ import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
+import { ASSAY_TOOL_DEFS, ASSAY_TOOLS, Assay, type AssayResult } from './assay'
 
 /** The shared AI catalogue minus its Studio-only tools: set_active_view and
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
@@ -47,8 +48,15 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_issues',
-    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). After them it lists the decisions of the Hub\'s concern packs imported but bound to nothing, with the elements to bind them to, and the concerns the model has not settled (who is calling, …), with the elements, the questions to ask the user and the pack to import. Call it after building or changing a state machine, and before you report work as done.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    description: 'What breaks the rules in the model now, as the Validation list in Studio\'s metamodel editor shows it: errors (wrong parent, relation the metamodel does not allow, unknown type) and warnings (missing required properties, references to no node, and state machine rules: a machine or compound state without one initial pseudostate, a parallel state with fewer than two regions, a final state with outgoing transitions, unreachable states, unguarded transitions competing for one event). After them it lists the decisions of the Hub\'s concern packs imported but bound to nothing, with the elements to bind them to, and the concerns the model has not settled (who is calling, …), with the elements, the questions to ask the user and the pack to import. On a large model the concerns run long: concerns "brief" lists each in one line, "none" leaves them out, and concept narrows them to one. Call it after building or changing a state machine, and before you report work as done.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        concerns: { type: 'string', enum: ['full', 'brief', 'none'], description: 'How the concerns are listed: full (default: elements, bindTo, questions), brief (one line each), none.' },
+        concept: { type: 'string', description: 'Only this concern pack\'s conceptId, in full.' },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'get_selection',
@@ -124,6 +132,7 @@ const buildTools = (metamodel: Metamodel | undefined): ToolDef[] => [
   ...SERVER_TOOL_DEFS,
   ...buildToolDefs(metamodel).filter((tool) => !EXCLUDED_TOOLS.has(tool.name)),
   ...FORGE_TOOL_DEFS,
+  ...ASSAY_TOOL_DEFS,
 ]
 
 /** Per call: progress for a client that asked for it, and the client's cancel. */
@@ -324,15 +333,22 @@ export class FolderModel {
    *  the open concerns (concern-unaddressed), each with its elements, its
    *  questions and how to settle it; one whose decision is in the model
    *  unbound is settled by binding it, not by importing the pack again. */
-  private openConcerns(data: DiagramData, mm: Metamodel | undefined): string[] {
+  /** The concerns the model has not settled and the decisions bound to nothing; `brief`, a line each; `concept`, one pack only. */
+  private openConcerns(data: DiagramData, mm: Metamodel | undefined, brief = false, concept?: string): string[] {
     if (!holdsConcerns(mm)) return []
     const byId = <T extends { id: string }>(items: T[]) => Object.fromEntries(items.map((x) => [x.id, x]))
     const nodes = byId(data.nodes)
     const relations = byId(data.relations)
     const packs = this.forge.concernPacks()
     const named = (id: string) => `${nodes[id].label} (${id})`
-    const unbound = unboundDecisions(packs, nodes, relations, mm)
-    const open = concernStatuses(packs, nodes, relations).filter((s) => s.open.length)
+    const unbound = unboundDecisions(packs, nodes, relations, mm).filter((u) => !concept || packs.find((p) => p.id === concept)?.concern.id === u.concern)
+    const open = concernStatuses(packs, nodes, relations).filter((s) => s.open.length && (!concept || s.pack.id === concept))
+    if (brief) {
+      return [
+        ...(unbound.length ? ['', `Unbound decisions: ${unbound.map(({ adr, concern }) => `ADR "${adr.label}" (${adr.id}) for ${concern}`).join('; ')}.`] : []),
+        ...(open.length ? ['', `Unaddressed concerns (${open.length}; get_issues with concept for one in full):`, ...open.map(({ pack, open: ids }) => `- ${pack.name} (conceptId ${pack.id}): ${ids.length} element${ids.length === 1 ? '' : 's'}`)] : []),
+      ]
+    }
     return [
       ...(unbound.length ? ['', 'Unbound decisions (warnings of radical check\'s concern-unbound). Each settles its concern for nothing until it constrains the elements: add_relation constrains from the ADR and its fitness functions to each element, and satisfies from each element to the requirements the pack brought.',
         ...unbound.map(({ adr, concern, checks, bindTo }) =>
@@ -358,6 +374,8 @@ export class FolderModel {
     ]
   }
   private readonly folder: string
+  /** Radical Assay's run: this folder is its central model. */
+  private readonly assay: Assay
   private metamodelKey: string
   /** Every tool the server offers; node/relation schemas follow the metamodel. */
   tools: ToolDef[]
@@ -365,6 +383,7 @@ export class FolderModel {
 
   private constructor(folder: string, private readonly preset: PresetName, metamodel: Metamodel | undefined) {
     this.folder = folder
+    this.assay = new Assay(folder, () => mappingRoot(folder))
     this.tools = buildTools(metamodel)
     this.metamodelKey = JSON.stringify(metamodel)
   }
@@ -695,7 +714,10 @@ export class FolderModel {
         const mm = facade.getMetamodel?.()
         const issues = mm ? issuesOf(data, mm) : []
         const text = issues.length ? issues.map(formatIssue).join('\n') : 'No issues: the model follows its metamodel.'
-        return { ok: true, text: [text, ...this.openConcerns(data, mm)].join('\n') }
+        const { concerns = 'full', concept } = (input ?? {}) as { concerns?: unknown; concept?: unknown }
+        if (!['full', 'brief', 'none'].includes(concerns as string)) return { ok: false, text: 'get_issues: concerns must be full, brief or none' }
+        if (concept !== undefined && typeof concept !== 'string') return { ok: false, text: 'get_issues: concept must be a conceptId' }
+        return { ok: true, text: [text, ...(concerns === 'none' ? [] : this.openConcerns(data, mm, concerns === 'brief' && concept === undefined, concept))].join('\n') }
       }
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
@@ -715,25 +737,28 @@ export class FolderModel {
         placeNext: (parentId) => placeNewNode(facade.getNodes(), parentId),
       }
       // While a Forge stage is open, its writes to earlier stages go through a proposal.
-      const refused = FORGE_TOOLS.has(name) || READ_ONLY.has(name) ? null : this.forge.guard(name, input, ctx)
+      const refused = FORGE_TOOLS.has(name) || ASSAY_TOOLS.has(name) || READ_ONLY.has(name) ? null : this.forge.guard(name, input, ctx)
       if (refused) {
         this.restoreTempIds(priorTempIds)
         return { ok: false, text: refused }
       }
       const metamodelBefore = facade.getMetamodel?.()
-      const result: ForgeResult = FORGE_TOOLS.has(name)
+      const result: ForgeResult & AssayResult = FORGE_TOOLS.has(name)
         ? await this.forge.call(name, input, ctx, facade)
-        : await runTool(name, input, ctx)
-      if (!result.ok || facade.lastError) {
+        : ASSAY_TOOLS.has(name)
+          ? await this.assay.call(name, input, ctx, facade)
+          : await runTool(name, input, ctx)
+      // Assay reads the facade's refusals itself and answers with all of them.
+      if (ASSAY_TOOLS.has(name) ? !result.ok : !result.ok || facade.lastError) {
         this.restoreTempIds(priorTempIds)
-        return { ok: false, text: facade.lastError ?? result.resultText }
+        return { ok: false, text: ASSAY_TOOLS.has(name) ? result.resultText : facade.lastError ?? result.resultText }
       }
       // A run starting on a folder git saved no base for: the model before it.
       const forgeBase = name === 'forge_start' ? forgeModelBase(ownModel(data).nodes, ownModel(data).relations) : null
       if (READ_ONLY.has(name) || result.readOnly) {
         result.commit?.()
         if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
-        return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') }
+        return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') + (result.afterWrite ? await result.afterWrite() : '') }
       }
 
       let changed = result.data ?? facade.toDiagramData()
@@ -755,6 +780,8 @@ export class FolderModel {
         return outcome
       }
       result.commit?.()
+      // Assay's files beside the model, once the model is on disk.
+      if (result.afterWrite) outcome.text += await result.afterWrite()
       if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
       if (forgeBase) outcome.text += await this.saveForgeBase(forgeBase)
       // A metamodel tool changed the types: re-advertise the schemas.
@@ -917,8 +944,10 @@ export class FolderModel {
       ? ` Merged with edits made in the folder while the call ran (${write.merged.changed.join(', ')})${write.merged.conflicts.length ? `; where both changed the same value the folder's was kept: ${write.merged.conflicts.join('; ')}. Check them with search_model` : ''}${notices.length ? `; ${notices.join('; ')}` : ''}.`
       : ''
     const revision = createHash('sha256').update(paths.map((path) => `${path}\0${next[path] ?? ''}`).join('\0')).digest('hex').slice(0, 12)
-    const createdRelation = changed.relations.find((relation) => !data.relations.some((old) => old.id === relation.id))?.id
-    return { ok: true, text: `${resultText}${createdRelation ? ` Relation ID: ${createdRelation}.` : ''} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}` }
+    // One relation made is named by id; several (an Assay plan, a Forge stage) are counted, not one of them named as if it were the only one.
+    const created = changed.relations.filter((relation) => !data.relations.some((old) => old.id === relation.id))
+    const madeText = created.length === 1 ? ` Relation ID: ${created[0].id}.` : created.length > 1 ? ` ${created.length} relations created.` : ''
+    return { ok: true, text: `${resultText}${madeText} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}` }
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds

@@ -18,7 +18,7 @@ export default defineConfig({
   clean: true,
   // The product version, commit and day of this build (@radical/common/version).
   define: buildDefine(fileURLToPath(new URL('.', import.meta.url))),
-  noExternal: ['@radical/common', '@radical/hub-catalogue', '@radical/layout', '@radical/node-files'],
+  noExternal: ['@radical/assay', '@radical/common', '@radical/hub-catalogue', '@radical/layout', '@radical/node-files'],
   onSuccess: async () => {
     await cp(catalogue, 'dist/hub-catalogue', { recursive: true })
     await cp(fileURLToPath(new URL('../../LICENSE', import.meta.url)), 'LICENSE')

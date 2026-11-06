@@ -17,7 +17,8 @@
     { "element": "cdefa455-5e6f-4395-8261-f61398610d02", "name": "@radical/crucible", "paths": ["packages/crucible"] },
     { "element": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed", "name": "@radical/host-bridge", "paths": ["packages/host-bridge"] },
     { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] },
-    { "element": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3", "name": "Crucible engine package", "paths": ["apps/crucible"] }
+    { "element": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3", "name": "Crucible engine package", "paths": ["apps/crucible"] },
+    { "element": "917d9018-dff9-45b1-87dc-d01f8ac836bb", "name": "@radical/assay", "paths": ["packages/assay"] }
   ],
   "verifies": [
     { "element": "1c0c7414-2092-4c70-a233-51bd95a280cc", "name": "Recover interrupted discussion sync", "tests": [
@@ -3006,6 +3007,122 @@
     { "element": "72d984fe-14e4-460e-975b-febc52359b74", "name": "Part's state machine judged", "tests": [
       "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › finds what is missing of its state machine's scenario, and nothing of another repository's",
       "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › takes in the state machines it implements and of the entities it realises, with all in them"
+    ] },
+    { "element": "37d66e19-979e-4f41-a403-401167f33b64", "name": "Facts read from a repository", "tests": [
+      "packages/assay/tests/extract.test.ts › radical assay: facts › reads a repository's units, dependencies, API, URL paths and tests, each with its file and line",
+      "packages/assay/tests/extract.test.ts › radical assay: facts › finds every workspace this repository's mapping names",
+      "packages/assay/tests/extract.test.ts › radical assay: facts › round-trips the facts file without the folder",
+      "packages/assay/tests/extract.test.ts › radical assay: facts › names URL paths, not files or text",
+      "apps/cli/src/assay.test.ts › radical assay extract › reads the facts of a directory of repositories, writes each one's facts file and prints the links, writing no model",
+      "apps/cli/src/assay.test.ts › radical assay extract › takes a repository's reports, and prints JSON",
+      "apps/cli/src/assay.test.ts › radical assay extract › says what is wrong"
+    ] },
+    { "element": "38d5607f-d36a-492d-a055-b4d81e988692", "name": "A directory of repositories read", "tests": [
+      "packages/assay/tests/extract.test.ts › radical assay: repositories › takes a directory of repositories as each of them, and leaves out a folder that is none",
+      "packages/assay/tests/extract.test.ts › radical assay: repositories › reads the commit of a repository that has one"
+    ] },
+    { "element": "eb229f78-4634-48b0-8428-2fb09f443f60", "name": "Repositories linked", "tests": [
+      "packages/assay/tests/extract.test.ts › radical assay: links › links a package dependency as observed and a declared path the code names as inferred, citing both sides",
+      "packages/assay/tests/extract.test.ts › radical assay: links › matches a path segment by segment"
+    ] },
+    { "element": "4e2c9dab-8ed9-4dd0-baf4-b717a3d75574", "name": "Assay run started over MCP", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › starts a run on a directory of repositories: facts per repository, links, the procedure",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › needs a run first"
+    ] },
+    { "element": "dc00a1e6-b36f-401e-a895-1bf251733cd2", "name": "Plan without evidence refused", "tests": [
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › names every claim no fact backs, and every reference to nothing",
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › accepts a plan every claim of which cites the run's facts",
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › refuses a relation whose cited link joins other units, or a call the wrong way, and a scenario on a test that failed",
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › refuses what is no plan",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › refuses a plan without evidence, or one the metamodel forbids, writing nothing"
+    ] },
+    { "element": "792bc652-c52b-4ad9-bed4-57be1e9f4a28", "name": "Plan written to the central model", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes a plan into the central model, maps the code repositories, keeps the evidence beside the model"
+    ] },
+    { "element": "db596e9f-c632-4681-bc15-9568799e80c3", "name": "Requirement proposal answered", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes a requirement only when the user accepts it, with its scenarios and their tests"
+    ] },
+    { "element": "91665f59-3c7f-4bc6-bfea-aad1c4ab2b3d", "name": "Code repositories mapped", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes a plan into the central model, maps the code repositories, keeps the evidence beside the model",
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › reads the model it names, and writes it back",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes inferred elements of code no extractor reads, on the code the agent quotes, checked"
+    ] },
+    { "element": "64ae7b45-dedd-419d-aca7-45523f4c4516", "name": "Legacy code cited", "tests": [
+      "packages/assay/tests/cite.test.ts › radical assay: code cited by the agent › takes a quotation found in those lines, spacing aside, as evidence of an inferred claim, and checks the folders named",
+      "packages/assay/tests/cite.test.ts › radical assay: code cited by the agent › names every quotation it does not find, and refuses one for an observed claim",
+      "packages/assay/tests/cite.test.ts › radical assay: code cited by the agent › refuses a quotation too short to say anything, or cut out of a word",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes inferred elements of code no extractor reads, on the code the agent quotes, checked",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › lets a file named with leading dots be quoted"
+    ] },
+    { "element": "376d790c-e0a8-4df0-8b29-cf44258d41a7", "name": "Units of every stack read", "tests": [
+      "packages/assay/tests/stacks.test.ts › radical assay: units of every stack › finds the units of every stack wherever they are, each with its kind, and the references between them by path",
+      "packages/assay/tests/stacks.test.ts › radical assay: units of every stack › links a VB6 program to the library whose binary it references, and a project to the one it names by path"
+    ] },
+    { "element": "a3af5eb0-3e6d-4924-9de9-13ae776d3fef", "name": "Deployment read", "tests": [
+      "packages/assay/tests/stacks.test.ts › radical assay: how the system runs › reads the services of docker-compose, Kubernetes and Aspire, each with its unit, and what each depends on"
+    ] },
+    { "element": "be8421be-b7e2-4d22-87b2-2ce31737d1eb", "name": "gRPC call linked", "tests": [
+      "packages/assay/tests/stacks.test.ts › radical assay: gRPC › takes a service a unit registers as its API, and links a unit making its client to it"
+    ] },
+    { "element": "38d3982c-1d7d-4e66-940b-4990146b3074", "name": "Database and tables read", "tests": [
+      "packages/assay/tests/stacks.test.ts › radical assay: databases and tables › reads the database a VB6 form and a Spring application connect to, and the tables the VB6 SQL names, not its captions",
+      "packages/assay/tests/cite.test.ts › radical assay: code cited by the agent › reads a VB6 project as a unit, its database and the tables its SQL names"
+    ] },
+    { "element": "7be3ecd9-836e-4e49-a8f9-40f8ab1a993e", "name": "Address linked", "tests": [
+      "packages/assay/tests/stacks.test.ts › radical assay: addresses › links a unit to the unit an address names: a load-balanced route, a URL in the environment, a host given as a default"
+    ] },
+    { "element": "acb669a6-8cef-45a8-9322-515c9a3b6a77", "name": "A folder of code read", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand › takes a folder with no repository inside as a folder of code",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › reads a folder of code with no repository, and writes no .radical/radical.json into it",
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand, kept from harm › finds repositories deeper in a directory of folders, and names those a folder of code leaves out"
+    ] },
+    { "element": "133c771b-bf33-4601-80f6-7c8ed1536488", "name": "Code read from a zip", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand › unpacks a .zip file of code, and refuses one with an entry outside its folder",
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand, kept from harm › leaves out a .git folder of a .zip file, so its configuration never runs",
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand, kept from harm › unpacks two .zip files of one name apart",
+      "packages/assay/tests/sources.test.ts › radical assay: code given by hand, kept from harm › reads each repository a .zip file holds as a folder of code of its own"
+    ] },
+    { "element": "2e5f8b96-ae6d-4dc4-a970-2407f853d076", "name": "Documents taken as sources", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: documents › keeps a text copy of each document of a folder and a link, as document facts",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › turns an HTML page into Markdown: headings, lists, tables and preformatted text; no scripts or styles",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › names a source like a repository of the run apart from it",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › replaces a source only when its new copy is taken",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › takes each source apart: a link that breaks off, or is too big, does not stop the others",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › takes a .zip file of documents, leaving out what no document is",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › reads headings only where the format has them",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › reads Markdown headings around code blocks that name their language, and no horizontal rule as a block",
+      "packages/assay/tests/sources.test.ts › radical assay: documents › decodes UTF-16 and Windows-1252 text",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › adds sources to a running run, replacing a source given again"
+    ] },
+    { "element": "f8f39da7-e8a2-41d1-9ab5-d6e6e14a39d7", "name": "Link behind a login refused", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: documents › refuses a link behind a login, keeping nothing of it"
+    ] },
+    { "element": "ddfe4d0c-cbb8-42ae-95c2-625954c093ae", "name": "Repository documents listed", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: documents › lists a repository's README, docs and ADR records where they are"
+    ] },
+    { "element": "619ae6a1-4b91-42d8-b511-a398265febdb", "name": "Need and decision proposed from a document", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › proposes a need and a decision a document states, and writes the requirement that derives from the need",
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › takes needs, decisions and requirements drawn from documents as hypotheses, and no document for an observed claim",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › refuses a plan that builds an element in a source, or derives a requirement from what is no need"
+    ] },
+    { "element": "4461312e-9243-4a09-afd8-6dbf3fa083d4", "name": "Lines of a run's file read", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › reads the lines of a run's file, numbered, and nothing outside the run"
+    ] },
+    { "element": "81df6d10-1239-4975-b8c0-ebac67788c6e", "name": "Private address refused", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: documents › refuses a private address, and one a redirect leads to"
+    ] },
+    { "element": "f3ee03cf-eff7-492b-99a8-d4b2c7bf56f7", "name": "Copy outside its folder refused", "tests": [
+      "packages/assay/tests/sources.test.ts › radical assay: documents › keeps every copy inside its own folder, and empties no other"
+    ] },
+    { "element": "87ac21fa-908d-4a68-a56a-63e25b0741e5", "name": "Proposal waits for what it names", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › derives a requirement from the need of its own plan, though a need left out had that key",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › finds what a proposal names when it is answered: one naming a proposal still waiting waits for it"
+    ] },
+    { "element": "3cb4758a-8653-445d-a541-6d17b0a56aaf", "name": "Concerns in brief", "tests": [
+      "apps/mcp/src/folderModel.test.ts › get_issues › lists unaddressed concerns after the metamodel issues"
+    ] },
+    { "element": "526d6850-aee3-402e-be88-784ebd08a6c3", "name": "Requirement nothing satisfies yet", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes a requirement no code satisfies yet, and derives one from the need the user names"
     ] }
   ]
 }
