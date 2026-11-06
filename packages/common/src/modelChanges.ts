@@ -58,6 +58,18 @@ export interface ModelChangeReport {
   relations: { added: RelationChange[]; removed: RelationChange[]; changed: RelationChange[] }
 }
 
+/** The changes of a report that touch `ids`: its elements, and the relations from
+ *  or to them. What a repository has left of the model is the report since the
+ *  commit its code has reached, kept to its part then and now. */
+export function onlyPart(report: ModelChangeReport, ids: Set<string>): ModelChangeReport {
+  const element = (list: ElementChange[]) => list.filter((e) => ids.has(e.id))
+  const relation = (list: RelationChange[]) => list.filter((r) => ids.has(r.source.id) || ids.has(r.target.id))
+  return {
+    elements: { added: element(report.elements.added), removed: element(report.elements.removed), changed: element(report.elements.changed) },
+    relations: { added: relation(report.relations.added), removed: relation(report.relations.removed), changed: relation(report.relations.changed) },
+  }
+}
+
 /** Fields of an element or relation that are not the model: identity and layout. */
 const NOT_MODEL = new Set(['id', 'x', 'y', 'width', 'height', 'collapsed'])
 /** Fields an entry already shows in its heading. */

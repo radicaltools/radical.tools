@@ -3,13 +3,13 @@ import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { deserializeFromMdFolder, isMdFolderModelPath, stripBom, type FolderFiles } from '@radical/common/formats/mdFolder'
-import { countModelChanges, formatModelChanges, modelChangeReport, type ModelChangeReport } from '@radical/common/modelChanges'
+import { countModelChanges, formatModelChanges, modelChangeReport, onlyPart, type ModelChangeReport } from '@radical/common/modelChanges'
 import type { ModelCopy } from '@radical/common/model'
 import type { DiagramData } from '@radical/common/c4'
 import { MODEL_BASE_FILE, serializeModelBase } from '@radical/common/formats/modelBase'
 import { writeEditorStateFile } from './selectionFile'
 import { readRepositoryMapping } from './repositoryLayout'
-import { testsBoundTo } from '@radical/common/repositoryMapping'
+import { repositoryPartIds, testsBoundTo } from '@radical/common/repositoryMapping'
 
 const exec = promisify(execFile)
 
@@ -146,6 +146,9 @@ export interface ModelChangesSince {
 export interface ChangesOptions {
   /** Also write the model at the base to .state/base.json, for Studio. */
   saveBase?: boolean
+  /** Only the repository's part, by its .radical/radical.json, as it is now
+   *  and as it was at the base (radical diff --part). */
+  part?: boolean
 }
 
 /** The branch checked out in `folder`'s repository; null on a detached HEAD. */
@@ -170,9 +173,13 @@ export async function modelChangesSince(folder: string, current: Pick<DiagramDat
   }
   const before: ModelCopy = { nodes: byId(old.nodes), relations: byId(old.relations) }
   const after: ModelCopy = { nodes: byId(current.nodes), relations: byId(current.relations) }
-  const report = modelChangeReport(before, after)
+  let report = modelChangeReport(before, after)
   // A scenario's or fitness function's tests, where the repository binds them.
   const mapping = await readRepositoryMapping(folder).catch(() => null)
+  if (options.part) {
+    if (!mapping) throw new Error('--part needs the repository\'s .radical/radical.json')
+    report = onlyPart(report, new Set([...repositoryPartIds(old, mapping.implements), ...repositoryPartIds(current, mapping.implements)]))
+  }
   if (mapping) {
     for (const change of [...report.elements.added, ...report.elements.changed, ...report.elements.removed]) {
       if (change.type === 'scenario' || change.type === 'fitness-fn') change.tests = testsBoundTo(mapping.verifies, change.id)

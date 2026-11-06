@@ -21,6 +21,8 @@ export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
 Checks a Radical Markdown model folder: its files, its metamodel, and that it
 is complete (requirements have scenarios, accepted ADRs fitness functions, …).
+In a repository whose .radical/radical.json names a model in a repository of
+its own ("model": { "repo": … }), it judges that repository's part of the model.
 
   folder              the model folder (default: the working directory)
   --config <file>     rule settings (default: check.json in the model folder,
@@ -192,6 +194,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     const mapping = await readRepositoryMapping(root)
     repository = mapping && {
       file: relative(io.cwd, mapping.file),
+      ...(mapping.model ? { model: mapping.model } : {}),
       implements: mapping.implements.map((entry) => ({ ...entry, missing: entry.paths.filter((path) => !existsSync(resolve(mapping.root, path))) })),
       verifies: mapping.verifies,
       ...(mapping.tests ? { tests: mapping.tests } : {}),
@@ -336,6 +339,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   const options = { folder, verbose: values.verbose }
+  if (repository?.model && values.format !== 'json' && !values.quiet) io.out(`Judged this repository's part of the model of ${repository.model.repo}.`)
   if (federation && values.format !== 'json' && !values.quiet) {
     io.out(`Checked with ${describeDeps(federation.fetched) || 'no other model'} (${DEPS_FILE}).`)
     for (const note of federation.notes) io.out(`Note: ${note}`)

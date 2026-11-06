@@ -42,12 +42,15 @@ const exists = (path: string): Promise<boolean> => stat(path).then(() => true, (
 const isModel = (folder: string): Promise<boolean> => isFile(join(folder, MD_MANIFEST_FILE))
 
 /** The folders from `from` up to the repository's root (the nearest with a
- *  .git), or up to the file system's root outside a repository. */
+ *  .git), or up to the file system's root outside a repository. A model
+ *  checked out at .radical/model has a .git of its own and belongs to the
+ *  repository around it (ADR One system model across repositories). */
 async function upwards(from: string): Promise<string[]> {
   const dirs: string[] = []
   for (let dir = resolve(from); ; dir = dirname(dir)) {
     dirs.push(dir)
-    if (await exists(join(dir, '.git')) || dirname(dir) === dir) return dirs
+    const checkout = basename(dir) === 'model' && basename(dirname(dir)) === RADICAL_DIR
+    if ((!checkout && await exists(join(dir, '.git'))) || dirname(dir) === dir) return dirs
   }
 }
 

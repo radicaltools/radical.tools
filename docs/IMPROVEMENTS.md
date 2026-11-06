@@ -356,6 +356,15 @@ gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
 
+### Dogfooding (2026-11-05): one system model across repositories
+
+- MCP `get_issues` in a code repository still judges the whole model: only `radical check` and `radical sense run` know the repository's part.
+- A fitness function that implements a shared ADR runs for every element the ADR constrains, even when its sensor is meant for one (Calls match the Warehouse API, in the demo). A direct `constrains` on the fitness function does not narrow it, so the model needs an ADR of its own for it.
+- `radical check --from-ci` and the git hooks in a checkout read the model's repository, not the code's.
+- There is no check of the whole system across repositories yet: it would read every repository's reports.
+- The SDLC demo computes a repository's part with a script of its own (`pipeline/part.mjs`, reading the model's files); `radical diff --part` and the part in `radical check` replace it once released.
+- Joining two models into one took a throwaway script: metamodels equal, one file name collision, relations and views concatenated. A `radical federation join` would do it.
+
 ### Dogfooding (2026-11-03): three repositories in a federation
 
 From building `radical.tools.sdlc.demo.2`: company standards, a Warehouse and a Shop, each with

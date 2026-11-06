@@ -2976,6 +2976,36 @@
     ] },
     { "element": "cf558ebc-3001-422c-942e-a92de2676977", "name": "A dependency in .radical/model", "tests": [
       "apps/cli/src/federation.test.ts › transitive dependencies › fetches a model in .radical/model, the folder name starting with a dot"
+    ] },
+    { "element": "33dc3858-1aba-40cc-8076-4bd3423eac98", "name": "Model checkout finds the mapping", "tests": [
+      "packages/node-files/tests/repositoryLayout.test.ts › a model checked out in a repository › belongs to the repository around .radical/, past its own .git",
+      "apps/cli/src/verify.test.ts › radical verify › in a model checked out in the repository, writes the repository's file and reads the model's history"
+    ] },
+    { "element": "6b8ab2de-7f49-4c58-bd48-bee37578dcb4", "name": "Another repository's gaps left out", "tests": [
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › leaves another repository's gaps out, and counts goals on its part",
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › marks what it does not build, and keeps a dependency's own mark"
+    ] },
+    { "element": "1f89bb3b-7504-4271-bc18-dbf781864755", "name": "No model named, judged whole", "tests": [
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › judges the whole model when it names none, as before"
+    ] },
+    { "element": "d27e5fdb-575f-4230-8fc6-5f8dd9c4610e", "name": "Another repository's element not measured", "tests": [
+      "apps/cli/src/sense.test.ts › radical sense run › in a repository of one system model, measures only what it builds"
+    ] },
+    { "element": "37d2ca87-329d-4b38-9ce1-79613c0877a2", "name": "Repository part tests", "tests": [
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model",
+      "packages/node-files/tests/repositoryLayout.test.ts › a model checked out in a repository",
+      "apps/cli/src/sense.test.ts › radical sense run › in a repository of one system model, measures only what it builds",
+      "apps/cli/src/diff.test.ts › radical diff --part"
+    ] },
+    { "element": "e2160d18-16f1-4ebe-b379-c490ad84005c", "name": "Diff lists the repository's part", "tests": [
+      "apps/cli/src/diff.test.ts › radical diff --part › lists the changes of the repository's part, and not another repository's"
+    ] },
+    { "element": "06d75e4b-2ddb-4ac5-83ce-6739b4d23bb0", "name": "Part's removed element listed", "tests": [
+      "apps/cli/src/diff.test.ts › radical diff --part › lists an element of the part that was taken out since the base"
+    ] },
+    { "element": "72d984fe-14e4-460e-975b-febc52359b74", "name": "Part's state machine judged", "tests": [
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › finds what is missing of its state machine's scenario, and nothing of another repository's",
+      "packages/common/tests/repositoryMapping.test.ts › a repository of one system model › takes in the state machines it implements and of the entities it realises, with all in them"
     ] }
   ]
 }

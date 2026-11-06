@@ -71,4 +71,18 @@ describe('radical verify', () => {
     expect(none.code).toBe(2)
     expect(none.err).toContain('No scenario or fitness-fn named "Refunds" in the model.')
   })
+
+  it('in a model checked out in the repository, writes the repository\'s file and reads the model\'s history', async () => {
+    const root = await repository()
+    const model = join(root, '.radical', 'model')
+    await exec('git', ['init', '-q'], { cwd: model })
+    await exec('git', ['add', '-A'], { cwd: model })
+    await exec('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'The model'], { cwd: model })
+    const { stdout } = await exec('git', ['rev-parse', 'HEAD'], { cwd: model })
+    expect((await run(root, 'verify', 'pay', '--test', 'a.test.ts › pays')).code).toBe(0)
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8')).verifies[0].tests).toEqual(['a.test.ts › pays'])
+    const diff = await run(root, 'diff', '.radical/model', '--since', stdout.trim())
+    expect(diff.code).toBe(0)
+    expect(diff.out).toContain('No model changes since')
+  })
 })

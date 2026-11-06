@@ -217,6 +217,24 @@ describe('radical sense run', () => {
     expect(JSON.parse(await readFile(join(cwd, 'paths-refund-api.json'), 'utf8'))).toEqual(['.'])
   })
 
+  it('in a repository of one system model, measures only what it builds', async () => {
+    const element = (id: string, label: string) => ({ id, type: 'container', label, x: 0, y: 0, width: 180, height: 52, collapsed: false }) as unknown as C4Node
+    const adr = (id: string, label: string) => ({ id, type: 'adr', label, x: 0, y: 0, width: 180, height: 52, collapsed: false }) as unknown as C4Node
+    const due = { cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', measure: 'mine' }
+    const link = (id: string, relationType: string, sourceId: string, targetId: string) => ({ id, relationType, sourceId, targetId }) as unknown as C4Relation
+    const cwd = await modelWith(
+      [adr('both', 'Both'), adr('theirs', 'Theirs'), fitness('ff-both', 'Measure both', due), fitness('ff-theirs', 'Measure theirs', due), element('x', 'X'), element('y', 'Y')],
+      [link('i1', 'implements', 'ff-both', 'both'), link('i2', 'implements', 'ff-theirs', 'theirs'), link('c1', 'constrains', 'both', 'x'), link('c2', 'constrains', 'both', 'y'), link('c3', 'constrains', 'theirs', 'y')],
+    )
+    await mkdir(join(cwd, '.radical', 'sensors'), { recursive: true })
+    await writeFile(join(cwd, '.radical', 'sensors', 'sensors.json'), JSON.stringify({ sensors: { mine: { command: [process.execPath, '-e', 'process.exit(0)', '--'] } } }))
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ model: { repo: 'https://example.com/arch.git' }, implements: [{ element: 'x', paths: ['.'] }] }))
+    const result = await run(cwd, 'sense', 'run', '--trigger', 'pull-request', '--folder', 'model', '--out', 'metrics')
+    expect(result.err).toBe('')
+    expect(result.out).toContain('Measure both: measured "mine" for X')
+    expect(result.out).not.toContain('for Y')
+    expect(result.out).not.toContain('Measure theirs')
+  })
   it('runs a repository\'s sensor that names an adapter with its arguments, for each element', async () => {
     const cwd = await repository({ figures: { adapter: 'json', args: ['figures.json', '--metric', 'openapi.operations=ops'] } }, 'figures')
     await writeFile(join(cwd, 'figures.json'), JSON.stringify({ ops: 12 }))

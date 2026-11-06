@@ -13,6 +13,7 @@
 import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot, DiagramView, Presentation } from '../c4'
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel, milestoneViews, originOf } from '../model'
+import { repositoryPart } from '../repositoryMapping'
 import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
 import { computeEvidence, withBoundTests, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
@@ -292,6 +293,8 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const found: Array<RuleFinding & { rule: string }> = []
   // The tests .radical/radical.json binds count as each node's conditions.
   data = { ...data, nodes: withBoundTests(data.nodes, options.repository?.verifies) }
+  // A repository of one system model answers for its part of it.
+  if (options.repository?.model) data = { ...data, ...repositoryPart(data, options.repository.implements) }
   const nodes = byId(data.nodes)
   const relations = byId(data.relations)
   staleReferences(data.views ?? [], data.sequences ?? [], data.presentations ?? [], nodes, relations, data.snapshots ?? [])

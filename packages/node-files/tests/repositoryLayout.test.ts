@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { elementPaths, findModelFolder, missingCodePaths, repositoryModel, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
+import { elementPaths, findModelFolder, mappingRoot, missingCodePaths, repositoryModel, findRepositoryFile, oldLayout, readRepositoryMapping, repositoryFileRoot as crucibleRoot, repositoryRoot } from '../src/repositoryLayout'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
@@ -73,6 +73,22 @@ describe('repository mapping', () => {
     expect(await readRepositoryMapping(await repository(['src/']))).toBeNull()
     await writeFile(join(root, '.radical/radical.json'), '{ "implements": [{ "paths": [] }] }')
     await expect(readRepositoryMapping(root)).rejects.toThrow('implements[0] needs "element" (an id) and "paths" (a list of folders)')
+  })
+})
+
+describe('a model checked out in a repository', () => {
+  it('belongs to the repository around .radical/, past its own .git', async () => {
+    const root = await repository(['.radical/model/radical.md', '.radical/model/.git/HEAD', 'src/'])
+    await writeFile(join(root, '.radical/radical.json'), JSON.stringify({ model: { repo: 'https://example.com/arch.git' }, implements: [{ element: 'shop', paths: ['src'] }] }))
+    const mapping = (await readRepositoryMapping(join(root, '.radical/model')))!
+    expect(mapping.file).toBe(join(root, '.radical/radical.json'))
+    expect(mapping.root).toBe(root)
+    expect(mapping.model).toEqual({ repo: 'https://example.com/arch.git' })
+    expect(await mappingRoot(join(root, '.radical/model'))).toBe(root)
+  })
+  it('stops at any other .git', async () => {
+    const root = await repository(['vendor/thing/.git/HEAD', 'vendor/thing/model/radical.md'])
+    expect(await repositoryRoot(join(root, 'vendor/thing/model'))).toBe(join(root, 'vendor/thing'))
   })
 })
 

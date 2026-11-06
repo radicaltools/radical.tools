@@ -20,6 +20,10 @@ folding are left out. The MCP server's get_changes tool gives the same list.
   --since <ref>       the git branch, tag or commit to compare with (default:
                       the merge base with the default branch, origin/main)
   --format <format>   text (default) or json
+  --part              only the repository's part of the model, by its
+                      .radical/radical.json, as it is now and as it was at the
+                      base: what the repository has left to build when the base
+                      is the commit its code has reached
   --save-base         also save the model at the base to .state/base.json in
                       the folder, for Studio to show the changes (radical hooks
                       install keeps it fresh)
@@ -38,6 +42,7 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
         since: { type: 'string' },
         format: { type: 'string', default: 'text' },
         'save-base': { type: 'boolean', default: false },
+        part: { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
       },
@@ -57,7 +62,7 @@ export async function diffCommand(args: string[], io: Io): Promise<number> {
     const root = await realpath(resolve(io.cwd, folder))
     if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
     const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(root), { writeCache: false }).readAll()).data
-    const changes = await modelChangesSince(root, data, values.since, { saveBase: values['save-base'] })
+    const changes = await modelChangesSince(root, data, values.since, { saveBase: values['save-base'], part: values.part })
     if (values.quiet && values['save-base']) return 0
     if (values['save-base']) io.err(`Saved the base (${changes.base.commit.slice(0, 7)}) to ${folder}/.state/base.json.`)
     io.out(values.format === 'json'

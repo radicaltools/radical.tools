@@ -11,6 +11,7 @@ import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import { writeBeside, type Io } from './check'
 import { SENSORS_FILE, repositorySensors } from './repositorySensors'
 import { REVIEWS_FILE as REPOSITORY_REVIEWS, elementPaths, mappingRoot, readRepositoryMapping, type MappedElement } from '@radical/node-files/repositoryLayout'
+import { repositoryPart } from '@radical/common/repositoryMapping'
 import { modelFolderArg } from './modelFolder'
 import { composeFolder, federationOthers } from './federation'
 import { SENSOR_ADAPTERS, sensorAdapter } from './sensors/registry'
@@ -146,8 +147,12 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
     // With deps.json: also the fitness functions of the models it depends on.
     const federation = await composeFolder(folder)
     const others = federation ? federationOthers(files, federation.fetched) : null
-    nodes = [...own.nodes, ...others?.nodes ?? []]
-    model = sensorModel({ nodes, relations: [...own.relations, ...others?.relations ?? []] }, federation?.deps.name || basename(folder), (await readRepositoryMapping(folder))?.implements ?? [])
+    const mapping = await readRepositoryMapping(folder)
+    // A repository of one system model measures what it builds.
+    const whole = { nodes: [...own.nodes, ...others?.nodes ?? []], relations: [...own.relations, ...others?.relations ?? []] }
+    const part = mapping?.model ? repositoryPart(whole, mapping.implements) : whole
+    nodes = part.nodes
+    model = sensorModel(part, federation?.deps.name || basename(folder), mapping?.implements ?? [])
     sensors = await repositorySensors(folder)
   } catch (error) {
     io.err(`Cannot read the model folder ${named}: ${(error as Error).message}`)
