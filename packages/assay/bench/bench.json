@@ -1,0 +1,816 @@
+{
+  "about": "Radical Assay's bench: public repositories of several stacks and ages, pinned, with the units and calls a person wrote down from each project's README and architecture. Units are folders; a call is from a unit's folder to another's, or to a deployed service by name (service:<name>) or a database by name (db:<name>). optional calls are true but not stated by the project, so they are neither required nor counted as wrong.",
+  "repositories": [
+    {
+      "name": "microservices-demo",
+      "url": "https://github.com/GoogleCloudPlatform/microservices-demo.git",
+      "commit": "c7cb6d5bfd6ea3aed768634ebbcb98cb7a523712",
+      "stacks": "Go, C#, Node.js, Python, Java; gRPC; Kubernetes, docker-compose",
+      "units": [
+        "src/adservice",
+        "src/cartservice/src",
+        "src/cartservice/tests",
+        "src/checkoutservice",
+        "src/currencyservice",
+        "src/emailservice",
+        "src/frontend",
+        "src/loadgenerator",
+        "src/paymentservice",
+        "src/productcatalogservice",
+        "src/recommendationservice",
+        "src/shippingservice",
+        "src/shoppingassistantservice"
+      ],
+      "calls": [
+        [
+          "src/frontend",
+          "src/adservice"
+        ],
+        [
+          "src/frontend",
+          "src/cartservice/src"
+        ],
+        [
+          "src/frontend",
+          "src/checkoutservice"
+        ],
+        [
+          "src/frontend",
+          "src/currencyservice"
+        ],
+        [
+          "src/frontend",
+          "src/productcatalogservice"
+        ],
+        [
+          "src/frontend",
+          "src/recommendationservice"
+        ],
+        [
+          "src/frontend",
+          "src/shippingservice"
+        ],
+        [
+          "src/frontend",
+          "src/shoppingassistantservice"
+        ],
+        [
+          "src/checkoutservice",
+          "src/cartservice/src"
+        ],
+        [
+          "src/checkoutservice",
+          "src/currencyservice"
+        ],
+        [
+          "src/checkoutservice",
+          "src/emailservice"
+        ],
+        [
+          "src/checkoutservice",
+          "src/paymentservice"
+        ],
+        [
+          "src/checkoutservice",
+          "src/productcatalogservice"
+        ],
+        [
+          "src/checkoutservice",
+          "src/shippingservice"
+        ],
+        [
+          "src/recommendationservice",
+          "src/productcatalogservice"
+        ],
+        [
+          "src/cartservice/src",
+          "service:redis-cart"
+        ],
+        [
+          "src/loadgenerator",
+          "src/frontend"
+        ]
+      ],
+      "optional": [
+        [
+          "src/cartservice/tests",
+          "src/cartservice/src"
+        ]
+      ]
+    },
+    {
+      "name": "spring-petclinic-microservices",
+      "url": "https://github.com/spring-petclinic/spring-petclinic-microservices.git",
+      "commit": "e8b747ab522721076cacb5cf688eb8a54ba8c5c9",
+      "stacks": "Java, Maven, Spring Cloud; docker-compose",
+      "units": [
+        "spring-petclinic-admin-server",
+        "spring-petclinic-api-gateway",
+        "spring-petclinic-config-server",
+        "spring-petclinic-customers-service",
+        "spring-petclinic-discovery-server",
+        "spring-petclinic-genai-service",
+        "spring-petclinic-vets-service",
+        "spring-petclinic-visits-service",
+        "docker/grafana",
+        "docker/prometheus"
+      ],
+      "calls": [
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-customers-service"
+        ],
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-vets-service"
+        ],
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-visits-service"
+        ],
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-genai-service"
+        ],
+        [
+          "spring-petclinic-genai-service",
+          "spring-petclinic-vets-service"
+        ],
+        [
+          "spring-petclinic-genai-service",
+          "spring-petclinic-customers-service"
+        ],
+        [
+          "spring-petclinic-admin-server",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-customers-service",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-discovery-server",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-genai-service",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-vets-service",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-visits-service",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "spring-petclinic-admin-server",
+          "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-api-gateway",
+          "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-customers-service",
+          "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-genai-service",
+          "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-vets-service",
+          "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-visits-service",
+          "spring-petclinic-discovery-server"
+        ]
+      ],
+      "optional": [
+        [
+          "docker/grafana",
+          "docker/prometheus"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-api-gateway"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-customers-service"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-vets-service"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-visits-service"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-genai-service"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-admin-server"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-config-server"
+        ],
+        [
+          "docker/prometheus",
+          "spring-petclinic-discovery-server"
+        ]
+      ]
+    },
+    {
+      "name": "eShopOnWeb",
+      "url": "https://github.com/dotnet-architecture/eShopOnWeb.git",
+      "commit": "4da8212117e87d808d4bbc7da6286fd2147ce606",
+      "stacks": ".NET, ASP.NET Core, Blazor, Entity Framework; SQL Server; docker-compose",
+      "units": [
+        "src/ApplicationCore",
+        "src/BlazorAdmin",
+        "src/BlazorShared",
+        "src/Infrastructure",
+        "src/PublicApi",
+        "src/Web",
+        "tests/FunctionalTests",
+        "tests/IntegrationTests",
+        "tests/PublicApiIntegrationTests",
+        "tests/UnitTests"
+      ],
+      "calls": [
+        [
+          "src/Web",
+          "src/ApplicationCore"
+        ],
+        [
+          "src/Web",
+          "src/Infrastructure"
+        ],
+        [
+          "src/Web",
+          "src/BlazorAdmin"
+        ],
+        [
+          "src/Web",
+          "src/BlazorShared"
+        ],
+        [
+          "src/PublicApi",
+          "src/ApplicationCore"
+        ],
+        [
+          "src/PublicApi",
+          "src/Infrastructure"
+        ],
+        [
+          "src/Infrastructure",
+          "src/ApplicationCore"
+        ],
+        [
+          "src/ApplicationCore",
+          "src/BlazorShared"
+        ],
+        [
+          "src/BlazorAdmin",
+          "src/BlazorShared"
+        ],
+        [
+          "src/BlazorAdmin",
+          "src/PublicApi"
+        ],
+        [
+          "src/Web",
+          "db:Microsoft.eShopOnWeb.CatalogDb"
+        ],
+        [
+          "src/Web",
+          "db:Microsoft.eShopOnWeb.Identity"
+        ],
+        [
+          "src/PublicApi",
+          "db:Microsoft.eShopOnWeb.CatalogDb"
+        ],
+        [
+          "src/PublicApi",
+          "db:Microsoft.eShopOnWeb.Identity"
+        ]
+      ],
+      "optional": [
+        [
+          "src/Web",
+          "src/PublicApi"
+        ],
+        [
+          "tests/FunctionalTests",
+          "src/ApplicationCore"
+        ],
+        [
+          "tests/FunctionalTests",
+          "src/PublicApi"
+        ],
+        [
+          "tests/FunctionalTests",
+          "src/Web"
+        ],
+        [
+          "tests/IntegrationTests",
+          "src/Infrastructure"
+        ],
+        [
+          "tests/IntegrationTests",
+          "tests/UnitTests"
+        ],
+        [
+          "tests/PublicApiIntegrationTests",
+          "src/PublicApi"
+        ],
+        [
+          "tests/PublicApiIntegrationTests",
+          "src/Web"
+        ],
+        [
+          "tests/UnitTests",
+          "src/ApplicationCore"
+        ],
+        [
+          "tests/UnitTests",
+          "src/Web"
+        ],
+        [
+          "src/Web",
+          "service:sqlserver"
+        ],
+        [
+          "src/PublicApi",
+          "service:sqlserver"
+        ]
+      ]
+    },
+    {
+      "name": "VBCorLib",
+      "url": "https://github.com/kellyethridge/VBCorLib.git",
+      "commit": "100acbbae0c072132267ec01c7aed808ff606e25",
+      "stacks": "VB6: ActiveX DLL, test EXE, example EXEs; project and COM references",
+      "units": [
+        "Source/CorLib",
+        "Source/Fakes",
+        "Source/Tests",
+        "Examples/Console Example/BouncingSquare",
+        "Examples/Console Example/ColoredSquare",
+        "Examples/Cryptography/FileEncryption",
+        "Examples/Cryptography/HashCodes",
+        "Examples/Cryptography/RealTimeDecryption",
+        "Examples/IO Examples/FileHexViewer",
+        "Examples/IO Examples/ResourceBrowser",
+        "Examples/IO Examples/SimpleBrowser",
+        "Examples/IO Examples/SimpleBrowser2",
+        "Examples/IO Examples/SimpleINIFileBrowser",
+        "Examples/Misc/Base64 Encoding",
+        "Examples/Misc/SimpleTicker",
+        "Examples/Misc/SimpleTicker2",
+        "Examples/Misc/StaticClasses",
+        "Examples/NumberFormatting/Format Integer",
+        "Examples/Registry/SimpleRegistryBrowser"
+      ],
+      "calls": [
+        [
+          "Source/Tests",
+          "Source/CorLib"
+        ],
+        [
+          "Source/Tests",
+          "Source/Fakes"
+        ],
+        [
+          "Source/Fakes",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Console Example/BouncingSquare",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Console Example/ColoredSquare",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Cryptography/FileEncryption",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Cryptography/HashCodes",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Cryptography/RealTimeDecryption",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/IO Examples/FileHexViewer",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/IO Examples/ResourceBrowser",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/IO Examples/SimpleBrowser",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/IO Examples/SimpleBrowser2",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/IO Examples/SimpleINIFileBrowser",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Misc/Base64 Encoding",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Misc/SimpleTicker",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Misc/SimpleTicker2",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Misc/StaticClasses",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/NumberFormatting/Format Integer",
+          "Source/CorLib"
+        ],
+        [
+          "Examples/Registry/SimpleRegistryBrowser",
+          "Source/CorLib"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "VBCCR",
+      "url": "https://github.com/Kr00l/VBCCR.git",
+      "commit": "b7641f63db231bee1ceb8369b94ba8e1b6294171",
+      "stacks": "VB6: an OCX and a Standard EXE built from the same sources",
+      "units": [
+        "ActiveX Control Version",
+        "Standard EXE Version"
+      ],
+      "calls": [],
+      "optional": []
+    },
+    {
+      "name": "student-attendance-management-system",
+      "url": "https://github.com/prashanth-kumar-g/student-attendance-management-system.git",
+      "commit": "c9549920d550347fa70d8c559e928e0a6f744374",
+      "stacks": "VB6 Standard EXE, ADO, SQL Server",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:SAMS"
+        ]
+      ],
+      "tables": [
+        "admin_table",
+        "attendance_table",
+        "overall_attendance_table",
+        "student_table"
+      ],
+      "optional": []
+    }
+  ],
+  "heldOut": [
+    {
+      "name": "robot-shop",
+      "url": "https://github.com/instana/robot-shop.git",
+      "commit": "55292e2199f2fb00a165b1f7d3045fe7f8922038",
+      "stacks": "Node.js, Java, Python, Go, PHP, nginx; MongoDB, MySQL, Redis, RabbitMQ; docker-compose",
+      "units": [
+        "web",
+        "catalogue",
+        "user",
+        "cart",
+        "shipping",
+        "ratings",
+        "payment",
+        "dispatch",
+        "load-gen",
+        "mongo",
+        "mysql"
+      ],
+      "calls": [
+        [
+          "web",
+          "catalogue"
+        ],
+        [
+          "web",
+          "user"
+        ],
+        [
+          "web",
+          "cart"
+        ],
+        [
+          "web",
+          "shipping"
+        ],
+        [
+          "web",
+          "payment"
+        ],
+        [
+          "web",
+          "ratings"
+        ],
+        [
+          "catalogue",
+          "mongo"
+        ],
+        [
+          "user",
+          "mongo"
+        ],
+        [
+          "user",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "catalogue"
+        ],
+        [
+          "shipping",
+          "mysql"
+        ],
+        [
+          "shipping",
+          "cart"
+        ],
+        [
+          "ratings",
+          "mysql"
+        ],
+        [
+          "ratings",
+          "catalogue"
+        ],
+        [
+          "payment",
+          "cart"
+        ],
+        [
+          "payment",
+          "user"
+        ],
+        [
+          "payment",
+          "service:rabbitmq"
+        ],
+        [
+          "dispatch",
+          "service:rabbitmq"
+        ],
+        [
+          "load-gen",
+          "web"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "eShop",
+      "url": "https://github.com/dotnet/eShop.git",
+      "commit": "913acea66708a59595351174cee9b29f37179d29",
+      "stacks": ".NET 9, Aspire, Blazor, gRPC, RabbitMQ, PostgreSQL, Redis",
+      "judge": "runtime",
+      "units": [
+        "src/Basket.API",
+        "src/Catalog.API",
+        "src/Identity.API",
+        "src/OrderProcessor",
+        "src/Ordering.API",
+        "src/PaymentProcessor",
+        "src/WebApp",
+        "src/WebhookClient",
+        "src/Webhooks.API"
+      ],
+      "calls": [
+        [
+          "src/WebApp",
+          "src/Basket.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Catalog.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Ordering.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Identity.API"
+        ],
+        [
+          "src/Basket.API",
+          "service:redis"
+        ],
+        [
+          "src/Basket.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Catalog.API",
+          "db:catalogdb"
+        ],
+        [
+          "src/Catalog.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Ordering.API",
+          "db:orderingdb"
+        ],
+        [
+          "src/Ordering.API",
+          "service:eventbus"
+        ],
+        [
+          "src/OrderProcessor",
+          "db:orderingdb"
+        ],
+        [
+          "src/OrderProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/PaymentProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/Webhooks.API",
+          "db:webhooksdb"
+        ],
+        [
+          "src/Webhooks.API",
+          "service:eventbus"
+        ],
+        [
+          "src/WebhookClient",
+          "src/Webhooks.API"
+        ],
+        [
+          "src/Identity.API",
+          "db:identitydb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "sockshop",
+      "about": "Several repositories: one per service, and microservices-demo deploying them. Written down from Sock Shop's architecture before Assay first ran on it.",
+      "repositories": [
+        {
+          "name": "front-end",
+          "url": "https://github.com/microservices-demo/front-end.git",
+          "commit": "52dee656f4423be041619bbb090205f912e00113"
+        },
+        {
+          "name": "catalogue",
+          "url": "https://github.com/microservices-demo/catalogue.git",
+          "commit": "925e08ee17c28b94b87160e1ae5e03da7f61cf84"
+        },
+        {
+          "name": "carts",
+          "url": "https://github.com/microservices-demo/carts.git",
+          "commit": "f4e80051668c6a83359c41b03a27baefa590adc8"
+        },
+        {
+          "name": "orders",
+          "url": "https://github.com/microservices-demo/orders.git",
+          "commit": "546a10c92d1ff9998c21f3849f5b95a0f14430a0"
+        },
+        {
+          "name": "user",
+          "url": "https://github.com/microservices-demo/user.git",
+          "commit": "e1a79e77860734cacc3f64cabff1487e22a442a4"
+        },
+        {
+          "name": "payment",
+          "url": "https://github.com/microservices-demo/payment.git",
+          "commit": "384e33447dda5334187517dda09566c9a17fd6af"
+        },
+        {
+          "name": "shipping",
+          "url": "https://github.com/microservices-demo/shipping.git",
+          "commit": "9c0fbfa31895dd029d44d3434de93f64cd71f87b"
+        },
+        {
+          "name": "queue-master",
+          "url": "https://github.com/microservices-demo/queue-master.git",
+          "commit": "7dc33721c765e5af415c9d244d84637ff2d510cd"
+        },
+        {
+          "name": "microservices-demo",
+          "url": "https://github.com/microservices-demo/microservices-demo.git",
+          "commit": "9dff06fae4981921caec6a62393a6ebfce4b3e3f"
+        }
+      ],
+      "stacks": "Node.js, Go, Java (Maven, Spring Boot); MySQL, MongoDB, RabbitMQ; docker-compose, Kubernetes; one repository per service",
+      "units": [
+        "front-end",
+        "catalogue",
+        "carts",
+        "orders",
+        "user",
+        "payment",
+        "shipping",
+        "queue-master"
+      ],
+      "calls": [
+        [
+          "front-end",
+          "catalogue"
+        ],
+        [
+          "front-end",
+          "carts"
+        ],
+        [
+          "front-end",
+          "orders"
+        ],
+        [
+          "front-end",
+          "user"
+        ],
+        [
+          "orders",
+          "payment"
+        ],
+        [
+          "orders",
+          "user"
+        ],
+        [
+          "orders",
+          "carts"
+        ],
+        [
+          "orders",
+          "shipping"
+        ],
+        [
+          "shipping",
+          "service:rabbitmq"
+        ],
+        [
+          "queue-master",
+          "service:rabbitmq"
+        ],
+        [
+          "catalogue",
+          "service:catalogue-db"
+        ],
+        [
+          "carts",
+          "service:carts-db"
+        ],
+        [
+          "orders",
+          "service:orders-db"
+        ],
+        [
+          "user",
+          "service:user-db"
+        ]
+      ],
+      "optional": []
+    }
+  ]
+}

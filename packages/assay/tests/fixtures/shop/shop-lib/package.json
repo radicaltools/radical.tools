@@ -1,0 +1,6 @@
+{
+  "name": "@shop/lib",
+  "description": "Money and order types shared by the shop's services.",
+  "version": "1.0.0",
+  "main": "src/index.js"
+}

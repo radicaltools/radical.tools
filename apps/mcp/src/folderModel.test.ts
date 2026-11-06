@@ -1145,6 +1145,17 @@ describe('get_issues', () => {
     expect(before).toContain(`Suggested bindTo: Storefront (${ids.get('web')}), which settles all of them`)
     expect(before).toMatch(/- IDENTITY: How do people sign in\? \[idp = .*none = nobody signs in\]/)
 
+    // A large model's concerns run long: brief lists each in a line, concept one in full, none leaves them out.
+    const brief = (await model.call('get_issues', { concerns: 'brief' })).text
+    expect(brief).toContain('- Authentication (conceptId concern-authentication): 1 element')
+    expect(brief).not.toContain('IDENTITY')
+    expect(brief.length).toBeLessThan(before.length / 3)
+    const one = (await model.call('get_issues', { concept: 'concern-authentication' })).text
+    expect(one).toContain('- IDENTITY: How do people sign in?')
+    expect(one.match(/\(conceptId /g)).toHaveLength(1)
+    expect((await model.call('get_issues', { concerns: 'none' })).text).toBe('No issues: the model follows its metamodel.')
+    expect(await model.call('get_issues', { concerns: 'some' })).toEqual({ ok: false, text: 'get_issues: concerns must be full, brief or none' })
+
     await add('forge_import_hub_concept', { conceptId: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' }, bindTo: ids.get('web') })
     const after = (await model.call('get_issues', {})).text
     expect(after.split('\n')[0]).toBe('No issues: the model follows its metamodel.')

@@ -1,0 +1,10 @@
+{
+  "name": "@storefront/web",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@shop/lib": "^1.0.0",
+    "react": "^18.3.1"
+  }
+}

@@ -407,6 +407,18 @@
             </tbody>
           </table>
         </div>
+        <h3>radical assay</h3>
+        <p>Radical Assay's deterministic part (experimental; see <a href="manual.html#assay">Finding the model in existing code</a>): reads the facts of code repositories, each with its file and line, and writes no model.</p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>extract &lt;directory or .zip&gt;…</code></td><td>Reads each repository in the directories (one with a <code>.git</code>; a directory without one stands for the repositories directly inside it, or is a folder of code when it holds none; a <code>.zip</code> file is unpacked into <code>.radical/assay/unpacked/</code> first): its units of every stack it knows (npm, Maven, Gradle, Go, .NET, Python, VB6, a Dockerfile) with their dependencies and references, the services of its docker-compose, Kubernetes and Aspire files, its OpenAPI and gRPC services, the addresses and URL paths its code and configuration name, its databases and the tables its SQL names, the tests its reports name, and its documents (READMEs, docs, ADR records). Writes them to the repository's <code>.radical/assay/facts.json</code>, links the units across the repositories (a dependency on another unit's package as observed, a path another unit's OpenAPI declares as inferred) and prints both.</td></tr>
+              <tr><td><code>--report &lt;repository&gt;=&lt;path&gt;</code></td><td>A test report of that repository (Vitest, Jest or Playwright JSON, JUnit XML; a file or a directory from its root); more than once for more. Default: each repository's <code>reports/</code>.</td></tr>
+              <tr><td><code>--json</code></td><td>Prints the facts and the links as JSON.</td></tr>
+            </tbody>
+          </table>
+        </div>
         <h3>radical sense</h3>
 <p>A fitness function is classified as <em>Building Evolutionary Architectures</em> classifies it. Its result is read from its metrics: <em>static</em> for fixed limits, <em>dynamic</em> for one against a baseline.</p>
         <div class="doc-table-wrap">
@@ -574,6 +586,7 @@ radical-mcp --version</code></pre>
               <tr><td><strong>Sequences &amp; slides</strong></td><td><code>create_sequence</code>, <code>update_sequence</code>, <code>delete_sequence</code> · <code>create_presentation</code>, <code>update_presentation</code>, <code>delete_presentation</code> (a slide shows a view or zooms onto elements with <code>focus</code>, from the model or a milestone)</td></tr>
               <tr><td><strong>Milestones</strong></td><td><code>list_milestones</code>, <code>create_milestone</code>, <code>update_milestone</code>, <code>delete_milestone</code>, <code>compare_milestones</code></td></tr>
               <tr><td><strong>Metamodel</strong></td><td><code>upsert_node_type</code>, <code>delete_node_type</code>, <code>upsert_relation_type</code>, <code>delete_relation_type</code>, <code>upsert_viewpoint</code>, <code>delete_viewpoint</code></td></tr>
+              <tr><td><strong>Radical Assay</strong></td><td><code>assay_start</code> (the code's directories or <code>.zip</code> files, their reports, the sources of documentation) · <code>assay_add_sources</code> · <code>assay_facts</code> · <code>assay_read</code> · <code>assay_apply</code> (a plan citing facts, or the lines of code or documents it quotes; its requirements, needs and decisions come back as proposals) → <code>assay_answer</code>, per proposal · <code>assay_finish</code></td></tr>
               <tr><td><strong>Radical Forge</strong></td><td><code>forge_start</code> · <code>forge_clarify</code> → <code>forge_generate</code> (with <code>forge_propose_refinement</code> → <code>forge_answer_refinement</code> when a stage finds what an earlier one lacks) → <code>forge_complete_stage</code> → <code>forge_arrange</code>, per stage · <code>forge_wireframe</code> · <code>forge_import_hub_concept</code> · <code>forge_finish</code></td></tr>
             </tbody>
           </table>
@@ -583,6 +596,7 @@ radical-mcp --version</code></pre>
           <li>A reference such as a transition's event takes an element's id, or a <code>tempId</code> from the same session.</li>
           <li>Changing a built-in metamodel saves a <em>-custom</em> copy and re-announces the tools with the new types.</li>
           <li>The server keeps a Forge run in <code>.state/forge-run.json</code>, and refuses direct writes to earlier stages while a proposal waits. In Claude Code, <code>/mcp__radical-folder__forge</code> starts a run.</li>
+          <li>An Assay run lives in the server's memory; what it wrote stays: the elements in the model, the evidence in <code>.radical/assay/run.json</code> of the model's repository, the mapping in each code repository's <code>.radical/radical.json</code>. In Claude Code, <code>/mcp__radical-folder__assay</code> starts a run.</li>
         </ul>
       </section>
 
@@ -612,6 +626,12 @@ radical-mcp --version</code></pre>
    ├─ model/                  <span class="cm"># the model folder (below)</span>
    ├─ radical.json            <span class="cm"># what this repository builds and where, its tests of the scenarios, its test files and CI artifacts</span>
    ├─ reviews.json            <span class="cm"># reviews of manual fitness functions, from radical sense review</span>
+   ├─ assay/
+   │  ├─ facts.json           <span class="cm"># Radical Assay's facts of this repository, each with its file and line</span>
+   │  ├─ run.json             <span class="cm"># in the central model's repository: what Assay wrote, its confidence and evidence</span>
+   │  ├─ sources/             <span class="cm"># in the central model's repository: the run's documents as text (kept out of git)</span>
+   │  ├─ facts/               <span class="cm"># in the central model's repository: the facts of folders of code, left as they were (kept out of git)</span>
+   │  └─ unpacked/            <span class="cm"># in the central model's repository: .zip files of code, unpacked (kept out of git)</span>
    ├─ sensors/
    │  ├─ sensors.json         <span class="cm"># the repository's own sensors: a command, or an adapter and its arguments</span>
    │  └─ *.mjs                <span class="cm"># the scripts only they run; commands run from the repository's root</span>
@@ -624,6 +644,7 @@ radical-mcp --version</code></pre>
 <pre class="code"><code>{ "implements": [
     { "element": "8c66e024-…", "name": "CLI", "paths": ["apps/cli"] },
     { "element": "60fb9531-…", "name": "Desktop app", "paths": ["apps/studio/src/main", "apps/studio/build"] } ] }</code></pre>
+        <p>A repository whose elements are of a central model kept in another repository names it in <code>"model"</code> (ADR One system model across repositories): its repository's address and, optionally, a branch or tag, <code>{ "model": { "repo": "git@github.com:acme/architecture.git", "ref": "main" }, "implements": [ … ] }</code>, the model checked out at <code>.radical/model</code>. Radical Assay writes it with the central repository's origin, or its path from the repository when it has none.</p>
         <p><code>radical implement &lt;element&gt; --path &lt;folder&gt;</code> writes an entry: the element by its id or its name (a name two elements share needs the id), the folders from the working directory, kept from the repository's root; more <code>--path</code> for more, and they replace the element's paths. <code>--remove</code> takes it out; with neither, it says where the element is built. On an element's card Studio shows the same, its paths or its nearest parent's, and for one the file maps nowhere the command to copy. Studio reads the file on the desktop, and in a browser when it opened the model by its repository or by its <code>.radical/</code> folder (it asks again for access to that folder when it reconnects); opened on the model folder alone, a browser cannot reach it.</p>
         <h3>Markdown folder</h3>
 <pre class="code"><code>my-model/

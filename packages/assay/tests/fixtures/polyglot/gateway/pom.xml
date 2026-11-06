@@ -1,0 +1,5 @@
+<project>
+  <groupId>shop</groupId>
+  <artifactId>gateway</artifactId>
+  <build><plugins><plugin><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
+</project>

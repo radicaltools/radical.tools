@@ -1,0 +1,4 @@
+Type=OleDll
+Class=Customer; Customer.cls
+Name="Lib"
+ExeName32="ShopLib.dll"

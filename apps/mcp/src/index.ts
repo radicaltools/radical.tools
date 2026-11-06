@@ -3,6 +3,7 @@ import { McpServer, fromJsonSchema, type RegisteredTool } from '@modelcontextpro
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import { FolderModel, PRESETS, READ_ONLY_TOOLS, type OpenOptions } from './folderModel'
 import { FORGE_PROCEDURE } from './forge'
+import { ASSAY_PROCEDURE } from './assay'
 import { displayVersion } from '@radical/common/version'
 import { findModelFolder } from '@radical/node-files/repositoryLayout'
 
@@ -43,6 +44,7 @@ const INSTRUCTIONS = [
   'Milestones are named copies of the model at phases of the system (e.g. "As-is", "Target 2027"): create_milestone saves the current model as the latest one, compare_milestones says what changed, and a slide can show a milestone.',
   'Metamodel tools (upsert_node_type, upsert_relation_type, …) change the types; the tool schemas refresh after them.',
   'To turn a free-text description into requirements, a domain model, fitness functions, scenarios, state machines, processes, mockups and a C4 model, each stage filling gaps in the ones before and a review of the whole model at the end, the way Studio\'s Radical Forge does, start with forge_start and follow the steps it returns.',
+  'To find the model in existing code (Radical Assay: one or several local repositories, this folder being their central model), start with assay_start and follow the steps it returns: every element cites the facts it rests on, and requirements are written only when the user accepts them.',
 ].join(' ')
 
 const FORGE_ARGS = fromJsonSchema({
@@ -59,6 +61,21 @@ function forgePrompt(description: string): string {
       : 'Ask me to describe the system first, or offer the needs already in the model (search_model: LIST NODES WHERE type = "need").',
     '',
     FORGE_PROCEDURE,
+  ].join('\n')
+}
+
+const ASSAY_ARGS = fromJsonSchema({
+  type: 'object',
+  properties: { directories: { type: 'string', description: 'The code repositories\' directories, or a directory holding them. Leave empty to be asked.' } },
+})
+
+/** The `assay` prompt: Radical Assay as one command (a slash command in Claude Code). */
+function assayPrompt(directories: string): string {
+  return [
+    'Run Radical Assay on the model of the radical MCP server: find the model in existing code.',
+    directories ? `The code repositories: ${directories}` : 'Ask me for the code repositories\' directories first.',
+    '',
+    ASSAY_PROCEDURE,
   ].join('\n')
 }
 
@@ -138,6 +155,14 @@ async function main(): Promise<void> {
   }, (args) => {
     const { description } = (args ?? {}) as { description?: unknown }
     return { messages: [{ role: 'user', content: { type: 'text', text: forgePrompt(typeof description === 'string' ? description.trim() : '') } }] }
+  })
+  server.registerPrompt('assay', {
+    title: 'Radical Assay',
+    description: 'Find the model in existing code: C4 elements from the repositories\' units and the links between them, then scenarios from their tests with the requirements they verify, every element citing its evidence.',
+    argsSchema: ASSAY_ARGS,
+  }, (args) => {
+    const { directories } = (args ?? {}) as { directories?: unknown }
+    return { messages: [{ role: 'user', content: { type: 'text', text: assayPrompt(typeof directories === 'string' ? directories.trim() : '') } }] }
   })
   // The Forge run status Studio shows names the client driving the run.
   model.clientName = () => server.server.getClientVersion()?.name

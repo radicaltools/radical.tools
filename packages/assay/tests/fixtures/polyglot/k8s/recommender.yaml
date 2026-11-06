@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommender
+spec:
+  template:
+    spec:
+      containers:
+        - name: server
+          image: shop/recommender:1.0
+          env:
+            - name: CATALOG_ADDR
+              value: "catalog:50051"

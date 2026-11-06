@@ -96,6 +96,7 @@
             <li><a href="#hub">Concern Hub</a></li>
             <li><a href="#ai">AI assistant</a></li>
             <li><a href="#forge">Radical Forge</a></li>
+            <li><a href="#assay">Radical Assay</a></li>
             <li><a href="#mcp">MCP server</a></li>
             <li><a href="#cli">Command line</a></li>
             <li><a href="#federation">Federation</a></li>
@@ -829,6 +830,21 @@ npx @radicaltools/cli setup</code></pre>
         <p>The same run, with the same stages and questions, works in Claude Code, Claude Desktop or any other MCP client, with the agent's model instead of a key in Studio. Ask the agent for Radical Forge; it first asks which language to talk in and which to model in. While it runs on the folder Studio has open, the Forge button pulses, blue while a stage generates and amber while it waits for you, and <em>Follow on the canvas</em> has Studio open the view that shows what the agent just added.</p>
       </section>
 
+      <section class="doc-section" id="assay">
+        <h2>Radical Assay</h2>
+        <p>Radical Assay finds the model in code that already exists, in one repository or several (experimental). Forge starts from what you mean; Assay starts from what the code states and works towards what it only suggests. It runs through your coding agent over MCP, because Studio in a browser cannot read a repository. The folder the MCP server is bound to is the central model; the code repositories are local directories, already cloned.</p>
+        <ul>
+          <li><strong>Facts first.</strong> Assay reads each repository the same way every time: its units in any of the stacks it knows (npm, Maven, Gradle, Go, .NET, Python, VB6, Dockerfiles) and their references, what its docker-compose, Kubernetes and Aspire files run, its OpenAPI and gRPC services, the addresses its code and configuration name, the databases its connection strings name and the tables its SQL names, and the tests its reports name. Each fact cites its file and line, and goes into the repository's <code>.radical/assay/facts.json</code>. It then links units across repositories: a dependency on another unit's package is <em>observed</em>, a path another unit's OpenAPI declares is <em>inferred</em>.</li>
+          <li><strong>A plan, checked.</strong> The agent turns the facts into systems, containers, components and their relations, and hands them over as one plan, each item citing the facts it rests on. A plan with anything no fact backs, or anything the metamodel forbids, is refused whole, with every problem named. Nothing of the evidence goes into the model: it is kept in <code>.radical/assay/run.json</code> beside it.</li>
+          <li><strong>Code as you have it.</strong> Besides repositories, a folder of code with no <code>.git</code> or a <code>.zip</code> file of code is read the same way, and left as it was; only git repositories get a <code>.radical/radical.json</code>.</li>
+          <li><strong>Documentation as a source.</strong> Give the agent folders, <code>.zip</code> files or public links of documentation. Each document is kept as text in <code>.radical/assay/sources/</code>, out of git, so every quotation of it can be checked. From them the agent proposes needs, decisions and requirements no test checks; you accept each. A document never makes anything <em>observed</em>: it says what someone meant, not what the code does. A link that asks for a login is refused: export its pages as PDF, HTML or Markdown and give the folder instead. Links to your own machine or network are not fetched unless the server runs with <code>RADICAL_ASSAY_PRIVATE_LINKS=1</code>.</li>
+          <li><strong>Any language.</strong> Where Assay reads no units yet (VB6, COBOL, Delphi), the agent reads the code itself and quotes the lines an element rests on. The server checks each quotation is really in those lines, and such an element is <em>inferred</em>, never observed.</li>
+          <li><strong>The code repositories are mapped.</strong> Each gets a <code>.radical/radical.json</code> saying which elements of the central model it builds, in which folders, and which central model that is.</li>
+          <li><strong>Requirements wait for you.</strong> From the tests the agent proposes requirements, each with the scenarios that verify it. You accept, change or leave out each one; only an accepted one is written, derived from a need <em>Found in the code</em>, with its tests bound to its scenarios.</li>
+        </ul>
+        <p>Ask your agent for Radical Assay, or in Claude Code run <code>/mcp__radical-folder__assay</code>. Without an agent, <code>radical assay extract &lt;directory&gt;…</code> reads the facts and prints them with the links.</p>
+      </section>
+
       <section class="doc-section" id="mcp">
         <h2>MCP server</h2>
         <p>The MCP server lets a coding agent work on your model directly: Claude Code, Claude Desktop, Codex or any client that speaks the Model Context Protocol. It runs locally, bound to one Markdown folder, with the same tools as the AI assistant. The agent reads the architecture, ADRs and requirements before it writes code, and updates the model when the design changes. Nothing leaves your machine except what the agent sends to its own provider.</p>
@@ -890,6 +906,7 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
               <tr><td><code>hooks install [folder]</code></td><td>Adds the git hooks that save that base after a checkout, a commit or a pull, and fetch the test results of CI and the other models in the background.</td></tr>
               <tr><td><code>federation fetch [folder]</code></td><td>Fetches the models its <code>deps.json</code> names, for Studio and agents to show beside its own. See <a href="#federation">Federation</a>.</td></tr>
               <tr><td><code>export confluence</code></td><td>Exports a wiki view as Markdown or HTML, or publishes it to Confluence Cloud.</td></tr>
+              <tr><td><code>assay extract &lt;directory or .zip&gt;…</code></td><td>Reads the facts of code repositories, folders of code or <code>.zip</code> files, for an agent to find their model. See <a href="#assay">Radical Assay</a>.</td></tr>
             </tbody>
           </table>
         </div>

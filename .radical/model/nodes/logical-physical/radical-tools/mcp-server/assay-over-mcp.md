@@ -1,0 +1,8 @@
+---
+id: "156f4473-a44b-424f-b5c1-62e044522faf"
+type: "component"
+label: "Assay over MCP"
+technology: "TypeScript, @radical/assay"
+---
+
+apps/mcp/src/assay.ts, the folder bound to the server being the central model. The assay_* tools: assay_start (the code's directories or .zip files, their test reports, the sources of documents: reads and links the facts, writes <repository>/.radical/assay/facts.json, keeps the documents' copies in <central repository>/.radical/assay/sources/, keeps the run in memory), assay_add_sources (more sources during a run, one given again replacing its copy), assay_read (a file's lines of the run's repositories and sources, numbered, at most 400 at once), assay_facts (a repository's, source's or unit's facts, a page at a time), assay_apply (checks a plan with @radical/assay, its facts and the code and documents it quotes, writes its elements and relations with the model tools so the metamodel's rules hold, refusing the whole plan on any problem with every reason; then maps the elements in each code repository's .radical/radical.json with a model entry naming the central model, a folder of code being left alone (its facts in <central repository>/.radical/assay/facts/), and keeps the evidence in <central repository>/.radical/assay/run.json), assay_answer (writes an accepted requirement with its scenarios, derived from its need or else the need Found in the code, binding their tests in the repository's .radical/radical.json; an accepted need or decision as a need or an ADR with what it constrains; drops a rejected one) and assay_finish (what the run wrote and what waits). apps/mcp/src/index.ts adds the assay prompt.

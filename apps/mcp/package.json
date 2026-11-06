@@ -34,10 +34,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.2.0",
-    "elkjs": "^0.9.3"
+    "elkjs": "^0.9.3",
+    "undici": "^6.29.1"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.2.0",
+    "@radical/assay": "*",
     "@radical/common": "*",
     "@radical/hub-catalogue": "*",
     "@radical/layout": "*",

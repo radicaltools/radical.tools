@@ -1,0 +1,16 @@
+openapi: 3.0.3
+info:
+  title: Orders
+  version: 1.0.0
+servers:
+  - url: https://orders.example.com/api
+paths:
+  /orders:
+    post:
+      summary: Place an order
+  /orders/{id}:
+    get:
+      summary: An order
+      parameters:
+        - name: id
+          in: path

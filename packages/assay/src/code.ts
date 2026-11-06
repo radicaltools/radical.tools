@@ -1,0 +1,234 @@
+// ─── Radical Assay: what a unit's code says ──────────────────────────────────
+//
+// Read from the source files of each unit, generated code and tests left
+// out: the URL paths and addresses its strings name, the gRPC services it
+// registers and the clients it makes (of the services .proto files declare),
+// the databases its connection strings name and the tables its SQL names.
+// VB6 strings continued over lines (" & _) are joined first.
+
+import { extname } from 'node:path'
+import { addressesIn } from './runtime'
+import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
+import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
+
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.php', '.rb', '.scala', '.fs'])
+const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
+/** Paths that name a file, not an endpoint. */
+const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
+/** Folders of a machine, not of an API. */
+const SYSTEM_PATH = /^\/(usr|dev|etc|tmp|var|bin|sbin|opt|proc|mnt|srv|nix|private)(\/|$)|^\/(Users|Library|System|Volumes)\//
+
+/** A URL path a string names, normalized ("/orders/{}"), or null when it names none. */
+export function urlPathOf(literal: string): string | null {
+  // A host, or a variable holding one (`${API}/orders`), goes.
+  let path = literal.replace(/^https?:\/\/[^/\s]+/i, '').replace(/^\$\{[^}]*\}/, '')
+  if (!path.startsWith('/') || path.startsWith('//')) return null
+  path = path.replace(/\$\{[^}]*\}/g, '{}').replace(/[?#].*$/, '').replace(/\/+$/, '')
+  if (!path || /\s/.test(path) || path.length > 200 || FILE_PATH.test(path) || SYSTEM_PATH.test(path)) return null
+  const segments = path.split('/').slice(1)
+  if (!segments.length || !segments.some((s) => /[A-Za-z]/.test(s))) return null
+  if (!segments.every((s) => /^(\{[^}]*\}|:[A-Za-z_]\w*|[A-Za-z0-9._~%@-]*)$/.test(s))) return null
+  return `/${segments.map((s) => (s.startsWith(':') || /^\{.*\}$/.test(s) ? '{}' : s)).join('/')}`
+}
+
+/** String literals: '…', "…" and `…` (a template's ${…} may hold spaces). */
+const STRING = /(["'`])((?:\$\{[^}]*\}|(?!\1)[^\\\n]|\\.)*)\1/g
+/** VB strings: "…" with "" inside; ' starts a comment. */
+const VB_STRING = /()"((?:[^"\n]|"")*)"/g
+
+/** A database a connection string names. */
+export function connectionOf(text: string): { engine: string; server?: string; name?: string } | null {
+  const field = (k: string) => new RegExp(`(?:^|;)\\s*(?:${k})\\s*=\\s*([^;"']*)`, 'i').exec(text)?.[1]?.trim() || undefined
+  // Go's MySQL driver: user:password@tcp(db:3306)/shop.
+  const go = /@tcp\(([\w.-]+)(?::\d+)?\)\/([\w-]+)/.exec(text)
+  if (go) return { engine: 'MySQL', server: go[1], name: go[2] }
+  // PHP's PDO: mysql:host=db;dbname=shop.
+  const pdo = /\b(mysql|pgsql|sqlsrv|oci|sqlite|odbc):(?:[^'"\s]*?host=([^;'"\s]+))?[^'"\s]*?(?:dbname|database)=([^;'"\s]+)/i.exec(text)
+  if (pdo) {
+    const engine = { mysql: 'MySQL', pgsql: 'PostgreSQL', sqlsrv: 'SQL Server', oci: 'Oracle', sqlite: 'SQLite', odbc: 'ODBC' }[pdo[1].toLowerCase()]!
+    return { engine, ...(pdo[2] ? { server: pdo[2] } : {}), name: pdo[3] }
+  }
+  const provider = field('Provider')
+  // An OLE DB provider, not any "provider=" setting.
+  if (provider && (/SQLOLEDB|SQLNCLI|MSOLEDBSQL|OLEDB|MSDA|OraOLEDB|IBMDA|DB2OLEDB/i.test(provider) || /Data Source\s*=/i.test(text))) {
+    const engine = /SQLOLEDB|SQLNCLI|MSOLEDBSQL/i.test(provider) ? 'SQL Server' : /Jet\.OLEDB|ACE\.OLEDB/i.test(provider) ? 'Access' : /OraOLEDB|MSDAORA/i.test(provider) ? 'Oracle' : /MSDASQL/i.test(provider) ? 'ODBC' : provider
+    const source = field('Data Source')
+    const file = source && /\.(mdb|accdb)$/i.test(source) ? source.split(/[\\/]/).pop() : undefined
+    return { engine, ...(source && !file ? { server: source } : {}), ...((field('Initial Catalog') ?? file) ? { name: field('Initial Catalog') ?? file } : {}) }
+  }
+  const dsn = field('DSN')
+  if (dsn) return { engine: 'ODBC', name: dsn }
+  const jdbc = /jdbc:([a-z]+)(?::[a-z]+)*:(?:\/\/|@)?([^/:;?\s"']+)?(?::\d+)?(?:[/:;](?:databaseName=)?([\w-]+))?/i.exec(text)
+  if (jdbc) {
+    const engine = { postgresql: 'PostgreSQL', mysql: 'MySQL', mariadb: 'MariaDB', sqlserver: 'SQL Server', oracle: 'Oracle', h2: 'H2', hsqldb: 'HSQLDB', db2: 'Db2' }[jdbc[1].toLowerCase()] ?? jdbc[1]
+    return { engine, ...(jdbc[2] && jdbc[2] !== 'mem' ? { server: jdbc[2] } : {}), ...(jdbc[3] ? { name: jdbc[3] } : {}) }
+  }
+  const url = /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/(?:[^@\s/]+@)?([\w.-]+)(?::\d+)?(?:\/([\w-]+))?/i.exec(text)
+  if (url) {
+    const engine = { postgres: 'PostgreSQL', postgresql: 'PostgreSQL', mysql: 'MySQL', mongodb: 'MongoDB', 'mongodb+srv': 'MongoDB', redis: 'Redis', sqlserver: 'SQL Server', mssql: 'SQL Server' }[url[1].toLowerCase()]!
+    return { engine, server: url[2], ...(url[3] ? { name: url[3] } : {}) }
+  }
+  const server = field('Server|Data Source|Host')
+  const database = field('Database|Initial Catalog')
+  if (server && database) return { engine: /\bHost\s*=/i.test(text) ? 'PostgreSQL' : 'SQL Server', server, name: database }
+  return null
+}
+
+/** Tables SQL names: after FROM, JOIN, INTO, UPDATE (and TABLE). */
+const NOT_TABLES = new Set(['select', 'where', 'set', 'values', 'dual', 'as', 'on', 'and', 'or', 'the', 'a', 'an', 'to', 'of', 'in', 'is'])
+export function tablesOf(sql: string): string[] {
+  // A statement, not a caption: SELECT … FROM, INSERT INTO, UPDATE … SET, DELETE FROM, MERGE INTO, WITH … AS.
+  if (!/^\s*\(?\s*(select\b[\s\S]*\bfrom\b|insert\s+into\b|update\s+\S+\s+set\b|delete\s+from\b|merge\s+into\b|with\s+\w+\s+as\b)/i.test(sql)) return []
+  const out = new Set<string>()
+  for (const m of sql.matchAll(/\b(?:from|join|into|update|table)\s+\[?([A-Za-z_][\w$]*(?:\.\[?[A-Za-z_][\w$]*\]?)?)\]?/gi)) {
+    const name = m[1].replace(/[[\]]/g, '')
+    if (!NOT_TABLES.has(name.toLowerCase())) out.add(name)
+  }
+  return [...out]
+}
+
+/** A host name given as a default to a setting named for an address. */
+const HOSTISH = '\\w*(?:HOST|ADDR|ADDRESS|URL|URI|ENDPOINT|SERVER|SERVICE)\\w*'
+const DEFAULT_HOST = new RegExp([
+  `\\b${HOSTISH}\\s*(?:\\|\\||\\?\\?)\\s*["']([a-z][a-z0-9-]{1,40})["']`,
+  `(?:getenv|environ\\.get|Getenv|getProperty|GetValue<string>)\\(\\s*["']${HOSTISH}["']\\s*,\\s*["']([a-z][a-z0-9-]{1,40})["']`,
+  `\\$\\{[\\w.-]*(?:host|addr|url|uri|endpoint|server|service)[\\w.-]*:(?:https?:\\/\\/)?([a-z][a-z0-9-]{1,40})(?=[:/}])`,
+  `getenv\\(\\s*"${HOSTISH}"\\s*\\)\\s*==\\s*null\\s*\\?\\s*"([a-z][a-z0-9-]{1,40})"`,
+  `\\b\\w*(?:Host|Hostname|HostName|Endpoint)\\(\\s*["']([a-z][a-z0-9-]{1,40})["']\\s*\\)`,
+].join('|'), 'gi')
+/** A variable named for another service's address: ${CATALOGUE_HOST}, $CART_URL, %ORDERS_ENDPOINT%. */
+const NAMED_HOST = /[$%]\{?([A-Z][A-Z0-9_]*?)_(?:HOST|ADDR|ADDRESS|URL|URI|ENDPOINT|SERVICE_HOST)\b\}?%?/g
+
+/** gRPC: a unit serving `service`, and one making a client of it, in any of the usual languages. */
+const serves = (s: string): RegExp => new RegExp(`Register${s}Server\\(|add_${s}Servicer_to_server|extends\\s+(?:[\\w.]+\\.)?${s}Grpc\\.${s}ImplBase|:\\s*(?:[\\w.]+\\.)?${s}\\.${s}Base\\b|\\.${s}\\.service\\b|${s}\\.service\\s*,`)
+const calls = (s: string): RegExp => new RegExp(`New${s}Client\\(|${s}Stub\\(|${s}Grpc\\.new(?:Blocking|Future)?Stub\\(|new\\s+${s}\\.${s}Client\\(|new\\s+\\w+\\.${s}\\(|\\b${s}Client\\(`)
+
+export interface CodeFacts {
+  urls: UrlFact[]
+  addresses: AddressFact[]
+  apis: ApiFact[]
+  clients: ClientFact[]
+  databases: DatabaseFact[]
+  tables: TableFact[]
+}
+
+export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFacts {
+  const out: CodeFacts = { urls: [], addresses: [], apis: [], clients: [], databases: [], tables: [] }
+  const seen = new Set<string>()
+  const once = (id: string): boolean => (seen.has(id) ? false : (seen.add(id), true))
+
+  // The services every .proto of the repository declares.
+  const protoServices = [...new Set(files.named(/\.proto$/).flatMap((f) => [...files.read(f).matchAll(/^\s*service\s+(\w+)\s*\{/gm)].map((m) => m[1])))]
+
+  for (const file of files.list) {
+    const ext = extname(file).toLowerCase()
+    const config = CONFIG.test(file)
+    if (!SOURCE.has(ext) && !config) continue
+    const unit = owner(units, file)
+    if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config)) continue
+    let text = files.read(file)
+    if (!text) continue
+    // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
+    const vb = /\.(bas|cls|frm|ctl|dsr|vb)$/i.test(file)
+    if (vb) text = text.replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
+    // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
+    text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
+    const at = (index: number) => ({ file, line: lineAt(text, index) })
+
+    // Connection strings, in code and configuration alike.
+    for (const m of text.matchAll(/[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
+      const db = connectionOf(m[0])
+      if (!db) continue
+      // A name filled in at run time ($dsn, {db}, %DB%) names nothing.
+      if (db.name && /[$%{}]/.test(db.name)) delete db.name
+      if (db.server && /[$%{}]/.test(db.server)) delete db.server
+      // Neither a server nor a name: a variable assigned, not a connection string.
+      if (!db.server && !db.name) continue
+      // One database per name: a developer's and a container's connection string name the same one.
+      if (db.server) db.server = db.server.replace(/[,:]\d+$/, '')
+      const id = `${repo}:db:${unit.path}:${db.engine}/${db.name ?? db.server ?? ''}`
+      // The same database named again: a server's connection string over a developer's local one.
+      const known = out.databases.findIndex((d) => d.id === id)
+      if (known >= 0 && /^(localhost|127\.0\.0\.1)$/i.test(out.databases[known].server ?? '') && db.server && !/^(localhost|127\.0\.0\.1)$/i.test(db.server)) out.databases.splice(known, 1)
+      if (out.databases.some((d) => d.id === id)) continue
+      seen.add(id)
+      out.databases.push({ id, unit: unit.id, engine: db.engine, ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
+    }
+
+    // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
+    for (const m of text.matchAll(DEFAULT_HOST)) {
+      const host = (m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5]).toLowerCase()
+      const id = `${repo}:address:${unit.path}:default:${host}`
+      if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'default', host, text: m[0], evidence: at(m.index!) })
+    }
+
+    for (const m of text.matchAll(NAMED_HOST)) {
+      const host = m[1].toLowerCase().replace(/_/g, '-')
+      if (host === 'db' || host === 'database') continue
+      const id = `${repo}:address:${unit.path}:variable:${host}`
+      if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'variable', host, text: m[0], evidence: at(m.index!) })
+    }
+
+    // Deployment manifests are the services' (runtime.ts), not the folder's they lie in.
+    if (config && /^\s*kind\s*:\s*(Deployment|StatefulSet|DaemonSet|Service|Job|CronJob|ConfigMap)\b/m.test(text)) continue
+    if (config && /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file)) continue
+
+    if (config) {
+      // A setting named for a host: spring.rabbitmq.host=rabbitmq, redis: { host: cache }.
+      for (const m of text.matchAll(/^\s*["']?[\w.-]*(?:host|hostname|address|server|endpoint)["']?\s*[=:]\s*["']?([a-z][a-z0-9-]{1,40}(?:\.[a-z0-9-]+)*)["']?\s*,?\s*$/gim)) {
+        const host = m[1].toLowerCase()
+        if (['localhost', 'true', 'false', 'null', 'none'].includes(host)) continue
+        const id = `${repo}:address:${unit.path}:setting:${host}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'setting', host, text: m[0].trim(), evidence: at(m.index!) })
+      }
+      for (const a of addressesIn(text, false)) {
+        const id = `${repo}:address:${unit.path}:${a.text}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(a.index) })
+      }
+      continue
+    }
+
+    for (const m of text.matchAll(vb ? VB_STRING : STRING)) {
+      const literal = m[2]
+      const path = urlPathOf(literal)
+      if (path) {
+        const id = `${repo}:url:${unit.path}:${path}`
+        if (once(id)) out.urls.push({ id, unit: unit.id, path, evidence: at(m.index!) })
+      }
+      for (const a of addressesIn(literal, false)) {
+        const id = `${repo}:address:${unit.path}:${a.text}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(m.index!) })
+      }
+      for (const table of tablesOf(literal)) {
+        const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
+        if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
+      }
+    }
+
+    // A service looked up by name: Spring's discovery client, a Feign client.
+    for (const m of text.matchAll(/\bgetInstances\(\s*"([\w.-]+)"|@FeignClient\(\s*(?:(?:name|value)\s*=\s*)?"([\w.-]+)"/g)) {
+      const host = (m[1] ?? m[2]).toLowerCase()
+      const id = `${repo}:address:${unit.path}:discovery:${host}`
+      if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'discovery', host, text: m[0], evidence: at(m.index!) })
+    }
+
+    for (const s of protoServices) {
+      const server = serves(s).exec(text)
+      if (server) {
+        const id = `${repo}:api:${unit.path}:grpc ${s}`
+        if (once(id)) out.apis.push({ id, unit: unit.id, protocol: 'grpc', method: 'service', path: s, evidence: at(server.index) })
+      }
+      const client = calls(s).exec(text)
+      if (client) {
+        const id = `${repo}:client:${unit.path}:${s}`
+        if (once(id)) out.clients.push({ id, unit: unit.id, service: s, evidence: at(client.index) })
+      }
+    }
+  }
+  // A developer's local database beside the same one on a server is the same database.
+  const local = (s?: string) => !!s && /^(localhost|127\.0\.0\.1|\.|\(local\)|\(localdb\).*)$/i.test(s)
+  out.databases = out.databases.filter((d) => !local(d.server) || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && o.server && !local(o.server)))
+  return out
+}
+
+export { escapeRe }

@@ -1,0 +1,4 @@
+syntax = "proto3";
+service CatalogService {
+  rpc ListProducts (Empty) returns (Products) {}
+}

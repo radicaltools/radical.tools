@@ -20,6 +20,8 @@ export interface ModelFacade extends DiagramFacade {
   toDiagramData(): DiagramData
   /** Why the most recent refused change was refused, or null. */
   readonly lastError: string | null
+  /** How many changes it has refused: a caller tells a new refusal from the last one by it. */
+  readonly refusals: number
 }
 
 export interface ModelFacadeOptions {
@@ -72,10 +74,12 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     ...(keepSequences || Object.keys(state.sequences).length ? { sequences: Object.values(state.sequences) } : {}),
   })
   let lastError: string | null = null
-  const refuse = (reason: string): void => { lastError = reason }
+  let refusals = 0
+  const refuse = (reason: string): void => { lastError = reason; refusals++ }
 
   return {
     get lastError() { return lastError },
+    get refusals() { return refusals },
 
     getNodes: () => state.c4Nodes,
     getRelations: () => state.c4Relations,

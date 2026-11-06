@@ -1,0 +1,3 @@
+Type=Exe
+Reference=*\A..\Lib\Lib.vbp
+Name="LibTests"

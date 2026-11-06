@@ -355,6 +355,107 @@ run on feat/hub-answers-preview and passed three times alone in 3.3 s.
 gone, is named and left as it is` missed its toast ("model.radical cannot be
 read (malformed JSON)") once in a full run on feat/fitness-sensors and passed
 three times alone in 7.6 s; the change does not touch reading .radical files.
+`apps/e2e/tests/studio/nesting.spec.ts › the special key › one gesture on
+several selected elements is one undo step, relations and nests alike`
+failed once in a full local run on feat/radical-assay (2026-11-02, which
+does not touch Studio) and passed three times alone in 9.7 s.
+
+### Dogfooding (2026-11-02): Radical Assay
+
+- The project's MCP server (`radical-architecture` in `.mcp.json`) is bound
+  to the main checkout's model. Work on a branch in a git worktree, as
+  agents do here, cannot reach its own model through it: the model changes
+  for this branch went through a stdio client of the worktree's own server,
+  run from a script. A way to point the session's server at another folder
+  (or a server per worktree in `.mcp.json`) would keep agents on the tools.
+- A script that sent the same list of calls twice, each to a server of its
+  own, added every element twice (tempIds live per server). Nothing warns
+  that an element of the same type and name is already in the same parent;
+  `add_node` could say so, as item 62 of Part 1 asks for file names.
+- The first write after #302 rewrote `nodes/decisions/one-way-wiki-publication.md`
+  with an indented blank line in a YAML block (`-` empty line, `+` two
+  spaces): the serializer does not reproduce a file another writer left, so
+  an unrelated decision shows up changed in every branch's diff until it is
+  rewritten once on main.
+- Assay's MVP reads npm workspaces only. On this repository it finds every
+  workspace `.radical/radical.json` maps an element to
+  (`packages/assay/tests/extract.test.ts`), but a repository built with Maven, Gradle, Go modules, .NET or Python has
+  no units yet, and links by HTTP need an OpenAPI description on the
+  provider's side.
+- `description-path-missing` takes every path in a description for one
+  from this repository's root, so the components that write files into
+  other repositories (`.radical/assay/facts.json` of each code repository)
+  were warned about; their descriptions now write `<repository>/.radical/…`.
+  A path of another repository has no way to say so.
+- Reverse engineering beyond npm (2026-11-03). On six public repositories of
+  four stacks (Go/C#/Node/Python/Java with gRPC and Kubernetes, Java/Maven
+  with Spring Cloud, .NET with Blazor and SQL Server, and three VB6 projects:
+  a COM library with tests and examples, an OCX, an ADO application) the
+  npm-only prototype found no unit at all. A code review (an agent reading
+  the code cold) found 13 bugs, all fixed with a test. After the readers of
+  every stack, the bench (`packages/assay/bench`) finds every unit and every
+  call the projects' documentation names on those six; but the rules were
+  tuned on them. On three repositories written down before the extractor
+  first ran on them (robot-shop, dotnet/eShop, Sock Shop's nine
+  repositories), the first runs found 65%, 6% and 43% of the calls; each miss
+  had a general cause (a database served by a compose service, Aspire's
+  AppHost, nginx templates, hosts given as defaults or in variables, Go before
+  modules, a deployment repository's services built in other repositories),
+  and after those were read they find all of them. Their remaining links the
+  documentation leaves out were each checked in the code and are true
+  (tracing and logs, Identity's URL, a mobile client), so the precision the
+  bench reports there (88%) is a floor. A tenth repository, untouched, is
+  the honest next measurement. Not read yet: COBOL, Delphi, PowerBuilder,
+  Ruby, PHP's own manifests, message topics (Kafka, RabbitMQ queues by name),
+  GraphQL, and service discovery by configuration (Consul, Eureka's
+  registry); the agent cites the code for them.
+- Measured on this repository (2026-11-02, the extractor alone, no agent):
+  of the 19 links between units `.radical/radical.json` maps, the model
+  relates 17 either way (89%), and of the 19 pairs the model relates, the
+  links find 17 (89%). Not found: Website and manual — Architecture Hub (a
+  link in HTML) and CLI — MCP server (the CLI configures the server; no
+  package dependency). Two links the model lacks are drift in the model:
+  `@radical/host-bridge` depends on `@radical/common`, and the CLI on
+  `@radical/hub-catalogue` (it bundles the concern packs). The model draws
+  its arrows from a package to the app that uses it, the links from the
+  user to what it uses: counted with the direction, only 6 of 19 agree. The
+  C4 stage should say which way an arrow goes, or follow the model's own
+  habit when it has one. Three units map to no element: `packages/assay`
+  (new), `apps/e2e` (not modelled) and `apps/studio`, whose containers map
+  to folders inside it.
+- Sources besides the code (2026-11-06). A model tool's refusal reached the
+  agent's server only as `facade.lastError`, a string that keeps the last
+  refusal, so two refusals worded alike in a row could not be told apart,
+  and the folder model answered an Assay call with the raw facade error
+  instead of the plan's list of problems: the facade now counts its
+  refusals. In the governance metamodel a decision constrains C4 elements
+  only, so an ADR drawn from a document cannot constrain a requirement or a
+  need it explains; Assay says so when it is answered. Bundled into the
+  MCP server's ESM build, a CommonJS dependency (undici) failed at run time
+  with "Dynamic require of assert", while every unit test, run from the
+  sources, passed: only a smoke test of the built server caught it. CI
+  could run a few MCP calls against `apps/mcp/dist` (assay_start with a
+  link and a PDF, forge_start) after the build. A first end-to-end run by
+  an agent (only the MCP tools, no files of its own) left these open: a
+  test with an empty body passes and counts as verification (a check for
+  tests that assert nothing would help); a front end's relative path
+  (`/api/orders`) is linked to the service whose OpenAPI declares it, as a
+  dev proxy or gateway would route it, without saying so; the System
+  context view may not lift a person's relation to a container up to the
+  system; `assay_start` does not say which report file each test status
+  came from, nor that a repository has no documents. A third run had no
+  refusal; still open from it: the http link's detail does not say that a
+  relative path or an OpenAPI base the server does not use is the weak half
+  of it; the system grouping the user settles leaves no trace in run.json;
+  `assay_finish` gives neither ids nor views; the Components view leaves
+  out a component's group; `get_issues` brief names no elements; an ADR's
+  `date` does not say which date; `assay_facts` has no kind for all of a
+  unit's facts at once. `get_issues` answers every
+  call with the concern packs' full question lists (thousands of lines on
+  this model), which hides the few issues a change brought in. On the
+  held-out bench, Sock Shop's deployment repository yields four units no one
+  listed (folders with only a Dockerfile, an `openapi/` test project): unit
+  precision 53% there, calls still 100%/88%.
 
 ### Dogfooding (2026-11-05): one system model across repositories
 

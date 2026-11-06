@@ -556,6 +556,65 @@ of its tool's real output; `src/sensors/contract.test.ts` runs every adapter on
 its fixture and checks that it writes valid radical-metrics/1 and takes no
 threshold. Pull requests welcome.
 
+## radical assay
+
+Radical Assay finds the model in existing code (experimental). `extract` is
+its deterministic part: it reads the facts of each code repository in the
+directories given, each with its file and line, and writes no model; an agent
+turns the facts into one over MCP (`assay_start`, see the MCP server's
+README).
+
+```bash
+radical assay extract ../shop                 # every repository in ../shop
+radical assay extract orders storefront --report storefront=reports/unit.json
+radical assay extract . --json                # the facts and links as JSON
+radical assay extract ~/handover/billing.zip  # code handed over as an archive
+```
+
+A directory is a repository when it has a `.git`; one that is not stands for
+the repositories directly inside it, or is a folder of code itself when it
+holds none. A directory of nothing but folders is searched three levels down. A
+`.zip` file is unpacked into `.radical/assay/unpacked/` first, without any
+`.git` folder it holds (and refused whole when an entry would land outside
+it). A folder of code is left as it was: its facts go to
+`.radical/assay/facts/` of the current directory. Nothing is fetched or
+cloned. For each repository it reads, from the files git lists:
+
+- units, wherever they are: npm packages, Maven and Gradle projects, Go
+  modules (or main packages before modules), .NET projects, Python projects,
+  VB6 projects, and a folder with a Dockerfile no manifest claims; each an
+  app, a library or tests, with its stack and the frameworks it names;
+- each unit's dependencies, and its references to other units by path (a
+  .NET `ProjectReference`, a VB6 `Reference=*\A…vbp`, a Gradle `project(':x')`);
+  a VB6 reference to a COM binary another unit builds counts as one;
+- solutions and VB6 groups (`.sln`, `.vbg`);
+- what runs: the services of docker-compose files, Kubernetes manifests and
+  .NET Aspire AppHosts, each built from a unit or running a database, queue,
+  cache or observability image, with what it depends on or references;
+- calls: OpenAPI operations, gRPC services (`.proto`) with the units that
+  register and call them, and addresses in code and configuration (a URL or
+  `host:port` naming another unit or service, `lb://name`, a host given as a
+  default or named in a variable such as `${CART_HOST}`, a local port only
+  one unit listens on);
+- data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,
+  .NET, PDO, Go's MySQL driver, database URLs) and the tables SQL names;
+- the tests its reports name (Vitest, Jest or Playwright JSON, JUnit XML; by
+  default its `reports/`), as `<file> › <title>` from its root;
+- its documents: READMEs, the documents of `docs/` and decisions folders and
+  its ADR records, each with its title and headings.
+
+Documentation from outside the code (folders, `.zip` files, public links) is
+taken over MCP (`assay_start`'s `sources`, `assay_add_sources`).
+
+They go to the repository's `.radical/assay/facts.json`. Then the units are
+linked across the repositories: references, dependencies, `depends_on` and
+connection strings as observed; OpenAPI paths, gRPC clients and addresses as
+inferred. Each link cites the facts of both sides.
+
+`packages/assay/bench` measures it on pinned public repositories of several
+stacks and ages: `npx tsx packages/assay/bench/bench.ts` (and `--held-out`
+for the ones no rule was tuned on).
+
 ## radical fuzz
 
 Runs a project's fuzz files (Radical Crucible): tests that do random sequences

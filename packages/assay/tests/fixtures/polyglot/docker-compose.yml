@@ -1,0 +1,15 @@
+services:
+  orders:
+    build: ./orders
+    environment:
+      CATALOG_URL: http://catalog:8080
+    depends_on:
+      - orders-db
+  orders-db:
+    image: postgres:16
+  catalog:
+    build: ./catalog
+  gateway:
+    build: ./gateway
+    depends_on:
+      - orders
