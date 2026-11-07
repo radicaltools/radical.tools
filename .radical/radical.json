@@ -3225,6 +3225,21 @@
     { "element": "b99ba0a7-3393-4c79-9532-ccebf0828922", "name": "Assay desktop screen tests", "tests": [
       "packages/assay/tests/forms.test.ts",
       "apps/mcp/src/assayForms.test.ts"
+    ] },
+    { "element": "ac2e385c-6e43-467b-9fb9-021599d48719", "name": "Database named by its schema", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads the database a schema creates, in the engine its dialect shows, and links the program to it"
+    ] },
+    { "element": "c845e0b3-1a8e-4359-a6df-9ba027b3a882", "name": "Connection templates of a library left out", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › leaves out a library's connection templates of several engines, with a note"
+    ] },
+    { "element": "82eb0e10-6923-419a-8f26-96665d53592d", "name": "Schema outside every project read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads a schema in no unit's folder, in UTF-16, as that of every unit whose code names one of its tables"
+    ] },
+    { "element": "1876c841-7d57-4106-a451-698b5ef22a18", "name": "Views and system tables left out", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › leaves out the views and a database's own tables the code names"
+    ] },
+    { "element": "87079c41-cc85-4793-8bd3-d15f6caef966", "name": "Several VB6 projects in one folder", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › joins several VB6 projects of one folder into one unit known by each project's binary, and links a program to it"
     ] }
   ]
 }
