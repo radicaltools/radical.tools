@@ -281,6 +281,32 @@ describe('radical assay: entry points', () => {
     expect(facts.units.map((u) => [u.name, u.testFramework])).toEqual([['@storefront/admin', 'jest'], ['@storefront/web', 'vitest']])
   })
 
+  it("reads a VB6 server's timers, any control a user clicks and the Handle procedures a Select calls, each with its Case", () => {
+    const frm = [
+      'VERSION 5.00', 'Begin VB.Form frmMain', '   Caption = "Server"',
+      '   Begin VB.Timer AutoSave', '      Interval = 60000', '   End',
+      '   Begin AOLibre.uAOButton btnStart', '      TX = "&Start"', '   End',
+      '   Begin VB.Image imgLogo', '   End',
+      'End', 'Attribute VB_Name = "frmMain"',
+      'Private Sub AutoSave_Timer()', '  SaveWorld', 'End Sub', 'Private Sub imgLogo_Click()', 'End Sub', '',
+    ].join('\r\n')
+    const protocol = [
+      'Attribute VB_Name = "Protocol"', 'Public Sub HandleIncomingData(ByVal id As Byte)', '  Select Case id',
+      '    Case ClientPacketID.Login', '      Call HandleLogin', '    Case ClientPacketID.Walk: HandleWalk', '  End Select', 'End Sub',
+      'Private Sub HandleLogin()', 'End Sub', 'Private Sub HandleWalk()', 'End Sub', 'Private Sub HandleUnused()', 'End Sub', '',
+    ].join('\r\n')
+    const facts = extractRepository(repo('server', { 'Server.vbp': 'Type=Exe\r\nForm=frmMain.frm\r\nModule=Protocol; Protocol.bas\r\nName="Server"\r\n', 'frmMain.frm': frm, 'Protocol.bas': protocol }))
+    expect(facts.entries.filter((e) => e.kind !== 'form').map((e) => [e.kind, e.name, e.detail, e.evidence.line, e.handler?.line])).toEqual([
+      ['handler', 'HandleIncomingData', undefined, 2, undefined],
+      ['handler', 'HandleLogin', 'ClientPacketID.Login', 9, undefined],
+      ['handler', 'HandleWalk', 'ClientPacketID.Walk', 11, undefined],
+      ['handler', 'HandleUnused', undefined, 13, undefined],
+      ['job', 'AutoSave', 'every 60000 ms', 4, 14],
+      ['control', 'btnStart', 'Start', 7, undefined],
+      ['control', 'imgLogo', undefined, 10, 17],
+    ])
+  })
+
   it("reads a VB6 form's caption, its menu items and buttons with their Click handlers, separators left out", () => {
     const frm = [
       'VERSION 5.00', 'Begin VB.Form frmSales', '   Caption         =   "Sales && Returns"', '   ClientHeight    =   3000',
