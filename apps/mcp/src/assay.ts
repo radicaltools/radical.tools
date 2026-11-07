@@ -189,8 +189,8 @@ export const ASSAY_PROCEDURE = [
   '   builds it, or none when no code does (the model then shows it unsatisfied, a gap; give it a parent). Put them in',
   '   plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user with its',
   '   scenarios, ask whether to add it, change it (assay_answer changes: label, properties, need, parent) or leave it out,',
-  '   one at a time, and pass the answer to assay_answer. Then relate each process to the accepted requirements it meets',
-  '   (add_relation, satisfies), and make the views that show them: create_view with viewpoint "Specification" (the',
+  '   one at a time, and pass the answer to assay_answer. A requirement a process meets names it (processes): accepted,',
+  '   the process satisfies it. Then make the views that show them: create_view with viewpoint "Specification" (the',
   '   requirements with their scenarios) and "Requirement coverage" (which are verified, which are not).',
   '9. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
   '   breaks the metamodel; the concerns it lists are the user\'s to settle later (Forge, forge_import_hub_concept), not',
@@ -294,6 +294,7 @@ const PLAN_SCHEMA = {
           satisfiedBy: { type: 'string', description: 'The element whose code the tests exercise: a key or an id. Leave it out for a requirement drawn from documents that no code builds yet: the model then shows it unsatisfied, as it is.' },
           parent: { type: 'string', description: 'Where to put it and its scenarios (a system, domain or group). Default: the system holding satisfiedBy, else the model\'s root.' },
           need: { type: 'string', description: 'The need it derives from: a key of a need of this plan or of an earlier one still waiting, or an id of the model. Default: the run\'s need "Found in the code".' },
+          processes: { type: 'array', items: { type: 'string' }, description: 'The processes that meet it (keys or ids): accepted, each satisfies it.' },
           facts: { type: 'array', items: { type: 'string' } },
           citations: { type: 'array', items: CITATION_SCHEMA, description: 'Code or documents you quote; a requirement drawn from documents has no scenarios.' },
           scenarios: {
@@ -1264,7 +1265,7 @@ export class Assay {
     ].filter(Boolean).join(' ')
     const need = p.needProposal ?? (p.need ? label(p.need) : undefined)
     return [
-      `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${need ? `, derived from ${need}` : ''}: ${ears}`,
+      `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${r.processes?.length ? ` and the process${r.processes.length === 1 ? '' : 'es'} ${r.processes.map(label).join(', ')}` : ''}${need ? `, derived from ${need}` : ''}: ${ears}`,
       ...(props.rationale ? [`    rationale: ${props.rationale}`] : []),
       ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}${s.tests?.length ? `; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}` : ''}${s.paths?.length ? `; explored paths, each written as a Playwright test when accepted: ${s.paths.map((x) => `"${(run.facts.get(x)?.fact as PathFact | undefined)?.name ?? x}"`).join(', ')}` : ''}${!s.tests?.length && !s.paths?.length && s.citations?.length ? `; drawn from the code (${s.citations.map((c) => `${c.repository}/${c.file}:${c.lines[0]}`).join(', ')}): no test checks it; ${this.pendingTestNote(run, p.satisfiedBy, pending)}` : ''}`),
       ...(r.scenarios.length ? [] : ['    no scenario: it rests on what it cites (code, screens or documents), not on tests that pass']),
@@ -1373,6 +1374,14 @@ export class Assay {
         written.push({ id: ctx.resolveId(r.key), key: r.key, kind: 'requirement', label, confidence: 'hypothesis', facts, ...(r.citations?.length ? { citations: r.citations } : {}), accepted: accepted(false) })
         if (needId) await step('add_relation', { sourceId: r.key, targetId: needId, relationType: 'derives' }, 'derives from its need')
         if (satisfiedBy) await step('add_relation', { sourceId: satisfiedBy, targetId: r.key, relationType: 'satisfies' }, `${nodes[satisfiedBy].label} satisfies it`)
+        // The processes that meet it, as the plan named them.
+        for (const ref of r.processes ?? []) {
+          const process = where(ref)
+          if (typeof process === 'object') { failures.push(`its process: ${process.problem}`); continue }
+          if (await step('add_relation', { sourceId: process, targetId: r.key, relationType: 'satisfies' }, `process ${nodes[process]?.label ?? ref} satisfies it`)) {
+            written.push({ id: Object.values(facade.getRelations()).find((x) => x.sourceId === process && x.targetId === ctx.resolveId(r.key))?.id ?? '', key: `${ref}->${r.key}`, kind: 'relation', label: 'satisfies', confidence: 'inferred', facts: [] })
+          }
+        }
         for (const sc of r.scenarios) {
           if (!await step('add_node', { tempId: sc.key, type: 'scenario', label: sc.label, properties: { given: sc.given, when: sc.when, then: sc.then }, ...(parent ? { parentId: parent } : {}) }, `scenario "${sc.label}"`)) continue
           written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: [...(sc.tests ?? []), ...(sc.paths ?? [])], ...(sc.citations?.length ? { citations: sc.citations } : {}) })

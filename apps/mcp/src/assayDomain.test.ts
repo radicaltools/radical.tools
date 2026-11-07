@@ -137,6 +137,13 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const process = all.find((n) => n.type === 'process')!
     expect(all.filter((n) => n.type === 'step').map((n) => [n.label, n.order, n.parentId === process.id]).sort((a, b) => Number(a[1]) - Number(b[1]))).toEqual([['Place the order', 1, true], ['Pay for it', 2, true], ['Ship it', 3, true]])
     expect((await relations()).filter((r) => r.relationType === 'performed-by').length).toBe(3)
+    // A requirement names the process that meets it; accepted, the process satisfies it.
+    const requirement = (processes: string[]) => ({ requirements: [{ key: `r-fulfil-${processes.length}`, label: 'Fulfil orders', satisfiedBy: 'orders', processes, properties: { action: 'the orders service shall take an order from placing to shipping' }, citations: [CODE([9, 11], "order.status = 'paid'")] }] })
+    expect((await call('assay_apply', { plan: requirement(['fulfil', 'orders']) })).text).toContain('- requirements[0] (Fulfil orders): processes must list processes of the plan or the model that meet it')
+    const proposed = await call('assay_apply', { plan: requirement(['fulfil']) })
+    expect(proposed.text).toContain('requirement "Fulfil orders" (ubiquitous), satisfied by Orders service and the process Fulfil an order: the orders service shall take an order from placing to shipping')
+    expect((await call('assay_answer', { proposal: 'P1', accept: true })).ok).toBe(true)
+    expect((await relations()).filter((r) => r.relationType === 'satisfies').map((r) => [r.sourceLabel, r.targetLabel]).sort()).toEqual([['Fulfil an order', 'Fulfil orders'], ['Orders service', 'Fulfil orders']])
     const pay = json(join(root, '.radical/assay/run.json')).written.find((w: { label: string }) => w.label === 'Pay for it')
     expect([pay.kind, pay.confidence, pay.evidence.map((e: { fact?: string; quote?: string }) => e.fact ?? e.quote)]).toEqual(['step', 'inferred', [route('POST /orders/:id/payment'), "order.status = 'paid'"]])
   })
