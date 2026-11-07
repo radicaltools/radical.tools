@@ -210,6 +210,8 @@ export interface TestFact {
   /** `<file> › <title>`, the id .radical/radical.json verifies binds. */
   test: string
   status: 'passed' | 'failed' | 'skipped'
+  /** Its body is empty or asserts nothing (a JavaScript test): it passes whatever the code does. */
+  checksNothing?: boolean
   evidence: Evidence
 }
 

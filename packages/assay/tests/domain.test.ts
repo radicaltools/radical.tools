@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { extractRepository } from '../src/index'
+import { checkPlan, extractRepository, factIndex, parsePlan } from '../src/index'
 
 /** A git repository of `files` (path → text) in a fresh folder. */
 function repo(name: string, files: Record<string, string>): string {
@@ -322,6 +322,34 @@ describe('radical assay: entry points', () => {
       ['control', 'cmdSave', 'frmSales', 'Save sale', 5, 21],
       ['menu', 'mnuExport', 'frmSales', 'Export…', 10, 24],
       ['menu', 'mnuFile', 'frmSales', 'File', 8, undefined],
+    ])
+  })
+})
+
+describe('radical assay: tests that check nothing', () => {
+  it('marks a passing test whose body is empty or asserts nothing, and refuses a scenario resting on it', () => {
+    const dir = repo('web', {
+      'package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' }, devDependencies: { vitest: '4' } }),
+      'tests/orders.test.js': [
+        "import { describe, expect, it } from 'vitest'", "describe('orders', () => {",
+        "  it('shows an order', () => {})", "  it('places an order', async () => { await fetch('/api/orders') })",
+        "  it('lists orders', () => {", "    // the list", "    expect(list()).toHaveLength(2)", '  })', '})', '',
+      ].join('\n'),
+      'reports/unit.json': JSON.stringify({ testResults: [{ name: 'tests/orders.test.js', assertionResults: ['shows an order', 'places an order', 'lists orders'].map((title) => ({ ancestorTitles: ['orders'], title, status: 'passed' })) }] }),
+    })
+    const facts = extractRepository(dir)
+    expect(facts.tests.map((t) => [t.test, t.checksNothing ?? false])).toEqual([
+      ['tests/orders.test.js › orders › shows an order', true], ['tests/orders.test.js › orders › places an order', true], ['tests/orders.test.js › orders › lists orders', false],
+    ])
+    const { plan } = parsePlan({
+      elements: [{ key: 'web', type: 'webapp', label: 'Web', units: ['web:unit:.'], facts: ['web:unit:.'], confidence: 'observed' }],
+      requirements: [{ key: 'r', label: 'Show an order', satisfiedBy: 'web', properties: { action: 'the web shall show it' }, scenarios: [
+        { key: 's1', label: 'Shown', given: 'g', when: 'w', then: 't', tests: ['web:test:tests/orders.test.js › orders › shows an order'] },
+        { key: 's2', label: 'Listed', given: 'g', when: 'w', then: 't', tests: ['web:test:tests/orders.test.js › orders › lists orders'] },
+      ] }],
+    })
+    expect(checkPlan(plan, factIndex([facts]), () => false, [facts])).toEqual([
+      'requirements[0] (Show an order), scenario 1 (Shown): web:test:tests/orders.test.js › orders › shows an order checks nothing (its body is empty or asserts nothing), so it passes whatever the code does: leave it out of the scenario; rest the scenario on explored paths or on the code it is drawn from (citations), whose pending test the team then writes',
     ])
   })
 })

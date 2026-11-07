@@ -616,6 +616,8 @@ interface Written {
   citations?: Citation[]
   /** For a proposal: whether the user accepted it as proposed or changed it. */
   accepted?: 'as-proposed' | 'changed'
+  /** For a transition: a line of the code sets its target (sets), or only a quotation backs it (quoted). */
+  basis?: 'sets' | 'quoted'
 }
 
 /** A hypothesis waiting for the user: a requirement (with its scenarios), or a need or decision drawn from documents. */
@@ -1107,6 +1109,7 @@ export class Assay {
         ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
+      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation alone (marked "quoted" in ${RUN_FILE}: the code may not make them).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -1132,11 +1135,11 @@ export class Assay {
       written.push({ id: ctx.resolveId(args.tempId as string), key: args.tempId as string, ...record, ...(record.citations?.length ? {} : { citations: undefined }) })
       return true
     }
-    const relate = async (from: string, to: string, relationType: string, what: string, extra: { label?: string; properties?: Record<string, unknown>; facts?: string[]; citations?: Citation[]; confidence?: Written['confidence'] } = {}): Promise<void> => {
+    const relate = async (from: string, to: string, relationType: string, what: string, extra: { label?: string; properties?: Record<string, unknown>; facts?: string[]; citations?: Citation[]; confidence?: Written['confidence']; basis?: Written['basis'] } = {}): Promise<void> => {
       const before = new Set(Object.keys(facade.getRelations()))
       const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType, ...(extra.label ? { label: extra.label } : {}), ...(extra.properties && Object.keys(extra.properties).length ? { properties: extra.properties } : {}) }, ctx, facade)
       if (error) { failures.push(`${what}: ${error}`); return }
-      written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}) })
+      written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}), ...(extra.basis ? { basis: extra.basis } : {}) })
     }
     const table = (id: string): TableFact | undefined => (run.facts.get(id)?.kind === 'table' ? run.facts.get(id)!.fact as TableFact : undefined)
     /** The containers, components and web applications of the run built from `unit`. */
@@ -1215,7 +1218,8 @@ export class Assay {
         // The state facts whose lines set its target back it, beside what it cites.
         const sets = stateFacts.filter((f) => f.sets.some((x) => stateName(x.value) === valueOf(t.to))).map((f) => f.id)
         const properties = { ...(t.event && events.has(t.event) ? { event: events.get(t.event) } : {}), ...(t.guard ? { guard: t.guard } : {}), ...(t.actions ? { actions: t.actions } : {}) }
-        await relate(t.from, t.to, 'transition', `stateMachines "${m.key}", transition ${t.from} → ${t.to}`, { ...(t.event ? { label: t.event } : {}), properties, facts: [...new Set([...(t.facts ?? []), ...sets])], citations: t.citations })
+        // What backs it, kept apart in the evidence: a line that sets its target, or a quotation alone.
+        await relate(t.from, t.to, 'transition', `stateMachines "${m.key}", transition ${t.from} → ${t.to}`, { ...(t.event ? { label: t.event } : {}), properties, facts: [...new Set([...(t.facts ?? []), ...sets])], citations: t.citations, basis: sets.length ? 'sets' : 'quoted' })
       }
       await relate(m.key, m.entity, 'lifecycle-of', `stateMachines "${m.key}" lifecycle of ${m.entity}`, { facts: m.facts })
       // What runs it: the elements built from the units whose code sets its values; none when no code does.

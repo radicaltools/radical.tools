@@ -142,7 +142,7 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
   })
 
   it('writes the lifecycle of an entity from its status values, implemented by the container whose code sets them', async () => {
-    const { call, nodes, relations } = await central()
+    const { call, nodes, relations, root, json } = await central()
     await call('assay_apply', { plan: C4 })
     await call('assay_apply', { plan: DOMAIN })
     const status = 'orders:state:.:orderstatus'
@@ -154,20 +154,29 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const wrong = await call('assay_apply', { plan: { stateMachines: [{ ...machine, states: [...machine.states, { key: 'lost', label: 'Lost' }], transitions: [...machine.transitions, { from: 'shipped', to: 'lost' }] }] } })
     expect(wrong.text).toContain('- stateMachines[0] (Order lifecycle).states[3] (Lost): no state fact the machine cites holds "Lost" (new, paid, shipped); give its value, or cite the code that names it')
     expect(wrong.text).toContain('- stateMachines[0] (Order lifecycle).transitions[2] (shipped → lost): rests on nothing: no line of the code the state facts name sets lost; cite the code that makes it (citations)')
-    const applied = await call('assay_apply', { plan: { stateMachines: [machine] } })
+    // Paid and shipped are set by lines of the code; a cancellation no code makes rests on a quotation alone.
+    const quote = CODE([1, 1], "export type OrderStatus = 'new'")
+    const applied = await call('assay_apply', { plan: { stateMachines: [{
+      ...machine,
+      states: [...machine.states, { key: 'cancelled', label: 'Cancelled', kind: 'final', citations: [quote] }],
+      transitions: [...machine.transitions, { from: 'new', to: 'cancelled', event: 'Cancelled', citations: [quote] }],
+    }] } })
     expect(applied.ok).toBe(true)
-    expect(applied.text).toContain('1 state machine of 3 states')
+    expect(applied.text).toContain('1 state machine of 4 states')
+    expect(applied.text).toContain('Transitions: 2 rest on a line of the code that sets their target, 1 on a quotation alone (marked "quoted" in .radical/assay/run.json: the code may not make them).')
+    const evidence = json(join(root, '.radical/assay/run.json')).written.filter((w: { basis?: string }) => w.basis).map((w: { label: string; basis: string }) => [w.label, w.basis])
+    expect(evidence).toEqual([['Payment received', 'sets'], ['Shipped', 'sets'], ['Cancelled', 'quoted']])
     const all = await nodes()
     const life = all.find((n) => n.type === 'state-machine')!
     expect([life.label, life.parentId === all.find((n) => n.label === 'Sales')!.id]).toEqual(['Order lifecycle', true])
     expect(all.filter((n) => n.parentId === life.id).map((n) => [n.type, n.label, n.kind]).sort()).toEqual([
-      ['event', 'Payment received', undefined], ['event', 'Shipped', undefined],
-      ['pseudostate', 'Start', 'initial'], ['state', 'New', 'normal'], ['state', 'Paid', 'normal'], ['state', 'Shipped', 'final'],
+      ['event', 'Cancelled', undefined], ['event', 'Payment received', undefined], ['event', 'Shipped', undefined],
+      ['pseudostate', 'Start', 'initial'], ['state', 'Cancelled', 'final'], ['state', 'New', 'normal'], ['state', 'Paid', 'normal'], ['state', 'Shipped', 'final'],
     ])
     const rels = await relations()
     expect(rels.filter((r) => ['transition', 'lifecycle-of', 'implements'].includes(r.relationType)).map((r) => [r.relationType, r.sourceLabel, r.targetLabel]).sort()).toEqual([
       ['implements', 'Orders service', 'Order lifecycle'], ['lifecycle-of', 'Order lifecycle', 'Order'],
-      ['transition', 'New', 'Paid'], ['transition', 'Paid', 'Shipped'], ['transition', 'Start', 'New'],
+      ['transition', 'New', 'Cancelled'], ['transition', 'New', 'Paid'], ['transition', 'Paid', 'Shipped'], ['transition', 'Start', 'New'],
     ])
     const paid = rels.find((r) => r.relationType === 'transition' && r.targetLabel === 'Paid')!
     expect(paid.event).toBe(all.find((n) => n.label === 'Payment received')!.id)
