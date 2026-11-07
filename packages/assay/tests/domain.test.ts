@@ -522,7 +522,11 @@ describe('radical assay: what legacy repositories hide', () => {
       'Server/Mainform.frm': 'VERSION 5.00\r\nBegin VB.Form Mainform\r\n   Begin VB.TextBox txtServerPort\r\n      Text = "6123"\r\n   End\r\nEnd\r\nAttribute VB_Name = "Mainform"\r\nPrivate Sub Form_Load()\r\n  sck.LocalPort = txtServerPort.Text\r\n  sck.Listen\r\nEnd Sub\r\n',
       'web/package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' } }),
       'web/.env.example': 'APP_NAME=ERP\nDB_CONNECTION=sqlsrv\nDB_HOST=127.0.0.1\nDB_DATABASE=AINData2\n',
+      'MIGRATION_HANDOFF.md': '# Migration handoff\n\nThe legacy tables are in AINData2.\n',
     }))
+    // An ActiveX document is a screen; a Markdown file at the root is a document.
+    expect(facts.screens.map((x) => x.route)).toEqual(['Chatdoc', 'Mainform'])
+    expect(facts.documents.map((d) => d.file)).toEqual(['MIGRATION_HANDOFF.md'])
     expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to]).sort()).toEqual([
       ['address', 'chat:unit:Client', 'chat:unit:Server'], ['data', 'chat:unit:web', 'chat:db:web:SQL Server/AINData2'],
     ])
