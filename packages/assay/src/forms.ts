@@ -55,7 +55,7 @@ const caption = (text: string): string => text.replace(/""/g, '"').replace(/&&/g
 /** Each form of the repository's VB6 units, as a screen fact. */
 export function readForms(files: RepoFiles, repo: string, units: Unit[]): ScreenFact[] {
   const forms: Array<{ screen: ScreenFact; code: string; codeLine: number; unit: Unit }> = []
-  for (const file of files.list.filter((f) => /\.frm$/i.test(f))) {
+  for (const file of files.list.filter((f) => /\.(frm|dob)$/i.test(f))) {
     const unit = owner(units, file)
     if (!unit || unit.stack !== 'vb6') continue
     const text = files.read(file)
@@ -74,7 +74,8 @@ export function readForms(files: RepoFiles, repo: string, units: Unit[]): Screen
 
 /** A form file's screen: its name, caption, size and controls, and where its code starts. */
 export function readForm(text: string, file: string): { name: string; codeAt: number; screen: Omit<ScreenFact, 'id'> } | null {
-  const head = /^\s*Begin\s+VB\.(?:Form|MDIForm)\s+(\w+)/m.exec(text)
+  // A form, an MDI form, or an ActiveX document (a page a browser hosts).
+  const head = /^\s*Begin\s+VB\.(?:Form|MDIForm|UserDocument)\s+(\w+)/m.exec(text)
   if (!head) return null
   const begin = head.index + head[0].indexOf('Begin')
   const lines = text.slice(begin).split('\n')

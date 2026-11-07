@@ -38,6 +38,24 @@ const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|langua
 /** A line that opens an address in the user's browser rather than calling it (Inet's OpenURL is a call). */
 const BROWSER = /\bShellExecute\w*\b|\bShell\s*\(|\bProcess\.Start\b|\bwebbrowser\.open|\bwindow\.open\b|\.Navigate2?\b|\bLaunchUrl\b|\bopenExternal\b/i
 
+/** VB statements continued over lines (" & _, or _) joined into one, each on its first line, and as many empty lines
+ *  after it as it was continued over: every line below keeps its number, so evidence cites the right one. */
+export function joinContinuations(text: string): string {
+  const lines = text.split('\n')
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].replace(/\r$/, '')
+    let joined = 0
+    while (i + 1 < lines.length && /\s_\s*$/.test(line)) {
+      const next = lines[++i].replace(/\r$/, '')
+      joined++
+      line = /"\s*&\s*_\s*$/.test(line) && /^\s*"/.test(next) ? line.replace(/"\s*&\s*_\s*$/, '') + next.replace(/^\s*"/, '') : `${line.replace(/\s_\s*$/, '')} ${next.trim()}`
+    }
+    out.push(line, ...Array<string>(joined).fill(''))
+  }
+  return out.join('\n')
+}
+
 /** VB code without its comments (' or Rem to the end of a line, outside a string), its lines kept. */
 export function withoutVbComments(text: string): string {
   return text.split('\n').map((line) => {
@@ -167,7 +185,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
     const vb = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i.test(file)
-    if (vb) text = withoutVbComments(text).replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
+    if (vb) text = joinContinuations(withoutVbComments(text))
     // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
     text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
     const at = (index: number) => ({ file, line: lineAt(text, index) })

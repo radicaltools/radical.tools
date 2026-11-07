@@ -73,7 +73,7 @@ describe('radical assay: databases and tables', () => {
       ['db:legacy/App:SQL Server/Shop', 'SQL Server', 'SQL02', 'Shop', 'legacy/App/frmMain.frm:6'],
       ['db:orders:PostgreSQL/orders', 'PostgreSQL', 'orders-db', 'orders', 'orders/src/main/resources/application.yml:5'],
     ])
-    expect(facts.tables.map((t) => [t.table, `${t.evidence.file}:${t.evidence.line}`])).toEqual([['Customers', 'legacy/App/frmMain.frm:7'], ['Orders', 'legacy/App/frmMain.frm:7']])
+    expect(facts.tables.map((t) => [t.table, `${t.evidence.file}:${t.evidence.line}`])).toEqual([['Customers', 'legacy/App/frmMain.frm:8'], ['Orders', 'legacy/App/frmMain.frm:8']])
     // The Spring application's database runs on the service compose deploys.
     expect(linked('data')).toEqual([
       ['data', 'observed', 'unit:legacy/App', 'db:legacy/App:SQL Server/Shop'],
