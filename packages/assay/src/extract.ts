@@ -219,7 +219,8 @@ export function checksNothing(text: string, at: number): boolean {
     if (c === '"' || c === "'" || c === '`') quote = c
     else if (c === '{') depth++
     else if (c === '}' && --depth === 0) {
-      const body = text.slice(start, i).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+      // An assertion on a constant (expect(1).toBe(1)) checks nothing either.
+      const body = text.slice(start, i).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').replace(/\bexpect\(\s*(?:-?\d[\d.]*|true|false|null|undefined|'[^']*'|"[^"]*")\s*\)(?:\.\w+)*\([^)]*\)/g, '')
       return !body.trim() || !ASSERTS.test(body)
     }
   }

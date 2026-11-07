@@ -332,7 +332,7 @@ describe('radical assay: tests that check nothing', () => {
       'package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' }, devDependencies: { vitest: '4' } }),
       'tests/orders.test.js': [
         "import { describe, expect, it } from 'vitest'", "describe('orders', () => {",
-        "  it('shows an order', () => {})", "  it('places an order', async () => { await fetch('/api/orders') })",
+        "  it('shows an order', () => {})", "  it('places an order', async () => { await fetch('/api/orders'); expect(1).toBe(1) })",
         "  it('lists orders', () => {", "    // the list", "    expect(list()).toHaveLength(2)", '  })', '})', '',
       ].join('\n'),
       'reports/unit.json': JSON.stringify({ testResults: [{ name: 'tests/orders.test.js', assertionResults: ['shows an order', 'places an order', 'lists orders'].map((title) => ({ ancestorTitles: ['orders'], title, status: 'passed' })) }] }),

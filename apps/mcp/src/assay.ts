@@ -163,7 +163,8 @@ export const ASSAY_PROCEDURE = [
   '   whose code sets its values (or implementedBy). A state no fact holds needs citations of the code that names it.',
   '   When no line sets the values (the fact lists none) and no code you read moves them, write the states and the',
   '   initial only, no transition the code does not show, and say so in the machine\'s description: an order of the',
-  '   values is a guess, not a lifecycle (get_issues then warns its states cannot be reached: that is so, leave it).',
+  '   values is a guess, not a lifecycle (assay_apply and get_issues then warn its states cannot be reached: that is so,',
+  '   leave those warnings).',
   '   A status kept in flags or nullable dates is a state fact of flags (its values each flag and its negation: dead, not',
   '   dead; paid, not paid): a state takes one as its value (Alive: value "not dead"), and the lines that set or clear a',
   '   flag back the transitions. A machine with no state fact at all rests on citations of the code that names its',
@@ -704,6 +705,8 @@ async function attempt(tool: string, args: Record<string, unknown>, ctx: ToolRun
 
 export class Assay {
   private run: Run | null = null
+  /** The labels of the entities the last plan wrote that no element realises. */
+  private unrealised: string[] = []
 
   /** `folder`: the bound model folder; `root`: its repository's root. */
   constructor(private readonly folder: string, private readonly root: () => Promise<string>) {}
@@ -755,7 +758,7 @@ export class Assay {
     }
     run.facts = this.indexOf(run)
     if ('problem' in got) return refused(`${name}: ${got.problem}`)
-    return ok(Explorer.describe(got.screen, got.path, run.root, facts.dir), { readOnly: true })
+    return ok(`${'note' in got && got.note ? `Note: ${got.note}\n` : ''}${Explorer.describe(got.screen, got.path, run.root, facts.dir)}`, { readOnly: true })
   }
 
   private async start(input: unknown): Promise<AssayResult> {
@@ -1111,6 +1114,7 @@ export class Assay {
         ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
+      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
       ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation alone (marked "quoted" in ${RUN_FILE}: the code may not make them).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
@@ -1157,6 +1161,8 @@ export class Assay {
         `entities "${e.key}" (${e.label})`, { kind: 'entity', label: e.label, confidence: 'observed', facts: e.tables })
     }
     const realised = new Set<string>()
+    // Entities no element realises, for the answer: no unit's code names their tables.
+    this.unrealised = []
     for (const e of plan.entities) {
       // Only a foreign key joins two entities (checkPlan): the tables that hold it are the evidence.
       if (e.partOf) await relate(e.key, e.partOf, 'part-of', `entities "${e.key}" part of ${e.partOf}`, { confidence: 'observed', facts: e.tables })
@@ -1167,6 +1173,7 @@ export class Assay {
       const names = new Set(e.tables.map((id) => tableName(table(id)?.table ?? '')))
       // A schema file alone names it nowhere a unit uses it.
       const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
+      if (!named.some((t) => builtFrom(t.unit).length)) this.unrealised.push(e.label)
       for (const unit of new Set(named.map((t) => t.unit))) {
         for (const element of builtFrom(unit)) {
           if (realised.has(`${element}->${e.key}`)) continue
@@ -1422,7 +1429,9 @@ export class Assay {
 
   /** What becomes of a scenario drawn from the code, as a proposal says it: its element named by a key or an id. */
   private pendingTestNote(run: Run, element: string | undefined, pending: Proposal[]): string {
-    const unitId = element ? run.written.find((w) => w.id === element || w.key === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    const built = element ? run.written.find((w) => w.id === element || w.key === element) : undefined
+    const unitId = built?.facts.find((f) => run.facts.get(f)?.kind === 'unit')
+    if (built && !unitId) return `${built.label} is built from no unit of this run: accepted, the scenario only`
     if (!unitId || pending.some((x) => x.kind === 'requirement' && x.requirement.key === element)) return 'a pending test is written when accepted, where its unit has a test framework'
     const unit = run.facts.get(unitId)!.fact as Unit
     const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)

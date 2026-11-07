@@ -31,7 +31,7 @@ const ACTION_TIMEOUT = 10_000
 export type ExploreAction = Step['action']
 
 /** What a call of the Explore stage gives back: the screen reached, or why nothing was done. */
-export type Explored = { screen: ScreenFact; path: PathFact } | { problem: string }
+export type Explored = { screen: ScreenFact; path: PathFact; note?: string } | { problem: string }
 
 /** Reads the controls, headings and title of the page in the browser, and tags each control with
  *  its reference (data-assay-ref) so an action finds it. Plain JavaScript, sent to the page as it
@@ -247,7 +247,9 @@ export class Explorer {
       if (!visible) return { problem: `"${value}" is not on the current screen (${from.id}): expect a text it shows` }
       step = { action, value, from: from.id, to: from.id }
       path.steps.push(step)
-      return { screen: from, path }
+      // A text shown in several places (a heading and a link) proves little: the test checks its first.
+      const count = await page.getByText(value).count().catch(() => 1)
+      return { screen: from, path, ...(count > 1 ? { note: `"${value}" is on the screen ${count} times (a link or heading may hold it too); the test checks the first: expect a text only the outcome shows` } : {}) }
     }
     if (action === 'goto') {
       let target: URL
