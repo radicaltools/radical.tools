@@ -19,14 +19,16 @@
 // what it wrote stays in the model and the files.
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
-  GIT, isRepository, linkRepositories, parsePlan, SKIPPED, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  type Citation, type FactIndex, type Link, type PlanDecision, type PlanNeed, type PlanRequirement, type RepositoryFacts, type TestFact, type Unit,
+  GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
+  emptyFacts, pageOf, pathTest, pathTestFile, pathTestId, stepLabel,
+  type Citation, type FactIndex, type Link, type PathFact, type PlanDecision, type PlanNeed, type PlanRequirement, type RepositoryFacts, type ScreenFact, type TestFact, type Unit,
 } from '@radical/assay'
+import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
@@ -92,7 +94,20 @@ export const ASSAY_PROCEDURE = [
   '   there) and name the folders an element is built in (paths). Only facts back an observed claim. assay_apply it; a',
   '   refused plan comes back with every problem: fix them and apply again. Then show the user what was written, make views',
   '   of the C4 viewpoints (create_view with viewpoint "System context", "Containers", "Components") and smart_layout them.',
-  '3. Documents stage, when the run has documents (the sources\' and the repositories\' own: README, docs, ADR records;',
+  '3. Explore stage, when the user has the web application running on this machine, on a test database (ask for its address',
+  '   and the repository that builds it; skip the stage otherwise). assay_explore opens it and starts a path named for what a',
+  '   user does; assay_explore_act clicks, fills, selects, checks, presses or goes to an address, by the references of the',
+  '   screen it returns. Take the paths a user takes: signing in, the main lists and details, creating and changing what the',
+  '   application keeps; one path per task, starting each with assay_explore. Each path starts signed out in a fresh',
+  '   session, as its test will: a path behind the sign-in signs in first. Fill forms with plausible test data. Another',
+  '   host and controls that pay or delete an account are refused: leave them. Then one plan: a mockup per page that',
+  '   matters (a page is a route with its numbers as {id}: /orders/1 and /orders/2 are one page; mockups: label as a user',
+  '   would call it, screen: one of its screens, description from the screen\'s text, presentedBy the webapp that renders',
+  '   it, parent its system); the server joins the pages in the order of each path with navigates-to. People the sign-in',
+  '   screens show are person elements, inferred, citing those screens (facts). Make a view of the mockups (create_view;',
+  '   the viewpoint for screens where the metamodel has one). A defect the application shows (a password in its address,',
+  '   an error page) is an unwanted-behaviour requirement nothing satisfies yet, citing the screen, for the next stage.',
+  '4. Documents stage, when the run has documents (the sources\' and the repositories\' own: README, docs, ADR records;',
   '   assay_facts with kind "documents"). Read them with assay_read and draw from them, citing the lines (citations): needs',
   '   (what people asked for, in their words: one need per thing asked for, a sentence or a short passage, with label,',
   '   description, properties.kind, parent the system it concerns) and decisions (ADRs: decisions, with properties',
@@ -101,20 +116,23 @@ export const ASSAY_PROCEDURE = [
   '   applies to). A document says what someone meant, not what the code does: everything from it is a',
   '   proposal or an inferred claim, never observed. Apply them in small plans and ask the user about each proposal, one at',
   '   a time; the needs answered here are what the requirements of the next stage derive from.',
-  '4. Scenarios stage. For each unit with tests (assay_facts with unit and kind "tests"), group its tests by the behaviour they',
+  '5. Scenarios stage. For each unit with tests (assay_facts with unit and kind "tests"), group its tests by the behaviour they',
   '   check (a describe block, a file), read the test code where the titles do not say enough, and write for each group a',
   '   requirement in EARS (what the code does, as the tests show it; satisfiedBy the element of that unit; need: the need it',
   '   serves, a need key of the plan, a need proposal still waiting or a need of the model, else it derives from the run\'s',
-  '   need Found in the code) with the scenarios that verify it (given, when, then; tests: the test facts). Each test fact',
-  '   has a status: a scenario rests only on tests that passed. A behaviour whose tests failed or were skipped is no',
-  '   scenario: propose its requirement with no scenarios, citing the code it is drawn from, and tell the user its tests do',
-  '   not pass; so may behaviour the code shows that no test checks. Then the requirements the documents state that',
-  '   no test checks: no scenarios, citations of the document,',
-  '   satisfiedBy the element that builds it, or none when no code does (the model then shows it unsatisfied, a gap). Put',
-  '   them in plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user',
-  '   with its scenarios, ask whether to add it, change it (assay_answer changes: label, properties, need) or leave it out,',
+  '   need Found in the code) with the scenarios that verify it (given, when, then; tests: the test facts; paths: the explored',
+  '   paths that show it, which become Playwright tests of its repository when the user accepts it). Each test fact',
+  '   has a status: a scenario rests only on tests that passed, or on explored paths (paths) that show the behaviour, as',
+  '   when a unit test fails or checks nothing while the application does it. Write the EARS fields without their keyword',
+  '   (trigger: "a customer opens an order", not "When …"). A behaviour whose tests failed or were skipped, and that no',
+  '   explored path shows, is no scenario: propose its requirement with no scenarios, citing the code it is drawn from,',
+  '   and tell the user its tests do not pass; so may behaviour the code shows that no test checks. Then the requirements',
+  '   the documents state that no test checks: no scenarios, citations of the document, satisfiedBy the element that',
+  '   builds it, or none when no code does (the model then shows it unsatisfied, a gap; give it a parent). Put them in',
+  '   plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user with its',
+  '   scenarios, ask whether to add it, change it (assay_answer changes: label, properties, need, parent) or leave it out,',
   '   one at a time, and pass the answer to assay_answer.',
-  '5. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
+  '6. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
   '   breaks the metamodel; the concerns it lists are the user\'s to settle later (Forge, forge_import_hub_concept), not',
   '   Assay\'s. Then assay_finish: what the run wrote, and the proposals still waiting.',
 ].join('\n')
@@ -208,8 +226,9 @@ const PLAN_SCHEMA = {
                 when: { type: 'string' },
                 then: { type: 'string' },
                 tests: { type: 'array', items: { type: 'string' }, description: 'The test facts that check it.' },
+                paths: { type: 'array', items: { type: 'string' }, description: 'Paths explored in the running application that show it (assay_explore): accepted, each is written as a Playwright test into its repository\'s e2e/assay/ and bound to the scenario.' },
               },
-              required: ['key', 'label', 'given', 'when', 'then', 'tests'],
+              required: ['key', 'label', 'given', 'when', 'then'],
               additionalProperties: false,
             },
           },
@@ -233,6 +252,23 @@ const PLAN_SCHEMA = {
           citations: { type: 'array', items: CITATION_SCHEMA },
         },
         required: ['key', 'label', 'description'],
+        additionalProperties: false,
+      },
+    },
+    mockups: {
+      type: 'array',
+      description: 'Screens of the explored application, written as observed mockups; the screens of a path are joined by navigates-to in its order.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          label: { type: 'string', description: 'The screen\'s name, as a user would call it.' },
+          screen: { type: 'string', description: 'The screen fact it is built from (assay_explore\'s answers).' },
+          description: { type: 'string', description: 'What the user sees and does on it.' },
+          parent: { type: 'string', description: 'A system, domain or group: a key or an id.' },
+          presentedBy: { type: 'string', description: 'The element that renders it (a webapp, container, component or system): a key or an id.' },
+        },
+        required: ['key', 'label', 'screen'],
         additionalProperties: false,
       },
     },
@@ -299,6 +335,34 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'assay_explore',
+    description: 'Open a web application running on this machine (localhost, a loopback address or a .localhost name; run it on a test database) in a browser the server drives, and start a path through it named for what a user does (Sign in, Place an order). Each path starts in a fresh browser session, signed out, as its test will; what it creates or changes is done for real, on the test database. Returns the screen: its address, title, headings and each control with a reference (e1, e2, …), its role and its name; its screenshot is kept in .radical/assay/explore/. Act on it with assay_explore_act. Each path is a fact of the run: its screens can become mockups, and a requirement\'s scenario can rest on it, written as a Playwright test into the repository when the user accepts it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Where the path starts, e.g. http://localhost:5173/.' },
+        path: { type: 'string', description: 'The path\'s name: what the user does along it.' },
+        repository: { type: 'string', description: 'The code repository of the run that builds the application: its e2e/assay/ gets the path\'s test.' },
+      },
+      required: ['url', 'path', 'repository'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'assay_explore_act',
+    description: 'Do one thing on the current screen of the explored application, as the next step of the current path: click, fill (value: the text), select (value: the option), check, or press (value: a key such as Enter) the control with that reference, or goto (value: an address or route of the same application). Returns the screen it leads to. Another host\'s address, and a control whose name says it pays, buys, transfers money or deletes or closes an account, are refused.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'goto'] },
+        ref: { type: 'string', description: 'The control\'s reference on the current screen (none for goto).' },
+        value: { type: 'string' },
+      },
+      required: ['action'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'assay_facts',
     description: 'The facts of the Assay run, to cite in a plan: a repository\'s, source\'s or unit\'s units, dependencies, APIs, services, addresses, databases, tests, documents, or the links. Long lists come a page at a time.',
     inputSchema: {
@@ -326,7 +390,7 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
       properties: {
         proposal: { type: 'string', description: 'The proposal\'s id (P1, P2, …).' },
         accept: { type: 'boolean' },
-        changes: { type: 'object', properties: { label: { type: 'string' }, properties: { type: 'object' }, description: { type: 'string' }, need: { type: 'string', description: 'For a requirement: the need it derives from, an id of the model or a need proposal (P3).' } }, additionalProperties: false, description: 'What the user changed in it.' },
+        changes: { type: 'object', properties: { label: { type: 'string' }, properties: { type: 'object' }, description: { type: 'string' }, need: { type: 'string', description: 'For a requirement: the need it derives from, an id of the model or a need proposal (P3).' }, parent: { type: 'string', description: 'Where to put it: a system, domain or group, an id or a key.' } }, additionalProperties: false, description: 'What the user changed in it.' },
       },
       required: ['proposal', 'accept'],
       additionalProperties: false,
@@ -353,7 +417,7 @@ export interface AssayResult extends ToolResult {
 interface Written {
   id: string
   key: string
-  kind: 'element' | 'relation' | 'requirement' | 'scenario' | 'need' | 'decision'
+  kind: 'element' | 'relation' | 'requirement' | 'scenario' | 'need' | 'decision' | 'mockup'
   label: string
   confidence: 'observed' | 'inferred' | 'hypothesis'
   facts: string[]
@@ -394,7 +458,31 @@ interface Run {
   written: Written[]
   proposals: Proposal[]
   needId?: string
+  /** The Explore stage's session: the screens and paths seen, and the browser that sees them. */
+  explore?: { facts: RepositoryFacts; explorer: Explorer }
+  /** The mockup written for each page (pageOf a screen's route), and the mockups joined by navigates-to already. */
+  mockupOf: Map<string, string>
+  navigated: Set<string>
+  /** The Playwright tests written into the repositories. */
+  testsWritten: string[]
 }
+
+/** The config written beside the Explore stage's tests, when a repository has none there. */
+const PLAYWRIGHT_CONFIG = `// Written by Radical Assay beside the tests of the paths it explored.
+// Run: npx playwright test -c e2e/assay (E2E_BASE_URL: where the application runs).
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: '.',
+  use: { baseURL: process.env.E2E_BASE_URL },
+})
+`
+
+/** Where the central repository keeps the Explore stage's screenshots. */
+export const EXPLORE_DIR = '.radical/assay/explore'
+
+/** `n` things, singular for one. */
+const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
 
 const ok = (resultText: string, extra: Partial<AssayResult> = {}): AssayResult => ({ ok: true, resultText, ...extra })
 const refused = (resultText: string): AssayResult => ({ ok: false, resultText })
@@ -422,13 +510,50 @@ export class Assay {
     if (name === 'assay_facts') return this.factsOf(run, input)
     if (name === 'assay_add_sources') return this.addSources(run, input)
     if (name === 'assay_read') return this.read(run, input)
+    if (name === 'assay_explore' || name === 'assay_explore_act') return this.explore(run, name, input)
     if (name === 'assay_apply') return this.apply(run, input, ctx, facade)
     if (name === 'assay_answer') return this.answer(run, input, ctx, facade)
     if (name === 'assay_finish') return ok(this.summary(run), { readOnly: true })
     return refused(`Unknown tool ${name}`)
   }
 
+  /** Every fact of the run by id: its repositories', its sources' and what the Explore stage saw. */
+  private indexOf(run: Run): FactIndex {
+    return factIndex([...run.repositories, ...run.sources, ...(run.explore ? [run.explore.facts] : [])], run.links)
+  }
+
+  private async explore(run: Run, name: string, input: unknown): Promise<AssayResult> {
+    const { url, path, repository, action, ref, value } = (input ?? {}) as Record<string, unknown>
+    if (!run.explore) {
+      if (name !== 'assay_explore') return refused(`${name}: no application is open: start a path with assay_explore`)
+      const taken = new Set([...run.repositories, ...run.sources].map((r) => r.repository))
+      let session = 'explore'
+      for (let i = 2; taken.has(session); i++) session = `explore-${i}`
+      const dir = join(run.root, EXPLORE_DIR)
+      ignored(dir)
+      const facts = emptyFacts(session, dir)
+      run.explore = { facts, explorer: new Explorer(facts, dir, run.root, { browser: process.env.RADICAL_ASSAY_BROWSER }) }
+    }
+    const { facts, explorer } = run.explore
+    let got
+    if (name === 'assay_explore') {
+      if (typeof url !== 'string' || !url) return refused('assay_explore: url must be the address the path starts at')
+      if (typeof path !== 'string' || !path.trim()) return refused('assay_explore: path must name what the user does along it')
+      if (!run.repositories.some((r) => r.repository === repository)) return refused(`assay_explore: repository must be a code repository of the run (${run.repositories.map((r) => r.repository).join(', ')})`)
+      got = await explorer.open(url, path.trim(), repository as string)
+    } else {
+      const actions: ExploreAction[] = ['click', 'fill', 'select', 'check', 'press', 'goto']
+      if (!actions.includes(action as ExploreAction)) return refused(`assay_explore_act: action must be one of ${actions.join(', ')}`)
+      if (value !== undefined && typeof value !== 'string') return refused('assay_explore_act: value must be text')
+      got = await explorer.act(action as ExploreAction, typeof ref === 'string' ? ref : undefined, value as string | undefined)
+    }
+    run.facts = this.indexOf(run)
+    if ('problem' in got) return refused(`${name}: ${got.problem}`)
+    return ok(Explorer.describe(got.screen, got.path, run.root, facts.dir), { readOnly: true })
+  }
+
   private async start(input: unknown): Promise<AssayResult> {
+    await this.run?.explore?.explorer.close()
     const { directories, reports, sources } = (input ?? {}) as { directories?: unknown; reports?: unknown; sources?: unknown }
     if (!Array.isArray(directories) || !directories.length || !directories.every((d) => typeof d === 'string' && d.trim())) {
       return refused('assay_start: directories must list the code repositories\' directories')
@@ -462,7 +587,7 @@ export class Assay {
     }
     const links = linkRepositories(repositories)
     const taken = await takeSources((sources ?? []) as string[], root, new Set(repositories.map((r) => r.repository)), SOURCE_OPTIONS)
-    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [] }
+    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [], mockupOf: new Map(), navigated: new Set(), testsWritten: [] }
     const lines = [
       `Assay run on ${repositories.length} repositor${repositories.length === 1 ? 'y' : 'ies'}${taken.sources.length ? ` and ${taken.sources.length} source${taken.sources.length === 1 ? '' : 's'} of documents` : ''}; the central model is ${this.run.modelPath} in ${root}.`,
       ...(found.empty.length ? [`Nothing in: ${found.empty.join(', ')}.`] : []),
@@ -494,7 +619,7 @@ export class Assay {
       readOnly: true,
       commit: () => {
         run.sources = [...run.sources.filter((x) => !taken.sources.some((t) => t.repository === x.repository)), ...taken.sources]
-        run.facts = factIndex([...run.repositories, ...run.sources], run.links)
+        run.facts = this.indexOf(run)
       },
     })
   }
@@ -548,8 +673,14 @@ export class Assay {
 
   private factsOf(run: Run, input: unknown): AssayResult {
     const { repository, unit, kind, offset, limit } = (input ?? {}) as { repository?: string; unit?: string; kind?: string; offset?: number; limit?: number }
-    const every = [...run.repositories, ...run.sources]
-    const repos = repository ? every.filter((r) => r.repository === repository) : every
+    const every = [...run.repositories, ...run.sources, ...(run.explore ? [run.explore.facts] : [])]
+    let repos = repository ? every.filter((r) => r.repository === repository) : every
+    // The paths explored in an application are also the facts of the repository that builds it.
+    if (repository && run.explore && repos.length && repos[0] !== run.explore.facts) {
+      const paths = run.explore.facts.paths.filter((x) => x.repository === repository)
+      const seen = new Set(paths.flatMap((x) => x.steps.map((st) => st.to)))
+      if (paths.length) repos = [{ ...repos[0], paths, screens: run.explore.facts.screens.filter((x) => seen.has(x.id)) }]
+    }
     if (repository && !repos.length) return refused(`assay_facts: no repository or source ${repository} in the run (${every.map((r) => r.repository).join(', ')})`)
     if (unit && run.facts.get(unit)?.kind !== 'unit') return refused(`assay_facts: ${unit} is no unit of the run`)
     const all: string[] = [...FACT_LISTS, 'links']
@@ -618,6 +749,49 @@ export class Assay {
       const id = Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? ''
       written.push({ id, key: `${r.from}->${r.to}`, kind: 'relation', label: r.label ?? r.relationType ?? 'relation', confidence: r.confidence, facts: r.facts ?? [], ...(r.citations?.length ? { citations: r.citations } : {}) })
     }
+    // Screens the server saw are observed mockups; a path's screens follow one another.
+    const mockupOf = new Map(run.mockupOf)
+    for (const m of plan.mockups) {
+      const screen = run.facts.get(m.screen)!.fact as ScreenFact
+      const error = await attempt('add_node', {
+        tempId: m.key, type: 'mockup', label: m.label,
+        ...(m.parent ? { parentId: m.parent } : {}),
+        // The page, not one visit of it: no query (it may hold what was typed), numbers as {id}.
+        properties: { screen: pageOf(screen.route), ...(m.description ? { description: m.description } : {}) },
+      }, ctx, facade)
+      if (error) { failures.push(`mockups "${m.key}" (${m.label}): ${error}`); continue }
+      const id = ctx.resolveId(m.key)
+      mockupOf.set(pageOf(screen.route), id)
+      written.push({ id, key: m.key, kind: 'mockup', label: m.label, confidence: 'observed', facts: [m.screen] })
+      if (m.presentedBy) {
+        const before = new Set(Object.keys(facade.getRelations()))
+        const presented = await attempt('add_relation', { sourceId: m.key, targetId: m.presentedBy, relationType: 'presented-by' }, ctx, facade)
+        if (presented) failures.push(`mockups "${m.key}" presented by ${m.presentedBy}: ${presented}`)
+        else written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${m.key}->${m.presentedBy}`, kind: 'relation', label: 'presented by', confidence: 'observed', facts: [m.screen] })
+      }
+    }
+    const navigated = new Set(run.navigated)
+    // A mockup stands for its page, whichever screen of it a path reached.
+    const screenOf = new Map((run.explore?.facts.screens ?? []).map((x) => [x.id, x]))
+    const pageAt = (id: string) => pageOf(screenOf.get(id)?.route ?? '')
+    const planned = new Set(plan.mockups.map((m) => pageAt(m.screen)))
+    for (const path of run.explore?.facts.paths ?? []) {
+      // Along the path, from one page that has a mockup to the next that has another: what led there is the step reaching it.
+      let at: { mockup: string; page: string } | undefined
+      for (const step of path.steps) {
+        const to = mockupOf.get(pageAt(step.to))
+        if (!to) continue
+        const from = at
+        at = { mockup: to, page: pageAt(step.to) }
+        if (!from || from.mockup === to || navigated.has(`${from.mockup}->${to}`)) continue
+        if (!planned.has(from.page) && !planned.has(at.page)) continue
+        const before = new Set(Object.keys(facade.getRelations()))
+        const error = await attempt('add_relation', { sourceId: from.mockup, targetId: to, relationType: 'navigates-to', properties: { description: stepLabel(step) } }, ctx, facade)
+        if (error) { failures.push(`navigates-to for "${path.name}": ${error}`); continue }
+        navigated.add(`${from.mockup}->${to}`)
+        written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from.mockup}->${to}`, kind: 'relation', label: stepLabel(step), confidence: 'observed', facts: [path.id] })
+      }
+    }
     if (failures.length) return refused(`assay_apply: the plan is refused, nothing was written:\n${failures.map((f) => `- ${f}`).join('\n')}`)
 
     // Needs and decisions first: a requirement may name a need of the same plan.
@@ -644,7 +818,7 @@ export class Assay {
       if (at.length) built.set(ctx.resolveId(e.key), at)
     }
     const lines = [
-      `Wrote ${written.filter((w) => w.kind === 'element').length} elements and ${written.filter((w) => w.kind === 'relation').length} relations into the central model.`,
+      `Wrote ${plural(written.filter((w) => w.kind === 'element').length, 'element')}${plan.mockups.length ? `, ${plural(written.filter((w) => w.kind === 'mockup').length, 'mockup')}` : ''} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model.`,
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -653,6 +827,8 @@ export class Assay {
       commit: () => {
         run.written.push(...written)
         run.proposals.push(...proposals)
+        run.mockupOf = mockupOf
+        run.navigated = navigated
       },
       afterWrite: async () => this.writeFiles(run, { implements: built, verifies: new Map() }, nodes),
     })
@@ -679,25 +855,27 @@ export class Assay {
     }
     const r = p.requirement
     const props = r.properties as Record<string, string | undefined>
+    // A clause given with its own keyword (When the customer …) is not given it twice.
+    const bare = (text: string | undefined, keyword: RegExp) => text?.replace(keyword, '')
     const ears = [
-      props.feature && `Where ${props.feature},`,
-      props.precondition && `while ${props.precondition},`,
-      props.trigger && `when ${props.trigger},`,
-      props.unwanted_condition && `if ${props.unwanted_condition}, then`,
+      props.feature && `Where ${bare(props.feature, /^where\s+/i)},`,
+      props.precondition && `while ${bare(props.precondition, /^while\s+/i)},`,
+      props.trigger && `when ${bare(props.trigger, /^when\s+/i)},`,
+      props.unwanted_condition && `if ${bare(props.unwanted_condition, /^if\s+/i)}, then`,
       props.action,
     ].filter(Boolean).join(' ')
     const need = p.needProposal ?? (p.need ? label(p.need) : undefined)
     return [
       `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${need ? `, derived from ${need}` : ''}: ${ears}`,
       ...(props.rationale ? [`    rationale: ${props.rationale}`] : []),
-      ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}`),
+      ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}${s.tests?.length ? `; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}` : ''}${s.paths?.length ? `; explored paths, each written as a Playwright test when accepted: ${s.paths.map((x) => `"${(run.facts.get(x)?.fact as PathFact | undefined)?.name ?? x}"`).join(', ')}` : ''}`),
       ...(r.scenarios.length ? [] : ['    no scenario: it rests on the code or documents it cites, not on tests that pass']),
       ...quoted(r.citations),
     ].join('\n')
   }
 
   private async answer(run: Run, input: unknown, ctx: ToolRunContext, facade: ModelFacade): Promise<AssayResult> {
-    const { proposal, accept, changes } = (input ?? {}) as { proposal?: unknown; accept?: unknown; changes?: { label?: unknown; properties?: unknown; description?: unknown; need?: unknown } }
+    const { proposal, accept, changes } = (input ?? {}) as { proposal?: unknown; accept?: unknown; changes?: { label?: unknown; properties?: unknown; description?: unknown; need?: unknown; parent?: unknown } }
     const p = run.proposals.find((x) => x.id === proposal)
     if (!p) return refused(`assay_answer: no proposal ${String(proposal)}; the waiting ones: ${run.proposals.filter((x) => x.status === 'waiting').map((x) => x.id).join(', ') || 'none'}`)
     if (p.status !== 'waiting') return refused(`assay_answer: ${p.id} was ${p.status} already`)
@@ -725,7 +903,7 @@ export class Assay {
       return { problem: waiting ? `it names ${waiting.id} ("${labelOf(waiting)}"); answer ${waiting.id} first` : `it names ${ref}, which is not in the model` }
     }
     const found = (ref: string | undefined): string | undefined | { problem: string } => (ref === undefined ? undefined : where(ref))
-    const parentOf = found(p.parent)
+    const parentOf = found(typeof changes?.parent === 'string' ? changes.parent : p.parent)
     if (typeof parentOf === 'object') return refused(`assay_answer: ${p.id}: its place: ${parentOf.problem}`)
     const placed = parentOf ? { parentId: parentOf } : {}
 
@@ -792,18 +970,20 @@ export class Assay {
         }
       }
       if (await step('add_node', { tempId: r.key, type: 'requirement', label, properties, ...(parent ? { parentId: parent } : {}) }, `requirement "${label}"`)) {
-        const facts = [...new Set([...(r.facts ?? []), ...r.scenarios.flatMap((s) => s.tests)])]
+        const facts = [...new Set([...(r.facts ?? []), ...r.scenarios.flatMap((s) => [...(s.tests ?? []), ...(s.paths ?? [])])])]
         written.push({ id: ctx.resolveId(r.key), key: r.key, kind: 'requirement', label, confidence: 'hypothesis', facts, ...(r.citations?.length ? { citations: r.citations } : {}), accepted: accepted(false) })
         if (needId) await step('add_relation', { sourceId: r.key, targetId: needId, relationType: 'derives' }, 'derives from its need')
         if (satisfiedBy) await step('add_relation', { sourceId: satisfiedBy, targetId: r.key, relationType: 'satisfies' }, `${nodes[satisfiedBy].label} satisfies it`)
         for (const sc of r.scenarios) {
           if (!await step('add_node', { tempId: sc.key, type: 'scenario', label: sc.label, properties: { given: sc.given, when: sc.when, then: sc.then }, ...(parent ? { parentId: parent } : {}) }, `scenario "${sc.label}"`)) continue
-          written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: sc.tests })
+          written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: [...(sc.tests ?? []), ...(sc.paths ?? [])] })
           await step('add_relation', { sourceId: sc.key, targetId: r.key, relationType: 'verifies' }, `scenario "${sc.label}" verifies it`)
         }
       }
       if (failures.length) return refused(`assay_answer: ${p.id} could not be written, nothing was:\n${failures.map((f) => `- ${f}`).join('\n')}`)
-      const verifies = new Map(r.scenarios.map((sc) => [ctx.resolveId(sc.key), sc.tests]))
+      const verifies = new Map(r.scenarios.map((sc) => [ctx.resolveId(sc.key), sc.tests ?? []]))
+      // An explored path becomes a test of the repository that builds the application.
+      const pathTests = r.scenarios.flatMap((sc) => (sc.paths ?? []).map((id) => ({ scenario: ctx.resolveId(sc.key), path: run.facts.get(id)!.fact as PathFact })))
       const after = facade.getNodes()
       return ok(`${p.id} added: requirement "${label}" (${ctx.resolveId(r.key)}) with ${r.scenarios.length} scenario${r.scenarios.length === 1 ? '' : 's'}${parent ? ` in ${after[parent]?.label}` : ''}.${note}`, {
         commit: () => {
@@ -812,7 +992,7 @@ export class Assay {
           run.written.push(...written)
           if (foundNeed) run.needId = foundNeed
         },
-        afterWrite: async () => this.writeFiles(run, { implements: new Map(), verifies }, after),
+        afterWrite: async () => this.writeFiles(run, { implements: new Map(), verifies, pathTests }, after),
       })
     }
     if (failures.length) return refused(`assay_answer: ${p.id} could not be written, nothing was:\n${failures.map((f) => `- ${f}`).join('\n')}`)
@@ -830,7 +1010,7 @@ export class Assay {
 
   /** Writes the files beside the model and says what it wrote; never
    *  throws, so a write the model already has is never reported as refused. */
-  private async writeFiles(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]> }, nodes: Record<string, { label: string }>): Promise<string> {
+  private async writeFiles(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]>; pathTests?: Array<{ scenario: string; path: PathFact }> }, nodes: Record<string, { label: string }>): Promise<string> {
     try {
       return await this.writeMapping(run, map, nodes)
     } catch (error) {
@@ -840,7 +1020,7 @@ export class Assay {
 
   /** Writes the code repositories' .radical/radical.json entries and the
    *  central repository's run file; says what it wrote. */
-  private async writeMapping(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]> }, nodes: Record<string, { label: string }>): Promise<string> {
+  private async writeMapping(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]>; pathTests?: Array<{ scenario: string; path: PathFact }> }, nodes: Record<string, { label: string }>): Promise<string> {
     const byRepo = new Map<string, { implements: Map<string, string[]>; verifies: Map<string, string[]> }>()
     const entry = (repo: string) => byRepo.get(repo) ?? byRepo.set(repo, { implements: new Map(), verifies: new Map() }).get(repo)!
     for (const [id, places] of map.implements) {
@@ -858,6 +1038,23 @@ export class Assay {
       }
     }
     const notes: string[] = []
+    // An explored path's test goes into e2e/assay/ of the repository that builds the application, and nowhere else.
+    const screens = new Map((run.explore?.facts.screens ?? []).map((x) => [x.id, x]))
+    for (const { scenario, path } of map.pathTests ?? []) {
+      const dir = run.repositories.find((r) => r.repository === path.repository)?.dir
+      if (!dir || !isRepository(dir)) { notes.push(`${path.repository} is no git repository: the test of "${path.name}" is not written`); continue }
+      const file = join(dir, pathTestFile(path))
+      if (!within(join(dir, 'e2e', 'assay'), file)) { notes.push(`the test of "${path.name}" would land outside e2e/assay/: not written`); continue }
+      await mkdir(dirname(file), { recursive: true })
+      await writeFile(file, pathTest(path, screens, new Date().toISOString().slice(0, 10)))
+      // A config beside the tests, so they run as they are: npx playwright test -c e2e/assay.
+      const config = join(dir, 'e2e', 'assay', 'playwright.config.ts')
+      if (!existsSync(config)) await writeFile(config, PLAYWRIGHT_CONFIG)
+      notes.push(`${path.repository}/${pathTestFile(path)} (run: npx playwright test -c e2e/assay, with @playwright/test installed, E2E_BASE_URL${path.steps.some((x) => x.secret) ? ' and E2E_PASSWORD' : ''})`)
+      run.testsWritten.push(`${path.repository}/${pathTestFile(path)}`)
+      const list = entry(path.repository).verifies
+      list.set(scenario, [...new Set([...(list.get(scenario) ?? []), pathTestId(path)])])
+    }
     for (const [repo, changes] of byRepo) {
       const dir = run.repositories.find((r) => r.repository === repo)?.dir
       if (!dir) { notes.push(`${repo} is no code repository of the run: nothing is mapped in it`); continue }
@@ -934,6 +1131,7 @@ export class Assay {
     const waiting = run.proposals.filter((p) => p.status === 'waiting')
     return [
       `Assay run on ${run.repositories.map((r) => r.repository).join(', ')}${run.sources.length ? ` with ${run.sources.length} source${run.sources.length === 1 ? '' : 's'} of documents (${run.sources.map((r) => r.repository).join(', ')})` : ''}: wrote ${count('element')} elements and ${count('relation')} relations between them, ${count('requirement')} requirements, ${count('scenario')} scenarios, ${run.written.filter((w) => w.kind === 'need' && w.key !== 'need').length} needs from documents${run.needId ? ' and the need Found in the code' : ''} and ${count('decision')} decisions into ${run.modelPath}; each requirement, scenario, need and decision with its own relations (satisfies, verifies, derives, constrains).`,
+      ...(run.explore ? [`Explored: ${run.explore.facts.paths.length} paths, ${run.explore.facts.screens.length} screens; ${run.written.filter((w) => w.kind === 'mockup').length} mockups written${run.testsWritten.length ? `, Playwright tests written: ${[...new Set(run.testsWritten)].join(', ')}` : ''}.`] : []),
       `Proposals: ${run.proposals.filter((p) => p.status === 'accepted').length} accepted, ${run.proposals.filter((p) => p.status === 'rejected').length} left out, ${waiting.length} waiting${waiting.length ? ` (${waiting.map((p) => `${p.id} "${labelOf(p)}"`).join(', ')})` : ''}.`,
       `Evidence: ${RUN_FILE}; facts: ${FACTS_FILE} in each repository; mapping: ${REPOSITORY_FILE} in each repository Assay wrote to.`,
     ].join('\n')

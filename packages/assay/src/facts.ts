@@ -12,6 +12,7 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import type { PathFact, ScreenFact } from './explore'
 
 /** Where a fact is written in the repository: a file from its root and a line (1-based). */
 export interface Evidence {
@@ -190,6 +191,9 @@ export interface RepositoryFacts {
   groups: GroupFact[]
   tests: TestFact[]
   documents: DocumentFact[]
+  /** The screens and paths of an explored application (the Explore stage's session only). */
+  screens: ScreenFact[]
+  paths: PathFact[]
   /** What could not be read, said, not thrown: a manifest that does not parse, a report that is no report. */
   notes: string[]
 }
@@ -205,11 +209,11 @@ export const factsFileOf = (dir: string, name: string, root: string): string =>
 const FORMAT = 'radical-assay-facts/1'
 
 /** The lists of facts a repository's facts hold. */
-export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'groups', 'tests', 'documents'] as const
+export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
 
 /** No facts yet: every list empty. */
 export const emptyFacts = (repository: string, dir: string): RepositoryFacts => ({
-  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], groups: [], tests: [], documents: [], notes: [],
+  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
 })
 
 /** The facts as written to FACTS_FILE: without the absolute folder, which is the reader's. */
@@ -246,12 +250,12 @@ export interface Link {
   via?: string
 }
 
-export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'group' | 'test' | 'document' | 'link'
-export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | GroupFact | TestFact | DocumentFact | Link
+export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
+export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
 
 const KIND_OF: Record<(typeof FACT_LISTS)[number], FactKind> = {
   units: 'unit', dependencies: 'dependency', apis: 'api', urls: 'url', clients: 'client', addresses: 'address',
-  services: 'service', databases: 'database', tables: 'table', groups: 'group', tests: 'test', documents: 'document',
+  services: 'service', databases: 'database', tables: 'table', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
 }
 
 /** Every fact of the repositories by id, links included. */

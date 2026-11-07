@@ -90,7 +90,7 @@ describe('Radical Assay over MCP', () => {
     await call('assay_start', { directories: ['../shop'] })
     const applied = await call('assay_apply', { plan: C4 })
     expect(applied.ok).toBe(true)
-    expect(applied.text).toContain('Wrote 3 elements and 1 relations into the central model.')
+    expect(applied.text).toContain('Wrote 3 elements and 1 relation into the central model.')
     const written = await nodes()
     expect(written.map((n) => [n.type, n.label]).sort()).toEqual([['container', 'Orders service'], ['system', 'Shop'], ['webapp', 'Storefront']])
     const id = (label: string) => written.find((n) => n.label === label)!.id

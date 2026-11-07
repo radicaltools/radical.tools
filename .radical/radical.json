@@ -3123,6 +3123,24 @@
     ] },
     { "element": "526d6850-aee3-402e-be88-784ebd08a6c3", "name": "Requirement nothing satisfies yet", "tests": [
       "apps/mcp/src/assay.test.ts › Radical Assay over MCP › writes a requirement no code satisfies yet, and derives one from the need the user names"
+    ] },
+    { "element": "1a73a026-8c62-4426-a717-85c4d4a1baf4", "name": "Running application opened", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › opens an application running on this machine, and refuses one on another host"
+    ] },
+    { "element": "2d06f0e3-1a6a-47b1-914c-3cc47174408f", "name": "Path recorded", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › records each action as the next step of the path, a password not kept"
+    ] },
+    { "element": "0f8fcf66-dc79-435b-9824-b402605163df", "name": "Destructive action refused", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › refuses a control that pays or deletes an account, and a link to another host"
+    ] },
+    { "element": "962e63e6-c621-4f06-990b-f02b89194459", "name": "Screens written as mockups", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › writes screens as observed mockups, joined in the order of the path",
+      "packages/assay/tests/explore.test.ts › radical assay: a path as a test › takes the routes of one page as one, whatever their data"
+    ] },
+    { "element": "b4c52bdc-3f40-4f7d-843e-5a3672fb8690", "name": "Path written as a test", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › writes an accepted path as a Playwright test of the repository, which passes",
+      "packages/assay/tests/explore.test.ts › radical assay: a path as a test › replays the path with the locators recorded, checks each screen it reaches, and keeps no password",
+      "packages/assay/tests/explore.test.ts › radical assay: a path as a test › checks a heading with a number by any number, and once for a screen that did not change"
     ] }
   ]
 }

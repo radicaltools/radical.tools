@@ -52,7 +52,23 @@ export interface PlanScenario {
   when: string
   then: string
   /** The test facts that check it: they go into its repository's .radical/radical.json verifies. */
-  tests: string[]
+  tests?: string[]
+  /** Paths explored in the running application that show it: each is written as a Playwright
+   *  test into the application's repository when the requirement is accepted. */
+  paths?: string[]
+}
+
+/** A screen of the running application, as a mockup. */
+export interface PlanMockup {
+  key: string
+  label: string
+  /** The screen fact it is built from. */
+  screen: string
+  description?: string
+  /** A plan key or an id of the model (a system, domain or group). */
+  parent?: string
+  /** The element that presents it (a webapp, container, component or system): a plan key or an id. */
+  presentedBy?: string
 }
 
 export interface PlanRequirement {
@@ -106,6 +122,7 @@ export interface Plan {
   requirements: PlanRequirement[]
   needs: PlanNeed[]
   decisions: PlanDecision[]
+  mockups: PlanMockup[]
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -116,7 +133,7 @@ const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) =
 export function parsePlan(input: unknown): { plan: Plan; problems: string[] } {
   const problems: string[] = []
   const raw = isRecord(input) ? input : {}
-  if (!isRecord(input)) problems.push('the plan must be an object with elements, relations, requirements, needs and decisions')
+  if (!isRecord(input)) problems.push('the plan must be an object with elements, relations, requirements, needs, decisions and mockups')
   const list = (key: string): Record<string, unknown>[] => {
     const v = raw[key]
     if (v === undefined) return []
@@ -132,8 +149,9 @@ export function parsePlan(input: unknown): { plan: Plan; problems: string[] } {
     requirements: list('requirements') as unknown as PlanRequirement[],
     needs: list('needs') as unknown as PlanNeed[],
     decisions: list('decisions') as unknown as PlanDecision[],
+    mockups: list('mockups') as unknown as PlanMockup[],
   }
-  if (!plan.elements.length && !plan.relations.length && !plan.requirements.length && !plan.needs.length && !plan.decisions.length && isRecord(input)) problems.push('the plan is empty')
+  if (!plan.elements.length && !plan.relations.length && !plan.requirements.length && !plan.needs.length && !plan.decisions.length && !plan.mockups.length && isRecord(input)) problems.push('the plan is empty')
   return { plan, problems }
 }
 
@@ -166,6 +184,7 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
   })
   plan.needs.forEach((n, i) => key(n.key, `needs[${i}]`))
   plan.decisions.forEach((d, i) => key(d.key, `decisions[${i}]`))
+  plan.mockups.forEach((m, i) => key(m.key, `mockups[${i}]`))
   const elementKeys = new Set(plan.elements.map((e) => e.key))
   const needKeys = new Set(plan.needs.map((n) => n.key))
   /** What an end of a relation is built from or stands for: units, services, databases (and the units services run). */
@@ -285,14 +304,24 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
       const at = `${where}, scenario ${j + 1} (${s?.label ?? s?.key})`
       if (!isRecord(s)) return
       for (const field of ['label', 'given', 'when', 'then'] as const) if (!text(s[field])) problems.push(`${at}: ${field} is missing`)
-      if (!strings(s.tests) || !s.tests.length) problems.push(`${at}: tests must list the test facts that check it`)
-      else for (const t of s.tests) {
+      const paths = s.paths
+      if (paths !== undefined && (!strings(paths) || paths.some((p) => facts.get(p)?.kind !== 'path'))) problems.push(`${at}: paths must list paths explored in the running application (assay_explore)`)
+      if ((!strings(s.tests) || !s.tests.length) && !(strings(paths) && paths.length)) problems.push(`${at}: tests must list the test facts that check it, or paths the explored paths that show it`)
+      else for (const t of strings(s.tests) ? s.tests : []) {
         const f = facts.get(t)
         if (f?.kind !== 'test') problems.push(`${at}: ${t} is no test of the run`)
         else if ((f.fact as TestFact).status !== 'passed') problems.push(`${at}: ${t} ${(f.fact as TestFact).status} in the reports; a scenario rests on tests that pass: leave the test out of it, or the scenario, and propose the requirement with the code it is drawn from (citations) and no scenarios`)
       }
     })
   })
+  plan.mockups.forEach((m, i) => {
+    const where = `mockups[${i}] (${m.label ?? m.key})`
+    if (!text(m.label)) problems.push(`${where}: label is missing`)
+    if (!text(m.screen) || facts.get(m.screen)?.kind !== 'screen') problems.push(`${where}: screen must name a screen of the explored application (assay_explore)`)
+    if (m.parent !== undefined && !resolves(m.parent)) problems.push(`${where}: parent ${String(m.parent)} is neither a key of the plan nor an id of the model`)
+    if (m.presentedBy !== undefined && !resolves(m.presentedBy)) problems.push(`${where}: presentedBy ${String(m.presentedBy)} is neither a key of the plan nor an id of the model`)
+  })
+
   plan.needs.forEach((n, i) => {
     const where = `needs[${i}] (${n.label ?? n.key})`
     if (!text(n.label)) problems.push(`${where}: label is missing`)

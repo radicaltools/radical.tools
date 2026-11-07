@@ -360,6 +360,30 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-07): Assay explores the running application
+
+Two runs of an agent (MCP tools only) through Assay with the Explore stage on
+a demo shop served locally. Fixed on the way: a password the form put in the
+address was kept in the screen facts; every field filled made a new screen,
+so navigates-to joined one pair of five mockups; paths shared one session
+while their tests start signed out; a heading with the run's data (Order 3)
+was asserted literally; a mockup kept the query of the visit. Still open:
+
+- The generated test checks the screens a path reaches, not what the
+  scenario's "then" says (the order's item and status): a scenario and its
+  test can disagree, and nothing reports it.
+- Every path behind a sign-in replays it; a shared start (a storage state,
+  a fixture) would shorten the paths and their tests.
+- Exploring changes the test database for real and nothing resets it, so a
+  path that creates something is not repeatable as recorded.
+- A page served without a charset is read as the browser shows it ("Â·"):
+  faithful, but the facts carry the mojibake.
+- The C4 stage still takes an http link at face value when one call of a
+  front end is absolute (another host) and another relative (a proxy): the
+  link's detail should say which half is weak.
+- The Explore stage reads web applications only; desktop applications wait
+  for a driver per platform (ADR Assay explores the running application).
+
 ### Dogfooding (2026-11-02): Radical Assay
 
 - The project's MCP server (`radical-architecture` in `.mcp.json`) is bound
