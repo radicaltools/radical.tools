@@ -442,7 +442,18 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const drafts = [...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...dotnet(files, groups, repo), ...python(files), ...vb6(files, groups, repo)]
   // One unit per folder: the first stack read claims it (a Python folder with a package.json for its tooling stays npm).
   const byPath = new Map<string, Draft>()
-  for (const d of drafts) if (!byPath.has(d.path)) byPath.set(d.path, d)
+  for (const d of drafts) {
+    const first = byPath.get(d.path)
+    if (!first) { byPath.set(d.path, d); continue }
+    // Several VB6 projects in one folder (a library, its EXE build, a variant) are one unit, known by each project's name and binary.
+    if (first.stack !== 'vb6' || d.stack !== 'vb6') continue
+    first.aliases.push(...(d.named ? [d.name] : []), ...d.aliases)
+    first.deps.push(...d.deps.filter((x) => !first.deps.includes(x)))
+    for (const [k, v] of d.depLines) if (!first.depLines.has(k)) first.depLines.set(k, v)
+    for (const [k, v] of d.depFiles) if (!first.depFiles.has(k)) first.depFiles.set(k, v)
+    first.refs.push(...d.refs)
+    first.reasons.push(...d.reasons.filter((x) => !first.reasons.includes(x)))
+  }
   for (const d of docker(files, new Set(byPath.keys()))) byPath.set(d.path, d)
 
   const units: Unit[] = []

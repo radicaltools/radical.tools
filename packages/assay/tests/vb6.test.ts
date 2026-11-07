@@ -85,4 +85,15 @@ describe('radical assay: VB6 applications as they are', () => {
     const dir = repo('pos', { 'App/POS.vbp': vbp('POS'), 'App/frmMain.frm': '', 'App/README!!.txt': 'Login: admin\n', 'Changelog-server.txt': 'v1\n', 'README.md': '# POS\n' })
     expect(extractRepository(dir).documents.map((d) => d.file)).toEqual(['App/README!!.txt', 'Changelog-server.txt', 'README.md'])
   })
+  it("joins several VB6 projects of one folder into one unit known by each project's binary, and links a program to it", () => {
+    const root = mkdtempSync(join(tmpdir(), 'assay-vb6-'))
+    const lib = repo('framework', {
+      'src/ASPMAN.vbp': 'Type=OleDll\r\nClass=cPage; cPage.cls\r\nName="ASPMANLIB"\r\nExeName32="ASPMAN.dll"\r\n', 'src/cPage.cls': '',
+      'src/VBMAN.vbp': 'Type=OleDll\r\nClass=cHttp; cHttp.cls\r\nName="VBMANLIB"\r\nExeName32="VBMAN.dll"\r\n', 'src/cHttp.cls': '',
+      'demo/Demo.vbp': 'Type=Exe\r\nReference=*\\G{A638B373-E3B1-4281-8BD3-957EAD54B31C}#3f.0#0#..\\dist\\DLL\\VBMAN.dll#VBMANLIB\r\nForm=frmMain.frm\r\nName="Demo"\r\n', 'demo/frmMain.frm': '',
+    }, root)
+    const facts = extractRepository(lib)
+    expect(facts.units.map((u) => [u.path, u.name, u.aliases])).toEqual([['demo', 'Demo', ['Demo.vbp']], ['src', 'ASPMANLIB', ['ASPMAN.dll', 'ASPMAN.vbp', 'VBMANLIB', 'VBMAN.dll', 'VBMAN.vbp']]])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to])).toEqual([['package', 'framework:unit:demo', 'framework:unit:src']])
+  })
 })

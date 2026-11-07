@@ -140,10 +140,12 @@ export interface CodeFacts {
   clients: ClientFact[]
   databases: DatabaseFact[]
   tables: TableFact[]
+  /** What was read as no fact, and why. */
+  notes: string[]
 }
 
 export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFacts {
-  const out: CodeFacts = { urls: [], addresses: [], apis: [], clients: [], databases: [], tables: [] }
+  const out: CodeFacts = { urls: [], addresses: [], apis: [], clients: [], databases: [], tables: [], notes: [] }
   const seen = new Set<string>()
   const once = (id: string): boolean => (seen.has(id) ? false : (seen.add(id), true))
 
@@ -279,6 +281,14 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   // A developer's local database beside the same one on a server is the same database.
   const local = (s?: string) => !!s && /^(localhost|127\.0\.0\.1|\.|\(local\)|\(localdb\).*)$/i.test(s)
   out.databases = out.databases.filter((d) => !local(d.server) || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && o.server && !local(o.server)))
+  // One file naming three engines or more is a library's templates (one per engine it supports), not databases it uses.
+  const engines = new Map<string, Set<string>>()
+  for (const d of out.databases) engines.set(d.evidence.file, (engines.get(d.evidence.file) ?? new Set()).add(d.engine))
+  for (const [file, set] of engines) {
+    if (set.size < 3) continue
+    out.databases = out.databases.filter((d) => d.evidence.file !== file)
+    out.notes.push(`${file} holds connection strings of ${set.size} engines (${[...set].sort().join(', ')}): a library's templates, read as no database`)
+  }
   return out
 }
 

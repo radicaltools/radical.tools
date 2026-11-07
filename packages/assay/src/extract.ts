@@ -115,10 +115,18 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.apis.push(...code.apis)
   facts.addresses.push(...code.addresses)
   facts.databases.push(...code.databases)
+  facts.notes.push(...code.notes)
   // The tables its schemas and ORM classes declare, with those its code names; its statuses; where its code is entered.
   const domain = readDomain(files, repo, facts.units, code.tables)
   facts.tables = domain.tables
   facts.states = domain.states
+  // A database a schema creates, unless a connection string of the unit already names it; one of its engine the unit
+  // names with neither a name nor a server (filled in at run time) is that one.
+  for (const db of domain.databases) {
+    if (facts.databases.some((d) => d.unit === db.unit && d.name?.toLowerCase() === db.name?.toLowerCase())) continue
+    facts.databases = facts.databases.filter((d) => !(d.unit === db.unit && d.engine === db.engine && !d.name && !d.server))
+    facts.databases.push(db)
+  }
   facts.entries = readEntries(files, repo, facts.units)
   // A desktop application's forms are its screens, read from their files.
   facts.screens = readForms(files, repo, facts.units)
