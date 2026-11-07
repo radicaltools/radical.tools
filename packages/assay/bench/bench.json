@@ -742,6 +742,89 @@
           "src/Demos/Modbus/Slave"
         ]
       ]
+    },
+    {
+      "name": "billing-system-vb6-2016",
+      "about": "A VB6 billing system on SQL Server 2008 R2, its schema (with foreign keys) in Database/CreateDatabase.sql. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out at first (units 5/5, calls 1/3, tables 13/17 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/Mherediau/billing-system-vb6-2016.git",
+      "commit": "6e62436c615188e3f5c5c3053b3b83a6d526f11c",
+      "stacks": "VB6 Standard EXE, ADO, SQL Server, Crystal Reports",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:billingdb"
+        ]
+      ],
+      "tables": [
+        "auditlog",
+        "configuration",
+        "customers",
+        "invoicedetails",
+        "invoices",
+        "payments",
+        "products",
+        "stockmovements",
+        "users"
+      ],
+      "optional": []
+    },
+    {
+      "name": "MMUD-Explorer",
+      "about": "A VB6 database viewer for the game MajorMUD, reading its Access game database through DAO (its docs name the recordsets of items, monsters, spells, rooms, shops, races, classes and lairs). Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out at first (units 5/5, calls 1/3, tables 13/17 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/syntax53/MMUD-Explorer.git",
+      "commit": "28d23d70caf4f971418aa7ea25471cdb0ab0888a",
+      "stacks": "VB6 Standard EXE, DAO, Access",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:data-v1.11p.mdb"
+        ]
+      ],
+      "tables": [
+        "classes",
+        "items",
+        "lairs",
+        "monsters",
+        "races",
+        "rooms",
+        "shops",
+        "spells"
+      ],
+      "optional": []
+    },
+    {
+      "name": "omelette-vb6",
+      "about": "A VB6 framework that generates database applications: the Omelette tool, which keeps its projects in Databases/Projects.mdb and copies its Access templates, and two sample projects. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out at first (units 5/5, calls 1/3, tables 13/17 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/pyhoon/omelette-vb6.git",
+      "commit": "d327ef8a4a5c548a2494682d7189693fe0421922",
+      "stacks": "VB6 Standard EXEs, ADO, Access",
+      "units": [
+        ".",
+        "Samples/Empty",
+        "Samples/HelloWorld"
+      ],
+      "calls": [
+        [
+          ".",
+          "db:projects.mdb"
+        ]
+      ],
+      "optional": [
+        [
+          ".",
+          "db:master.mdb"
+        ],
+        [
+          ".",
+          "db:project.mdb"
+        ]
+      ]
     }
   ],
   "heldOut": [
@@ -1058,87 +1141,55 @@
       "optional": []
     },
     {
-      "name": "billing-system-vb6-2016",
-      "about": "A VB6 billing system on SQL Server 2008 R2, its schema (with foreign keys) in Database/CreateDatabase.sql. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/Mherediau/billing-system-vb6-2016.git",
-      "commit": "6e62436c615188e3f5c5c3053b3b83a6d526f11c",
-      "stacks": "VB6 Standard EXE, ADO, SQL Server, Crystal Reports",
+      "name": "hospital-management-system",
+      "about": "A VB6 hospital management system on an Access database (hms.mdb, named by its Jet connection strings and a data environment). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/Htech00/hospital-management-system.git",
+      "commit": "a10da471bc5045b225f4405a7d0963fa05a0b631",
+      "stacks": "VB6 Standard EXE, ADO, Jet, data environment, Access",
       "units": [
         "."
       ],
       "calls": [
         [
           ".",
-          "db:billingdb"
+          "db:hms.mdb"
         ]
-      ],
-      "tables": [
-        "auditlog",
-        "configuration",
-        "customers",
-        "invoicedetails",
-        "invoices",
-        "payments",
-        "products",
-        "stockmovements",
-        "users"
       ],
       "optional": []
     },
     {
-      "name": "MMUD-Explorer",
-      "about": "A VB6 database viewer for the game MajorMUD, reading its Access game database through DAO (its docs name the recordsets of items, monsters, spells, rooms, shops, races, classes and lairs). Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/syntax53/MMUD-Explorer.git",
-      "commit": "28d23d70caf4f971418aa7ea25471cdb0ab0888a",
-      "stacks": "VB6 Standard EXE, DAO, Access",
+      "name": "philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781",
+      "about": "A VB6 inventory and receivables system on ADO and an Access database (Db.mdb in its folder), reports through a file DSN (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/Planet-Source-Code/philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781.git",
+      "commit": "970ac3aa3109f1745f5ff9a35c6349643cb7db96",
+      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
       "units": [
-        "."
+        "prjSMIAS/SMIAS"
       ],
       "calls": [
         [
-          ".",
-          "db:data-v1.11p.mdb"
+          "prjSMIAS/SMIAS",
+          "db:db.mdb"
         ]
-      ],
-      "tables": [
-        "classes",
-        "items",
-        "lairs",
-        "monsters",
-        "races",
-        "rooms",
-        "shops",
-        "spells"
       ],
       "optional": []
     },
     {
-      "name": "omelette-vb6",
-      "about": "A VB6 framework that generates database applications: the Omelette tool, which keeps its projects in Databases/Projects.mdb and copies its Access templates, and two sample projects. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/pyhoon/omelette-vb6.git",
-      "commit": "d327ef8a4a5c548a2494682d7189693fe0421922",
-      "stacks": "VB6 Standard EXEs, ADO, Access",
+      "name": "divyen-patel-inventory-control-system__1-40440",
+      "about": "A VB6 retail inventory and accounts system on an Access database (Master_Database.mdb, one per company under data\\\\<company>), Crystal Reports (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/Planet-Source-Code/divyen-patel-inventory-control-system__1-40440.git",
+      "commit": "01826ffaca35679bc09c6a7841b26deb7e4f858a",
+      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
       "units": [
-        ".",
-        "Samples/Empty",
-        "Samples/HelloWorld"
+        "Inventory System"
       ],
       "calls": [
         [
-          ".",
-          "db:projects.mdb"
+          "Inventory System",
+          "db:master_database.mdb"
         ]
       ],
-      "optional": [
-        [
-          ".",
-          "db:master.mdb"
-        ],
-        [
-          ".",
-          "db:project.mdb"
-        ]
-      ]
+      "optional": []
     }
   ]
 }
