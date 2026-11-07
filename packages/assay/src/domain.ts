@@ -8,7 +8,8 @@
 // reads). A table an ORM class maps is the table its SQL names: one fact,
 // its id the table's name.
 
-import { extname } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { extname, join } from 'node:path'
 import type { DatabaseFact, StateFact, TableFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
@@ -447,7 +448,16 @@ export interface DomainFacts {
   states: StateFact[]
   /** The databases SQL files create. */
   databases: DatabaseFact[]
+  notes: string[]
 }
+
+/** An Access file's tables, their columns, and its relationships (MSysRelationships). */
+export interface AccessSchema {
+  tables: Array<{ name: string; columns: Array<{ name: string; type?: string }> }>
+  relationships: Array<{ table: string; column: string; references: string; referencedColumn?: string }>
+}
+/** Reads an Access file's schema; throws when it cannot (a password, another format). */
+export type AccessReader = (bytes: Uint8Array) => AccessSchema
 
 /** A database's own tables, which no system of its users keeps: SQL Server's sys…, the information schema, Oracle's dual, Access's MSys…. */
 const SYSTEM_TABLE = /^(sys\w*|information_schema|dual|msys\w*|sqlite_\w+|pg_\w+)$/i
@@ -455,8 +465,32 @@ const SYSTEM_TABLE = /^(sys\w*|information_schema|dual|msys\w*|sqlite_\w+|pg_\w+
 const VIEW_NAME = /^(v|vw|view|appview)_|_(v|vw|view)$/i
 
 /** The tables of the repository's schemas and ORM classes, merged with those its code names (`named`), and its statuses. */
-export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[]): DomainFacts {
+export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[], used: DatabaseFact[] = [], access?: AccessReader): DomainFacts {
   const declared: Declared[] = []
+  const notes: string[] = []
+  // An Access file the repository holds is the schema of the units whose code uses it (the one that holds it, else).
+  for (const file of files.list.filter((f) => /\.(mdb|accdb)$/i.test(f))) {
+    const base = file.slice(file.lastIndexOf('/') + 1).toLowerCase()
+    const users = units.filter((u) => used.some((d) => d.unit === u.id && d.engine === 'Access' && d.name?.toLowerCase() === base))
+    if (!users.length) continue
+    if (!access) { notes.push(`${file}: an Access file whose tables only the MCP server reads (the CLI reads no Access file)`); continue }
+    let schema: AccessSchema
+    try {
+      schema = access(readFileSync(join(files.root, file)))
+    } catch (error) {
+      notes.push(`${file}: an Access file not read (${(error as Error).message.split('\n')[0]})`)
+      continue
+    }
+    for (const unit of users) {
+      for (const t of schema.tables) {
+        declared.push({
+          unit, table: t.name, declared: 'Access', evidence: { file, line: 1 },
+          columns: t.columns.map((c) => ({ name: c.name, ...(c.type ? { type: c.type } : {}), line: 1 })),
+          references: schema.relationships.filter((r) => r.table === t.name).map((r) => ({ column: r.column, table: r.references, line: 1 })),
+        })
+      }
+    }
+  }
   const schemaStates: Array<SchemaState & { unit: Unit }> = []
   const prismaEnums: Array<CodeEnum & { unit: Unit }> = []
   const enums: Array<CodeEnum & { unit: Unit }> = []
@@ -550,6 +584,36 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     states.push({ id, unit: t.unit, name: `${t.table} flags`, values: flags.flatMap((f) => [f.value, `not ${f.value}`]), table: t.table, flags: flags.map((f) => ({ ...f, line: t.columns!.find((c) => c.name === f.column)!.line })), sets: [], evidence: { file: t.evidence.file, line: t.columns!.find((c) => c.name === flags[0].column)!.line } })
     flagsOf.set(id, flags)
   }
+  // A status kept in short quoted values the code sets and tests (Paid = "Y", Status = "New"): a state fact of its field.
+  const quoted = new Map<string, { unit: Unit; field: string; values: Map<string, string>; sets: StateFact['sets']; evidence: { file: string; line: number } }>()
+  const isField = (name: string): boolean => isStatus(name) || CONDITION.test(name) || /^(paid|cleared|lock(ed)?|posted|approved|active|void(ed)?|closed|cancell?ed)$/i.test(name)
+  for (const file of sources.filter((f) => /\.(bas|cls|frm|ctl|vb)$/i.test(f))) {
+    const unit = own(file)!
+    withoutVbComments(files.read(file)).split('\n').forEach((line, i) => {
+      const note = (field: string, value: string, set: boolean): void => {
+        if (!isField(field) || !value.trim() || value.length > 12) return
+        const key = `${unit.id}|${field.toLowerCase()}`
+        const q = quoted.get(key) ?? quoted.set(key, { unit, field, values: new Map(), sets: [], evidence: { file, line: i + 1 } }).get(key)!
+        if (!q.values.has(value.toLowerCase())) q.values.set(value.toLowerCase(), value)
+        if (set && q.sets.length < SETS) q.sets.push({ value: q.values.get(value.toLowerCase())!, unit: unit.id, file, line: i + 1 })
+      }
+      // In SQL: an UPDATE's SET assigns, its WHERE (and any other) compares.
+      const update = /\bupdate\b[\s\S]*?\bset\b([\s\S]*?)(?:\bwhere\b([\s\S]*))?$/i.exec(line)
+      for (const m of (update?.[1] ?? '').matchAll(/\b(\w+)\s*=\s*'([^'"]{1,12})'/g)) note(m[1], m[2], true)
+      for (const m of (update ? update[2] ?? '' : line).matchAll(/\b(\w+)\s*=\s*'([^'"]{1,12})'/g)) note(m[1], m[2], false)
+      // In VB: rs!Paid = "Y", rs("Paid") = "Y", rs.Fields("Paid").Value = "Y"; a test (If, Case, While) compares.
+      const test = /^\s*(?:If|ElseIf|Case|Do|Loop|While|Select)\b/i.test(line)
+      for (const m of line.matchAll(/(?:!|\(\s*")(\w+)"?\s*\)?(?:\.Value)?\s*=\s*"([^"]{1,12})"/g)) note(m[1], m[2], !test)
+    })
+  }
+  for (const q of quoted.values()) {
+    if (q.values.size < 2 || !q.sets.length) continue
+    const id = `${repo}:state:${q.unit.path}:${q.field.toLowerCase()}`
+    if (states.some((s) => s.id === id)) continue
+    const column = [...tables.values()].filter((t) => t.unit === q.unit.id && t.columns?.some((c) => c.name.toLowerCase() === q.field.toLowerCase()))
+    states.push({ id, unit: q.unit.id, name: q.field, values: [...q.values.values()], ...(column.length === 1 ? { table: column[0].table, column: column[0].columns!.find((c) => c.name.toLowerCase() === q.field.toLowerCase())!.name } : {}), sets: q.sets, evidence: q.evidence })
+    flagsOf.set(id, [])
+  }
   if (states.length) {
     // Where each value is set, in any unit's code: an enum by its name and member, any status by its string,
     // a flag by its column set (1, true, now) or cleared (0, false, null).
@@ -592,5 +656,28 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   }
   // A view, or a database's own table, that the code names is no table of the domain.
   for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|information_schema)\./i.test(t.table))) tables.delete(id)
-  return { tables: [...tables.values()], states, databases }
+  return { tables: [...tables.values()], states, databases, notes }
+}
+
+/** What an Access file reader must offer: mdb-reader's MDBReader, which the MCP server and the bench hand over. */
+interface MdbLike {
+  getTableNames(options?: { normalTables?: boolean; systemTables?: boolean; linkedTables?: boolean }): string[]
+  getTable(name: string): { getColumns(): Array<{ name: string; type: string }>; getData(): Array<Record<string, unknown>> }
+}
+
+/** An AccessReader of mdb-reader's class: the tables and their columns, and the relationships MSysRelationships holds. */
+export function accessReaderOf(MDB: new (buffer: Buffer) => MdbLike): AccessReader {
+  return (bytes) => {
+    const db = new MDB(Buffer.from(bytes))
+    const tables = db.getTableNames().map((name) => ({ name, columns: db.getTable(name).getColumns().map((c) => ({ name: c.name, type: c.type })) }))
+    let relationships: AccessSchema['relationships'] = []
+    if (db.getTableNames({ normalTables: false, systemTables: true }).includes('MSysRelationships')) {
+      try {
+        relationships = db.getTable('MSysRelationships').getData().map((r) => ({ table: String(r.szObject), column: String(r.szColumn), references: String(r.szReferencedObject), referencedColumn: String(r.szReferencedColumn) }))
+      } catch {
+        // A file whose system tables cannot be read: its tables without their relationships.
+      }
+    }
+    return { tables, relationships }
+  }
 }

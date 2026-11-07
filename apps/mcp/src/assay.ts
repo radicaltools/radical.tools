@@ -30,13 +30,17 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  accessReaderOf, emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
   type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
+import MDBReader from 'mdb-reader'
 import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
+
+/** Reads the Access files of the code: their tables, columns and relationships. */
+const ACCESS = accessReaderOf(MDBReader)
 
 /** The evidence of what a run wrote, from the central repository's root. */
 export const RUN_FILE = '.radical/assay/run.json'
@@ -782,7 +786,7 @@ export class Assay {
     const repositories: RepositoryFacts[] = []
     for (const dir of found.dirs) {
       const own = byRepo[basename(dir)]
-      const facts = extractRepository(dir, Array.isArray(own) ? { reports: own.filter((r): r is string => typeof r === 'string') } : {})
+      const facts = extractRepository(dir, { access: ACCESS, ...(Array.isArray(own) ? { reports: own.filter((r): r is string => typeof r === 'string') } : {}) })
       repositories.push(facts)
       // A folder of code is left as it was: its facts are kept in the central repository.
       const file = factsFileOf(dir, facts.repository, root)
@@ -1039,6 +1043,10 @@ export class Assay {
         const to = mockupOf.get(target)
         if (!to || to === from || navigated.has(`${from}->${to}`)) continue
         const control = screen.controls.find((c) => c.ref === open.via || c.ref.startsWith(`${open.via}(`))
+        // Closing, saving or going back to the form that opens this one is no navigation.
+        const opener = (run.facts.get(target)?.fact as ScreenFact | undefined)?.opens?.some((o) => o.form.toLowerCase() === screen.route.toLowerCase())
+        const BACK = /^(?:cmd|btn|mnu|img|lbl|command)?_?(?:close|back|cancel|exit|return|done|save|quit|salir|cerrar|volver|regresar)/i
+        if (opener && (BACK.test(open.via ?? '') || BACK.test((control?.name ?? '').replace(/^[^A-Za-z]+/, '')))) continue
         const name = control ? `"${control.name}"` : open.via ?? 'the form'
         const label = open.key ? `presses a key in ${name}` : `${control?.role === 'menuitem' ? 'chooses' : 'clicks'} ${name}`
         const before = new Set(Object.keys(facade.getRelations()))

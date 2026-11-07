@@ -8,7 +8,8 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { extractRepository, linkRepositories, type Link, type RepositoryFacts } from '../src/index'
+import MDBReader from 'mdb-reader'
+import { accessReaderOf, extractRepository, linkRepositories, type Link, type RepositoryFacts } from '../src/index'
 
 interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; judge?: 'runtime' }
 const bench = JSON.parse(readFileSync(fileURLToPath(new URL('./bench.json', import.meta.url)), 'utf8')) as { repositories: Expected[]; heldOut: Expected[] }
@@ -46,7 +47,7 @@ for (const repo of (heldOut ? bench.heldOut : bench.repositories).filter((r) => 
     return dir
   })
   const started = Date.now()
-  const all = dirs.map((d) => extractRepository(d))
+  const all = dirs.map((d) => extractRepository(d, { access: accessReaderOf(MDBReader) }))
   const links: Link[] = linkRepositories(all)
   const ms = Date.now() - started
   const facts: RepositoryFacts = { ...all[0], units: [], services: [], databases: [], tables: [], notes: [] }
