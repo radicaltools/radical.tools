@@ -213,6 +213,32 @@ describe('radical assay: status values', () => {
   })
 })
 
+describe('radical assay: status flags', () => {
+  it('records a lifecycle kept in boolean flags and nullable dates, and the lines that set and clear each', () => {
+    const facts = extractRepository(repo('game', {
+      'Server.vbp': 'Type=Exe\r\nModule=modUser; modUser.bas\r\nName="Server"\r\n',
+      'db/schema.sql': [
+        'CREATE TABLE user (', '  id INT PRIMARY KEY,', '  is_dead BOOLEAN NOT NULL DEFAULT FALSE,', '  is_ban TINYINT(1) NOT NULL DEFAULT 0,',
+        '  is_admin_note VARCHAR(20),', '  created_at DATETIME,', '  level INT NOT NULL', ');', '',
+        'CREATE TABLE invoices (', '  id INT PRIMARY KEY,', '  PaidOn DATETIME NULL,', '  DueDate DATETIME NULL,', '  IssuedOn DATETIME NOT NULL,', '  shipped_at timestamp', ');', '',
+      ].join('\n'),
+      'modUser.bas': [
+        'Attribute VB_Name = "modUser"', 'Public Sub Kill(ByVal id As Long)', '  db.Execute "UPDATE user SET is_dead = 1 WHERE id = " & id',
+        'End Sub', 'Public Sub Revive(rs As Recordset)', '  rs!is_dead = 0', '  If rs!is_ban = 1 Then Exit Sub', 'End Sub',
+        'Public Sub Pay(rs As Recordset)', '  rs("PaidOn") = Now', 'End Sub', '',
+      ].join('\r\n'),
+    }))
+    const flags = facts.states.filter((s) => s.flags)
+    expect(flags.map((s) => [s.id, s.name, s.table, s.values, s.flags!.map((f) => [f.column, f.value])])).toEqual([
+      ['game:state:.:user.flags', 'user flags', 'user', ['dead', 'not dead', 'ban', 'not ban'], [['is_dead', 'dead'], ['is_ban', 'ban']]],
+      ['game:state:.:invoices.flags', 'invoices flags', 'invoices', ['paid', 'not paid', 'shipped', 'not shipped'], [['PaidOn', 'paid'], ['shipped_at', 'shipped']]],
+    ])
+    // A comparison sets nothing; a date when the row was made, or one due, is no event of its lifecycle.
+    expect(flags[0].sets.map((x) => [x.value, x.file, x.line])).toEqual([['dead', 'modUser.bas', 3], ['not dead', 'modUser.bas', 6]])
+    expect(flags[1].sets.map((x) => [x.value, x.line])).toEqual([['paid', 10]])
+  })
+})
+
 describe('radical assay: entry points', () => {
   it('records HTTP routes, scheduled jobs and message handlers, each with its line, and a unit\'s test framework', () => {
     const node = extractRepository(repo('orders-node', {
