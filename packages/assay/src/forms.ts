@@ -55,13 +55,24 @@ const caption = (text: string): string => text.replace(/""/g, '"').replace(/&&/g
 /** Each form of the repository's VB6 units, as a screen fact. */
 export function readForms(files: RepoFiles, repo: string, units: Unit[]): ScreenFact[] {
   const forms: Array<{ screen: ScreenFact; code: string; codeLine: number; unit: Unit }> = []
+  // The forms each project lists (Form=, UserDocument=): a form file it does not list is no screen of it.
+  const listed = new Map<string, Set<string>>()
+  for (const u of units.filter((x) => x.stack === 'vb6' && /\.vbp$/i.test(x.evidence.file))) {
+    const dir = u.path === '.' ? '' : `${u.path}/`
+    const names = [...files.read(u.evidence.file).matchAll(/^(?:Form|UserDocument)=(.+?)\s*$/gim)].map((m) => `${dir}${m[1].trim().replace(/\\/g, '/')}`.toLowerCase())
+    if (names.length) listed.set(u.id, new Set(names))
+  }
   for (const file of files.list.filter((f) => /\.(frm|dob)$/i.test(f))) {
     const unit = owner(units, file)
     if (!unit || unit.stack !== 'vb6') continue
+    if (listed.has(unit.id) && !listed.get(unit.id)!.has(file.toLowerCase())) continue
     const text = files.read(file)
     const read = readForm(text, file)
     if (!read) continue
-    forms.push({ unit, code: text.slice(read.codeAt), codeLine: lineAt(text, read.codeAt), screen: { id: `${repo}:screen:${unit.path}:${read.name}`, ...read.screen } })
+    // Two files declaring one form name are two screens.
+    const base = `${repo}:screen:${unit.path}:${read.name}`
+    const id = forms.some((f) => f.screen.id === base) ? `${base}@${file.slice(file.lastIndexOf('/') + 1)}` : base
+    forms.push({ unit, code: text.slice(read.codeAt), codeLine: lineAt(text, read.codeAt), screen: { id, ...read.screen } })
   }
   // A form opens another of its own unit by its name.
   for (const f of forms) {

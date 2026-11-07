@@ -97,7 +97,8 @@ export const ASSAY_PROCEDURE = [
   '   database, a service) is no element: tell the user, and let a decision or requirement say so. A group is inferred.',
   '   Reuse elements the model has, by id, instead of adding them again. Every element and relation cites the facts it',
   '   rests on (facts) and is observed when a',
-  '   fact states it (a unit, an API, a service, a database, a dependency, an observed link) or inferred when concluded',
+  '   fact states it (an element: a unit, an API, a service, a database; a relation: a dependency, an observed link; a',
+  '   component a dependency alone names is inferred, citing it) or inferred when concluded',
   '   (a system grouping units, an http, gRPC or address link); an element built from units lists them in units (a system',
   '   cites the units it groups in facts, not units, which map folders), and a',
   '   relation\'s links must join the units of its two ends. Code no reader covers (COBOL, Delphi, PowerBuilder, …: a',
@@ -1126,7 +1127,7 @@ export class Assay {
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
       ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
-      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
+      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts${plan.stateMachines.every((m) => !(m.facts ?? []).length) ? ' (the machines cite no state fact: that is expected)' : ''} (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -1454,6 +1455,7 @@ export class Assay {
   private skeletonFor(run: Run, element: string | undefined, requirement: string, scenarios: Array<{ id: string; label: string; given: string; when: string; then: string; citations?: Citation[] }>): ({ repository: string; scenarios: string[] } & Skeleton) | { note: string } {
     const none = (why: string) => ({ note: `Its scenario${scenarios.length === 1 ? '' : 's'} from the code ${scenarios.length === 1 ? 'has' : 'have'} no pending test: ${why}.` })
     const unitId = element ? run.written.find((w) => w.id === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    if (!element) return none('nothing satisfies it yet')
     if (!unitId) return none('the element that satisfies it is built from no unit of this run')
     const unit = run.facts.get(unitId)!.fact as Unit
     const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)

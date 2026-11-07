@@ -380,7 +380,22 @@ Access projects, gave units 3/3 and calls 3/3 before any change. Open:
   hold out repositories with several projects, SQL Server or Oracle, and
   network calls, where the first rounds failed.
 - **The agent's model is not measured.** The bench judges the facts; an
-  agent run on the held-out set is compared by hand.
+  agent run on the held-out set is compared by hand. On the last three (run
+  19) it wrote a system and a container per unit and each application's
+  database from the facts, as expected; it read 105 screens as mockups, 52
+  entities, 12 processes and 36 requirements on top. Fixed after it: one Access
+  file whatever the case of its name, cited where the code connects to it;
+  only forms the project lists; Access queries (`qry_`) are no tables;
+  READ_ME and WARNING files are documents. Still open from it:
+  - **Access schemas.** An .mdb in the repository holds its tables' columns
+    and relations, unread: every entity relation rests on quoted code.
+  - **Statuses as Y/N strings.** `Paid = "Y"`, `Status = "New"` set in code
+    are no state fact; an ADO form-mode enum named *State is one.
+  - **UI timers as jobs.** A 50 ms splash timer reads as a scheduled job.
+  - **Navigation back to the menu.** Every form "opens" the main menu on
+    Save or Close; a menu that opens forms by a name in a variable opens none.
+  - **Unused references.** A COM reference never used in the code still reads
+    as a dependency.
 
 ### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
 

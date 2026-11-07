@@ -462,7 +462,7 @@ export type AccessReader = (bytes: Uint8Array) => AccessSchema
 /** A database's own tables, which no system of its users keeps: SQL Server's sys…, the information schema, Oracle's dual, Access's MSys…. */
 const SYSTEM_TABLE = /^(sys\w*|information_schema|dual|msys\w*|sqlite_\w+|pg_\w+)$/i
 /** A view by its name, where no schema of the repository creates it: vw_orders, v_stock, appview_itemlist, orders_view. */
-const VIEW_NAME = /^(v|vw|view|appview)_|_(v|vw|view)$/i
+const VIEW_NAME = /^(v|vw|view|appview|qry|query)_|_(v|vw|view|qry)$/i
 
 /** The tables of the repository's schemas and ORM classes, merged with those its code names (`named`), and its statuses. */
 export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[], used: DatabaseFact[] = [], access?: AccessReader): DomainFacts {

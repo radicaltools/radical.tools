@@ -201,7 +201,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       if (!db.server && !db.name && !db.explicit) continue
       // One database per name: a developer's and a container's connection string name the same one.
       if (db.server) db.server = db.server.replace(/[,:]\d+$/, '')
-      const id = `${repo}:db:${unit.path}:${db.engine}/${db.name ?? db.server ?? ''}`
+      // An Access file is one whatever the case of its name (hms.mdb, HMS.MDB).
+      const id = `${repo}:db:${unit.path}:${db.engine}/${db.engine === 'Access' ? (db.name ?? '').toLowerCase() : db.name ?? db.server ?? ''}`
       // The same database named again: a server's connection string over a developer's local one.
       const known = out.databases.findIndex((d) => d.id === id)
       if (known >= 0 && /^(localhost|127\.0\.0\.1)$/i.test(out.databases[known].server ?? '') && db.server && !/^(localhost|127\.0\.0\.1)$/i.test(db.server)) out.databases.splice(known, 1)
@@ -336,8 +337,10 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   for (const [unitId, named] of accessNamed) {
     if (!accessUsers.has(unitId)) continue
     const unit = units.find((u) => u.id === unitId)!
-    for (const n of named) {
-      const id = `${repo}:db:${unit.path}:Access/${n.name}`
+    // Where the code connects to it or opens it says more than where it copies or deletes it.
+    const opens = (n: { evidence: { file: string; line: number } }): boolean => /ConnectionString|Data Source|DBQ|OpenDatabase|DatabaseName|\.Open\b|Provider/i.test(files.read(n.evidence.file).split('\n')[n.evidence.line - 1] ?? '')
+    for (const n of [...named.filter(opens), ...named.filter((x) => !opens(x))]) {
+      const id = `${repo}:db:${unit.path}:Access/${n.name.toLowerCase()}`
       if (out.databases.some((d) => d.unit === unitId && d.engine === 'Access' && d.name?.toLowerCase() === n.name.toLowerCase())) continue
       out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
     }
