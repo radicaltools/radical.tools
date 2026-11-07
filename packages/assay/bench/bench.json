@@ -1440,7 +1440,7 @@
     },
     {
       "name": "ERPMigrationCore",
-      "about": "A legacy ERP being migrated: two VB6 modules (PERCS, QAIS) on SQL Server, their catalog set at run time, and the Laravel and Vite application they move into, on SQL Server AINData2 (its handoff notes and environment). Written down on 2026-11-07 from its README, docs, project files, SQL and the code that connects, before Assay first ran on it; held out: no rule is tuned on it.",
+      "about": "A legacy ERP being migrated: two VB6 modules (PERCS, QAIS) on SQL Server, their catalog AINData (Module1.bas assigns W_DB = \"AINData\"; first written down as an unnamed SQL Server database, corrected after the first run showed the assignment), and the Laravel and Vite application they move into, on SQL Server AINData2 (its handoff notes and environment). Written down on 2026-11-07 from its README, docs, project files, SQL and the code that connects, before Assay first ran on it; held out: no rule is tuned on it.",
       "url": "https://github.com/syahrulamsb-stack/ERPMigrationCore.git",
       "commit": "019caedf004765d06455936b4facf09adb49d7f1",
       "stacks": "VB6 Standard EXEs, ADO, SQL Server; PHP Laravel, Vite",
@@ -1452,11 +1452,11 @@
       "calls": [
         [
           "AINPERCSCode",
-          "db:sql server"
+          "db:aindata"
         ],
         [
           "AINQAISCode",
-          "db:sql server"
+          "db:aindata"
         ],
         [
           ".",
