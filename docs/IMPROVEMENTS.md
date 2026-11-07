@@ -360,6 +360,16 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
+
+Done on the next branch, from the list below: VB6 forms as screens with
+wireframes and navigation; flags and nullable dates as state facts; VB6
+Timers, clickable controls and Handle procedures as entry points; a
+transition's basis (sets or quoted) in run.json; a test that asserts nothing
+rests no scenario; `expect` in Explore; a requirement names its processes.
+Still open: a form opened by a name held in a variable is not joined; a
+JavaScript test's assertions are judged, not a Java or .NET one's.
+
 ### Dogfooding (2026-11-07): Assay's domain, processes and lifecycles
 
 Three agent runs (VB6 game and point of sale, the demo shop explored, the
@@ -376,30 +386,11 @@ unit realises an entity only where its code names the table, not where a
 schema file lies, a state machine no code moves is implemented by nothing,
 and a plan's relations may join its entities and set their properties. Open:
 
-- **Flags as states.** A lifecycle kept in boolean columns (`is_dead`,
-  `is_ban`, `deleted`) or a nullable timestamp (`PaidOn IS NULL`) gives no
-  state fact; the agent cites every state. A state fact of flags would help
-  legacy code most.
-- **A transition's evidence is not judged.** A quotation only has to be in
-  the file: a `WHERE status = …` line backs a transition as well as an
-  `UPDATE … SET`. The run file could mark the transitions that rest on a line
-  that sets their target apart from those that rest on a quotation alone.
-- **Processes and requirements.** A process cannot name the requirements it
-  meets in the plan (they are proposals, accepted later); the agent relates
-  them by hand with add_relation, outside the run's evidence.
 - **Shared steps.** A sign-in step is copied into every process that needs
   it; there is no sub-process to reuse.
-- **Scenarios a test exercises but does not check.** A Playwright test of an
-  explored path asserts the headings it saw, not a scenario's "then"; an
-  empty test that passes rests a scenario as well as a real one.
 - **Code and the running application disagree.** A step may rest on what the
   explored application does while its code does otherwise (a handler that
   stores nothing); the procedure says nothing of which to model.
-- **Desktop screens.** A VB6 `.frm` describes its screen (caption, controls,
-  their positions) exactly, yet only explored web screens become mockups.
-- **More entry points of VB6.** Custom button controls (`uAOButton`), a
-  game server's protocol `Handle*` procedures and Timer controls are no entry
-  points yet; "Form1" captions make forms hard to tell apart.
 - **Columns of an Access database.** A `.mdb` keeps its schema in the binary
   file: the POS tables have names, no columns and no keys.
 - **A database can't realise an entity.** The metamodel allows realises from
