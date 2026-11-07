@@ -57,7 +57,7 @@ describe('Radical Assay over MCP', () => {
     const started = await call('assay_start', { directories: ['../shop'] })
     expect(started.ok).toBe(true)
     expect(started.text).toContain('Assay run on 3 repositories; the central model is .radical/model')
-    expect(started.text).toContain(`  - ${WEB}: @storefront/web (npm app: it has a dev script; Node.js, React)`)
+    expect(started.text).toContain(`  - ${WEB}: @storefront/web (npm app: it has a dev script; Node.js, React; tests with vitest)`)
     expect(started.text).toContain(`link:http:${WEB}->${ORDERS}: ${WEB} → ${ORDERS}, http, inferred: GET /api/orders/{id}, POST /api/orders`)
     expect(started.text).toContain('2. C4 stage.')
     for (const repo of ['orders-service', 'shop-lib', 'storefront']) expect(existsSync(join(dir, repo, '.radical/assay/facts.json'))).toBe(true)
@@ -152,7 +152,7 @@ describe('Radical Assay over MCP', () => {
   it('writes inferred elements of code no extractor reads, on the code the agent quotes, checked', async () => {
     const { dir, root, call, nodes, json } = await central(legacy)
     const started = await call('assay_start', { directories: ['../legacy'] })
-    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table.')
+    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table, 1 entry point.')
     expect(started.text).toContain('Code no reader covers (COBOL, Delphi, PowerBuilder')
     const quote = { repository: 'billing-vb6', file: 'Billing.vbp', lines: [1, 8], text: 'ExeName32="Billing.exe"' }
     const plan = (text: string) => ({ plan: {
@@ -235,7 +235,7 @@ describe('Radical Assay over MCP', () => {
     expect(applied.ok).toBe(true)
     expect(applied.text).toContain('- P1: need "See orders": Customers see their orders at any time.\n    from handover/goals.md:3: "Customers see their orders at any time."')
     expect(applied.text).toContain('- P2: decision (ADR) "Orders over HTTP", accepted, constrains Storefront: The storefront calls the orders service over HTTP.')
-    expect(applied.text).toContain('- P3: requirement "See orders at any time" (ubiquitous), satisfied by Storefront, derived from P1: the storefront shall show a customer\'s orders at any time\n    no scenario: it rests on the code or documents it cites')
+    expect(applied.text).toContain('- P3: requirement "See orders at any time" (ubiquitous), satisfied by Storefront, derived from P1: the storefront shall show a customer\'s orders at any time\n    no scenario: it rests on what it cites (code, screens or documents)')
     const before = (await nodes()).length
     expect(await call('assay_answer', { proposal: 'P3', accept: true })).toEqual({ ok: false, text: 'assay_answer: P3 derives from P1 ("See orders"); answer P1 first' })
     expect((await nodes()).length).toBe(before)

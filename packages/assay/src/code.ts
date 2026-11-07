@@ -150,17 +150,6 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   // The services every .proto of the repository declares.
   const protoServices = [...new Set(files.named(/\.proto$/).flatMap((f) => [...files.read(f).matchAll(/^\s*service\s+(\w+)\s*\{/gm)].map((m) => m[1])))]
 
-  // The tables an SQL file creates (a schema, a migration, a fixture that builds the database).
-  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f))) {
-    const unit = owner(units, file)
-    if (!unit) continue
-    const text = files.read(file)
-    for (const m of text.matchAll(/\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?[`"[]?(?:\w+[`"\]]?\.)?[`"[]?([A-Za-z_][\w$]*)/gi)) {
-      const id = `${repo}:table:${unit.path}:${m[1].toLowerCase()}`
-      if (once(id)) out.tables.push({ id, unit: unit.id, table: m[1], evidence: { file, line: lineAt(text, m.index!) } })
-    }
-  }
-
   for (const file of files.list) {
     const ext = extname(file).toLowerCase()
     const config = CONFIG.test(file)

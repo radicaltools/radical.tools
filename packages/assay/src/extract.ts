@@ -14,6 +14,8 @@ import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { load } from './yaml'
 import { parseTestReport } from '@radical/common/check'
 import { readCode } from './code'
+import { readDomain } from './domain'
+import { readEntries } from './entries'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
 import { readRuntime } from './runtime'
@@ -112,7 +114,11 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.apis.push(...code.apis)
   facts.addresses.push(...code.addresses)
   facts.databases.push(...code.databases)
-  facts.tables = code.tables
+  // The tables its schemas and ORM classes declare, with those its code names; its statuses; where its code is entered.
+  const domain = readDomain(files, repo, facts.units, code.tables)
+  facts.tables = domain.tables
+  facts.states = domain.states
+  facts.entries = readEntries(files, repo, facts.units)
 
   facts.tests = readTests(root, repo, files, facts.units, options.reports, facts.notes)
   facts.documents = readDocuments(files, repo)
