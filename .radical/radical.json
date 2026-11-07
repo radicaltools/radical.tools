@@ -3279,6 +3279,9 @@
     ] },
     { "element": "baae6d0c-d6ff-40b4-bf85-5b3c231826e6", "name": "Socket connection linked", "tests": [
       "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › links a socket's client to the server listening on the port they name, and reads an environment's database"
+    ] },
+    { "element": "5c16ebdf-bb59-44ec-9712-789548cfc27a", "name": "Links and schemas call nothing", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › leaves out a page's links, schemas, namespaces, lock files and files beside the code as calls"
     ] }
   ]
 }
