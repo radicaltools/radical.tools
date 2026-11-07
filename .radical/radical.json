@@ -3196,6 +3196,35 @@
       "packages/assay/tests/domain.test.ts",
       "packages/assay/tests/skeleton.test.ts",
       "apps/mcp/src/assayDomain.test.ts"
+    ] },
+    { "element": "9f539754-f002-4492-bb89-d42189bbee1f", "name": "Forms read as screens", "tests": [
+      "packages/assay/tests/forms.test.ts › radical assay: desktop screens from their form files › reads each form as a screen: caption, size, controls at their positions, and the forms its code opens through which control",
+      "packages/assay/tests/forms.test.ts › radical assay: desktop screens from their form files › draws a form as a low-fi wireframe of its controls at their positions, inert and small"
+    ] },
+    { "element": "71a0a57c-bd14-466c-b0f0-66ee52944878", "name": "Form mockups joined", "tests": [
+      "apps/mcp/src/assayForms.test.ts › Radical Assay over MCP: desktop screens › writes mockups of forms with wireframes drawn from them, joined where one form's code opens another"
+    ] },
+    { "element": "f2c79ed0-48ee-4fc3-a718-aefacd26b8c4", "name": "Status flags read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: status flags › records a lifecycle kept in boolean flags and nullable dates, and the lines that set and clear each"
+    ] },
+    { "element": "3c6863e0-5aac-486a-a114-2f55266c996f", "name": "VB6 timers and handlers read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: entry points › reads a VB6 server's timers, any control a user clicks and the Handle procedures a Select calls, each with its Case"
+    ] },
+    { "element": "f0c66306-5dbc-45ea-8818-b00cc4f565ec", "name": "Transition evidence told apart", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes the lifecycle of an entity from its status values, implemented by the container whose code sets them"
+    ] },
+    { "element": "3ae8ea7f-31fa-4f40-9710-2450d1146e63", "name": "Empty test refused", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: tests that check nothing › marks a passing test whose body is empty or asserts nothing, and refuses a scenario resting on it"
+    ] },
+    { "element": "f5950883-7b6a-4ddc-9411-f493bc5079f3", "name": "Outcome checked by the path test", "tests": [
+      "apps/mcp/src/explore.test.ts › Radical Assay: the running application › writes an accepted path as a Playwright test of the repository, which passes"
+    ] },
+    { "element": "cd029ea3-4590-4152-8c50-46204f23d2cc", "name": "Process satisfies an accepted requirement", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes a process with its steps in order, inferred, each on the entry point it rests on"
+    ] },
+    { "element": "b99ba0a7-3393-4c79-9532-ccebf0828922", "name": "Assay desktop screen tests", "tests": [
+      "packages/assay/tests/forms.test.ts",
+      "apps/mcp/src/assayForms.test.ts"
     ] }
   ]
 }

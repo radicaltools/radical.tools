@@ -12,7 +12,7 @@ import type { EntryFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
 
-const SOURCE = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts|java|kt|cs|py|go|frm)$/i
+const SOURCE = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts|java|kt|cs|py|go|frm|bas|cls)$/i
 /** A server framework a JavaScript file uses: only there is app.get('/x', …) a route, not a call. */
 const JS_SERVER = /\b(?:require\(\s*|from\s+)['"](?:express|koa-router|@koa\/router|fastify|hono|restify)['"]/
 const JS_SERVER_TECH = /^(Express|Fastify|Koa|Hono)$/
@@ -37,6 +37,24 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     seen.add(id)
     out.push({ id, unit: unit.id, kind, name, ...rest })
   }
+  // The Case of a Select that calls each VB procedure: the message a packet handler handles.
+  let cases: Map<string, string> | undefined
+  const vbCases = (): Map<string, string> => {
+    if (cases) return cases
+    cases = new Map()
+    for (const f of files.list.filter((x) => /\.(bas|cls|frm)$/i.test(x))) {
+      let label: string | undefined
+      for (const line of withoutVbComments(files.read(f)).split(/\r?\n/)) {
+        // Case X, the call on its own line or after a colon on the same one.
+        const c = /^\s*Case\s+([^:]+?)\s*(?::(.*))?$/i.exec(line)
+        if (c && !/^else$/i.test(c[1])) label = c[1].trim()
+        if (/^\s*End\s+Select\b/i.test(line)) { label = undefined; continue }
+        const call = label && /^\s*(?:Call\s+)?(Handle\w+)\b/i.exec(c ? c[2] ?? '' : line)
+        if (call && !cases.has(call[1].toLowerCase())) cases.set(call[1].toLowerCase(), label!)
+      }
+    }
+    return cases
+  }
   for (const file of files.list) {
     if (!SOURCE.test(file) || TEST_FILE.test(file) || GENERATED.test(file)) continue
     const unit = owner(units, file)
@@ -50,7 +68,8 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
       add(unit, 'route', name, { detail: path || '/', evidence: at(index) })
     }
 
-    if (ext === '.frm') { vbForm(withoutVbComments(raw), file, unit, add); continue }
+    if (ext === '.frm') { vbForm(withoutVbComments(raw), file, unit, add) }
+    if (ext === '.frm' || ext === '.bas' || ext === '.cls') { vbHandlers(withoutVbComments(raw), file, unit, add, vbCases()); continue }
 
     if (/^\.[cm]?[jt]sx?$/.test(ext)) {
       if (JS_SERVER.test(raw) || unit.technology.some((t) => JS_SERVER_TECH.test(t))) {
@@ -131,8 +150,8 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
   const formName = form[1]
   const lines = text.split('\n')
   const lineOfIndex = (i: number) => ({ file, line: i + 1 })
-  const handler = (name: string): EntryFact['evidence'] | undefined => {
-    const re = new RegExp(`^\\s*(?:Private\\s+|Public\\s+)?Sub\\s+${name}_Click\\s*\\(`, 'i')
+  const handler = (name: string, event = 'Click'): EntryFact['evidence'] | undefined => {
+    const re = new RegExp(`^\\s*(?:Private\\s+|Public\\s+)?Sub\\s+${name}_${event}\\s*\\(`, 'i')
     const i = lines.findIndex((l) => re.test(l))
     return i < 0 ? undefined : lineOfIndex(i)
   }
@@ -140,7 +159,7 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
   let depth = 0
   let formCaption: string | undefined
   const items: Array<[EntryFact['kind'], string, Partial<EntryFact> & { evidence: EntryFact['evidence'] }]> = []
-  const stack: Array<{ kind: string; name: string; line: number; caption?: string; index?: string }> = []
+  const stack: Array<{ kind: string; name: string; line: number; caption?: string; index?: string; interval?: string }> = []
   lines.forEach((line, i) => {
     const begin = /^\s*Begin\s+([\w.]+)\s+(\w+)/.exec(line)
     if (begin) {
@@ -153,15 +172,28 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
       depth--
       if (!block) return
       const name = block.index !== undefined ? `${block.name}(${block.index})` : block.name
-      const kind = /^VB\.Menu$/i.test(block.kind) ? 'menu' : /^VB\.CommandButton$/i.test(block.kind) ? 'control' : undefined
+      if (/^VB\.Timer$/i.test(block.kind)) {
+        // A timer runs its handler every Interval milliseconds (0: until the code sets one).
+        const ticks = handler(block.name, 'Timer')
+        if (ticks) items.push(['job', name, { form: formName, detail: Number(block.interval) ? `every ${block.interval} ms` : 'interval set by the code', evidence: lineOfIndex(block.line), handler: ticks }])
+        return
+      }
+      // The code a user runs from it: a Click, or a key pressed in it (a sale entered in a text box).
+      const click = handler(block.name) ?? handler(block.name, 'KeyPress') ?? handler(block.name, 'KeyDown')
+      // A menu item; a button of any library, or any control the user clicks (an image, a label) that has a Click handler.
+      const kind = /^VB\.Menu$/i.test(block.kind) ? 'menu' : /button/i.test(block.kind) || click ? 'control' : undefined
       // A menu captioned - is a separator.
-      if (kind && block.caption && block.caption !== '-') items.push([kind, name, { form: formName, detail: block.caption, evidence: lineOfIndex(block.line), ...(handler(block.name) ? { handler: handler(block.name) } : {}) }])
+      if (kind === 'menu' && (!block.caption || block.caption === '-')) return
+      if (kind && (block.caption || click)) items.push([kind, name, { form: formName, ...(block.caption ? { detail: block.caption } : {}), evidence: lineOfIndex(block.line), ...(click ? { handler: click } : {}) }])
       return
     }
     const top = stack[stack.length - 1]
     if (!top) return
-    const cap = /^\s*Caption\s*=\s*"((?:[^"]|"")*)"/.exec(line)
+    // Custom button libraries keep the caption in TX.
+    const cap = /^\s*(?:Caption|TX)\s*=\s*"((?:[^"]|"")*)"/.exec(line)
     if (cap && top.caption === undefined) top.caption = caption(cap[1])
+    const interval = /^\s*Interval\s*=\s*(\d+)/.exec(line)
+    if (interval) top.interval = interval[1]
     const index = /^\s*Index\s*=\s*(\d+)/.exec(line)
     if (index) top.index = index[1]
     if (cap && depth === 1 && formCaption === undefined) formCaption = caption(cap[1])
@@ -169,4 +201,14 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
   const load = lines.findIndex((l) => /^\s*(?:Private\s+|Public\s+)?Sub\s+(?:Form|MDIForm)_Load\s*\(/i.test(l))
   add(unit, 'form', formName, { ...(formCaption ? { detail: formCaption } : {}), evidence: { file, line: lineAt(text, form.index! + form[0].indexOf('Begin')) }, ...(load >= 0 ? { handler: lineOfIndex(load) } : {}) })
   for (const [kind, name, rest] of items) add(unit, kind, name, rest)
+}
+
+/** A VB module's packet or message handlers: Sub Handle… procedures, each with the Case of the Select that calls it. */
+function vbHandlers(text: string, file: string, unit: Unit, add: (unit: Unit, kind: EntryFact['kind'], name: string, rest: Partial<EntryFact> & { evidence: EntryFact['evidence'] }) => void, cases: Map<string, string>): void {
+  text.split('\n').forEach((line, i) => {
+    const sub = /^\s*(?:(?:Public|Private|Friend)\s+)?Sub\s+(Handle\w+)\s*\(/i.exec(line)
+    if (!sub) return
+    const label = cases.get(sub[1].toLowerCase())
+    add(unit, 'handler', sub[1], { ...(label ? { detail: label } : {}), evidence: { file, line: i + 1 } })
+  })
 }

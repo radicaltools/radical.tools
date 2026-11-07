@@ -34,7 +34,7 @@ describe('radical assay: facts', () => {
     ])
     expect(store.tests).toEqual([
       { id: 'storefront:test:apps/web/tests/orders.test.js › orders › shows an order', unit: 'storefront:unit:apps/web', test: 'apps/web/tests/orders.test.js › orders › shows an order', status: 'passed', evidence: { file: 'apps/web/tests/orders.test.js', line: 3 } },
-      { id: 'storefront:test:apps/web/tests/orders.test.js › orders › places an order', unit: 'storefront:unit:apps/web', test: 'apps/web/tests/orders.test.js › orders › places an order', status: 'failed', evidence: { file: 'apps/web/tests/orders.test.js', line: 4 } },
+      { id: 'storefront:test:apps/web/tests/orders.test.js › orders › places an order', unit: 'storefront:unit:apps/web', test: 'apps/web/tests/orders.test.js › orders › places an order', status: 'failed', checksNothing: true, evidence: { file: 'apps/web/tests/orders.test.js', line: 4 } },
     ])
     expect(store.notes).toEqual([])
   })

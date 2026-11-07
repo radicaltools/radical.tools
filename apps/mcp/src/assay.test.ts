@@ -152,7 +152,7 @@ describe('Radical Assay over MCP', () => {
   it('writes inferred elements of code no extractor reads, on the code the agent quotes, checked', async () => {
     const { dir, root, call, nodes, json } = await central(legacy)
     const started = await call('assay_start', { directories: ['../legacy'] })
-    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table, 1 entry point.')
+    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table, 1 form, 1 entry point.')
     expect(started.text).toContain('Code no reader covers (COBOL, Delphi, PowerBuilder')
     const quote = { repository: 'billing-vb6', file: 'Billing.vbp', lines: [1, 8], text: 'ExeName32="Billing.exe"' }
     const plan = (text: string) => ({ plan: {

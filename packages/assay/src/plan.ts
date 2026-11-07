@@ -183,6 +183,8 @@ export interface PlanRequirement {
   parent?: string
   /** The need it derives from: a key of the plan's needs or an id of the model. Default: the run's need Found in the code. */
   need?: string
+  /** The processes that meet it: keys of the plan's processes or ids of the model; each satisfies it once it is accepted. */
+  processes?: string[]
   /** None when it is drawn from documents it cites: a requirement no test checks. */
   scenarios: PlanScenario[]
   facts?: string[]
@@ -410,9 +412,14 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
     if (!text(r.label)) problems.push(`${where}: label is missing`)
     if (!isRecord(r.properties) || !text(r.properties.action)) problems.push(`${where}: properties must hold the EARS action ("the system shall …") and its ears_type`)
     if (r.satisfiedBy !== undefined && !resolves(r.satisfiedBy)) problems.push(`${where}: satisfiedBy ${String(r.satisfiedBy)} is neither a key of the plan nor an id of the model`)
-    if (r.satisfiedBy === undefined && Array.isArray(r.scenarios) && r.scenarios.length) problems.push(`${where}: satisfiedBy must name the element whose code its scenarios' tests exercise`)
+    // Tests exercise an element's code; a defect's scenarios drawn from the code or a screen need none that satisfies it.
+    if (r.satisfiedBy === undefined && Array.isArray(r.scenarios) && r.scenarios.some((s) => strings(s?.tests) && s.tests.length)) problems.push(`${where}: satisfiedBy must name the element whose code its scenarios' tests exercise`)
     if (r.parent !== undefined && !resolves(r.parent)) problems.push(`${where}: parent ${String(r.parent)} is neither a key of the plan nor an id of the model`)
     const isNeed = (ref: string): boolean => needKeys.has(ref) || !!context.waitingNeeds?.has(ref) || (known(ref) && (!context.typeOf || context.typeOf(ref) === 'need'))
+    if (r.processes !== undefined) {
+      const isProcess = (ref: unknown): boolean => text(ref) && (plan.processes.some((p) => p.key === ref) || (known(ref) && (!context.typeOf || context.typeOf(ref) === 'process')))
+      if (!strings(r.processes) || r.processes.some((p) => !isProcess(p))) problems.push(`${where}: processes must list processes of the plan or the model that meet it`)
+    }
     if (r.need !== undefined && !(text(r.need) && isNeed(r.need))) problems.push(`${where}: need ${String(r.need)} is neither a key of the plan's needs, a need waiting for an answer, nor a need of the model`)
     const rests = cited(r, where, false, true).length > 0 || (Array.isArray(r.citations) && r.citations.length > 0)
     if (r.scenarios !== undefined && !Array.isArray(r.scenarios)) { problems.push(`${where}: scenarios must be a list`); return }
@@ -436,6 +443,7 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
         const f = facts.get(t)
         if (f?.kind !== 'test') problems.push(`${at}: ${t} is no test of the run`)
         else if ((f.fact as TestFact).status !== 'passed') problems.push(`${at}: ${t} ${(f.fact as TestFact).status} in the reports; a scenario rests on tests that pass: leave the test out of it, or the scenario, and propose the requirement with the code it is drawn from (citations) and no scenarios`)
+        else if ((f.fact as TestFact).checksNothing) problems.push(`${at}: ${t} checks nothing (its body is empty or asserts nothing), so it passes whatever the code does: leave it out of the scenario; rest the scenario on explored paths or on the code it is drawn from (citations), whose pending test the team then writes`)
       }
     })
   })

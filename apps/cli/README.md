@@ -601,12 +601,15 @@ cloned. For each repository it reads, from the files git lists:
   table SQL creates or alters, or an ORM class maps (JPA, Entity Framework
   Core, Django, SQLAlchemy, TypeORM, Prisma), with its columns and the table
   each foreign key references;
-- statuses: the values an enum named for a status, a `CHECK … IN` list or an
-  SQL `ENUM` gives, and the lines that set each value;
+- statuses: the values an enum named for a status, a `CHECK … IN` list, an
+  SQL `ENUM` or a table's flags (boolean columns, nullable dates of an event)
+  give, and the lines that set each value;
+- screens: each VB6 form, with its caption, size, controls at their
+  positions and the forms its code opens;
 - entry points: HTTP routes in code (Express, NestJS, Spring, ASP.NET Core,
-  Flask, FastAPI, Go), a VB6 form's caption, menu items and buttons with
-  their Click handlers, scheduled jobs and message handlers; and each unit's
-  test framework;
+  Flask, FastAPI, Go), a VB6 form's caption, menu items and any control with
+  a Click handler, VB6 Timers and `Handle…` procedures, scheduled jobs and
+  message handlers; and each unit's test framework;
 - the tests its reports name (Vitest, Jest or Playwright JSON, JUnit XML; by
   default its `reports/`), as `<file> › <title>` from its root;
 - its documents: READMEs, the documents of `docs/` and decisions folders and

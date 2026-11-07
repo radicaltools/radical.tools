@@ -17,7 +17,7 @@ const domainLines = (r: RepositoryFacts): string[] => {
   const names: Record<string, [string, string]> = { route: ['route', 'routes'], form: ['form', 'forms'], menu: ['menu item', 'menu items'], control: ['button', 'buttons'], job: ['scheduled job', 'scheduled jobs'], handler: ['message handler', 'message handlers'] }
   return [
     ...(declared.length ? [`  tables declared (${declared.map((t) => t.declared).filter((d, i, a) => a.indexOf(d) === i).join(', ')}): ${declared.map((t) => `${t.table} (${t.columns?.length ?? 0} columns${t.references?.length ? `, → ${t.references.map((x) => x.table).join(', ')}` : ''})`).join('; ')}${keys ? ` — ${count(keys, 'foreign key')}` : ''}`] : []),
-    ...r.states.map((s) => `  - ${s.id}: ${s.name}${s.table ? ` (${s.table}.${s.column})` : ''}: ${s.values.join(', ')}${s.initial ? ` (a new one starts ${s.initial})` : ''}; ${count(s.sets.length, 'line sets', 'lines set')} a value`),
+    ...r.states.map((s) => `  - ${s.id}: ${s.name}${s.flags ? ` (columns ${s.flags.map((f) => f.column).join(', ')})` : s.table ? ` (${s.table}.${s.column})` : ''}: ${s.values.join(', ')}${s.initial ? ` (a new one starts ${s.initial})` : ''}; ${count(s.sets.length, 'line sets', 'lines set')} a value`),
     ...(r.entries.length ? [`  entry points: ${[...kinds].map(([k, n]) => count(n, ...names[k])).join(', ')} (assay_facts with kind entries)`] : []),
   ]
 }
@@ -32,7 +32,7 @@ export function describeFacts(repositories: RepositoryFacts[], links: Link[], fr
         count(r.units.length, 'unit'), count(r.dependencies.length, 'dependency', 'dependencies'), count(r.apis.length, 'API operation'),
         count(r.urls.length, 'URL path'), count(r.clients.length, 'gRPC client'), count(r.addresses.length, 'address', 'addresses'),
         count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'),
-        count(r.states.length, 'status', 'statuses'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
+        count(r.states.length, 'status', 'statuses'), count(r.screens.length, 'form'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
       ].filter((c, i) => i === 0 || !c.startsWith('0 ')).join(', ')}.`,
       ...r.units.map(unitLine),
       ...r.services.map((s) => `  - ${s.id}: ${s.role}${s.image ? ` ${s.image}` : ''}${s.unit ? `, runs ${s.unit}` : ''}`),

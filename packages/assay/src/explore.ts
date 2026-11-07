@@ -30,13 +30,20 @@ export interface ScreenFact {
   /** The page's visible text, its first few hundred characters: what a mockup's description can say. */
   text?: string
   controls: Control[]
-  /** Its screenshot, from the explore folder of the central repository. */
+  /** form: read from a desktop application's form file, not seen running (its route is the form's name). */
+  source?: 'form'
+  /** A form's size and its controls at their positions, in twips: what its wireframe is drawn from. */
+  form?: { width: number; height: number; controls: Array<{ kind: string; name: string; caption?: string; left: number; top: number; width: number; height: number }> }
+  /** The forms its code opens, by their names, each from the handler of a control or menu item (via) or on loading. */
+  opens?: Array<{ form: string; via?: string; key?: boolean; line: number }>
+  /** Its screenshot, from the explore folder of the central repository; a form's file. */
   evidence: Evidence
 }
 
 /** One action of a path. */
 export interface Step {
-  action: 'goto' | 'click' | 'fill' | 'select' | 'check' | 'press'
+  /** expect: a text the screen shows, which the path's test asserts (the outcome a scenario names). */
+  action: 'goto' | 'click' | 'fill' | 'select' | 'check' | 'press' | 'expect'
   /** The control acted on (none for goto). */
   control?: { role: string; name: string; locator: string }
   /** What was typed or chosen; a password is not kept. */
@@ -67,6 +74,7 @@ export const pageOf = (route: string): string =>
 /** What a step does, as a person would say it: the label of a navigates-to. */
 export function stepLabel(step: Step): string {
   if (step.action === 'goto') return 'opens it'
+  if (step.action === 'expect') return `sees "${step.value ?? ''}"`
   const what = step.control ? `${step.control.role} "${step.control.name}"` : 'the page'
   if (step.action === 'click') return `clicks ${what}`
   if (step.action === 'fill') return `fills ${what}`
@@ -116,6 +124,9 @@ export function pathTest(path: PathFact, screens: Map<string, ScreenFact>, recor
     const to = screens.get(step.to)
     if (step.action === 'goto') {
       lines.push(`  await page.goto(\`\${BASE}${(to?.route ?? '/').replace(/[`$\\]/g, '\\$&')}\`)`)
+    } else if (step.action === 'expect') {
+      // The outcome the agent saw and named: the scenario's then.
+      lines.push(`  await expect(page.getByText(${quote(step.value ?? '')}).first()).toBeVisible()`)
     } else if (step.control) {
       const target = `page.${step.control.locator}`
       const value = step.secret ? 'PASSWORD' : quote(step.value ?? '')

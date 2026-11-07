@@ -31,7 +31,7 @@ const ACTION_TIMEOUT = 10_000
 export type ExploreAction = Step['action']
 
 /** What a call of the Explore stage gives back: the screen reached, or why nothing was done. */
-export type Explored = { screen: ScreenFact; path: PathFact } | { problem: string }
+export type Explored = { screen: ScreenFact; path: PathFact; note?: string } | { problem: string }
 
 /** Reads the controls, headings and title of the page in the browser, and tags each control with
  *  its reference (data-assay-ref) so an action finds it. Plain JavaScript, sent to the page as it
@@ -239,6 +239,18 @@ export class Explorer {
     if (this.facts.screens.length >= MAX_SCREENS) return { problem: `the run keeps at most ${MAX_SCREENS} screens` }
     const origin = new URL(path.origin)
     let step: Step
+    if (action === 'expect') {
+      // A text the current screen shows: the path's test asserts it. Nothing is done on the page.
+      if (!value?.trim()) return { problem: 'expect needs the text the screen shows (value)' }
+      if ([...this.secrets].some((secret) => value.includes(secret))) return { problem: 'expect names a password typed in this path: Assay keeps none' }
+      const visible = await page.getByText(value).first().waitFor({ state: 'visible', timeout: ACTION_TIMEOUT }).then(() => true, () => false)
+      if (!visible) return { problem: `"${value}" is not on the current screen (${from.id}): expect a text it shows` }
+      step = { action, value, from: from.id, to: from.id }
+      path.steps.push(step)
+      // A text shown in several places (a heading and a link) proves little: the test checks its first.
+      const count = await page.getByText(value).count().catch(() => 1)
+      return { screen: from, path, ...(count > 1 ? { note: `"${value}" is on the screen ${count} times (a link or heading may hold it too); the test checks the first: expect a text only the outcome shows` } : {}) }
+    }
     if (action === 'goto') {
       let target: URL
       try { target = new URL(value ?? '', origin) } catch { return { problem: `${value} is no address` } }

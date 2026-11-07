@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { extractRepository } from '../src/index'
+import { checkPlan, extractRepository, factIndex, parsePlan } from '../src/index'
 
 /** A git repository of `files` (path → text) in a fresh folder. */
 function repo(name: string, files: Record<string, string>): string {
@@ -213,6 +213,32 @@ describe('radical assay: status values', () => {
   })
 })
 
+describe('radical assay: status flags', () => {
+  it('records a lifecycle kept in boolean flags and nullable dates, and the lines that set and clear each', () => {
+    const facts = extractRepository(repo('game', {
+      'Server.vbp': 'Type=Exe\r\nModule=modUser; modUser.bas\r\nName="Server"\r\n',
+      'db/schema.sql': [
+        'CREATE TABLE user (', '  id INT PRIMARY KEY,', '  is_dead BOOLEAN NOT NULL DEFAULT FALSE,', '  is_ban TINYINT(1) NOT NULL DEFAULT 0,',
+        '  is_admin_note VARCHAR(20),', '  created_at DATETIME,', '  level INT NOT NULL', ');', '',
+        'CREATE TABLE invoices (', '  id INT PRIMARY KEY,', '  PaidOn DATETIME NULL,', '  DueDate DATETIME NULL,', '  IssuedOn DATETIME NOT NULL,', '  shipped_at timestamp', ');', '',
+      ].join('\n'),
+      'modUser.bas': [
+        'Attribute VB_Name = "modUser"', 'Public Sub Kill(ByVal id As Long)', '  db.Execute "UPDATE user SET is_dead = 1 WHERE id = " & id',
+        'End Sub', 'Public Sub Revive(rs As Recordset)', '  rs!is_dead = 0', '  If rs!is_ban = 1 Then Exit Sub', 'End Sub',
+        'Public Sub Pay(rs As Recordset)', '  rs("PaidOn") = Now', 'End Sub', '',
+      ].join('\r\n'),
+    }))
+    const flags = facts.states.filter((s) => s.flags)
+    expect(flags.map((s) => [s.id, s.name, s.table, s.values, s.flags!.map((f) => [f.column, f.value])])).toEqual([
+      ['game:state:.:user.flags', 'user flags', 'user', ['dead', 'not dead', 'ban', 'not ban'], [['is_dead', 'dead'], ['is_ban', 'ban']]],
+      ['game:state:.:invoices.flags', 'invoices flags', 'invoices', ['paid', 'not paid', 'shipped', 'not shipped'], [['PaidOn', 'paid'], ['shipped_at', 'shipped']]],
+    ])
+    // A comparison sets nothing; a date when the row was made, or one due, is no event of its lifecycle.
+    expect(flags[0].sets.map((x) => [x.value, x.file, x.line])).toEqual([['dead', 'modUser.bas', 3], ['not dead', 'modUser.bas', 6]])
+    expect(flags[1].sets.map((x) => [x.value, x.line])).toEqual([['paid', 10]])
+  })
+})
+
 describe('radical assay: entry points', () => {
   it('records HTTP routes, scheduled jobs and message handlers, each with its line, and a unit\'s test framework', () => {
     const node = extractRepository(repo('orders-node', {
@@ -255,6 +281,32 @@ describe('radical assay: entry points', () => {
     expect(facts.units.map((u) => [u.name, u.testFramework])).toEqual([['@storefront/admin', 'jest'], ['@storefront/web', 'vitest']])
   })
 
+  it("reads a VB6 server's timers, any control a user clicks and the Handle procedures a Select calls, each with its Case", () => {
+    const frm = [
+      'VERSION 5.00', 'Begin VB.Form frmMain', '   Caption = "Server"',
+      '   Begin VB.Timer AutoSave', '      Interval = 60000', '   End',
+      '   Begin AOLibre.uAOButton btnStart', '      TX = "&Start"', '   End',
+      '   Begin VB.Image imgLogo', '   End',
+      'End', 'Attribute VB_Name = "frmMain"',
+      'Private Sub AutoSave_Timer()', '  SaveWorld', 'End Sub', 'Private Sub imgLogo_Click()', 'End Sub', '',
+    ].join('\r\n')
+    const protocol = [
+      'Attribute VB_Name = "Protocol"', 'Public Sub HandleIncomingData(ByVal id As Byte)', '  Select Case id',
+      '    Case ClientPacketID.Login', '      Call HandleLogin', '    Case ClientPacketID.Walk: HandleWalk', '  End Select', 'End Sub',
+      'Private Sub HandleLogin()', 'End Sub', 'Private Sub HandleWalk()', 'End Sub', 'Private Sub HandleUnused()', 'End Sub', '',
+    ].join('\r\n')
+    const facts = extractRepository(repo('server', { 'Server.vbp': 'Type=Exe\r\nForm=frmMain.frm\r\nModule=Protocol; Protocol.bas\r\nName="Server"\r\n', 'frmMain.frm': frm, 'Protocol.bas': protocol }))
+    expect(facts.entries.filter((e) => e.kind !== 'form').map((e) => [e.kind, e.name, e.detail, e.evidence.line, e.handler?.line])).toEqual([
+      ['handler', 'HandleIncomingData', undefined, 2, undefined],
+      ['handler', 'HandleLogin', 'ClientPacketID.Login', 9, undefined],
+      ['handler', 'HandleWalk', 'ClientPacketID.Walk', 11, undefined],
+      ['handler', 'HandleUnused', undefined, 13, undefined],
+      ['job', 'AutoSave', 'every 60000 ms', 4, 14],
+      ['control', 'btnStart', 'Start', 7, undefined],
+      ['control', 'imgLogo', undefined, 10, 17],
+    ])
+  })
+
   it("reads a VB6 form's caption, its menu items and buttons with their Click handlers, separators left out", () => {
     const frm = [
       'VERSION 5.00', 'Begin VB.Form frmSales', '   Caption         =   "Sales && Returns"', '   ClientHeight    =   3000',
@@ -270,6 +322,34 @@ describe('radical assay: entry points', () => {
       ['control', 'cmdSave', 'frmSales', 'Save sale', 5, 21],
       ['menu', 'mnuExport', 'frmSales', 'Export…', 10, 24],
       ['menu', 'mnuFile', 'frmSales', 'File', 8, undefined],
+    ])
+  })
+})
+
+describe('radical assay: tests that check nothing', () => {
+  it('marks a passing test whose body is empty or asserts nothing, and refuses a scenario resting on it', () => {
+    const dir = repo('web', {
+      'package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' }, devDependencies: { vitest: '4' } }),
+      'tests/orders.test.js': [
+        "import { describe, expect, it } from 'vitest'", "describe('orders', () => {",
+        "  it('shows an order', () => {})", "  it('places an order', async () => { await fetch('/api/orders'); expect(1).toBe(1) })",
+        "  it('lists orders', () => {", "    // the list", "    expect(list()).toHaveLength(2)", '  })', '})', '',
+      ].join('\n'),
+      'reports/unit.json': JSON.stringify({ testResults: [{ name: 'tests/orders.test.js', assertionResults: ['shows an order', 'places an order', 'lists orders'].map((title) => ({ ancestorTitles: ['orders'], title, status: 'passed' })) }] }),
+    })
+    const facts = extractRepository(dir)
+    expect(facts.tests.map((t) => [t.test, t.checksNothing ?? false])).toEqual([
+      ['tests/orders.test.js › orders › shows an order', true], ['tests/orders.test.js › orders › places an order', true], ['tests/orders.test.js › orders › lists orders', false],
+    ])
+    const { plan } = parsePlan({
+      elements: [{ key: 'web', type: 'webapp', label: 'Web', units: ['web:unit:.'], facts: ['web:unit:.'], confidence: 'observed' }],
+      requirements: [{ key: 'r', label: 'Show an order', satisfiedBy: 'web', properties: { action: 'the web shall show it' }, scenarios: [
+        { key: 's1', label: 'Shown', given: 'g', when: 'w', then: 't', tests: ['web:test:tests/orders.test.js › orders › shows an order'] },
+        { key: 's2', label: 'Listed', given: 'g', when: 'w', then: 't', tests: ['web:test:tests/orders.test.js › orders › lists orders'] },
+      ] }],
+    })
+    expect(checkPlan(plan, factIndex([facts]), () => false, [facts])).toEqual([
+      'requirements[0] (Show an order), scenario 1 (Shown): web:test:tests/orders.test.js › orders › shows an order checks nothing (its body is empty or asserts nothing), so it passes whatever the code does: leave it out of the scenario; rest the scenario on explored paths or on the code it is drawn from (citations), whose pending test the team then writes',
     ])
   })
 })

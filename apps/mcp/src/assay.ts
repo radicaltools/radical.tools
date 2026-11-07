@@ -30,7 +30,7 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  emptyFacts, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
   type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
 import { Explorer, type ExploreAction } from './explore'
@@ -106,8 +106,9 @@ export const ASSAY_PROCEDURE = [
   '   and the repository that builds it; skip the stage otherwise). assay_explore opens it and starts a path named for what a',
   '   user does; assay_explore_act clicks, fills, selects, checks, presses or goes to an address, by the references of the',
   '   screen it returns. Take the paths a user takes: signing in, the main lists and details, creating and changing what the',
-  '   application keeps; one path per task, starting each with assay_explore. Each path starts signed out in a fresh',
-  '   session, as its test will: a path behind the sign-in signs in first. Fill forms with plausible test data. Another',
+  '   application keeps; one path per task, starting each with assay_explore. Where a path shows its outcome (an order\'s',
+  '   status, a message), expect that text (assay_explore_act expect): the path\'s test checks it, not only where it went.',
+  '   Each path starts signed out in a fresh session, as its test will: a path behind the sign-in signs in first. Fill forms with plausible test data. Another',
   '   host and controls that pay or delete an account are refused: leave them. Then one plan: a mockup per page that',
   '   matters (a page is a route with its numbers as {id}: /orders/1 and /orders/2 are one page; mockups: label as a user',
   '   would call it, screen: one of its screens, description from the screen\'s text, presentedBy the webapp that renders',
@@ -115,6 +116,11 @@ export const ASSAY_PROCEDURE = [
   '   screens show are person elements, inferred, citing those screens (facts). Make a view of the mockups (create_view;',
   '   the viewpoint for screens where the metamodel has one). A defect the application shows (a password in its address,',
   '   an error page) is an unwanted-behaviour requirement nothing satisfies yet, citing the screen, for the next stage.',
+  '   A desktop VB6 application needs no running: its forms are screens already (assay_facts with kind "screens": caption,',
+  '   controls with their roles and captions, the forms its code opens and from which control). One plan of mockups for the',
+  '   forms a user works with (splash, about and message boxes left out): label as a user would call it, screen: the form\'s',
+  '   screen fact, description of what the user does there, presentedBy the container, parent its system; the server draws',
+  '   each wireframe from the form and joins the mockups where one form\'s code opens another (navigates-to).',
   '4. Documents stage, when the run has documents (the sources\' and the repositories\' own: README, docs, ADR records;',
   '   assay_facts with kind "documents"). Read them with assay_read and draw from them, citing the lines (citations): needs',
   '   (what people asked for, in their words: one need per thing asked for, a sentence or a short passage, with label,',
@@ -147,8 +153,8 @@ export const ASSAY_PROCEDURE = [
   '   where one is made of several. Not every route is a process: those that serve a task together are its steps. One plan',
   '   (processes, parent the system); the server writes them directly, inferred, no proposal. Make a view of each',
   '   (create_view with viewpoint "Process").',
-  '7. State machines stage, for each entity with a status (assay_facts with kind "states": the values an enum, CHECK or',
-  '   ENUM gives, and the lines that set each value). Read those lines (assay_read) and write its lifecycle: states (one per',
+  '7. State machines stage, for each entity with a status (assay_facts with kind "states": the values an enum, CHECK,',
+  '   ENUM or a table\'s flags give, and the lines that set each value). Read those lines (assay_read) and write its lifecycle: states (one per',
   '   value; value: the fact\'s value when the label is the business word; kind final for one nothing leaves), initial',
   '   (the state a new one starts in: the fact\'s default, else where the code creates it), transitions (from, to, event: what happens, in words;',
   '   guard and actions where the code tests or does something; each rests on a line that sets its target, which the',
@@ -157,9 +163,12 @@ export const ASSAY_PROCEDURE = [
   '   whose code sets its values (or implementedBy). A state no fact holds needs citations of the code that names it.',
   '   When no line sets the values (the fact lists none) and no code you read moves them, write the states and the',
   '   initial only, no transition the code does not show, and say so in the machine\'s description: an order of the',
-  '   values is a guess, not a lifecycle (get_issues then warns its states cannot be reached: that is so, leave it).',
-  '   A machine with no state fact (a status kept in flags or a nullable date) rests on citations of the code that names',
-  '   its states, the machine\'s own and each state\'s. Make a view of each (create_view with viewpoint "State machine").',
+  '   values is a guess, not a lifecycle (assay_apply and get_issues then warn its states cannot be reached: that is so,',
+  '   leave those warnings).',
+  '   A status kept in flags or nullable dates is a state fact of flags (its values each flag and its negation: dead, not',
+  '   dead; paid, not paid): a state takes one as its value (Alive: value "not dead"), and the lines that set or clear a',
+  '   flag back the transitions. A machine with no state fact at all rests on citations of the code that names its',
+  '   states, the machine\'s own and each state\'s. Make a view of each (create_view with viewpoint "State machine").',
   '8. Scenarios stage. For each unit with tests (assay_facts with unit and kind "tests"), group its tests by the behaviour they',
   '   check (a describe block, a file), read the test code where the titles do not say enough, and write for each group a',
   '   requirement in EARS (what the code does, as the tests show it; satisfiedBy the element of that unit; need: the need it',
@@ -181,8 +190,8 @@ export const ASSAY_PROCEDURE = [
   '   builds it, or none when no code does (the model then shows it unsatisfied, a gap; give it a parent). Put them in',
   '   plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user with its',
   '   scenarios, ask whether to add it, change it (assay_answer changes: label, properties, need, parent) or leave it out,',
-  '   one at a time, and pass the answer to assay_answer. Then relate each process to the accepted requirements it meets',
-  '   (add_relation, satisfies), and make the views that show them: create_view with viewpoint "Specification" (the',
+  '   one at a time, and pass the answer to assay_answer. A requirement a process meets names it (processes): accepted,',
+  '   the process satisfies it. Then make the views that show them: create_view with viewpoint "Specification" (the',
   '   requirements with their scenarios) and "Requirement coverage" (which are verified, which are not).',
   '9. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
   '   breaks the metamodel; the concerns it lists are the user\'s to settle later (Forge, forge_import_hub_concept), not',
@@ -286,6 +295,7 @@ const PLAN_SCHEMA = {
           satisfiedBy: { type: 'string', description: 'The element whose code the tests exercise: a key or an id. Leave it out for a requirement drawn from documents that no code builds yet: the model then shows it unsatisfied, as it is.' },
           parent: { type: 'string', description: 'Where to put it and its scenarios (a system, domain or group). Default: the system holding satisfiedBy, else the model\'s root.' },
           need: { type: 'string', description: 'The need it derives from: a key of a need of this plan or of an earlier one still waiting, or an id of the model. Default: the run\'s need "Found in the code".' },
+          processes: { type: 'array', items: { type: 'string' }, description: 'The processes that meet it (keys or ids): accepted, each satisfies it.' },
           facts: { type: 'array', items: { type: 'string' } },
           citations: { type: 'array', items: CITATION_SCHEMA, description: 'Code or documents you quote; a requirement drawn from documents has no scenarios.' },
           scenarios: {
@@ -534,11 +544,11 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'assay_explore_act',
-    description: 'Do one thing on the current screen of the explored application, as the next step of the current path: click, fill (value: the text), select (value: the option), check, or press (value: a key such as Enter) the control with that reference, or goto (value: an address or route of the same application). Returns the screen it leads to. Another host\'s address, and a control whose name says it pays, buys, transfers money or deletes or closes an account, are refused.',
+    description: 'Do one thing on the current screen of the explored application, as the next step of the current path: click, fill (value: the text), select (value: the option), check, or press (value: a key such as Enter) the control with that reference, or goto (value: an address or route of the same application); or expect (value: a text the current screen shows, the outcome a scenario names: the path\'s test asserts it). Returns the screen it leads to. Another host\'s address, and a control whose name says it pays, buys, transfers money or deletes or closes an account, are refused.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'goto'] },
+        action: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'goto', 'expect'] },
         ref: { type: 'string', description: 'The control\'s reference on the current screen (none for goto).' },
         value: { type: 'string' },
       },
@@ -609,6 +619,8 @@ interface Written {
   citations?: Citation[]
   /** For a proposal: whether the user accepted it as proposed or changed it. */
   accepted?: 'as-proposed' | 'changed'
+  /** For a transition: a line of the code sets its target (sets), or only a quotation backs it (quoted). */
+  basis?: 'sets' | 'quoted'
 }
 
 /** A hypothesis waiting for the user: a requirement (with its scenarios), or a need or decision drawn from documents. */
@@ -693,6 +705,8 @@ async function attempt(tool: string, args: Record<string, unknown>, ctx: ToolRun
 
 export class Assay {
   private run: Run | null = null
+  /** The labels of the entities the last plan wrote that no element realises. */
+  private unrealised: string[] = []
 
   /** `folder`: the bound model folder; `root`: its repository's root. */
   constructor(private readonly folder: string, private readonly root: () => Promise<string>) {}
@@ -737,14 +751,14 @@ export class Assay {
       if (!run.repositories.some((r) => r.repository === repository)) return refused(`assay_explore: repository must be a code repository of the run (${run.repositories.map((r) => r.repository).join(', ')})`)
       got = await explorer.open(url, path.trim(), repository as string)
     } else {
-      const actions: ExploreAction[] = ['click', 'fill', 'select', 'check', 'press', 'goto']
+      const actions: ExploreAction[] = ['click', 'fill', 'select', 'check', 'press', 'goto', 'expect']
       if (!actions.includes(action as ExploreAction)) return refused(`assay_explore_act: action must be one of ${actions.join(', ')}`)
       if (value !== undefined && typeof value !== 'string') return refused('assay_explore_act: value must be text')
       got = await explorer.act(action as ExploreAction, typeof ref === 'string' ? ref : undefined, value as string | undefined)
     }
     run.facts = this.indexOf(run)
     if ('problem' in got) return refused(`${name}: ${got.problem}`)
-    return ok(Explorer.describe(got.screen, got.path, run.root, facts.dir), { readOnly: true })
+    return ok(`${'note' in got && got.note ? `Note: ${got.note}\n` : ''}${Explorer.describe(got.screen, got.path, run.root, facts.dir)}`, { readOnly: true })
   }
 
   private async start(input: unknown): Promise<AssayResult> {
@@ -950,7 +964,9 @@ export class Assay {
         const runs = new Set(r.services.filter((s) => s.unit === unit).map((s) => s.id))
         const mine = (f: { id: string; unit?: string; service?: string; units?: string[] }) =>
           !unit || (k === 'units' ? f.id === unit : f.unit === unit || (!!f.service && runs.has(f.service)) || (k === 'groups' && !!f.units?.includes(unit)))
-        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...f })))
+        // A form's layout is the wireframe's, not the agent's: its size and how many controls it has.
+        const shown = (f: Record<string, unknown>) => (k === 'screens' && f.form ? { ...f, form: { width: (f.form as { width: number }).width, height: (f.form as { height: number }).height, controls: (f.form as { controls: unknown[] }).controls.length } } : f)
+        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...shown(f as unknown as Record<string, unknown>) })))
       }
     }
     const from = Math.max(0, offset ?? 0)
@@ -996,12 +1012,15 @@ export class Assay {
       const error = await attempt('add_node', {
         tempId: m.key, type: 'mockup', label: m.label,
         ...(m.parent ? { parentId: m.parent } : {}),
-        // The page, not one visit of it: no query (it may hold what was typed), numbers as {id}.
-        properties: { screen: pageOf(screen.route), ...(m.description ? { description: m.description } : {}) },
+        // The page, not one visit of it: no query (it may hold what was typed), numbers as {id}; a form by its name.
+        properties: { screen: screen.source === 'form' ? screen.route : pageOf(screen.route), ...(m.description ? { description: m.description } : {}) },
       }, ctx, facade)
       if (error) { failures.push(`mockups "${m.key}" (${m.label}): ${error}`); continue }
       const id = ctx.resolveId(m.key)
-      mockupOf.set(pageOf(screen.route), id)
+      // A form's mockup is drawn from its controls at their positions (ADR Assay reads desktop screens from their form files).
+      const wireframe = screen.source === 'form' ? formWireframe(screen) : null
+      if (wireframe) facade.updateNode(id, { wireframe } as Parameters<ModelFacade['updateNode']>[1])
+      mockupOf.set(screen.source === 'form' ? screen.id : pageOf(screen.route), id)
       written.push({ id, key: m.key, kind: 'mockup', label: m.label, confidence: 'observed', facts: [m.screen] })
       if (m.presentedBy) {
         const before = new Set(Object.keys(facade.getRelations()))
@@ -1011,6 +1030,24 @@ export class Assay {
       }
     }
     const navigated = new Set(run.navigated)
+    // A form's code opening another joins their mockups, labelled with what the user does to open it.
+    for (const [screenId, from] of mockupOf) {
+      const screen = run.facts.get(screenId)?.fact as ScreenFact | undefined
+      if (screen?.source !== 'form') continue
+      for (const open of screen.opens ?? []) {
+        const target = `${screenId.slice(0, screenId.lastIndexOf(':') + 1)}${open.form}`
+        const to = mockupOf.get(target)
+        if (!to || to === from || navigated.has(`${from}->${to}`)) continue
+        const control = screen.controls.find((c) => c.ref === open.via || c.ref.startsWith(`${open.via}(`))
+        const name = control ? `"${control.name}"` : open.via ?? 'the form'
+        const label = open.key ? `presses a key in ${name}` : `${control?.role === 'menuitem' ? 'chooses' : 'clicks'} ${name}`
+        const before = new Set(Object.keys(facade.getRelations()))
+        const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType: 'navigates-to', properties: { description: label } }, ctx, facade)
+        if (error) { failures.push(`navigates-to from ${screen.route} to ${open.form}: ${error}`); continue }
+        navigated.add(`${from}->${to}`)
+        written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label, confidence: 'observed', facts: [screenId] })
+      }
+    }
     // A mockup stands for its page, whichever screen of it a path reached.
     const screenOf = new Map((run.explore?.facts.screens ?? []).map((x) => [x.id, x]))
     const pageAt = (id: string) => pageOf(screenOf.get(id)?.route ?? '')
@@ -1080,6 +1117,8 @@ export class Assay {
         ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
+      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
+      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -1105,11 +1144,11 @@ export class Assay {
       written.push({ id: ctx.resolveId(args.tempId as string), key: args.tempId as string, ...record, ...(record.citations?.length ? {} : { citations: undefined }) })
       return true
     }
-    const relate = async (from: string, to: string, relationType: string, what: string, extra: { label?: string; properties?: Record<string, unknown>; facts?: string[]; citations?: Citation[]; confidence?: Written['confidence'] } = {}): Promise<void> => {
+    const relate = async (from: string, to: string, relationType: string, what: string, extra: { label?: string; properties?: Record<string, unknown>; facts?: string[]; citations?: Citation[]; confidence?: Written['confidence']; basis?: Written['basis'] } = {}): Promise<void> => {
       const before = new Set(Object.keys(facade.getRelations()))
       const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType, ...(extra.label ? { label: extra.label } : {}), ...(extra.properties && Object.keys(extra.properties).length ? { properties: extra.properties } : {}) }, ctx, facade)
       if (error) { failures.push(`${what}: ${error}`); return }
-      written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}) })
+      written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}), ...(extra.basis ? { basis: extra.basis } : {}) })
     }
     const table = (id: string): TableFact | undefined => (run.facts.get(id)?.kind === 'table' ? run.facts.get(id)!.fact as TableFact : undefined)
     /** The containers, components and web applications of the run built from `unit`. */
@@ -1125,6 +1164,8 @@ export class Assay {
         `entities "${e.key}" (${e.label})`, { kind: 'entity', label: e.label, confidence: 'observed', facts: e.tables })
     }
     const realised = new Set<string>()
+    // Entities no element realises, for the answer: no unit's code names their tables.
+    this.unrealised = []
     for (const e of plan.entities) {
       // Only a foreign key joins two entities (checkPlan): the tables that hold it are the evidence.
       if (e.partOf) await relate(e.key, e.partOf, 'part-of', `entities "${e.key}" part of ${e.partOf}`, { confidence: 'observed', facts: e.tables })
@@ -1135,6 +1176,7 @@ export class Assay {
       const names = new Set(e.tables.map((id) => tableName(table(id)?.table ?? '')))
       // A schema file alone names it nowhere a unit uses it.
       const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
+      if (!named.some((t) => builtFrom(t.unit).length)) this.unrealised.push(e.label)
       for (const unit of new Set(named.map((t) => t.unit))) {
         for (const element of builtFrom(unit)) {
           if (realised.has(`${element}->${e.key}`)) continue
@@ -1188,7 +1230,8 @@ export class Assay {
         // The state facts whose lines set its target back it, beside what it cites.
         const sets = stateFacts.filter((f) => f.sets.some((x) => stateName(x.value) === valueOf(t.to))).map((f) => f.id)
         const properties = { ...(t.event && events.has(t.event) ? { event: events.get(t.event) } : {}), ...(t.guard ? { guard: t.guard } : {}), ...(t.actions ? { actions: t.actions } : {}) }
-        await relate(t.from, t.to, 'transition', `stateMachines "${m.key}", transition ${t.from} → ${t.to}`, { ...(t.event ? { label: t.event } : {}), properties, facts: [...new Set([...(t.facts ?? []), ...sets])], citations: t.citations })
+        // What backs it, kept apart in the evidence: a line that sets its target, or a quotation alone.
+        await relate(t.from, t.to, 'transition', `stateMachines "${m.key}", transition ${t.from} → ${t.to}`, { ...(t.event ? { label: t.event } : {}), properties, facts: [...new Set([...(t.facts ?? []), ...sets])], citations: t.citations, basis: sets.length ? 'sets' : 'quoted' })
       }
       await relate(m.key, m.entity, 'lifecycle-of', `stateMachines "${m.key}" lifecycle of ${m.entity}`, { facts: m.facts })
       // What runs it: the elements built from the units whose code sets its values; none when no code does.
@@ -1232,7 +1275,7 @@ export class Assay {
     ].filter(Boolean).join(' ')
     const need = p.needProposal ?? (p.need ? label(p.need) : undefined)
     return [
-      `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${need ? `, derived from ${need}` : ''}: ${ears}`,
+      `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${r.processes?.length ? ` and the process${r.processes.length === 1 ? '' : 'es'} ${r.processes.map(label).join(', ')}` : ''}${need ? `, derived from ${need}` : ''}: ${ears}`,
       ...(props.rationale ? [`    rationale: ${props.rationale}`] : []),
       ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}${s.tests?.length ? `; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}` : ''}${s.paths?.length ? `; explored paths, each written as a Playwright test when accepted: ${s.paths.map((x) => `"${(run.facts.get(x)?.fact as PathFact | undefined)?.name ?? x}"`).join(', ')}` : ''}${!s.tests?.length && !s.paths?.length && s.citations?.length ? `; drawn from the code (${s.citations.map((c) => `${c.repository}/${c.file}:${c.lines[0]}`).join(', ')}): no test checks it; ${this.pendingTestNote(run, p.satisfiedBy, pending)}` : ''}`),
       ...(r.scenarios.length ? [] : ['    no scenario: it rests on what it cites (code, screens or documents), not on tests that pass']),
@@ -1341,6 +1384,14 @@ export class Assay {
         written.push({ id: ctx.resolveId(r.key), key: r.key, kind: 'requirement', label, confidence: 'hypothesis', facts, ...(r.citations?.length ? { citations: r.citations } : {}), accepted: accepted(false) })
         if (needId) await step('add_relation', { sourceId: r.key, targetId: needId, relationType: 'derives' }, 'derives from its need')
         if (satisfiedBy) await step('add_relation', { sourceId: satisfiedBy, targetId: r.key, relationType: 'satisfies' }, `${nodes[satisfiedBy].label} satisfies it`)
+        // The processes that meet it, as the plan named them.
+        for (const ref of r.processes ?? []) {
+          const process = where(ref)
+          if (typeof process === 'object') { failures.push(`its process: ${process.problem}`); continue }
+          if (await step('add_relation', { sourceId: process, targetId: r.key, relationType: 'satisfies' }, `process ${nodes[process]?.label ?? ref} satisfies it`)) {
+            written.push({ id: Object.values(facade.getRelations()).find((x) => x.sourceId === process && x.targetId === ctx.resolveId(r.key))?.id ?? '', key: `${ref}->${r.key}`, kind: 'relation', label: 'satisfies', confidence: 'inferred', facts: [] })
+          }
+        }
         for (const sc of r.scenarios) {
           if (!await step('add_node', { tempId: sc.key, type: 'scenario', label: sc.label, properties: { given: sc.given, when: sc.when, then: sc.then }, ...(parent ? { parentId: parent } : {}) }, `scenario "${sc.label}"`)) continue
           written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: [...(sc.tests ?? []), ...(sc.paths ?? [])], ...(sc.citations?.length ? { citations: sc.citations } : {}) })
@@ -1381,7 +1432,9 @@ export class Assay {
 
   /** What becomes of a scenario drawn from the code, as a proposal says it: its element named by a key or an id. */
   private pendingTestNote(run: Run, element: string | undefined, pending: Proposal[]): string {
-    const unitId = element ? run.written.find((w) => w.id === element || w.key === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    const built = element ? run.written.find((w) => w.id === element || w.key === element) : undefined
+    const unitId = built?.facts.find((f) => run.facts.get(f)?.kind === 'unit')
+    if (built && !unitId) return `${built.label} is built from no unit of this run: accepted, the scenario only`
     if (!unitId || pending.some((x) => x.kind === 'requirement' && x.requirement.key === element)) return 'a pending test is written when accepted, where its unit has a test framework'
     const unit = run.facts.get(unitId)!.fact as Unit
     const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)
@@ -1543,6 +1596,7 @@ export class Assay {
     const waiting = run.proposals.filter((p) => p.status === 'waiting')
     return [
       `Assay run on ${run.repositories.map((r) => r.repository).join(', ')}${run.sources.length ? ` with ${run.sources.length} source${run.sources.length === 1 ? '' : 's'} of documents (${run.sources.map((r) => r.repository).join(', ')})` : ''}: wrote ${count('element')} elements and ${count('relation')} relations between them, ${count('requirement')} requirements, ${count('scenario')} scenarios, ${run.written.filter((w) => w.kind === 'need' && w.key !== 'need').length} needs from documents${run.needId ? ' and the need Found in the code' : ''} and ${count('decision')} decisions into ${run.modelPath}; each requirement, scenario, need and decision with its own relations (satisfies, verifies, derives, constrains).`,
+      ...(count('mockup') && !run.explore ? [`Mockups: ${count('mockup')}, from the forms.`] : []),
       ...(['entity', 'process', 'state-machine'].some((k) => count(k as Written['kind'])) ? [`Domain: ${plural(count('entity'), 'entity').replace(/entitys$/, 'entities')}; ${plural(count('process'), 'process').replace(/processs$/, 'processes')} of ${plural(count('step'), 'step')} and ${plural(count('state-machine'), 'state machine')}, inferred.`] : []),
       ...(run.skeletons.length ? [`Pending tests written for scenarios drawn from the code: ${[...new Set(run.skeletons)].join(', ')}.`] : []),
       ...(run.explore ? [`Explored: ${run.explore.facts.paths.length} paths, ${run.explore.facts.screens.length} screens; ${run.written.filter((w) => w.kind === 'mockup').length} mockups written${run.testsWritten.length ? `, Playwright tests written: ${[...new Set(run.testsWritten)].join(', ')}` : ''}.`] : []),

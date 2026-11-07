@@ -16,6 +16,7 @@ import { parseTestReport } from '@radical/common/check'
 import { readCode } from './code'
 import { readDomain } from './domain'
 import { readEntries } from './entries'
+import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
 import { readRuntime } from './runtime'
@@ -119,6 +120,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.tables = domain.tables
   facts.states = domain.states
   facts.entries = readEntries(files, repo, facts.units)
+  // A desktop application's forms are its screens, read from their files.
+  facts.screens = readForms(files, repo, facts.units)
 
   facts.tests = readTests(root, repo, files, facts.units, options.reports, facts.notes)
   facts.documents = readDocuments(files, repo)
@@ -171,7 +174,9 @@ function readTests(root: string, repo: string, files: RepoFiles, units: Unit[], 
       const quoted = title ? [`'${title}'`, `"${title}"`, `\`${title}\``].map((q) => text.indexOf(q)).filter((i) => i >= 0)[0] : undefined
       const line = quoted !== undefined ? text.slice(0, quoted).split('\n').length : title ? lineOf(text, title) : 1
       const unit = owner(units, file)
-      byId.set(id, { id, ...(unit ? { unit: unit.id } : {}), test, status: c.status, evidence: { file, line } })
+      // A test that passes without checking anything rests no scenario.
+      const empty = quoted !== undefined && /\.[cm]?[jt]sx?$/.test(file) && checksNothing(text, quoted)
+      byId.set(id, { id, ...(unit ? { unit: unit.id } : {}), test, status: c.status, ...(empty ? { checksNothing: true } : {}), evidence: { file, line } })
     }
   }
   return [...byId.values()]
@@ -195,4 +200,29 @@ function repositoryPath(root: string, file: string, files: RepoFiles, byName: Ma
   const base = name.slice(name.lastIndexOf('/') + 1)
   const ends = (byName.get(base) ?? []).filter((f) => name.endsWith(`/${f}`) || f.endsWith(`/${name}`) || f === name)
   return ends.length === 1 ? ends[0] : null
+}
+
+/** An assertion in a JavaScript test: expect, assert, should, a node:test or AVA check. */
+const ASSERTS = /\b(expect|assert\w*|should|strictEqual|deepEqual|deepStrictEqual|throws|rejects)\b|\bt\.(is|not|true|false|deepEqual|throws|snapshot)\b|\.(toBe|toEqual|toMatch|toHave\w*|toThrow\w*|toContain)\b/
+
+/** Whether the test whose title is at `at` in `text` has an empty body or one that asserts nothing. */
+export function checksNothing(text: string, at: number): boolean {
+  // The function after the title: its body from the first { past the arrow or the parameters.
+  const head = /^\s*(['"`])(?:\\.|(?!\1).)*\1\s*,\s*(?:async\s*)?(?:function\s*\w*\s*)?(?:\([^)]*\)|\w+)\s*(?:=>)?\s*\{/.exec(text.slice(at))
+  if (!head) return false
+  const start = at + head[0].length
+  let depth = 1
+  let quote = ''
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]
+    if (quote) { if (c === '\\') i++; else if (c === quote) quote = ''; continue }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) {
+      // An assertion on a constant (expect(1).toBe(1)) checks nothing either.
+      const body = text.slice(start, i).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').replace(/\bexpect\(\s*(?:-?\d[\d.]*|true|false|null|undefined|'[^']*'|"[^"]*")\s*\)(?:\.\w+)*\([^)]*\)/g, '')
+      return !body.trim() || !ASSERTS.test(body)
+    }
+  }
+  return false
 }

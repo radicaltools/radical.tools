@@ -150,7 +150,7 @@ export interface TableFact {
   /** Where it is declared, its columns known: SQL (CREATE TABLE), JPA, Entity Framework Core, Django, SQLAlchemy, TypeORM, Prisma. */
   declared?: string
   /** Its columns, as declared; `type` as written (for an ORM class, the field's type). */
-  columns?: Array<{ name: string; type?: string; line: number }>
+  columns?: Array<{ name: string; type?: string; notNull?: boolean; line: number }>
   /** Its foreign keys: the column and the table it references (an ORM class's reference names the table its class maps). */
   references?: Array<{ column?: string; table: string; line: number }>
   evidence: Evidence
@@ -166,6 +166,9 @@ export interface StateFact {
   /** The table and column whose values they are, where the SQL or an ORM class says so. */
   table?: string
   column?: string
+  /** A lifecycle kept in flags: each boolean column or nullable date, and the value it stands for (is_dead: dead,
+   *  PaidOn: paid); the fact's values are each flag and its negation (dead, not dead). */
+  flags?: Array<{ column: string; value: string; line: number }>
   /** The value a new one starts with, where the SQL gives the column a default. */
   initial?: string
   /** The lines of the repository's code that set a value (an assignment, a setter, an UPDATE … SET), each with its unit. */
@@ -207,6 +210,8 @@ export interface TestFact {
   /** `<file> › <title>`, the id .radical/radical.json verifies binds. */
   test: string
   status: 'passed' | 'failed' | 'skipped'
+  /** Its body is empty or asserts nothing (a JavaScript test): it passes whatever the code does. */
+  checksNothing?: boolean
   evidence: Evidence
 }
 

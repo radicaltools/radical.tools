@@ -117,7 +117,7 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
       if (!column) continue
       const name = unquote(column[1])
       const type = column[2]?.replace(/\s+/g, ' ')
-      declared.columns.push({ name, ...(type ? { type: /^enum\b/i.test(type) ? 'ENUM' : type } : {}), line })
+      declared.columns.push({ name, ...(type ? { type: /^enum\b/i.test(type) ? 'ENUM' : type } : {}), ...(/\bnot\s+null\b|\bprimary\s+key\b/i.test(item.text) ? { notNull: true } : {}), line })
       const ref = new RegExp(`\\breferences\\s+${SQL_NAME}`, 'i').exec(item.text)
       if (ref) declared.references.push({ column: name, table: ref[1], line })
       // A status column's values: an inline CHECK … IN, a MySQL ENUM, or a type created as an enum.
@@ -347,7 +347,7 @@ function prisma(text: string, file: string): { tables: Array<Omit<Declared, 'uni
         continue
       }
       if (f[3] && !PRISMA_SCALAR.test(f[2])) continue
-      declared.columns.push({ name: /@map\(\s*"([^"]+)"/.exec(f[5])?.[1] ?? f[1], type: f[2], line: lineNo })
+      declared.columns.push({ name: /@map\(\s*"([^"]+)"/.exec(f[5])?.[1] ?? f[1], type: f[2], ...(f[4] ? {} : { notNull: true }), line: lineNo })
     }
   }
   return { tables, enums }
@@ -402,6 +402,26 @@ function codeEnums(text: string, file: string): CodeEnum[] {
     }
   }
   return out
+}
+
+const BOOLEAN = /^(bool|boolean|bit|tinyint\s*\(\s*1\s*\)|BooleanField|NullBooleanField)$/i
+const DATE = /^(date|datetime2?|smalldatetime|timestamp(tz)?|timestamp\s+with(out)?\s+time\s+zone|DateTime\??|DateTimeOffset\??|LocalDate(Time)?|Instant|Date|DateTimeField|DateField)$/i
+/** Names of a condition a row is in: is_dead, has_paid, banned, deleted. */
+const CONDITION = /^(is|has|was)_?[a-z]|^(deleted|banned|blocked|locked|closed|paid|archived|cancell?ed|approved|verified|suspended|dead|online|disabled|expired|completed|shipped|delivered|refunded|void(ed)?)$/i
+/** A date an event stamps: a past participle and at, on, date or time (paid_at, PaidOn, shipped_date); not when a row was made or touched. */
+const EVENT_DATE = /^(?!(created|updated|modified|inserted|changed|last|birth|dob))[a-z]*?(ed|paid|sent|sold|built|done|won|lost|made)_?(at|on|date|time)$/i
+/** An SQL date type, nullable unless NOT NULL; an ORM's is nullable only when it says so (DateTime?). */
+const SQL_DATE = /^(date|datetime2?|smalldatetime|timestamp(tz)?|timestamp\s+with(out)?\s+time\s+zone)$/
+
+/** The value a flag column stands for (is_dead → dead, PaidOn → paid), or none when it is no flag. */
+function flagValue(c: Column): string | undefined {
+  const type = (c.type ?? '').replace(/\(.*$/, (m) => (/^\(\s*1\s*\)$/.test(m) ? m : '')).trim()
+  const words = (s: string): string => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim().toLowerCase()
+  if ((BOOLEAN.test(type) || (/^(tinyint|int|integer|smallint|number)/i.test(type) && /^(is|has|was)_/i.test(c.name))) && CONDITION.test(c.name)) {
+    return words(c.name.replace(/^(is|has|was)_?/i, '')) || undefined
+  }
+  if (DATE.test(type) && !c.notNull && (SQL_DATE.test(type.toLowerCase()) && (type === type.toUpperCase() || type === type.toLowerCase()) || /\?$/.test(type)) && EVENT_DATE.test(c.name)) return words(c.name.replace(/_?(at|on|date|time)$/i, '')) || undefined
+  return undefined
 }
 
 /** A line that sets a status: an assignment to a status, a setter, an UPDATE … SET, a VB recordset field. */
@@ -495,11 +515,25 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     states.push({ id, unit: e.unit.id, name: e.name, values: e.values, ...(typed ? { table: typed.table, column: typed.column.name } : {}), sets: [], evidence: { file: e.file, line: e.line } })
     aliasesOf.set(id, e.aliases)
   }
+  // A lifecycle kept in flags: boolean columns named for a condition, nullable dates named for an event.
+  const flagsOf = new Map<string, Array<{ column: string; value: string }>>()
+  for (const t of tables.values()) {
+    const flags = (t.columns ?? []).map((c) => ({ column: c.name, value: flagValue(c) })).filter((f): f is { column: string; value: string } => !!f.value)
+    if (!flags.length) continue
+    const unit = units.find((u) => u.id === t.unit)!
+    const id = `${repo}:state:${unit.path}:${t.table.toLowerCase()}.flags`
+    states.push({ id, unit: t.unit, name: `${t.table} flags`, values: flags.flatMap((f) => [f.value, `not ${f.value}`]), table: t.table, flags: flags.map((f) => ({ ...f, line: t.columns!.find((c) => c.name === f.column)!.line })), sets: [], evidence: { file: t.evidence.file, line: t.columns!.find((c) => c.name === flags[0].column)!.line } })
+    flagsOf.set(id, flags)
+  }
   if (states.length) {
-    // Where each value is set, in any unit's code: an enum by its name and member, any status by its string.
+    // Where each value is set, in any unit's code: an enum by its name and member, any status by its string,
+    // a flag by its column set (1, true, now) or cleared (0, false, null).
     const tokens = states.map((s) => ({
       state: s,
-      values: s.values.map((value) => {
+      values: flagsOf.has(s.id) ? flagsOf.get(s.id)!.flatMap((f) => [
+        { value: f.value, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*=\\s*(?:-?1\\b|true\\b|now\\b|now\\s*\\(|getdate\\s*\\(|current_timestamp|sysdate|new\\s+date|datetime\\.(?:utc)?now|date\\s*\\(|instant\\.now|localdatetime\\.now|timezone\\.now|datetime\\.(?:utc)?now\\()`, 'i') },
+        { value: `not ${f.value}`, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*=\\s*(?:0\\b|false\\b|null\\b|nothing\\b|none\\b)`, 'i') },
+      ]) : s.values.map((value) => {
         const spellings = [value, ...(aliasesOf.get(s.id)?.get(value) ?? [])]
         const member = aliasesOf.has(s.id) ? `\\b${escapeRe(s.name)}\\.${escapeRe(value)}\\b|` : ''
         return { value, re: new RegExp(`${member}(['"])(?:${spellings.map(escapeRe).join('|')})\\1`, aliasesOf.has(s.id) ? '' : 'i') }
@@ -513,12 +547,17 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
       const lines = (vb ? withoutVbComments(raw) : raw).split('\n')
       lines.forEach((line, i) => {
         const sql = SQL_SET.exec(line)
-        if (!sql && (!SETTER.test(line) || NOT_SETTING.test(line))) return
+        // An UPDATE's assignments, before its WHERE; elsewhere a line that sets rather than compares.
+        const assigned = /\bupdate\b[\s\S]*?\bset\b([\s\S]*?)(?:\bwhere\b|$)/i.exec(line)?.[1]
+        const setting = !NOT_SETTING.test(line)
+        if (!sql && !assigned && (!SETTER.test(line) || !setting) && !(setting && /=/.test(line))) return
         for (const { state, values } of tokens) {
           if (state.sets.length >= SETS) continue
           if (state.evidence.file === file && state.evidence.line === i + 1) continue
+          const flags = flagsOf.has(state.id)
+          if (flags ? !assigned && !setting : !sql && (!SETTER.test(line) || !setting)) continue
           for (const { value, re } of values) {
-            if (!re.test(sql ? `'${sql[2] ?? sql[3]}'` : line)) continue
+            if (!re.test(flags ? assigned ?? line : sql ? `'${sql[2] ?? sql[3]}'` : line)) continue
             if (state.sets.filter((x) => x.value === value).length >= SETS_PER_VALUE) continue
             state.sets.push({ value, unit: unit.id, file, line: i + 1 })
           }

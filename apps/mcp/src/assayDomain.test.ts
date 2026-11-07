@@ -78,6 +78,7 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const applied = await call('assay_apply', { plan: DOMAIN })
     expect(applied.ok).toBe(true)
     expect(applied.text).toContain('Wrote 1 element, 2 entities and 2 relations into the central model.')
+    expect(applied.text).toContain('No element realises "Customer": no unit\'s code names their tables (a schema file is no use of them).')
     const all = await nodes()
     const sales = all.find((n) => n.label === 'Sales')!
     const order = all.find((n) => n.label === 'Order')!
@@ -137,12 +138,19 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const process = all.find((n) => n.type === 'process')!
     expect(all.filter((n) => n.type === 'step').map((n) => [n.label, n.order, n.parentId === process.id]).sort((a, b) => Number(a[1]) - Number(b[1]))).toEqual([['Place the order', 1, true], ['Pay for it', 2, true], ['Ship it', 3, true]])
     expect((await relations()).filter((r) => r.relationType === 'performed-by').length).toBe(3)
+    // A requirement names the process that meets it; accepted, the process satisfies it.
+    const requirement = (processes: string[]) => ({ requirements: [{ key: `r-fulfil-${processes.length}`, label: 'Fulfil orders', satisfiedBy: 'orders', processes, properties: { action: 'the orders service shall take an order from placing to shipping' }, citations: [CODE([9, 11], "order.status = 'paid'")] }] })
+    expect((await call('assay_apply', { plan: requirement(['fulfil', 'orders']) })).text).toContain('- requirements[0] (Fulfil orders): processes must list processes of the plan or the model that meet it')
+    const proposed = await call('assay_apply', { plan: requirement(['fulfil']) })
+    expect(proposed.text).toContain('requirement "Fulfil orders" (ubiquitous), satisfied by Orders service and the process Fulfil an order: the orders service shall take an order from placing to shipping')
+    expect((await call('assay_answer', { proposal: 'P1', accept: true })).ok).toBe(true)
+    expect((await relations()).filter((r) => r.relationType === 'satisfies').map((r) => [r.sourceLabel, r.targetLabel]).sort()).toEqual([['Fulfil an order', 'Fulfil orders'], ['Orders service', 'Fulfil orders']])
     const pay = json(join(root, '.radical/assay/run.json')).written.find((w: { label: string }) => w.label === 'Pay for it')
     expect([pay.kind, pay.confidence, pay.evidence.map((e: { fact?: string; quote?: string }) => e.fact ?? e.quote)]).toEqual(['step', 'inferred', [route('POST /orders/:id/payment'), "order.status = 'paid'"]])
   })
 
   it('writes the lifecycle of an entity from its status values, implemented by the container whose code sets them', async () => {
-    const { call, nodes, relations } = await central()
+    const { call, nodes, relations, root, json } = await central()
     await call('assay_apply', { plan: C4 })
     await call('assay_apply', { plan: DOMAIN })
     const status = 'orders:state:.:orderstatus'
@@ -154,20 +162,29 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const wrong = await call('assay_apply', { plan: { stateMachines: [{ ...machine, states: [...machine.states, { key: 'lost', label: 'Lost' }], transitions: [...machine.transitions, { from: 'shipped', to: 'lost' }] }] } })
     expect(wrong.text).toContain('- stateMachines[0] (Order lifecycle).states[3] (Lost): no state fact the machine cites holds "Lost" (new, paid, shipped); give its value, or cite the code that names it')
     expect(wrong.text).toContain('- stateMachines[0] (Order lifecycle).transitions[2] (shipped → lost): rests on nothing: no line of the code the state facts name sets lost; cite the code that makes it (citations)')
-    const applied = await call('assay_apply', { plan: { stateMachines: [machine] } })
+    // Paid and shipped are set by lines of the code; a cancellation no code makes rests on a quotation alone.
+    const quote = CODE([1, 1], "export type OrderStatus = 'new'")
+    const applied = await call('assay_apply', { plan: { stateMachines: [{
+      ...machine,
+      states: [...machine.states, { key: 'cancelled', label: 'Cancelled', kind: 'final', citations: [quote] }],
+      transitions: [...machine.transitions, { from: 'new', to: 'cancelled', event: 'Cancelled', citations: [quote] }],
+    }] } })
     expect(applied.ok).toBe(true)
-    expect(applied.text).toContain('1 state machine of 3 states')
+    expect(applied.text).toContain('1 state machine of 4 states')
+    expect(applied.text).toContain('Transitions: 2 rest on a line of the code that sets their target, 1 on a quotation the server could not match to such a line in the state facts (marked "quoted" in .radical/assay/run.json: read them again if the quotation does not show the target set).')
+    const evidence = json(join(root, '.radical/assay/run.json')).written.filter((w: { basis?: string }) => w.basis).map((w: { label: string; basis: string }) => [w.label, w.basis])
+    expect(evidence).toEqual([['Payment received', 'sets'], ['Shipped', 'sets'], ['Cancelled', 'quoted']])
     const all = await nodes()
     const life = all.find((n) => n.type === 'state-machine')!
     expect([life.label, life.parentId === all.find((n) => n.label === 'Sales')!.id]).toEqual(['Order lifecycle', true])
     expect(all.filter((n) => n.parentId === life.id).map((n) => [n.type, n.label, n.kind]).sort()).toEqual([
-      ['event', 'Payment received', undefined], ['event', 'Shipped', undefined],
-      ['pseudostate', 'Start', 'initial'], ['state', 'New', 'normal'], ['state', 'Paid', 'normal'], ['state', 'Shipped', 'final'],
+      ['event', 'Cancelled', undefined], ['event', 'Payment received', undefined], ['event', 'Shipped', undefined],
+      ['pseudostate', 'Start', 'initial'], ['state', 'Cancelled', 'final'], ['state', 'New', 'normal'], ['state', 'Paid', 'normal'], ['state', 'Shipped', 'final'],
     ])
     const rels = await relations()
     expect(rels.filter((r) => ['transition', 'lifecycle-of', 'implements'].includes(r.relationType)).map((r) => [r.relationType, r.sourceLabel, r.targetLabel]).sort()).toEqual([
       ['implements', 'Orders service', 'Order lifecycle'], ['lifecycle-of', 'Order lifecycle', 'Order'],
-      ['transition', 'New', 'Paid'], ['transition', 'Paid', 'Shipped'], ['transition', 'Start', 'New'],
+      ['transition', 'New', 'Cancelled'], ['transition', 'New', 'Paid'], ['transition', 'Paid', 'Shipped'], ['transition', 'Start', 'New'],
     ])
     const paid = rels.find((r) => r.relationType === 'transition' && r.targetLabel === 'Paid')!
     expect(paid.event).toBe(all.find((n) => n.label === 'Payment received')!.id)
