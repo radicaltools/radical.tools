@@ -239,6 +239,16 @@ export class Explorer {
     if (this.facts.screens.length >= MAX_SCREENS) return { problem: `the run keeps at most ${MAX_SCREENS} screens` }
     const origin = new URL(path.origin)
     let step: Step
+    if (action === 'expect') {
+      // A text the current screen shows: the path's test asserts it. Nothing is done on the page.
+      if (!value?.trim()) return { problem: 'expect needs the text the screen shows (value)' }
+      if ([...this.secrets].some((secret) => value.includes(secret))) return { problem: 'expect names a password typed in this path: Assay keeps none' }
+      const visible = await page.getByText(value).first().waitFor({ state: 'visible', timeout: ACTION_TIMEOUT }).then(() => true, () => false)
+      if (!visible) return { problem: `"${value}" is not on the current screen (${from.id}): expect a text it shows` }
+      step = { action, value, from: from.id, to: from.id }
+      path.steps.push(step)
+      return { screen: from, path }
+    }
     if (action === 'goto') {
       let target: URL
       try { target = new URL(value ?? '', origin) } catch { return { problem: `${value} is no address` } }

@@ -157,6 +157,10 @@ describe('Radical Assay: the running application', () => {
   it('writes an accepted path as a Playwright test of the repository, which passes', async () => {
     const r = await run()
     await signIn(r)
+    // The outcome the scenario names, checked on the screen and kept as a step; a text not there, or a password, is refused.
+    expect((await r.call('assay_explore_act', { action: 'expect', value: 'Order 99' })).text).toBe('assay_explore_act: "Order 99" is not on the current screen (explore:screen:2): expect a text it shows')
+    expect((await r.call('assay_explore_act', { action: 'expect', value: 'secret-1' })).text).toBe('assay_explore_act: expect names a password typed in this path: Assay keeps none')
+    expect((await r.call('assay_explore_act', { action: 'expect', value: 'Welcome' })).ok).toBe(true)
     await r.call('assay_apply', { plan: C4 })
     await r.call('assay_apply', { plan: { requirements: [{
       key: 'r-sign-in', label: 'Sign in', satisfiedBy: 'web',
@@ -171,6 +175,7 @@ describe('Radical Assay: the running application', () => {
     expect(spec).toContain("expect(PASSWORD, 'Set E2E_PASSWORD to the password of the test account').not.toBe('')")
     expect(readFileSync(join(r.dir, 'storefront', 'e2e/assay/playwright.config.ts'), 'utf8')).toContain("testDir: '.'")
     expect(spec).toContain("await expect(page.getByRole('heading', { name: \"Welcome\", exact: true }).first()).toBeVisible()")
+    expect(spec).toContain('await expect(page.getByText("Welcome").first()).toBeVisible()')
     expect(spec).not.toContain('secret-1')
     const mapping = JSON.parse(readFileSync(join(r.dir, 'storefront', '.radical/radical.json'), 'utf8'))
     const scenario = (await r.nodes()).find((n) => n.label === 'Customer signs in')!

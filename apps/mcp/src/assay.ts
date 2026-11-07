@@ -106,8 +106,9 @@ export const ASSAY_PROCEDURE = [
   '   and the repository that builds it; skip the stage otherwise). assay_explore opens it and starts a path named for what a',
   '   user does; assay_explore_act clicks, fills, selects, checks, presses or goes to an address, by the references of the',
   '   screen it returns. Take the paths a user takes: signing in, the main lists and details, creating and changing what the',
-  '   application keeps; one path per task, starting each with assay_explore. Each path starts signed out in a fresh',
-  '   session, as its test will: a path behind the sign-in signs in first. Fill forms with plausible test data. Another',
+  '   application keeps; one path per task, starting each with assay_explore. Where a path shows its outcome (an order\'s',
+  '   status, a message), expect that text (assay_explore_act expect): the path\'s test checks it, not only where it went.',
+  '   Each path starts signed out in a fresh session, as its test will: a path behind the sign-in signs in first. Fill forms with plausible test data. Another',
   '   host and controls that pay or delete an account are refused: leave them. Then one plan: a mockup per page that',
   '   matters (a page is a route with its numbers as {id}: /orders/1 and /orders/2 are one page; mockups: label as a user',
   '   would call it, screen: one of its screens, description from the screen\'s text, presentedBy the webapp that renders',
@@ -541,11 +542,11 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'assay_explore_act',
-    description: 'Do one thing on the current screen of the explored application, as the next step of the current path: click, fill (value: the text), select (value: the option), check, or press (value: a key such as Enter) the control with that reference, or goto (value: an address or route of the same application). Returns the screen it leads to. Another host\'s address, and a control whose name says it pays, buys, transfers money or deletes or closes an account, are refused.',
+    description: 'Do one thing on the current screen of the explored application, as the next step of the current path: click, fill (value: the text), select (value: the option), check, or press (value: a key such as Enter) the control with that reference, or goto (value: an address or route of the same application); or expect (value: a text the current screen shows, the outcome a scenario names: the path\'s test asserts it). Returns the screen it leads to. Another host\'s address, and a control whose name says it pays, buys, transfers money or deletes or closes an account, are refused.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'goto'] },
+        action: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'goto', 'expect'] },
         ref: { type: 'string', description: 'The control\'s reference on the current screen (none for goto).' },
         value: { type: 'string' },
       },
@@ -746,7 +747,7 @@ export class Assay {
       if (!run.repositories.some((r) => r.repository === repository)) return refused(`assay_explore: repository must be a code repository of the run (${run.repositories.map((r) => r.repository).join(', ')})`)
       got = await explorer.open(url, path.trim(), repository as string)
     } else {
-      const actions: ExploreAction[] = ['click', 'fill', 'select', 'check', 'press', 'goto']
+      const actions: ExploreAction[] = ['click', 'fill', 'select', 'check', 'press', 'goto', 'expect']
       if (!actions.includes(action as ExploreAction)) return refused(`assay_explore_act: action must be one of ${actions.join(', ')}`)
       if (value !== undefined && typeof value !== 'string') return refused('assay_explore_act: value must be text')
       got = await explorer.act(action as ExploreAction, typeof ref === 'string' ? ref : undefined, value as string | undefined)

@@ -42,7 +42,8 @@ export interface ScreenFact {
 
 /** One action of a path. */
 export interface Step {
-  action: 'goto' | 'click' | 'fill' | 'select' | 'check' | 'press'
+  /** expect: a text the screen shows, which the path's test asserts (the outcome a scenario names). */
+  action: 'goto' | 'click' | 'fill' | 'select' | 'check' | 'press' | 'expect'
   /** The control acted on (none for goto). */
   control?: { role: string; name: string; locator: string }
   /** What was typed or chosen; a password is not kept. */
@@ -73,6 +74,7 @@ export const pageOf = (route: string): string =>
 /** What a step does, as a person would say it: the label of a navigates-to. */
 export function stepLabel(step: Step): string {
   if (step.action === 'goto') return 'opens it'
+  if (step.action === 'expect') return `sees "${step.value ?? ''}"`
   const what = step.control ? `${step.control.role} "${step.control.name}"` : 'the page'
   if (step.action === 'click') return `clicks ${what}`
   if (step.action === 'fill') return `fills ${what}`
@@ -122,6 +124,9 @@ export function pathTest(path: PathFact, screens: Map<string, ScreenFact>, recor
     const to = screens.get(step.to)
     if (step.action === 'goto') {
       lines.push(`  await page.goto(\`\${BASE}${(to?.route ?? '/').replace(/[`$\\]/g, '\\$&')}\`)`)
+    } else if (step.action === 'expect') {
+      // The outcome the agent saw and named: the scenario's then.
+      lines.push(`  await expect(page.getByText(${quote(step.value ?? '')}).first()).toBeVisible()`)
     } else if (step.control) {
       const target = `page.${step.control.locator}`
       const value = step.secret ? 'PASSWORD' : quote(step.value ?? '')
