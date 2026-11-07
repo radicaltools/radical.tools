@@ -503,7 +503,9 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     // A schema in no unit's folder is that of every unit whose code names one of its tables (the only unit, else).
     const unit = own(file)
     const names = new Set(schema.tables.map((t) => bare(t.table).toLowerCase()))
-    const users = unit ? [unit] : units.length === 1 ? units : units.filter((u) => named.some((t) => t.unit === u.id && names.has(bare(t.table).toLowerCase())))
+    // …or of every unit using the database the script names (USE, CREATE DATABASE).
+    const scriptDbs = new Set([...files.read(file).matchAll(/^\s*(?:use|create\s+database)\s+\[?(\w+)\]?/gim)].map((m) => m[1].toLowerCase()))
+    const users = unit ? [unit] : units.length === 1 ? units : units.filter((u) => named.some((t) => t.unit === u.id && names.has(bare(t.table).toLowerCase())) || used.some((d) => d.unit === u.id && !!d.name && scriptDbs.has(d.name.toLowerCase())))
     for (const u of users) {
       declared.push(...schema.tables.map((t) => ({ ...t, unit: u })))
       schemaStates.push(...schema.states.map((s) => ({ ...s, unit: u })))

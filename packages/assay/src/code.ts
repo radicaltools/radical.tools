@@ -11,7 +11,7 @@ import { addressesIn } from './runtime'
 import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
 
-const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.php', '.rb', '.scala', '.fs'])
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.scala', '.fs'])
 const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
 /** Paths that name a file, not an endpoint. */
 const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
@@ -166,7 +166,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     let text = files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
-    const vb = /\.(bas|cls|frm|ctl|dsr|vb)$/i.test(file)
+    const vb = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i.test(file)
     if (vb) text = withoutVbComments(text).replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
     // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
     text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
@@ -214,7 +214,13 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         accessNamed.set(unit.id, [...(accessNamed.get(unit.id) ?? []), { name: m[2], evidence: at(m.index!) }])
       }
       // A form's fields holding a host and a port by default: an address of the unit, or, beside a listening socket, its port.
-      if (file.toLowerCase().endsWith('.frm')) formAddress(text, file, unit, repo, out, once)
+      if (/\.(frm|dob|pag|ctl)$/i.test(file)) formAddress(text, file, unit, repo, out, once)
+      // A socket connecting to a port the code names: Winsock1.Connect ServerName, 6123.
+      for (const m of text.matchAll(/\.Connect\s*\(?\s*("([^"]+)"|[\w.]+)\s*,\s*(\d{2,5})\b/gi)) {
+        const host = (m[2] ?? m[1]).toLowerCase()
+        const id = `${repo}:address:${unit.path}:connect:${host}:${m[3]}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'socket', host, port: Number(m[3]), text: m[0].trim(), evidence: at(m.index!) })
+      }
     }
 
     // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
@@ -317,6 +323,17 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       if (out.databases.some((d) => d.unit === unitId && d.engine === 'Access' && d.name?.toLowerCase() === n.name.toLowerCase())) continue
       out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
     }
+  }
+  // A nameless SQL Server or ODBC connection, where the repository's SQL scripts name one database (USE, CREATE DATABASE), is that one.
+  const scripted = new Set(files.list.filter((f) => /\.sql$/i.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*(?:use|create\s+database)\s+\[?(\w+)\]?/gim)].map((m) => m[1]).filter((n) => !/^(master|tempdb|model|msdb)$/i.test(n))))
+  const scriptedNames = [...new Map([...scripted].map((n) => [n.toLowerCase(), n])).values()]
+  if (scriptedNames.length === 1) {
+    for (const d of out.databases) {
+      if (d.name || d.server || !['SQL Server', 'ODBC'].includes(d.engine)) continue
+      d.name = scriptedNames[0]
+      d.id = `${d.id.slice(0, d.id.lastIndexOf(':') + 1)}${d.engine}/${d.name}`
+    }
+    out.databases = out.databases.filter((d, i) => out.databases.findIndex((o) => o.id === d.id) === i)
   }
   // A nameless connection beside a database of its engine the unit names is that one.
   out.databases = out.databases.filter((d) => d.name || d.server || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && (o.name || o.server)))

@@ -362,7 +362,8 @@ describe('radical assay: what legacy repositories hide', () => {
       'schema.sql': "USE MASTER\r\nGO\r\n--- CREATE DATABASE [commented_out]\r\nCREATE DATABASE [erp_db] COLLATE SQL_Latin1_General_CP1_CI_AS\r\nGO\r\nCREATE TABLE [dbo].[items] ([id] [int] IDENTITY (1, 1) NOT NULL, [name] [nvarchar] (50) NULL)\r\nGO\r\n",
     })
     const facts = extractRepository(dir)
-    expect(facts.databases.map((d) => [d.engine, d.name, d.evidence])).toEqual([['SQL Server', 'erp_db', { file: 'schema.sql', line: 4 }]])
+    // The connection its code opens, named by the schema's database.
+    expect(facts.databases.map((d) => [d.engine, d.name, d.evidence])).toEqual([['SQL Server', 'erp_db', { file: 'frmMain.frm', line: 6 }]])
     expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to])).toEqual([['data', 'erp:unit:.', 'erp:db:.:SQL Server/erp_db']])
   })
 
@@ -509,6 +510,20 @@ describe('radical assay: what legacy repositories hide', () => {
     const facts = extractRepository(repo('reports', { 'Reports.vbp': vbp, 'modReport.bas': 'Attribute VB_Name = "modReport"\r\nSub Export()\r\n  Set xl = CreateObject("Excel.Application")\r\nEnd Sub\r\n' }))
     expect(facts.dependencies.filter((d) => /Object Library/.test(d.package)).map((d) => [d.package, d.unused ?? false])).toEqual([
       ['Microsoft Excel 9.0 Object Library', false], ['Microsoft Word 9.0 Object Library', true],
+    ])
+  })
+
+  it("links a socket's client to the server listening on the port they name, and reads an environment's database", () => {
+    const facts = extractRepository(repo('chat', {
+      'Client/Client.vbp': 'Type=OleExe\r\nUserDocument=Chatdoc.dob\r\nName="Client"\r\n',
+      'Client/Chatdoc.dob': 'VERSION 5.00\r\nBegin VB.UserDocument Chatdoc\r\nEnd\r\nAttribute VB_Name = "Chatdoc"\r\nPrivate Sub cmdGo_Click()\r\n  Winsock1.Connect ServerName, 6123\r\nEnd Sub\r\n',
+      'Server/Server.vbp': 'Type=Exe\r\nForm=Mainform.frm\r\nName="Server"\r\n',
+      'Server/Mainform.frm': 'VERSION 5.00\r\nBegin VB.Form Mainform\r\n   Begin VB.TextBox txtServerPort\r\n      Text = "6123"\r\n   End\r\nEnd\r\nAttribute VB_Name = "Mainform"\r\nPrivate Sub Form_Load()\r\n  sck.LocalPort = txtServerPort.Text\r\n  sck.Listen\r\nEnd Sub\r\n',
+      'web/package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' } }),
+      'web/.env.example': 'APP_NAME=ERP\nDB_CONNECTION=sqlsrv\nDB_HOST=127.0.0.1\nDB_DATABASE=AINData2\n',
+    }))
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to]).sort()).toEqual([
+      ['address', 'chat:unit:Client', 'chat:unit:Server'], ['data', 'chat:unit:web', 'chat:db:web:SQL Server/AINData2'],
     ])
   })
 })
