@@ -497,6 +497,75 @@
         "student_table"
       ],
       "optional": []
+    },
+    {
+      "name": "argentum-online",
+      "about": "A VB6 online game in two repositories, a client and a server. Written down from their READMEs and configuration before Assay first ran on them (2026-11-07); the VB6 reader was tuned on them since.",
+      "stacks": "VB6 Standard EXEs, DirectX 8, Winsock, ADO, MySQL; INI settings",
+      "repositories": [
+        {
+          "name": "ao-cliente",
+          "url": "https://github.com/ao-libre/ao-cliente.git",
+          "commit": "7d32d61759d6b95069aba72ae12bed03c1d13700"
+        },
+        {
+          "name": "ao-server",
+          "url": "https://github.com/ao-libre/ao-server.git",
+          "commit": "ca6ad7ff428a585475373474ec5640eabe05961b"
+        }
+      ],
+      "units": [
+        "ao-cliente",
+        "ao-server"
+      ],
+      "calls": [
+        [
+          "ao-cliente",
+          "ao-server"
+        ],
+        [
+          "ao-server",
+          "db:mysql"
+        ]
+      ],
+      "tables": [
+        "account",
+        "attribute",
+        "bank_item",
+        "inventory_item",
+        "pet",
+        "punishment",
+        "skillpoint",
+        "spell",
+        "user"
+      ],
+      "optional": []
+    },
+    {
+      "name": "chohan-pos",
+      "about": "A VB6 point-of-sale and inventory system on an Access database (Planet Source Code archive). Written down before Assay first ran on it (2026-11-07); the VB6 reader was tuned on it since.",
+      "url": "https://github.com/Planet-Source-Code/hamza-chohan-chohan-s-shop-pos-and-inventory-system__1-73192.git",
+      "commit": "d3c336b8a1d950dd00d563da93df8a3c1b37a029",
+      "stacks": "VB6 Standard EXE, ADO data controls, Access",
+      "units": [
+        "Chohan's POS and Inventory System"
+      ],
+      "calls": [
+        [
+          "Chohan's POS and Inventory System",
+          "db:Data.mdb"
+        ]
+      ],
+      "tables": [
+        "categories",
+        "customers",
+        "products",
+        "sales",
+        "salesman",
+        "suppliers",
+        "users"
+      ],
+      "optional": []
     }
   ],
   "heldOut": [

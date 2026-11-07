@@ -27,8 +27,28 @@ export function urlPathOf(literal: string): string | null {
   if (!path || /\s/.test(path) || path.length > 200 || FILE_PATH.test(path) || SYSTEM_PATH.test(path)) return null
   const segments = path.split('/').slice(1)
   if (!segments.length || !segments.some((s) => /[A-Za-z]/.test(s))) return null
+  // A command typed in a chat or a console (/SALIR, /MEDITAR), not a path: one upper-case word.
+  if (segments.length === 1 && /^[A-Z][A-Z0-9_]*$/.test(segments[0])) return null
   if (!segments.every((s) => /^(\{[^}]*\}|:[A-Za-z_]\w*|[A-Za-z0-9._~%@-]*)$/.test(s))) return null
   return `/${segments.map((s) => (s.startsWith(':') || /^\{.*\}$/.test(s) ? '{}' : s)).join('/')}`
+}
+
+/** Where an address calls nothing: CI configuration, translations. */
+const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\//i
+/** A line that opens an address in the user's browser rather than calling it (Inet's OpenURL is a call). */
+const BROWSER = /\bShellExecute\w*\b|\bShell\s*\(|\bProcess\.Start\b|\bwebbrowser\.open|\bwindow\.open\b|\.Navigate2?\b|\bLaunchUrl\b|\bopenExternal\b/i
+
+/** VB code without its comments (' or Rem to the end of a line, outside a string), its lines kept. */
+export function withoutVbComments(text: string): string {
+  return text.split('\n').map((line) => {
+    let quoted = false
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]
+      if (c === '"') quoted = !quoted
+      else if (!quoted && (c === "'" || (/^rem\b/i.test(line.slice(i)) && /^\s*$/.test(line.slice(0, i))))) return line.slice(0, i)
+    }
+    return line
+  }).join('\n')
 }
 
 /** String literals: '…', "…" and `…` (a template's ${…} may hold spaces). */
@@ -37,8 +57,18 @@ const STRING = /(["'`])((?:\$\{[^}]*\}|(?!\1)[^\\\n]|\\.)*)\1/g
 const VB_STRING = /()"((?:[^"\n]|"")*)"/g
 
 /** A database a connection string names. */
-export function connectionOf(text: string): { engine: string; server?: string; name?: string } | null {
+export function connectionOf(text: string): { engine: string; server?: string; name?: string; explicit?: boolean } | null {
   const field = (k: string) => new RegExp(`(?:^|;)\\s*(?:${k})\\s*=\\s*([^;"']*)`, 'i').exec(text)?.[1]?.trim() || undefined
+  // An ODBC driver names its engine, whatever fills in the server and the database at run time.
+  const driver = /\bDRIVER\s*=\s*\{([^}]*)\}/i.exec(text)?.[1]
+  if (driver) {
+    const engine = /mysql/i.test(driver) ? 'MySQL' : /mariadb/i.test(driver) ? 'MariaDB' : /postgres/i.test(driver) ? 'PostgreSQL'
+      : /sql server|sql native|odbc driver \d+ for sql/i.test(driver) ? 'SQL Server' : /oracle/i.test(driver) ? 'Oracle'
+        : /access|\*\.mdb/i.test(driver) ? 'Access' : /sqlite/i.test(driver) ? 'SQLite' : /db2/i.test(driver) ? 'Db2' : 'ODBC'
+    const dbq = field('DBQ')
+    const name = field('Database') ?? (dbq ? dbq.split(/[\\/]/).pop() : undefined)
+    return { engine, ...(field('Server|Host') ? { server: field('Server|Host') } : {}), ...(name ? { name } : {}), explicit: true }
+  }
   // Go's MySQL driver: user:password@tcp(db:3306)/shop.
   const go = /@tcp\(([\w.-]+)(?::\d+)?\)\/([\w-]+)/.exec(text)
   if (go) return { engine: 'MySQL', server: go[1], name: go[2] }
@@ -54,7 +84,7 @@ export function connectionOf(text: string): { engine: string; server?: string; n
     const engine = /SQLOLEDB|SQLNCLI|MSOLEDBSQL/i.test(provider) ? 'SQL Server' : /Jet\.OLEDB|ACE\.OLEDB/i.test(provider) ? 'Access' : /OraOLEDB|MSDAORA/i.test(provider) ? 'Oracle' : /MSDASQL/i.test(provider) ? 'ODBC' : provider
     const source = field('Data Source')
     const file = source && /\.(mdb|accdb)$/i.test(source) ? source.split(/[\\/]/).pop() : undefined
-    return { engine, ...(source && !file ? { server: source } : {}), ...((field('Initial Catalog') ?? file) ? { name: field('Initial Catalog') ?? file } : {}) }
+    return { engine, ...(source && !file ? { server: source } : {}), ...((field('Initial Catalog') ?? file) ? { name: field('Initial Catalog') ?? file } : {}), explicit: true }
   }
   const dsn = field('DSN')
   if (dsn) return { engine: 'ODBC', name: dsn }
@@ -120,6 +150,17 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   // The services every .proto of the repository declares.
   const protoServices = [...new Set(files.named(/\.proto$/).flatMap((f) => [...files.read(f).matchAll(/^\s*service\s+(\w+)\s*\{/gm)].map((m) => m[1])))]
 
+  // The tables an SQL file creates (a schema, a migration, a fixture that builds the database).
+  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f))) {
+    const unit = owner(units, file)
+    if (!unit) continue
+    const text = files.read(file)
+    for (const m of text.matchAll(/\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?[`"[]?(?:\w+[`"\]]?\.)?[`"[]?([A-Za-z_][\w$]*)/gi)) {
+      const id = `${repo}:table:${unit.path}:${m[1].toLowerCase()}`
+      if (once(id)) out.tables.push({ id, unit: unit.id, table: m[1], evidence: { file, line: lineAt(text, m.index!) } })
+    }
+  }
+
   for (const file of files.list) {
     const ext = extname(file).toLowerCase()
     const config = CONFIG.test(file)
@@ -130,20 +171,20 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
     const vb = /\.(bas|cls|frm|ctl|dsr|vb)$/i.test(file)
-    if (vb) text = text.replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
+    if (vb) text = withoutVbComments(text).replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
     // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
     text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
     const at = (index: number) => ({ file, line: lineAt(text, index) })
 
     // Connection strings, in code and configuration alike.
-    for (const m of text.matchAll(/[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
+    for (const m of text.matchAll(/[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
       const db = connectionOf(m[0])
       if (!db) continue
       // A name filled in at run time ($dsn, {db}, %DB%) names nothing.
       if (db.name && /[$%{}]/.test(db.name)) delete db.name
       if (db.server && /[$%{}]/.test(db.server)) delete db.server
-      // Neither a server nor a name: a variable assigned, not a connection string.
-      if (!db.server && !db.name) continue
+      // Neither a server nor a name: a variable assigned, not a connection string, unless a driver or provider names the engine.
+      if (!db.server && !db.name && !db.explicit) continue
       // One database per name: a developer's and a container's connection string name the same one.
       if (db.server) db.server = db.server.replace(/[,:]\d+$/, '')
       const id = `${repo}:db:${unit.path}:${db.engine}/${db.name ?? db.server ?? ''}`
@@ -153,6 +194,17 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       if (out.databases.some((d) => d.id === id)) continue
       seen.add(id)
       out.databases.push({ id, unit: unit.id, engine: db.engine, ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
+    }
+
+    // A VB6 data control reads a table, or the table its SQL names: RecordSource = "Users".
+    if (vb) {
+      for (const m of text.matchAll(/^\s*RecordSource\s*=\s*"((?:[^"]|"")+)"/gm)) {
+        const source = m[1].replace(/""/g, '"')
+        for (const table of /^[A-Za-z_][\w$]*$/.test(source) ? [source] : tablesOf(source)) {
+          const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
+          if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
+        }
+      }
     }
 
     // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
@@ -173,6 +225,9 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     if (config && /^\s*kind\s*:\s*(Deployment|StatefulSet|DaemonSet|Service|Job|CronJob|ConfigMap)\b/m.test(text)) continue
     if (config && /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file)) continue
 
+    // CI configuration and translations name addresses no unit calls.
+    if (NO_CALLS.test(file)) continue
+
     if (config) {
       // A setting named for a host: spring.rabbitmq.host=rabbitmq, redis: { host: cache }.
       for (const m of text.matchAll(/^\s*["']?[\w.-]*(?:host|hostname|address|server|endpoint)["']?\s*[=:]\s*["']?([a-z][a-z0-9-]{1,40}(?:\.[a-z0-9-]+)*)["']?\s*,?\s*$/gim)) {
@@ -190,12 +245,17 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
 
     for (const m of text.matchAll(vb ? VB_STRING : STRING)) {
       const literal = m[2]
-      const path = urlPathOf(literal)
+      // An address opened in the browser is a page for the user, not a call of the unit.
+      const lineText = text.slice(text.lastIndexOf('\n', m.index!) + 1, text.indexOf('\n', m.index!) < 0 ? undefined : text.indexOf('\n', m.index!))
+      const opened = BROWSER.test(lineText)
+      // In VB code a lone segment (/_BUG, /json) is a command or a fragment far more often than a route.
+      const found = opened ? null : urlPathOf(literal)
+      const path = vb && found && found.split('/').length === 2 ? null : found
       if (path) {
         const id = `${repo}:url:${unit.path}:${path}`
         if (once(id)) out.urls.push({ id, unit: unit.id, path, evidence: at(m.index!) })
       }
-      for (const a of addressesIn(literal, false)) {
+      for (const a of opened ? [] : addressesIn(literal, false)) {
         const id = `${repo}:address:${unit.path}:${a.text}`
         if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(m.index!) })
       }
@@ -225,6 +285,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       }
     }
   }
+  // A database a driver names without its name, beside one of that engine the unit names, is that one.
+  out.databases = out.databases.filter((d) => d.name || d.server || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && (o.name || o.server)))
   // A developer's local database beside the same one on a server is the same database.
   const local = (s?: string) => !!s && /^(localhost|127\.0\.0\.1|\.|\(local\)|\(localdb\).*)$/i.test(s)
   out.databases = out.databases.filter((d) => !local(d.server) || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && o.server && !local(o.server)))

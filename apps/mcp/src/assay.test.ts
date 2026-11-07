@@ -133,7 +133,7 @@ describe('Radical Assay over MCP', () => {
     const all = await nodes()
     const shop = all.find((n) => n.label === 'Shop')!.id
     expect(all.filter((n) => ['need', 'requirement', 'scenario'].includes(n.type)).map((n) => [n.type, n.label, n.parentId === shop]).sort()).toEqual([
-      ['need', 'Found in the code', true], ['requirement', 'Show one order', true], ['scenario', 'Order shown', true],
+      ['need', 'Found in the code', false], ['requirement', 'Show one order', true], ['scenario', 'Order shown', true],
     ])
     const scenario = all.find((n) => n.label === 'Order shown')!.id
     const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows.map((r: { relationType: string; sourceLabel?: string; source?: { label: string } }) => r.relationType).sort()
@@ -152,7 +152,7 @@ describe('Radical Assay over MCP', () => {
   it('writes inferred elements of code no extractor reads, on the code the agent quotes, checked', async () => {
     const { dir, root, call, nodes, json } = await central(legacy)
     const started = await call('assay_start', { directories: ['../legacy'] })
-    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 4 dependencies, 1 database, 1 table.')
+    expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table.')
     expect(started.text).toContain('Code no reader covers (COBOL, Delphi, PowerBuilder')
     const quote = { repository: 'billing-vb6', file: 'Billing.vbp', lines: [1, 8], text: 'ExeName32="Billing.exe"' }
     const plan = (text: string) => ({ plan: {
@@ -192,10 +192,10 @@ describe('Radical Assay over MCP', () => {
     expect(await call('assay_read', { repository: 'orders-service', file: 'openapi.yaml', from: 5, to: 3 })).toEqual({ ok: false, text: 'assay_read: to (3) comes before from (5)' })
     // A folder, or none, lists the files to read, hidden ones aside.
     const listed = (await call('assay_read', { repository: 'storefront' })).text.split('\n')
-    expect(listed[0]).toMatch(/^storefront\/: \d+ files, 1–\d+ listed:$/)
+    expect(listed[0]).toMatch(/^storefront\/: \d+ files, lines 1–\d+ of \d+; a folder of more than 25 files of one kind is one line:$/)
     expect(listed).toContain('apps/web/src/orders.js')
     expect(listed.some((l) => l.startsWith('.git'))).toBe(false)
-    expect((await call('assay_read', { repository: 'storefront', file: 'apps/web', from: 2 })).text.split('\n')[0]).toMatch(/^storefront\/apps\/web\/: \d+ files, 2–\d+ listed:$/)
+    expect((await call('assay_read', { repository: 'storefront', file: 'apps/web', from: 2 })).text.split('\n')[0]).toMatch(/^storefront\/apps\/web\/: \d+ files, lines 2–\d+ of \d+;/)
   })
 
   it('reads a folder of code with no repository, and writes no .radical/radical.json into it', async () => {
@@ -363,6 +363,24 @@ describe('Radical Assay over MCP', () => {
     ]))
     expect(all.some((n) => n.label === 'Found in the code')).toBe(false)
     expect(await call('assay_answer', { proposal: 'P9', accept: true })).toMatchObject({ ok: false })
+  })
+
+  it('finds the lines that hold a text, and lists a folder of many data files as one line', async () => {
+    const { dir, call } = await central()
+    mkdirSync(join(dir, 'orders-service', 'maps'))
+    for (let i = 1; i <= 30; i++) writeFileSync(join(dir, 'orders-service', 'maps', `Map${i}.dat`), `map ${i}`)
+    await call('assay_start', { directories: ['../shop'] })
+    const found = await call('assay_search', { repository: 'storefront', pattern: 'fetch(' })
+    expect(found.ok).toBe(true)
+    expect(found.text.split('\n')[0]).toMatch(/^\d+ lines? hold "fetch\("/)
+    expect(found.text).toMatch(/apps\/web\/src\/orders\.js:\d+: .*fetch\(/)
+    const regex = await call('assay_search', { repository: 'orders-service', pattern: 'app\\.(get|post)\\(', regex: true, path: 'src' })
+    expect(regex.text.split('\n').slice(1).every((l) => l.startsWith('src/'))).toBe(true)
+    expect(regex.text.split('\n').length).toBeGreaterThan(1)
+    expect((await call('assay_search', { repository: 'storefront', pattern: '(', regex: true })).ok).toBe(false)
+    const listed = (await call('assay_read', { repository: 'orders-service' })).text
+    expect(listed).toContain('maps/*.dat (30 files, Map1.dat … Map9.dat)')
+    expect(listed).not.toContain('maps/Map12.dat')
   })
 })
 

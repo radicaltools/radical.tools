@@ -21,7 +21,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, relative } from 'node:path'
+import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
@@ -66,7 +66,7 @@ export const ASSAY_PROCEDURE = [
   '2. C4 stage. Read what assay_start lists: per repository its units (stack, app, library or tests), the services its',
   '   deployment runs (docker-compose, Kubernetes, Aspire), its databases, its groups (a .sln, a VB6 .vbg), then the links',
   '   (package and project references, http, gRPC, addresses, depends_on, data). assay_facts gives a repository\'s or a',
-  '   unit\'s details; assay_read lists a folder\'s files and reads a file\'s lines. search_model for what the central model',
+  '   unit\'s details; assay_read lists a folder\'s files and reads a file\'s lines; assay_search finds the lines that hold a text. search_model for what the central model',
   '   already holds; get_model_summary for the types it allows. Propose to the user how the units group into software',
   '   systems (a group, a deployment, a product name or the documents hint at it; one system unless the code or the',
   '   documents show more, or the user says otherwise; a system may cite the document lines that name it), and wait for',
@@ -81,7 +81,8 @@ export const ASSAY_PROCEDURE = [
   '   labelled with what one does with the other (follow the model\'s own direction where it already has relations); a',
   '   data link\'s via names the deployed service the database runs on (with no via, relate to the database only). The',
   '   System context view shows systems and people only: relate each person to the system they use, and a system to',
-  '   another where a link crosses them, inferred, citing those links. What the documents name but no code shows (a',
+  '   another where a link crosses them, inferred, citing those links (or, with no link, the address facts and the code',
+  '   that show the call). What the documents name but no code shows (a',
   '   database, a service) is no element: tell the user, and let a decision or requirement say so. A group is inferred.',
   '   Reuse elements the model has, by id, instead of adding them again. Every element and relation cites the facts it',
   '   rests on (facts) and is observed when a',
@@ -126,7 +127,12 @@ export const ASSAY_PROCEDURE = [
   '   when a unit test fails or checks nothing while the application does it. Write the EARS fields without their keyword',
   '   (trigger: "a customer opens an order", not "When …"). A behaviour whose tests failed or were skipped, and that no',
   '   explored path shows, is no scenario: propose its requirement with no scenarios, citing the code it is drawn from,',
-  '   and tell the user its tests do not pass; so may behaviour the code shows that no test checks. Then the requirements',
+  '   and tell the user its tests do not pass; so may behaviour the code shows that no test checks: with no tests at all,',
+  '   the behaviours a user or another system relies on (signing in, the main transactions, what is stored), not every',
+  '   routine. A defect you find in the code (SQL joined from input, a password in the source) is an unwanted-behaviour',
+  '   requirement nothing satisfies yet, citing the lines around it but quoting never the secret itself (.radical/assay/',
+  '   run.json keeps only the text you quote). With no tests and no explored paths, requirements have no scenarios: the',
+  '   model shows them unverified, as they are. Then the requirements',
   '   the documents state that no test checks: no scenarios, citations of the document, satisfiedBy the element that',
   '   builds it, or none when no code does (the model then shows it unsatisfied, a gap; give it a parent). Put them in',
   '   plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user with its',
@@ -335,6 +341,21 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'assay_search',
+    description: 'The lines of a repository\'s or source\'s files that hold a text (or match a regular expression), each with its file and line, to find what to read with assay_read: where a connection is opened, a form named, a port set. At most 100 lines.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        repository: { type: 'string', description: 'A repository\'s or source\'s name.' },
+        pattern: { type: 'string', description: 'The text to find, case aside.' },
+        regex: { type: 'boolean', description: 'pattern is a regular expression.' },
+        path: { type: 'string', description: 'Only this folder or file, from the root.' },
+      },
+      required: ['repository', 'pattern'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'assay_explore',
     description: 'Open a web application running on this machine (localhost, a loopback address or a .localhost name; run it on a test database) in a browser the server drives, and start a path through it named for what a user does (Sign in, Place an order). Each path starts in a fresh browser session, signed out, as its test will; what it creates or changes is done for real, on the test database. Returns the screen: its address, title, headings and each control with a reference (e1, e2, …), its role and its name; its screenshot is kept in .radical/assay/explore/. Act on it with assay_explore_act. Each path is a fact of the run: its screens can become mockups, and a requirement\'s scenario can rest on it, written as a Playwright test into the repository when the user accepts it.',
     inputSchema: {
@@ -510,6 +531,7 @@ export class Assay {
     if (name === 'assay_facts') return this.factsOf(run, input)
     if (name === 'assay_add_sources') return this.addSources(run, input)
     if (name === 'assay_read') return this.read(run, input)
+    if (name === 'assay_search') return this.search(run, input)
     if (name === 'assay_explore' || name === 'assay_explore_act') return this.explore(run, name, input)
     if (name === 'assay_apply') return this.apply(run, input, ctx, facade)
     if (name === 'assay_answer') return this.answer(run, input, ctx, facade)
@@ -627,6 +649,8 @@ export class Assay {
   /** At most this many lines come back at once, of a file of at most READ_BYTES. */
   private static readonly READ_LINES = 400
   private static readonly READ_BYTES = 20_000_000
+  /** A folder holding more files of one kind than this is listed as one line. */
+  private static readonly FOLD = 25
 
   private read(run: Run, input: unknown): AssayResult {
     const { repository, file, from, to } = (input ?? {}) as { repository?: unknown; file?: unknown; from?: unknown; to?: unknown }
@@ -662,13 +686,68 @@ export class Assay {
       }
     }
     walk('')
+    // A folder of many files of one kind (a game's maps, a site's images) is one line: its data, not its code.
+    const keyOf = (f: string) => `${f.includes('/') ? f.slice(0, f.lastIndexOf('/') + 1) : ''}*${extname(f).toLowerCase()}`
+    const groups = new Map<string, string[]>()
+    for (const f of files) groups.set(keyOf(f), [...(groups.get(keyOf(f)) ?? []), f])
+    const lines: string[] = []
+    const folded = new Set<string>()
+    for (const f of files) {
+      const key = keyOf(f)
+      const group = groups.get(key)!
+      if (group.length <= Assay.FOLD) { lines.push(f); continue }
+      if (folded.has(key)) continue
+      folded.add(key)
+      const name = (x: string) => x.slice(x.lastIndexOf('/') + 1)
+      lines.push(`${key} (${group.length} files, ${name(group[0])} … ${name(group[group.length - 1])})`)
+    }
     const first = Math.max(1, Number.isInteger(from) ? from as number : 1)
-    const page = files.slice(first - 1, first - 1 + Assay.READ_LINES)
+    const page = lines.slice(first - 1, first - 1 + Assay.READ_LINES)
     const prefix = asked === '.' ? '' : `${asked.replace(/\/+$/, '')}/`
     return ok([
-      `${repository}/${prefix || ''}: ${files.length} file${files.length === 1 ? '' : 's'}${files.length ? `, ${first}–${first + page.length - 1} listed` : ''}${first - 1 + page.length < files.length ? ` (next: from ${first + page.length})` : ''}:`,
+      `${repository}/${prefix || ''}: ${files.length} file${files.length === 1 ? '' : 's'}${lines.length ? `, lines ${first}–${first + page.length - 1} of ${lines.length}` : ''}${first - 1 + page.length < lines.length ? ` (next: from ${first + page.length})` : ''}; a folder of more than ${Assay.FOLD} files of one kind is one line:`,
       ...page.map((f) => `${prefix}${f}`),
     ].join('\n'), { readOnly: true })
+  }
+
+  /** At most this many matches come back from one search. */
+  private static readonly SEARCH_HITS = 100
+
+  /** The lines of a repository's or source's files that hold `pattern`, with their files and line numbers. */
+  private search(run: Run, input: unknown): AssayResult {
+    const { repository, pattern, path, regex } = (input ?? {}) as { repository?: unknown; pattern?: unknown; path?: unknown; regex?: unknown }
+    const all = [...run.repositories, ...run.sources]
+    const repo = all.find((r) => r.repository === repository)
+    if (!repo) return refused(`assay_search: no repository or source ${String(repository)} in the run (${all.map((r) => r.repository).join(', ')})`)
+    if (typeof pattern !== 'string' || !pattern) return refused('assay_search: pattern must be the text to find')
+    let re: RegExp
+    try { re = new RegExp(regex ? pattern : pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } catch (error) { return refused(`assay_search: ${(error as Error).message}`) }
+    const under = typeof path === 'string' && path ? inside(repo.dir, path) : repo.dir
+    if (!under) return refused(`assay_search: ${repo.repository} has no ${String(path)}`)
+    const hits: string[] = []
+    let total = 0
+    const scan = (full: string): void => {
+      if (statSync(full).size > 2_000_000) return
+      const bytes = readFileSync(full)
+      if (bytes.subarray(0, 8000).includes(0)) return
+      const rel = posix(relative(repo.dir, full))
+      decodeText(bytes).split(/\r?\n/).forEach((line, i) => {
+        if (!re.test(line)) return
+        total++
+        if (hits.length < Assay.SEARCH_HITS) hits.push(`${rel}:${i + 1}: ${line.trim().slice(0, 200)}`)
+      })
+    }
+    const walk = (at: string): void => {
+      for (const d of readdirSync(at, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        if (d.name.startsWith('.') || (d.isDirectory() && SKIPPED.has(d.name))) continue
+        const full = join(at, d.name)
+        if (d.isDirectory()) walk(full)
+        else if (d.isFile()) scan(full)
+      }
+    }
+    if (statSync(under).isFile()) scan(under)
+    else walk(under)
+    return ok([`${total} line${total === 1 ? '' : 's'} hold ${regex ? `/${pattern}/` : `"${pattern}"`}${total > hits.length ? ` (the first ${hits.length} shown)` : ''}:`, ...hits].join('\n'), { readOnly: true })
   }
 
   private factsOf(run: Run, input: unknown): AssayResult {
@@ -862,7 +941,8 @@ export class Assay {
       props.precondition && `while ${bare(props.precondition, /^while\s+/i)},`,
       props.trigger && `when ${bare(props.trigger, /^when\s+/i)},`,
       props.unwanted_condition && `if ${bare(props.unwanted_condition, /^if\s+/i)}, then`,
-      props.action,
+      // After a clause, "The game server shall …" reads "the game server shall …".
+      props.action && (props.feature || props.precondition || props.trigger || props.unwanted_condition) ? props.action.replace(/^The\b/, 'the') : props.action,
     ].filter(Boolean).join(' ')
     const need = p.needProposal ?? (p.need ? label(p.need) : undefined)
     return [
@@ -960,7 +1040,8 @@ export class Assay {
           const names = run.repositories.map((x) => x.repository).join(', ')
           const needKey = `assay-need-${Date.now()}`
           if (await step('add_node', {
-            tempId: needKey, type: 'need', label: 'Found in the code', ...(parent ? { parentId: parent } : {}),
+            // At the root: a run's requirements may be of several systems.
+            tempId: needKey, type: 'need', label: 'Found in the code',
             description: `Requirements Radical Assay found in the code and tests of ${names}, each accepted by the user one by one. The tests and code each rests on are in ${RUN_FILE}.`,
             properties: { kind: 'other', source: `Radical Assay, ${new Date().toISOString().slice(0, 10)}` },
           }, 'the need')) {

@@ -55,6 +55,8 @@ export interface DependencyFact {
   package: string
   /** The unit it names, when it names one by path. */
   target?: string
+  /** The binary a COM reference names (a VB6 DLL or OCX): another unit may build it. */
+  file?: string
   evidence: Evidence
 }
 

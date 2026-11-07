@@ -33,7 +33,8 @@ const TECHNOLOGY: Array<[RegExp, string]> = [
   [/^Microsoft\.EntityFrameworkCore/, 'Entity Framework Core'], [/^Microsoft\.AspNetCore\.Components\.WebAssembly/, 'Blazor'],
   [/^(flask|Flask)$/, 'Flask'], [/^(django|Django)$/, 'Django'], [/^fastapi$/, 'FastAPI'],
   [/^github\.com\/gin-gonic\/gin$/, 'Gin'], [/^github\.com\/gorilla\/mux$/, 'gorilla/mux'],
-  [/Microsoft ActiveX Data Objects|^msado/i, 'ADO'], [/Microsoft DAO/i, 'DAO'],
+  [/Microsoft ActiveX Data Objects|^msado/i, 'ADO'], [/Microsoft DAO/i, 'DAO'], [/DirectX|^dx\d+vb/i, 'DirectX'],
+  [/Winsock|^mswinsck/i, 'Winsock'],
 ]
 
 const technologyOf = (names: string[]): string[] =>
@@ -74,10 +75,12 @@ interface Draft {
   /** Dependencies by path: the dependency's text, the unit folder or manifest it names, its line. */
   refs: Array<{ name: string; path: string; line: number; file: string }>
   depLines: Map<string, { file: string; line: number }>
+  /** The binary a VB6 reference names, by the library's name: what another unit's ExeName32 may be. */
+  depFiles: Map<string, string>
 }
 
 function draft(stack: Stack, path: string, file: string, name: string | undefined, line: number): Draft {
-  return { path, stack, name: name || basename(path === '.' ? '' : path) || '.', named: !!name, aliases: [], reasons: [], tests: false, deps: [], evidence: { file, line }, refs: [], depLines: new Map() }
+  return { path, stack, name: name || basename(path === '.' ? '' : path) || '.', named: !!name, aliases: [], reasons: [], tests: false, deps: [], evidence: { file, line }, refs: [], depLines: new Map(), depFiles: new Map() }
 }
 
 // ── npm ──────────────────────────────────────────────────────────────────────
@@ -348,8 +351,8 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
         const parts = e.value.split('#')
         const library = (parts[4] ?? '').trim() || basename((parts[3] ?? '').replace(/\\/g, '/'))
         const binary = basename((parts[3] ?? '').replace(/\\/g, '/'))
-        if (library) { d.deps.push(library); d.depLines.set(library, { file, line: e.line }) }
-        if (binary && binary !== library) { d.deps.push(binary); d.depLines.set(binary, { file, line: e.line }) }
+        // One reference, one dependency: named for its library, its binary kept to find the unit that builds it.
+        if (library) { d.deps.push(library); d.depLines.set(library, { file, line: e.line }); if (binary && binary !== library) d.depFiles.set(library, binary) }
       } else if (e.key === 'Object') {
         const ocx = e.value.split(';').pop()?.trim()
         if (ocx) { d.deps.push(ocx); d.depLines.set(ocx, { file, line: e.line }) }
@@ -357,7 +360,10 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
     }
     if (entries.some((e) => /^(Form|UserControl)$/.test(e.key))) d.reasons.push('it has forms')
     if (type !== 'Exe' && type !== 'OleExe') d.reasons = d.reasons.filter((r) => r !== 'it has forms')
-    d.description = { Exe: 'VB6 Standard EXE', OleExe: 'VB6 ActiveX EXE', OleDll: 'VB6 ActiveX DLL', Control: 'VB6 ActiveX Control (OCX)' }[type] ?? `VB6 ${type}`
+    const kind = { Exe: 'VB6 Standard EXE', OleExe: 'VB6 ActiveX EXE', OleDll: 'VB6 ActiveX DLL', Control: 'VB6 ActiveX Control (OCX)' }[type] ?? `VB6 ${type}`
+    // What its authors call it: the version information's description, else the project's description or title.
+    const said = ['VersionFileDescription', 'Description', 'Title'].map((k) => unquote(get(k)?.value ?? '').trim()).find(Boolean)
+    d.description = said && said.toLowerCase() !== name.toLowerCase() ? `${said} (${kind})` : kind
     out.push(d)
   }
   for (const file of files.named(/\.vbg$/i).filter((f) => !inFixtures(f))) {
@@ -429,7 +435,8 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     })
     if (d.stack === 'docker') continue
     for (const dep of [...new Set(d.deps)].sort()) {
-      dependencies.push({ id: `${repo}:dep:${d.path}:${dep}`, unit: id, package: dep, evidence: d.depLines.get(dep) ?? d.evidence })
+      const binary = d.depFiles.get(dep)
+      dependencies.push({ id: `${repo}:dep:${d.path}:${dep}`, unit: id, package: dep, ...(binary ? { file: binary } : {}), evidence: d.depLines.get(dep) ?? d.evidence })
     }
     for (const r of d.refs) {
       // A path names a unit's folder, or its manifest (a .vbp or .csproj) in it.
