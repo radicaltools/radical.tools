@@ -30,7 +30,13 @@ export interface ScreenFact {
   /** The page's visible text, its first few hundred characters: what a mockup's description can say. */
   text?: string
   controls: Control[]
-  /** Its screenshot, from the explore folder of the central repository. */
+  /** form: read from a desktop application's form file, not seen running (its route is the form's name). */
+  source?: 'form'
+  /** A form's size and its controls at their positions, in twips: what its wireframe is drawn from. */
+  form?: { width: number; height: number; controls: Array<{ kind: string; name: string; caption?: string; left: number; top: number; width: number; height: number }> }
+  /** The forms its code opens, by their names, each from the handler of a control or menu item (via) or on loading. */
+  opens?: Array<{ form: string; via?: string; line: number }>
+  /** Its screenshot, from the explore folder of the central repository; a form's file. */
   evidence: Evidence
 }
 

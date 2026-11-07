@@ -16,6 +16,7 @@ import { parseTestReport } from '@radical/common/check'
 import { readCode } from './code'
 import { readDomain } from './domain'
 import { readEntries } from './entries'
+import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
 import { readRuntime } from './runtime'
@@ -119,6 +120,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.tables = domain.tables
   facts.states = domain.states
   facts.entries = readEntries(files, repo, facts.units)
+  // A desktop application's forms are its screens, read from their files.
+  facts.screens = readForms(files, repo, facts.units)
 
   facts.tests = readTests(root, repo, files, facts.units, options.reports, facts.notes)
   facts.documents = readDocuments(files, repo)

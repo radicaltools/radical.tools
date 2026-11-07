@@ -32,7 +32,7 @@ export function describeFacts(repositories: RepositoryFacts[], links: Link[], fr
         count(r.units.length, 'unit'), count(r.dependencies.length, 'dependency', 'dependencies'), count(r.apis.length, 'API operation'),
         count(r.urls.length, 'URL path'), count(r.clients.length, 'gRPC client'), count(r.addresses.length, 'address', 'addresses'),
         count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'),
-        count(r.states.length, 'status', 'statuses'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
+        count(r.states.length, 'status', 'statuses'), count(r.screens.length, 'form'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
       ].filter((c, i) => i === 0 || !c.startsWith('0 ')).join(', ')}.`,
       ...r.units.map(unitLine),
       ...r.services.map((s) => `  - ${s.id}: ${s.role}${s.image ? ` ${s.image}` : ''}${s.unit ? `, runs ${s.unit}` : ''}`),

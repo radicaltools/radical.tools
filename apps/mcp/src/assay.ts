@@ -30,7 +30,7 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  emptyFacts, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
   type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
 import { Explorer, type ExploreAction } from './explore'
@@ -115,6 +115,11 @@ export const ASSAY_PROCEDURE = [
   '   screens show are person elements, inferred, citing those screens (facts). Make a view of the mockups (create_view;',
   '   the viewpoint for screens where the metamodel has one). A defect the application shows (a password in its address,',
   '   an error page) is an unwanted-behaviour requirement nothing satisfies yet, citing the screen, for the next stage.',
+  '   A desktop VB6 application needs no running: its forms are screens already (assay_facts with kind "screens": caption,',
+  '   controls with their roles and captions, the forms its code opens and from which control). One plan of mockups for the',
+  '   forms a user works with (splash, about and message boxes left out): label as a user would call it, screen: the form\'s',
+  '   screen fact, description of what the user does there, presentedBy the container, parent its system; the server draws',
+  '   each wireframe from the form and joins the mockups where one form\'s code opens another (navigates-to).',
   '4. Documents stage, when the run has documents (the sources\' and the repositories\' own: README, docs, ADR records;',
   '   assay_facts with kind "documents"). Read them with assay_read and draw from them, citing the lines (citations): needs',
   '   (what people asked for, in their words: one need per thing asked for, a sentence or a short passage, with label,',
@@ -996,12 +1001,15 @@ export class Assay {
       const error = await attempt('add_node', {
         tempId: m.key, type: 'mockup', label: m.label,
         ...(m.parent ? { parentId: m.parent } : {}),
-        // The page, not one visit of it: no query (it may hold what was typed), numbers as {id}.
-        properties: { screen: pageOf(screen.route), ...(m.description ? { description: m.description } : {}) },
+        // The page, not one visit of it: no query (it may hold what was typed), numbers as {id}; a form by its name.
+        properties: { screen: screen.source === 'form' ? screen.route : pageOf(screen.route), ...(m.description ? { description: m.description } : {}) },
       }, ctx, facade)
       if (error) { failures.push(`mockups "${m.key}" (${m.label}): ${error}`); continue }
       const id = ctx.resolveId(m.key)
-      mockupOf.set(pageOf(screen.route), id)
+      // A form's mockup is drawn from its controls at their positions (ADR Assay reads desktop screens from their form files).
+      const wireframe = screen.source === 'form' ? formWireframe(screen) : null
+      if (wireframe) facade.updateNode(id, { wireframe } as Parameters<ModelFacade['updateNode']>[1])
+      mockupOf.set(screen.source === 'form' ? screen.id : pageOf(screen.route), id)
       written.push({ id, key: m.key, kind: 'mockup', label: m.label, confidence: 'observed', facts: [m.screen] })
       if (m.presentedBy) {
         const before = new Set(Object.keys(facade.getRelations()))
@@ -1011,6 +1019,23 @@ export class Assay {
       }
     }
     const navigated = new Set(run.navigated)
+    // A form's code opening another joins their mockups, labelled with what the user does to open it.
+    for (const [screenId, from] of mockupOf) {
+      const screen = run.facts.get(screenId)?.fact as ScreenFact | undefined
+      if (screen?.source !== 'form') continue
+      for (const open of screen.opens ?? []) {
+        const target = `${screenId.slice(0, screenId.lastIndexOf(':') + 1)}${open.form}`
+        const to = mockupOf.get(target)
+        if (!to || to === from || navigated.has(`${from}->${to}`)) continue
+        const control = screen.controls.find((c) => c.ref === open.via || c.ref.startsWith(`${open.via}(`))
+        const label = !open.via ? 'on opening' : control ? `${control.role === 'menuitem' ? 'chooses' : 'clicks'} "${control.name}"` : `${open.via}`
+        const before = new Set(Object.keys(facade.getRelations()))
+        const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType: 'navigates-to', properties: { description: label } }, ctx, facade)
+        if (error) { failures.push(`navigates-to from ${screen.route} to ${open.form}: ${error}`); continue }
+        navigated.add(`${from}->${to}`)
+        written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label, confidence: 'observed', facts: [screenId] })
+      }
+    }
     // A mockup stands for its page, whichever screen of it a path reached.
     const screenOf = new Map((run.explore?.facts.screens ?? []).map((x) => [x.id, x]))
     const pageAt = (id: string) => pageOf(screenOf.get(id)?.route ?? '')
