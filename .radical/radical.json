@@ -3252,6 +3252,33 @@
     ] },
     { "element": "9f4e027a-9eea-4295-9e54-c35d9067cf3e", "name": "Address in a form's fields linked", "tests": [
       "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › links a client to the server on the port their forms' fields hold, the nearest of several listening on it"
+    ] },
+    { "element": "5f19b144-6116-416b-96e0-58d787d085f2", "name": "Agent model scored", "tests": [
+      "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › scores the units its elements are built from, its relations as calls and its entities as tables, naming what it missed"
+    ] },
+    { "element": "5148d032-0497-4059-a3fd-051a224c7169", "name": "Access file schema read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads the tables, columns and relationships of the Access file a unit opens, through the reader it is given"
+    ] },
+    { "element": "450c1eac-3830-429f-abde-b96fc83d05a3", "name": "Status kept in quoted values read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads a status kept in short quoted values the code sets and tests, with the lines that set each"
+    ] },
+    { "element": "29ff84c4-64e7-4f1f-b92b-00496017ac01", "name": "A splash timer is no job", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads a timer that only changes what its form shows as no job, and one that does work as one"
+    ] },
+    { "element": "a9782182-ea29-4519-855d-de893686f515", "name": "Going back is no navigation", "tests": [
+      "apps/mcp/src/assayForms.test.ts › Radical Assay over MCP: desktop screens › writes mockups of forms with wireframes drawn from them, joined where one form's code opens another"
+    ] },
+    { "element": "0e7e474e-ec46-49ac-baff-d4401085fc83", "name": "A reference no code uses", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › marks an Office object library the code never automates as unused"
+    ] },
+    { "element": "2a7a9344-d59a-4242-bf09-eca8211bc099", "name": "Connection named by the scripts' database", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads the database a schema creates, in the engine its dialect shows, and links the program to it"
+    ] },
+    { "element": "40153159-9bc8-49f5-8161-9feb40bdce0f", "name": "Environment database read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › links a socket's client to the server listening on the port they name, and reads an environment's database"
+    ] },
+    { "element": "baae6d0c-d6ff-40b4-bf85-5b3c231826e6", "name": "Socket connection linked", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › links a socket's client to the server listening on the port they name, and reads an environment's database"
     ] }
   ]
 }
