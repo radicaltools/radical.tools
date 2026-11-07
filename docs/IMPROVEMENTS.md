@@ -427,6 +427,21 @@ one entity, from quoted code). Still open from it:
   that is not read.
 - **Agent dropped a fact-backed call.** It left Licenca → Conexao out and
   added the chat client's link only from quoted code.
+- **Laravel's routes and boilerplate.** Route prefixes of a group are lost
+  (`/deviations/register` is `/quality/deviations/register`); the framework's
+  default configuration still gives an SQS address and `/your-account-id`.
+  Fixed after the run: lock files, `$schema`, XML namespaces, a page's links
+  (`href`), `php://` streams and paths beside the code (`/../vendor/…`) are
+  no addresses or URL paths, and a refusal of citations on an observed item
+  says to drop them or mark it inferred.
+- **A repository's own PDFs.** `Formal_Documents/*.pdf` are no document
+  facts until the agent adds them as sources.
+- **An observed link through a system path.** A VB6 reference to
+  `SysWow64\…dll` another project builds is joined to that project and
+  stated observed; the build-time reference then becomes a System context
+  interaction by the procedure's "relate the systems a link crosses".
+- **Concerns for desktop code.** `get_issues` lists API concerns
+  (collections, errors, idempotency) for VB6 applications with no API.
 
 ### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
 

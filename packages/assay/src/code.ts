@@ -27,14 +27,23 @@ export function urlPathOf(literal: string): string | null {
   if (!path || /\s/.test(path) || path.length > 200 || FILE_PATH.test(path) || SYSTEM_PATH.test(path)) return null
   const segments = path.split('/').slice(1)
   if (!segments.length || !segments.some((s) => /[A-Za-z]/.test(s))) return null
+  // A file beside the code (__DIR__ . '/../vendor/autoload.php'), not an endpoint.
+  if (segments.some((s) => s === '.' || s === '..')) return null
   // A command typed in a chat or a console (/SALIR, /MEDITAR), not a path: one upper-case word.
   if (segments.length === 1 && /^[A-Z][A-Z0-9_]*$/.test(segments[0])) return null
   if (!segments.every((s) => /^(\{[^}]*\}|:[A-Za-z_]\w*|[A-Za-z0-9._~%@-]*)$/.test(s))) return null
   return `/${segments.map((s) => (s.startsWith(':') || /^\{.*\}$/.test(s) ? '{}' : s)).join('/')}`
 }
 
-/** Where an address calls nothing: CI configuration, translations. */
-const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\//i
+/** Where an address calls nothing: CI configuration, translations, lock files. */
+const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\/|(^|\/)(package-lock|npm-shrinkwrap)\.json$/i
+/** A line whose address names a page's link, an XML namespace or a schema, not a call. */
+const NOT_CALLED = /\bhref\s*=|\bxmlns(?::\w+)?\s*=|schemaLocation\s*=|["']\$schema["']\s*:/i
+/** The line of the text an index falls on. */
+const lineTextAt = (text: string, index: number): string => {
+  const end = text.indexOf('\n', index)
+  return text.slice(text.lastIndexOf('\n', index) + 1, end < 0 ? undefined : end)
+}
 /** A line that opens an address in the user's browser rather than calling it (Inet's OpenURL is a call). */
 const BROWSER = /\bShellExecute\w*\b|\bShell\s*\(|\bProcess\.Start\b|\bwebbrowser\.open|\bwindow\.open\b|\.Navigate2?\b|\bLaunchUrl\b|\bopenExternal\b/i
 
@@ -272,6 +281,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'setting', host, text: m[0].trim(), evidence: at(m.index!) })
       }
       for (const a of addressesIn(text, false)) {
+        if (NOT_CALLED.test(lineTextAt(text, a.index))) continue
         const id = `${repo}:address:${unit.path}:${a.text}`
         if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(a.index) })
       }
@@ -281,8 +291,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     for (const m of text.matchAll(vb ? VB_STRING : STRING)) {
       const literal = m[2]
       // An address opened in the browser is a page for the user, not a call of the unit.
-      const lineText = text.slice(text.lastIndexOf('\n', m.index!) + 1, text.indexOf('\n', m.index!) < 0 ? undefined : text.indexOf('\n', m.index!))
-      const opened = BROWSER.test(lineText)
+      const lineText = lineTextAt(text, m.index!)
+      const opened = BROWSER.test(lineText) || NOT_CALLED.test(lineText)
       // In VB code a lone segment (/_BUG, /json) is a command or a fragment far more often than a route.
       const found = opened ? null : urlPathOf(literal)
       const path = vb && found && found.split('/').length === 2 ? null : found

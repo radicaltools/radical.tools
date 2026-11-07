@@ -531,4 +531,17 @@ describe('radical assay: what legacy repositories hide', () => {
       ['address', 'chat:unit:Client', 'chat:unit:Server'], ['data', 'chat:unit:web', 'chat:db:web:SQL Server/AINData2'],
     ])
   })
+
+  it("leaves out a page's links, schemas, namespaces, lock files and files beside the code as calls", () => {
+    const facts = extractRepository(repo('web', {
+      'package.json': JSON.stringify({ $schema: 'https://www.schemastore.org/package.json', name: 'web', scripts: { dev: 'vite' } }, null, 1),
+      'package-lock.json': JSON.stringify({ packages: { 'node_modules/x': { resolved: 'https://registry.npmjs.org/x/-/x-1.0.0.tgz', funding: { url: 'https://opencollective.com/x' } } } }, null, 1),
+      'phpunit.xml': '<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.0/phpunit.xsd">\n</phpunit>\n',
+      'public/index.php': "<?php\nrequire __DIR__.'/../vendor/autoload.php';\n",
+      'config/logging.php': "<?php\nreturn ['stream' => 'php://stderr'];\n",
+      'resources/views/welcome.blade.php': '<a href="https://laravel.com/docs">Docs</a>\n<svg xmlns="http://www.w3.org/2000/svg"></svg>\n<script>fetch("/quality/lookup/reports")</script>\n',
+    }))
+    expect(facts.urls.map((u) => u.path)).toEqual(['/quality/lookup/reports'])
+    expect(facts.addresses).toEqual([])
+  })
 })

@@ -331,7 +331,7 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
     const citations = item.citations
     if (citations !== undefined) {
       if (!Array.isArray(citations)) problems.push(`${where}: citations must be a list`)
-      else if (citations.length && !quotes) problems.push(`${where}: observed, so it rests on facts; a citation backs only an inferred claim`)
+      else if (citations.length && !quotes) problems.push(`${where}: observed, so it rests on facts; a citation backs only an inferred claim: drop its citations, or mark it inferred`)
       else for (const c of citations) { const p = citationProblem(c, quotable); if (p) problems.push(`${where}: ${p}`) }
     }
     const quoted = quotes && Array.isArray(citations) && citations.length > 0

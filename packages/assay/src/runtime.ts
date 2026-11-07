@@ -33,7 +33,7 @@ export function addressesIn(text: string, withHostPort: boolean): Array<{ scheme
   const out: Array<{ scheme?: string; host: string; port?: number; text: string; index: number }> = []
   for (const m of text.matchAll(/\b([a-z][a-z0-9+.-]*):\/\/(?:[^@\s/'"`]+@)?([A-Za-z0-9][A-Za-z0-9.-]*)(?::(\d{2,5}))?/g)) {
     const scheme = m[1].toLowerCase()
-    if (/^(file|data|mailto|jdbc|urn)$/.test(scheme)) continue
+    if (/^(file|data|mailto|jdbc|urn|php)$/.test(scheme)) continue
     // A database's URL is its connection string, read as a database (code.ts), not as a call.
     if (/^(postgres(ql)?|mysql|mariadb|mongodb(\+srv)?|redis|rediss|sqlserver|mssql|oracle)$/.test(scheme) || /jdbc:[\w:]*$/i.test(text.slice(Math.max(0, m.index! - 20), m.index!))) continue
     out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0], index: m.index! })
