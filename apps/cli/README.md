@@ -597,18 +597,21 @@ cloned. For each repository it reads, from the files git lists:
   default or named in a variable such as `${CART_HOST}`, a local port only
   one unit listens on);
 - data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,
-  .NET, PDO, Go's MySQL driver, database URLs) and the tables SQL names; a
+  .NET, PDO, Go's MySQL driver, database URLs, a `.env` file's
+  `DB_CONNECTION` and `DB_DATABASE`) and the tables SQL names; a
   table SQL creates or alters, or an ORM class maps (JPA, Entity Framework
   Core, Django, SQLAlchemy, TypeORM, Prisma), with its columns and the table
-  each foreign key references;
+  each foreign key references. An Access file's own tables are read by the
+  MCP server only: the CLI notes each Access file a unit uses;
 - statuses: the values an enum named for a status, a `CHECK … IN` list, an
-  SQL `ENUM` or a table's flags (boolean columns, nullable dates of an event)
-  give, and the lines that set each value;
-- screens: each VB6 form, with its caption, size, controls at their
+  SQL `ENUM`, a table's flags (boolean columns, nullable dates of an event)
+  or a field set to quoted values (`!Paid = "Y"`) give, and the lines that
+  set each value;
+- screens: each VB6 form and ActiveX document, with its caption, size, controls at their
   positions and the forms its code opens;
 - entry points: HTTP routes in code (Express, NestJS, Spring, ASP.NET Core,
   Flask, FastAPI, Go), a VB6 form's caption, menu items and any control with
-  a Click handler, VB6 Timers and `Handle…` procedures, scheduled jobs and
+  a Click handler, VB6 Timers that do more than change the screen and `Handle…` procedures, scheduled jobs and
   message handlers; and each unit's test framework;
 - the tests its reports name (Vitest, Jest or Playwright JSON, JUnit XML; by
   default its `reports/`), as `<file> › <title>` from its root;

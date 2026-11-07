@@ -368,34 +368,65 @@ them. The first three (erp.gst, JewelBox-2004-Project, vbman) gave units
 creates, schemas outside every project, views and system tables, projects
 sharing a folder, connection templates of a library) and they are tuned on
 now. The next three (billing-system-vb6-2016, MMUD-Explorer, omelette-vb6),
-untouched: units 5/5, calls 1/3, tables 13/17. Open:
+untouched: units 5/5, calls 1/3, tables 13/17.
 
 Fixed in a second round (DAO and Access files, recordsets by name, nameless
 connections, sys.-schema tables, a form's host and port fields with the
 nearest listener); those three are tuned on now. The next three held out
 (hospital-management-system, philip-…-inventory, divyen-…-inventory), single
-Access projects, gave units 3/3 and calls 3/3 before any change. Open:
+Access projects, gave units 3/3 and calls 3/3 before any change.
 
-- **Harder held-out code.** The last three are simple; the next round should
-  hold out repositories with several projects, SQL Server or Oracle, and
-  network calls, where the first rounds failed.
-- **The agent's model is not measured.** The bench judges the facts; an
-  agent run on the held-out set is compared by hand. On the last three (run
-  19) it wrote a system and a container per unit and each application's
-  database from the facts, as expected; it read 105 screens as mockups, 52
-  entities, 12 processes and 36 requirements on top. Fixed after it: one Access
-  file whatever the case of its name, cited where the code connects to it;
-  only forms the project lists; Access queries (`qry_`) are no tables;
-  READ_ME and WARNING files are documents. Still open from it:
-  - **Access schemas.** An .mdb in the repository holds its tables' columns
-    and relations, unread: every entity relation rests on quoted code.
-  - **Statuses as Y/N strings.** `Paid = "Y"`, `Status = "New"` set in code
-    are no state fact; an ADO form-mode enum named *State is one.
-  - **UI timers as jobs.** A 50 ms splash timer reads as a scheduled job.
-  - **Navigation back to the menu.** Every form "opens" the main menu on
-    Save or Close; a menu that opens forms by a name in a variable opens none.
-  - **Unused references.** A COM reference never used in the code still reads
-    as a dependency.
+Fixed in a third round, from an agent's run on those three (run 19): one
+Access file whatever the case of its name, cited where the code connects to
+it; only forms the project lists; Access queries (`qry_`) are no tables;
+READ_ME and WARNING files are documents. They are tuned on now.
+
+A fourth round held out harder code: Projetos-VB6-SQL-SERVER (35 units, 31
+class libraries on SQL Server through ODBC), Chatroom (an ActiveX document
+client and a Winsock server) and ERPMigrationCore (two VB6 modules on SQL
+Server and the Laravel application they move into). Untouched: calls 37/41,
+tables 1/27. Fixed: an Access file's own schema (tables, columns, relations,
+read with mdb-reader by the MCP server; the CLI notes it), statuses kept as
+quoted strings (`!Paid = "Y"`, `SET Status = 'New'`), a timer that only
+changes the screen is no job, a form going back to the one that opened it
+(Close, Back, Cancel) is no navigation, an Office library no code uses is an
+unused reference, the database the SQL scripts name (`USE`) for a nameless
+SQL Server connection, a `.env` file's database, a Winsock `.Connect host,
+port`, ActiveX documents (`.dob`) as screens, a repository's root Markdown
+files as documents, and line continuations (` _`) read as one line. Calls
+41/41, tables 27/27; tuned on now. No VB6 repository is held out any more:
+the next round needs new ones.
+
+The agent's model is measured now: `npx tsx packages/assay/bench/model.ts
+<central> <entry>…` scores the units its containers, components and web
+applications are built from, its relations as calls and its entities as
+tables, from the facts `.radical/assay/run.json` says each rests on. Run 20
+(on the fourth round's three, before the fixes): units 100 % (precision
+100 %), calls recall 90 %, precision 97 %, tables as entities 1/27 (it wrote
+one entity, from quoted code). Still open from it:
+
+- **Statuses per field, not per table.** Two tables' `Status` fields of one
+  unit merge into one state fact.
+- **Library enums as statuses.** A shared library's `eStatus` enum reads as
+  the status of every unit that references it.
+- **Noisy entry points.** Every Click handler is an entry point: a
+  calculator form gives one per digit.
+- **Large screen facts.** `assay_facts` with screens fills an agent's answer
+  on 35 units; it needs a summary or paging.
+- **Laravel and PHP unread.** ERPMigrationCore's Laravel application is a
+  unit with no routes, models or migrations read.
+- **Word documents.** A `.docx` in the repository or given as a source is
+  not read.
+- **Folder listing.** A folder of many projects collapses into one line, so
+  the agent reads them one by one.
+- **Procedure gaps.** Nothing says how to model a library shared by two
+  systems, or one domain per system when the systems share a database.
+- **Secrets.** A password in a connection string is quoted as evidence and
+  not flagged.
+- **Late-bound classes.** `CreateObject("Lib.Class")` names a dependency
+  that is not read.
+- **Agent dropped a fact-backed call.** It left Licenca → Conexao out and
+  added the chat client's link only from quoted code.
 
 ### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
 
