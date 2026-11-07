@@ -3141,6 +3141,24 @@
       "apps/mcp/src/explore.test.ts › Radical Assay: the running application › writes an accepted path as a Playwright test of the repository, which passes",
       "packages/assay/tests/explore.test.ts › radical assay: a path as a test › replays the path with the locators recorded, checks each screen it reaches, and keeps no password",
       "packages/assay/tests/explore.test.ts › radical assay: a path as a test › checks a heading with a number by any number, and once for a screen that did not change"
+    ] },
+    { "element": "5228bd47-1d6d-47e4-93da-4146d5d84692", "name": "Settings file read", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › reads the port a server listens on and a client's server list from INI settings, and links them by that port"
+    ] },
+    { "element": "e0b4156b-e187-48dc-9e46-c9abcfeb8857", "name": "Commands and comments left out", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › leaves out commands, comments, CI configuration, translations and links opened in the browser"
+    ] },
+    { "element": "bd1f05f4-4e73-406b-ac82-a506fb1c5152", "name": "Database named by its driver", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › reads a database named by its driver, the tables an SQL file creates and the record source of a data control"
+    ] },
+    { "element": "7a9b2f9f-fb04-447f-ad71-29beaebfda8f", "name": "VB6 references read once", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › reads each reference once, by its library, with DirectX among the technologies and the version information as the description"
+    ] },
+    { "element": "faf2002b-894e-4ee0-aafb-6939185765d2", "name": "Documents of any name listed", "tests": [
+      "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › lists READMEs and changelogs whatever their names"
+    ] },
+    { "element": "3fc182c0-42da-4e57-b5a6-fdafff6fe2e1", "name": "Text found in a run's repository", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › finds the lines that hold a text, and lists a folder of many data files as one line"
     ] }
   ]
 }
