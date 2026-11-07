@@ -9,7 +9,7 @@
 // its id the table's name.
 
 import { extname } from 'node:path'
-import type { StateFact, TableFact, Unit } from './facts'
+import type { DatabaseFact, StateFact, TableFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
 
@@ -85,10 +85,17 @@ const NOT_COLUMNS = /^(constraint|primary|unique|key|index|fulltext|spatial|excl
 export interface SchemaState { name: string; values: string[]; initial?: string; table?: string; column?: string; file: string; line: number }
 
 /** The tables an SQL file creates and alters, with their columns, foreign keys and the values a status column takes. */
-export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[] } {
+export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[]; views: string[]; databases: Array<{ name: string; engine: string; line: number }> } {
   const text = withoutSqlComments(sql)
   const tables: Array<Omit<Declared, 'unit'>> = []
   const states: SchemaState[] = []
+  // Views are no tables: code selecting from one names no table of the domain.
+  const views = [...text.matchAll(new RegExp(`\\b(?:create|alter)\\s+(?:or\\s+(?:replace|alter)\\s+)?(?:materialized\\s+)?view\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))].map((m) => m[1])
+  // The database the script creates, in the engine its dialect shows.
+  const engine = /^\s*GO\s*$|\[dbo\]|\bnvarchar\b|\bIDENTITY\s*\(/im.test(text) ? 'SQL Server' : /`|\bENGINE\s*=|\bAUTO_INCREMENT\b/i.test(text) ? 'MySQL' : /\bSERIAL\b|::\w|\bplpgsql\b/i.test(text) ? 'PostgreSQL' : 'SQL'
+  const databases = [...text.matchAll(new RegExp(`\\bcreate\\s+(?:database|schema)\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))]
+    .filter((m) => /database/i.test(m[0]))
+    .map((m) => ({ name: m[1], engine, line: lineAt(text, m.index!) }))
   // PostgreSQL: CREATE TYPE order_status AS ENUM ('new', 'paid').
   const types = new Map<string, SchemaState>()
   for (const m of text.matchAll(new RegExp(`\\bcreate\\s+type\\s+${SQL_NAME}\\s+as\\s+enum\\s*\\(([^)]*)\\)`, 'gi'))) {
@@ -136,7 +143,7 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
     else tables.push({ table: m[1], declared: 'SQL', columns: [], references: [reference], evidence: { file, line } })
   }
   for (const t of types.values()) if (isStatus(t.name)) states.push(t)
-  return { tables, states }
+  return { tables, states, views, databases }
 }
 
 // ── ORM classes ──────────────────────────────────────────────────────────────
@@ -438,7 +445,14 @@ const SETS = 60
 export interface DomainFacts {
   tables: TableFact[]
   states: StateFact[]
+  /** The databases SQL files create. */
+  databases: DatabaseFact[]
 }
+
+/** A database's own tables, which no system of its users keeps: SQL Server's sys…, the information schema, Oracle's dual, Access's MSys…. */
+const SYSTEM_TABLE = /^(sys\w*|information_schema|dual|msys\w*|sqlite_\w+|pg_\w+)$/i
+/** A view by its name, where no schema of the repository creates it: vw_orders, v_stock, appview_itemlist, orders_view. */
+const VIEW_NAME = /^(v|vw|view|appview)_|_(v|vw|view)$/i
 
 /** The tables of the repository's schemas and ORM classes, merged with those its code names (`named`), and its statuses. */
 export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[]): DomainFacts {
@@ -447,12 +461,23 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   const prismaEnums: Array<CodeEnum & { unit: Unit }> = []
   const enums: Array<CodeEnum & { unit: Unit }> = []
   const own = (file: string): Unit | undefined => (GENERATED.test(file) ? undefined : owner(units, file))
+  const views = new Set<string>()
+  const databases: DatabaseFact[] = []
   for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f))) {
-    const unit = own(file)
-    if (!unit) continue
     const schema = readSchema(files.read(file), file)
-    declared.push(...schema.tables.map((t) => ({ ...t, unit })))
-    schemaStates.push(...schema.states.map((s) => ({ ...s, unit })))
+    for (const v of schema.views) views.add(v.toLowerCase())
+    // A schema in no unit's folder is that of every unit whose code names one of its tables (the only unit, else).
+    const unit = own(file)
+    const names = new Set(schema.tables.map((t) => bare(t.table).toLowerCase()))
+    const users = unit ? [unit] : units.length === 1 ? units : units.filter((u) => named.some((t) => t.unit === u.id && names.has(bare(t.table).toLowerCase())))
+    for (const u of users) {
+      declared.push(...schema.tables.map((t) => ({ ...t, unit: u })))
+      schemaStates.push(...schema.states.map((s) => ({ ...s, unit: u })))
+      for (const db of schema.databases) {
+        const id = `${repo}:db:${u.path}:${db.engine}/${db.name}`
+        if (!databases.some((d) => d.id === id)) databases.push({ id, unit: u.id, engine: db.engine, name: db.name, evidence: { file, line: db.line } })
+      }
+    }
   }
   const sources = files.list.filter((f) => SOURCE.test(f) && !TEST_FILE.test(f) && !!own(f))
   for (const file of sources) {
@@ -565,5 +590,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
       })
     }
   }
-  return { tables: [...tables.values()], states }
+  // A view, or a database's own table, that the code names is no table of the domain.
+  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|information_schema)\./i.test(t.table))) tables.delete(id)
+  return { tables: [...tables.values()], states, databases }
 }

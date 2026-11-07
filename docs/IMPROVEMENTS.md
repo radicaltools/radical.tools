@@ -360,6 +360,28 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-07): VB6 repositories held out
+
+Six VB6 repositories held out of the bench, written down before Assay ran on
+them. The first three (erp.gst, JewelBox-2004-Project, vbman) gave units
+18/19, calls 6/16, tables 32/36; their causes are fixed (databases a schema
+creates, schemas outside every project, views and system tables, projects
+sharing a folder, connection templates of a library) and they are tuned on
+now. The next three (billing-system-vb6-2016, MMUD-Explorer, omelette-vb6),
+untouched: units 5/5, calls 1/3, tables 13/17. Open:
+
+Fixed in a second round (DAO and Access files, recordsets by name, nameless
+connections, sys.-schema tables, a form's host and port fields with the
+nearest listener); those three are tuned on now. The next three held out
+(hospital-management-system, philip-…-inventory, divyen-…-inventory), single
+Access projects, gave units 3/3 and calls 3/3 before any change. Open:
+
+- **Harder held-out code.** The last three are simple; the next round should
+  hold out repositories with several projects, SQL Server or Oracle, and
+  network calls, where the first rounds failed.
+- **The agent's model is not measured.** The bench judges the facts; an
+  agent run on the held-out set is compared by hand.
+
 ### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
 
 Done on the next branch, from the list below: VB6 forms as screens with
