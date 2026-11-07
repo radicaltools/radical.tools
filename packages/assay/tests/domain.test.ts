@@ -399,10 +399,59 @@ describe('radical assay: what legacy repositories hide', () => {
       'App.vbp': 'Type=Exe\r\nModule=modMain; modMain.bas\r\nName="App"\r\n',
       'modMain.bas': [
         'Attribute VB_Name = "modMain"', 'Sub Main()', '  rs.Open "SELECT * FROM orders", cn', '  rs.Open "SELECT * FROM order_totals", cn',
-        '  rs.Open "SELECT * FROM appview_itemlist", cn', '  rs.Open "SELECT name FROM sysdatabases", cn', 'End Sub', '',
+        '  rs.Open "SELECT * FROM appview_itemlist", cn', '  rs.Open "SELECT name FROM sysdatabases", cn', '  rs.Open "SELECT name FROM sys.master_files", cn', 'End Sub', '',
       ].join('\r\n'),
       'db/schema.sql': 'CREATE TABLE orders (id INT PRIMARY KEY);\nCREATE VIEW order_totals AS SELECT id FROM orders;\n',
     }))
     expect(facts.tables.map((t) => t.table)).toEqual(['orders'])
+  })
+
+  it('reads an Access database DAO opens by a file its code names, and the tables it opens by name', () => {
+    const dir = repo('viewer', {
+      'Viewer.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="Viewer"\r\n',
+      'modData.bas': [
+        'Attribute VB_Name = "modData"', 'Const DB_FILE = "Projects.mdb"', 'Public Sub OpenAll(ByVal sFile As String)',
+        '  Set DB = DBEngine.OpenDatabase(App.Path & "\\" & DB_FILE)', '  Set tabItems = DB.OpenRecordset("Items")',
+        '  rs.Open "Spells", cn, adOpenStatic, adLockReadOnly, adCmdTable', '  Kill App.Path & "\\temp.mdb"', 'End Sub', '',
+      ].join('\r\n'),
+      'Projects.mdb': '',
+    })
+    const facts = extractRepository(dir)
+    // A file the repository holds, not one the code makes at run time.
+    expect(facts.databases.map((d) => [d.engine, d.name, d.evidence.line])).toEqual([['Access', 'Projects.mdb', 2]])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.to])).toEqual([['data', 'viewer:db:.:Access/Projects.mdb']])
+    expect(facts.tables.map((t) => t.table)).toEqual(['Items', 'Spells'])
+  })
+
+  it('takes a nameless connection for the Access database the unit names, and reads none from one beside nothing, with a note', () => {
+    const named = extractRepository(repo('app', {
+      'App.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="App"\r\n', 'Data.mdb': '',
+      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\n  sPath = App.Path & "\\Data.mdb"\r\nEnd Sub\r\n',
+    }))
+    expect(named.databases.map((d) => [d.engine, d.name])).toEqual([['Access', 'Data.mdb']])
+    const none = extractRepository(repo('tool', {
+      'Tool.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="Tool"\r\n',
+      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\nEnd Sub\r\n',
+    }))
+    expect(none.databases).toEqual([])
+    expect(none.notes).toContain('modData.bas:3 connects to Access with its database filled in at run time: no database read')
+  })
+
+  it("links a client to the server on the port their forms' fields hold, the nearest of several listening on it", () => {
+    const field = (name: string, text: string) => `   Begin VB.TextBox ${name}\r\n      Text = "${text}"\r\n   End`
+    const form = (name: string, fields: string[], code: string[]) => ['VERSION 5.00', `Begin VB.Form ${name}`, ...fields, 'End', `Attribute VB_Name = "${name}"`, ...code, ''].join('\r\n')
+    const files: Record<string, string> = {}
+    for (const demo of ['One', 'Two']) {
+      files[`${demo}/Master/Master.vbp`] = 'Type=Exe\r\nForm=FMaster.frm\r\nName="Master"\r\n'
+      files[`${demo}/Master/FMaster.frm`] = form('FMaster', [field('txtHost', '127.0.0.1'), field('txtPort', '1502'), field('txtReadAddress', '0')], ['Private Sub cmdConnect_Click()', '  m.Connect txtHost.Text, txtPort.Text', 'End Sub'])
+      files[`${demo}/Slave/Slave.vbp`] = 'Type=Exe\r\nForm=FSlave.frm\r\nName="Slave"\r\n'
+      files[`${demo}/Slave/FSlave.frm`] = form('FSlave', [field('txtTCPPort', '1502'), field('txtSerialPort', 'COM1')], ['Private Sub cmdStart_Click()', '  m_Slave.Start CStr(Val(txtTCPPort.Text))', 'End Sub'])
+    }
+    const facts = extractRepository(repo('demos', files))
+    expect(facts.units.filter((u) => u.ports).map((u) => [u.path, u.ports])).toEqual([['One/Slave', [1502]], ['Two/Slave', [1502]]])
+    expect(facts.addresses.map((a) => [a.unit, a.text])).toEqual([['demos:unit:One/Master', 'txtHost=127.0.0.1 txtPort=1502'], ['demos:unit:Two/Master', 'txtHost=127.0.0.1 txtPort=1502']])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to])).toEqual([
+      ['address', 'demos:unit:One/Master', 'demos:unit:One/Slave'], ['address', 'demos:unit:Two/Master', 'demos:unit:Two/Slave'],
+    ])
   })
 })

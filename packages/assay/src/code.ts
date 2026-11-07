@@ -149,6 +149,11 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   const seen = new Set<string>()
   const once = (id: string): boolean => (seen.has(id) ? false : (seen.add(id), true))
 
+  // Access databases: the .mdb and .accdb files the repository holds, and what each unit's code names of them.
+  const accessFiles = new Set(files.list.filter((f) => /\.(mdb|accdb)$/i.test(f)).map((f) => f.slice(f.lastIndexOf('/') + 1).toLowerCase()))
+  const accessNamed = new Map<string, Array<{ name: string; evidence: { file: string; line: number } }>>()
+  const accessUsers = new Set<string>()
+
   // The services every .proto of the repository declares.
   const protoServices = [...new Set(files.named(/\.proto$/).flatMap((f) => [...files.read(f).matchAll(/^\s*service\s+(\w+)\s*\{/gm)].map((m) => m[1])))]
 
@@ -187,15 +192,29 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       out.databases.push({ id, unit: unit.id, engine: db.engine, ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
     }
 
-    // A VB6 data control reads a table, or the table its SQL names: RecordSource = "Users".
+    // A VB6 data control reads a table, or the table its SQL names: RecordSource = "Users", in its properties or its code.
     if (vb) {
-      for (const m of text.matchAll(/^\s*RecordSource\s*=\s*"((?:[^"]|"")+)"/gm)) {
+      for (const m of text.matchAll(/^\s*(?:\w+\.)?RecordSource\s*=\s*"((?:[^"]|"")+)"/gm)) {
         const source = m[1].replace(/""/g, '"')
         for (const table of /^[A-Za-z_][\w$]*$/.test(source) ? [source] : tablesOf(source)) {
           const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
           if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
         }
       }
+      // A table opened by its name: db.OpenRecordset("Items"), rs.Open "Items", cn, , , adCmdTable.
+      for (const m of text.matchAll(/\bOpenRecordset\s*\(\s*"([A-Za-z_][\w$]*)"|\.Open\s+"([A-Za-z_][\w$]*)"\s*,[^\n]*\badCmdTable(?:Direct)?\b/g)) {
+        const table = m[1] ?? m[2]
+        const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
+        if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
+      }
+      // Access through DAO, Jet or ACE, or a data control: the unit uses the Access files its code names.
+      if (/\bOpenDatabase\s*\(|\bDBEngine\b|Jet\.OLEDB|ACE\.OLEDB|Microsoft Access Driver|^\s*(?:\w+\.)?DatabaseName\s*=/im.test(text)) accessUsers.add(unit.id)
+      for (const m of text.matchAll(/"([^"\n]*?([^"\\/\n]+\.(?:mdb|accdb)))"/gi)) {
+        if (!accessFiles.has(m[2].toLowerCase())) continue
+        accessNamed.set(unit.id, [...(accessNamed.get(unit.id) ?? []), { name: m[2], evidence: at(m.index!) }])
+      }
+      // A form's fields holding a host and a port by default: an address of the unit, or, beside a listening socket, its port.
+      if (file.toLowerCase().endsWith('.frm')) formAddress(text, file, unit, repo, out, once)
     }
 
     // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
@@ -289,7 +308,47 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     out.databases = out.databases.filter((d) => d.evidence.file !== file)
     out.notes.push(`${file} holds connection strings of ${set.size} engines (${[...set].sort().join(', ')}): a library's templates, read as no database`)
   }
+  // The Access files a unit's code names, where it uses Access: each a database it uses.
+  for (const [unitId, named] of accessNamed) {
+    if (!accessUsers.has(unitId)) continue
+    const unit = units.find((u) => u.id === unitId)!
+    for (const n of named) {
+      const id = `${repo}:db:${unit.path}:Access/${n.name}`
+      if (out.databases.some((d) => d.unit === unitId && d.engine === 'Access' && d.name?.toLowerCase() === n.name.toLowerCase())) continue
+      out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
+    }
+  }
+  // A nameless connection beside a database of its engine the unit names is that one.
+  out.databases = out.databases.filter((d) => d.name || d.server || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && (o.name || o.server)))
+  // A connection of Access or ODBC with neither name nor server, beside none of its engine named, names no database.
+  out.databases = out.databases.filter((d) => {
+    if (d.name || d.server || !['Access', 'ODBC'].includes(d.engine) || out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && o.name)) return true
+    out.notes.push(`${d.evidence.file}:${d.evidence.line} connects to ${d.engine} with its database filled in at run time: no database read`)
+    return false
+  })
   return out
 }
 
 export { escapeRe }
+
+/** A form's text fields holding a host and a port by default (txtHost = "127.0.0.1", txtPort = "502"): an address of the
+ *  unit; a port field of a form whose code listens (Listen, Bind, LocalPort): a port the unit listens on. */
+function formAddress(text: string, file: string, unit: Unit, repo: string, out: CodeFacts, once: (id: string) => boolean): void {
+  const fields = [...text.matchAll(/^\s*Begin\s+VB\.TextBox\s+(\w+)\s*$([\s\S]*?)^\s*End\s*$/gm)].map((m) => ({
+    name: m[1], value: /^\s*Text\s*=\s*"([^"]*)"/m.exec(m[2])?.[1]?.trim() ?? '', index: m.index!,
+  }))
+  const host = fields.find((f) => /(host|ip|server)/i.test(f.name) && /^(localhost|\d{1,3}(\.\d{1,3}){3}|[a-z][\w-]*(\.[\w-]+)+)$/i.test(f.value))
+  const port = fields.find((f) => /port/i.test(f.name) && !/(serial|com)/i.test(f.name) && /^\d{1,5}$/.test(f.value) && Number(f.value) > 0 && Number(f.value) < 65536)
+  if (!port) return
+  const portNo = Number(port.value)
+  const line = (i: number) => text.slice(0, i).split('\n').length
+  // A server starts on it: Listen, Bind, LocalPort; or, with no host field beside it, a Start the port field's value reaches.
+  const portRead = new RegExp(`\\b${port.name}\\.Text\\b|Val\\(\\s*${port.name}\\b`, 'i').test(text)
+  if (/\.Listen\b|\.Bind\b|\bLocalPort\s*=|\bStartListen|\bStartServer/i.test(text) || (!host && portRead && /\.Start\b/i.test(text))) {
+    unit.ports = [...new Set([...(unit.ports ?? []), portNo])].sort((a, b) => a - b)
+    return
+  }
+  if (!host) return
+  const id = `${repo}:address:${unit.path}:form:${host.value}:${portNo}`
+  if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'form', host: host.value, port: portNo, text: `${host.name}=${host.value} ${port.name}=${portNo}`, evidence: { file, line: line(host.index) + 1 } })
+}

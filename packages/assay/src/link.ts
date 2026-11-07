@@ -102,7 +102,19 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     // A port names a unit only when no other unit listens on it too (5000 is everyone's default); away
     // from this machine, only a port few programs use (a game server's 24582, not 8080).
     const listening = a.port !== undefined && (local || !COMMON_PORTS.has(a.port)) ? units.filter((u) => u.ports?.includes(a.port!)) : []
-    const byPort = (listening.length === 1 ? listening : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
+    // Several listening on it (demos of one protocol): the one nearest the caller in the folders, when only one is.
+    const caller = units.find((u) => u.id === from)
+    const shared = (u: Unit): number => {
+      if (!caller || u.id.split(':unit:')[0] !== caller.id.split(':unit:')[0]) return -1
+      const a = caller.path.split('/')
+      const b = u.path.split('/')
+      let n = 0
+      while (n < a.length && n < b.length && a[n] === b[n] && a[n] !== '.') n++
+      return n
+    }
+    const best = listening.length > 1 ? Math.max(...listening.map(shared)) : 0
+    const nearest = listening.length > 1 && best > 0 ? listening.filter((u) => shared(u) === best) : listening
+    const byPort = (nearest.length === 1 ? nearest : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
     const targets = local ? byPort : byName.get(a.host) ?? byName.get(a.host.split('.')[0]) ?? byPort
     for (const t of targets) {
       const to = t.unit?.id ?? t.service?.id

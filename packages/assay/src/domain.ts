@@ -591,6 +591,6 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     }
   }
   // A view, or a database's own table, that the code names is no table of the domain.
-  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)))) tables.delete(id)
+  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|information_schema)\./i.test(t.table))) tables.delete(id)
   return { tables: [...tables.values()], states, databases }
 }
