@@ -1166,6 +1166,12 @@
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
   },
   {
+    "id": "0f925257-85a1-488b-a0c0-8a04117c8be1",
+    "relationType": "constrains",
+    "sourceId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d",
+    "targetId": "f971b2de-614a-44d5-8b34-09777f4523c6"
+  },
+  {
     "id": "0f93cf61-f07c-437b-843b-49651c286461",
     "relationType": "derives",
     "sourceId": "cb2a9f54-7fc1-4f30-b178-fcb5f9c3a76b",
@@ -1764,6 +1770,12 @@
     "relationType": "satisfies",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
     "targetId": "0b1dbef8-eb37-4311-b410-07809b7b45d3"
+  },
+  {
+    "id": "175bfd7a-f6ea-44a0-b810-5482804091a2",
+    "relationType": "satisfies",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc"
   },
   {
     "id": "178b51c6-2eb7-42c8-9618-9f893fa502c7",
@@ -2512,6 +2524,12 @@
     "relationType": "satisfies",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
     "targetId": "62b6849d-5aff-4d06-b0cd-776b410b6a6b"
+  },
+  {
+    "id": "2192cafe-e69b-43e4-b3d5-6ba01ac14403",
+    "relationType": "verifies",
+    "sourceId": "b4c52bdc-3f40-4f7d-843e-5a3672fb8690",
+    "targetId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc"
   },
   {
     "id": "21bc1a95-2f0c-4ca3-9be0-7505758706a1",
@@ -3564,6 +3582,12 @@
     "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
+    "id": "2ea04fed-c9f6-48d2-bf63-3ee907528f53",
+    "relationType": "derives",
+    "sourceId": "05aa4962-63a6-4115-810a-8cda52652246",
+    "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
+  },
+  {
     "id": "2ea76c24-b234-4ece-a9ec-d5308737e4eb",
     "relationType": "derives",
     "sourceId": "d9b85644-ed67-4cbb-b578-1e134d7eb706",
@@ -3647,6 +3671,12 @@
     "relationType": "verifies",
     "sourceId": "e140c110-780c-4b42-b68e-696cf8f27046",
     "targetId": "e6f624c1-8d05-4204-b2d0-143ce4a658c1"
+  },
+  {
+    "id": "2f3a407b-e0e8-4de3-a6c7-87025fd92791",
+    "relationType": "traces-to",
+    "sourceId": "68e6db69-61b2-4a9f-8780-e07dd4a715df",
+    "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
   },
   {
     "id": "2f570192-c0f5-49b9-be7a-c9ec19d69880",
@@ -4001,6 +4031,12 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "c6fccca5-a488-4ef6-9e1b-045998930d00"
+  },
+  {
+    "id": "339f9d25-d16d-4c2a-9501-5732a1312513",
+    "relationType": "verifies",
+    "sourceId": "2d06f0e3-1a6a-47b1-914c-3cc47174408f",
+    "targetId": "5546d0e1-221a-4e6a-8b70-e2ac12441100"
   },
   {
     "id": "33a33402-855e-490a-b43b-9f0c7d4c1ec3",
@@ -4648,6 +4684,12 @@
     "relationType": "verifies",
     "sourceId": "aa646c3c-eb0f-44ba-a37e-7f937975959b",
     "targetId": "3d9caeb2-ee6f-4d5e-81b3-c29b135b49aa"
+  },
+  {
+    "id": "3b8f673a-dee4-4ee0-b8af-519192840e84",
+    "relationType": "traces-to",
+    "sourceId": "05aa4962-63a6-4115-810a-8cda52652246",
+    "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
   },
   {
     "id": "3b9aedbb-5fc9-41fe-8573-f3a4dab64ded",
@@ -7212,6 +7254,12 @@
     "targetId": "157f7331-5a0f-4b2e-8524-06a7a9152234"
   },
   {
+    "id": "5b92250c-5348-4497-9ed4-fe7ce10e159a",
+    "relationType": "constrains",
+    "sourceId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d",
+    "targetId": "156f4473-a44b-424f-b5c1-62e044522faf"
+  },
+  {
     "id": "5b983eb1-b820-4696-a498-a901ea15b5b9",
     "relationType": "performed-by",
     "sourceId": "eb244e35-4f16-425a-911d-90bb0c135dd7",
@@ -7598,6 +7646,12 @@
     "targetId": "9fb646d2-b550-45f2-b4b7-1b6dbb688919"
   },
   {
+    "id": "602a5222-9331-49f6-989e-e104e9154fad",
+    "relationType": "satisfies",
+    "sourceId": "f971b2de-614a-44d5-8b34-09777f4523c6",
+    "targetId": "5546d0e1-221a-4e6a-8b70-e2ac12441100"
+  },
+  {
     "id": "603e0c56-15ae-4c2c-98db-0a9729253ac1",
     "relationType": "satisfies",
     "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
@@ -7644,6 +7698,12 @@
     "relationType": "derives",
     "sourceId": "bdb3b41d-0e1a-4995-86c0-01584c7395af",
     "targetId": "48604bc7-944d-4bea-bf39-ec39a7b329b0"
+  },
+  {
+    "id": "60af946d-f53b-4327-aafd-afa5923d2f6f",
+    "relationType": "derives",
+    "sourceId": "68e6db69-61b2-4a9f-8780-e07dd4a715df",
+    "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
   },
   {
     "id": "60b0d888-5537-4b67-9ecd-040b51104709",
@@ -8179,6 +8239,12 @@
     "relationType": "traces-to",
     "sourceId": "13268d7a-04d2-4293-817b-54193099f408",
     "targetId": "910a34a4-578f-4392-969e-6cc2f191ca65"
+  },
+  {
+    "id": "6817c7b8-ce0d-44eb-8ad1-23e2cc030086",
+    "relationType": "traces-to",
+    "sourceId": "90dcdf2d-3ea5-48b9-865a-5d83a1510c99",
+    "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
   },
   {
     "id": "683782eb-7cc6-4ef3-be3d-e58034ad1cd7",
@@ -10347,6 +10413,12 @@
     "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa"
   },
   {
+    "id": "81df0d99-86d6-4ff3-80ad-14974c3c0dbe",
+    "relationType": "verifies",
+    "sourceId": "0f8fcf66-dc79-435b-9824-b402605163df",
+    "targetId": "05aa4962-63a6-4115-810a-8cda52652246"
+  },
+  {
     "id": "81e3f166-f6f2-4c2b-a13e-c5136728e915",
     "relationType": "verifies",
     "sourceId": "2b5f0e2b-5e61-4692-99f8-1e1289520ad2",
@@ -10381,6 +10453,12 @@
     "relationType": "derives",
     "sourceId": "30971391-994f-4975-a7f2-d21379ed201b",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "82ab1a98-159f-4efc-9744-9cddd5a31ad9",
+    "relationType": "derives",
+    "sourceId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc",
+    "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
   },
   {
     "id": "82ade8bb-6314-4dc6-8edb-2d3368fc0c3c",
@@ -10998,6 +11076,12 @@
     "relationType": "verifies",
     "sourceId": "f190776c-8f99-49a6-beb7-51a2cbfb9813",
     "targetId": "364b6aa3-6057-4c10-973d-b2da937c0ab8"
+  },
+  {
+    "id": "8a2fb1d9-8bfb-4d06-8727-783ceb7b4de4",
+    "relationType": "satisfies",
+    "sourceId": "f971b2de-614a-44d5-8b34-09777f4523c6",
+    "targetId": "05aa4962-63a6-4115-810a-8cda52652246"
   },
   {
     "id": "8a43b6e3-fc27-4212-abcc-aaaa2524123e",
@@ -11923,6 +12007,12 @@
     "targetId": "83cc122a-c0cf-4e92-ba26-7efea2fde95f"
   },
   {
+    "id": "9580e8a8-b51c-4731-9a23-f0eed4ab7c0e",
+    "relationType": "satisfies",
+    "sourceId": "917d9018-dff9-45b1-87dc-d01f8ac836bb",
+    "targetId": "90dcdf2d-3ea5-48b9-865a-5d83a1510c99"
+  },
+  {
     "id": "95846919-c47a-4db3-aa3e-20716ac07a03",
     "relationType": "verifies",
     "sourceId": "969cf1a2-096a-41a5-ba79-0eefe310eb82",
@@ -12589,6 +12679,12 @@
     "relationType": "verifies",
     "sourceId": "1a558428-a009-4190-ae04-127b413a9ad7",
     "targetId": "9768f8de-c0bc-4b4a-8599-a97c1a96c41d"
+  },
+  {
+    "id": "9dea2ba3-650e-424d-ae07-a130d22a5235",
+    "relationType": "satisfies",
+    "sourceId": "917d9018-dff9-45b1-87dc-d01f8ac836bb",
+    "targetId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc"
   },
   {
     "id": "9df857d1-57d5-4358-a476-249fce507d45",
@@ -13557,6 +13653,12 @@
     "targetId": "7bbeaca4-2a83-4111-81c3-e17d864d7db6"
   },
   {
+    "id": "aa3b403e-9bb5-412f-82f9-2fb534513c68",
+    "relationType": "satisfies",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "90dcdf2d-3ea5-48b9-865a-5d83a1510c99"
+  },
+  {
     "id": "aa45a495-b0d2-4f1b-a996-28d7902304eb",
     "relationType": "verifies",
     "sourceId": "75f3e81c-a291-4a8f-86ef-4f2f6ec2b2a8",
@@ -13574,6 +13676,12 @@
     "relationType": "derives",
     "sourceId": "37611a1b-233c-4094-882a-0a52d65ef667",
     "targetId": "88fd21dd-e52d-44e3-a9f1-e6532151edba"
+  },
+  {
+    "id": "aa50c6f6-59bf-4df6-877e-c646fec650c0",
+    "relationType": "verifies",
+    "sourceId": "1a73a026-8c62-4426-a717-85c4d4a1baf4",
+    "targetId": "68e6db69-61b2-4a9f-8780-e07dd4a715df"
   },
   {
     "id": "aa63df99-bc1c-46f3-98ac-859a47a85845",
@@ -14345,6 +14453,12 @@
     "targetId": "6f84875d-7998-4d7f-a676-b2aa41dab92c"
   },
   {
+    "id": "b409b5e7-6606-4131-a3c3-7673e2a662c5",
+    "relationType": "satisfies",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "68e6db69-61b2-4a9f-8780-e07dd4a715df"
+  },
+  {
     "id": "b4185154-7796-44a0-96d0-3b9be5f50bf6",
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
@@ -14640,6 +14754,12 @@
     "relationType": "verifies",
     "sourceId": "bcdd4139-494a-495d-abaa-d366a131a9a3",
     "targetId": "565a5084-b620-44e1-960a-7e3fd59cc0f2"
+  },
+  {
+    "id": "b8a4e220-781b-4ea4-9ceb-5ffa83c79758",
+    "relationType": "derives",
+    "sourceId": "5546d0e1-221a-4e6a-8b70-e2ac12441100",
+    "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
   },
   {
     "description": "The Markdown-folder sync reads formats N and N-1, writes N, and refuses a newer format without rewriting it.",
@@ -15037,6 +15157,12 @@
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
     "targetId": "bbf96d1d-e59e-4400-addd-415a53053cde"
+  },
+  {
+    "id": "bdfcb6aa-f642-4736-b0df-16b31e51f896",
+    "relationType": "verifies",
+    "sourceId": "962e63e6-c621-4f06-990b-f02b89194459",
+    "targetId": "90dcdf2d-3ea5-48b9-865a-5d83a1510c99"
   },
   {
     "id": "be006856-0811-4598-9629-33f60e50deae",
@@ -17654,6 +17780,13 @@
     "targetId": "81aeb9d5-a134-408a-9c36-91a5c341b015"
   },
   {
+    "id": "dc0e23e5-1cf5-480c-94bc-e515b85c1fba",
+    "label": "explores the running application with",
+    "relationType": "interacts",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "f971b2de-614a-44d5-8b34-09777f4523c6"
+  },
+  {
     "id": "dc24ba06-a81c-4818-b593-261109492649",
     "relationType": "satisfies",
     "sourceId": "700904a2-cba3-4b18-aa76-522dd2f141e9",
@@ -18237,6 +18370,12 @@
     "targetId": "9214f6c2-e5bf-4919-8fbf-045c470a0bdb"
   },
   {
+    "id": "e3a4517a-2500-4282-9068-e4371f70d3f8",
+    "relationType": "derives",
+    "sourceId": "90dcdf2d-3ea5-48b9-865a-5d83a1510c99",
+    "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
+  },
+  {
     "id": "e3bf9518-1647-451c-a1d5-fb9c7b394efc",
     "relationType": "constrains",
     "sourceId": "6f372230-d6ac-4357-8349-c8d9975c48d8",
@@ -18641,6 +18780,12 @@
     "targetId": "b7250ae8-f0ec-4f8f-bc21-f2502f710dba"
   },
   {
+    "id": "e90a3d4c-6e48-46c0-aff8-b0025ee96ea7",
+    "relationType": "traces-to",
+    "sourceId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc",
+    "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
+  },
+  {
     "id": "e94423d5-d1ab-44d5-811d-b8d58583d811",
     "relationType": "derives",
     "sourceId": "dad2535d-c7d6-4564-a9c2-6c65cc5e1032",
@@ -19037,6 +19182,12 @@
     "relationType": "verifies",
     "sourceId": "21880701-5b50-4a18-a807-e08959a48c74",
     "targetId": "3610f961-fc0d-45a9-937f-69998c12f08e"
+  },
+  {
+    "id": "efe044e1-3c2a-4ba8-8bc5-56b2b555c39e",
+    "relationType": "satisfies",
+    "sourceId": "f971b2de-614a-44d5-8b34-09777f4523c6",
+    "targetId": "68e6db69-61b2-4a9f-8780-e07dd4a715df"
   },
   {
     "id": "efe9febd-34f1-4650-8855-e7a0a886209f",
@@ -20051,6 +20202,12 @@
     "relationType": "satisfies",
     "sourceId": "8c78dee7-eb8a-4d4f-bc18-187edbb4f172",
     "targetId": "3fc618ce-c9ba-40a2-aa02-c02317439b4f"
+  },
+  {
+    "id": "fc21831f-4f4f-4683-abcf-f817f5219eec",
+    "relationType": "traces-to",
+    "sourceId": "5546d0e1-221a-4e6a-8b70-e2ac12441100",
+    "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
   },
   {
     "id": "fc23daad-a854-41af-900e-456d5466a4a8",
