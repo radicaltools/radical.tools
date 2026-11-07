@@ -5,11 +5,15 @@
 // observed or inferred and cite the facts they rest on; requirements are
 // hypotheses, each with the scenarios that verify it from the tests or drawn
 // from the documents it cites, and wait for the user, as needs and decisions
-// drawn from documents do. checkPlan finds every way a plan is not backed by the facts;
-// the metamodel's rules are the model tools' to check when it is written.
+// drawn from documents do. Entities are observed on the tables they are;
+// processes and state machines are written as inferred, each step and
+// transition on the facts or code it rests on (ADR Assay writes the domain,
+// processes and lifecycles it reads). checkPlan finds every way a plan is
+// not backed by the facts; the metamodel's rules are the model tools' to
+// check when it is written.
 
 import { citationProblem, pathProblem, type Citation, type PlanPath } from './cite'
-import type { DependencyFact, Link, RepositoryFacts, ServiceFact, TestFact, Unit, factIndex } from './facts'
+import type { DependencyFact, Link, RepositoryFacts, ServiceFact, StateFact, TableFact, TestFact, Unit, factIndex } from './facts'
 
 export type FactIndex = ReturnType<typeof factIndex>
 
@@ -40,6 +44,8 @@ export interface PlanRelation {
   relationType?: string
   label?: string
   technology?: string
+  /** The relation type's properties (a references' cardinality, …). */
+  properties?: Record<string, unknown>
   facts: string[]
   citations?: Citation[]
   confidence: 'observed' | 'inferred'
@@ -56,6 +62,100 @@ export interface PlanScenario {
   /** Paths explored in the running application that show it: each is written as a Playwright
    *  test into the application's repository when the requirement is accepted. */
   paths?: string[]
+  /** The code it is drawn from, when no test or path shows it: accepted, a pending test of it is
+   *  written where the unit that builds its element has a test framework. */
+  citations?: Citation[]
+}
+
+/** A table of the code, as an entity of the domain. */
+export interface PlanEntity {
+  key: string
+  label: string
+  description?: string
+  /** aggregate-root (default) or entity: a part of an aggregate, with partOf. */
+  kind?: 'aggregate-root' | 'entity'
+  /** The table facts it is: the table, as its SQL and its ORM class name it. */
+  tables: string[]
+  /** The domain it is in: a plan key or an id of the model. */
+  parent?: string
+  /** The entity whose aggregate it is part of: a foreign key of its tables must reference that entity's. */
+  partOf?: string
+  /** The entities it refers to: a foreign key of its tables must reference each one's. */
+  references?: Array<{ to: string; cardinality?: 'one' | 'many'; description?: string }>
+}
+
+/** A step of a process, in order among its siblings. */
+export interface PlanStep {
+  key: string
+  label: string
+  description?: string
+  /** The person or element that does it: a plan key or an id. */
+  performedBy?: string
+  /** The mockups that show it: plan keys or ids. */
+  mockups?: string[]
+  repeat?: '1' | '0..1' | '1..n' | '0..n'
+  condition?: string
+  /** How its own steps run. */
+  children?: 'sequence' | 'choice' | 'concurrent'
+  steps?: PlanStep[]
+  /** The entry points, explored paths, screens or other facts it rests on. */
+  facts?: string[]
+  citations?: Citation[]
+}
+
+/** A process the code shows, written as inferred. */
+export interface PlanProcess {
+  key: string
+  label: string
+  description?: string
+  parent?: string
+  children?: 'sequence' | 'choice' | 'concurrent'
+  steps: PlanStep[]
+  facts?: string[]
+  citations?: Citation[]
+}
+
+export interface PlanState {
+  key: string
+  label: string
+  /** normal (default) or final. */
+  kind?: 'normal' | 'final'
+  description?: string
+  /** The value of the machine's state facts it is; default its label. */
+  value?: string
+  /** For a state no state fact holds: the code that names it. */
+  citations?: Citation[]
+}
+
+export interface PlanTransition {
+  /** State keys of the machine. */
+  from: string
+  to: string
+  /** The event's name: one event of the machine per name. */
+  event?: string
+  guard?: string
+  actions?: string
+  facts?: string[]
+  citations?: Citation[]
+}
+
+/** The lifecycle of an entity, written as inferred. */
+export interface PlanStateMachine {
+  key: string
+  label: string
+  description?: string
+  parent?: string
+  /** The entity it is the lifecycle of: a plan key or an id. */
+  entity: string
+  /** The state facts its states are the values of. */
+  facts?: string[]
+  citations?: Citation[]
+  /** The state it starts in: a state key. */
+  initial: string
+  states: PlanState[]
+  transitions: PlanTransition[]
+  /** The elements that run it: plan keys or ids. Default: the elements built from the units whose code sets its values. */
+  implementedBy?: string[]
 }
 
 /** A screen of the running application, as a mockup. */
@@ -123,7 +223,15 @@ export interface Plan {
   needs: PlanNeed[]
   decisions: PlanDecision[]
   mockups: PlanMockup[]
+  entities: PlanEntity[]
+  processes: PlanProcess[]
+  stateMachines: PlanStateMachine[]
 }
+
+/** A table's name to compare by: no schema, no quotes, any case. */
+export const tableName = (name: string): string => (name.split('.').pop() ?? name).replace(/[`"[\]]/g, '').toLowerCase()
+/** A state's name to compare by: letters and digits, any case (PAID, paid, Paid). */
+export const stateName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const text = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0
@@ -133,7 +241,7 @@ const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) =
 export function parsePlan(input: unknown): { plan: Plan; problems: string[] } {
   const problems: string[] = []
   const raw = isRecord(input) ? input : {}
-  if (!isRecord(input)) problems.push('the plan must be an object with elements, relations, requirements, needs, decisions and mockups')
+  if (!isRecord(input)) problems.push('the plan must be an object with elements, relations, requirements, needs, decisions, mockups, entities, processes and stateMachines')
   const list = (key: string): Record<string, unknown>[] => {
     const v = raw[key]
     if (v === undefined) return []
@@ -150,8 +258,11 @@ export function parsePlan(input: unknown): { plan: Plan; problems: string[] } {
     needs: list('needs') as unknown as PlanNeed[],
     decisions: list('decisions') as unknown as PlanDecision[],
     mockups: list('mockups') as unknown as PlanMockup[],
+    entities: list('entities') as unknown as PlanEntity[],
+    processes: list('processes') as unknown as PlanProcess[],
+    stateMachines: list('stateMachines') as unknown as PlanStateMachine[],
   }
-  if (!plan.elements.length && !plan.relations.length && !plan.requirements.length && !plan.needs.length && !plan.decisions.length && !plan.mockups.length && isRecord(input)) problems.push('the plan is empty')
+  if (!Object.values(plan).some((items) => items.length) && isRecord(input)) problems.push('the plan is empty')
   return { plan, problems }
 }
 
@@ -185,7 +296,16 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
   plan.needs.forEach((n, i) => key(n.key, `needs[${i}]`))
   plan.decisions.forEach((d, i) => key(d.key, `decisions[${i}]`))
   plan.mockups.forEach((m, i) => key(m.key, `mockups[${i}]`))
-  const elementKeys = new Set(plan.elements.map((e) => e.key))
+  plan.entities.forEach((e, i) => key(e.key, `entities[${i}]`))
+  const stepKeys = (steps: unknown, where: string): void => {
+    if (Array.isArray(steps)) steps.forEach((st, j) => { key(st?.key, `${where}.steps[${j}]`); stepKeys(st?.steps, `${where}.steps[${j}]`) })
+  }
+  plan.processes.forEach((p, i) => { key(p.key, `processes[${i}]`); stepKeys(p.steps, `processes[${i}]`) })
+  plan.stateMachines.forEach((m, i) => {
+    key(m.key, `stateMachines[${i}]`)
+    if (Array.isArray(m.states)) m.states.forEach((st, j) => key(st?.key, `stateMachines[${i}].states[${j}]`))
+  })
+  const elementKeys = new Set([...plan.elements.map((e) => e.key), ...plan.entities.map((e) => e.key), ...plan.mockups.map((m) => m.key)])
   const needKeys = new Set(plan.needs.map((n) => n.key))
   /** What an end of a relation is built from or stands for: units, services, databases (and the units services run). */
   const ends = (ref: unknown): Set<string> => {
@@ -306,7 +426,12 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
       for (const field of ['label', 'given', 'when', 'then'] as const) if (!text(s[field])) problems.push(`${at}: ${field} is missing`)
       const paths = s.paths
       if (paths !== undefined && (!strings(paths) || paths.some((p) => facts.get(p)?.kind !== 'path'))) problems.push(`${at}: paths must list paths explored in the running application (assay_explore)`)
-      if ((!strings(s.tests) || !s.tests.length) && !(strings(paths) && paths.length)) problems.push(`${at}: tests must list the test facts that check it, or paths the explored paths that show it`)
+      const fromCode = Array.isArray(s.citations) && s.citations.length > 0
+      if (s.citations !== undefined) {
+        if (!Array.isArray(s.citations)) problems.push(`${at}: citations must be a list`)
+        else for (const c of s.citations) { const p = citationProblem(c, repositories); if (p) problems.push(`${at}: ${p}`) }
+      }
+      if ((!strings(s.tests) || !s.tests.length) && !(strings(paths) && paths.length) && !fromCode) problems.push(`${at}: tests must list the test facts that check it, paths the explored paths that show it, or citations the code it is drawn from`)
       else for (const t of strings(s.tests) ? s.tests : []) {
         const f = facts.get(t)
         if (f?.kind !== 'test') problems.push(`${at}: ${t} is no test of the run`)
@@ -320,6 +445,108 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
     if (!text(m.screen) || facts.get(m.screen)?.kind !== 'screen') problems.push(`${where}: screen must name a screen of the explored application (assay_explore)`)
     if (m.parent !== undefined && !resolves(m.parent)) problems.push(`${where}: parent ${String(m.parent)} is neither a key of the plan nor an id of the model`)
     if (m.presentedBy !== undefined && !resolves(m.presentedBy)) problems.push(`${where}: presentedBy ${String(m.presentedBy)} is neither a key of the plan nor an id of the model`)
+  })
+
+  // ── the domain: entities on their tables, relations on foreign keys ──
+  const entityKeys = new Set(plan.entities.map((e) => e.key))
+  /** The table facts an entity is: this plan's, or those an earlier plan wrote it on. */
+  const tablesOf = (ref: string): TableFact[] => {
+    const e = plan.entities.find((x) => x.key === ref)
+    const ids = e ? (strings(e.tables) ? e.tables : []) : factsOf(ref)
+    return ids.map((id) => facts.get(id)).filter((f) => f?.kind === 'table').map((f) => f!.fact as TableFact)
+  }
+  const isEntity = (ref: unknown): boolean => text(ref) && (entityKeys.has(ref) || (known(ref) && (!context.typeOf || context.typeOf(ref) === 'entity')))
+  /** A foreign key of `from`'s tables that references one of `to`'s. */
+  const foreignKey = (from: string, to: string): boolean => {
+    const targets = new Set(tablesOf(to).map((t) => tableName(t.table)))
+    return tablesOf(from).some((t) => (t.references ?? []).some((r) => targets.has(tableName(r.table))))
+  }
+  const claimed = new Map<string, string>()
+  plan.entities.forEach((e, i) => {
+    const where = `entities[${i}] (${e.label ?? e.key})`
+    if (!text(e.label)) problems.push(`${where}: label is missing`)
+    if (!strings(e.tables) || !e.tables.length) problems.push(`${where}: tables must list the table facts it is (assay_facts with kind tables); an entity no table backs is no entity of the code`)
+    else for (const t of e.tables) {
+      if (facts.get(t)?.kind !== 'table') problems.push(`${where}: ${t} is no table of the run`)
+      const name = facts.get(t) ? `${facts.get(t)!.repository}:${tableName((facts.get(t)!.fact as TableFact).table)}` : t
+      if (claimed.has(name) && claimed.get(name) !== e.key) problems.push(`${where}: its table ${t} is entity "${claimed.get(name)}" already`)
+      claimed.set(name, e.key)
+    }
+    if (e.kind !== undefined && e.kind !== 'aggregate-root' && e.kind !== 'entity') problems.push(`${where}: kind must be aggregate-root or entity`)
+    if (e.parent !== undefined && !resolves(e.parent)) problems.push(`${where}: parent ${String(e.parent)} is neither a key of the plan nor an id of the model`)
+    if (e.partOf !== undefined) {
+      if (!isEntity(e.partOf)) problems.push(`${where}: partOf ${String(e.partOf)} is no entity of the plan or the model`)
+      else if (!foreignKey(e.key, e.partOf)) problems.push(`${where}: part of ${String(e.partOf)}, but no foreign key of its tables references that entity's`)
+    }
+    if (e.references !== undefined) {
+      if (!Array.isArray(e.references)) problems.push(`${where}: references must list { to, cardinality }`)
+      else for (const r of e.references) {
+        if (!isRecord(r) || !isEntity(r.to)) problems.push(`${where}: references ${String((r as { to?: unknown })?.to)}, which is no entity of the plan or the model`)
+        else if (!foreignKey(e.key, r.to as string)) problems.push(`${where}: references ${String(r.to)}, but no foreign key of its tables references that entity's (a reference the code makes otherwise goes in relations, inferred, citing it)`)
+      }
+    }
+  })
+
+  // ── processes: every step on what it rests on ──
+  const mockupOrModel = (ref: unknown): boolean => text(ref) && (plan.mockups.some((m) => m.key === ref) || known(ref))
+  const checkSteps = (steps: unknown, where: string): void => {
+    if (!Array.isArray(steps)) { problems.push(`${where}: steps must be a list`); return }
+    steps.forEach((st, j) => {
+      const at = `${where}.steps[${j}] (${st?.label ?? st?.key})`
+      if (!isRecord(st)) return
+      if (!text(st.label)) problems.push(`${at}: label is missing`)
+      // A step made of steps rests on them; one of its own on what it cites.
+      const parts = Array.isArray(st.steps) && st.steps.length > 0
+      if (!cited(st, at, !parts, true).length && !(Array.isArray(st.citations) && st.citations.length) && !parts) return
+      if (st.performedBy !== undefined && !resolves(st.performedBy)) problems.push(`${at}: performedBy ${String(st.performedBy)} is neither a key of the plan nor an id of the model`)
+      if (st.mockups !== undefined && (!strings(st.mockups) || st.mockups.some((m) => !mockupOrModel(m)))) problems.push(`${at}: mockups must list mockups of the plan or the model`)
+      if (st.steps !== undefined) checkSteps(st.steps, at)
+    })
+  }
+  plan.processes.forEach((p, i) => {
+    const where = `processes[${i}] (${p.label ?? p.key})`
+    if (!text(p.label)) problems.push(`${where}: label is missing`)
+    if (p.parent !== undefined && !resolves(p.parent)) problems.push(`${where}: parent ${String(p.parent)} is neither a key of the plan nor an id of the model`)
+    if (p.facts !== undefined || p.citations !== undefined) cited(p, where, false, true)
+    if (!Array.isArray(p.steps) || !p.steps.length) problems.push(`${where}: steps must list its steps in order`)
+    else checkSteps(p.steps, where)
+  })
+
+  // ── state machines: states from the state facts, transitions on the code ──
+  plan.stateMachines.forEach((m, i) => {
+    const where = `stateMachines[${i}] (${m.label ?? m.key})`
+    if (!text(m.label)) problems.push(`${where}: label is missing`)
+    if (!isEntity(m.entity)) problems.push(`${where}: entity ${String(m.entity)} is no entity of the plan or the model`)
+    if (m.parent !== undefined && !resolves(m.parent)) problems.push(`${where}: parent ${String(m.parent)} is neither a key of the plan nor an id of the model`)
+    const ids = cited(m, where, true, true)
+    const stateFacts = ids.map((id) => facts.get(id)).filter((f) => f?.kind === 'state').map((f) => f!.fact as StateFact)
+    const values = new Set(stateFacts.flatMap((f) => f.values.map(stateName)))
+    if (!Array.isArray(m.states) || !m.states.length) { problems.push(`${where}: states must list its states`); return }
+    const keysHere = new Set<string>()
+    m.states.forEach((st, j) => {
+      const at = `${where}.states[${j}] (${st?.label ?? st?.key})`
+      if (!isRecord(st)) return
+      keysHere.add(st.key)
+      if (!text(st.label)) problems.push(`${at}: label is missing`)
+      if (st.kind !== undefined && st.kind !== 'normal' && st.kind !== 'final') problems.push(`${at}: kind must be normal or final`)
+      const quotes = Array.isArray(st.citations) && st.citations.length > 0
+      if (quotes) for (const c of st.citations!) { const p = citationProblem(c, repositories); if (p) problems.push(`${at}: ${p}`) }
+      else if (!values.has(stateName(st.value ?? st.label ?? ''))) problems.push(`${at}: no state fact the machine cites holds "${st.value ?? st.label}" (${stateFacts.length ? [...new Set(stateFacts.flatMap((f) => f.values))].join(', ') : 'it cites none'}); give its value, or cite the code that names it`)
+    })
+    if (!keysHere.has(m.initial)) problems.push(`${where}: initial must name one of its states`)
+    if (!Array.isArray(m.transitions)) { problems.push(`${where}: transitions must be a list`); return }
+    const valueOf = (k: string): string => stateName(((st) => st?.value ?? st?.label ?? '')(m.states.find((x) => x.key === k)))
+    m.transitions.forEach((t, j) => {
+      const at = `${where}.transitions[${j}] (${String(t?.from)} → ${String(t?.to)})`
+      if (!isRecord(t)) return
+      if (!keysHere.has(t.from)) problems.push(`${at}: from must name one of the machine's states`)
+      if (!keysHere.has(t.to)) problems.push(`${at}: to must name one of the machine's states`)
+      // A line of the code that sets the state it goes to is evidence of it, as is code quoted.
+      const sets = stateFacts.some((f) => f.sets.some((x) => stateName(x.value) === valueOf(t.to)))
+      const own = t.facts !== undefined || t.citations !== undefined ? cited(t, at, false, true) : []
+      if (!sets && !own.length && !(Array.isArray(t.citations) && t.citations.length)) problems.push(`${at}: rests on nothing: no line of the code the state facts name sets ${String(t.to)}; cite the code that makes it (citations)`)
+    })
+    if (m.implementedBy !== undefined && (!strings(m.implementedBy) || m.implementedBy.some((x) => !resolves(x)))) problems.push(`${where}: implementedBy must list keys of the plan or ids of the model`)
   })
 
   plan.needs.forEach((n, i) => {

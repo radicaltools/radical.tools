@@ -12,8 +12,13 @@
 // tests, and is written only when the user accepts it (assay_answer). Sources
 // of documents (folders, .zip files, public links) are kept as text in the
 // central repository's .radical/assay/sources/; the needs and decisions the
-// agent draws from them are proposals too. assay_read gives the agent the
-// lines of any file of the run, so an agent with no files of its own cites.
+// agent draws from them are proposals too. Entities, processes and state
+// machines are written as they are applied: entities observed on their
+// tables, processes and state machines inferred (ADR Assay writes the
+// domain, processes and lifecycles it reads); a scenario drawn from code
+// gets a pending test where its unit has a test framework. assay_read gives
+// the agent the lines of any file of the run, so an agent with no files of
+// its own cites.
 //
 // One run per server; assay_start begins a new one. The run lives in memory;
 // what it wrote stays in the model and the files.
@@ -25,8 +30,8 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  emptyFacts, pageOf, pathTest, pathTestFile, pathTestId, stepLabel,
-  type Citation, type FactIndex, type Link, type PathFact, type PlanDecision, type PlanNeed, type PlanRequirement, type RepositoryFacts, type ScreenFact, type TestFact, type Unit,
+  emptyFacts, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
 import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
@@ -54,9 +59,10 @@ const SOURCE_OPTIONS = { get allowPrivate() { return process.env.RADICAL_ASSAY_P
 /** The whole flow, for assay_start's answer and the `assay` prompt. */
 export const ASSAY_PROCEDURE = [
   'Radical Assay finds the model in existing code, new or old (npm, Maven, Gradle, Go, .NET, Python, VB6, Dockerfiles; docker-compose,',
-  'Kubernetes, Aspire; OpenAPI, gRPC; connection strings and SQL): C4 elements from the repositories\' units and the links between them,',
-  'the needs and decisions its documents state, then requirements with the scenarios that verify them from the tests, and those the',
-  'documents state that no test checks. This server\'s model folder is the central model; the code is in local directories',
+  'Kubernetes, Aspire; OpenAPI, gRPC; connection strings, SQL and ORM classes): C4 elements from the repositories\' units and the links',
+  'between them, the needs and decisions its documents state, the domain from its tables, its processes from its entry points, the',
+  'lifecycles of what it keeps from its statuses, then requirements with the scenarios that verify them from the tests or the code,',
+  'and those the documents state that no test checks. This server\'s model folder is the central model; the code is in local directories',
   '(repositories already cloned, folders, .zip files), the documentation in folders, .zip files or public links.',
   '1. (Done when you read this in assay_start\'s answer: go on with step 2.) Ask the user for the code repositories\' directories (a directory that holds several repositories stands for each of them;',
   '   a folder of code with no .git, or a .zip file of code, is one too) and, when their test reports are not in each',
@@ -74,7 +80,8 @@ export const ASSAY_PROCEDURE = [
   '   library unit a component: inside the container that uses it, or, when several use it, inside a group of the system',
   '   (named, say, "Shared libraries"), with a relation from it to each container that bundles it labelled "bundled into"',
   '   (code built in, not a call at run time; the package link backs it either way); a database element per database fact',
-  '   or database service, a queue per queue',
+  '   or database service (and, where SQL files declare tables no connection string reaches, one database, inferred,',
+  '   citing those table facts), a queue per queue',
   '   service, a cache as a database; units of kind tests are no elements. Services of role observability (tracing,',
   '   metrics, logs) stay out unless the user wants them. People (person elements) only where the documents name them,',
   '   inferred, citing the lines. Relations of type interacts from the links, directed from the caller to what it calls,',
@@ -117,7 +124,43 @@ export const ASSAY_PROCEDURE = [
   '   applies to). A document says what someone meant, not what the code does: everything from it is a',
   '   proposal or an inferred claim, never observed. Apply them in small plans and ask the user about each proposal, one at',
   '   a time; the needs answered here are what the requirements of the next stage derive from.',
-  '5. Scenarios stage. For each unit with tests (assay_facts with unit and kind "tests"), group its tests by the behaviour they',
+  '5. Domain stage, when the run has tables (assay_facts with kind "tables": their columns, and the table each foreign key',
+  '   references, where a schema or an ORM class declares them; the tables code only names have neither). One plan: a domain',
+  '   per system (elements: type domain, inferred, citing its tables, at the root or in a group: a domain is never inside a',
+  '   system; named for the business area, not the system\'s own name), and entities: one',
+  '   per table that matters to what the system does (tables: its table facts, the SQL\'s and the ORM class\'s of one table',
+  '   together; label as the business calls it, in the singular; parent the domain). Join tables of two others, logs and',
+  '   framework tables are no entities. An entity whose table\'s foreign key references an aggregate it belongs to (an',
+  '   order line, an order) is kind entity, partOf that one; one that refers to another aggregate references it (to,',
+  '   cardinality one). Only a foreign key backs these: the server refuses one no foreign key states; a reference only the',
+  '   code shows (a join, a lookup by a column) goes in relations instead: relationType references, inferred, citing the',
+  '   code. The server writes',
+  '   the entities observed and relates each element of the run built from a unit whose code names the table to it',
+  '   (realises). Make a view of them (create_view with viewpoint "Domain model").',
+  '6. Processes stage. Read the entry points (assay_facts with kind "entries": routes, VB6 forms, menu items and buttons',
+  '   with their Click handlers, scheduled jobs, message handlers), the explored paths and the code behind them (assay_read',
+  '   at the handler\'s line), and write what a user or the system does from start to end: one process per task a person',
+  '   or a clock starts (placing an order, closing the day), its steps in order, a step per thing done (facts: the entry',
+  '   point, path, screen or table fact it rests on, or citations of the code; a step made of steps may rest on them',
+  '   alone), performedBy the person or the element',
+  '   that does it, mockups the mockups that show it, repeat and condition where the code loops or branches, nested steps',
+  '   where one is made of several. Not every route is a process: those that serve a task together are its steps. One plan',
+  '   (processes, parent the system); the server writes them directly, inferred, no proposal. Make a view of each',
+  '   (create_view with viewpoint "Process").',
+  '7. State machines stage, for each entity with a status (assay_facts with kind "states": the values an enum, CHECK or',
+  '   ENUM gives, and the lines that set each value). Read those lines (assay_read) and write its lifecycle: states (one per',
+  '   value; value: the fact\'s value when the label is the business word; kind final for one nothing leaves), initial',
+  '   (the state a new one starts in: the fact\'s default, else where the code creates it), transitions (from, to, event: what happens, in words;',
+  '   guard and actions where the code tests or does something; each rests on a line that sets its target, which the',
+  '   server finds in the state fact, or on citations of the code that moves it), entity, facts the state facts. The',
+  '   server writes it directly, inferred, the lifecycle of its entity, implemented by the elements built from the units',
+  '   whose code sets its values (or implementedBy). A state no fact holds needs citations of the code that names it.',
+  '   When no line sets the values (the fact lists none) and no code you read moves them, write the states and the',
+  '   initial only, no transition the code does not show, and say so in the machine\'s description: an order of the',
+  '   values is a guess, not a lifecycle (get_issues then warns its states cannot be reached: that is so, leave it).',
+  '   A machine with no state fact (a status kept in flags or a nullable date) rests on citations of the code that names',
+  '   its states, the machine\'s own and each state\'s. Make a view of each (create_view with viewpoint "State machine").',
+  '8. Scenarios stage. For each unit with tests (assay_facts with unit and kind "tests"), group its tests by the behaviour they',
   '   check (a describe block, a file), read the test code where the titles do not say enough, and write for each group a',
   '   requirement in EARS (what the code does, as the tests show it; satisfiedBy the element of that unit; need: the need it',
   '   serves, a need key of the plan, a need proposal still waiting or a need of the model, else it derives from the run\'s',
@@ -125,20 +168,23 @@ export const ASSAY_PROCEDURE = [
   '   paths that show it, which become Playwright tests of its repository when the user accepts it). Each test fact',
   '   has a status: a scenario rests only on tests that passed, or on explored paths (paths) that show the behaviour, as',
   '   when a unit test fails or checks nothing while the application does it. Write the EARS fields without their keyword',
-  '   (trigger: "a customer opens an order", not "When …"). A behaviour whose tests failed or were skipped, and that no',
-  '   explored path shows, is no scenario: propose its requirement with no scenarios, citing the code it is drawn from,',
-  '   and tell the user its tests do not pass; so may behaviour the code shows that no test checks: with no tests at all,',
-  '   the behaviours a user or another system relies on (signing in, the main transactions, what is stored), not every',
-  '   routine. A defect you find in the code (SQL joined from input, a password in the source) is an unwanted-behaviour',
-  '   requirement nothing satisfies yet, citing the lines around it but quoting never the secret itself (.radical/assay/',
-  '   run.json keeps only the text you quote). With no tests and no explored paths, requirements have no scenarios: the',
-  '   model shows them unverified, as they are. Then the requirements',
+  '   (trigger: "a customer opens an order", not "When …"). Then the behaviours a user or another system relies on that no',
+  '   test checks (the processes\' steps, what is stored, the transitions of a lifecycle; not every routine), and those',
+  '   whose tests failed or were skipped and that no path shows: a requirement each, satisfiedBy the element whose code',
+  '   does it, with scenarios drawn from the code (given, when, then; citations: the lines that do it). Accepted, such a',
+  '   scenario is written, and where the unit that builds its element has a test framework (the unit lines say "tests',
+  '   with …"), the server writes a pending test of it into that repository and binds it; a VB6 unit, or one with none,',
+  '   gets the scenario only. Tell the user when tests do not pass. A defect you find in the code (SQL joined from input, a',
+  '   password in the source) is an unwanted-behaviour requirement nothing satisfies yet, citing the lines around it but',
+  '   quoting never the secret itself (.radical/assay/run.json keeps only the text you quote). Then the requirements',
   '   the documents state that no test checks: no scenarios, citations of the document, satisfiedBy the element that',
   '   builds it, or none when no code does (the model then shows it unsatisfied, a gap; give it a parent). Put them in',
   '   plans of a few requirements each and assay_apply them. Each comes back as a proposal: show it to the user with its',
   '   scenarios, ask whether to add it, change it (assay_answer changes: label, properties, need, parent) or leave it out,',
-  '   one at a time, and pass the answer to assay_answer.',
-  '6. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
+  '   one at a time, and pass the answer to assay_answer. Then relate each process to the accepted requirements it meets',
+  '   (add_relation, satisfies), and make the views that show them: create_view with viewpoint "Specification" (the',
+  '   requirements with their scenarios) and "Requirement coverage" (which are verified, which are not).',
+  '9. get_issues with concerns "brief" (the concern packs\' questions in full take a large model\'s whole answer): fix what',
   '   breaks the metamodel; the concerns it lists are the user\'s to settle later (Forge, forge_import_hub_concept), not',
   '   Assay\'s. Then assay_finish: what the run wrote, and the proposals still waiting.',
 ].join('\n')
@@ -160,6 +206,26 @@ const PATH_SCHEMA = {
   type: 'object',
   properties: { repository: { type: 'string' }, path: { type: 'string', description: 'A folder (or file) from the repository\'s root.' } },
   required: ['repository', 'path'],
+  additionalProperties: false,
+}
+
+/** A step of a process; its own steps are of this shape too. */
+const STEP_SCHEMA = {
+  type: 'object',
+  properties: {
+    key: { type: 'string' },
+    label: { type: 'string', description: 'What is done, as a verb phrase: "Enter the items".' },
+    description: { type: 'string' },
+    performedBy: { type: 'string', description: 'The person or element that does it: a key or an id.' },
+    mockups: { type: 'array', items: { type: 'string' }, description: 'The mockups that show it: keys or ids.' },
+    repeat: { type: 'string', enum: ['1', '0..1', '1..n', '0..n'] },
+    condition: { type: 'string', description: 'for each …, while …, if …' },
+    children: { type: 'string', enum: ['sequence', 'choice', 'concurrent'], description: 'How its own steps run.' },
+    steps: { type: 'array', items: { type: 'object' }, description: 'Its own steps, in order, of this same shape.' },
+    facts: { type: 'array', items: { type: 'string' }, description: 'The entry points, explored paths, screens or other facts it rests on.' },
+    citations: { type: 'array', items: CITATION_SCHEMA },
+  },
+  required: ['key', 'label'],
   additionalProperties: false,
 }
 
@@ -199,6 +265,7 @@ const PLAN_SCHEMA = {
           relationType: { type: 'string' },
           label: { type: 'string' },
           technology: { type: 'string' },
+          properties: { type: 'object', description: 'The relation type\'s properties, as the metamodel has them (a references\' cardinality, …).' },
           facts: { type: 'array', items: { type: 'string' } },
           citations: { type: 'array', items: CITATION_SCHEMA, description: 'Code or document lines you quote, for an inferred relation.' },
           confidence: { type: 'string', enum: ['observed', 'inferred'] },
@@ -233,6 +300,7 @@ const PLAN_SCHEMA = {
                 then: { type: 'string' },
                 tests: { type: 'array', items: { type: 'string' }, description: 'The test facts that check it.' },
                 paths: { type: 'array', items: { type: 'string' }, description: 'Paths explored in the running application that show it (assay_explore): accepted, each is written as a Playwright test into its repository\'s e2e/assay/ and bound to the scenario.' },
+                citations: { type: 'array', items: CITATION_SCHEMA, description: 'The code it is drawn from, when no test or path shows it: accepted, a pending test of it is written where the unit that builds its element has a test framework.' },
               },
               required: ['key', 'label', 'given', 'when', 'then'],
               additionalProperties: false,
@@ -275,6 +343,101 @@ const PLAN_SCHEMA = {
           presentedBy: { type: 'string', description: 'The element that renders it (a webapp, container, component or system): a key or an id.' },
         },
         required: ['key', 'label', 'screen'],
+        additionalProperties: false,
+      },
+    },
+    entities: {
+      type: 'array',
+      description: 'The tables that matter, as entities of a domain: written observed. A relation between two rests on a foreign key of their tables.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          label: { type: 'string', description: 'As the business calls it, in the singular.' },
+          description: { type: 'string', description: 'Default: its table, where it is declared and its columns.' },
+          kind: { type: 'string', enum: ['aggregate-root', 'entity'], description: 'entity: a part of another\'s aggregate (with partOf). Default aggregate-root.' },
+          tables: { type: 'array', items: { type: 'string' }, description: 'The table facts it is (one table: its SQL\'s and its ORM class\'s facts).' },
+          parent: { type: 'string', description: 'Its domain: a key or an id.' },
+          partOf: { type: 'string', description: 'The entity whose aggregate it belongs to: a foreign key of its tables references that one\'s.' },
+          references: {
+            type: 'array',
+            items: { type: 'object', properties: { to: { type: 'string' }, cardinality: { type: 'string', enum: ['one', 'many'] }, description: { type: 'string' } }, required: ['to'], additionalProperties: false },
+            description: 'The aggregates it refers to: a foreign key of its tables references each one\'s.',
+          },
+        },
+        required: ['key', 'label', 'tables'],
+        additionalProperties: false,
+      },
+    },
+    processes: {
+      type: 'array',
+      description: 'What a user or the system does from start to end, step by step, from the entry points, paths and code: written directly, inferred.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          label: { type: 'string' },
+          description: { type: 'string' },
+          parent: { type: 'string', description: 'A system, domain or group: a key or an id.' },
+          children: { type: 'string', enum: ['sequence', 'choice', 'concurrent'] },
+          steps: { type: 'array', items: STEP_SCHEMA, description: 'In order.' },
+          facts: { type: 'array', items: { type: 'string' } },
+          citations: { type: 'array', items: CITATION_SCHEMA },
+        },
+        required: ['key', 'label', 'steps'],
+        additionalProperties: false,
+      },
+    },
+    stateMachines: {
+      type: 'array',
+      description: 'The lifecycle of an entity from its status values and the code that sets them: written directly, inferred.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          label: { type: 'string', description: 'Default style: "<Entity> lifecycle".' },
+          description: { type: 'string' },
+          parent: { type: 'string', description: 'Default: the domain of its entity.' },
+          entity: { type: 'string', description: 'The entity: a key or an id.' },
+          facts: { type: 'array', items: { type: 'string' }, description: 'The state facts its states are the values of.' },
+          citations: { type: 'array', items: CITATION_SCHEMA, description: 'With no state fact: the code that keeps its status (a flag, a nullable date).' },
+          initial: { type: 'string', description: 'The key of the state a new one starts in.' },
+          states: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                key: { type: 'string' },
+                label: { type: 'string' },
+                kind: { type: 'string', enum: ['normal', 'final'] },
+                description: { type: 'string' },
+                value: { type: 'string', description: 'The state fact\'s value it is, when its label is another word.' },
+                citations: { type: 'array', items: CITATION_SCHEMA, description: 'For a state no state fact holds: the code that names it.' },
+              },
+              required: ['key', 'label'],
+              additionalProperties: false,
+            },
+          },
+          transitions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                from: { type: 'string', description: 'A state key.' },
+                to: { type: 'string', description: 'A state key.' },
+                event: { type: 'string', description: 'What happens, in words: one event of the machine per name.' },
+                guard: { type: 'string' },
+                actions: { type: 'string' },
+                facts: { type: 'array', items: { type: 'string' } },
+                citations: { type: 'array', items: CITATION_SCHEMA, description: 'The code that makes it, unless a line the state facts name sets its target.' },
+              },
+              required: ['from', 'to'],
+              additionalProperties: false,
+            },
+          },
+          implementedBy: { type: 'array', items: { type: 'string' }, description: 'The elements that run it. Default: those built from the units whose code sets its values.' },
+        },
+        required: ['key', 'label', 'entity', 'initial', 'states', 'transitions'],
         additionalProperties: false,
       },
     },
@@ -400,12 +563,12 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'assay_apply',
-    description: 'Hand the server a plan of what you found. It refuses the whole plan, naming every problem, when an item cites no fact or a fact the run lacks, quotes what the file does not hold, an observed item cites nothing that states it (or a document), or the metamodel forbids it; otherwise it writes the elements and relations into the central model, maps them in each code repository\'s .radical/radical.json (implements: the units\' folders), keeps their evidence in .radical/assay/run.json, and returns each requirement, need and decision as a proposal for the user.',
+    description: 'Hand the server a plan of what you found. It refuses the whole plan, naming every problem, when an item cites no fact or a fact the run lacks, quotes what the file does not hold, an observed item cites nothing that states it (or a document), an entity relation no foreign key states, or the metamodel forbids it; otherwise it writes the elements, relations, mockups, entities, processes and state machines into the central model, maps them in each code repository\'s .radical/radical.json (implements: the units\' folders), keeps their evidence in .radical/assay/run.json, and returns each requirement, need and decision as a proposal for the user.',
     inputSchema: { type: 'object', properties: { plan: PLAN_SCHEMA }, required: ['plan'], additionalProperties: false },
   },
   {
     name: 'assay_answer',
-    description: 'The user\'s answer to an Assay proposal. An accepted requirement is written whole, derived from its need (else the run\'s need "Found in the code"), satisfied by its element and verified by its scenarios, whose tests go into their repository\'s .radical/radical.json verifies; an accepted need or decision is written as a need or an ADR, the ADR constraining what it names. Changes come first: a new label, properties merged into the proposed ones, a need\'s description, a requirement\'s need. Rejected, nothing of it is written.',
+    description: 'The user\'s answer to an Assay proposal. An accepted requirement is written whole, derived from its need (else the run\'s need "Found in the code"), satisfied by its element and verified by its scenarios, whose tests go into their repository\'s .radical/radical.json verifies (a scenario drawn from the code gets a pending test, where the unit that builds its element has a test framework); an accepted need or decision is written as a need or an ADR, the ADR constraining what it names. Changes come first: a new label, properties merged into the proposed ones, a need\'s description, a requirement\'s need. Rejected, nothing of it is written.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -438,7 +601,7 @@ export interface AssayResult extends ToolResult {
 interface Written {
   id: string
   key: string
-  kind: 'element' | 'relation' | 'requirement' | 'scenario' | 'need' | 'decision' | 'mockup'
+  kind: 'element' | 'relation' | 'requirement' | 'scenario' | 'need' | 'decision' | 'mockup' | 'entity' | 'process' | 'step' | 'state-machine' | 'state' | 'event'
   label: string
   confidence: 'observed' | 'inferred' | 'hypothesis'
   facts: string[]
@@ -486,6 +649,16 @@ interface Run {
   navigated: Set<string>
   /** The Playwright tests written into the repositories. */
   testsWritten: string[]
+  /** The pending tests written for scenarios drawn from the code. */
+  skeletons: string[]
+}
+
+/** What a call writes beside the model: the elements' folders, the scenarios' tests, the explored paths' and pending tests. */
+interface FileChanges {
+  implements: Map<string, Array<{ repository: string; path: string }>>
+  verifies: Map<string, string[]>
+  pathTests?: Array<{ scenario: string; path: PathFact }>
+  skeletons?: Array<{ repository: string; scenarios: string[] } & Skeleton>
 }
 
 /** The config written beside the Explore stage's tests, when a repository has none there. */
@@ -609,7 +782,7 @@ export class Assay {
     }
     const links = linkRepositories(repositories)
     const taken = await takeSources((sources ?? []) as string[], root, new Set(repositories.map((r) => r.repository)), SOURCE_OPTIONS)
-    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [], mockupOf: new Map(), navigated: new Set(), testsWritten: [] }
+    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [], mockupOf: new Map(), navigated: new Set(), testsWritten: [], skeletons: [] }
     const lines = [
       `Assay run on ${repositories.length} repositor${repositories.length === 1 ? 'y' : 'ies'}${taken.sources.length ? ` and ${taken.sources.length} source${taken.sources.length === 1 ? '' : 's'} of documents` : ''}; the central model is ${this.run.modelPath} in ${root}.`,
       ...(found.empty.length ? [`Nothing in: ${found.empty.join(', ')}.`] : []),
@@ -777,7 +950,7 @@ export class Assay {
         const runs = new Set(r.services.filter((s) => s.unit === unit).map((s) => s.id))
         const mine = (f: { id: string; unit?: string; service?: string; units?: string[] }) =>
           !unit || (k === 'units' ? f.id === unit : f.unit === unit || (!!f.service && runs.has(f.service)) || (k === 'groups' && !!f.units?.includes(unit)))
-        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency' }[k] ?? k.replace(/s$/, ''), ...f })))
+        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...f })))
       }
     }
     const from = Math.max(0, offset ?? 0)
@@ -815,18 +988,6 @@ export class Assay {
       }, ctx, facade)
       if (error) { failures.push(`elements "${e.key}" (${e.label}): ${error}`); continue }
       written.push({ id: ctx.resolveId(e.key), key: e.key, kind: 'element', label: e.label, confidence: e.confidence, facts: [...new Set([...(e.units ?? []), ...(e.facts ?? [])])], ...(e.citations?.length ? { citations: e.citations } : {}) })
-    }
-    for (const r of plan.relations) {
-      const before = new Set(Object.keys(facade.getRelations()))
-      const error = await attempt('add_relation', {
-        sourceId: r.from, targetId: r.to,
-        ...(r.relationType ? { relationType: r.relationType } : {}),
-        ...(r.label ? { label: r.label } : {}),
-        ...(r.technology ? { technology: r.technology } : {}),
-      }, ctx, facade)
-      if (error) { failures.push(`relations ${r.from} → ${r.to}: ${error}`); continue }
-      const id = Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? ''
-      written.push({ id, key: `${r.from}->${r.to}`, kind: 'relation', label: r.label ?? r.relationType ?? 'relation', confidence: r.confidence, facts: r.facts ?? [], ...(r.citations?.length ? { citations: r.citations } : {}) })
     }
     // Screens the server saw are observed mockups; a path's screens follow one another.
     const mockupOf = new Map(run.mockupOf)
@@ -871,6 +1032,21 @@ export class Assay {
         written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from.mockup}->${to}`, kind: 'relation', label: stepLabel(step), confidence: 'observed', facts: [path.id] })
       }
     }
+    await this.writeDomain(run, plan, ctx, facade, written, failures)
+    // The relations last: they may join any element, mockup or entity of the plan.
+    for (const r of plan.relations) {
+      const before = new Set(Object.keys(facade.getRelations()))
+      const error = await attempt('add_relation', {
+        sourceId: r.from, targetId: r.to,
+        ...(r.relationType ? { relationType: r.relationType } : {}),
+        ...(r.label ? { label: r.label } : {}),
+        ...(r.technology ? { technology: r.technology } : {}),
+        ...(r.properties && Object.keys(r.properties).length ? { properties: r.properties } : {}),
+      }, ctx, facade)
+      if (error) { failures.push(`relations ${r.from} → ${r.to}: ${error}`); continue }
+      const id = Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? ''
+      written.push({ id, key: `${r.from}->${r.to}`, kind: 'relation', label: r.label ?? r.relationType ?? 'relation', confidence: r.confidence, facts: r.facts ?? [], ...(r.citations?.length ? { citations: r.citations } : {}) })
+    }
     if (failures.length) return refused(`assay_apply: the plan is refused, nothing was written:\n${failures.map((f) => `- ${f}`).join('\n')}`)
 
     // Needs and decisions first: a requirement may name a need of the same plan.
@@ -897,7 +1073,13 @@ export class Assay {
       if (at.length) built.set(ctx.resolveId(e.key), at)
     }
     const lines = [
-      `Wrote ${plural(written.filter((w) => w.kind === 'element').length, 'element')}${plan.mockups.length ? `, ${plural(written.filter((w) => w.kind === 'mockup').length, 'mockup')}` : ''} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model.`,
+      `Wrote ${[
+        plural(written.filter((w) => w.kind === 'element').length, 'element'),
+        ...(plan.mockups.length ? [plural(written.filter((w) => w.kind === 'mockup').length, 'mockup')] : []),
+        ...(plan.entities.length ? [plural(written.filter((w) => w.kind === 'entity').length, 'entity').replace(/entitys$/, 'entities')] : []),
+        ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
+        ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
+      ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -911,6 +1093,110 @@ export class Assay {
       },
       afterWrite: async () => this.writeFiles(run, { implements: built, verifies: new Map() }, nodes),
     })
+  }
+
+  /** Writes a plan's entities, processes and state machines into `written`, every failure into `failures`:
+   *  entities observed on their tables, joined by the foreign keys checkPlan found and realised by the elements
+   *  built from the units whose code names their tables; processes and state machines inferred, as read. */
+  private async writeDomain(run: Run, plan: Plan, ctx: ToolRunContext, facade: ModelFacade, written: Written[], failures: string[]): Promise<void> {
+    const add = async (args: Record<string, unknown>, what: string, record: Omit<Written, 'id' | 'key'>): Promise<boolean> => {
+      const error = await attempt('add_node', args, ctx, facade)
+      if (error) { failures.push(`${what}: ${error}`); return false }
+      written.push({ id: ctx.resolveId(args.tempId as string), key: args.tempId as string, ...record, ...(record.citations?.length ? {} : { citations: undefined }) })
+      return true
+    }
+    const relate = async (from: string, to: string, relationType: string, what: string, extra: { label?: string; properties?: Record<string, unknown>; facts?: string[]; citations?: Citation[]; confidence?: Written['confidence'] } = {}): Promise<void> => {
+      const before = new Set(Object.keys(facade.getRelations()))
+      const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType, ...(extra.label ? { label: extra.label } : {}), ...(extra.properties && Object.keys(extra.properties).length ? { properties: extra.properties } : {}) }, ctx, facade)
+      if (error) { failures.push(`${what}: ${error}`); return }
+      written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}) })
+    }
+    const table = (id: string): TableFact | undefined => (run.facts.get(id)?.kind === 'table' ? run.facts.get(id)!.fact as TableFact : undefined)
+    /** The containers, components and web applications of the run built from `unit`. */
+    const builtFrom = (unit: string): string[] => [...new Set([...run.written, ...written]
+      .filter((w) => w.kind === 'element' && w.facts.includes(unit) && ['container', 'component', 'webapp'].includes(facade.getNodes()[w.id]?.type ?? ''))
+      .map((w) => w.id))]
+
+    for (const e of plan.entities) {
+      const tables = e.tables.map(table).filter((t): t is TableFact => !!t)
+      // By default, what the code says of it: its table, where it is declared, its columns.
+      const description = e.description ?? tables.map((t) => `Table ${t.table}${t.declared ? ` (${t.declared}, ${t.evidence.file}:${t.evidence.line})` : ''}${t.columns?.length ? `: ${t.columns.map((c) => c.name).join(', ')}` : ''}.`).join(' ')
+      await add({ tempId: e.key, type: 'entity', label: e.label, ...(e.parent ? { parentId: e.parent } : {}), ...(description ? { description } : {}), properties: { kind: e.kind ?? (e.partOf ? 'entity' : 'aggregate-root') } },
+        `entities "${e.key}" (${e.label})`, { kind: 'entity', label: e.label, confidence: 'observed', facts: e.tables })
+    }
+    const realised = new Set<string>()
+    for (const e of plan.entities) {
+      // Only a foreign key joins two entities (checkPlan): the tables that hold it are the evidence.
+      if (e.partOf) await relate(e.key, e.partOf, 'part-of', `entities "${e.key}" part of ${e.partOf}`, { confidence: 'observed', facts: e.tables })
+      for (const r of e.references ?? []) {
+        await relate(e.key, r.to, 'references', `entities "${e.key}" references ${r.to}`, { confidence: 'observed', facts: e.tables, properties: { cardinality: r.cardinality ?? 'one', ...(r.description ? { description: r.description } : {}) } })
+      }
+      // Every element built from a unit whose code names one of its tables realises it.
+      const names = new Set(e.tables.map((id) => tableName(table(id)?.table ?? '')))
+      // A schema file alone names it nowhere a unit uses it.
+      const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
+      for (const unit of new Set(named.map((t) => t.unit))) {
+        for (const element of builtFrom(unit)) {
+          if (realised.has(`${element}->${e.key}`)) continue
+          realised.add(`${element}->${e.key}`)
+          await relate(element, e.key, 'realises', `${facade.getNodes()[element]?.label} realises "${e.label}"`, { confidence: 'observed', facts: named.filter((t) => t.unit === unit).map((t) => t.id) })
+        }
+      }
+    }
+
+    const steps = async (list: PlanStep[], parent: string, what: string): Promise<void> => {
+      for (const [i, st] of list.entries()) {
+        const props = { order: i + 1, ...(st.repeat ? { repeat: st.repeat } : {}), ...(st.condition ? { condition: st.condition } : {}), ...(st.children ? { children: st.children } : {}) }
+        if (!await add({ tempId: st.key, type: 'step', label: st.label, parentId: parent, ...(st.description ? { description: st.description } : {}), properties: props },
+          `${what}, step "${st.key}" (${st.label})`, { kind: 'step', label: st.label, confidence: 'inferred', facts: st.facts ?? [], citations: st.citations })) continue
+        if (st.performedBy) await relate(st.key, st.performedBy, 'performed-by', `step "${st.key}" performed by ${st.performedBy}`, { facts: st.facts })
+        for (const m of st.mockups ?? []) await relate(m, st.key, 'illustrates', `mockup ${m} illustrates step "${st.key}"`, { facts: st.facts })
+        if (st.steps?.length) await steps(st.steps, st.key, what)
+      }
+    }
+    for (const p of plan.processes) {
+      // After the processes beside it.
+      const parent = p.parent ? ctx.resolveId(p.parent) : undefined
+      const order = Object.values(facade.getNodes()).filter((n) => n.type === 'process' && (n.parentId ?? undefined) === parent).length + 1
+      if (!await add({ tempId: p.key, type: 'process', label: p.label, ...(p.parent ? { parentId: p.parent } : {}), ...(p.description ? { description: p.description } : {}), properties: { order, ...(p.children ? { children: p.children } : {}) } },
+        `processes "${p.key}" (${p.label})`, { kind: 'process', label: p.label, confidence: 'inferred', facts: p.facts ?? [], citations: p.citations })) continue
+      await steps(p.steps, p.key, `processes "${p.key}"`)
+    }
+
+    for (const m of plan.stateMachines) {
+      // In its entity's domain unless the plan says otherwise.
+      const parent = m.parent ?? plan.entities.find((e) => e.key === m.entity)?.parent ?? facade.getNodes()[ctx.resolveId(m.entity)]?.parentId ?? undefined
+      const stateFacts = (m.facts ?? []).map((id) => run.facts.get(id)).filter((f) => f?.kind === 'state').map((f) => f!.fact as StateFact)
+      if (!await add({ tempId: m.key, type: 'state-machine', label: m.label, ...(parent ? { parentId: parent } : {}), ...(m.description ? { description: m.description } : {}) },
+        `stateMachines "${m.key}" (${m.label})`, { kind: 'state-machine', label: m.label, confidence: 'inferred', facts: m.facts ?? [], citations: m.citations })) continue
+      const start = `${m.key}:initial`
+      await add({ tempId: start, type: 'pseudostate', label: 'Start', parentId: m.key, properties: { kind: 'initial' } }, `stateMachines "${m.key}", its start`, { kind: 'state', label: 'Start', confidence: 'inferred', facts: [] })
+      for (const st of m.states) {
+        await add({ tempId: st.key, type: 'state', label: st.label, parentId: m.key, ...(st.description ? { description: st.description } : {}), properties: { kind: st.kind ?? 'normal' } },
+          `stateMachines "${m.key}", state "${st.key}" (${st.label})`, { kind: 'state', label: st.label, confidence: 'inferred', facts: st.citations?.length ? [] : m.facts ?? [], citations: st.citations })
+      }
+      // One event per name, inside the machine.
+      const events = new Map<string, string>()
+      for (const t of m.transitions) {
+        if (!t.event || events.has(t.event)) continue
+        const key = `${m.key}:event:${events.size + 1}`
+        if (await add({ tempId: key, type: 'event', label: t.event, parentId: m.key }, `stateMachines "${m.key}", event "${t.event}"`, { kind: 'event', label: t.event, confidence: 'inferred', facts: [] })) events.set(t.event, key)
+      }
+      await relate(start, m.initial, 'transition', `stateMachines "${m.key}", its start`, { facts: m.facts })
+      const valueOf = (k: string): string => stateName(((st) => st?.value ?? st?.label ?? '')(m.states.find((x) => x.key === k)))
+      for (const t of m.transitions) {
+        // The state facts whose lines set its target back it, beside what it cites.
+        const sets = stateFacts.filter((f) => f.sets.some((x) => stateName(x.value) === valueOf(t.to))).map((f) => f.id)
+        const properties = { ...(t.event && events.has(t.event) ? { event: events.get(t.event) } : {}), ...(t.guard ? { guard: t.guard } : {}), ...(t.actions ? { actions: t.actions } : {}) }
+        await relate(t.from, t.to, 'transition', `stateMachines "${m.key}", transition ${t.from} → ${t.to}`, { ...(t.event ? { label: t.event } : {}), properties, facts: [...new Set([...(t.facts ?? []), ...sets])], citations: t.citations })
+      }
+      await relate(m.key, m.entity, 'lifecycle-of', `stateMachines "${m.key}" lifecycle of ${m.entity}`, { facts: m.facts })
+      // What runs it: the elements built from the units whose code sets its values; none when no code does.
+      const units = stateFacts.flatMap((f) => f.sets.map((x) => x.unit))
+      for (const element of m.implementedBy ?? [...new Set(units.flatMap(builtFrom))]) {
+        await relate(element, m.key, 'implements', `${facade.getNodes()[ctx.resolveId(element)]?.label ?? element} implements "${m.label}"`, { facts: m.facts })
+      }
+    }
   }
 
   /** A proposal as the user is to see it; what it names by the model's labels, or by the proposals still waiting. */
@@ -948,8 +1234,8 @@ export class Assay {
     return [
       `- ${p.id}: requirement "${r.label}" (${props.ears_type ?? 'ubiquitous'}), ${p.satisfiedBy ? `satisfied by ${label(p.satisfiedBy)}` : 'satisfied by nothing yet'}${need ? `, derived from ${need}` : ''}: ${ears}`,
       ...(props.rationale ? [`    rationale: ${props.rationale}`] : []),
-      ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}${s.tests?.length ? `; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}` : ''}${s.paths?.length ? `; explored paths, each written as a Playwright test when accepted: ${s.paths.map((x) => `"${(run.facts.get(x)?.fact as PathFact | undefined)?.name ?? x}"`).join(', ')}` : ''}`),
-      ...(r.scenarios.length ? [] : ['    no scenario: it rests on the code or documents it cites, not on tests that pass']),
+      ...r.scenarios.map((s) => `    scenario "${s.label}": given ${s.given}, when ${s.when}, then ${s.then}${s.tests?.length ? `; tests: ${s.tests.map((t) => (run.facts.get(t)?.fact as TestFact | undefined)?.test ?? t).join('; ')}` : ''}${s.paths?.length ? `; explored paths, each written as a Playwright test when accepted: ${s.paths.map((x) => `"${(run.facts.get(x)?.fact as PathFact | undefined)?.name ?? x}"`).join(', ')}` : ''}${!s.tests?.length && !s.paths?.length && s.citations?.length ? `; drawn from the code (${s.citations.map((c) => `${c.repository}/${c.file}:${c.lines[0]}`).join(', ')}): no test checks it; ${this.pendingTestNote(run, p.satisfiedBy, pending)}` : ''}`),
+      ...(r.scenarios.length ? [] : ['    no scenario: it rests on what it cites (code, screens or documents), not on tests that pass']),
       ...quoted(r.citations),
     ].join('\n')
   }
@@ -1057,7 +1343,7 @@ export class Assay {
         if (satisfiedBy) await step('add_relation', { sourceId: satisfiedBy, targetId: r.key, relationType: 'satisfies' }, `${nodes[satisfiedBy].label} satisfies it`)
         for (const sc of r.scenarios) {
           if (!await step('add_node', { tempId: sc.key, type: 'scenario', label: sc.label, properties: { given: sc.given, when: sc.when, then: sc.then }, ...(parent ? { parentId: parent } : {}) }, `scenario "${sc.label}"`)) continue
-          written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: [...(sc.tests ?? []), ...(sc.paths ?? [])] })
+          written.push({ id: ctx.resolveId(sc.key), key: sc.key, kind: 'scenario', label: sc.label, confidence: 'hypothesis', facts: [...(sc.tests ?? []), ...(sc.paths ?? [])], ...(sc.citations?.length ? { citations: sc.citations } : {}) })
           await step('add_relation', { sourceId: sc.key, targetId: r.key, relationType: 'verifies' }, `scenario "${sc.label}" verifies it`)
         }
       }
@@ -1065,6 +1351,10 @@ export class Assay {
       const verifies = new Map(r.scenarios.map((sc) => [ctx.resolveId(sc.key), sc.tests ?? []]))
       // An explored path becomes a test of the repository that builds the application.
       const pathTests = r.scenarios.flatMap((sc) => (sc.paths ?? []).map((id) => ({ scenario: ctx.resolveId(sc.key), path: run.facts.get(id)!.fact as PathFact })))
+      // A scenario drawn from the code gets a pending test, where the unit that builds its element has a test framework.
+      const fromCode = r.scenarios.filter((sc) => !sc.tests?.length && !sc.paths?.length && sc.citations?.length)
+      const pending = fromCode.length ? this.skeletonFor(run, satisfiedBy as string | undefined, label, fromCode.map((sc) => ({ ...sc, id: ctx.resolveId(sc.key) }))) : undefined
+      if (pending && 'note' in pending) note += ` ${pending.note}`
       const after = facade.getNodes()
       return ok(`${p.id} added: requirement "${label}" (${ctx.resolveId(r.key)}) with ${r.scenarios.length} scenario${r.scenarios.length === 1 ? '' : 's'}${parent ? ` in ${after[parent]?.label}` : ''}.${note}`, {
         commit: () => {
@@ -1073,7 +1363,7 @@ export class Assay {
           run.written.push(...written)
           if (foundNeed) run.needId = foundNeed
         },
-        afterWrite: async () => this.writeFiles(run, { implements: new Map(), verifies, pathTests }, after),
+        afterWrite: async () => this.writeFiles(run, { implements: new Map(), verifies, pathTests, ...(pending && 'file' in pending ? { skeletons: [pending] } : {}) }, after),
       })
     }
     if (failures.length) return refused(`assay_answer: ${p.id} could not be written, nothing was:\n${failures.map((f) => `- ${f}`).join('\n')}`)
@@ -1089,9 +1379,34 @@ export class Assay {
     })
   }
 
+  /** What becomes of a scenario drawn from the code, as a proposal says it: its element named by a key or an id. */
+  private pendingTestNote(run: Run, element: string | undefined, pending: Proposal[]): string {
+    const unitId = element ? run.written.find((w) => w.id === element || w.key === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    if (!unitId || pending.some((x) => x.kind === 'requirement' && x.requirement.key === element)) return 'a pending test is written when accepted, where its unit has a test framework'
+    const unit = run.facts.get(unitId)!.fact as Unit
+    const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)
+    const tester = repository && testUnitFor(unit, repository)
+    return tester?.testFramework ? `accepted, a pending ${tester.testFramework} test of it is written into ${repository!.repository}` : `${unit.name} (${unit.stack}) has no test framework Assay writes tests for: accepted, the scenario only`
+  }
+
+  /** The pending test of the scenarios drawn from the code, for the unit that builds `element`; or why there is none. */
+  private skeletonFor(run: Run, element: string | undefined, requirement: string, scenarios: Array<{ id: string; label: string; given: string; when: string; then: string; citations?: Citation[] }>): ({ repository: string; scenarios: string[] } & Skeleton) | { note: string } {
+    const none = (why: string) => ({ note: `Its scenario${scenarios.length === 1 ? '' : 's'} from the code ${scenarios.length === 1 ? 'has' : 'have'} no pending test: ${why}.` })
+    const unitId = element ? run.written.find((w) => w.id === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    if (!unitId) return none('the element that satisfies it is built from no unit of this run')
+    const unit = run.facts.get(unitId)!.fact as Unit
+    const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)
+    if (!repository) return none(`${unitId} is in no code repository of the run`)
+    const tester = testUnitFor(unit, repository)
+    if (!tester?.testFramework) return none(`${unit.name} (${unit.stack}) has no test framework Assay writes tests for`)
+    const from = (c: Citation) => `${c.file}:${c.lines[0]}${c.lines[1] !== c.lines[0] ? `-${c.lines[1]}` : ''}`
+    const skeleton = testSkeleton(tester, tester.testFramework, requirement, scenarios.map((sc) => ({ label: sc.label, given: sc.given, when: sc.when, then: sc.then, ...(sc.citations?.length ? { from: sc.citations.map(from).join(', ') } : {}) })), new Date().toISOString().slice(0, 10))
+    return { repository: repository.repository, scenarios: scenarios.map((sc) => sc.id), ...skeleton }
+  }
+
   /** Writes the files beside the model and says what it wrote; never
    *  throws, so a write the model already has is never reported as refused. */
-  private async writeFiles(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]>; pathTests?: Array<{ scenario: string; path: PathFact }> }, nodes: Record<string, { label: string }>): Promise<string> {
+  private async writeFiles(run: Run, map: FileChanges, nodes: Record<string, { label: string }>): Promise<string> {
     try {
       return await this.writeMapping(run, map, nodes)
     } catch (error) {
@@ -1101,7 +1416,7 @@ export class Assay {
 
   /** Writes the code repositories' .radical/radical.json entries and the
    *  central repository's run file; says what it wrote. */
-  private async writeMapping(run: Run, map: { implements: Map<string, Array<{ repository: string; path: string }>>; verifies: Map<string, string[]>; pathTests?: Array<{ scenario: string; path: PathFact }> }, nodes: Record<string, { label: string }>): Promise<string> {
+  private async writeMapping(run: Run, map: FileChanges, nodes: Record<string, { label: string }>): Promise<string> {
     const byRepo = new Map<string, { implements: Map<string, string[]>; verifies: Map<string, string[]> }>()
     const entry = (repo: string) => byRepo.get(repo) ?? byRepo.set(repo, { implements: new Map(), verifies: new Map() }).get(repo)!
     for (const [id, places] of map.implements) {
@@ -1135,6 +1450,22 @@ export class Assay {
       run.testsWritten.push(`${path.repository}/${pathTestFile(path)}`)
       const list = entry(path.repository).verifies
       list.set(scenario, [...new Set([...(list.get(scenario) ?? []), pathTestId(path)])])
+    }
+    // A pending test goes into the repository whose unit has the test framework; one the team has already is kept.
+    for (const sk of map.skeletons ?? []) {
+      const dir = run.repositories.find((r) => r.repository === sk.repository)?.dir
+      if (!dir || !isRepository(dir)) { notes.push(`${sk.repository} is no git repository: the pending test ${sk.file} is not written`); continue }
+      const file = join(dir, sk.file)
+      if (!within(dir, file)) { notes.push(`${sk.file} would land outside ${sk.repository}: not written`); continue }
+      if (existsSync(file)) notes.push(`${sk.repository}/${sk.file} is there already: kept as it is`)
+      else {
+        await mkdir(dirname(file), { recursive: true })
+        await writeFile(file, sk.content)
+        notes.push(`${sk.repository}/${sk.file} (pending tests: write their bodies)`)
+        run.skeletons.push(`${sk.repository}/${sk.file}`)
+      }
+      const list = entry(sk.repository).verifies
+      sk.scenarios.forEach((scenario, i) => list.set(scenario, [...new Set([...(list.get(scenario) ?? []), sk.tests[i]])]))
     }
     for (const [repo, changes] of byRepo) {
       const dir = run.repositories.find((r) => r.repository === repo)?.dir
@@ -1212,6 +1543,8 @@ export class Assay {
     const waiting = run.proposals.filter((p) => p.status === 'waiting')
     return [
       `Assay run on ${run.repositories.map((r) => r.repository).join(', ')}${run.sources.length ? ` with ${run.sources.length} source${run.sources.length === 1 ? '' : 's'} of documents (${run.sources.map((r) => r.repository).join(', ')})` : ''}: wrote ${count('element')} elements and ${count('relation')} relations between them, ${count('requirement')} requirements, ${count('scenario')} scenarios, ${run.written.filter((w) => w.kind === 'need' && w.key !== 'need').length} needs from documents${run.needId ? ' and the need Found in the code' : ''} and ${count('decision')} decisions into ${run.modelPath}; each requirement, scenario, need and decision with its own relations (satisfies, verifies, derives, constrains).`,
+      ...(['entity', 'process', 'state-machine'].some((k) => count(k as Written['kind'])) ? [`Domain: ${plural(count('entity'), 'entity').replace(/entitys$/, 'entities')}; ${plural(count('process'), 'process').replace(/processs$/, 'processes')} of ${plural(count('step'), 'step')} and ${plural(count('state-machine'), 'state machine')}, inferred.`] : []),
+      ...(run.skeletons.length ? [`Pending tests written for scenarios drawn from the code: ${[...new Set(run.skeletons)].join(', ')}.`] : []),
       ...(run.explore ? [`Explored: ${run.explore.facts.paths.length} paths, ${run.explore.facts.screens.length} screens; ${run.written.filter((w) => w.kind === 'mockup').length} mockups written${run.testsWritten.length ? `, Playwright tests written: ${[...new Set(run.testsWritten)].join(', ')}` : ''}.`] : []),
       `Proposals: ${run.proposals.filter((p) => p.status === 'accepted').length} accepted, ${run.proposals.filter((p) => p.status === 'rejected').length} left out, ${waiting.length} waiting${waiting.length ? ` (${waiting.map((p) => `${p.id} "${labelOf(p)}"`).join(', ')})` : ''}.`,
       `Evidence: ${RUN_FILE}; facts: ${FACTS_FILE} in each repository; mapping: ${REPOSITORY_FILE} in each repository Assay wrote to.`,

@@ -526,7 +526,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
     id: 'illustrates',
     layout: { flow: 'side' },
     label: 'Illustrates',
-    description: 'The screen shows the requirement being met, the step of the scenario, or what the user sees in the state.',
+    description: 'The screen shows the requirement being met, the step of the scenario or the process, or what the user sees in the state.',
     inverseLabel: 'Illustrated by',
     allowedPairs: [
       { from: 'mockup', to: 'requirement' },
@@ -836,7 +836,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
   satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' }, { from: 'entity', to: 'requirement' })
   verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' }, { from: 'scenario', to: 'process' })
   satisfies.allowedPairs.push({ from: 'process', to: 'requirement' })
-  illustrates.allowedPairs.push({ from: 'mockup', to: 'state' })
+  illustrates.allowedPairs.push({ from: 'mockup', to: 'state' }, { from: 'mockup', to: 'step' })
 
   return {
     id: 'c4-ddd-governance-builtin',

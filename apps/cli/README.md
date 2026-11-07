@@ -597,7 +597,16 @@ cloned. For each repository it reads, from the files git lists:
   default or named in a variable such as `${CART_HOST}`, a local port only
   one unit listens on);
 - data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,
-  .NET, PDO, Go's MySQL driver, database URLs) and the tables SQL names;
+  .NET, PDO, Go's MySQL driver, database URLs) and the tables SQL names; a
+  table SQL creates or alters, or an ORM class maps (JPA, Entity Framework
+  Core, Django, SQLAlchemy, TypeORM, Prisma), with its columns and the table
+  each foreign key references;
+- statuses: the values an enum named for a status, a `CHECK … IN` list or an
+  SQL `ENUM` gives, and the lines that set each value;
+- entry points: HTTP routes in code (Express, NestJS, Spring, ASP.NET Core,
+  Flask, FastAPI, Go), a VB6 form's caption, menu items and buttons with
+  their Click handlers, scheduled jobs and message handlers; and each unit's
+  test framework;
 - the tests its reports name (Vitest, Jest or Playwright JSON, JUnit XML; by
   default its `reports/`), as `<file> › <title>` from its root;
 - its documents: READMEs, the documents of `docs/` and decisions folders and

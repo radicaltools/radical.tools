@@ -8,7 +8,7 @@
 // every repository are known (link.ts).
 
 import { basename } from 'node:path'
-import type { DependencyFact, GroupFact, Stack, Unit } from './facts'
+import type { DependencyFact, GroupFact, Stack, TestFramework, Unit } from './facts'
 import { RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, lineOf, resolveFrom } from './files'
 
 export interface StackUnits {
@@ -36,6 +36,38 @@ const TECHNOLOGY: Array<[RegExp, string]> = [
   [/Microsoft ActiveX Data Objects|^msado/i, 'ADO'], [/Microsoft DAO/i, 'DAO'], [/DirectX|^dx\d+vb/i, 'DirectX'],
   [/Winsock|^mswinsck/i, 'Winsock'],
 ]
+
+/** The test frameworks a unit's dependencies name, the first that matches. */
+const TEST_FRAMEWORKS: Array<[RegExp, TestFramework]> = [
+  [/^vitest$/, 'vitest'], [/^jest$/, 'jest'], [/^mocha$/, 'mocha'],
+  [/^org\.junit\.jupiter:|^org\.springframework\.boot:spring-boot-starter-test$/, 'junit5'], [/^junit:junit$/, 'junit4'],
+  [/^pytest$/i, 'pytest'], [/^xunit(\.core|\.v3[\w.-]*)?$/i, 'xunit'], [/^NUnit$/i, 'nunit'], [/^MSTest(\.TestFramework|\.Sdk)?(\/[\d.]+)?$/i, 'mstest'],
+]
+
+/** The unit's test framework: from its dependencies, a Gradle build's test dependencies, a Python folder's pytest files. */
+function testFrameworkOf(d: Draft, files: RepoFiles): TestFramework | undefined {
+  const named = TEST_FRAMEWORKS.find(([re]) => d.deps.some((dep) => re.test(dep)))?.[1]
+  if (named) return named
+  const prefix = d.path === '.' ? '' : `${d.path}/`
+  if (d.stack === 'gradle') {
+    const build = files.read(d.evidence.file)
+    if (/junit-jupiter|spring-boot-starter-test|useJUnitPlatform\(\)/.test(build)) return 'junit5'
+    if (/['"]junit:junit:/.test(build)) return 'junit4'
+  }
+  // An npm workspace runs the tests of its packages from its root: the framework the nearest package.json above names.
+  if (d.stack === 'npm') {
+    for (let at = d.path; at !== '.';) {
+      at = dirOf(at)
+      let json: Record<string, unknown> = {}
+      try { json = JSON.parse(files.read(`${at === '.' ? '' : `${at}/`}package.json`) || '{}') } catch { continue }
+      const deps = ['dependencies', 'devDependencies'].flatMap((k) => Object.keys((json[k] as Record<string, unknown> | undefined) ?? {}))
+      const found = TEST_FRAMEWORKS.find(([re]) => deps.some((dep) => re.test(dep)))?.[1]
+      if (found) return found
+    }
+  }
+  if (d.stack === 'python' && (files.has(`${prefix}pytest.ini`) || files.has(`${prefix}conftest.py`) || /\[tool\.pytest/.test(files.read(`${prefix}pyproject.toml`)))) return 'pytest'
+  return undefined
+}
 
 const technologyOf = (names: string[]): string[] =>
   [...new Set(names.flatMap((d) => TECHNOLOGY.filter(([re]) => re.test(d)).map(([, name]) => name)))].sort()
@@ -429,6 +461,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
       kind: d.tests ? 'tests' : d.reasons.length ? 'app' : 'library',
       why: d.tests ? 'it checks other units' : d.reasons.length ? [...new Set(d.reasons)].join(', ') : 'nothing in its manifest runs it',
       technology: [...technology].sort(),
+      ...((framework) => (framework ? { testFramework: framework } : {}))(testFrameworkOf(d, files)),
       ...(d.description ? { description: d.description } : {}),
       ...(d.named ? {} : { named: false }),
       evidence: d.evidence,

@@ -3159,6 +3159,43 @@
     ] },
     { "element": "3fc182c0-42da-4e57-b5a6-fdafff6fe2e1", "name": "Text found in a run's repository", "tests": [
       "apps/mcp/src/assay.test.ts › Radical Assay over MCP › finds the lines that hold a text, and lists a folder of many data files as one line"
+    ] },
+    { "element": "8a328a02-e902-4bfc-bc53-46497454c108", "name": "Table structure read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: tables and their structure › records each table's columns and the table each foreign key references, from SQL and an ORM class",
+      "packages/assay/tests/domain.test.ts › radical assay: tables and their structure › reads JPA, Django, SQLAlchemy, TypeORM, Entity Framework Core and Prisma classes as the tables they map"
+    ] },
+    { "element": "23cfabe0-1e49-4887-afc3-50ec7e14b0d9", "name": "Status values read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: status values › records the values a status takes and the lines that set each, from code and from SQL",
+      "packages/assay/tests/domain.test.ts › radical assay: status values › reads enums named for a state in Java, C#, Python and VB6, and the column whose type one is"
+    ] },
+    { "element": "2e303d99-9307-4f54-8e04-4e0e88604503", "name": "Entry points read", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: entry points › records HTTP routes, scheduled jobs and message handlers, each with its line, and a unit's test framework",
+      "packages/assay/tests/domain.test.ts › radical assay: entry points › reads a VB6 form's caption, its menu items and buttons with their Click handlers, separators left out"
+    ] },
+    { "element": "9e83de94-c016-4816-a1d1-89f26b516e43", "name": "Entities written from tables", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes entities from the tables, related by their foreign keys and realised by the containers that use them"
+    ] },
+    { "element": "e8d3e5f9-80fd-4e36-ace1-8cd33b678de7", "name": "Entity relation without a foreign key refused", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › refuses an entity relation no foreign key states, and an entity on no table, writing nothing"
+    ] },
+    { "element": "482ac21d-83ed-4143-8e8a-d96008b74a22", "name": "Process written from entry points", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes a process with its steps in order, inferred, each on the entry point it rests on"
+    ] },
+    { "element": "9043ec64-996f-4593-b8d4-e25392bac67c", "name": "State machine written from a status enum", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes the lifecycle of an entity from its status values, implemented by the container whose code sets them"
+    ] },
+    { "element": "7c43f966-b961-4853-a053-cd78727a3ee5", "name": "Pending test written for a scenario from code", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes a pending test for a scenario drawn from the code, bound in the repository's mapping",
+      "packages/assay/tests/skeleton.test.ts › radical assay: pending tests of scenarios from the code › writes one pending test per scenario for each framework, with the ids its reports name",
+      "packages/assay/tests/skeleton.test.ts › radical assay: pending tests of scenarios from the code › finds the unit that runs the tests: its own framework, a test project referencing it, else a root that tests"
+    ] },
+    { "element": "45f18f82-2def-4bc5-9fcf-5e0861316fa2", "name": "Scenario only where no test framework", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › writes only the scenario where the unit has no test framework, as a VB6 one"
+    ] },
+    { "element": "3c7aa05f-f995-4e41-b8ff-5449129f71af", "name": "Assay domain and lifecycle tests", "tests": [
+      "packages/assay/tests/domain.test.ts",
+      "packages/assay/tests/skeleton.test.ts",
+      "apps/mcp/src/assayDomain.test.ts"
     ] }
   ]
 }

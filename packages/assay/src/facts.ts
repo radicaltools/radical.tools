@@ -4,8 +4,11 @@
 // Assay): its units, in whatever stack and wherever they are in it, what each
 // depends on, the APIs it declares or serves, the addresses and URL paths its
 // code and configuration name, the gRPC clients it makes, the services its
-// deployment files run, the databases and tables it uses, the groups of
-// units its solutions name, and the tests its reports name. Each fact cites
+// deployment files run, the databases and tables it uses (with their columns
+// and foreign keys where a schema or an ORM class declares them), the values
+// its statuses take, its entry points (routes, forms and menus, jobs,
+// handlers), the groups of units its solutions name, and the tests its
+// reports name. Each fact cites
 // its file and line from the repository's root. A fact's id starts with the
 // repository's name, so the facts of a run's repositories never clash and a
 // plan can cite any of them.
@@ -43,9 +46,14 @@ export interface Unit {
   technology: string[]
   /** Ports it listens on, as its launch settings, Dockerfile or configuration give them. */
   ports?: number[]
+  /** The test framework its manifest names, which a pending test of a scenario is written for. */
+  testFramework?: TestFramework
   description?: string
   evidence: Evidence
 }
+
+/** The test frameworks Assay writes a pending test for. */
+export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'junit5' | 'junit4' | 'pytest' | 'xunit' | 'nunit' | 'mstest'
 
 /** A unit depends on a package, or on another unit by path (a project reference). */
 export interface DependencyFact {
@@ -132,11 +140,54 @@ export interface DatabaseFact {
   evidence: Evidence
 }
 
-/** A table the SQL in a unit's code names. */
+/** A table the SQL in a unit's code names, an SQL file creates or an ORM class maps. */
 export interface TableFact {
   id: string
   unit: string
   table: string
+  /** Its unit's code names it (SQL in a string, a data control, an ORM class), beyond a schema file. */
+  inCode?: boolean
+  /** Where it is declared, its columns known: SQL (CREATE TABLE), JPA, Entity Framework Core, Django, SQLAlchemy, TypeORM, Prisma. */
+  declared?: string
+  /** Its columns, as declared; `type` as written (for an ORM class, the field's type). */
+  columns?: Array<{ name: string; type?: string; line: number }>
+  /** Its foreign keys: the column and the table it references (an ORM class's reference names the table its class maps). */
+  references?: Array<{ column?: string; table: string; line: number }>
+  evidence: Evidence
+}
+
+/** The values a status or state takes: an enum named for one, a CHECK … IN list, an SQL ENUM. */
+export interface StateFact {
+  id: string
+  unit: string
+  /** The enum's name, or the column's. */
+  name: string
+  values: string[]
+  /** The table and column whose values they are, where the SQL or an ORM class says so. */
+  table?: string
+  column?: string
+  /** The value a new one starts with, where the SQL gives the column a default. */
+  initial?: string
+  /** The lines of the repository's code that set a value (an assignment, a setter, an UPDATE … SET), each with its unit. */
+  sets: Array<{ value: string; unit: string; file: string; line: number }>
+  evidence: Evidence
+}
+
+/** Where a user, a clock or another system enters a unit's code. */
+export interface EntryFact {
+  id: string
+  unit: string
+  /** route: an HTTP route its code declares; form, menu, control: a VB6 form, a menu item and a command button of it;
+   *  job: a scheduled job; handler: a message or event handler. */
+  kind: 'route' | 'form' | 'menu' | 'control' | 'job' | 'handler'
+  /** The route's method, the form's or control's name, the job's or handler's method. */
+  name: string
+  /** A route's path, a form's or control's caption, a job's schedule, a handler's queue or topic. */
+  detail?: string
+  /** The form a menu item or control is on. */
+  form?: string
+  /** The code that runs: a VB6 control's Click handler. */
+  handler?: Evidence
   evidence: Evidence
 }
 
@@ -190,6 +241,8 @@ export interface RepositoryFacts {
   services: ServiceFact[]
   databases: DatabaseFact[]
   tables: TableFact[]
+  states: StateFact[]
+  entries: EntryFact[]
   groups: GroupFact[]
   tests: TestFact[]
   documents: DocumentFact[]
@@ -211,11 +264,11 @@ export const factsFileOf = (dir: string, name: string, root: string): string =>
 const FORMAT = 'radical-assay-facts/1'
 
 /** The lists of facts a repository's facts hold. */
-export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
+export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'states', 'entries', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
 
 /** No facts yet: every list empty. */
 export const emptyFacts = (repository: string, dir: string): RepositoryFacts => ({
-  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
+  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], states: [], entries: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
 })
 
 /** The facts as written to FACTS_FILE: without the absolute folder, which is the reader's. */
@@ -252,12 +305,12 @@ export interface Link {
   via?: string
 }
 
-export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
-export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
+export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'state' | 'entry' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
+export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | StateFact | EntryFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
 
 const KIND_OF: Record<(typeof FACT_LISTS)[number], FactKind> = {
   units: 'unit', dependencies: 'dependency', apis: 'api', urls: 'url', clients: 'client', addresses: 'address',
-  services: 'service', databases: 'database', tables: 'table', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
+  services: 'service', databases: 'database', tables: 'table', states: 'state', entries: 'entry', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
 }
 
 /** Every fact of the repositories by id, links included. */

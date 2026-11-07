@@ -2,7 +2,7 @@
 id: "10dd6e39-0a30-458a-964e-2bd422518401"
 type: "requirement"
 label: "Read entry points"
-action: "the system shall record each entry point as a fact of that unit with its kind, its name, the method and route or the caption, and its file and line, and the unit's test framework"
+action: "the system shall record each entry point as a fact of that unit with its kind, its name, the method and route or the caption, and its file and line, and the unit's test framework (a package of an npm workspace takes its root's)"
 ears_type: "event-driven"
 rationale: "A process starts where a user or a clock enters the code; a legacy desktop application's forms and menus are its screens."
 trigger: "a unit's code declares an HTTP route (Express, Spring, ASP.NET Core, Flask, FastAPI, Go), a VB6 form or menu, a scheduled job or a message handler, or its manifest names a test framework"
