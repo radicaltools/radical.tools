@@ -419,16 +419,17 @@ describe('radical assay: what legacy repositories hide', () => {
     const facts = extractRepository(dir)
     // A file the repository holds, not one the code makes at run time.
     expect(facts.databases.map((d) => [d.engine, d.name, d.evidence.line])).toEqual([['Access', 'Projects.mdb', 2]])
-    expect(linkRepositories([facts]).map((l) => [l.kind, l.to])).toEqual([['data', 'viewer:db:.:Access/Projects.mdb']])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.to])).toEqual([['data', 'viewer:db:.:Access/projects.mdb']])
     expect(facts.tables.map((t) => t.table)).toEqual(['Items', 'Spells'])
   })
 
   it('takes a nameless connection for the Access database the unit names, and reads none from one beside nothing, with a note', () => {
     const named = extractRepository(repo('app', {
       'App.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="App"\r\n', 'Data.mdb': '',
-      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\n  sPath = App.Path & "\\Data.mdb"\r\nEnd Sub\r\n',
+      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  FileCopy App.Path & "\\DATA.MDB", sBackup\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\n  sPath = App.Path & "\\Data.mdb"\r\n  cn2.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\\APP\\data.mdb"\r\nEnd Sub\r\n',
     }))
-    expect(named.databases.map((d) => [d.engine, d.name])).toEqual([['Access', 'Data.mdb']])
+    // One file whatever the case of its name, cited where the code connects to it.
+    expect(named.databases.map((d) => [d.engine, d.name, d.evidence.line])).toEqual([['Access', 'data.mdb', 6]])
     const none = extractRepository(repo('tool', {
       'Tool.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="Tool"\r\n',
       'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\nEnd Sub\r\n',
