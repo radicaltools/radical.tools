@@ -360,6 +360,64 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-07): Assay on VB6 applications found on GitHub
+
+An agent ran Assay (MCP tools only) on Argentum Online's client and server
+(ao-libre/ao-cliente, ao-libre/ao-server) and a VB6 point-of-sale system,
+with expectations written from their READMEs and configuration before the
+first run. The reader then missed the client-to-server connection (an INI
+server list and a server's StartPort), the server's MySQL database (a
+connection string built from variables), a data control's table, and read
+207 chat commands as URL paths; those are fixed and the three are on the
+bench (tuned on now). Still open:
+
+- `get_issues` suggests concern packs that do not fit the technology: API
+  collections and page tokens for a client and server that talk a binary
+  socket protocol, tenant isolation for a one-shop Access file, EU DORA for
+  a hobby game. A pack could name the kinds of element and protocol it is for.
+- A VB6 form declares its controls and captions: its screens could be
+  mockups read from the .frm files, without running anything. The Explore
+  stage clicks web applications only; desktop applications need a driver.
+- A COM call (CreateObject("X.Y")) and a Winsock connect to a variable host
+  are no facts yet; the INI settings carry most of it in these repositories.
+- A second run, after the reader's fixes, got the client-to-server link, the
+  database and the port from facts, and found more by searching the code.
+  Still no fact: INI files as a data store (the game server keeps its
+  characters in Charfile/*.chr through GetVar/WriteVar, MySQL only behind
+  `[DATABASE] Enabled=1`, off by default); a configuration flag that guards a
+  connection; HTTP clients (XMLHTTP, Inet) as client facts; a base URL from
+  settings (UrlServer) joined to the paths called on it; a process another
+  program starts (Shell "npm start"); a .vbp's modules and folders as
+  candidate components.
+- `assay_answer` cannot change what a requirement is satisfied by, its
+  citations or what a decision constrains, nor split a proposal in two.
+- A source document can hold personal data (a README with an email address
+  and a phone number); nothing says how Assay treats it.
+
+### Dogfooding (2026-11-07): Assay explores the running application
+
+Two runs of an agent (MCP tools only) through Assay with the Explore stage on
+a demo shop served locally. Fixed on the way: a password the form put in the
+address was kept in the screen facts; every field filled made a new screen,
+so navigates-to joined one pair of five mockups; paths shared one session
+while their tests start signed out; a heading with the run's data (Order 3)
+was asserted literally; a mockup kept the query of the visit. Still open:
+
+- The generated test checks the screens a path reaches, not what the
+  scenario's "then" says (the order's item and status): a scenario and its
+  test can disagree, and nothing reports it.
+- Every path behind a sign-in replays it; a shared start (a storage state,
+  a fixture) would shorten the paths and their tests.
+- Exploring changes the test database for real and nothing resets it, so a
+  path that creates something is not repeatable as recorded.
+- A page served without a charset is read as the browser shows it ("Â·"):
+  faithful, but the facts carry the mojibake.
+- The C4 stage still takes an http link at face value when one call of a
+  front end is absolute (another host) and another relative (a proxy): the
+  link's detail should say which half is weak.
+- The Explore stage reads web applications only; desktop applications wait
+  for a driver per platform (ADR Assay explores the running application).
+
 ### Dogfooding (2026-11-02): Radical Assay
 
 - The project's MCP server (`radical-architecture` in `.mcp.json`) is bound

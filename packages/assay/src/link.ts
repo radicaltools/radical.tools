@@ -9,6 +9,9 @@
 
 import type { AddressFact, ApiFact, Link, RepositoryFacts, ServiceFact, Unit, UrlFact } from './facts'
 
+/** Ports many programs listen on: a remote address on one of them names no unit by its port. */
+const COMMON_PORTS = new Set([20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995, 1433, 1521, 3000, 3306, 4200, 5000, 5001, 5173, 5432, 5672, 6379, 8000, 8008, 8080, 8081, 8443, 8888, 9000, 9090, 9200, 11211, 27017])
+
 /** At most this many facts of one side are cited by a link. */
 const CITED = 10
 
@@ -61,7 +64,7 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
   for (const u of units) for (const n of packageNames(u)) byPackage.set(n, [...(byPackage.get(n) ?? []), u])
   for (const r of repositories) {
     for (const dep of r.dependencies) {
-      const targets = dep.target ? units.filter((u) => u.id === dep.target) : byPackage.get(dep.package.toLowerCase()) ?? []
+      const targets = dep.target ? units.filter((u) => u.id === dep.target) : byPackage.get(dep.package.toLowerCase()) ?? (dep.file ? byPackage.get(dep.file.toLowerCase()) : undefined) ?? []
       for (const t of targets) add('package', dep.unit, t.id, 'observed', [dep.id, t.id], dep.target ? `references ${dep.package}` : `depends on ${dep.package}`)
     }
   }
@@ -96,11 +99,11 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     const from = a.unit ?? holder?.unit
     if (!from) continue
     const local = ['localhost', '127.0.0.1', '0.0.0.0', 'host.docker.internal'].includes(a.host)
-    // A local port names a unit only when no other unit listens on it too (5000 is everyone's default).
-    const listening = local && a.port !== undefined ? units.filter((u) => u.ports?.includes(a.port!)) : []
-    const targets = local
-      ? (listening.length === 1 ? listening : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
-      : byName.get(a.host) ?? byName.get(a.host.split('.')[0]) ?? []
+    // A port names a unit only when no other unit listens on it too (5000 is everyone's default); away
+    // from this machine, only a port few programs use (a game server's 24582, not 8080).
+    const listening = a.port !== undefined && (local || !COMMON_PORTS.has(a.port)) ? units.filter((u) => u.ports?.includes(a.port!)) : []
+    const byPort = (listening.length === 1 ? listening : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
+    const targets = local ? byPort : byName.get(a.host) ?? byName.get(a.host.split('.')[0]) ?? byPort
     for (const t of targets) {
       const to = t.unit?.id ?? t.service?.id
       if (!to || to === from) continue

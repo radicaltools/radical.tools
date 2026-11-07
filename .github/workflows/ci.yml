@@ -41,6 +41,8 @@ jobs:
       - run: npm ci
       - run: npm run check:workspaces
       - run: npm run typecheck
+      # Radical Assay's Explore tests drive a browser: Playwright's Chromium.
+      - run: npx playwright install --with-deps chromium
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
       # What the model measures on a pull request: the measure of every

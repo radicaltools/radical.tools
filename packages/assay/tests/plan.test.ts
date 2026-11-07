@@ -123,7 +123,7 @@ describe('radical assay: the plan', () => {
   })
 
   it('refuses what is no plan', () => {
-    expect(parsePlan('x').problems).toEqual(['the plan must be an object with elements, relations, requirements, needs and decisions'])
+    expect(parsePlan('x').problems).toEqual(['the plan must be an object with elements, relations, requirements, needs, decisions and mockups'])
     expect(parsePlan({}).problems).toEqual(['the plan is empty'])
     expect(parsePlan({ elements: {} }).problems).toEqual(['elements must be a list', 'the plan is empty'])
   })

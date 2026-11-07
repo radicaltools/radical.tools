@@ -9,7 +9,7 @@
 import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
-import { RepoFiles, dirOf, escapeRe, lineOf, resolveFrom } from './files'
+import { RepoFiles, dirOf, escapeRe, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
 const ROLES: Array<[RegExp, ServiceFact['role'], string?]> = [
@@ -171,9 +171,66 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       if (ports.length) u.ports = [...new Set([...(u.ports ?? []), ...ports])].sort((a, b) => a - b)
       if (!file.endsWith('launchSettings.json')) addAddresses([text], file, text, { unit: u.id })
     }
+    readSettings(files, repo, u, units, addresses)
     const dockerfile = files.read(`${prefix}Dockerfile`)
     const exposed = [...dockerfile.matchAll(/^EXPOSE\s+(.+)$/gmi)].flatMap((m) => m[1].split(/\s+/).map((p) => Number(p.split('/')[0]))).filter((p) => p > 0)
     if (exposed.length) u.ports = [...new Set([...(u.ports ?? []), ...exposed])].sort((a, b) => a - b)
   }
   return { services, addresses, databases, notes }
 }
+
+// ── INI-style settings ───────────────────────────────────────────────────────
+
+/** A settings file: any .ini, and a .dat, .cfg or .conf in the unit's root or a settings folder (INIT/, config/). */
+const SETTINGS = /\.ini$/i
+const SETTINGS_ELSEWHERE = /\.(dat|cfg|conf)$/i
+const SETTINGS_FOLDER = /^(init|config|conf|configs|settings|cfg|ini|setup)$/i
+/** A key naming the port the program itself listens on, and a key naming a host. */
+const OWN_PORT = /^(start|listen|server|local|bind|tcp)?[_-]?(port|puerto)$/i
+const HOST_KEY = /^(ip|host|hostname|server|servidor|address|addr|direccion|remotehost)$/i
+const HOST_VALUE = /^(\d{1,3}(\.\d{1,3}){3}|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9-]+)*)$/i
+
+/** The [sections] of an INI text, each with its key=value lines; lines before the first section are section "". */
+function iniSections(text: string): Array<{ name: string; line: number; entries: Array<{ key: string; value: string; line: number }> }> {
+  const out = [{ name: '', line: 1, entries: [] as Array<{ key: string; value: string; line: number }> }]
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.trim()
+    if (!line || /^[;#']/.test(line)) return
+    const section = /^\[([^\]]+)\]$/.exec(line)
+    if (section) { out.push({ name: section[1].trim(), line: i + 1, entries: [] }); return }
+    const at = line.indexOf('=')
+    if (at > 0) out[out.length - 1].entries.push({ key: line.slice(0, at).trim(), value: line.slice(at + 1).replace(/\s+['#;].*$/, '').trim().replace(/^"(.*)"$/, '$1'), line: i + 1 })
+  })
+  return out
+}
+
+/** A unit's INI-style settings: the port it listens on (StartPort=24582), and each section that gives a
+ *  host and one port-like number (a server list's IP=… and PJ=…) as an address. */
+function readSettings(files: RepoFiles, repo: string, u: Unit, units: Unit[], addresses: AddressFact[]): void {
+  const prefix = u.path === '.' ? '' : `${u.path}/`
+  for (const file of files.list) {
+    if (!file.startsWith(prefix) || owner(units, file)?.id !== u.id || /(^|\/)(tests?|__tests__|fixtures?|testdata)\//i.test(file)) continue
+    const folders = file.slice(prefix.length).split('/').slice(0, -1)
+    if (!SETTINGS.test(file) && !(SETTINGS_ELSEWHERE.test(file) && (folders.length === 0 || folders.some((f) => SETTINGS_FOLDER.test(f))))) continue
+    const text = files.read(file)
+    if (!/^\s*\[[^\]\n]+\]\s*$/m.test(text.slice(0, 4000)) && !SETTINGS.test(file)) continue
+    for (const section of iniSections(text)) {
+      const host = section.entries.find((e) => HOST_KEY.test(e.key) && HOST_VALUE.test(e.value))
+      const port = (e: { value: string }) => /^\d{2,5}$/.test(e.value) && Number(e.value) > 0 && Number(e.value) < 65536
+      if (!host) {
+        for (const e of section.entries) {
+          if (OWN_PORT.test(e.key) && port(e)) u.ports = [...new Set([...(u.ports ?? []), Number(e.value)])].sort((a, b) => a - b)
+        }
+        continue
+      }
+      // The section's port: a key named for one, else its one number a port can be (PJ=24582).
+      const named = section.entries.find((e) => /port|puerto/i.test(e.key) && port(e))
+      const numbers = section.entries.filter((e) => e !== host && port(e) && Number(e.value) >= 1024)
+      const at = named ?? (numbers.length === 1 ? numbers[0] : undefined)
+      const id = `${repo}:address:${u.path}:ini:${host.value.toLowerCase()}${at ? `:${at.value}` : ''}`
+      if (addresses.some((a) => a.id === id)) continue
+      addresses.push({ id, unit: u.id, scheme: 'setting', host: host.value.toLowerCase(), ...(at ? { port: Number(at.value) } : {}), text: `${host.key}=${host.value}${at ? ` ${at.key}=${at.value}` : ''}`, evidence: { file, line: host.line } })
+    }
+  }
+}
+
