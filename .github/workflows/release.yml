@@ -34,6 +34,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # Radical Assay's Explore tests drive a real Chromium.
+      - run: npx playwright install --with-deps chromium
       - run: npm test
 
       # One product version: the CLI, the MCP server, the Desktop app and the

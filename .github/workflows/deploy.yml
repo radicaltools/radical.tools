@@ -38,6 +38,10 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      # Radical Assay's Explore tests drive a real Chromium, as the CI job does.
+      - name: Install Chromium for the Explore tests
+        run: npx playwright install --with-deps chromium
+
       - name: Test
         run: npm test
 

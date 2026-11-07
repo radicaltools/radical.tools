@@ -95,6 +95,9 @@ jobs:
         run: npm run check:workspaces
       - if: ${{ env.PUBLISHED != 'true' }}
         run: npm run typecheck
+      # Radical Assay's Explore tests drive a real Chromium.
+      - if: ${{ env.PUBLISHED != 'true' }}
+        run: npx playwright install --with-deps chromium
       - if: ${{ env.PUBLISHED != 'true' }}
         run: npm test
       - name: Verify the installable tarball
