@@ -229,6 +229,18 @@
         [
           "docker/prometheus",
           "spring-petclinic-discovery-server"
+        ],
+        [
+          "spring-petclinic-customers-service",
+          "db:petclinic"
+        ],
+        [
+          "spring-petclinic-vets-service",
+          "db:petclinic"
+        ],
+        [
+          "spring-petclinic-visits-service",
+          "db:petclinic"
         ]
       ]
     },
@@ -566,6 +578,170 @@
         "users"
       ],
       "optional": []
+    },
+    {
+      "name": "erp.gst",
+      "about": "A small VB6 ERP (billing, stock, accounts) on SQL Server, its schema in a T-SQL file. Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 18/19, calls 6/16, tables 32/36 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/rmaner/erp.gst.git",
+      "commit": "6df85487916712ffdde7c8fc515494eb901c65a9",
+      "stacks": "VB6 Standard EXE, ADO, SQL Server (T-SQL schema), Winsock",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:uits_gst_db"
+        ]
+      ],
+      "tables": [
+        "cman",
+        "currency",
+        "dbkey",
+        "grp",
+        "items",
+        "journal",
+        "letters",
+        "personal",
+        "pmain",
+        "pmt",
+        "preturnmain",
+        "purchase",
+        "purchasereturn",
+        "rct",
+        "sale",
+        "salereturn",
+        "smain",
+        "sreturnmain",
+        "tin",
+        "tinmain",
+        "tout",
+        "toutmain",
+        "trf",
+        "vouchers",
+        "xbd"
+      ],
+      "optional": []
+    },
+    {
+      "name": "JewelBox-2004-Project",
+      "about": "One jewellery shop system in seven implementations: three VB6 (Access, MySQL over ODBC, a refined one), two VB.NET, C# and Java, all on the database JewelBox (an ODBC DSN or a SQL Server catalog), its tables in a UTF-16 T-SQL file. Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 18/19, calls 6/16, tables 32/36 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/nithinmohantk/JewelBox-2004-Project.git",
+      "commit": "9a9ee1d895ae9bc6d13b390cce5d5c70de9f0e35",
+      "stacks": "VB6, VB.NET, C# (.NET 1.1/2.0), Java (JDBC-ODBC); Access, MySQL, SQL Server",
+      "units": [
+        "JewelBox VB",
+        "JewelBox VB MYSQL",
+        "JewelBox VB_new",
+        "JewelBox C#.NET",
+        "JewelBox VB.NET/JewelBox2004_vs2002",
+        "JewelBox VB.NET/JewelBox2004_vs2005",
+        "JewelBox Java"
+      ],
+      "calls": [
+        [
+          "JewelBox VB",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox VB MYSQL",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox VB_new",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox C#.NET",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox VB.NET/JewelBox2004_vs2002",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox VB.NET/JewelBox2004_vs2005",
+          "db:jewelbox"
+        ],
+        [
+          "JewelBox Java",
+          "db:jewelbox"
+        ]
+      ],
+      "tables": [
+        "bill",
+        "exchange",
+        "login",
+        "purchase",
+        "rate",
+        "received",
+        "reorder",
+        "sales",
+        "salesman",
+        "stock",
+        "stocklevel"
+      ],
+      "optional": []
+    },
+    {
+      "name": "vbman",
+      "about": "A VB6 network framework: the VBMAN library (with ASPMAN in its folder), a TLS socket control and an HTTP DLL, and demos: a captcha demo and Modbus masters and slaves that reference VBMAN.dll or include its sources, each master talking Modbus TCP to its slave on port 502 (their docs). Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 18/19, calls 6/16, tables 32/36 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/woeoio/vbman.git",
+      "commit": "8afc2b0b048c1db576457fb24b1a1f95109ed514",
+      "stacks": "VB6 ActiveX DLLs, OCX and EXEs; COM references; Modbus TCP/RTU",
+      "units": [
+        "src",
+        "src/Aliyun/Captcha/Src/Demo",
+        "src/Demos/Modbus/Master",
+        "src/Demos/Modbus/Slave",
+        "src/Demos/Modbus/src",
+        "src/Demos/Modbus2/Master",
+        "src/Demos/Modbus2/Slave",
+        "src/Demos/Modbus3/Master",
+        "src/Demos/Modbus3/Slave",
+        "src/Socket/contrib/dll",
+        "src/Toast/demo"
+      ],
+      "calls": [
+        [
+          "src/Aliyun/Captcha/Src/Demo",
+          "src"
+        ],
+        [
+          "src/Demos/Modbus/Master",
+          "src"
+        ],
+        [
+          "src/Demos/Modbus/Slave",
+          "src"
+        ],
+        [
+          "src/Demos/Modbus/src",
+          "src"
+        ],
+        [
+          "src/Demos/Modbus3/Slave",
+          "src"
+        ],
+        [
+          "src/Demos/Modbus/Master",
+          "src/Demos/Modbus/Slave"
+        ],
+        [
+          "src/Demos/Modbus2/Master",
+          "src/Demos/Modbus2/Slave"
+        ],
+        [
+          "src/Demos/Modbus3/Master",
+          "src/Demos/Modbus3/Slave"
+        ]
+      ],
+      "optional": [
+        [
+          "src/Demos/Modbus/src",
+          "src/Demos/Modbus/Slave"
+        ]
+      ]
     }
   ],
   "heldOut": [
@@ -882,166 +1058,85 @@
       "optional": []
     },
     {
-      "name": "erp.gst",
-      "about": "A small VB6 ERP (billing, stock, accounts) on SQL Server, its schema in a T-SQL file. Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/rmaner/erp.gst.git",
-      "commit": "6df85487916712ffdde7c8fc515494eb901c65a9",
-      "stacks": "VB6 Standard EXE, ADO, SQL Server (T-SQL schema), Winsock",
+      "name": "billing-system-vb6-2016",
+      "about": "A VB6 billing system on SQL Server 2008 R2, its schema (with foreign keys) in Database/CreateDatabase.sql. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/Mherediau/billing-system-vb6-2016.git",
+      "commit": "6e62436c615188e3f5c5c3053b3b83a6d526f11c",
+      "stacks": "VB6 Standard EXE, ADO, SQL Server, Crystal Reports",
       "units": [
         "."
       ],
       "calls": [
         [
           ".",
-          "db:uits_gst_db"
+          "db:billingdb"
         ]
       ],
       "tables": [
-        "cman",
-        "currency",
-        "dbkey",
-        "grp",
+        "auditlog",
+        "configuration",
+        "customers",
+        "invoicedetails",
+        "invoices",
+        "payments",
+        "products",
+        "stockmovements",
+        "users"
+      ],
+      "optional": []
+    },
+    {
+      "name": "MMUD-Explorer",
+      "about": "A VB6 database viewer for the game MajorMUD, reading its Access game database through DAO (its docs name the recordsets of items, monsters, spells, rooms, shops, races, classes and lairs). Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/syntax53/MMUD-Explorer.git",
+      "commit": "28d23d70caf4f971418aa7ea25471cdb0ab0888a",
+      "stacks": "VB6 Standard EXE, DAO, Access",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:data-v1.11p.mdb"
+        ]
+      ],
+      "tables": [
+        "classes",
         "items",
-        "journal",
-        "letters",
-        "personal",
-        "pmain",
-        "pmt",
-        "preturnmain",
-        "purchase",
-        "purchasereturn",
-        "rct",
-        "sale",
-        "salereturn",
-        "smain",
-        "sreturnmain",
-        "tin",
-        "tinmain",
-        "tout",
-        "toutmain",
-        "trf",
-        "vouchers",
-        "xbd"
+        "lairs",
+        "monsters",
+        "races",
+        "rooms",
+        "shops",
+        "spells"
       ],
       "optional": []
     },
     {
-      "name": "JewelBox-2004-Project",
-      "about": "One jewellery shop system in seven implementations: three VB6 (Access, MySQL over ODBC, a refined one), two VB.NET, C# and Java, all on the database JewelBox (an ODBC DSN or a SQL Server catalog), its tables in a UTF-16 T-SQL file. Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/nithinmohantk/JewelBox-2004-Project.git",
-      "commit": "9a9ee1d895ae9bc6d13b390cce5d5c70de9f0e35",
-      "stacks": "VB6, VB.NET, C# (.NET 1.1/2.0), Java (JDBC-ODBC); Access, MySQL, SQL Server",
+      "name": "omelette-vb6",
+      "about": "A VB6 framework that generates database applications: the Omelette tool, which keeps its projects in Databases/Projects.mdb and copies its Access templates, and two sample projects. Written down on 2026-11-07 from its README, docs, project files and schema before Assay first ran on it; held out: no rule is tuned on it.",
+      "url": "https://github.com/pyhoon/omelette-vb6.git",
+      "commit": "d327ef8a4a5c548a2494682d7189693fe0421922",
+      "stacks": "VB6 Standard EXEs, ADO, Access",
       "units": [
-        "JewelBox VB",
-        "JewelBox VB MYSQL",
-        "JewelBox VB_new",
-        "JewelBox C#.NET",
-        "JewelBox VB.NET/JewelBox2004_vs2002",
-        "JewelBox VB.NET/JewelBox2004_vs2005",
-        "JewelBox Java"
+        ".",
+        "Samples/Empty",
+        "Samples/HelloWorld"
       ],
       "calls": [
         [
-          "JewelBox VB",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox VB MYSQL",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox VB_new",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox C#.NET",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox VB.NET/JewelBox2004_vs2002",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox VB.NET/JewelBox2004_vs2005",
-          "db:jewelbox"
-        ],
-        [
-          "JewelBox Java",
-          "db:jewelbox"
-        ]
-      ],
-      "tables": [
-        "bill",
-        "exchange",
-        "login",
-        "purchase",
-        "rate",
-        "received",
-        "reorder",
-        "sales",
-        "salesman",
-        "stock",
-        "stocklevel"
-      ],
-      "optional": []
-    },
-    {
-      "name": "vbman",
-      "about": "A VB6 network framework: the VBMAN library (with ASPMAN in its folder), a TLS socket control and an HTTP DLL, and demos: a captcha demo and Modbus masters and slaves that reference VBMAN.dll or include its sources, each master talking Modbus TCP to its slave on port 502 (their docs). Written down on 2026-11-07 from its README, project files, configuration and schema before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/woeoio/vbman.git",
-      "commit": "8afc2b0b048c1db576457fb24b1a1f95109ed514",
-      "stacks": "VB6 ActiveX DLLs, OCX and EXEs; COM references; Modbus TCP/RTU",
-      "units": [
-        "src",
-        "src/Aliyun/Captcha/Src/Demo",
-        "src/Demos/Modbus/Master",
-        "src/Demos/Modbus/Slave",
-        "src/Demos/Modbus/src",
-        "src/Demos/Modbus2/Master",
-        "src/Demos/Modbus2/Slave",
-        "src/Demos/Modbus3/Master",
-        "src/Demos/Modbus3/Slave",
-        "src/Socket/contrib/dll",
-        "src/Toast/demo"
-      ],
-      "calls": [
-        [
-          "src/Aliyun/Captcha/Src/Demo",
-          "src"
-        ],
-        [
-          "src/Demos/Modbus/Master",
-          "src"
-        ],
-        [
-          "src/Demos/Modbus/Slave",
-          "src"
-        ],
-        [
-          "src/Demos/Modbus/src",
-          "src"
-        ],
-        [
-          "src/Demos/Modbus3/Slave",
-          "src"
-        ],
-        [
-          "src/Demos/Modbus/Master",
-          "src/Demos/Modbus/Slave"
-        ],
-        [
-          "src/Demos/Modbus2/Master",
-          "src/Demos/Modbus2/Slave"
-        ],
-        [
-          "src/Demos/Modbus3/Master",
-          "src/Demos/Modbus3/Slave"
+          ".",
+          "db:projects.mdb"
         ]
       ],
       "optional": [
         [
-          "src/Demos/Modbus/src",
-          "src/Demos/Modbus/Slave"
+          ".",
+          "db:master.mdb"
+        ],
+        [
+          ".",
+          "db:project.mdb"
         ]
       ]
     }
