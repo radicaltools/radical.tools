@@ -412,7 +412,8 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
     if (!text(r.label)) problems.push(`${where}: label is missing`)
     if (!isRecord(r.properties) || !text(r.properties.action)) problems.push(`${where}: properties must hold the EARS action ("the system shall …") and its ears_type`)
     if (r.satisfiedBy !== undefined && !resolves(r.satisfiedBy)) problems.push(`${where}: satisfiedBy ${String(r.satisfiedBy)} is neither a key of the plan nor an id of the model`)
-    if (r.satisfiedBy === undefined && Array.isArray(r.scenarios) && r.scenarios.length) problems.push(`${where}: satisfiedBy must name the element whose code its scenarios' tests exercise`)
+    // Tests exercise an element's code; a defect's scenarios drawn from the code or a screen need none that satisfies it.
+    if (r.satisfiedBy === undefined && Array.isArray(r.scenarios) && r.scenarios.some((s) => strings(s?.tests) && s.tests.length)) problems.push(`${where}: satisfiedBy must name the element whose code its scenarios' tests exercise`)
     if (r.parent !== undefined && !resolves(r.parent)) problems.push(`${where}: parent ${String(r.parent)} is neither a key of the plan nor an id of the model`)
     const isNeed = (ref: string): boolean => needKeys.has(ref) || !!context.waitingNeeds?.has(ref) || (known(ref) && (!context.typeOf || context.typeOf(ref) === 'need'))
     if (r.processes !== undefined) {

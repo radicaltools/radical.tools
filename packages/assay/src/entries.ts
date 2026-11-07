@@ -178,7 +178,8 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
         if (ticks) items.push(['job', name, { form: formName, detail: Number(block.interval) ? `every ${block.interval} ms` : 'interval set by the code', evidence: lineOfIndex(block.line), handler: ticks }])
         return
       }
-      const click = handler(block.name)
+      // The code a user runs from it: a Click, or a key pressed in it (a sale entered in a text box).
+      const click = handler(block.name) ?? handler(block.name, 'KeyPress') ?? handler(block.name, 'KeyDown')
       // A menu item; a button of any library, or any control the user clicks (an image, a label) that has a Click handler.
       const kind = /^VB\.Menu$/i.test(block.kind) ? 'menu' : /button/i.test(block.kind) || click ? 'control' : undefined
       // A menu captioned - is a separator.

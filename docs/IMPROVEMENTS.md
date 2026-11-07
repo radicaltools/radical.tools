@@ -367,8 +367,21 @@ wireframes and navigation; flags and nullable dates as state facts; VB6
 Timers, clickable controls and Handle procedures as entry points; a
 transition's basis (sets or quoted) in run.json; a test that asserts nothing
 rests no scenario; `expect` in Explore; a requirement names its processes.
-Still open: a form opened by a name held in a variable is not joined; a
-JavaScript test's assertions are judged, not a Java or .NET one's.
+Still open, after two more agent runs:
+
+- **Navigation outside the forms.** A form shown from a module (a packet
+  handler showing the account panel) or by a name held in a variable is not
+  joined; a main form's own Show calls (focus) look like navigation.
+- **Orthogonal flags.** A table's flags are one state fact (dead, banned,
+  logged in, …), while the metamodel allows one machine per entity: the agent
+  picks one dimension. Parallel regions of a state would hold them all.
+- **Flags set in memory.** A flag changed on a structure named otherwise
+  (`.flags.Muerto = 1` for `is_dead`) is not found; only lines naming the
+  column are.
+- **Large answers.** Mockups with wireframes make `search_model LIST NODES`
+  very large; a listing could leave the wireframe out.
+- **Assertions of other languages.** A JavaScript test's assertions are
+  judged, not a Java or .NET one's.
 
 ### Dogfooding (2026-11-07): Assay's domain, processes and lifecycles
 

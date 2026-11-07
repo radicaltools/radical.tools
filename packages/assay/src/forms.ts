@@ -35,6 +35,8 @@ export interface FormLayout {
 export interface FormOpen {
   form: string
   via?: string
+  /** Opened by a key pressed in the control (KeyPress, KeyDown), not a click. */
+  key?: boolean
   line: number
 }
 
@@ -150,14 +152,17 @@ const num = (v: string | undefined): number => (v === undefined ? 0 : Number.par
 export function formOpens(code: string, firstLine: number, forms: Set<string>): FormOpen[] {
   const out: FormOpen[] = []
   let handler: string | undefined
+  let event: string | undefined
   withoutVbComments(code).split('\n').forEach((line, i) => {
-    const sub = /^\s*(?:(?:Private|Public|Friend|Static)\s+)*Sub\s+(\w+?)_(Click|DblClick|Load|Activate|KeyPress|Timer)\s*\(/i.exec(line)
-    if (sub) { handler = /^(Form|MDIForm)$/i.test(sub[1]) ? undefined : sub[1]; return }
+    // What the user does to open a form: a control's or menu item's Click, a key pressed in a control. A form showing
+    // others as it loads (a hidden main form) is no step of the user's.
+    const sub = /^\s*(?:(?:Private|Public|Friend|Static)\s+)*Sub\s+(\w+?)_(Click|DblClick|KeyPress|KeyDown)\s*\(/i.exec(line)
+    if (sub && !/^(Form|MDIForm)$/i.test(sub[1])) { handler = sub[1]; event = sub[2]; return }
     if (/^\s*(?:(?:Private|Public|Friend|Static)\s+)*(Sub|Function)\s+\w+/i.test(line)) { handler = undefined; return }
     for (const m of line.matchAll(/\b(\w+)\.Show\b|\bLoad\s+(\w+)\b/gi)) {
       const form = (m[1] ?? m[2]).toLowerCase()
-      if (!forms.has(form) || out.some((o) => o.form === form && o.via === handler)) continue
-      out.push({ form, ...(handler ? { via: handler } : {}), line: firstLine + i })
+      if (!handler || !forms.has(form) || out.some((o) => o.form === form && o.via === handler)) continue
+      out.push({ form, via: handler, ...(/^key/i.test(event ?? '') ? { key: true } : {}), line: firstLine + i })
     }
   })
   return out

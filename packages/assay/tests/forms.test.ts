@@ -40,7 +40,9 @@ export const POS_FORMS: Record<string, string> = {
     block('VB.Menu', 'mnuReports', { Caption: '&Reports' }, block('VB.Menu', 'mnuDaily', { Caption: '&Daily report' })),
     'End',
     'Attribute VB_Name = "frmMain"',
-    'Private Sub mnuDaily_Click()', '  Load frmReport', '  frmReport.Show vbModal', 'End Sub', '',
+    'Private Sub Form_Load()', '  frmLogin.Show', 'End Sub',
+    'Private Sub mnuDaily_Click()', '  Load frmReport', '  frmReport.Show vbModal', 'End Sub',
+    'Private Sub txtCode_KeyPress(KeyAscii As Integer)', '  If KeyAscii = 13 Then frmLogin.Show', 'End Sub', '',
   ].join('\r\n'),
   'frmReport.frm': ['VERSION 5.00', 'Begin VB.Form frmReport', '   Caption = "Daily report"', '   ClientHeight = 3000', '   ClientWidth = 4000', 'End', 'Attribute VB_Name = "frmReport"', ''].join('\r\n'),
 }
@@ -65,7 +67,8 @@ describe('radical assay: desktop screens from their form files', () => {
     expect(login.text).toBe('Username:')
     // Opened from a button's handler and from a menu item's; a form named in a comment opens nothing.
     expect(login.opens).toEqual([{ form: 'frmMain', via: 'cmdLogin', line: 49 }])
-    expect(facts.screens[1].opens).toEqual([{ form: 'frmReport', via: 'mnuDaily', line: 15 }])
+    // A form showing others as it loads is no step of the user's; a key pressed in a control is.
+    expect(facts.screens[1].opens).toEqual([{ form: 'frmReport', via: 'mnuDaily', line: 18 }, { form: 'frmLogin', via: 'txtCode', key: true, line: 22 }])
     expect(facts.screens[1].controls).toEqual([{ ref: 'mnuDaily', role: 'menuitem', name: 'Daily report' }, { ref: 'mnuReports', role: 'menuitem', name: 'Reports' }])
   })
 

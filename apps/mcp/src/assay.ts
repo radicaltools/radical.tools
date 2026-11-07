@@ -964,7 +964,9 @@ export class Assay {
         const runs = new Set(r.services.filter((s) => s.unit === unit).map((s) => s.id))
         const mine = (f: { id: string; unit?: string; service?: string; units?: string[] }) =>
           !unit || (k === 'units' ? f.id === unit : f.unit === unit || (!!f.service && runs.has(f.service)) || (k === 'groups' && !!f.units?.includes(unit)))
-        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...f })))
+        // A form's layout is the wireframe's, not the agent's: its size and how many controls it has.
+        const shown = (f: Record<string, unknown>) => (k === 'screens' && f.form ? { ...f, form: { width: (f.form as { width: number }).width, height: (f.form as { height: number }).height, controls: (f.form as { controls: unknown[] }).controls.length } } : f)
+        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...shown(f as unknown as Record<string, unknown>) })))
       }
     }
     const from = Math.max(0, offset ?? 0)
@@ -1037,7 +1039,8 @@ export class Assay {
         const to = mockupOf.get(target)
         if (!to || to === from || navigated.has(`${from}->${to}`)) continue
         const control = screen.controls.find((c) => c.ref === open.via || c.ref.startsWith(`${open.via}(`))
-        const label = !open.via ? 'on opening' : control ? `${control.role === 'menuitem' ? 'chooses' : 'clicks'} "${control.name}"` : `${open.via}`
+        const name = control ? `"${control.name}"` : open.via ?? 'the form'
+        const label = open.key ? `presses a key in ${name}` : `${control?.role === 'menuitem' ? 'chooses' : 'clicks'} ${name}`
         const before = new Set(Object.keys(facade.getRelations()))
         const error = await attempt('add_relation', { sourceId: from, targetId: to, relationType: 'navigates-to', properties: { description: label } }, ctx, facade)
         if (error) { failures.push(`navigates-to from ${screen.route} to ${open.form}: ${error}`); continue }
@@ -1115,7 +1118,7 @@ export class Assay {
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
       ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
-      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation alone (marked "quoted" in ${RUN_FILE}: the code may not make them).`] : []),
+      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -1593,6 +1596,7 @@ export class Assay {
     const waiting = run.proposals.filter((p) => p.status === 'waiting')
     return [
       `Assay run on ${run.repositories.map((r) => r.repository).join(', ')}${run.sources.length ? ` with ${run.sources.length} source${run.sources.length === 1 ? '' : 's'} of documents (${run.sources.map((r) => r.repository).join(', ')})` : ''}: wrote ${count('element')} elements and ${count('relation')} relations between them, ${count('requirement')} requirements, ${count('scenario')} scenarios, ${run.written.filter((w) => w.kind === 'need' && w.key !== 'need').length} needs from documents${run.needId ? ' and the need Found in the code' : ''} and ${count('decision')} decisions into ${run.modelPath}; each requirement, scenario, need and decision with its own relations (satisfies, verifies, derives, constrains).`,
+      ...(count('mockup') && !run.explore ? [`Mockups: ${count('mockup')}, from the forms.`] : []),
       ...(['entity', 'process', 'state-machine'].some((k) => count(k as Written['kind'])) ? [`Domain: ${plural(count('entity'), 'entity').replace(/entitys$/, 'entities')}; ${plural(count('process'), 'process').replace(/processs$/, 'processes')} of ${plural(count('step'), 'step')} and ${plural(count('state-machine'), 'state machine')}, inferred.`] : []),
       ...(run.skeletons.length ? [`Pending tests written for scenarios drawn from the code: ${[...new Set(run.skeletons)].join(', ')}.`] : []),
       ...(run.explore ? [`Explored: ${run.explore.facts.paths.length} paths, ${run.explore.facts.screens.length} screens; ${run.written.filter((w) => w.kind === 'mockup').length} mockups written${run.testsWritten.length ? `, Playwright tests written: ${[...new Set(run.testsWritten)].join(', ')}` : ''}.`] : []),

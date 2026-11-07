@@ -171,7 +171,7 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     }] } })
     expect(applied.ok).toBe(true)
     expect(applied.text).toContain('1 state machine of 4 states')
-    expect(applied.text).toContain('Transitions: 2 rest on a line of the code that sets their target, 1 on a quotation alone (marked "quoted" in .radical/assay/run.json: the code may not make them).')
+    expect(applied.text).toContain('Transitions: 2 rest on a line of the code that sets their target, 1 on a quotation the server could not match to such a line in the state facts (marked "quoted" in .radical/assay/run.json: read them again if the quotation does not show the target set).')
     const evidence = json(join(root, '.radical/assay/run.json')).written.filter((w: { basis?: string }) => w.basis).map((w: { label: string; basis: string }) => [w.label, w.basis])
     expect(evidence).toEqual([['Payment received', 'sets'], ['Shipped', 'sets'], ['Cancelled', 'quoted']])
     const all = await nodes()
