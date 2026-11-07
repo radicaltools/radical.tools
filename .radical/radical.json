@@ -3240,6 +3240,18 @@
     ] },
     { "element": "87079c41-cc85-4793-8bd3-d15f6caef966", "name": "Several VB6 projects in one folder", "tests": [
       "packages/assay/tests/vb6.test.ts › radical assay: VB6 applications as they are › joins several VB6 projects of one folder into one unit known by each project's binary, and links a program to it"
+    ] },
+    { "element": "046b61e9-972c-4554-ac02-475d0c79f447", "name": "Access database opened through DAO", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads an Access database DAO opens by a file its code names, and the tables it opens by name"
+    ] },
+    { "element": "3271179d-8f17-4432-b79c-a246bc9aa64f", "name": "Tables opened by name", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › reads an Access database DAO opens by a file its code names, and the tables it opens by name"
+    ] },
+    { "element": "0fc5730d-32a7-4f29-90a7-b73ba944968c", "name": "Nameless connection named or left out", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › takes a nameless connection for the Access database the unit names, and reads none from one beside nothing, with a note"
+    ] },
+    { "element": "9f4e027a-9eea-4295-9e54-c35d9067cf3e", "name": "Address in a form's fields linked", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › links a client to the server on the port their forms' fields hold, the nearest of several listening on it"
     ] }
   ]
 }

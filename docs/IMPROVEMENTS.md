@@ -370,17 +370,17 @@ sharing a folder, connection templates of a library) and they are tuned on
 now. The next three (billing-system-vb6-2016, MMUD-Explorer, omelette-vb6),
 untouched: units 5/5, calls 1/3, tables 13/17. Open:
 
-- **DAO and file paths.** `DBEngine.OpenDatabase(App.Path & "\data.mdb")`
-  names an Access database by a path built at run time, not a connection
-  string: no database fact (MMUD-Explorer, omelette's Projects.mdb).
-- **Recordsets by name.** `db.OpenRecordset("Items")` names a table outside
-  SQL: half of MMUD-Explorer's tables are missed.
-- **Nameless connections.** A connection string whose file comes from a
-  variable gives a database of no name (`db:access`, `db:odbc`) that matches
-  nothing.
-- **System tables with a schema.** `sys.master_files` is read as a table.
-- **Calls in docs and form defaults.** vbman's Modbus masters reach their
-  slaves on 127.0.0.1:502, stated only in the docs and the forms' defaults.
+Fixed in a second round (DAO and Access files, recordsets by name, nameless
+connections, sys.-schema tables, a form's host and port fields with the
+nearest listener); those three are tuned on now. The next three held out
+(hospital-management-system, philip-…-inventory, divyen-…-inventory), single
+Access projects, gave units 3/3 and calls 3/3 before any change. Open:
+
+- **Harder held-out code.** The last three are simple; the next round should
+  hold out repositories with several projects, SQL Server or Oracle, and
+  network calls, where the first rounds failed.
+- **The agent's model is not measured.** The bench judges the facts; an
+  agent run on the held-out set is compared by hand.
 
 ### Dogfooding (2026-11-07): Assay's desktop screens, flags and evidence
 
