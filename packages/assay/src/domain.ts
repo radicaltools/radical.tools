@@ -13,6 +13,7 @@ import { extname, join } from 'node:path'
 import type { DatabaseFact, StateFact, TableFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
+import { laravelMigrations } from './laravel'
 
 type Column = NonNullable<TableFact['columns']>[number]
 type Reference = NonNullable<TableFact['references']>[number]
@@ -37,6 +38,13 @@ const isStatus = (name: string): boolean => STATUS_NAME.test(name) && !/^(is|has
 const unquote = (name: string): string => name.replace(/^[`"[]|[`"\]]$/g, '')
 /** schema.table → table. */
 const bare = (name: string): string => unquote(name.split('.').pop() ?? name)
+/** The schema a database puts a table in when none is named. */
+const DEFAULT_SCHEMA = /^(dbo|public)$/i
+/** schema.table → schema, unless it is the default one. */
+const schemaOf = (name: string): string | undefined => {
+  const parts = name.split('.')
+  return parts.length > 1 && !DEFAULT_SCHEMA.test(unquote(parts[parts.length - 2])) ? unquote(parts[parts.length - 2]) : undefined
+}
 /** OrderItem → order_item. */
 const snake = (name: string): string => name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').toLowerCase()
 const quoted = (text: string): string[] => [...text.matchAll(/'((?:[^']|'')*)'|"([^"]*)"/g)].map((m) => (m[1] ?? m[2]).replace(/''/g, "'"))
@@ -80,13 +88,13 @@ function topLevel(body: string, separator = ','): Array<{ text: string; at: numb
 /** SQL without its comments (--, # in MySQL, /* … *\/), its lines kept. */
 const withoutSqlComments = (sql: string): string => sql.replace(/--[^\n]*|(^|[ \t,(])#[^\n'"]*$/gm, (m) => ' '.repeat(m.length)).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
 
-const SQL_NAME = '[`"[]?(?:\\w+[`"\\]]?\\.)?[`"[]?([A-Za-z_][\\w$]*)[`"\\]]?'
+const SQL_NAME = '[`"[]?(?:\\w+[`"\\]]?\\.)?[`"[]?([A-Za-z_][\\w$]*(?:-[\\w$]+)*)[`"\\]]?'
 const NOT_COLUMNS = /^(constraint|primary|unique|key|index|fulltext|spatial|exclude|period|like)\b/i
 
 export interface SchemaState { name: string; values: string[]; initial?: string; table?: string; column?: string; file: string; line: number }
 
 /** The tables an SQL file creates and alters, with their columns, foreign keys and the values a status column takes. */
-export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[]; views: string[]; databases: Array<{ name: string; engine: string; line: number }> } {
+export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[]; views: string[]; databases: Array<{ name: string; engine: string; line: number }>; changes: Array<{ drop: string } | { from: string; to: string }> } {
   const text = withoutSqlComments(sql)
   const tables: Array<Omit<Declared, 'unit'>> = []
   const states: SchemaState[] = []
@@ -105,7 +113,9 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
     types.set(m[1].toLowerCase(), { name: m[1], values, file, line: lineAt(text, m.index!) })
   }
   for (const m of text.matchAll(new RegExp(`\\bcreate\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}\\s*\\(`, 'gi'))) {
-    const table = m[1]
+    // A table in a schema other than the default one keeps it: two schemas may hold one name.
+    const schema = /^create\s+table\s+(?:if\s+not\s+exists\s+)?[`"[]?(\w+)[`"\]]?\s*\./i.exec(m[0])?.[1]
+    const table = schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${m[1]}` : m[1]
     const open = m.index! + m[0].length - 1
     const body = enclosed(text, open)
     const declared: Omit<Declared, 'unit'> = { table, declared: 'SQL', columns: [], references: [], evidence: { file, line: lineAt(text, m.index!) } }
@@ -144,7 +154,20 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
     else tables.push({ table: m[1], declared: 'SQL', columns: [], references: [reference], evidence: { file, line } })
   }
   for (const t of types.values()) if (isStatus(t.name)) states.push(t)
-  return { tables, states, views, databases }
+  // Tables the script drops or renames, in order: those it created before go or change name here, earlier scripts' with them.
+  const changes: Array<{ drop: string } | { from: string; to: string }> = []
+  const events = [
+    ...[...text.matchAll(new RegExp(`\\bdrop\\s+table\\s+(?:if\\s+exists\\s+)?${SQL_NAME}`, 'gi'))].map((m) => ({ at: m.index!, change: { drop: m[1] } })),
+    ...[...text.matchAll(new RegExp(`\\b(?:alter\\s+table\\s+(?:if\\s+exists\\s+)?${SQL_NAME}\\s+rename\\s+to|rename\\s+table\\s+${SQL_NAME}\\s+to)\\s+${SQL_NAME}`, 'gi'))].map((m) => ({ at: m.index!, change: { from: m[1] ?? m[2], to: m[3] } })),
+  ].sort((a, b) => a.at - b.at)
+  for (const e of events) {
+    const line = lineAt(text, e.at)
+    const named = (t: Omit<Declared, 'unit'>, name: string): boolean => bare(t.table).toLowerCase() === name.toLowerCase() && t.evidence.line <= line
+    if ('drop' in e.change) { const gone = e.change.drop; for (let i = tables.length - 1; i >= 0; i--) if (named(tables[i], gone)) tables.splice(i, 1) }
+    else { const { from, to } = e.change; for (const t of tables) if (named(t, from)) t.table = t.table.replace(/[^.]+$/, to) }
+    changes.push(e.change)
+  }
+  return { tables, states, views, databases, changes }
 }
 
 // ── ORM classes ──────────────────────────────────────────────────────────────
@@ -219,19 +242,32 @@ const CS_SIMPLE = /^(int|long|short|byte|string|decimal|double|float|bool|char|G
 /** Entity Framework Core: the classes a DbContext's DbSets name (or [Table] marks), their tables by the DbSet's name. */
 function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit'>> {
   const sets = new Map<string, string>()
-  const tables = new Map<string, string>()
+  // The tables classes map to, each with where it is said: two modules may each have a class of one name.
+  const mapped = new Map<string, Array<{ table: string; file: string }>>()
+  const map = (className: string, table: string, schema: string | undefined, file: string): void => {
+    mapped.set(className, [...(mapped.get(className) ?? []), { table: schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${table}` : table, file }])
+  }
   for (const f of sources.filter((x) => x.endsWith('.cs'))) {
     const text = files.read(f)
     for (const m of text.matchAll(/\bDbSet<(\w+)>\s+(\w+)/g)) sets.set(m[1], m[2])
-    for (const m of text.matchAll(/\bEntity<(\w+)>\(\)\s*\.ToTable\(\s*"([^"]+)"/g)) tables.set(m[1], m[2])
+    for (const m of text.matchAll(/\bEntity<(\w+)>\(\)\s*\.ToTable\(\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?/g)) map(m[1], m[2], m[3], f)
+    // A configuration class: IEntityTypeConfiguration<Member> with builder.ToTable("Members", "meetings").
+    const configured = /\bIEntityTypeConfiguration<(\w+)>/.exec(text)?.[1]
+    const table = configured ? /\b\w+\.ToTable\(\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?/.exec(text) : null
+    if (configured && table) map(configured, table[1], table[2], f)
+  }
+  /** The table a class maps to, said nearest the class's file. */
+  const tableOf = (className: string, file: string): string | undefined => {
+    const shared = (a: string, b: string): number => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i }
+    return (mapped.get(className) ?? []).sort((a, b) => shared(b.file, file) - shared(a.file, file))[0]?.table
   }
   const out: Array<Omit<Declared, 'unit'>> = []
   for (const f of sources.filter((x) => x.endsWith('.cs'))) {
     const text = withoutComments(files.read(f))
     for (const m of text.matchAll(/(\[Table\(\s*"([^"]+)"[^\]]*\]\s*)?(?:(?:public|internal|sealed|partial|abstract)\s+)*class\s+(\w+)/g)) {
       const name = m[3]
-      if (!sets.has(name) && !m[2]) continue
-      const declared: Omit<Declared, 'unit'> = { table: m[2] ?? tables.get(name) ?? sets.get(name)!, className: name, declared: 'Entity Framework Core', columns: [], references: [], evidence: { file: f, line: lineAt(text, m.index! + (m[1]?.length ?? 0)) } }
+      if (!sets.has(name) && !m[2] && !mapped.has(name)) continue
+      const declared: Omit<Declared, 'unit'> = { table: m[2] ?? tableOf(name, f) ?? sets.get(name)!, className: name, declared: 'Entity Framework Core', columns: [], references: [], evidence: { file: f, line: lineAt(text, m.index! + (m[1]?.length ?? 0)) } }
       out.push(declared)
       const body = classBody(text, m.index! + m[0].length)
       if (!body) continue
@@ -507,6 +543,15 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const scriptDbs = new Set([...files.read(file).matchAll(/^\s*(?:use|create\s+database)\s+\[?(\w+)\]?/gim)].map((m) => m[1].toLowerCase()))
     const users = unit ? [unit] : units.length === 1 ? units : units.filter((u) => named.some((t) => t.unit === u.id && names.has(bare(t.table).toLowerCase())) || used.some((d) => d.unit === u.id && !!d.name && scriptDbs.has(d.name.toLowerCase())))
     for (const u of users) {
+      // An earlier script's table this one drops or renames.
+      for (const c of schema.changes) {
+        for (let i = declared.length - 1; i >= 0; i--) {
+          const d = declared[i]
+          if (d.unit !== u || d.declared !== 'SQL' || bare(d.table).toLowerCase() !== bare('drop' in c ? c.drop : c.from).toLowerCase()) continue
+          if ('drop' in c) declared.splice(i, 1)
+          else d.table = d.table.replace(/[^.]+$/, c.to)
+        }
+      }
       declared.push(...schema.tables.map((t) => ({ ...t, unit: u })))
       schemaStates.push(...schema.states.map((s) => ({ ...s, unit: u })))
       for (const db of schema.databases) {
@@ -514,6 +559,12 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
         if (!databases.some((d) => d.id === id)) databases.push({ id, unit: u.id, engine: db.engine, name: db.name, evidence: { file, line: db.line } })
       }
     }
+  }
+  // Laravel's migrations, in the order they run: the tables the last one leaves, per unit.
+  const migrations = files.list.filter((f) => /(^|\/)database\/migrations\/[^/]+\.php$/.test(f) && !!own(f))
+  for (const unit of new Set(migrations.map((f) => own(f)!))) {
+    const mine = migrations.filter((f) => own(f) === unit).map((file) => ({ file, text: withoutComments(files.read(file)) }))
+    declared.push(...laravelMigrations(mine).map((t) => ({ ...t, declared: 'Laravel', unit })))
   }
   const sources = files.list.filter((f) => SOURCE.test(f) && !TEST_FILE.test(f) && !!own(f))
   for (const file of sources) {
@@ -533,8 +584,19 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   for (const file of files.named(/\.prisma$/)) {
     const unit = own(file)
     if (!unit) continue
-    const read = prisma(files.read(file), file)
+    const text = files.read(file)
+    const read = prisma(text, file)
     declared.push(...read.tables.map((t) => ({ ...t, unit })))
+    // Its datasource: the engine its provider names, the database its address names (none when the environment gives it).
+    const source = /\bdatasource\s+\w+\s*\{([^}]*)\}/.exec(text)
+    const provider = source && /\bprovider\s*=\s*"(\w+)"/.exec(source[1])?.[1]
+    const engine = provider && ({ postgresql: 'PostgreSQL', postgres: 'PostgreSQL', mysql: 'MySQL', sqlite: 'SQLite', sqlserver: 'SQL Server', mongodb: 'MongoDB', cockroachdb: 'CockroachDB' } as Record<string, string>)[provider.toLowerCase()]
+    if (source && engine) {
+      const url = /\burl\s*=\s*"([^"]+)"/.exec(source[1])?.[1]
+      const name = url ? /\/([\w-]+)(?:\?|$)/.exec(url.replace(/^\w+:\/\/[^/]*/, ''))?.[1] : undefined
+      const id = `${repo}:db:${unit.path}:${engine}/${name ?? ''}`
+      if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit.id, engine, ...(name ? { name } : {}), evidence: { file, line: lineAt(text, source.index) } })
+    }
     prismaEnums.push(...read.enums.map((e) => ({ name: e.name, values: e.values, aliases: new Map<string, string[]>(), file, line: e.line, unit })))
   }
 
@@ -543,9 +605,31 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const of = declared.filter((d) => d.className === className)
     return (of.find((d) => d.unit === unit) ?? of[0])?.table ?? snake(className)
   }
-  const tables = new Map<string, TableFact>(named.map((t) => [t.id, { ...t, inCode: true }]))
+  // A table is known by its name, or by its schema and name where two schemas the repository declares hold that name
+  // (its code may name them from units other than the one declaring them).
+  const schemas = new Map<string, Set<string>>()
   for (const d of declared) {
-    const id = `${repo}:table:${d.unit.path}:${bare(d.table).toLowerCase()}`
+    const schema = schemaOf(d.table)
+    // A declaration without a schema (an ORM class) is of whichever schema holds the name.
+    if (!schema) continue
+    const key = bare(d.table).toLowerCase()
+    schemas.set(key, (schemas.get(key) ?? new Set()).add(schema.toLowerCase()))
+  }
+  const nameOf = (table: string): string => {
+    const schema = schemaOf(table)
+    return schema && (schemas.get(bare(table).toLowerCase())?.size ?? 0) > 1 ? `${schema}.${bare(table)}` : bare(table)
+  }
+  const unitPath = new Map(units.map((u) => [u.id, u.path]))
+  const tables = new Map<string, TableFact>()
+  for (const t of named) {
+    // A database's own schema holds no table of the system (sys.master_files).
+    if (/^(sys|information_schema)$/i.test(schemaOf(t.table) ?? '')) continue
+    const name = nameOf(t.table)
+    const id = `${repo}:table:${unitPath.get(t.unit) ?? ''}:${name.toLowerCase()}`
+    if (!tables.has(id)) tables.set(id, { ...t, id, table: name, inCode: true })
+  }
+  for (const d of declared) {
+    const id = `${repo}:table:${d.unit.path}:${nameOf(d.table).toLowerCase()}`
     const references = d.references.map(({ className, ...r }) => ({ ...r, table: bare(className ? classTable(className, d.unit) : r.table) }))
     const known = tables.get(id)
     if (known) {
@@ -558,7 +642,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
       if (!known.columns?.length) known.columns = d.columns
       known.references = [...(known.references ?? []), ...references.filter((r) => !known.references?.some((k) => k.table === r.table && k.column === r.column))]
     } else {
-      tables.set(id, { id, unit: d.unit.id, table: bare(d.table), ...(d.declared !== 'SQL' ? { inCode: true } : {}), declared: d.declared, columns: d.columns, references, evidence: d.evidence })
+      tables.set(id, { id, unit: d.unit.id, table: nameOf(d.table), ...(d.declared !== 'SQL' ? { inCode: true } : {}), declared: d.declared, columns: d.columns, references, evidence: d.evidence })
     }
   }
 

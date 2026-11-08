@@ -580,12 +580,17 @@ it). A folder of code is left as it was: its facts go to
 `.radical/assay/facts/` of the current directory. Nothing is fetched or
 cloned. For each repository it reads, from the files git lists:
 
-- units, wherever they are: npm packages, Maven and Gradle projects, Go
-  modules (or main packages before modules), .NET projects, Python projects,
-  VB6 projects, and a folder with a Dockerfile no manifest claims; each an
-  app, a library or tests, with its stack and the frameworks it names;
+- units, wherever they are: npm packages, Nx projects (`project.json`),
+  Composer projects (PHP, Laravel), Maven and Gradle projects, Go modules (or
+  main packages before modules), .NET projects and SQL Server database
+  projects (`.sqlproj`), Python projects, VB6 projects, and a folder with a
+  Dockerfile no manifest claims (not a `.devcontainer`, nor one that copies
+  other units' projects: it builds them); each an app, a library or tests,
+  with its stack and the frameworks it names;
 - each unit's dependencies, and its references to other units by path (a
-  .NET `ProjectReference`, a VB6 `Reference=*\A…vbp`, a Gradle `project(':x')`);
+  .NET `ProjectReference`, also those `Directory.Build.props` and
+  `.targets` add by conditions on the project's name and path, a VB6
+  `Reference=*\A…vbp`, a Gradle `project(':x')`);
   a VB6 reference to a COM binary another unit builds counts as one;
 - solutions and VB6 groups (`.sln`, `.vbg`);
 - what runs: the services of docker-compose files, Kubernetes manifests and
@@ -598,10 +603,14 @@ cloned. For each repository it reads, from the files git lists:
   one unit listens on);
 - data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,
   .NET, PDO, Go's MySQL driver, database URLs, a `.env` file's
-  `DB_CONNECTION` and `DB_DATABASE`) and the tables SQL names; a
-  table SQL creates or alters, or an ORM class maps (JPA, Entity Framework
-  Core, Django, SQLAlchemy, TypeORM, Prisma), with its columns and the table
-  each foreign key references. An Access file's own tables are read by the
+  `DB_CONNECTION` (or Laravel's default connection) and `DB_DATABASE`, a
+  compose service's environment, a Prisma datasource) and the tables SQL
+  names; a table SQL creates or alters, Laravel's migrations create, or an
+  ORM class maps (JPA, Entity Framework Core, Django, SQLAlchemy, TypeORM,
+  Prisma), with its columns and the table each foreign key references;
+  migrations count in order, so a table a later one drops is gone; a table
+  in a schema is named by schema and name only where two schemas hold its
+  name. An Access file's own tables are read by the
   MCP server only: the CLI notes each Access file a unit uses;
 - statuses: the values an enum named for a status, a `CHECK … IN` list, an
   SQL `ENUM`, a table's flags (boolean columns, nullable dates of an event)

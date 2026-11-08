@@ -10,6 +10,7 @@
 import { basename } from 'node:path'
 import type { DependencyFact, GroupFact, Stack, TestFramework, Unit } from './facts'
 import { RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, lineOf, resolveFrom } from './files'
+import { buildReferences } from './msbuild'
 
 export interface StackUnits {
   units: Unit[]
@@ -32,6 +33,7 @@ const TECHNOLOGY: Array<[RegExp, string]> = [
   [/spring-boot-starter-data-jpa/, 'JPA'], [/^Microsoft\.AspNetCore|^Microsoft\.NET\.Sdk\.Web$/, 'ASP.NET Core'],
   [/^Microsoft\.EntityFrameworkCore/, 'Entity Framework Core'], [/^Microsoft\.AspNetCore\.Components\.WebAssembly/, 'Blazor'],
   [/^(flask|Flask)$/, 'Flask'], [/^(django|Django)$/, 'Django'], [/^fastapi$/, 'FastAPI'],
+  [/^laravel\/framework$/, 'Laravel'], [/^symfony\/framework-bundle$/, 'Symfony'],
   [/^github\.com\/gin-gonic\/gin$/, 'Gin'], [/^github\.com\/gorilla\/mux$/, 'gorilla/mux'],
   [/Microsoft ActiveX Data Objects|^msado/i, 'ADO'], [/Microsoft DAO/i, 'DAO'], [/DirectX|^dx\d+vb/i, 'DirectX'],
   [/Winsock|^mswinsck/i, 'Winsock'],
@@ -154,6 +156,20 @@ function npm(files: RepoFiles, notes: string[]): Draft[] {
     d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
     out.push(d)
   }
+  // An Nx workspace's project with no package.json of its own: its project.json.
+  if (files.has('nx.json')) {
+    for (const file of files.named(/^project\.json$/).filter((f) => !inTests(f) || /(^|\/)e2e\//.test(f))) {
+      const path = dirOf(file)
+      if (files.has(path === '.' ? 'package.json' : `${path}/package.json`)) continue
+      const text = files.read(file)
+      let json: Record<string, unknown>
+      try { json = JSON.parse(text) as Record<string, unknown> } catch { continue }
+      const d = draft('npm', path, file, typeof json.name === 'string' ? json.name : undefined, lineOf(text, /"name"\s*:/))
+      d.tests = TESTS.test(`${d.name} ${path}`)
+      if (!d.tests && json.projectType === 'application') d.reasons.push('it is an Nx application')
+      out.push(d)
+    }
+  }
   return out
 }
 
@@ -273,9 +289,9 @@ function goWithoutModules(files: RepoFiles): Draft[] {
 
 function dotnet(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
   const out: Draft[] = []
-  for (const file of files.named(/\.(cs|fs|vb)proj$/i).filter((f) => !inFixtures(f))) {
+  for (const file of files.named(/\.(cs|fs|vb|sql)proj$/i).filter((f) => !inFixtures(f))) {
     const text = files.read(file)
-    const name = /<AssemblyName>([^<]+)<\/AssemblyName>/.exec(text)?.[1] ?? basename(file).replace(/\.(cs|fs|vb)proj$/i, '')
+    const name = /<AssemblyName>([^<]+)<\/AssemblyName>/.exec(text)?.[1] ?? basename(file).replace(/\.(cs|fs|vb|sql)proj$/i, '')
     const path = dirOf(file)
     const d = draft('dotnet', path, file, name, 1)
     const sdk = /<Project\s+Sdk="([^"]+)"/.exec(text)?.[1] ?? ''
@@ -285,6 +301,8 @@ function dotnet(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
       const target = resolveFrom(path, m[1])
       if (target) d.refs.push({ name: basename(m[1].replace(/\\/g, '/')).replace(/\.(cs|fs|vb)proj$/i, ''), path: target, line: lineAt(text, m.index!), file })
     }
+    // References the Directory.Build files above it add, by their conditions on its name and path.
+    for (const r of buildReferences(files, file)) if (!d.refs.some((x) => x.path === r.path)) d.refs.push(r)
     for (const m of text.matchAll(/<PackageReference\s+Include="([^"]+)"/g)) {
       d.deps.push(m[1])
       d.depLines.set(m[1], { file, line: lineAt(text, m.index!) })
@@ -303,6 +321,35 @@ function dotnet(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
       units: projects.map((p) => resolveFrom(dirOf(file), dirOf(p[2].replace(/\\/g, '/'))) ?? '').filter(Boolean).map((p) => `${repo}:unit:${p}`),
       evidence: { file, line: lineOf(text, /^Project\(/m) },
     })
+  }
+  return out
+}
+
+// ── PHP ──────────────────────────────────────────────────────────────────────
+
+/** Composer projects: an app when it is a Laravel application or has a front controller (public/index.php). */
+function php(files: RepoFiles, notes: string[]): Draft[] {
+  const out: Draft[] = []
+  for (const file of files.named(/^composer\.json$/).filter((f) => !inTests(f))) {
+    const text = files.read(file)
+    let json: Record<string, unknown>
+    try { json = JSON.parse(text) as Record<string, unknown> } catch (error) { notes.push(`${file} does not parse: ${(error as Error).message}`); continue }
+    const path = dirOf(file)
+    const prefix = path === '.' ? '' : `${path}/`
+    const d = draft('php', path, file, typeof json.name === 'string' ? json.name : undefined, lineOf(text, /"name"\s*:/))
+    for (const field of ['require', 'require-dev']) {
+      const deps = json[field]
+      if (!deps || typeof deps !== 'object') continue
+      for (const dep of Object.keys(deps)) {
+        d.deps.push(dep)
+        d.depLines.set(dep, { file, line: lineOf(text, new RegExp(`"${escapeRe(dep)}"\\s*:`)) })
+      }
+    }
+    if (d.deps.includes('laravel/framework') || files.has(`${prefix}artisan`)) d.reasons.push('it is a Laravel application')
+    else if (files.has(`${prefix}public/index.php`) || files.has(`${prefix}index.php`)) d.reasons.push('it has a front controller')
+    if (typeof json.description === 'string' && json.description) d.description = json.description
+    d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
+    out.push(d)
   }
   return out
 }
@@ -410,17 +457,28 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
 // ── Docker ───────────────────────────────────────────────────────────────────
 
 /** A folder with a Dockerfile no manifest claims runs something: an app in the language its base image names. */
-function docker(files: RepoFiles, claimed: Set<string>): Draft[] {
+function docker(files: RepoFiles, claimed: Set<string>, moves: Map<string, string>): Draft[] {
   const out: Draft[] = []
   for (const file of files.named(/^Dockerfile$/).filter((f) => !inTests(f))) {
     const path = dirOf(file)
     if (claimed.has(path)) continue
+    // A development container's image is the developers', not the system's.
+    if (/(^|\/)\.devcontainer$/.test(path)) continue
+    // A Dockerfile above other units that copies their projects or folders builds them.
+    const text = files.read(file)
+    const copied = [...text.matchAll(/^\s*(?:COPY|ADD)\s+(?:--\S+\s+)*(?:\[\s*"([^"]+)"|(\S+))/gmi)].map((m) => resolveFrom(path, m[1] ?? m[2])).filter((r): r is string => !!r)
+    const built = [...claimed].filter((c) => c !== path && copied.some((r) => (r === '.' && path === '.') || c === r || c.startsWith(`${r}/`) || (dirOf(r) === c && /\.(cs|fs|vb|sql)proj$|(^|\/)(package\.json|composer\.json|pom\.xml|build\.gradle(\.kts)?|go\.mod|pyproject\.toml|requirements\.txt)$/i.test(r))))
+    if (built.length) {
+      // The only unit below it, which it packages (an application in html/ behind its Dockerfile), is known by its folder.
+      const below = [...claimed].filter((c) => path === '.' ? c !== '.' : c.startsWith(`${path}/`))
+      if (below.length === 1 && built.length === 1 && path !== '.') moves.set(below[0], path)
+      continue
+    }
     // docker/<name>/Dockerfile below a unit packages that unit.
     if ([...claimed].some((c) => (c === '.' || path.startsWith(`${c}/`)) && /(^|\/)(docker|\.docker|deploy|build|packaging|container)(\/|$)/i.test(c === '.' ? path : path.slice(c.length + 1)))) continue
     // A Dockerfile alone in its folder builds what other folders hold.
     const prefix = path === '.' ? '' : `${path}/`
     if (!files.list.some((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes('/') && !/^(Dockerfile|\.dockerignore|README(\.md)?)$/i.test(f.slice(prefix.length)))) continue
-    const text = files.read(file)
     const d = draft('docker', path, file, undefined, lineOf(text, /^FROM\s/mi))
     d.reasons.push('it has a Dockerfile')
     const images = [...text.matchAll(/^FROM\s+(\S+)/gmi)].map((m) => m[1].toLowerCase())
@@ -439,7 +497,8 @@ const BASE_IMAGES: Array<[RegExp, string]> = [
 export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
   const groups: GroupFact[] = []
-  const drafts = [...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...dotnet(files, groups, repo), ...python(files), ...vb6(files, groups, repo)]
+  // A Composer project claims its folder before the package.json that builds its front end.
+  const drafts = [...php(files, notes), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...dotnet(files, groups, repo), ...python(files), ...vb6(files, groups, repo)]
   // One unit per folder: the first stack read claims it (a Python folder with a package.json for its tooling stays npm).
   const byPath = new Map<string, Draft>()
   for (const d of drafts) {
@@ -454,7 +513,16 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     first.refs.push(...d.refs)
     first.reasons.push(...d.reasons.filter((x) => !first.reasons.includes(x)))
   }
-  for (const d of docker(files, new Set(byPath.keys()))) byPath.set(d.path, d)
+  const moves = new Map<string, string>()
+  for (const d of docker(files, new Set(byPath.keys()), moves)) byPath.set(d.path, d)
+  for (const [from, to] of moves) {
+    const d = byPath.get(from)!
+    byPath.delete(from)
+    d.path = to
+    if (!d.named) d.name = basename(to)
+    d.reasons.push('it has a Dockerfile')
+    byPath.set(to, d)
+  }
 
   const units: Unit[] = []
   const dependencies: DependencyFact[] = []
@@ -463,7 +531,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     if (files.has(`${prefix}Dockerfile`) && !d.reasons.includes('it has a Dockerfile')) d.reasons.push('it has a Dockerfile')
     const technology = new Set(technologyOf(d.deps))
     if (d.stack === 'docker') for (const img of d.deps) for (const [re, t] of BASE_IMAGES) if (re.test(img)) technology.add(t)
-    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', vb6: 'VB6', docker: '' }[d.stack])
+    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', vb6: 'VB6', docker: '' }[d.stack])
     technology.delete('')
     const id = `${repo}:unit:${d.path}`
     units.push({

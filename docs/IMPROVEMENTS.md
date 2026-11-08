@@ -360,6 +360,34 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-08): other stacks held out
+
+Four repositories of other stacks were written down by hand (from READMEs,
+manifests, configuration and schemas, before Assay ran on them): BookStack
+(Laravel), spring-petclinic, modular-monolith-with-ddd (.NET) and
+node-express-realworld-example-app (Node, Prisma). Untouched: units 50/53,
+calls 16/52, tables 40/100. The causes were references Directory.Build
+files add (34 of the 36 missed calls), Laravel unread, a Prisma database
+with no name, dropped tables kept, schema names and JPQL entities read as
+tables, and Nx, database and build projects missed. Fixed: 53/53, 52/52,
+99/100; tuned on now. The held-out set keeps robot-shop, eShop and sockshop,
+whose unit precision (76 %) is still low: libraries and test projects the
+bench does not list, and eShop's root package.json. Open:
+
+- **A new held-out set.** Nothing of the other stacks is held out but the
+  three above, all seen many times; the next round needs new repositories.
+- **robot-shop was looked at.** Making Composer projects units turned its
+  ratings/html into the unit and left ratings out; the fix (the only unit a
+  Dockerfile packages is known by its folder) came from seeing that.
+- **PHPUnit.** A Laravel unit names no test framework, so an accepted
+  scenario gets no pending test; the test skeletons know no PHP.
+- **Laravel routes.** Route groups' prefixes are lost (`/deviations/register`
+  is `/quality/deviations/register`), and routes are URL paths, not APIs.
+- **Stale scripts.** A schema script nothing runs (InitializeDatabase.sql
+  beside the database project) still counts as a schema.
+- **depends_on is no call.** A compose service waiting for a migrator reads
+  as a call of it.
+
 ### Dogfooding (2026-11-07): VB6 repositories held out
 
 Six VB6 repositories held out of the bench, written down before Assay ran on

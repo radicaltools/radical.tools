@@ -97,7 +97,10 @@ export class RepoFiles {
 
   constructor(readonly root: string) {
     const listing = listFiles(root)
-    this.list = listing.files.filter((f) => !f.split('/').slice(0, -1).some((seg) => SKIPPED.has(seg))).sort()
+    // A build folder holding a .NET project is a build project's code (NUKE's build/_build.csproj), not output.
+    const builds = new Set(listing.files.filter((f) => /(^|\/)build\/[^/]+\.(cs|fs)proj$/i.test(f)).map((f) => f.slice(0, f.lastIndexOf('/'))))
+    const skipped = (f: string): boolean => f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !(seg === 'build' && builds.has(segs.slice(0, i + 1).join('/'))))
+    this.list = listing.files.filter((f) => !skipped(f)).sort()
     this.set = new Set(this.list)
     this.nested = listing.nested.sort()
     this.more = listing.more
