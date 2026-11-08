@@ -428,6 +428,27 @@ as no entities (12 of 30). Open, from the reports:
 - **assay_apply's description** says a document may back an observed item;
   the server refuses it. Plan elements take no `properties` (a domain's kind).
 
+Run 23 (`23-services`, 2026-11-08, after the procedure asked for an entity
+per table and the scorer stopped counting test projects and join tables as
+missed; $8.9, 17 minutes): units 95 %, calls 100 % (precision 100 %),
+tables as entities 97 % (run 22 re-scored: 95 %, 100 %, 52 %). New in its
+report, open:
+
+- **Django foreign keys without a target.** Most of bakerydemo's references
+  have `table: ""` (`image_id`, `page_id`, `person_id`), so `partOf` and
+  `references` cannot rest on them.
+- **Tables in C# strings.** Dapper services' `CREATE TABLE` in C# strings is
+  unparsed (no columns, the `REFERENCES WorkshopPlanning` key lost), and
+  their tables are labelled Entity Framework Core.
+- **Ports a unit calls read as ports it listens on** (`notification-service`
+  listens on 465 and 27017); Seq is `role: other`, not observability; hosts
+  in fixtures JSON and `.pre-commit-config.yaml` are addresses.
+- **A Python unit at the root is named `.`**, and Wagtail's
+  `WagtailPageTestCase` tests are no test framework to it.
+- **The plan's schema** does not say step keys are unique across a plan, not
+  per process (42 refusals); `assay_answer` cannot set a requirement's need
+  back to *Found in the code*.
+
 ### Dogfooding (2026-11-08): nine repositories held out
 
 Nine new repositories were written down by hand before Assay ran on them
