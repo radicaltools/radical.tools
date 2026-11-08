@@ -64,9 +64,13 @@ describe('radical assay: what other stacks hide', () => {
       'src/Database/entrypoint.sh': '/opt/mssql/bin/sqlservr\n',
       'src/Database/Db/Db.sqlproj': '<Project Sdk="MSBuild.Sdk.SqlProj/2.0.0" />\n',
       'src/Database/Db/Scripts/Create.sql': 'CREATE DATABASE [Shop]\n',
+      // An application in html/ that its Dockerfile packages is known by the Dockerfile's folder.
+      'ratings/Dockerfile': 'FROM php:8-apache\nCOPY html/ /var/www/html/\n',
+      'ratings/html/composer.json': JSON.stringify({ require: { 'slim/slim': '^4' } }),
+      'ratings/html/index.php': '<?php\n',
     }))
     expect(facts.units.map((u) => [u.path, u.kind]).sort()).toEqual([
-      ['.', 'app'], ['build', 'app'], ['e2e', 'tests'], ['src/Api', 'app'], ['src/Database', 'app'], ['src/Database/Db', 'library'],
+      ['.', 'app'], ['build', 'app'], ['e2e', 'tests'], ['ratings', 'app'], ['src/Api', 'app'], ['src/Database', 'app'], ['src/Database/Db', 'library'],
     ])
   })
 

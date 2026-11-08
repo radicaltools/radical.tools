@@ -457,7 +457,7 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
 // ── Docker ───────────────────────────────────────────────────────────────────
 
 /** A folder with a Dockerfile no manifest claims runs something: an app in the language its base image names. */
-function docker(files: RepoFiles, claimed: Set<string>): Draft[] {
+function docker(files: RepoFiles, claimed: Set<string>, moves: Map<string, string>): Draft[] {
   const out: Draft[] = []
   for (const file of files.named(/^Dockerfile$/).filter((f) => !inTests(f))) {
     const path = dirOf(file)
@@ -467,7 +467,13 @@ function docker(files: RepoFiles, claimed: Set<string>): Draft[] {
     // A Dockerfile above other units that copies their projects or folders builds them.
     const text = files.read(file)
     const copied = [...text.matchAll(/^\s*(?:COPY|ADD)\s+(?:--\S+\s+)*(?:\[\s*"([^"]+)"|(\S+))/gmi)].map((m) => resolveFrom(path, m[1] ?? m[2])).filter((r): r is string => !!r)
-    if (copied.some((r) => [...claimed].some((c) => c !== path && (r === '.' && path === '.' || c === r || c.startsWith(`${r}/`) || (dirOf(r) === c && /\.(cs|fs|vb|sql)proj$|(^|\/)(package\.json|pom\.xml|build\.gradle(\.kts)?|go\.mod|pyproject\.toml|requirements\.txt)$/i.test(r)))))) continue
+    const built = [...claimed].filter((c) => c !== path && copied.some((r) => (r === '.' && path === '.') || c === r || c.startsWith(`${r}/`) || (dirOf(r) === c && /\.(cs|fs|vb|sql)proj$|(^|\/)(package\.json|composer\.json|pom\.xml|build\.gradle(\.kts)?|go\.mod|pyproject\.toml|requirements\.txt)$/i.test(r))))
+    if (built.length) {
+      // The only unit below it, which it packages (an application in html/ behind its Dockerfile), is known by its folder.
+      const below = [...claimed].filter((c) => path === '.' ? c !== '.' : c.startsWith(`${path}/`))
+      if (below.length === 1 && built.length === 1 && path !== '.') moves.set(below[0], path)
+      continue
+    }
     // docker/<name>/Dockerfile below a unit packages that unit.
     if ([...claimed].some((c) => (c === '.' || path.startsWith(`${c}/`)) && /(^|\/)(docker|\.docker|deploy|build|packaging|container)(\/|$)/i.test(c === '.' ? path : path.slice(c.length + 1)))) continue
     // A Dockerfile alone in its folder builds what other folders hold.
@@ -507,7 +513,16 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     first.refs.push(...d.refs)
     first.reasons.push(...d.reasons.filter((x) => !first.reasons.includes(x)))
   }
-  for (const d of docker(files, new Set(byPath.keys()))) byPath.set(d.path, d)
+  const moves = new Map<string, string>()
+  for (const d of docker(files, new Set(byPath.keys()), moves)) byPath.set(d.path, d)
+  for (const [from, to] of moves) {
+    const d = byPath.get(from)!
+    byPath.delete(from)
+    d.path = to
+    if (!d.named) d.name = basename(to)
+    d.reasons.push('it has a Dockerfile')
+    byPath.set(to, d)
+  }
 
   const units: Unit[] = []
   const dependencies: DependencyFact[] = []
