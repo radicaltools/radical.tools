@@ -7725,6 +7725,12 @@
     "targetId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd"
   },
   {
+    "id": "5e1e4dc8-2f11-4213-9588-b314c0332581",
+    "relationType": "verifies",
+    "sourceId": "f07170af-4d2b-43b3-830b-5345e609f850",
+    "targetId": "1d76bc57-df23-4d1c-9f53-8407ec2ff575"
+  },
+  {
     "id": "5e2e96f7-3b42-4e87-9491-3f80b865b1eb",
     "relationType": "verifies",
     "sourceId": "cd07ab8a-2e59-4d07-9468-cc5ff6b26359",
@@ -8545,6 +8551,12 @@
     "relationType": "verifies",
     "sourceId": "3350cbe6-388e-4db3-82f8-e35b8fdb4336",
     "targetId": "504dbf56-23f2-410a-9066-5f1ae6caea6a"
+  },
+  {
+    "id": "68638510-b1c0-4721-a797-671dd0b431f9",
+    "relationType": "verifies",
+    "sourceId": "22e3ad6a-de06-48fb-b0db-c6d1f7e833d4",
+    "targetId": "49103558-00bb-4898-90bd-aaf0bc34ecbc"
   },
   {
     "description": "Records its version in .radical/agent-activity.json with each write.",
@@ -11969,6 +11981,12 @@
     "relationType": "derives",
     "sourceId": "54d62487-7310-4272-817f-f7c5ef747543",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "9063969c-2c9e-4b91-b652-a862279f11fe",
+    "relationType": "verifies",
+    "sourceId": "6d8080a1-5be9-4123-b2e7-42edbb2370da",
+    "targetId": "5bae57b7-ffe0-42b3-98ce-f96dfb62a3ef"
   },
   {
     "id": "90681a03-2895-4236-9332-3a58f0eadbbc",
