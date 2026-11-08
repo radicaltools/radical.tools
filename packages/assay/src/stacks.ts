@@ -2,8 +2,9 @@
 //
 // Each reader finds the units of its stack anywhere in the repository and
 // the dependencies each manifest states: npm, Maven, Gradle, Go, .NET,
-// Python, VB6, and a folder with only a Dockerfile. A reference by path (a
-// .NET ProjectReference, a VB6 project reference, a Gradle project(':x'))
+// Python, PHP, Ruby, Elixir, Rust, VB6, and a folder with only a
+// Dockerfile. A reference by path (a .NET ProjectReference, a VB6 project
+// reference, a Gradle project(':x'), a gem, mix or Cargo path dependency)
 // names its unit at once; a reference by name is resolved when the units of
 // every repository are known (link.ts).
 
@@ -35,6 +36,7 @@ const TECHNOLOGY: Array<[RegExp, string]> = [
   [/^Microsoft\.EntityFrameworkCore/, 'Entity Framework Core'], [/^Microsoft\.AspNetCore\.Components\.WebAssembly/, 'Blazor'],
   [/^(flask|Flask)$/, 'Flask'], [/^(django|Django)$/, 'Django'], [/^fastapi$/, 'FastAPI'],
   [/^laravel\/framework$/, 'Laravel'], [/^symfony\/framework-bundle$/, 'Symfony'],
+  [/^rails$/, 'Rails'], [/^sinatra$/, 'Sinatra'], [/^phoenix$/, 'Phoenix'], [/^ecto_sql$/, 'Ecto'], [/^actix-web$/, 'Actix Web'], [/^axum$/, 'Axum'], [/^sqlx$/, 'SQLx'],
   [/^github\.com\/gin-gonic\/gin$/, 'Gin'], [/^github\.com\/gorilla\/mux$/, 'gorilla/mux'],
   [/Microsoft ActiveX Data Objects|^msado/i, 'ADO'], [/Microsoft DAO/i, 'DAO'], [/DirectX|^dx\d+vb/i, 'DirectX'],
   [/Winsock|^mswinsck/i, 'Winsock'],
@@ -120,6 +122,8 @@ function draft(stack: Stack, path: string, file: string, name: string | undefine
 
 // ── npm ──────────────────────────────────────────────────────────────────────
 
+const LINT_TOOLS = /^(markdownlint(-cli2?)?|prettier|@biomejs\/biome|eslint|@eslint\/\S+|eslint-(config|plugin)-\S+|stylelint(-\S+)?|husky|lint-staged|@commitlint\/\S+|commitlint|cspell|textlint(-\S+)?|editorconfig-checker|alex|write-good)$/
+
 function npm(files: RepoFiles, notes: string[]): Draft[] {
   const manifests = files.named(/^package\.json$/).filter((f) => !inTests(f))
   const out: Draft[] = []
@@ -137,6 +141,10 @@ function npm(files: RepoFiles, notes: string[]): Draft[] {
     // A root that names workspaces is their shell, when they are there.
     if (path === '.' && json.workspaces && manifests.length > 1) continue
     if (path === '.' && files.has('pnpm-workspace.yaml') && manifests.length > 1) continue
+    // A manifest of lint and format tools alone (markdownlint, Prettier, Biome) builds and runs nothing.
+    const deps = ['dependencies', 'peerDependencies', 'optionalDependencies'].flatMap((k) => Object.keys((json[k] as Record<string, unknown> | undefined) ?? {}))
+    const dev = Object.keys((json.devDependencies as Record<string, unknown> | undefined) ?? {})
+    if (!deps.length && dev.length && dev.every((x) => LINT_TOOLS.test(x)) && !json.main && !json.bin && !json.exports && !json.workspaces) continue
     const d = draft('npm', path, file, typeof json.name === 'string' ? json.name : undefined, lineOf(text, /"name"\s*:/))
     const scripts = (json.scripts && typeof json.scripts === 'object' ? json.scripts : {}) as Record<string, unknown>
     if (json.bin) d.reasons.push('it has a bin')
@@ -216,8 +224,51 @@ function maven(files: RepoFiles): Draft[] {
 
 // ── Gradle ───────────────────────────────────────────────────────────────────
 
+/** The folder of the settings file a Gradle build in path belongs to, and its projects by type-safe accessor
+ *  (include(":core:data-test") is projects.core.dataTest). */
+function gradleSettings(files: RepoFiles, path: string): { root: string; accessors: Map<string, string> } | undefined {
+  for (let dir = path; ; dir = dirOf(dir)) {
+    const prefix = dir === '.' ? '' : `${dir}/`
+    const text = files.read(`${prefix}settings.gradle.kts`) || files.read(`${prefix}settings.gradle`)
+    if (text) {
+      const accessors = new Map<string, string>()
+      for (const m of text.matchAll(/\binclude\s*\(?((?:\s*,?\s*['"]:?[\w:.-]+['"])+)/g)) {
+        for (const p of m[1].matchAll(/['"]:?([\w:.-]+)['"]/g)) {
+          const camel = p[1].split(':').map((s) => s.replace(/[-_.](\w)/g, (_, c: string) => c.toUpperCase())).join('.')
+          accessors.set(camel, prefix + p[1].replace(/:/g, '/'))
+        }
+      }
+      return { root: dir, accessors }
+    }
+    if (dir === '.') return undefined
+  }
+}
+
+/** Convention plugins of the repository's builds (gradlePlugin { plugins { register(…) { id = …; implementationClass = … } } }):
+ *  each by the id or catalog accessor a build applies it with, and the projects its class adds as dependencies. */
+function conventionPlugins(files: RepoFiles): Map<string, Array<{ project: string; file: string; line: number }>> {
+  const out = new Map<string, Array<{ project: string; file: string; line: number }>>()
+  for (const file of files.named(/^build\.gradle(\.kts)?$/)) {
+    const text = files.read(file)
+    for (const m of text.matchAll(/\bregister\s*\(\s*["'][^"']+["']\s*\)\s*\{([^{}]*)\}/g)) {
+      const cls = /implementationClass\s*=\s*["']([\w.]+)["']/.exec(m[1])?.[1]
+      const id = /\bid\s*=\s*(?:["']([\w.-]+)["']|libs\.plugins\.([\w.]+?)(?:\.asProvider\(\))?\.get\(\))/.exec(m[1])
+      if (!cls || !id) continue
+      const within = dirOf(file) === '.' ? '' : `${dirOf(file)}/`
+      const name = new RegExp(`(^|/)${escapeRe(cls.split('.').pop()!)}\\.(kt|java|groovy)$`)
+      const source = files.list.find((f) => f.startsWith(within) && name.test(f))
+      if (!source) continue
+      const code = files.read(source)
+      const added = [...code.matchAll(/project\(\s*["']:?([\w:.-]+)["']\s*\)/g)].map((p) => ({ project: p[1], file: source, line: lineAt(code, p.index!) }))
+      if (added.length) out.set(id[1] ?? `libs.plugins.${id[2]}`, added)
+    }
+  }
+  return out
+}
+
 function gradle(files: RepoFiles): Draft[] {
   const out: Draft[] = []
+  const conventions = conventionPlugins(files)
   for (const file of files.named(/^build\.gradle(\.kts)?$/).filter((f) => !inTests(f))) {
     const text = files.read(file)
     const path = dirOf(file)
@@ -229,8 +280,21 @@ function gradle(files: RepoFiles): Draft[] {
     if (/\b(application|org\.springframework\.boot)\b/.test(text)) d.reasons.push('it applies the application or Spring Boot plugin')
     const main = javaMain(files, path)
     if (main) d.reasons.push(main)
-    for (const m of text.matchAll(/\b(?:implementation|api|compile|runtimeOnly|testImplementation)\s*\(?\s*project\(\s*['"]:?([^'"]+)['"]\s*\)/g)) {
-      d.refs.push({ name: `:${m[1]}`, path: m[1].replace(/:/g, '/'), line: lineAt(text, m.index!), file })
+    // A project dependency in any configuration (implementation, api, testImplementation, baselineProfile, lintPublish, …):
+    // project(":a:b"), or its type-safe accessor projects.a.b.
+    const build = gradleSettings(files, path)
+    const base = build && build.root !== '.' ? `${build.root}/` : ''
+    for (const m of text.matchAll(/\b\w+\s*\(?\s*(?:project\(\s*['"]:?([^'"]+)['"]\s*\)|projects\.([\w.]+))/g)) {
+      const target = m[1] ? base + m[1].replace(/:/g, '/') : build?.accessors.get(m[2])
+      if (target && target !== path) d.refs.push({ name: m[1] ? `:${m[1]}` : `projects.${m[2]}`, path: target, line: lineAt(text, m.index!), file })
+    }
+    // The projects its convention plugins add (plugins { alias(libs.plugins.x) } or id("x")).
+    const plugins = /\bplugins\s*\{([\s\S]*?)\n\s*\}/.exec(text)
+    for (const m of plugins ? plugins[1].matchAll(/\b(?:alias\(\s*(libs\.plugins\.[\w.]+)\s*\)|id\(\s*["']([\w.-]+)["']\s*\))/g) : []) {
+      for (const added of conventions.get(m[1] ?? m[2]) ?? []) {
+        const target = base + added.project.replace(/:/g, '/')
+        if (target !== path) d.refs.push({ name: `:${added.project}`, path: target, line: added.line, file: added.file })
+      }
     }
     for (const m of text.matchAll(/\b(?:implementation|api|compile|runtimeOnly)\s*\(?\s*['"]([\w.-]+):([\w.-]+)(?::[^'"]*)?['"]/g)) {
       const dep = `${m[1]}:${m[2]}`
@@ -254,7 +318,8 @@ function go(files: RepoFiles): Draft[] {
     const prefix = path === '.' ? '' : `${path}/`
     // Its own Go files: none of a module nested in it (go.work's members).
     const nested = files.list.filter((f) => f !== file && f.endsWith('/go.mod') && (path === '.' || f.startsWith(prefix))).map(dirOf)
-    const own = files.list.filter((f) => f.startsWith(prefix) && f.endsWith('.go') && !nested.some((n) => dirOf(f) === n || f.startsWith(`${n}/`)))
+    // (A tools.go pinning tool versions, //go:build tools, is not code of the module.)
+    const own = files.list.filter((f) => f.startsWith(prefix) && f.endsWith('.go') && !nested.some((n) => dirOf(f) === n || f.startsWith(`${n}/`)) && !/^\s*\/\/\s*(go:build|\+build)\s+tools\s*$/m.test(files.read(f)))
     // A module with no Go code of its own (a workspace's root, its tool directives only) builds nothing.
     if (!own.length) continue
     // Its main packages are its apps; a module without one is a library.
@@ -357,6 +422,91 @@ function php(files: RepoFiles, notes: string[]): Draft[] {
     if (d.deps.includes('laravel/framework') || files.has(`${prefix}artisan`)) d.reasons.push('it is a Laravel application')
     else if (files.has(`${prefix}public/index.php`) || files.has(`${prefix}index.php`)) d.reasons.push('it has a front controller')
     if (typeof json.description === 'string' && json.description) d.description = json.description
+    d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
+    out.push(d)
+  }
+  return out
+}
+
+// ── Ruby, Elixir, Rust ───────────────────────────────────────────────────────
+
+/** A Gemfile's (or a gemspec's) project: a Rails or Rack application, else a library; gems by path are references. */
+function ruby(files: RepoFiles): Draft[] {
+  const out: Draft[] = []
+  const markers = files.named(/^Gemfile$|\.gemspec$/).filter((f) => !inTests(f))
+  for (const path of [...new Set(markers.map(dirOf))]) {
+    const prefix = path === '.' ? '' : `${path}/`
+    const gemfile = files.read(`${prefix}Gemfile`)
+    const spec = markers.find((m) => dirOf(m) === path && m.endsWith('.gemspec'))
+    const name = spec ? /\.name\s*=\s*["']([^"']+)["']/.exec(files.read(spec))?.[1] : undefined
+    const d = draft('ruby', path, gemfile ? `${prefix}Gemfile` : spec!, name, 1)
+    d.aliases.push(basename(path === '.' ? '' : path))
+    // A Rails application is known by its module (module Maybe: maybe, an image's name).
+    const module = /^module\s+(\w+)/m.exec(files.read(`${prefix}config/application.rb`))?.[1]
+    if (module) d.aliases.push(module.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase())
+    if (files.has(`${prefix}config/application.rb`)) d.reasons.push('it is a Rails application')
+    else if (files.has(`${prefix}config.ru`)) d.reasons.push('it has a Rack config.ru')
+    for (const m of gemfile.matchAll(/^\s*gem\s+["']([\w.-]+)["']([^\n]*)/gm)) {
+      const local = /\bpath:\s*["']([^"']+)["']/.exec(m[2])?.[1]
+      const target = local ? resolveFrom(path, local) : null
+      if (target) d.refs.push({ name: m[1], path: target, line: lineAt(gemfile, m.index!), file: `${prefix}Gemfile` })
+      else { d.deps.push(m[1]); d.depLines.set(m[1], { file: `${prefix}Gemfile`, line: lineAt(gemfile, m.index!) }) }
+    }
+    d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
+    out.push(d)
+  }
+  return out
+}
+
+/** A mix.exs project: an OTP application with its own module (mod:) or a Phoenix app, else a library; an umbrella's
+ *  root only holds its apps. Dependencies by path or in the umbrella are references. */
+function elixir(files: RepoFiles): Draft[] {
+  const out: Draft[] = []
+  for (const file of files.named(/^mix\.exs$/).filter((f) => !inTests(f) && !/(^|\/)deps\//.test(f))) {
+    const text = files.read(file)
+    if (/\bapps_path:\s*"/.test(text)) continue
+    const path = dirOf(file)
+    const d = draft('elixir', path, file, /\bapp:\s*:(\w+)/.exec(text)?.[1], lineOf(text, /\bapp:\s*:/))
+    d.aliases.push(basename(path === '.' ? '' : path))
+    if (/\bmod:\s*\{/.test(text)) d.reasons.push('it is an OTP application with its own module')
+    const deps = /\bdefp?\s+deps\b[^]*?\bdo\b([^]*?)\n\s*end\b/.exec(text)
+    for (const m of deps ? deps[1].matchAll(/\{\s*:(\w+)\s*,([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g) : []) {
+      const line = lineAt(text, deps!.index! + deps![0].indexOf(deps![1]) + m.index!)
+      const local = /\bpath:\s*"([^"]+)"/.exec(m[2])?.[1]
+      const target = local ? resolveFrom(path, local) : /\bin_umbrella:\s*true/.test(m[2]) ? resolveFrom(path, `../${m[1]}`) : null
+      if (target) d.refs.push({ name: m[1], path: target, line, file })
+      else { d.deps.push(m[1]); d.depLines.set(m[1], { file, line }) }
+    }
+    if (!d.reasons.length && d.deps.includes('phoenix')) d.reasons.push('it is a Phoenix application')
+    d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
+    out.push(d)
+  }
+  return out
+}
+
+/** A Cargo.toml's crate: a binary (src/main.rs, [[bin]]) or a library; a workspace's root without a [package] only holds
+ *  its members. Dependencies by path are references. */
+function rust(files: RepoFiles): Draft[] {
+  const out: Draft[] = []
+  for (const file of files.named(/^Cargo\.toml$/).filter((f) => !inTests(f))) {
+    const text = files.read(file)
+    if (!/^\[package\]/m.test(text)) continue
+    const path = dirOf(file)
+    const prefix = path === '.' ? '' : `${path}/`
+    const pkg = /^\[package\]([^[]*)/m.exec(text)?.[1] ?? ''
+    const d = draft('rust', path, file, /^\s*name\s*=\s*"([^"]+)"/m.exec(pkg)?.[1], lineOf(text, /^\[package\]/m))
+    d.aliases.push(basename(path === '.' ? '' : path))
+    if (files.has(`${prefix}src/main.rs`) || /^\[\[bin\]\]/m.test(text) || files.list.some((f) => f.startsWith(`${prefix}src/bin/`) && f.endsWith('.rs'))) d.reasons.push('it builds a binary')
+    // [dependencies], [dev-dependencies], [build-dependencies] and their target-specific forms.
+    for (const section of text.matchAll(/^\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\]([^]*?)(?=^\[|$(?![^]))/gm)) {
+      for (const m of section[1].matchAll(/^\s*([\w-]+)\s*=\s*(.*)$/gm)) {
+        const line = lineAt(text, section.index! + section[0].indexOf(section[1]) + m.index!)
+        const local = /\bpath\s*=\s*"([^"]+)"/.exec(m[2])?.[1]
+        const target = local ? resolveFrom(path, local) : null
+        if (target) d.refs.push({ name: m[1], path: target, line, file })
+        else { d.deps.push(m[1]); d.depLines.set(m[1], { file, line }) }
+      }
+    }
     d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
     out.push(d)
   }
@@ -508,9 +658,11 @@ function docker(files: RepoFiles, claimed: Set<string>, moves: Map<string, strin
     }
     // docker/<name>/Dockerfile below a unit packages that unit.
     if ([...claimed].some((c) => (c === '.' || path.startsWith(`${c}/`)) && /(^|\/)(docker|\.docker|deploy|build|packaging|container)(\/|$)/i.test(c === '.' ? path : path.slice(c.length + 1)))) continue
-    // A Dockerfile alone in its folder builds what other folders hold.
+    // A Dockerfile alone in its folder builds what other folders hold, unless it copies nothing of the repository (an
+    // image of its own: a broker with an agent added, a server fetched and built).
     const prefix = path === '.' ? '' : `${path}/`
-    if (!files.list.some((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes('/') && !/^(Dockerfile|\.dockerignore|README(\.md)?)$/i.test(f.slice(prefix.length)))) continue
+    const local = [...text.matchAll(/^\s*(?:COPY|ADD)\s+((?:--\S+\s+)*)(?:\[\s*"([^"]+)"|(\S+))/gmi)].some((m) => !/--from=/i.test(m[1]) && !/^https?:\/\//i.test(m[2] ?? m[3]))
+    if (local && !files.list.some((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes('/') && !/^(Dockerfile|\.dockerignore|README(\.md)?)$/i.test(f.slice(prefix.length)))) continue
     const d = draft('docker', path, file, undefined, lineOf(text, /^FROM\s/mi))
     d.reasons.push('it has a Dockerfile')
     const images = [...text.matchAll(/^FROM\s+(\S+)/gmi)].map((m) => m[1].toLowerCase())
@@ -532,8 +684,8 @@ const jsonOf = (text: string): { dependencies?: Record<string, string> } => { tr
 export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
   const groups: GroupFact[] = []
-  // A Composer or .NET project claims its folder before the package.json that builds its front end.
-  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
+  // A Composer, .NET, Ruby, Elixir or Rust project claims its folder before the package.json that builds its front end.
+  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
   // One unit per folder: the first stack read claims it (a Python folder with a package.json for its tooling stays npm).
   const byPath = new Map<string, Draft>()
   for (const d of drafts) {
@@ -571,7 +723,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     if (files.has(`${prefix}Dockerfile`) && !d.reasons.includes('it has a Dockerfile')) d.reasons.push('it has a Dockerfile')
     const technology = new Set(technologyOf(d.deps))
     if (d.stack === 'docker') for (const img of d.deps) for (const [re, t] of BASE_IMAGES) if (re.test(img)) technology.add(t)
-    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', vb6: 'VB6', docker: '' }[d.stack])
+    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', ruby: 'Ruby', elixir: 'Elixir', rust: 'Rust', vb6: 'VB6', docker: '' }[d.stack])
     technology.delete('')
     const id = `${repo}:unit:${d.path}`
     units.push({
