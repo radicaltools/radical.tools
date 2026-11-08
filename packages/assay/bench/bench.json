@@ -825,6 +825,331 @@
           "db:project.mdb"
         ]
       ]
+    },
+    {
+      "name": "hospital-management-system",
+      "about": "A VB6 hospital management system on an Access database (hms.mdb, named by its Jet connection strings and a data environment). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out at first (units 3/3, calls 3/3 for the three); an agent run on it and its Access files were worked on since.",
+      "url": "https://github.com/Htech00/hospital-management-system.git",
+      "commit": "a10da471bc5045b225f4405a7d0963fa05a0b631",
+      "stacks": "VB6 Standard EXE, ADO, Jet, data environment, Access",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:hms.mdb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781",
+      "about": "A VB6 inventory and receivables system on ADO and an Access database (Db.mdb in its folder), reports through a file DSN (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out at first (units 3/3, calls 3/3 for the three); an agent run on it and its Access files were worked on since.",
+      "url": "https://github.com/Planet-Source-Code/philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781.git",
+      "commit": "970ac3aa3109f1745f5ff9a35c6349643cb7db96",
+      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
+      "units": [
+        "prjSMIAS/SMIAS"
+      ],
+      "calls": [
+        [
+          "prjSMIAS/SMIAS",
+          "db:db.mdb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "divyen-patel-inventory-control-system__1-40440",
+      "about": "A VB6 retail inventory and accounts system on an Access database (Master_Database.mdb, one per company under data\\\\<company>), Crystal Reports (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out at first (units 3/3, calls 3/3 for the three); an agent run on it and its Access files were worked on since.",
+      "url": "https://github.com/Planet-Source-Code/divyen-patel-inventory-control-system__1-40440.git",
+      "commit": "01826ffaca35679bc09c6a7841b26deb7e4f858a",
+      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
+      "units": [
+        "Inventory System"
+      ],
+      "calls": [
+        [
+          "Inventory System",
+          "db:master_database.mdb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "Projetos-VB6-SQL-SERVER",
+      "about": "Two VB6 systems on SQL Server ADRRBR01: a licence register (an EXE and two class libraries in a group) and a workflow (31 class libraries, one per table, and an executable), every library referencing ADRRBR_SIS_Basico.dll and the connection libraries reaching the database through ODBC; two projects build ADRRBR_SIS_Conexao.dll. Written down on 2026-11-07 from its README, docs, project files, SQL and the code that connects, before Assay first ran on it; held out at first (calls 37/41, tables 1/27 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/ADRRBR/Projetos-VB6-SQL-SERVER.git",
+      "commit": "a2cc14ecfaf88dddbafba2aaa4bda0ec61a859a5",
+      "stacks": "VB6 Standard EXE and ActiveX DLLs, a group; ODBC, SQL Server (T-SQL scripts)",
+      "units": [
+        "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo",
+        "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico",
+        "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Conexao",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_APL_Usuarios",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Func_Rot",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Funcoes",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Manut_Tab",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Rot_Sist",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Rotinas",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Sistemas",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tabelas",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tip_Manut",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tip_Menu",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Usu_Func",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Aprov_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Aval_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Clientes",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Fases",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Filiais",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Interr_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Produtos",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Represent",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Status_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_TrabFA_Sim",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_TrabFS_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Trab_Tip",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Trabalhos",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_AtuBD",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_AtuBD_Com",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_Log",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/GRF - Controle Gráfico/ADRRBR_GRF_Trab_Fases",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Conexao - Adaptada",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Pesquisa - Adaptada",
+        "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_View",
+        "Projeto VB6-SQL Server-WorkFlow/Executaveis/ADRRBR_Executa_Aplicacoes"
+      ],
+      "calls": [
+        [
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Conexao"
+        ],
+        [
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Conexao",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_APL_Usuarios",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Func_Rot",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Funcoes",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Manut_Tab",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Rot_Sist",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Rotinas",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Sistemas",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tabelas",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tip_Manut",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Tip_Menu",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Apl_Usu_Func",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Aprov_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Aval_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Clientes",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Fases",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Filiais",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Interr_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Produtos",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Represent",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Status_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_TrabFA_Sim",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_TrabFS_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Trab_Tip",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_GRF_Trabalhos",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_AtuBD",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_AtuBD_Com",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/Classes - Tabelas/ADRRBR_Sis_Log",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/GRF - Controle Gráfico/ADRRBR_GRF_Trab_Fases",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Conexao - Adaptada",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Pesquisa - Adaptada",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_View",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Executaveis/ADRRBR_Executa_Aplicacoes",
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Basico"
+        ],
+        [
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo/ADRRBR_SIS_Conexao",
+          "db:adrrbr01"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Conexao - Adaptada",
+          "db:adrrbr01"
+        ]
+      ],
+      "tables": [
+        "grf_aprovacao_tipos",
+        "grf_avaliacao_tipos",
+        "grf_clientes",
+        "grf_fases",
+        "grf_filiais",
+        "grf_interrupcao_tipos",
+        "grf_produtos",
+        "grf_representantes",
+        "grf_trabalhos",
+        "grf_trabalhos_fases_acao_simultanea",
+        "grf_trabalhos_fases_manut1",
+        "grf_trabalhos_fases_manut10",
+        "grf_trabalhos_fases_manut11",
+        "grf_trabalhos_fases_manut12",
+        "grf_trabalhos_fases_manut2",
+        "grf_trabalhos_fases_manut3",
+        "grf_trabalhos_fases_manut4",
+        "grf_trabalhos_fases_manut5",
+        "grf_trabalhos_fases_manut6",
+        "grf_trabalhos_fases_manut7",
+        "grf_trabalhos_fases_manut8",
+        "grf_trabalhos_fases_manut9",
+        "grf_trabalhos_fases_manut_generico",
+        "grf_trabalhos_fases_status",
+        "grf_trabalhos_fases_status_tipos",
+        "grf_trabalhos_tipos",
+        "tab_licencas"
+      ],
+      "optional": [
+        [
+          "Projeto VB6-SQL Server-Cadastra Licenca-Exemplo",
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Conexao - Adaptada"
+        ]
+      ]
+    },
+    {
+      "name": "Chatroom",
+      "about": "A VB6 chat: a client ActiveX document EXE and a server keeping users and rooms, talking over Winsock. Written down on 2026-11-07 from its README, docs, project files, SQL and the code that connects, before Assay first ran on it; held out at first (calls 37/41, tables 1/27 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/VaderConsulting/Chatroom.git",
+      "commit": "98c4018179c6a4eae6f675824ddc6fa77ee24619",
+      "stacks": "VB6 ActiveX Document EXE and Standard EXE, Winsock",
+      "units": [
+        "Client",
+        "Server"
+      ],
+      "calls": [
+        [
+          "Client",
+          "Server"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "ERPMigrationCore",
+      "about": "A legacy ERP being migrated: two VB6 modules (PERCS, QAIS) on SQL Server, their catalog AINData (Module1.bas assigns W_DB = \"AINData\"; first written down as an unnamed SQL Server database, corrected after the first run showed the assignment), and the Laravel and Vite application they move into, on SQL Server AINData2 (its handoff notes and environment). Written down on 2026-11-07 from its README, docs, project files, SQL and the code that connects, before Assay first ran on it; held out at first (calls 37/41, tables 1/27 for the three); the readers were tuned on it since.",
+      "url": "https://github.com/syahrulamsb-stack/ERPMigrationCore.git",
+      "commit": "019caedf004765d06455936b4facf09adb49d7f1",
+      "stacks": "VB6 Standard EXEs, ADO, SQL Server; PHP Laravel, Vite",
+      "units": [
+        ".",
+        "AINPERCSCode",
+        "AINQAISCode"
+      ],
+      "calls": [
+        [
+          "AINPERCSCode",
+          "db:aindata"
+        ],
+        [
+          "AINQAISCode",
+          "db:aindata"
+        ],
+        [
+          ".",
+          "db:aindata2"
+        ]
+      ],
+      "optional": []
     }
   ],
   "heldOut": [
@@ -1136,57 +1461,6 @@
         [
           "user",
           "service:user-db"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "hospital-management-system",
-      "about": "A VB6 hospital management system on an Access database (hms.mdb, named by its Jet connection strings and a data environment). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/Htech00/hospital-management-system.git",
-      "commit": "a10da471bc5045b225f4405a7d0963fa05a0b631",
-      "stacks": "VB6 Standard EXE, ADO, Jet, data environment, Access",
-      "units": [
-        "."
-      ],
-      "calls": [
-        [
-          ".",
-          "db:hms.mdb"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781",
-      "about": "A VB6 inventory and receivables system on ADO and an Access database (Db.mdb in its folder), reports through a file DSN (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/Planet-Source-Code/philip-v-naparan-a-complete-inventory-and-account-receivable-system-updated__1-62781.git",
-      "commit": "970ac3aa3109f1745f5ff9a35c6349643cb7db96",
-      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
-      "units": [
-        "prjSMIAS/SMIAS"
-      ],
-      "calls": [
-        [
-          "prjSMIAS/SMIAS",
-          "db:db.mdb"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "divyen-patel-inventory-control-system__1-40440",
-      "about": "A VB6 retail inventory and accounts system on an Access database (Master_Database.mdb, one per company under data\\\\<company>), Crystal Reports (Planet Source Code archive). Written down on 2026-11-07 from its README, project file and the code that opens its database, before Assay first ran on it; held out: no rule is tuned on it.",
-      "url": "https://github.com/Planet-Source-Code/divyen-patel-inventory-control-system__1-40440.git",
-      "commit": "01826ffaca35679bc09c6a7841b26deb7e4f858a",
-      "stacks": "VB6 Standard EXE, ADO, Access, Crystal Reports",
-      "units": [
-        "Inventory System"
-      ],
-      "calls": [
-        [
-          "Inventory System",
-          "db:master_database.mdb"
         ]
       ],
       "optional": []

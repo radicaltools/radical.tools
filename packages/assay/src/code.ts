@@ -11,7 +11,7 @@ import { addressesIn } from './runtime'
 import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
 
-const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.php', '.rb', '.scala', '.fs'])
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.scala', '.fs'])
 const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
 /** Paths that name a file, not an endpoint. */
 const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
@@ -27,16 +27,43 @@ export function urlPathOf(literal: string): string | null {
   if (!path || /\s/.test(path) || path.length > 200 || FILE_PATH.test(path) || SYSTEM_PATH.test(path)) return null
   const segments = path.split('/').slice(1)
   if (!segments.length || !segments.some((s) => /[A-Za-z]/.test(s))) return null
+  // A file beside the code (__DIR__ . '/../vendor/autoload.php'), not an endpoint.
+  if (segments.some((s) => s === '.' || s === '..')) return null
   // A command typed in a chat or a console (/SALIR, /MEDITAR), not a path: one upper-case word.
   if (segments.length === 1 && /^[A-Z][A-Z0-9_]*$/.test(segments[0])) return null
   if (!segments.every((s) => /^(\{[^}]*\}|:[A-Za-z_]\w*|[A-Za-z0-9._~%@-]*)$/.test(s))) return null
   return `/${segments.map((s) => (s.startsWith(':') || /^\{.*\}$/.test(s) ? '{}' : s)).join('/')}`
 }
 
-/** Where an address calls nothing: CI configuration, translations. */
-const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\//i
+/** Where an address calls nothing: CI configuration, translations, lock files. */
+const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\/|(^|\/)(package-lock|npm-shrinkwrap)\.json$/i
+/** A line whose address names a page's link, an XML namespace or a schema, not a call. */
+const NOT_CALLED = /\bhref\s*=|\bxmlns(?::\w+)?\s*=|schemaLocation\s*=|["']\$schema["']\s*:/i
+/** The line of the text an index falls on. */
+const lineTextAt = (text: string, index: number): string => {
+  const end = text.indexOf('\n', index)
+  return text.slice(text.lastIndexOf('\n', index) + 1, end < 0 ? undefined : end)
+}
 /** A line that opens an address in the user's browser rather than calling it (Inet's OpenURL is a call). */
 const BROWSER = /\bShellExecute\w*\b|\bShell\s*\(|\bProcess\.Start\b|\bwebbrowser\.open|\bwindow\.open\b|\.Navigate2?\b|\bLaunchUrl\b|\bopenExternal\b/i
+
+/** VB statements continued over lines (" & _, or _) joined into one, each on its first line, and as many empty lines
+ *  after it as it was continued over: every line below keeps its number, so evidence cites the right one. */
+export function joinContinuations(text: string): string {
+  const lines = text.split('\n')
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].replace(/\r$/, '')
+    let joined = 0
+    while (i + 1 < lines.length && /\s_\s*$/.test(line)) {
+      const next = lines[++i].replace(/\r$/, '')
+      joined++
+      line = /"\s*&\s*_\s*$/.test(line) && /^\s*"/.test(next) ? line.replace(/"\s*&\s*_\s*$/, '') + next.replace(/^\s*"/, '') : `${line.replace(/\s_\s*$/, '')} ${next.trim()}`
+    }
+    out.push(line, ...Array<string>(joined).fill(''))
+  }
+  return out.join('\n')
+}
 
 /** VB code without its comments (' or Rem to the end of a line, outside a string), its lines kept. */
 export function withoutVbComments(text: string): string {
@@ -166,8 +193,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     let text = files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
-    const vb = /\.(bas|cls|frm|ctl|dsr|vb)$/i.test(file)
-    if (vb) text = withoutVbComments(text).replace(/"\s*&\s*_\s*\r?\n\s*"/g, '').replace(/\s_\s*\r?\n\s*/g, ' ')
+    const vb = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i.test(file)
+    if (vb) text = joinContinuations(withoutVbComments(text))
     // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
     text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
     const at = (index: number) => ({ file, line: lineAt(text, index) })
@@ -183,7 +210,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       if (!db.server && !db.name && !db.explicit) continue
       // One database per name: a developer's and a container's connection string name the same one.
       if (db.server) db.server = db.server.replace(/[,:]\d+$/, '')
-      const id = `${repo}:db:${unit.path}:${db.engine}/${db.name ?? db.server ?? ''}`
+      // An Access file is one whatever the case of its name (hms.mdb, HMS.MDB).
+      const id = `${repo}:db:${unit.path}:${db.engine}/${db.engine === 'Access' ? (db.name ?? '').toLowerCase() : db.name ?? db.server ?? ''}`
       // The same database named again: a server's connection string over a developer's local one.
       const known = out.databases.findIndex((d) => d.id === id)
       if (known >= 0 && /^(localhost|127\.0\.0\.1)$/i.test(out.databases[known].server ?? '') && db.server && !/^(localhost|127\.0\.0\.1)$/i.test(db.server)) out.databases.splice(known, 1)
@@ -214,7 +242,13 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         accessNamed.set(unit.id, [...(accessNamed.get(unit.id) ?? []), { name: m[2], evidence: at(m.index!) }])
       }
       // A form's fields holding a host and a port by default: an address of the unit, or, beside a listening socket, its port.
-      if (file.toLowerCase().endsWith('.frm')) formAddress(text, file, unit, repo, out, once)
+      if (/\.(frm|dob|pag|ctl)$/i.test(file)) formAddress(text, file, unit, repo, out, once)
+      // A socket connecting to a port the code names: Winsock1.Connect ServerName, 6123.
+      for (const m of text.matchAll(/\.Connect\s*\(?\s*("([^"]+)"|[\w.]+)\s*,\s*(\d{2,5})\b/gi)) {
+        const host = (m[2] ?? m[1]).toLowerCase()
+        const id = `${repo}:address:${unit.path}:connect:${host}:${m[3]}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'socket', host, port: Number(m[3]), text: m[0].trim(), evidence: at(m.index!) })
+      }
     }
 
     // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
@@ -247,6 +281,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'setting', host, text: m[0].trim(), evidence: at(m.index!) })
       }
       for (const a of addressesIn(text, false)) {
+        if (NOT_CALLED.test(lineTextAt(text, a.index))) continue
         const id = `${repo}:address:${unit.path}:${a.text}`
         if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(a.index) })
       }
@@ -256,8 +291,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     for (const m of text.matchAll(vb ? VB_STRING : STRING)) {
       const literal = m[2]
       // An address opened in the browser is a page for the user, not a call of the unit.
-      const lineText = text.slice(text.lastIndexOf('\n', m.index!) + 1, text.indexOf('\n', m.index!) < 0 ? undefined : text.indexOf('\n', m.index!))
-      const opened = BROWSER.test(lineText)
+      const lineText = lineTextAt(text, m.index!)
+      const opened = BROWSER.test(lineText) || NOT_CALLED.test(lineText)
       // In VB code a lone segment (/_BUG, /json) is a command or a fragment far more often than a route.
       const found = opened ? null : urlPathOf(literal)
       const path = vb && found && found.split('/').length === 2 ? null : found
@@ -312,11 +347,24 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   for (const [unitId, named] of accessNamed) {
     if (!accessUsers.has(unitId)) continue
     const unit = units.find((u) => u.id === unitId)!
-    for (const n of named) {
-      const id = `${repo}:db:${unit.path}:Access/${n.name}`
+    // Where the code connects to it or opens it says more than where it copies or deletes it.
+    const opens = (n: { evidence: { file: string; line: number } }): boolean => /ConnectionString|Data Source|DBQ|OpenDatabase|DatabaseName|\.Open\b|Provider/i.test(files.read(n.evidence.file).split('\n')[n.evidence.line - 1] ?? '')
+    for (const n of [...named.filter(opens), ...named.filter((x) => !opens(x))]) {
+      const id = `${repo}:db:${unit.path}:Access/${n.name.toLowerCase()}`
       if (out.databases.some((d) => d.unit === unitId && d.engine === 'Access' && d.name?.toLowerCase() === n.name.toLowerCase())) continue
       out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
     }
+  }
+  // A nameless SQL Server or ODBC connection, where the repository's SQL scripts name one database (USE, CREATE DATABASE), is that one.
+  const scripted = new Set(files.list.filter((f) => /\.sql$/i.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*(?:use|create\s+database)\s+\[?(\w+)\]?/gim)].map((m) => m[1]).filter((n) => !/^(master|tempdb|model|msdb)$/i.test(n))))
+  const scriptedNames = [...new Map([...scripted].map((n) => [n.toLowerCase(), n])).values()]
+  if (scriptedNames.length === 1) {
+    for (const d of out.databases) {
+      if (d.name || d.server || !['SQL Server', 'ODBC'].includes(d.engine)) continue
+      d.name = scriptedNames[0]
+      d.id = `${d.id.slice(0, d.id.lastIndexOf(':') + 1)}${d.engine}/${d.name}`
+    }
+    out.databases = out.databases.filter((d, i) => out.databases.findIndex((o) => o.id === d.id) === i)
   }
   // A nameless connection beside a database of its engine the unit names is that one.
   out.databases = out.databases.filter((d) => d.name || d.server || !out.databases.some((o) => o !== d && o.unit === d.unit && o.engine === d.engine && (o.name || o.server)))

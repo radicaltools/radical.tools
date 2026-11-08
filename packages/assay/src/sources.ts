@@ -34,7 +34,7 @@ const PDF = /\.pdf$/i
 const MARKDOWN = /(\.(md|markdown|mdx|txt|text)|(^|\/)[^./]+)$/i
 const ASCIIDOC = /\.(adoc|asciidoc)$/i
 /** A document Assay reads in a repository: a README or changelog of any name (README!!.txt, Changelog-server.txt), or a document of a docs or decisions folder. */
-const REPOSITORY_DOCUMENT = /(^|\/)(readme|changelog|changes|history|leeme)([^/]*\.(md|markdown|txt|adoc|rst))?$|(^|\/)(docs?|documentation|adrs?|decisions|architecture)\/(.+\/)?[^/]+\.(md|markdown|adoc|asciidoc|rst|txt)$/i
+const REPOSITORY_DOCUMENT = /(^|\/)(read[_ -]?me[^/]*|changelog|changes|history|leeme|warning)([^/]*\.(md|markdown|txt|adoc|rst))?$|(^|\/)(docs?|documentation|adrs?|decisions|architecture)\/(.+\/)?[^/]+\.(md|markdown|adoc|asciidoc|rst|txt)$|^[^/]+\.(md|markdown|adoc|rst)$/i
 const FIXTURE = /(^|\/)(tests?|__tests__|fixtures?|testdata)\//i
 /** A link's answer, a file of a source, or all of a .zip file's contents, bigger than this is not taken. */
 const MAX_BYTES = 50_000_000

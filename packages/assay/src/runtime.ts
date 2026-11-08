@@ -9,7 +9,7 @@
 import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
-import { RepoFiles, dirOf, escapeRe, lineOf, owner, resolveFrom } from './files'
+import { RepoFiles, dirOf, escapeRe, lineAt, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
 const ROLES: Array<[RegExp, ServiceFact['role'], string?]> = [
@@ -33,7 +33,7 @@ export function addressesIn(text: string, withHostPort: boolean): Array<{ scheme
   const out: Array<{ scheme?: string; host: string; port?: number; text: string; index: number }> = []
   for (const m of text.matchAll(/\b([a-z][a-z0-9+.-]*):\/\/(?:[^@\s/'"`]+@)?([A-Za-z0-9][A-Za-z0-9.-]*)(?::(\d{2,5}))?/g)) {
     const scheme = m[1].toLowerCase()
-    if (/^(file|data|mailto|jdbc|urn)$/.test(scheme)) continue
+    if (/^(file|data|mailto|jdbc|urn|php)$/.test(scheme)) continue
     // A database's URL is its connection string, read as a database (code.ts), not as a call.
     if (/^(postgres(ql)?|mysql|mariadb|mongodb(\+srv)?|redis|rediss|sqlserver|mssql|oracle)$/.test(scheme) || /jdbc:[\w:]*$/i.test(text.slice(Math.max(0, m.index! - 20), m.index!))) continue
     out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0], index: m.index! })
@@ -170,6 +170,16 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       ]
       if (ports.length) u.ports = [...new Set([...(u.ports ?? []), ...ports])].sort((a, b) => a - b)
       if (!file.endsWith('launchSettings.json')) addAddresses([text], file, text, { unit: u.id })
+      // An environment's database (Laravel, Rails, Django settings by env): DB_CONNECTION and DB_DATABASE.
+      const env = (key: string) => new RegExp(`^\\s*${key}\\s*=\\s*["']?([^"'\\s#]+)`, 'm').exec(text)
+      const kind = env('DB_CONNECTION')
+      const name = env('DB_DATABASE')
+      if (/\.env(\.[\w-]+)?$/.test(file) && kind && name) {
+        const engine = ({ sqlsrv: 'SQL Server', mysql: 'MySQL', mariadb: 'MariaDB', pgsql: 'PostgreSQL', postgres: 'PostgreSQL', sqlite: 'SQLite', oracle: 'Oracle' } as Record<string, string>)[kind[1].toLowerCase()] ?? kind[1]
+        const server = env('DB_HOST')?.[1]
+        const id = `${repo}:db:${u.path}:${engine}/${name[1]}`
+        if (!databases.some((d) => d.id === id)) databases.push({ id, unit: u.id, engine, name: name[1], ...(server ? { server } : {}), evidence: { file, line: lineAt(text, name.index) } })
+      }
     }
     readSettings(files, repo, u, units, addresses)
     const dockerfile = files.read(`${prefix}Dockerfile`)

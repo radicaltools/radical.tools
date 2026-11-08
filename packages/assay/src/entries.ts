@@ -173,9 +173,10 @@ function vbForm(text: string, file: string, unit: Unit, add: (unit: Unit, kind: 
       if (!block) return
       const name = block.index !== undefined ? `${block.name}(${block.index})` : block.name
       if (/^VB\.Timer$/i.test(block.kind)) {
-        // A timer runs its handler every Interval milliseconds (0: until the code sets one).
+        // A timer runs its handler every Interval milliseconds (0: until the code sets one); one that only changes
+        // what the form shows (a splash, a clock, an animation) is no job.
         const ticks = handler(block.name, 'Timer')
-        if (ticks) items.push(['job', name, { form: formName, detail: Number(block.interval) ? `every ${block.interval} ms` : 'interval set by the code', evidence: lineOfIndex(block.line), handler: ticks }])
+        if (ticks && !onlyShows(lines, ticks.line - 1)) items.push(['job', name, { form: formName, detail: Number(block.interval) ? `every ${block.interval} ms` : 'interval set by the code', evidence: lineOfIndex(block.line), handler: ticks }])
         return
       }
       // The code a user runs from it: a Click, or a key pressed in it (a sale entered in a text box).
@@ -211,4 +212,15 @@ function vbHandlers(text: string, file: string, unit: Unit, add: (unit: Unit, ki
     const label = cases.get(sub[1].toLowerCase())
     add(unit, 'handler', sub[1], { ...(label ? { detail: label } : {}), evidence: { file, line: i + 1 } })
   })
+}
+
+/** A line that only changes what a form shows: a control's look or place, showing or closing a form, a counter. */
+const SHOWS = /^\s*(?:$|Dim\b|Static\b|Else\b|ElseIf\b.*\bThen\s*$|End If\b|Exit Sub\b|Next\b|For\b|DoEvents\b|Beep\b|Unload\b|Load\b|Set\s+\w+\s*=\s*Nothing|If\b.*\bThen\s*$|If\b.*\bThen\s+(?:Unload|\w+\.(?:Show|Hide|Enabled\s*=)|Exit Sub)\b.*$|(?:\w+\.)*\w+\.(?:Caption|Visible|Left|Top|Width|Height|Value|Picture|ForeColor|BackColor|Text|Enabled|Interval|FillColor|Appearance|Max|Min)\s*=|(?:\w+\.)*\w+\.(?:Move|Refresh|Show|Hide|SetFocus|ZOrder|Cls|Print)\b|Me\.(?:Hide|Show|Refresh)\b|\w+\s*=\s*\w+\s*[-+]\s*\d+\s*$|\w+\s*=\s*(?:Time|Now|Format\$?\(\s*(?:Time|Now)\b))/i
+
+/** Whether the Sub whose line is `at` (0-based) only changes what the form shows. */
+function onlyShows(lines: string[], at: number): boolean {
+  for (let i = at + 1; i < lines.length && !/^\s*End\s+Sub\b/i.test(lines[i]); i++) {
+    if (!SHOWS.test(lines[i].replace(/\r$/, ''))) return false
+  }
+  return true
 }

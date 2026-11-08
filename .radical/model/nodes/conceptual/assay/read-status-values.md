@@ -5,5 +5,5 @@ label: "Read status values"
 action: "the system shall record them as a state fact of that unit, with the table and column they belong to and the value a new one starts with where the SQL says so, and the lines of the repository's code that set each value"
 ears_type: "event-driven"
 rationale: "A lifecycle is the values a status takes and the code that moves it from one to the next."
-trigger: "a unit's code or SQL declares the values a status or state can take: an enum named for a status or state, a CHECK … IN list or a MySQL ENUM on such a column, a PostgreSQL enum type, a TypeScript union of strings"
+trigger: "a unit's code or SQL declares the values a status or state can take (an enum named for a status or state, a CHECK … IN list or a MySQL ENUM on such a column, a PostgreSQL enum type, a TypeScript union of strings), or its code sets a field named for a status or a condition to short quoted values (Paid = \"Y\", Status = \"New\")"
 ---

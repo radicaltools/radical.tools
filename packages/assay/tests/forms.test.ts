@@ -49,7 +49,8 @@ export const POS_FORMS: Record<string, string> = {
 
 describe('radical assay: desktop screens from their form files', () => {
   it("reads each form as a screen: caption, size, controls at their positions, and the forms its code opens through which control", () => {
-    const facts = extractRepository(repo('pos', POS_FORMS))
+    // A form file the project does not list is no screen of it.
+    const facts = extractRepository(repo('pos', { ...POS_FORMS, 'old/frmStray.frm': 'VERSION 5.00\r\nBegin VB.Form frmStray\r\nEnd\r\n' }))
     expect(facts.screens.map((s) => [s.id, s.route, s.title, s.source, s.evidence])).toEqual([
       ['pos:screen:.:frmLogin', 'frmLogin', 'Program Login', 'form', { file: 'frmLogin.frm', line: 3 }],
       ['pos:screen:.:frmMain', 'frmMain', 'Shop', 'form', { file: 'frmMain.frm', line: 2 }],

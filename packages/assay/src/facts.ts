@@ -65,6 +65,8 @@ export interface DependencyFact {
   target?: string
   /** The binary a COM reference names (a VB6 DLL or OCX): another unit may build it. */
   file?: string
+  /** Referenced, but no code of the unit uses it (an Office object library it never automates). */
+  unused?: boolean
   evidence: Evidence
 }
 

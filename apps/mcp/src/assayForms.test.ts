@@ -21,7 +21,9 @@ async function central() {
     'frmMain.frm': form('frmMain', 'Shop', [
       '   Begin VB.Menu mnuReports', '      Caption = "&Reports"', '      Begin VB.Menu mnuDaily', '         Caption = "&Daily report"', '      End', '   End',
     ], ['Private Sub mnuDaily_Click()', '  frmReport.Show vbModal', 'End Sub']),
-    'frmReport.frm': form('frmReport', 'Daily report', [], []),
+    'frmReport.frm': form('frmReport', 'Daily report', [
+      '   Begin VB.CommandButton cmdClose', '      Caption = "&Close"', '      Left = 100', '      Top = 100', '      Width = 900', '      Height = 300', '   End',
+    ], ['Private Sub cmdClose_Click()', '  frmMain.Show', '  Unload Me', 'End Sub']),
   }
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(code, 'pos', path)), { recursive: true })
@@ -42,9 +44,9 @@ describe('Radical Assay over MCP: desktop screens', () => {
   it('writes mockups of forms with wireframes drawn from them, joined where one form\'s code opens another', async () => {
     const { call, nodes, relations } = await central()
     const started = await call('assay_start', { directories: ['../code'] })
-    expect(started.text).toContain('pos (../code/pos, no commit): 1 unit, 3 forms, 6 entry points.')
+    expect(started.text).toContain('pos (../code/pos, no commit): 1 unit, 3 forms, 7 entry points.')
     const screens = JSON.parse((await call('assay_facts', { repository: 'pos', kind: 'screens' })).text).facts
-    expect(screens.map((s: { id: string; opens?: unknown[] }) => [s.id, s.opens?.length ?? 0])).toEqual([['pos:screen:.:frmLogin', 1], ['pos:screen:.:frmMain', 1], ['pos:screen:.:frmReport', 0]])
+    expect(screens.map((s: { id: string; opens?: unknown[] }) => [s.id, s.opens?.length ?? 0])).toEqual([['pos:screen:.:frmLogin', 1], ['pos:screen:.:frmMain', 1], ['pos:screen:.:frmReport', 1]])
     const applied = await call('assay_apply', { plan: {
       elements: [
         { key: 'pos', type: 'system', label: 'Point of sale', facts: ['pos:unit:.'], confidence: 'inferred' },
@@ -62,6 +64,7 @@ describe('Radical Assay over MCP: desktop screens', () => {
     const node = await call('search_model', { query: `GET NODE ${mockups.find((m) => m.label === 'Sign in')!.id}` })
     expect(JSON.parse(node.text).node.wireframe).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"[\s\S]*>OK<\/text>/)
     expect((await relations()).filter((r) => r.relationType === 'navigates-to').map((r) => [r.sourceLabel, r.targetLabel, r.description]).sort()).toEqual([
+      // Closing the report shows the menu that opens it again: going back, no navigation.
       ['Main menu', 'Daily report', 'chooses "Daily report"'], ['Sign in', 'Main menu', 'clicks "OK"'],
     ])
     expect((await call('get_issues')).text).toMatch(/^No issues/)

@@ -478,9 +478,15 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
       evidence: d.evidence,
     })
     if (d.stack === 'docker') continue
+    // An Office object library the unit's code never automates (Excel., Word.) is referenced but unused.
+    const code = d.stack === 'vb6' ? files.list.filter((f) => (d.path === '.' || f.startsWith(`${d.path}/`)) && /\.(bas|cls|frm|ctl)$/i.test(f)).map((f) => files.read(f)).join('\n') : ''
+    const unused = (dep: string): boolean => {
+      const app = /^Microsoft (Excel|Word|Outlook|PowerPoint|Access) [\d.]+ Object Library$/i.exec(dep)?.[1]
+      return !!app && !new RegExp(`\\b${app}\\.`, 'i').test(code)
+    }
     for (const dep of [...new Set(d.deps)].sort()) {
       const binary = d.depFiles.get(dep)
-      dependencies.push({ id: `${repo}:dep:${d.path}:${dep}`, unit: id, package: dep, ...(binary ? { file: binary } : {}), evidence: d.depLines.get(dep) ?? d.evidence })
+      dependencies.push({ id: `${repo}:dep:${d.path}:${dep}`, unit: id, package: dep, ...(binary ? { file: binary } : {}), ...(unused(dep) ? { unused: true } : {}), evidence: d.depLines.get(dep) ?? d.evidence })
     }
     for (const r of d.refs) {
       // A path names a unit's folder, or its manifest (a .vbp or .csproj) in it.

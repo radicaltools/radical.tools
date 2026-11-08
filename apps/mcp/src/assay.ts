@@ -30,13 +30,17 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  accessReaderOf, emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
   type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
+import MDBReader from 'mdb-reader'
 import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
+
+/** Reads the Access files of the code: their tables, columns and relationships. */
+const ACCESS = accessReaderOf(MDBReader)
 
 /** The evidence of what a run wrote, from the central repository's root. */
 export const RUN_FILE = '.radical/assay/run.json'
@@ -93,7 +97,8 @@ export const ASSAY_PROCEDURE = [
   '   database, a service) is no element: tell the user, and let a decision or requirement say so. A group is inferred.',
   '   Reuse elements the model has, by id, instead of adding them again. Every element and relation cites the facts it',
   '   rests on (facts) and is observed when a',
-  '   fact states it (a unit, an API, a service, a database, a dependency, an observed link) or inferred when concluded',
+  '   fact states it (an element: a unit, an API, a service, a database; a relation: a dependency, an observed link; a',
+  '   component a dependency alone names is inferred, citing it) or inferred when concluded',
   '   (a system grouping units, an http, gRPC or address link); an element built from units lists them in units (a system',
   '   cites the units it groups in facts, not units, which map folders), and a',
   '   relation\'s links must join the units of its two ends. Code no reader covers (COBOL, Delphi, PowerBuilder, …: a',
@@ -782,7 +787,7 @@ export class Assay {
     const repositories: RepositoryFacts[] = []
     for (const dir of found.dirs) {
       const own = byRepo[basename(dir)]
-      const facts = extractRepository(dir, Array.isArray(own) ? { reports: own.filter((r): r is string => typeof r === 'string') } : {})
+      const facts = extractRepository(dir, { access: ACCESS, ...(Array.isArray(own) ? { reports: own.filter((r): r is string => typeof r === 'string') } : {}) })
       repositories.push(facts)
       // A folder of code is left as it was: its facts are kept in the central repository.
       const file = factsFileOf(dir, facts.repository, root)
@@ -1039,6 +1044,10 @@ export class Assay {
         const to = mockupOf.get(target)
         if (!to || to === from || navigated.has(`${from}->${to}`)) continue
         const control = screen.controls.find((c) => c.ref === open.via || c.ref.startsWith(`${open.via}(`))
+        // Closing, saving or going back to the form that opens this one is no navigation.
+        const opener = (run.facts.get(target)?.fact as ScreenFact | undefined)?.opens?.some((o) => o.form.toLowerCase() === screen.route.toLowerCase())
+        const BACK = /^(?:cmd|btn|mnu|img|lbl|command)?_?(?:close|back|cancel|exit|return|done|save|quit|salir|cerrar|volver|regresar)/i
+        if (opener && (BACK.test(open.via ?? '') || BACK.test((control?.name ?? '').replace(/^[^A-Za-z]+/, '')))) continue
         const name = control ? `"${control.name}"` : open.via ?? 'the form'
         const label = open.key ? `presses a key in ${name}` : `${control?.role === 'menuitem' ? 'chooses' : 'clicks'} ${name}`
         const before = new Set(Object.keys(facade.getRelations()))
@@ -1118,7 +1127,7 @@ export class Assay {
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
       ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
-      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
+      ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts${plan.stateMachines.every((m) => !(m.facts ?? []).length) ? ' (the machines cite no state fact: that is expected)' : ''} (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
     return ok(lines.join('\n'), {
@@ -1446,6 +1455,7 @@ export class Assay {
   private skeletonFor(run: Run, element: string | undefined, requirement: string, scenarios: Array<{ id: string; label: string; given: string; when: string; then: string; citations?: Citation[] }>): ({ repository: string; scenarios: string[] } & Skeleton) | { note: string } {
     const none = (why: string) => ({ note: `Its scenario${scenarios.length === 1 ? '' : 's'} from the code ${scenarios.length === 1 ? 'has' : 'have'} no pending test: ${why}.` })
     const unitId = element ? run.written.find((w) => w.id === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    if (!element) return none('nothing satisfies it yet')
     if (!unitId) return none('the element that satisfies it is built from no unit of this run')
     const unit = run.facts.get(unitId)!.fact as Unit
     const repository = run.repositories.find((r) => r.repository === run.facts.get(unitId)!.repository)

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { checkPlan, extractRepository, factIndex, linkRepositories, parsePlan } from '../src/index'
+import { accessReaderOf, checkPlan, extractRepository, factIndex, linkRepositories, parsePlan } from '../src/index'
 
 /** A git repository of `files` (path → text) in a fresh folder. */
 function repo(name: string, files: Record<string, string>): string {
@@ -362,7 +362,8 @@ describe('radical assay: what legacy repositories hide', () => {
       'schema.sql': "USE MASTER\r\nGO\r\n--- CREATE DATABASE [commented_out]\r\nCREATE DATABASE [erp_db] COLLATE SQL_Latin1_General_CP1_CI_AS\r\nGO\r\nCREATE TABLE [dbo].[items] ([id] [int] IDENTITY (1, 1) NOT NULL, [name] [nvarchar] (50) NULL)\r\nGO\r\n",
     })
     const facts = extractRepository(dir)
-    expect(facts.databases.map((d) => [d.engine, d.name, d.evidence])).toEqual([['SQL Server', 'erp_db', { file: 'schema.sql', line: 4 }]])
+    // The connection its code opens, named by the schema's database.
+    expect(facts.databases.map((d) => [d.engine, d.name, d.evidence])).toEqual([['SQL Server', 'erp_db', { file: 'frmMain.frm', line: 6 }]])
     expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to])).toEqual([['data', 'erp:unit:.', 'erp:db:.:SQL Server/erp_db']])
   })
 
@@ -419,16 +420,17 @@ describe('radical assay: what legacy repositories hide', () => {
     const facts = extractRepository(dir)
     // A file the repository holds, not one the code makes at run time.
     expect(facts.databases.map((d) => [d.engine, d.name, d.evidence.line])).toEqual([['Access', 'Projects.mdb', 2]])
-    expect(linkRepositories([facts]).map((l) => [l.kind, l.to])).toEqual([['data', 'viewer:db:.:Access/Projects.mdb']])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.to])).toEqual([['data', 'viewer:db:.:Access/projects.mdb']])
     expect(facts.tables.map((t) => t.table)).toEqual(['Items', 'Spells'])
   })
 
   it('takes a nameless connection for the Access database the unit names, and reads none from one beside nothing, with a note', () => {
     const named = extractRepository(repo('app', {
       'App.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="App"\r\n', 'Data.mdb': '',
-      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\n  sPath = App.Path & "\\Data.mdb"\r\nEnd Sub\r\n',
+      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  FileCopy App.Path & "\\DATA.MDB", sBackup\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\n  sPath = App.Path & "\\Data.mdb"\r\n  cn2.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\\APP\\data.mdb"\r\nEnd Sub\r\n',
     }))
-    expect(named.databases.map((d) => [d.engine, d.name])).toEqual([['Access', 'Data.mdb']])
+    // One file whatever the case of its name, cited where the code connects to it.
+    expect(named.databases.map((d) => [d.engine, d.name, d.evidence.line])).toEqual([['Access', 'data.mdb', 6]])
     const none = extractRepository(repo('tool', {
       'Tool.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="Tool"\r\n',
       'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sPath\r\nEnd Sub\r\n',
@@ -453,5 +455,93 @@ describe('radical assay: what legacy repositories hide', () => {
     expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to])).toEqual([
       ['address', 'demos:unit:One/Master', 'demos:unit:One/Slave'], ['address', 'demos:unit:Two/Master', 'demos:unit:Two/Slave'],
     ])
+  })
+
+  it("reads the tables, columns and relationships of the Access file a unit opens, through the reader it is given", () => {
+    const files = {
+      'Shop.vbp': 'Type=Exe\r\nModule=modData; modData.bas\r\nName="Shop"\r\n', 'Shop.mdb': 'not read by the test',
+      'modData.bas': 'Attribute VB_Name = "modData"\r\nSub Main()\r\n  Set DB = OpenDatabase(App.Path & "\\Shop.mdb")\r\nEnd Sub\r\n',
+    }
+    // mdb-reader's class, as the MCP server hands it over: what accessReaderOf asks of it.
+    class FakeMdb {
+      getTableNames(o?: { systemTables?: boolean }) { return o?.systemTables ? ['MSysObjects', 'MSysRelationships'] : ['Customers', 'Invoices'] }
+      getTable(name: string) {
+        return {
+          getColumns: () => (name === 'Customers' ? [{ name: 'PK', type: 'long' }, { name: 'Name', type: 'text' }] : [{ name: 'PK', type: 'long' }, { name: 'CustomerFK', type: 'long' }]),
+          getData: () => [{ szObject: 'Invoices', szColumn: 'CustomerFK', szReferencedObject: 'Customers', szReferencedColumn: 'PK' }],
+        }
+      }
+    }
+    const facts = extractRepository(repo('shop', files), { access: accessReaderOf(FakeMdb as never) })
+    expect(facts.tables.filter((t) => t.declared === 'Access').map((t) => [t.table, t.columns!.map((c) => c.name), t.references])).toEqual([
+      ['Customers', ['PK', 'Name'], []], ['Invoices', ['PK', 'CustomerFK'], [{ column: 'CustomerFK', table: 'Customers', line: 1 }]],
+    ])
+    // Without a reader (the CLI), the file is noted, not read.
+    expect(extractRepository(repo('shop', files)).notes).toContain('Shop.mdb: an Access file whose tables only the MCP server reads (the CLI reads no Access file)')
+  })
+
+  it('reads a status kept in short quoted values the code sets and tests, with the lines that set each', () => {
+    const facts = extractRepository(repo('billing', {
+      'Billing.vbp': 'Type=Exe\r\nModule=modInvoice; modInvoice.bas\r\nName="Billing"\r\n',
+      'modInvoice.bas': [
+        'Attribute VB_Name = "modInvoice"', 'Sub Save(rs As Recordset)', '  rs!Paid = "N"', '  rs!Remarks = "OK"', 'End Sub',
+        'Sub Pay(id As Long)', '  cn.Execute "UPDATE Invoices SET Paid = \'Y\' WHERE InvoiceNo = " & id', 'End Sub',
+        'Sub Unpaid()', '  rs.Open "SELECT * FROM Invoices WHERE Paid = \'N\'", cn', '  If rs("Paid") = "Y" Then Exit Sub', 'End Sub', '',
+      ].join('\r\n'),
+    }))
+    expect(facts.states.map((s) => [s.name, s.values, s.sets.map((x) => [x.value, x.line])])).toEqual([['Paid', ['N', 'Y'], [['N', 3], ['Y', 7]]]])
+  })
+
+  it('reads a timer that only changes what its form shows as no job, and one that does work as one', () => {
+    const frm = [
+      'VERSION 5.00', 'Begin VB.Form frmSplash', '   Begin VB.Timer tmrProgress', '      Interval = 50', '   End', '   Begin VB.Timer tmrSave', '      Interval = 60000', '   End', 'End',
+      'Attribute VB_Name = "frmSplash"',
+      'Private Sub tmrProgress_Timer()', '  pb.Value = pb.Value + 1', '  lblTime.Caption = Format$(Now, "hh:nn")', '  If pb.Value = 100 Then', '    Unload Me', '    frmMain.Show', '  End If', 'End Sub',
+      'Private Sub tmrSave_Timer()', '  Call SaveWorld', 'End Sub', '',
+    ].join('\r\n')
+    const facts = extractRepository(repo('game', { 'Game.vbp': 'Type=Exe\r\nForm=frmSplash.frm\r\nName="Game"\r\n', 'frmSplash.frm': frm }))
+    expect(facts.entries.filter((e) => e.kind === 'job').map((e) => [e.name, e.detail])).toEqual([['tmrSave', 'every 60000 ms']])
+  })
+
+  it('marks an Office object library the code never automates as unused', () => {
+    const vbp = [
+      'Type=Exe', 'Reference=*\\G{00020813-0000-0000-C000-000000000046}#1.3#0#C:\\Office\\EXCEL9.OLB#Microsoft Excel 9.0 Object Library',
+      'Reference=*\\G{00020905-0000-0000-C000-000000000046}#8.1#0#C:\\Office\\MSWORD9.OLB#Microsoft Word 9.0 Object Library', 'Module=modReport; modReport.bas', 'Name="Reports"', '',
+    ].join('\r\n')
+    const facts = extractRepository(repo('reports', { 'Reports.vbp': vbp, 'modReport.bas': 'Attribute VB_Name = "modReport"\r\nSub Export()\r\n  Set xl = CreateObject("Excel.Application")\r\nEnd Sub\r\n' }))
+    expect(facts.dependencies.filter((d) => /Object Library/.test(d.package)).map((d) => [d.package, d.unused ?? false])).toEqual([
+      ['Microsoft Excel 9.0 Object Library', false], ['Microsoft Word 9.0 Object Library', true],
+    ])
+  })
+
+  it("links a socket's client to the server listening on the port they name, and reads an environment's database", () => {
+    const facts = extractRepository(repo('chat', {
+      'Client/Client.vbp': 'Type=OleExe\r\nUserDocument=Chatdoc.dob\r\nName="Client"\r\n',
+      'Client/Chatdoc.dob': 'VERSION 5.00\r\nBegin VB.UserDocument Chatdoc\r\nEnd\r\nAttribute VB_Name = "Chatdoc"\r\nPrivate Sub cmdGo_Click()\r\n  Winsock1.Connect ServerName, 6123\r\nEnd Sub\r\n',
+      'Server/Server.vbp': 'Type=Exe\r\nForm=Mainform.frm\r\nName="Server"\r\n',
+      'Server/Mainform.frm': 'VERSION 5.00\r\nBegin VB.Form Mainform\r\n   Begin VB.TextBox txtServerPort\r\n      Text = "6123"\r\n   End\r\nEnd\r\nAttribute VB_Name = "Mainform"\r\nPrivate Sub Form_Load()\r\n  sck.LocalPort = txtServerPort.Text\r\n  sck.Listen\r\nEnd Sub\r\n',
+      'web/package.json': JSON.stringify({ name: 'web', scripts: { dev: 'vite' } }),
+      'web/.env.example': 'APP_NAME=ERP\nDB_CONNECTION=sqlsrv\nDB_HOST=127.0.0.1\nDB_DATABASE=AINData2\n',
+      'MIGRATION_HANDOFF.md': '# Migration handoff\n\nThe legacy tables are in AINData2.\n',
+    }))
+    // An ActiveX document is a screen; a Markdown file at the root is a document.
+    expect(facts.screens.map((x) => x.route)).toEqual(['Chatdoc', 'Mainform'])
+    expect(facts.documents.map((d) => d.file)).toEqual(['MIGRATION_HANDOFF.md'])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.from, l.to]).sort()).toEqual([
+      ['address', 'chat:unit:Client', 'chat:unit:Server'], ['data', 'chat:unit:web', 'chat:db:web:SQL Server/AINData2'],
+    ])
+  })
+
+  it("leaves out a page's links, schemas, namespaces, lock files and files beside the code as calls", () => {
+    const facts = extractRepository(repo('web', {
+      'package.json': JSON.stringify({ $schema: 'https://www.schemastore.org/package.json', name: 'web', scripts: { dev: 'vite' } }, null, 1),
+      'package-lock.json': JSON.stringify({ packages: { 'node_modules/x': { resolved: 'https://registry.npmjs.org/x/-/x-1.0.0.tgz', funding: { url: 'https://opencollective.com/x' } } } }, null, 1),
+      'phpunit.xml': '<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.0/phpunit.xsd">\n</phpunit>\n',
+      'public/index.php': "<?php\nrequire __DIR__.'/../vendor/autoload.php';\n",
+      'config/logging.php': "<?php\nreturn ['stream' => 'php://stderr'];\n",
+      'resources/views/welcome.blade.php': '<a href="https://laravel.com/docs">Docs</a>\n<svg xmlns="http://www.w3.org/2000/svg"></svg>\n<script>fetch("/quality/lookup/reports")</script>\n',
+    }))
+    expect(facts.urls.map((u) => u.path)).toEqual(['/quality/lookup/reports'])
+    expect(facts.addresses).toEqual([])
   })
 })

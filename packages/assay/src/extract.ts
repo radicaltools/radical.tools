@@ -14,7 +14,8 @@ import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { load } from './yaml'
 import { parseTestReport } from '@radical/common/check'
 import { readCode } from './code'
-import { readDomain } from './domain'
+import { readDomain, type AccessReader } from './domain'
+export type { AccessReader, AccessSchema } from './domain'
 import { readEntries } from './entries'
 import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
@@ -30,6 +31,8 @@ export interface ExtractOptions {
    *  directories, from the repository's root or absolute. Default: the
    *  repository's reports/ when it has one. */
   reports?: string[]
+  /** Reads an Access file's schema (the MCP server and the bench give mdb-reader's); none: Access files are noted, not read. */
+  access?: AccessReader
 }
 
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'patch', 'head', 'options', 'trace'])
@@ -117,7 +120,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.databases.push(...code.databases)
   facts.notes.push(...code.notes)
   // The tables its schemas and ORM classes declare, with those its code names; its statuses; where its code is entered.
-  const domain = readDomain(files, repo, facts.units, code.tables)
+  const domain = readDomain(files, repo, facts.units, code.tables, code.databases, options.access)
+  facts.notes.push(...domain.notes)
   facts.tables = domain.tables
   facts.states = domain.states
   // A database a schema creates, unless a connection string of the unit already names it; one of its engine the unit
