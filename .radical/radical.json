@@ -3366,6 +3366,9 @@
     ] },
     { "element": "f005c482-43ea-4d54-9a13-2be003c91501", "name": "Tables by attribute, databases by their files, a schema by its users", "tests": [
       "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads tables an attribute names over a DbSet, SQLite and Access by their files, and a schema by the services using its database"
+    ] },
+    { "element": "6f8ef9f8-2ad5-42c8-a4bd-6a3dbd1a5746", "name": "Tests and join tables left out of the score", "tests": [
+      "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › counts no units of tests nor join tables as missed, and a unit a database rests on through its service as built"
     ] }
   ]
 }
