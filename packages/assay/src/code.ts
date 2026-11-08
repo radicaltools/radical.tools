@@ -10,6 +10,8 @@ import { extname } from 'node:path'
 import { addressesIn } from './runtime'
 import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
+import { springConfigOwners } from './spring'
+import { inlineValues, vbValues, type VbValues } from './values'
 
 const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.scala', '.fs'])
 const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
@@ -82,6 +84,8 @@ export function withoutVbComments(text: string): string {
 const STRING = /(["'`])((?:\$\{[^}]*\}|(?!\1)[^\\\n]|\\.)*)\1/g
 /** VB strings: "…" with "" inside; ' starts a comment. */
 const VB_STRING = /()"((?:[^"\n]|"")*)"/g
+/** VB source: modules, classes, forms, controls, designers and documents. */
+const VB_CODE = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i
 
 /** A database a connection string names. */
 export function connectionOf(text: string): { engine: string; server?: string; name?: string; explicit?: boolean } | null {
@@ -120,7 +124,14 @@ export function connectionOf(text: string): { engine: string; server?: string; n
     const engine = { postgresql: 'PostgreSQL', mysql: 'MySQL', mariadb: 'MariaDB', sqlserver: 'SQL Server', oracle: 'Oracle', h2: 'H2', hsqldb: 'HSQLDB', db2: 'Db2' }[jdbc[1].toLowerCase()] ?? jdbc[1]
     return { engine, ...(jdbc[2] && jdbc[2] !== 'mem' ? { server: jdbc[2] } : {}), ...(jdbc[3] ? { name: jdbc[3] } : {}) }
   }
-  const url = /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/(?:[^@\s/]+@)?([\w.-]+)(?::\d+)?(?:\/([\w-]+))?/i.exec(text)
+  // An SQLite URL names its file (sqlite:///%kernel.project_dir%/data/database.sqlite).
+  const sqlite = /\bsqlite:\/\/\/?([^\s"'<?]+)/i.exec(text)
+  if (sqlite) {
+    const file = sqlite[1].split(/[\\/]/).pop() ?? ''
+    return /^[\w.-]+$/.test(file) && !/memory/i.test(file) ? { engine: 'SQLite', name: file } : null
+  }
+  // A user and password taken from the environment (postgres:${POSTGRES_PASSWORD}@db) leave the server and name read.
+  const url = /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/(?:(?:\$\{[^{}]*\}|[^@\s/])+@)?([\w.-]+)(?::\d+)?(?:\/([\w-]+))?/i.exec(text)
   if (url) {
     const engine = { postgres: 'PostgreSQL', postgresql: 'PostgreSQL', mysql: 'MySQL', mongodb: 'MongoDB', 'mongodb+srv': 'MongoDB', redis: 'Redis', sqlserver: 'SQL Server', mssql: 'SQL Server' }[url[1].toLowerCase()]!
     return { engine, server: url[2], ...(url[3] ? { name: url[3] } : {}) }
@@ -181,30 +192,51 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   const accessNamed = new Map<string, Array<{ name: string; evidence: { file: string; line: number } }>>()
   const accessUsers = new Set<string>()
 
+  // What each unit's VB code sets its constants, variables and settings to, read once a unit.
+  const valuesByUnit = new Map<string, VbValues>()
+  const valuesOf = (unit: Unit): VbValues => {
+    const known = valuesByUnit.get(unit.id)
+    if (known) return known
+    const mine = files.list.filter((f) => owner(units, f)?.id === unit.id)
+    const values = vbValues(files, mine.filter((f) => VB_CODE.test(f)).map((f) => joinContinuations(withoutVbComments(files.read(f)))), mine.filter((f) => /\.ini$/i.test(f)))
+    valuesByUnit.set(unit.id, values)
+    return values
+  }
+
   // The services every .proto of the repository declares.
   const protoServices = [...new Set(files.named(/\.proto$/).flatMap((f) => [...files.read(f).matchAll(/^\s*service\s+(\w+)\s*\{/gm)].map((m) => m[1])))]
 
-  for (const file of files.list) {
+  // A config server's files are read as the configuration of the applications they configure.
+  const configures = springConfigOwners(files, units)
+  const readings = files.list.flatMap((file): Array<[string, Unit | undefined]> => configures.get(file)?.map((u) => [file, u] as [string, Unit]) ?? [[file, owner(units, file)]])
+  for (const [file, unit] of readings) {
     const ext = extname(file).toLowerCase()
     const config = CONFIG.test(file)
     if (!SOURCE.has(ext) && !config) continue
-    const unit = owner(units, file)
     if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config)) continue
     let text = files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
-    const vb = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i.test(file)
-    if (vb) text = joinContinuations(withoutVbComments(text))
-    // ${key:default} is its default where nothing sets it, for every reader below (on its line: lines hold).
-    text = text.replace(/\$\{[\w.-]+:([^${}\n]*)\}/g, '$1')
+    const vb = VB_CODE.test(file)
+    // A variable spliced into a string ("Server=" & DBservidor & ";…") is the value the unit sets it to.
+    if (vb) text = inlineValues(joinContinuations(withoutVbComments(text)), valuesOf(unit))
+    // A commented line of a configuration file sets nothing (lines hold: it is emptied, not removed).
+    if (config && /\.(ya?ml|properties|env|toml|conf|ini)$|(^|\/)\.env(\.[\w-]+)?$/i.test(file)) text = text.replace(/^[ \t]*#.*$/gm, '').replace(/\.ini$/i.test(file) ? /^[ \t]*;.*$/gm : /$^/, '')
+    // ${key:default} (${KEY:-default}) is its default where nothing sets it, for every reader below (on its line: lines
+    // hold); ${KEY:?message} has none.
+    text = text.replace(/\$\{([\w.-]+):([^${}\n]*)\}/g, (_, key: string, value: string) => (value.startsWith('?') ? `\${${key}}` : value.replace(/^-/, '')))
+    // A compose file's or a deployment manifest's connection strings are the services' it runs (runtime.ts).
+    const deployment = config && (/(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file) || /^\s*kind\s*:\s*(Deployment|StatefulSet|DaemonSet|Service|Job|CronJob|ConfigMap)\b/m.test(text))
     const at = (index: number) => ({ file, line: lineAt(text, index) })
 
     // Connection strings, in code and configuration alike.
-    for (const m of text.matchAll(/[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
+    for (const m of deployment ? [] : text.matchAll(/\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
       const db = connectionOf(m[0])
       if (!db) continue
       // A name filled in at run time ($dsn, {db}, %DB%) names nothing.
       if (db.name && /[$%{}]/.test(db.name)) delete db.name
+      // A placeholder for the name (YOUR DATABASE NAME, db_name) names none either.
+      if (db.name && db.engine !== 'Access' && (/^(your|enter|my)[\s_-]/i.test(db.name) || /^(database|db)[\s_-]?name$|\s(database|db)\s+name$/i.test(db.name))) delete db.name
       if (db.server && /[$%{}]/.test(db.server)) delete db.server
       // Neither a server nor a name: a variable assigned, not a connection string, unless a driver or provider names the engine.
       if (!db.server && !db.name && !db.explicit) continue
@@ -243,11 +275,28 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       }
       // A form's fields holding a host and a port by default: an address of the unit, or, beside a listening socket, its port.
       if (/\.(frm|dob|pag|ctl)$/i.test(file)) formAddress(text, file, unit, repo, out, once)
-      // A socket connecting to a port the code names: Winsock1.Connect ServerName, 6123.
-      for (const m of text.matchAll(/\.Connect\s*\(?\s*("([^"]+)"|[\w.]+)\s*,\s*(\d{2,5})\b/gi)) {
-        const host = (m[2] ?? m[1]).toLowerCase()
-        const id = `${repo}:address:${unit.path}:connect:${host}:${m[3]}`
-        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'socket', host, port: Number(m[3]), text: m[0].trim(), evidence: at(m.index!) })
+      // A socket connecting to a port the code names, or one a constant, variable or setting holds: Winsock1.Connect
+      // ServerName, 6123; .RemoteHost = GAME_IP and .RemotePort = GAME_PORT before a bare .Connect.
+      const values = valuesOf(unit)
+      const hostOf = (expr: string): string => (values.resolve(expr) ?? /^"([^"]+)"$/.exec(expr.trim())?.[1] ?? expr.trim()).toLowerCase()
+      const remoteHost = /\.RemoteHost\s*=\s*([^\n]+)/i.exec(text)?.[1]
+      const connects = [
+        ...[...text.matchAll(/\.Connect\s*\(?\s*("[^"]+"|[\w.]+\$?)\s*,\s*([\w.]+\$?)/gi)].map((m) => ({ host: m[1], port: m[2], index: m.index! })),
+        ...[...text.matchAll(/\.RemotePort\s*=\s*([^\n]+)/gi)].map((m) => ({ host: remoteHost ?? 'localhost', port: m[1], index: m.index! })),
+      ]
+      for (const c of connects) {
+        const port = /^\d+$/.test(c.port.trim()) ? c.port.trim() : values.resolve(c.port)
+        if (!port || !/^\d{2,5}$/.test(port)) continue
+        const host = hostOf(c.host)
+        const id = `${repo}:address:${unit.path}:connect:${host}:${port}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'socket', host, port: Number(port), text: lineTextAt(text, c.index).trim(), evidence: at(c.index) })
+      }
+      // A socket listening on a port a constant, variable or setting holds: .LocalPort = GAME_PORT and .Listen.
+      if (/\.Listen\b/i.test(text)) {
+        for (const m of text.matchAll(/\.LocalPort\s*=\s*([^\n]+)/gi)) {
+          const port = values.resolve(m[1])
+          if (port && /^\d{2,5}$/.test(port)) unit.ports = [...new Set([...(unit.ports ?? []), Number(port)])].sort((a, b) => a - b)
+        }
       }
     }
 
@@ -273,6 +322,11 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     if (NO_CALLS.test(file)) continue
 
     if (config) {
+      // A gateway's route to a service by its id (zuul's serviceId: orders).
+      for (const m of text.matchAll(/^\s*serviceId\s*[=:]\s*["']?([a-z][a-z0-9-]{1,40})["']?\s*$/gim)) {
+        const id = `${repo}:address:${unit.path}:route:${m[1].toLowerCase()}`
+        if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'route', host: m[1].toLowerCase(), text: m[0].trim(), evidence: at(m.index!) })
+      }
       // A setting named for a host: spring.rabbitmq.host=rabbitmq, redis: { host: cache }.
       for (const m of text.matchAll(/^\s*["']?[\w.-]*(?:host|hostname|address|server|endpoint)["']?\s*[=:]\s*["']?([a-z][a-z0-9-]{1,40}(?:\.[a-z0-9-]+)*)["']?\s*,?\s*$/gim)) {
         const host = m[1].toLowerCase()
@@ -289,7 +343,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     }
 
     for (const m of text.matchAll(vb ? VB_STRING : STRING)) {
-      const literal = m[2]
+      // A template's value with a default is its default where nothing sets it: `localhost:${process.env.PORT || 3002}`.
+      const literal = vb ? m[2] : m[2].replace(/\$\{[^{}]*?(?:\|\||\?\?)\s*['"]?([\w.-]+)['"]?\s*\}/g, '$1')
       // An address opened in the browser is a page for the user, not a call of the unit.
       const lineText = lineTextAt(text, m.index!)
       const opened = BROWSER.test(lineText) || NOT_CALLED.test(lineText)
@@ -357,12 +412,13 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
     }
   }
-  // A nameless SQL Server or ODBC connection, where the repository's SQL scripts name one database (USE, CREATE DATABASE), is that one.
-  const scripted = new Set(files.list.filter((f) => /\.sql$/i.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*(?:use|create\s+database)\s+\[?(\w+)\]?/gim)].map((m) => m[1]).filter((n) => !/^(master|tempdb|model|msdb)$/i.test(n))))
+  // A nameless SQL Server, ODBC or MySQL connection, where the repository's SQL scripts name one database (USE, CREATE
+  // DATABASE, a dump's -- Database: header), is that one.
+  const scripted = new Set(files.list.filter((f) => /\.sql$/i.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*(?:use|create\s+database(?:\s+if\s+not\s+exists)?)\s+[[`"]?(\w+)[\]`"]?|^--\s*Database:\s*[`'"]?(\w+)/gim)].map((m) => m[1] ?? m[2]).filter((n) => !/^(master|tempdb|model|msdb|mysql|information_schema)$/i.test(n))))
   const scriptedNames = [...new Map([...scripted].map((n) => [n.toLowerCase(), n])).values()]
   if (scriptedNames.length === 1) {
     for (const d of out.databases) {
-      if (d.name || d.server || !['SQL Server', 'ODBC'].includes(d.engine)) continue
+      if (d.name || !['SQL Server', 'ODBC', 'MySQL', 'MariaDB'].includes(d.engine)) continue
       d.name = scriptedNames[0]
       d.id = `${d.id.slice(0, d.id.lastIndexOf(':') + 1)}${d.engine}/${d.name}`
     }

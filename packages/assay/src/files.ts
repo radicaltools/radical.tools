@@ -11,6 +11,8 @@ import type { Unit } from './facts'
 
 /** Folders that hold no source of the repository's own. */
 export const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', '.radical', 'vendor', 'target', '.venv', 'venv', '__pycache__', 'bin', 'obj', '.gradle', '.idea', '.vs', '.svelte-kit', 'storybook-static'])
+/** Libraries copied into a web application's folder (ASP.NET's wwwroot/lib, Bower's components): not its own source. */
+const VENDORED = /(^|\/)(wwwroot\/lib|bower_components)\//i
 /** Files bigger than this are not read. */
 const MAX_FILE = 1_000_000
 
@@ -99,7 +101,7 @@ export class RepoFiles {
     const listing = listFiles(root)
     // A build folder holding a .NET project is a build project's code (NUKE's build/_build.csproj), not output.
     const builds = new Set(listing.files.filter((f) => /(^|\/)build\/[^/]+\.(cs|fs)proj$/i.test(f)).map((f) => f.slice(0, f.lastIndexOf('/'))))
-    const skipped = (f: string): boolean => f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !(seg === 'build' && builds.has(segs.slice(0, i + 1).join('/'))))
+    const skipped = (f: string): boolean => VENDORED.test(f) || f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !(seg === 'build' && builds.has(segs.slice(0, i + 1).join('/'))))
     this.list = listing.files.filter((f) => !skipped(f)).sort()
     this.set = new Set(this.list)
     this.nested = listing.nested.sort()

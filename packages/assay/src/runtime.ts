@@ -10,6 +10,7 @@ import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
 import { connectionOf } from './code'
+import { springConfigOwners } from './spring'
 import { RepoFiles, dirOf, escapeRe, lineAt, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
@@ -65,11 +66,14 @@ function environment(env: unknown): string[] {
 }
 
 /** The unit a service runs: built from its folder, else the one its name or image names. */
-function unitFor(units: Unit[], name: string, image: string | undefined, built: string | null): Unit | undefined {
+function unitFor(units: Unit[], name: string, image: string | undefined, built: string | null, mounted: string[] = []): Unit | undefined {
   if (built) {
     const exact = units.find((u) => u.path === built) ?? units.filter((u) => built.startsWith(`${u.path}/`) || u.path.startsWith(`${built}/`)).sort((a, b) => b.path.length - a.path.length)[0]
     if (exact) return exact
   }
+  // Built from a runner image, the one unit whose folder it mounts (./web:/web).
+  const inMounts = units.filter((u) => mounted.some((m) => u.path === m || u.path.startsWith(`${m}/`)))
+  if (inMounts.length === 1) return inMounts[0]
   const names = [name, image?.split('/').pop()?.split(':')[0]].filter((n): n is string => !!n).map((n) => n.toLowerCase())
   return units.find((u) => [u.name, ...(u.aliases ?? []), u.path.split('/').pop() ?? ''].some((a) => names.includes(a.toLowerCase())))
 }
@@ -87,6 +91,7 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
   const addresses: AddressFact[] = []
   const databases: DatabaseFact[] = []
   const notes: string[] = []
+  const published = new Map<string, number[]>()
   // One service per name: docker-compose, Kubernetes and its overlays name the same one again.
   const service = (s: Omit<ServiceFact, 'id'> & { file: string }): ServiceFact => {
     const id = `${repo}:service:${s.name}`
@@ -134,9 +139,16 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         const built = context !== null && dockerfile ? dirOf(resolveFrom(context, dockerfile) ?? '') : context
         // The project its Dockerfile builds, where the context holds several.
         const dockerPath = context !== null ? resolveFrom(context, dockerfile ?? 'Dockerfile') : null
-        const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built)
+        const mounted = (Array.isArray(def.volumes) ? def.volumes : []).filter((v): v is string => typeof v === 'string' && /^\.{1,2}(\/|:)/.test(v)).map((v) => resolveFrom(dirOf(file), v.split(':')[0])).filter((v): v is string => !!v && v !== '.')
+        const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built, mounted)
         const dependsOn = Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object' ? Object.keys(def.depends_on) : []
         const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
+        // The ports it publishes on this machine ("127.0.0.1:3002:8080", "8080:80", { published: 8080 }).
+        for (const p of Array.isArray(def.ports) ? def.ports : []) {
+          const parts = typeof p === 'string' || typeof p === 'number' ? String(p).split(':') : []
+          const host = typeof p === 'object' && p ? (p as { published?: unknown }).published : parts.length === 3 ? parts[1] : parts.length === 2 ? parts[0] : undefined
+          if (/^\d{2,5}$/.test(String(host ?? ''))) published.set(s.id, [...(published.get(s.id) ?? []), Number(host)])
+        }
         addAddresses(environment(def.environment), file, text, { service: s.id })
         // A connection string in the environment of a service a unit runs: a database of that unit.
         for (const value of unit ? environment(def.environment) : []) {
@@ -172,9 +184,19 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
   databases.push(...aspire.databases.filter((d) => !databases.some((x) => x.id === d.id)))
 
   // Configuration of a unit: its Spring name, its port, and the addresses it names.
+  // A service's published ports are its unit's, on this machine.
+  for (const [id, ports] of published) {
+    const u = units.find((x) => x.id === services.find((s) => s.id === id)?.unit)
+    if (u) u.ports = [...new Set([...(u.ports ?? []), ...ports])].sort((a, b) => a - b)
+  }
+  // A config server's files are the configuration of the applications they configure.
+  const configures = springConfigOwners(files, units)
   for (const u of units) {
     const prefix = u.path === '.' ? '' : `${u.path}/`
-    const configs = files.list.filter((f) => f.startsWith(prefix) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f))
+    const configs = [
+      ...files.list.filter((f) => f.startsWith(prefix) && !configures.has(f) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f)),
+      ...[...configures].filter(([, configured]) => configured.includes(u)).map(([f]) => f),
+    ]
     for (const file of configs) {
       const text = files.read(file)
       const springName = /spring\.application\.name\s*[=:]\s*([\w.-]+)/.exec(text)?.[1] ?? (() => {
@@ -222,7 +244,7 @@ const HOST_KEY = /^(ip|host|hostname|server|servidor|address|addr|direccion|remo
 const HOST_VALUE = /^(\d{1,3}(\.\d{1,3}){3}|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9-]+)*)$/i
 
 /** The [sections] of an INI text, each with its key=value lines; lines before the first section are section "". */
-function iniSections(text: string): Array<{ name: string; line: number; entries: Array<{ key: string; value: string; line: number }> }> {
+export function iniSections(text: string): Array<{ name: string; line: number; entries: Array<{ key: string; value: string; line: number }> }> {
   const out = [{ name: '', line: 1, entries: [] as Array<{ key: string; value: string; line: number }> }]
   text.split(/\r?\n/).forEach((raw, i) => {
     const line = raw.trim()

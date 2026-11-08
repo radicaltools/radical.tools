@@ -127,7 +127,8 @@ describe('radical assay: tables and their structure', () => {
       ].join('\n'),
     }))
     const tables = new Map(python.tables.map((t) => [t.table, t]))
-    expect([...tables.keys()].sort()).toEqual(['invoices', 'orders_customer', 'shop_orders'])
+    // Its many-to-many field adds the join table.
+    expect([...tables.keys()].sort()).toEqual(['invoices', 'orders_customer', 'shop_orders', 'shop_orders_tags'])
     expect(tables.get('shop_orders')!.references).toEqual([{ column: 'customer_id', table: 'orders_customer', line: 7 }])
     expect(tables.get('shop_orders')!.columns!.map((c) => [c.name, c.type])).toEqual([['status', 'OrderStatus']])
     expect([tables.get('invoices')!.declared, tables.get('invoices')!.references]).toEqual(['SQLAlchemy', [{ column: 'order_id', table: 'shop_orders', line: 4 }]])
