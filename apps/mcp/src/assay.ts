@@ -145,9 +145,9 @@ export const ASSAY_PROCEDURE = [
   '   references, where a schema or an ORM class declares them; the tables code only names have neither). One plan: a domain',
   '   per system (elements: type domain, inferred, citing its tables, at the root or in a group: a domain is never inside a',
   '   system; named for the business area, not the system\'s own name), and entities: one',
-  '   per table that matters to what the system does (tables: its table facts, the SQL\'s and the ORM class\'s of one table',
-  '   together; label as the business calls it, in the singular; parent the domain). Join tables of two others, logs and',
-  '   framework tables are no entities. An entity whose table\'s foreign key references an aggregate it belongs to (an',
+  '   per table of the repository\'s own, every one, a page type or a settings table of a CMS too (tables: its table facts,',
+  '   the SQL\'s and the ORM class\'s of one table together; label as the business calls it, in the singular; parent the',
+  '   domain). Only join tables of two others, logs and framework tables are no entities. An entity whose table\'s foreign key references an aggregate it belongs to (an',
   '   order line, an order) is kind entity, partOf that one; one that refers to another aggregate references it (to,',
   '   cardinality one). Only a foreign key backs these: the server refuses one no foreign key states; a reference only the',
   '   code shows (a join, a lookup by a column) goes in relations instead: relationType references, inferred, citing the',
@@ -369,7 +369,7 @@ const PLAN_SCHEMA = {
     },
     entities: {
       type: 'array',
-      description: 'The tables that matter, as entities of a domain: written observed. A relation between two rests on a foreign key of their tables.',
+      description: 'Every table of the repository\'s own but join tables, logs and framework tables, as entities of a domain: written observed. A relation between two rests on a foreign key of their tables.',
       items: {
         type: 'object',
         properties: {

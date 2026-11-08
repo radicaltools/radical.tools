@@ -5,7 +5,8 @@
 // web applications are built from, the calls its relations between those
 // elements and the databases make, and the tables its entities are. What
 // each element is built from or stands for comes from the run's evidence
-// (.radical/assay/run.json), the facts it cites.
+// (.radical/assay/run.json), the facts it cites. It asks what Assay's
+// procedure asks: units of tests are no elements, join tables no entities.
 
 /** A bench entry's expectations, as bench.json writes them. */
 export interface Expectations {
@@ -26,10 +27,31 @@ export interface ModelNode { id: string; type: string; label: string }
 export interface ModelRelation { sourceId: string; targetId: string; relationType?: string; label?: string | null }
 export interface WrittenItem { id: string; kind: string; facts: string[] }
 
+/** What the run's repositories' facts say, beyond the model: deployed services, units of tests, join tables. */
+export interface RunFacts {
+  /** Deployed services by fact id: the name, the unit it runs. */
+  services?: Record<string, { name: string; unit?: string }>
+  /** Unit facts of kind tests. */
+  tests?: string[]
+  /** Table facts that only join two others. */
+  joins?: string[]
+}
+
 export interface Score {
-  units: { found: number; expected: number; read: number; missed: string[]; extra: string[] }
+  /** tests: expected units that are tests, which the procedure makes no elements. */
+  units: { found: number; expected: number; read: number; missed: string[]; extra: string[]; tests?: string[] }
   calls: { right: number; expected: number; wrong: string[]; missed: string[] }
-  tables?: { found: number; expected: number; missed: string[] }
+  /** joins: expected tables that only join two others, which the procedure makes no entities. */
+  tables?: { found: number; expected: number; missed: string[]; joins?: string[] }
+}
+
+/** A table that only joins others: foreign keys to two tables or more, and no column of its own beyond them and its key
+ *  or bookkeeping (id, created_at, sort_order). */
+export function joinsOnly(t: { references?: Array<{ column?: string; table: string }>; columns?: Array<{ name: string }> }): boolean {
+  const refs = t.references ?? []
+  if (new Set(refs.map((r) => r.table.toLowerCase())).size < 2 && refs.length < 2) return false
+  const keys = new Set(refs.map((r) => r.column?.toLowerCase()).filter((c): c is string => !!c))
+  return (t.columns ?? []).every((c) => keys.has(c.name.toLowerCase()) || /^(id|created_at|updated_at|inserted_at|sort_order|position)$/i.test(c.name))
 }
 
 const BUILT = new Set(['container', 'component', 'webapp'])
@@ -39,7 +61,8 @@ const STRUCTURE = new Set(['contains', 'part-of', 'references', 'realises', 'sat
 const lower = (call: string): string => call.replace(/db:[^ ]+/g, (m) => m.toLowerCase())
 
 /** The model's score for one bench entry: its elements' units, its relations as calls, its entities as tables. */
-export function scoreModel(expected: Expectations, nodes: ModelNode[], relations: ModelRelation[], written: WrittenItem[], services: Record<string, { name: string; unit?: string }> = {}): Score {
+export function scoreModel(expected: Expectations, nodes: ModelNode[], relations: ModelRelation[], written: WrittenItem[], run: RunFacts = {}): Score {
+  const services = run.services ?? {}
   const repos = expected.repositories?.flatMap(cloned) ?? cloned(expected)
   const multi = !!expected.repositories
   /** The bench's name of a repository a fact names. */
@@ -75,13 +98,19 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
     return [...new Set([...units, ...dbs, ...deployed])]
   }
 
-  const built = new Set(nodes.filter((n) => BUILT.has(n.type)).flatMap((n) => names(n.id).filter((x) => !x.startsWith('db:') && !x.startsWith('service:'))))
+  // The units elements are built from, and those a database or queue rests on through the service running it (an image of
+  // the repository's).
+  const built = new Set(nodes.flatMap((n) => (BUILT.has(n.type) ? names(n.id) : (facts.get(n.id) ?? []).map(serviceName).filter((x): x is string => !!x))
+    .filter((x) => !x.startsWith('db:') && !x.startsWith('service:'))))
+  const tests = new Set((run.tests ?? []).map(unitName).filter((x): x is string => !!x))
+  const wanted = expected.units.filter((u) => !tests.has(u) || built.has(u))
   const units = {
-    found: expected.units.filter((u) => built.has(u)).length,
-    expected: expected.units.length,
+    found: wanted.filter((u) => built.has(u)).length,
+    expected: wanted.length,
     read: built.size,
-    missed: expected.units.filter((u) => !built.has(u)),
+    missed: wanted.filter((u) => !built.has(u)),
     extra: [...built].filter((u) => !expected.units.includes(u)),
+    ...(wanted.length < expected.units.length ? { tests: expected.units.filter((u) => !wanted.includes(u)) } : {}),
   }
 
   const want = new Set(expected.calls.map(([a, b]) => lower(`${a} → ${b}`)))
@@ -107,7 +136,12 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
   if (expected.tables) {
     const entities = new Set(nodes.filter((n) => n.type === 'entity').flatMap((n) => (facts.get(n.id) ?? [])
       .map((f) => /^(.+?):table:[^:]*:(.+)$/.exec(f)).filter((m): m is RegExpExecArray => !!m && repos.includes(m[1])).map((m) => m[2].toLowerCase())))
-    tables = { found: expected.tables.filter((t) => entities.has(t)).length, expected: expected.tables.length, missed: expected.tables.filter((t) => !entities.has(t)) }
+    const joins = new Set((run.joins ?? []).map((f) => /^(.+?):table:[^:]*:(.+)$/.exec(f)).filter((m): m is RegExpExecArray => !!m && repos.includes(m[1])).map((m) => m[2].toLowerCase()))
+    const want = expected.tables.filter((t) => !joins.has(t) || entities.has(t))
+    tables = {
+      found: want.filter((t) => entities.has(t)).length, expected: want.length, missed: want.filter((t) => !entities.has(t)),
+      ...(want.length < expected.tables.length ? { joins: expected.tables.filter((t) => !want.includes(t)) } : {}),
+    }
   }
   return { units, calls, ...(tables ? { tables } : {}) }
 }
