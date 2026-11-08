@@ -141,7 +141,7 @@ describe('radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolate
     }))
     expect(tables(shop)).toEqual(['orderitem', 'products'])
     expect(shop.tables.find((t) => t.table === 'products')?.unit).toBe('shop:unit:src/catalog')
-    expect(shop.databases.filter((d) => d.engine === 'SQLite').map((d) => [d.unit.split(':unit:')[1], d.name])).toEqual([['src/Discount', 'discountdb']])
+    expect(shop.databases.filter((d) => d.engine === 'SQLite').map((d) => [d.unit?.split(':unit:')[1], d.name])).toEqual([['src/Discount', 'discountdb']])
 
     const pharmacy = extractRepository(repo('pharmacy', {
       'Pharmacy.vbp': 'Type=Exe\r\nDesigner=DataEnvironment1.Dsr\r\nName="Pharmacy"\r\n',
