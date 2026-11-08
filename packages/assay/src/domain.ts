@@ -289,46 +289,137 @@ function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit
   return out
 }
 
-/** Python classes: Django models and SQLAlchemy's declarative classes. */
-function python(text: string, file: string): Array<Omit<Declared, 'unit'>> {
-  const out: Array<Omit<Declared, 'unit'>> = []
+/** Model bases of Django and Wagtail (and of the packages they bring) a model class may derive from instead of models.Model. */
+const DJANGO_BASES = new Set(['Model', 'Page', 'Orderable', 'ClusterableModel', 'AbstractFormField', 'AbstractEmailForm', 'AbstractForm', 'BaseGenericSetting', 'BaseSiteSetting', 'BaseSetting', 'TaskState', 'Task', 'TaggedItemBase', 'ItemBase', 'CommonGenericTaggedItemBase', 'AbstractUser', 'AbstractBaseUser', 'AbstractImage', 'AbstractRendition', 'AbstractDocument'])
+/** A Django app's models: models.py, or a module of its models package. */
+const DJANGO_MODELS = /(^|\/)(models\.py|models\/[^/]+\.py)$/
+
+/** Python classes, each with its bases and body; a head may span lines (class Person(⏎ Base,⏎ ):). */
+function pythonClasses(text: string): Array<{ name: string; bases: string[]; indent: number; line: number; body: Array<{ text: string; line: number }> }> {
+  const out: Array<{ name: string; bases: string[]; indent: number; line: number; body: Array<{ text: string; line: number }> }> = []
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    const head = /^(\s*)class\s+(\w+)\s*\(([^)]*)\)\s*:/.exec(lines[i])
-    if (!head) continue
-    const indent = head[1].length
+    const open = /^(\s*)class\s+(\w+)\s*\(/.exec(lines[i])
+    if (!open) continue
+    let head = lines[i]
+    let last = i
+    while (!/\)\s*:/.test(head) && last + 1 < lines.length && last - i < 20) head += ` ${lines[++last].trim()}`
+    const bases = /\(([^)]*)\)\s*:/.exec(head)?.[1]
+    if (bases === undefined) continue
+    const indent = open[1].length
     const body: Array<{ text: string; line: number }> = []
-    for (let j = i + 1; j < lines.length; j++) {
+    for (let j = last + 1; j < lines.length; j++) {
       if (lines[j].trim() && lines[j].length - lines[j].trimStart().length <= indent) break
       body.push({ text: lines[j], line: j + 1 })
     }
-    const all = body.map((b) => b.text).join('\n')
-    const django = /\bmodels\.Model\b|^\s*Model\s*$/.test(head[3]) && /=\s*models\.\w+Field\(|=\s*models\.ForeignKey\(/.test(all)
+    out.push({ name: open[2], bases: bases.split(',').map((b) => b.trim()).filter(Boolean), indent, line: i + 1, body })
+  }
+  return out
+}
+
+/** The names of the repository's Django model classes: those deriving from models.Model, a model base of Django or
+ *  Wagtail in an app's models, or another of them (abstract ones too: a model may derive from them). */
+export function djangoModels(sources: Array<{ file: string; text: string }>): Set<string> {
+  // A base of Django or Wagtail counts in an app's models that import them, and where the repository has no class of its name.
+  const classes = sources.flatMap(({ file, text }) => pythonClasses(text).map((c) => ({ ...c, models: DJANGO_MODELS.test(file) && /^\s*(?:from|import)\s+(?:django|wagtail|modelcluster|taggit)\b/m.test(text) })))
+  const own = new Set(classes.map((c) => c.name))
+  const models = new Set<string>()
+  for (let grown = true; grown;) {
+    grown = false
+    for (const c of classes) {
+      if (models.has(c.name)) continue
+      const named = c.bases.map((b) => b.split('.').pop()!)
+      if (c.bases.includes('models.Model') || (c.models && named.some((b) => DJANGO_BASES.has(b) && !own.has(b))) || named.some((b) => models.has(b))) { models.add(c.name); grown = true }
+    }
+  }
+  return models
+}
+
+/** Python classes: Django models (`models`: the repository's model classes) and SQLAlchemy's declarative classes. */
+function python(text: string, file: string, models: Set<string>): Array<Omit<Declared, 'unit'>> {
+  const out: Array<Omit<Declared, 'unit'>> = []
+  for (const c of pythonClasses(text)) {
+    const all = c.body.map((b) => b.text).join('\n')
+    const named = c.bases.map((b) => b.split('.').pop()!)
+    const django = models.has(c.name) && (named.some((b) => b !== 'Model' && models.has(b)) || DJANGO_MODELS.test(file) || /=\s*models\.\w+Field\(|=\s*models\.ForeignKey\(/.test(all))
     const tablename = /^\s*__tablename__\s*=\s*['"](\w+)['"]/m.exec(all)?.[1]
     if (!django && !tablename) continue
+    // An abstract model is a base of others, no table of its own.
+    if (django && /^\s+class\s+Meta\b[^\n]*:[\s\S]*?^\s+abstract\s*=\s*True\b/m.test(all)) continue
     // Django names a model's table <app>_<model>, its app the folder of models.py.
     const app = file.split('/').slice(0, -1).filter((s) => s !== 'models').pop() ?? ''
-    const table = tablename ?? /^\s*db_table\s*=\s*['"](\w+)['"]/m.exec(all)?.[1] ?? `${app ? `${app}_` : ''}${head[2].toLowerCase()}`
-    const declared: Omit<Declared, 'unit'> = { table, className: head[2], declared: django ? 'Django' : 'SQLAlchemy', columns: [], references: [], evidence: { file, line: i + 1 } }
+    const table = tablename ?? /^\s*db_table\s*=\s*['"](\w+)['"]/m.exec(all)?.[1] ?? `${app ? `${app}_` : ''}${c.name.toLowerCase()}`
+    const declared: Omit<Declared, 'unit'> = { table, className: c.name, declared: django ? 'Django' : 'SQLAlchemy', columns: [], references: [], evidence: { file, line: c.line } }
     out.push(declared)
-    for (const b of body) {
+    for (const b of c.body) {
       if (django) {
-        const f = /^\s+(\w+)\s*=\s*models\.(\w+)\((.*)$/.exec(b.text)
-        if (!f) continue
-        if (/^(ForeignKey|OneToOneField)$/.test(f[2])) {
-          const target = /^\s*['"]?(?:\w+\.)?(\w+)['"]?/.exec(f[3])?.[1] ?? ''
-          declared.references.push({ column: `${f[1]}_id`, table: '', className: target === 'self' ? head[2] : target, line: b.line })
-        } else if (f[2] !== 'ManyToManyField') {
+        const f = /^\s+(\w+)\s*=\s*(?:models\.)?(\w+)\((.*)$/.exec(b.text)
+        if (!f || !/Field$|^(ForeignKey|OneToOneField|ParentalKey)$/.test(f[2]) || (!/^\s+\w+\s*=\s*models\./.test(b.text) && !/^(ForeignKey|OneToOneField|ParentalKey|ManyToManyField|ParentalManyToManyField)$/.test(f[2]))) continue
+        const target = /^\s*['"]?(?:\w+\.)?(\w+)['"]?/.exec(f[3])?.[1] ?? ''
+        if (/^(ForeignKey|OneToOneField|ParentalKey)$/.test(f[2])) {
+          declared.references.push({ column: `${f[1]}_id`, table: '', className: target === 'self' ? c.name : target, line: b.line })
+        } else if (/ManyToManyField$/.test(f[2])) {
+          // Its join table, unless a model of the repository is its table (through=).
+          if (/\bthrough\s*=/.test(f[3])) continue
+          out.push({ table: `${table}_${f[1]}`, declared: 'Django', columns: [], evidence: { file, line: b.line }, references: [
+            { column: `${c.name.toLowerCase()}_id`, table: '', className: c.name, line: b.line },
+            { column: `${(target === 'self' ? c.name : target).toLowerCase()}_id`, table: '', className: target === 'self' ? c.name : target, line: b.line },
+          ] })
+        } else {
           declared.columns.push({ name: f[1], type: /\bchoices\s*=\s*(\w+)\.choices/.exec(f[3])?.[1] ?? f[2], line: b.line })
         }
         continue
       }
-      const c = /^\s+(\w+)\s*(?::\s*Mapped\[([^\]]*)\]\s*)?=\s*(?:\w+\.)?(Column|mapped_column|relationship)\((.*)$/.exec(b.text)
-      if (!c || c[3] === 'relationship') continue
-      const fk = /ForeignKey\(\s*['"](?:\w+\.)?(\w+)\.\w+['"]/.exec(c[4])
-      if (fk) declared.references.push({ column: c[1], table: fk[1], line: b.line })
-      const type = /^\s*(?:\w+\.)?(Enum)\(\s*(\w+)/.exec(c[4])?.[2] ?? /^\s*(?:\w+\.)?([A-Z]\w*)/.exec(c[4])?.[1] ?? c[2]
-      declared.columns.push({ name: c[1], ...(type ? { type } : {}), line: b.line })
+      const col = /^\s+(\w+)\s*(?::\s*Mapped\[([^\]]*)\]\s*)?=\s*(?:\w+\.)?(Column|mapped_column|relationship)\((.*)$/.exec(b.text)
+      if (!col || col[3] === 'relationship') continue
+      const fk = /ForeignKey\(\s*['"](?:\w+\.)?(\w+)\.\w+['"]/.exec(col[4])
+      if (fk) declared.references.push({ column: col[1], table: fk[1], line: b.line })
+      const type = /^\s*(?:\w+\.)?(Enum)\(\s*(\w+)/.exec(col[4])?.[2] ?? /^\s*(?:\w+\.)?([A-Z]\w*)/.exec(col[4])?.[1] ?? col[2]
+      declared.columns.push({ name: col[1], ...(type ? { type } : {}), line: b.line })
+    }
+  }
+  return out
+}
+
+/** PHP classes Doctrine maps (#[ORM\Entity], @ORM\Entity): the table #[ORM\Table] names, else the class in snake case
+ *  (Symfony's underscore naming), its columns, its many-to-one references and its many-to-many join tables. */
+function doctrine(text: string, file: string): Array<Omit<Declared, 'unit'>> {
+  const out: Array<Omit<Declared, 'unit'>> = []
+  for (const m of text.matchAll(/(?:#\[|@)ORM\\Entity\b/g)) {
+    const cls = /\bclass\s+(\w+)/.exec(text.slice(m.index!))
+    if (!cls) continue
+    const at = m.index! + cls.index
+    const head = text.slice(m.index!, at)
+    const table = /ORM\\Table\(\s*(?:name\s*[:=]\s*)?['"]([^'"]+)['"]/.exec(head)?.[1] ?? snake(cls[1])
+    const declared: Omit<Declared, 'unit'> = { table, className: cls[1], declared: 'Doctrine', columns: [], references: [], evidence: { file, line: lineAt(text, at) } }
+    out.push(declared)
+    const body = classBody(text, at)
+    if (!body) continue
+    let attributes = ''
+    for (const l of ownLines(body.body)) {
+      const line = l.text.trim()
+      if (/^#\[|^\*?\s*@ORM\\|^\/\*\*|^\*/.test(line)) { attributes += ` ${line}`; continue }
+      const prop = /^(?:(?:public|protected|private|readonly)\s+)+(?:\??[\w\\]+\s+)?\$(\w+)/.exec(line)
+      if (!prop) { if (line) attributes = ''; continue }
+      const given = attributes
+      attributes = ''
+      const lineNo = lineAt(text, body.start + l.at)
+      const target = /targetEntity\s*[:=]\s*['"]?\\?(?:[\w\\]+\\)?(\w+)(?:::class)?/.exec(given)?.[1]
+      if (/ORM\\(ManyToOne|OneToOne)\b/.test(given) && target) {
+        if (/ORM\\OneToOne\b/.test(given) && /mappedBy/.test(given)) continue
+        declared.references.push({ column: /JoinColumn\([^)]*\bname\s*[:=]\s*['"](\w+)['"]/.exec(given)?.[1] ?? `${snake(prop[1])}_id`, table: '', className: target, line: lineNo })
+      } else if (/ORM\\ManyToMany\b/.test(given) && target) {
+        // The owning side's join table: the one it names, else <table>_<target's table>.
+        if (/mappedBy/.test(given)) continue
+        const named = /JoinTable\(\s*(?:name\s*[:=]\s*)?['"]([^'"]+)['"]/.exec(given)?.[1]
+        out.push({ table: named ?? `${table}_${snake(target)}`, declared: 'Doctrine', columns: [], evidence: { file, line: lineNo }, references: [
+          { column: `${snake(cls[1])}_id`, table: '', className: cls[1], line: lineNo },
+          { column: `${snake(target)}_id`, table: '', className: target, line: lineNo },
+        ] })
+      } else if (/ORM\\Column\b/.test(given)) {
+        const type = /ORM\\Column\([^)]*\btype\s*[:=]\s*(?:Types::(\w+)|['"](\w+)['"])/.exec(given)
+        declared.columns.push({ name: /ORM\\Column\([^)]*\bname\s*[:=]\s*['"](\w+)['"]/.exec(given)?.[1] ?? snake(prop[1]), ...(type ? { type: (type[1] ?? type[2]).toLowerCase() } : {}), line: lineNo })
+      }
     }
   }
   return out
@@ -567,6 +658,8 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     declared.push(...laravelMigrations(mine).map((t) => ({ ...t, declared: 'Laravel', unit })))
   }
   const sources = files.list.filter((f) => SOURCE.test(f) && !TEST_FILE.test(f) && !!own(f))
+  // Django's models, known across the repository: a model may derive from another app's.
+  const models = djangoModels(sources.filter((f) => f.endsWith('.py')).map((file) => ({ file, text: files.read(file) })).filter((s) => /\bclass\s+\w+\s*\(/.test(s.text)))
   for (const file of sources) {
     const unit = own(file)!
     const raw = files.read(file)
@@ -575,7 +668,8 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const vb = /^\.(bas|cls|frm|ctl|vb)$/.test(ext)
     const text = vb ? withoutVbComments(raw) : ext === '.py' ? raw : withoutComments(raw)
     if ((ext === '.java' || ext === '.kt') && /@Entity\b/.test(text)) declared.push(...jpa(text, file).map((t) => ({ ...t, unit })))
-    if (ext === '.py' && /\bmodels\.Model\b|__tablename__/.test(text)) declared.push(...python(text, file).map((t) => ({ ...t, unit })))
+    if (ext === '.py' && (/__tablename__/.test(text) || [...models].some((m) => new RegExp(`\\bclass\\s+${m}\\b`).test(text)))) declared.push(...python(text, file, models).map((t) => ({ ...t, unit })))
+    if (ext === '.php' && /ORM\\Entity\b/.test(text)) declared.push(...doctrine(text, file).map((t) => ({ ...t, unit })))
     if (/\.[cm]?tsx?$/.test(ext) && /@Entity\(/.test(text)) declared.push(...typeOrm(text, file).map((t) => ({ ...t, unit })))
     enums.push(...codeEnums(text, file).map((e) => ({ ...e, unit })))
   }

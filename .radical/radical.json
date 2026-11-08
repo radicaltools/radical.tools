@@ -3300,6 +3300,27 @@
     ] },
     { "element": "d8bbff59-9445-4e97-aab6-050c0262443d", "name": "Tables in schemas", "tests": [
       "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › names a table by its schema only where two schemas hold its name, and reads no schema or JPQL entity as a table"
+    ] },
+    { "element": "0f323673-7507-4817-943e-226e14860f8d", "name": "Socket port through a constant", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › links a VB6 client to the server by a port that reaches the socket through a record, a variable and a constant"
+    ] },
+    { "element": "a0c8812a-3193-485b-ac83-0a42d4148639", "name": "Connection string from variables and settings", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › reads a connection string's database from the variables and settings that build it, and a placeholder's from the dump"
+    ] },
+    { "element": "bf5b11ff-b938-49a3-8a7c-3dfd0dc1592d", "name": "Each application's configuration on a config server", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › reads a config server's files as its clients' configuration, a gateway's routes and a Feign client's name as calls"
+    ] },
+    { "element": "f6bfbeb1-b650-43ae-8105-65bb4c5a451a", "name": "Django and Doctrine entities", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › reads Django models of Wagtail and Doctrine entities as tables by their frameworks' names"
+    ] },
+    { "element": "4b12914f-8568-4be7-aa7a-e1d7b1e9f3d8", "name": "Commented and composed connection strings", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › reads no database from a commented setting, an SQLite URL's file, and a compose service's database despite its password's variable"
+    ] },
+    { "element": "77fa7f6b-21fb-4409-a76b-eca95664e055", "name": "Workspace roots, vendored libraries and runner images", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › reads no unit of a workspace root, a vendored library or a runner image, and a Go module required by its replace as a dependency"
+    ] },
+    { "element": "fd165ac1-d538-482f-b67b-4f02182ff3bf", "name": "Local port given by its default", "tests": [
+      "packages/assay/tests/values-frameworks.test.ts › radical assay: what values, frameworks and runner images hide › links a front end to the unit whose compose service publishes the local port its address gives by default"
     ] }
   ]
 }

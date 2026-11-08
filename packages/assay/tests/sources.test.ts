@@ -328,6 +328,7 @@ describe('radical assay: code given by hand, kept from harm', () => {
     mkdirSync(join(code, 'libs', 'vendor-lib'), { recursive: true })
     mkdirSync(join(code, 'node_modules', 'x'), { recursive: true })
     writeFileSync(join(code, 'go.mod'), 'module code\n')
+    writeFileSync(join(code, 'main.go'), 'package main\n')
     writeFileSync(join(code, 'node_modules', 'x', 'package.json'), '{"name":"x"}')
     execFileSync('git', ['init', '-q'], { cwd: join(code, 'libs', 'vendor-lib') })
     expect(repositoriesIn([code]).dirs).toEqual([code])

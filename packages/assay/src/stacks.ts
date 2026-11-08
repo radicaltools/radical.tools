@@ -7,6 +7,7 @@
 // names its unit at once; a reference by name is resolved when the units of
 // every repository are known (link.ts).
 
+import { load } from './yaml'
 import { basename } from 'node:path'
 import type { DependencyFact, GroupFact, Stack, TestFramework, Unit } from './facts'
 import { RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, lineOf, resolveFrom } from './files'
@@ -251,18 +252,26 @@ function go(files: RepoFiles): Draft[] {
     const module = /^module\s+(\S+)/m.exec(text)?.[1]
     const path = dirOf(file)
     const prefix = path === '.' ? '' : `${path}/`
+    // Its own Go files: none of a module nested in it (go.work's members).
+    const nested = files.list.filter((f) => f !== file && f.endsWith('/go.mod') && (path === '.' || f.startsWith(prefix))).map(dirOf)
+    const own = files.list.filter((f) => f.startsWith(prefix) && f.endsWith('.go') && !nested.some((n) => dirOf(f) === n || f.startsWith(`${n}/`)))
+    // A module with no Go code of its own (a workspace's root, its tool directives only) builds nothing.
+    if (!own.length) continue
     // Its main packages are its apps; a module without one is a library.
-    const mains = [...new Set(files.list
-      .filter((f) => f.startsWith(prefix) && f.endsWith('.go') && !f.endsWith('_test.go') && /^package main\b/m.test(files.read(f)))
-      .map(dirOf))]
-      .filter((dir) => !files.list.some((f) => f !== file && f.endsWith('/go.mod') && dir.startsWith(dirOf(f) + '/') && dirOf(f).length > path.length))
+    const mains = [...new Set(own.filter((f) => !f.endsWith('_test.go') && /^package main\b/m.test(files.read(f))).map(dirOf))]
+    // A module required through a replace directive to a folder is the unit there.
+    const replaced = new Map([...text.matchAll(/^\s*(?:replace\s+)?(\S+)(?:\s+v\S+)?\s+=>\s+(\.{1,2}\/\S*)\s*$/gm)].map((m) => [m[1], resolveFrom(path, m[2].replace(/\/$/, ''))]))
     const requires = [...text.matchAll(/^\s*(?:require\s+)?([a-z0-9.-]+\.[a-z]{2,}\/\S+)\s+v[\d.]+/gm)].map((m) => ({ dep: m[1], line: lineAt(text, m.index!) }))
     const at = mains.length === 1 ? [mains[0]] : mains.length ? mains : [path]
     for (const dir of at) {
       const d = draft('go', dir, file, module ? (dir === path ? module : `${module}/${dir.slice(prefix.length)}`) : undefined, lineOf(text, /^module\s/m))
       if (mains.includes(dir)) d.reasons.push('it has a main package')
       d.aliases.push(basename(dir === '.' ? (module ?? '') : dir))
-      for (const r of requires) { d.deps.push(r.dep); d.depLines.set(r.dep, { file, line: r.line }) }
+      for (const r of requires) {
+        const local = replaced.get(r.dep)
+        if (local) d.refs.push({ name: r.dep, path: local, line: r.line, file })
+        else { d.deps.push(r.dep); d.depLines.set(r.dep, { file, line: r.line }) }
+      }
       out.push(d)
     }
   }
@@ -363,11 +372,13 @@ function python(files: RepoFiles): Draft[] {
     const prefix = path === '.' ? '' : `${path}/`
     const pyproject = files.read(`${prefix}pyproject.toml`)
     const setup = files.read(`${prefix}setup.py`)
+    const entry = ['main.py', 'app.py', 'server.py', 'manage.py', 'wsgi.py', '__main__.py'].find((f) => files.has(`${prefix}${f}`))
+    // A pyproject.toml declaring no project ([project], [tool.poetry]), only a workspace or tools' settings, is no unit.
+    if (markers.filter((m) => dirOf(m) === path).every((m) => m.endsWith('pyproject.toml')) && !/^\[(project|tool\.poetry)\]/m.test(pyproject) && !entry) continue
     const name = /^\s*name\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1] ?? /\bname\s*=\s*["']([^"']+)["']/.exec(setup)?.[1]
     const evidenceFile = markers.find((m) => dirOf(m) === path)!
     const d = draft('python', path, evidenceFile, name, 1)
     d.aliases.push(basename(path === '.' ? '' : path))
-    const entry = ['main.py', 'app.py', 'server.py', 'manage.py', 'wsgi.py', '__main__.py'].find((f) => files.has(`${prefix}${f}`))
     if (entry) d.reasons.push(`it has ${entry}`)
     else if (files.list.some((f) => f.startsWith(prefix) && f.endsWith('.py') && !f.slice(prefix.length).includes('/') && /if __name__ == ['"]__main__['"]/.test(files.read(f)))) d.reasons.push('it has a __main__ block')
     const requirements = files.read(`${prefix}requirements.txt`)
@@ -457,13 +468,34 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
 // ── Docker ───────────────────────────────────────────────────────────────────
 
 /** A folder with a Dockerfile no manifest claims runs something: an app in the language its base image names. */
+/** Each folder a compose service is built from, with the folders its services mount as volumes (./web:/web). */
+export function composeMounts(files: RepoFiles): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  for (const file of files.list.filter((f) => /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(f))) {
+    let doc: { services?: Record<string, { build?: unknown; volumes?: unknown }> } | undefined
+    try { doc = load(files.read(file)) as typeof doc } catch { continue }
+    for (const def of Object.values(doc?.services ?? {})) {
+      const build = typeof def?.build === 'string' ? def.build : typeof (def?.build as { context?: unknown })?.context === 'string' ? (def.build as { context: string }).context : null
+      const context = build === null ? null : resolveFrom(dirOf(file), build)
+      if (context === null) continue
+      const mounted = (Array.isArray(def.volumes) ? def.volumes : []).filter((v): v is string => typeof v === 'string' && /^\.{1,2}(\/|:)/.test(v))
+        .map((v) => resolveFrom(dirOf(file), v.split(':')[0])).filter((v): v is string => !!v)
+      out.set(context, [...new Set([...(out.get(context) ?? []), ...mounted])])
+    }
+  }
+  return out
+}
+
 function docker(files: RepoFiles, claimed: Set<string>, moves: Map<string, string>): Draft[] {
   const out: Draft[] = []
+  const mounts = composeMounts(files)
   for (const file of files.named(/^Dockerfile$/).filter((f) => !inTests(f))) {
     const path = dirOf(file)
     if (claimed.has(path)) continue
     // A development container's image is the developers', not the system's.
     if (/(^|\/)\.devcontainer$/.test(path)) continue
+    // An image a compose service builds and then mounts a unit's folder into runs that unit (a runner of scripts).
+    if ((mounts.get(path) ?? []).some((m) => [...claimed].some((c) => c !== path && (m === '.' || c === m || c.startsWith(`${m}/`))))) continue
     // A Dockerfile above other units that copies their projects or folders builds them.
     const text = files.read(file)
     const copied = [...text.matchAll(/^\s*(?:COPY|ADD)\s+(?:--\S+\s+)*(?:\[\s*"([^"]+)"|(\S+))/gmi)].map((m) => resolveFrom(path, m[1] ?? m[2])).filter((r): r is string => !!r)
@@ -497,8 +529,8 @@ const BASE_IMAGES: Array<[RegExp, string]> = [
 export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
   const groups: GroupFact[] = []
-  // A Composer project claims its folder before the package.json that builds its front end.
-  const drafts = [...php(files, notes), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...dotnet(files, groups, repo), ...python(files), ...vb6(files, groups, repo)]
+  // A Composer or .NET project claims its folder before the package.json that builds its front end.
+  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
   // One unit per folder: the first stack read claims it (a Python folder with a package.json for its tooling stays npm).
   const byPath = new Map<string, Draft>()
   for (const d of drafts) {
