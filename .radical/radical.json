@@ -3345,6 +3345,27 @@
     ] },
     { "element": "6b7819ab-758c-4675-9451-68855f008120", "name": "A library bundled into a container scored", "tests": [
       "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › scores a library bundled into a container as the container calling the library"
+    ] },
+    { "element": "6668ec63-d414-4bc7-8f0f-41620d1f8862", "name": "Ruby, Elixir and Rust projects as units", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads a Rails app, an Elixir umbrella and a Cargo workspace as their projects, and tooling as no unit"
+    ] },
+    { "element": "f9d5031a-e154-472b-8485-5885dbae0cd7", "name": "A Gradle build's project dependencies by accessor and convention plugin", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads a Gradle build's project dependencies by type-safe accessor and those its convention plugins add"
+    ] },
+    { "element": "1e72df5a-bf92-4c57-a78c-b519bc849f0d", "name": "A Rails application's database and schema", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads Rails' database.yml and schema.rb, and no database of a CI pipeline"
+    ] },
+    { "element": "e5e1c626-d0f8-4556-b979-37f82b325afb", "name": "Ecto's migrations replayed", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › replays Ecto's migrations, the SQL they execute or load by name included, over a dump of their time"
+    ] },
+    { "element": "0499cfe9-82eb-475c-8f99-b0ce618f88c7", "name": "An Android app's Room database and tables", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads an Android app's Room database and its entities' tables"
+    ] },
+    { "element": "d69e583d-9557-4462-b351-9dab7a4bec06", "name": "What a compose file takes from its .env", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads what a compose file takes from its .env: the Dockerfile a service builds and the addresses it passes by name"
+    ] },
+    { "element": "f005c482-43ea-4d54-9a13-2be003c91501", "name": "Tables by attribute, databases by their files, a schema by its users", "tests": [
+      "packages/assay/tests/other-stacks.test.ts › radical assay: Ruby, Elixir, Rust, Kotlin and what compose interpolates › reads tables an attribute names over a DbSet, SQLite and Access by their files, and a schema by the services using its database"
     ] }
   ]
 }
