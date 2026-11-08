@@ -3282,6 +3282,24 @@
     ] },
     { "element": "5c16ebdf-bb59-44ec-9712-789548cfc27a", "name": "Links and schemas call nothing", "tests": [
       "packages/assay/tests/domain.test.ts › radical assay: what legacy repositories hide › leaves out a page's links, schemas, namespaces, lock files and files beside the code as calls"
+    ] },
+    { "element": "7a7435d0-75f0-4828-9f8e-79a65b61cd38", "name": "References a build file adds", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › reads the project references Directory.Build.targets adds by conditions on the project's name and path"
+    ] },
+    { "element": "ec0403f0-5adb-4964-b787-8c6a1737f602", "name": "Units of other build systems", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › reads an Nx project, a database project and a build project as units, and no Dockerfile that builds others or a development container"
+    ] },
+    { "element": "f626cd4f-0c1a-492b-8359-3683a0590eb3", "name": "Laravel's default connection", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › reads a Laravel application's database from its environment file and its default connection"
+    ] },
+    { "element": "65ec6ff5-61f8-4731-bff3-4fd318d93235", "name": "Prisma database from the environment", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › reads a Prisma datasource whose address the environment gives as a database of its provider's engine"
+    ] },
+    { "element": "23613b8c-3ae6-4cf9-84dd-477aa2a346e6", "name": "Migrations in order", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › reads migrations in their order: a table a later one drops is gone, one it renames has its new name"
+    ] },
+    { "element": "d8bbff59-9445-4e97-aab6-050c0262443d", "name": "Tables in schemas", "tests": [
+      "packages/assay/tests/stacks-other.test.ts › radical assay: what other stacks hide › names a table by its schema only where two schemas hold its name, and reads no schema or JPQL entity as a table"
     ] }
   ]
 }
