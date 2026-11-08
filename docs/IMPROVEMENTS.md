@@ -363,12 +363,18 @@ does not touch Studio) and passed three times alone in 9.7 s.
 ### Dogfooding (2026-11-08): an agent's run on three systems of services
 
 Run 21 (`/Volumes/data/Dev/assay-runs/21-services`): an agent ran Assay over
-MCP on piggymetrics, pitstop and bakerydemo (12 minutes). Its model scored
-units 73 %, calls 55 % (precision 97 %), tables as entities 47 %. Fixed since:
+MCP on piggymetrics, pitstop and bakerydemo (12 minutes). Fixed since:
 `assay_start`'s 52 KB answer (the agent never read the procedure), names
 matched across repositories (pitstop's services depended on piggymetrics'
 RabbitMQ), bakerydemo read as npm, shared Spring settings of libraries a
-service lacks. Open, from its report:
+service lacks; and the bench's scorer, which counted every call to a
+deployed service as missed and a library "bundled into" a container the
+wrong way. Re-scored: run 21 units 73 %, calls 85 % (precision 98 %); run 22
+(`22-services`, after the fixes, 19 minutes, 53 proposals answered) units
+77 %, calls 100 % (precision 100 %), tables as entities 47 % in both. Units
+fall short where the bench counts test projects and libraries the agent
+leaves out of the C4 model, tables where it models bakerydemo's Wagtail pages
+as no entities (12 of 30). Open, from the reports:
 
 - **Tests without reports.** With no test reports, the tests are invisible:
   pending tests were written for four scenarios that passing MSTest tests

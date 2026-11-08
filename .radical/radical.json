@@ -3339,6 +3339,12 @@
     ] },
     { "element": "6452ec9c-43a2-408f-b2fa-33d7f0bb2a26", "name": "A Python folder with tooling for its front end", "tests": [
       "packages/assay/tests/calls-precision.test.ts › radical assay: calls a unit makes, and calls it does not › leaves a folder to its Python project when its package.json holds tooling alone"
+    ] },
+    { "element": "28b96e68-030b-4d30-b525-97dde7811a57", "name": "Calls to deployed services scored", "tests": [
+      "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › scores a relation to an element resting on a deployed service as a call of the unit it runs, else of the service"
+    ] },
+    { "element": "6b7819ab-758c-4675-9451-68855f008120", "name": "A library bundled into a container scored", "tests": [
+      "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › scores a library bundled into a container as the container calling the library"
     ] }
   ]
 }

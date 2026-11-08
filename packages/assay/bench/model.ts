@@ -30,7 +30,17 @@ function folderFiles(dir: string): FolderFiles {
 }
 
 const { data } = deserializeFromMdFolder(folderFiles(join(central, '.radical', 'model')))
-const run = JSON.parse(readFileSync(join(central, '.radical', 'assay', 'run.json'), 'utf8')) as { written: Array<WrittenItem & { evidence?: Array<{ fact?: string }> }> }
+const run = JSON.parse(readFileSync(join(central, '.radical', 'assay', 'run.json'), 'utf8')) as { repositories?: Array<{ name: string; dir: string }>; written: Array<WrittenItem & { evidence?: Array<{ fact?: string }> }> }
+// The deployed services of the run's repositories, from their facts (in the repository, or the central one's for a folder of code).
+const services: Record<string, { name: string; unit?: string }> = {}
+for (const r of run.repositories ?? []) {
+  for (const file of [join(central, r.dir, '.radical', 'assay', 'facts.json'), join(central, '.radical', 'assay', 'facts', `${r.name}.json`)]) {
+    try {
+      for (const s of (JSON.parse(readFileSync(file, 'utf8')) as { services?: Array<{ id: string; name: string; unit?: string }> }).services ?? []) services[s.id] = { name: s.name, ...(s.unit ? { unit: s.unit } : {}) }
+      break
+    } catch { /* not there */ }
+  }
+}
 const written = run.written.map((w) => ({ ...w, facts: w.facts ?? (w.evidence ?? []).map((e) => e.fact).filter((f): f is string => !!f) }))
 const pct = (a: number, b: number): string => (b ? `${Math.round((100 * a) / b)}%` : '—')
 
@@ -38,7 +48,7 @@ const totals = { units: [0, 0, 0], calls: [0, 0, 0], tables: [0, 0] }
 for (const name of names) {
   const expected = [...bench.repositories, ...bench.heldOut].find((r) => r.name === name)
   if (!expected) { console.error(`no bench entry ${name}`); process.exit(2) }
-  const s = scoreModel(expected, data.nodes, data.relations, written)
+  const s = scoreModel(expected, data.nodes, data.relations, written, services)
   console.log(`\n${name}`)
   console.log(`  units: ${s.units.found}/${s.units.expected} in elements (recall ${pct(s.units.found, s.units.expected)}), ${s.units.read} built from (precision ${pct(s.units.found, s.units.read)})`)
   for (const u of s.units.missed) console.log(`    missed unit ${u}`)

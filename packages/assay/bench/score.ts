@@ -23,7 +23,7 @@ export interface Expectations {
 const cloned = (r: { name: string; url?: string }): string[] => [r.name, ...(r.url ? [r.url.replace(/\.git$/, '').split('/').pop()!] : [])]
 
 export interface ModelNode { id: string; type: string; label: string }
-export interface ModelRelation { sourceId: string; targetId: string; relationType?: string }
+export interface ModelRelation { sourceId: string; targetId: string; relationType?: string; label?: string | null }
 export interface WrittenItem { id: string; kind: string; facts: string[] }
 
 export interface Score {
@@ -39,7 +39,7 @@ const STRUCTURE = new Set(['contains', 'part-of', 'references', 'realises', 'sat
 const lower = (call: string): string => call.replace(/db:[^ ]+/g, (m) => m.toLowerCase())
 
 /** The model's score for one bench entry: its elements' units, its relations as calls, its entities as tables. */
-export function scoreModel(expected: Expectations, nodes: ModelNode[], relations: ModelRelation[], written: WrittenItem[]): Score {
+export function scoreModel(expected: Expectations, nodes: ModelNode[], relations: ModelRelation[], written: WrittenItem[], services: Record<string, { name: string; unit?: string }> = {}): Score {
   const repos = expected.repositories?.flatMap(cloned) ?? cloned(expected)
   const multi = !!expected.repositories
   /** The bench's name of a repository a fact names. */
@@ -57,16 +57,25 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
     if (!m || !repos.includes(m[1])) return undefined
     return `db:${(m[3] || m[2]).toLowerCase()}`
   }
+  /** A deployed service fact as the bench names it: the unit it runs, else service:<name>. */
+  const serviceName = (fact: string): string | undefined => {
+    const m = /^(.+?):service:(.+)$/.exec(fact)
+    if (!m || !repos.includes(m[1])) return undefined
+    const unit = services[fact]?.unit
+    return unit ? unitName(unit) : `service:${(services[fact]?.name ?? m[2]).toLowerCase()}`
+  }
   const facts = new Map(written.filter((w) => w.kind === 'element' || w.kind === 'entity').map((w) => [w.id, w.facts]))
   /** The names an element is called by: its units' folders, the databases it stands for. */
   const names = (id: string): string[] => {
     const f = facts.get(id) ?? []
     const units = BUILT.has(type.get(id) ?? '') ? f.map(unitName).filter((x): x is string => !!x) : []
     const dbs = type.get(id) === 'database' ? f.map(dbName).filter((x): x is string => !!x) : []
-    return [...new Set([...units, ...dbs])]
+    // An element resting on a deployed service (a queue, a database's container) stands for it.
+    const deployed = f.map(serviceName).filter((x): x is string => !!x)
+    return [...new Set([...units, ...dbs, ...deployed])]
   }
 
-  const built = new Set(nodes.filter((n) => BUILT.has(n.type)).flatMap((n) => names(n.id).filter((x) => !x.startsWith('db:'))))
+  const built = new Set(nodes.filter((n) => BUILT.has(n.type)).flatMap((n) => names(n.id).filter((x) => !x.startsWith('db:') && !x.startsWith('service:'))))
   const units = {
     found: expected.units.filter((u) => built.has(u)).length,
     expected: expected.units.length,
@@ -80,7 +89,10 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
   const found = new Set<string>()
   for (const r of relations) {
     if (STRUCTURE.has(r.relationType ?? '')) continue
-    const pairs = names(r.sourceId).flatMap((a) => names(r.targetId).filter((b) => b !== a).map((b) => lower(`${a} → ${b}`)))
+    // A library "bundled into" a container is the container's dependency on it, whichever way an agent drew it
+    // (Assay's procedure draws it from the library).
+    const pair = (from: string, to: string): string[] => names(from).flatMap((a) => names(to).filter((b) => b !== a).map((b) => lower(`${a} → ${b}`)))
+    const pairs = /^bundled into$/i.test(r.label?.trim() ?? '') ? [...pair(r.targetId, r.sourceId), ...pair(r.sourceId, r.targetId)] : pair(r.sourceId, r.targetId)
     if (!pairs.length) continue
     found.add(pairs.find((p) => want.has(p)) ?? pairs.find((p) => optional.has(p)) ?? pairs[0])
   }
