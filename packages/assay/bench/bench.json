@@ -1831,6 +1831,848 @@
         "_userfavorites",
         "_userfollows"
       ]
+    },
+    {
+      "name": "MirageMUD",
+      "about": "A VB6 MUD code base: a graphical client (with built-in editors) and a game server talking over Winsock on port 7777, the server keeping accounts, rooms, items, NPCs, shops and spells in flat binary and INI files rather than a database. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/DraigNET/MirageMUD.git",
+      "commit": "69495f3e061936545ab74380f2b60deba06a6b35",
+      "stacks": "VB6 Standard EXEs, Winsock, DirectX 8, FMOD; flat binary and INI files",
+      "units": [
+        "Client",
+        "Server"
+      ],
+      "calls": [
+        [
+          "Client",
+          "Server"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "shopping-cart-v2",
+      "about": "A VB6 point-of-sale and shop administration system (sales, inventory, purchases, customers, suppliers, fiscal printers over serial ports, Word/Excel reports, a cyber-cafe module that commands rental PCs over Winsock) on an Access database (data/datos.mdb) or, per its INI and README, a MySQL database (services_cell_store) over ODBC. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/electronicaJLV/shopping-cart-Software-v2-Vbasic6.git",
+      "commit": "887ca54bd85321cfcabac5873168ff5f6b88bbe9",
+      "stacks": "VB6 Standard EXE, ADO over ODBC, Access, MySQL; Winsock, MSComm (fiscal printers), Word/Excel COM automation; INI settings",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:datos.mdb"
+        ],
+        [
+          ".",
+          "db:services_cell_store"
+        ]
+      ],
+      "optional": [
+        [
+          ".",
+          "service:cybercafe-locker"
+        ]
+      ],
+      "tables": [
+        "cargo",
+        "cliente",
+        "compras",
+        "empresa",
+        "grupo",
+        "ingresos",
+        "inventario",
+        "proveedor",
+        "usuarios"
+      ]
+    },
+    {
+      "name": "rfid-presensi",
+      "about": "A college attendance system: a VB6 RFID desk application that writes attendance and registrations into a hosted MySQL database (schema rfid_bot on freemysqlhosting), and a Telegram bot on Google Apps Script (Lumpia.js) that reads it over JDBC; the bot's folder has no manifest, so only the VB6 project is a unit. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/cakraawijaya/Aplikasi-Presensi-Kuliah-dengan-RFID-disertai-Monitoring-Bot-Telegram.git",
+      "commit": "b12be09b636ef4983f5114a13d44fb934c3962f8",
+      "stacks": "VB6 Standard EXE, ADO over MySQL ODBC, MySQL/MariaDB (freemysqlhosting); Google Apps Script (JavaScript, Lumpia.js, JDBC), Telegram Bot API",
+      "units": [
+        "Src/RFID"
+      ],
+      "calls": [
+        [
+          "Src/RFID",
+          "db:rfid_bot"
+        ]
+      ],
+      "optional": [
+        [
+          "Src/RFID",
+          "db:sql12.freemysqlhosting.net"
+        ]
+      ],
+      "tables": [
+        "pengguna",
+        "umum"
+      ]
+    },
+    {
+      "name": "full-stack-fastapi-template",
+      "about": "The Full Stack FastAPI Template: a FastAPI backend (SQLModel, Alembic) on the PostgreSQL database app that also serves the built React frontend, which calls its API, with React Email templates exported into the backend; run with Docker Compose behind Traefik, with Mailpit catching email locally. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/fastapi/full-stack-fastapi-template.git",
+      "commit": "aabb90126964a164e02aff39e7c385bb0598236d",
+      "stacks": "Python 3.14, FastAPI, SQLModel, Alembic, PostgreSQL (uv workspace); React, TypeScript, Vite, TanStack Router/Query, Tailwind, Playwright; React Email (bun workspaces); Docker Compose, Traefik, Mailpit",
+      "units": [
+        "backend",
+        "frontend",
+        "packages/react-email"
+      ],
+      "calls": [
+        [
+          "frontend",
+          "backend"
+        ],
+        [
+          "backend",
+          "db:app"
+        ]
+      ],
+      "optional": [
+        [
+          "backend",
+          "service:db"
+        ],
+        [
+          "backend",
+          "service:mailpit"
+        ],
+        [
+          "frontend",
+          "service:mailpit"
+        ],
+        [
+          "backend",
+          "frontend"
+        ],
+        [
+          "backend",
+          "packages/react-email"
+        ]
+      ],
+      "tables": [
+        "item",
+        "user"
+      ]
+    },
+    {
+      "name": "bakerydemo",
+      "about": "Wagtail's bakery demo: one Django and Wagtail CMS site (apps base, blog, breads, locations, people, recipes, search) with a few npm lint tools at its root, on PostgreSQL app_db in Docker Compose (SQLite bakerydemodb when no DATABASE_URL is set) and a Redis cache in production. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/wagtail/bakerydemo.git",
+      "commit": "890285b95dcf980215ab9e9942d64ed2b47c48c3",
+      "stacks": "Python 3.12, Django 6.0, Wagtail 8.1, uWSGI; PostgreSQL (DATABASE_URL), SQLite (default), Redis (django-redis cache), optional Elasticsearch; npm lint tooling (ESLint, Stylelint, Prettier); Docker Compose, Vagrant, Heroku",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:app_db"
+        ],
+        [
+          ".",
+          "service:redis"
+        ]
+      ],
+      "optional": [
+        [
+          ".",
+          "service:db"
+        ],
+        [
+          ".",
+          "db:bakerydemodb"
+        ],
+        [
+          ".",
+          "db:bakerydemo"
+        ],
+        [
+          ".",
+          "service:elasticsearch"
+        ]
+      ],
+      "tables": [
+        "base_footertext",
+        "base_formfield",
+        "base_formpage",
+        "base_gallerypage",
+        "base_genericsettings",
+        "base_homepage",
+        "base_person",
+        "base_sitesettings",
+        "base_standardpage",
+        "base_userapprovaltask",
+        "base_userapprovaltaskstate",
+        "blog_blogindexpage",
+        "blog_blogpage",
+        "blog_blogpagetag",
+        "blog_blogpersonrelationship",
+        "breads_breadingredient",
+        "breads_breadpage",
+        "breads_breadpage_ingredients",
+        "breads_breadsindexpage",
+        "breads_breadtype",
+        "breads_country",
+        "locations_locationoperatingday",
+        "locations_locationoperatingtimeslot",
+        "locations_locationpage",
+        "locations_locationsindexpage",
+        "people_peopleindexpage",
+        "people_personpage",
+        "recipes_recipeindexpage",
+        "recipes_recipepage",
+        "recipes_recipepersonrelationship"
+      ]
+    },
+    {
+      "name": "symfony-demo",
+      "about": "The Symfony Demo Application: one Symfony (PHP) blog with an admin backend, its front-end assets served through AssetMapper and an importmap rather than npm, storing its posts, comments, tags and users with Doctrine ORM in the SQLite file data/database.sqlite committed with the code. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/symfony/demo.git",
+      "commit": "f42980c690b4bf335fa41bbafdb075bb67b719c2",
+      "stacks": "PHP 8.4, Symfony 8.1, Doctrine ORM 3 / DBAL 4, Twig, Symfony UX (Stimulus, Live Components), AssetMapper + importmap, Sass, SQLite; PHPUnit",
+      "units": [
+        "."
+      ],
+      "calls": [
+        [
+          ".",
+          "db:database.sqlite"
+        ]
+      ],
+      "optional": [
+        [
+          ".",
+          "db:database_test.sqlite"
+        ],
+        [
+          ".",
+          "db:app"
+        ]
+      ],
+      "tables": [
+        "symfony_demo_comment",
+        "symfony_demo_post",
+        "symfony_demo_post_tag",
+        "symfony_demo_tag",
+        "symfony_demo_user"
+      ]
+    },
+    {
+      "name": "wild-workouts",
+      "about": "Wild Workouts, Three Dots Labs' Go DDD/CQRS example: three Go services (trainer and users, each run as an HTTP and a gRPC server, and trainings over HTTP calling both over gRPC), a shared Go module, a Vue.js front-end calling the three HTTP APIs, Cloud Firestore (a Firebase emulator image locally) as the store, and a MySQL hours repository used only by tests. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example.git",
+      "commit": "8ecfcdf05b1462c4757bd2dcac9086c78e9f7791",
+      "stacks": "Go (one module per service, chi, gRPC, oapi-codegen), Vue.js 2 (vue-cli), Firebase Authentication, Cloud Firestore (Firebase emulator image locally), MySQL/MariaDB (test-only repository), Google Cloud Run, Firebase Hosting, Terraform, docker-compose",
+      "units": [
+        "docker/firestore-emulator",
+        "internal/common",
+        "internal/trainer",
+        "internal/trainings",
+        "internal/users",
+        "tools/c4",
+        "web"
+      ],
+      "calls": [
+        [
+          "internal/trainer",
+          "internal/common"
+        ],
+        [
+          "internal/trainings",
+          "internal/common"
+        ],
+        [
+          "internal/users",
+          "internal/common"
+        ],
+        [
+          "tools/c4",
+          "internal/trainer"
+        ],
+        [
+          "tools/c4",
+          "internal/trainings"
+        ],
+        [
+          "internal/trainings",
+          "internal/trainer"
+        ],
+        [
+          "internal/trainings",
+          "internal/users"
+        ],
+        [
+          "web",
+          "internal/trainer"
+        ],
+        [
+          "web",
+          "internal/trainings"
+        ],
+        [
+          "web",
+          "internal/users"
+        ],
+        [
+          "internal/trainer",
+          "docker/firestore-emulator"
+        ],
+        [
+          "internal/trainings",
+          "docker/firestore-emulator"
+        ],
+        [
+          "internal/users",
+          "docker/firestore-emulator"
+        ]
+      ],
+      "optional": [
+        [
+          "tools/c4",
+          "internal/common"
+        ],
+        [
+          "internal/trainer",
+          "service:firestore"
+        ],
+        [
+          "internal/trainings",
+          "service:firestore"
+        ],
+        [
+          "internal/users",
+          "service:firestore"
+        ],
+        [
+          "internal/trainer",
+          "db:db"
+        ],
+        [
+          "internal/trainer",
+          "service:mysql"
+        ],
+        [
+          "web",
+          "service:firebase-auth"
+        ],
+        [
+          "internal/trainer",
+          "service:firebase-auth"
+        ],
+        [
+          "internal/trainings",
+          "service:firebase-auth"
+        ],
+        [
+          "internal/users",
+          "service:firebase-auth"
+        ],
+        [
+          "internal/common",
+          "internal/trainer"
+        ],
+        [
+          "internal/common",
+          "internal/trainings"
+        ],
+        [
+          "internal/common",
+          "internal/users"
+        ],
+        [
+          "internal/common",
+          "service:firebase-auth"
+        ]
+      ],
+      "tables": [
+        "hours"
+      ]
+    },
+    {
+      "name": "piggymetrics",
+      "about": "Piggy Metrics, a Spring Cloud microservices tutorial: three business services (account, statistics, notification) and an OAuth2 auth service, each with its own MongoDB built from one image, behind a Zuul gateway, configured by a Spring Cloud Config server and registered in Eureka, with Hystrix metrics sent over RabbitMQ to a Turbine stream shown by a Hystrix dashboard. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/sqshq/piggymetrics.git",
+      "commit": "6bb2cf9ddbca980b664d3edbb6ff775d75369278",
+      "stacks": "Java 8, Spring Boot 2.0, Spring Cloud Finchley (Config, Eureka, Zuul, OpenFeign, Hystrix, Turbine Stream, Bus AMQP, Security OAuth2), Maven, MongoDB, RabbitMQ, docker-compose",
+      "units": [
+        "account-service",
+        "auth-service",
+        "config",
+        "gateway",
+        "monitoring",
+        "mongodb",
+        "notification-service",
+        "registry",
+        "statistics-service",
+        "turbine-stream-service"
+      ],
+      "calls": [
+        [
+          "account-service",
+          "config"
+        ],
+        [
+          "auth-service",
+          "config"
+        ],
+        [
+          "gateway",
+          "config"
+        ],
+        [
+          "monitoring",
+          "config"
+        ],
+        [
+          "notification-service",
+          "config"
+        ],
+        [
+          "registry",
+          "config"
+        ],
+        [
+          "statistics-service",
+          "config"
+        ],
+        [
+          "turbine-stream-service",
+          "config"
+        ],
+        [
+          "account-service",
+          "registry"
+        ],
+        [
+          "auth-service",
+          "registry"
+        ],
+        [
+          "gateway",
+          "registry"
+        ],
+        [
+          "notification-service",
+          "registry"
+        ],
+        [
+          "statistics-service",
+          "registry"
+        ],
+        [
+          "turbine-stream-service",
+          "registry"
+        ],
+        [
+          "gateway",
+          "auth-service"
+        ],
+        [
+          "gateway",
+          "account-service"
+        ],
+        [
+          "gateway",
+          "statistics-service"
+        ],
+        [
+          "gateway",
+          "notification-service"
+        ],
+        [
+          "account-service",
+          "statistics-service"
+        ],
+        [
+          "account-service",
+          "auth-service"
+        ],
+        [
+          "notification-service",
+          "account-service"
+        ],
+        [
+          "notification-service",
+          "auth-service"
+        ],
+        [
+          "statistics-service",
+          "auth-service"
+        ],
+        [
+          "account-service",
+          "service:rabbitmq"
+        ],
+        [
+          "notification-service",
+          "service:rabbitmq"
+        ],
+        [
+          "statistics-service",
+          "service:rabbitmq"
+        ],
+        [
+          "turbine-stream-service",
+          "service:rabbitmq"
+        ],
+        [
+          "auth-service",
+          "mongodb"
+        ],
+        [
+          "account-service",
+          "mongodb"
+        ],
+        [
+          "statistics-service",
+          "mongodb"
+        ],
+        [
+          "notification-service",
+          "mongodb"
+        ]
+      ],
+      "optional": [
+        [
+          "monitoring",
+          "turbine-stream-service"
+        ],
+        [
+          "notification-service",
+          "service:smtp.gmail.com"
+        ],
+        [
+          "statistics-service",
+          "service:api.exchangeratesapi.io"
+        ],
+        [
+          "auth-service",
+          "db:piggymetrics"
+        ],
+        [
+          "account-service",
+          "db:piggymetrics"
+        ],
+        [
+          "statistics-service",
+          "db:piggymetrics"
+        ],
+        [
+          "notification-service",
+          "db:piggymetrics"
+        ],
+        [
+          "auth-service",
+          "service:auth-mongodb"
+        ],
+        [
+          "account-service",
+          "service:account-mongodb"
+        ],
+        [
+          "statistics-service",
+          "service:statistics-mongodb"
+        ],
+        [
+          "notification-service",
+          "service:notification-mongodb"
+        ]
+      ]
+    },
+    {
+      "name": "pitstop",
+      "about": "Pitstop, a garage management sample for microservices, CQRS, event sourcing and DDD: an ASP.NET Core MVC web app calling three APIs (customer, vehicle, workshop management) over HTTP, and five back-end services (workshop event handler, invoice, notification, audit log, time) talking through RabbitMQ via the repository's own Infrastructure.Messaging NuGet package, with one logical SQL Server database per service, MailDev for e-mail and Seq for logs. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 41/41, calls 46/82, tables 25/55 for the nine); the readers were tuned on it since.",
+      "url": "https://github.com/EdwinVW/pitstop.git",
+      "commit": "6ab69be3ce6140c56292ee2eaa1866afdf4888c9",
+      "stacks": "C# / .NET 10, ASP.NET Core MVC and Web API, Refit, EF Core + Dapper, SQL Server, RabbitMQ (own Pitstop.Infrastructure.Messaging NuGet package), MailDev SMTP, Serilog + Seq, Vite, MSTest + Moq + Playwright, docker-compose, Kubernetes (Istio, Linkerd)",
+      "units": [
+        "src/AuditlogService",
+        "src/CustomerManagementAPI",
+        "src/Infrastructure.Messaging",
+        "src/InvoiceService",
+        "src/InvoiceService.UnitTests",
+        "src/NotificationService",
+        "src/NotificationService.UnitTests",
+        "src/TestUtils",
+        "src/TimeService",
+        "src/UITest",
+        "src/VehicleManagementAPI",
+        "src/WebApp",
+        "src/WorkshopManagement.UnitTests",
+        "src/WorkshopManagementAPI",
+        "src/WorkshopManagementEventHandler"
+      ],
+      "calls": [
+        [
+          "src/WebApp",
+          "src/CustomerManagementAPI"
+        ],
+        [
+          "src/WebApp",
+          "src/VehicleManagementAPI"
+        ],
+        [
+          "src/WebApp",
+          "src/WorkshopManagementAPI"
+        ],
+        [
+          "src/AuditlogService",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/CustomerManagementAPI",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/InvoiceService",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/NotificationService",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/TimeService",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/VehicleManagementAPI",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/WebApp",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/WorkshopManagementEventHandler",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/AuditlogService",
+          "service:rabbitmq"
+        ],
+        [
+          "src/CustomerManagementAPI",
+          "service:rabbitmq"
+        ],
+        [
+          "src/InvoiceService",
+          "service:rabbitmq"
+        ],
+        [
+          "src/NotificationService",
+          "service:rabbitmq"
+        ],
+        [
+          "src/TimeService",
+          "service:rabbitmq"
+        ],
+        [
+          "src/VehicleManagementAPI",
+          "service:rabbitmq"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "service:rabbitmq"
+        ],
+        [
+          "src/WorkshopManagementEventHandler",
+          "service:rabbitmq"
+        ],
+        [
+          "src/CustomerManagementAPI",
+          "db:customermanagement"
+        ],
+        [
+          "src/VehicleManagementAPI",
+          "db:vehiclemanagement"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "db:workshopmanagementeventstore"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "db:workshopmanagement"
+        ],
+        [
+          "src/WorkshopManagementEventHandler",
+          "db:workshopmanagement"
+        ],
+        [
+          "src/InvoiceService",
+          "db:invoicing"
+        ],
+        [
+          "src/NotificationService",
+          "db:notification"
+        ],
+        [
+          "src/InvoiceService",
+          "service:mailserver"
+        ],
+        [
+          "src/NotificationService",
+          "service:mailserver"
+        ]
+      ],
+      "optional": [
+        [
+          "src/Infrastructure.Messaging",
+          "service:rabbitmq"
+        ],
+        [
+          "src/CustomerManagementAPI",
+          "service:sqlserver"
+        ],
+        [
+          "src/VehicleManagementAPI",
+          "service:sqlserver"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "service:sqlserver"
+        ],
+        [
+          "src/WorkshopManagementEventHandler",
+          "service:sqlserver"
+        ],
+        [
+          "src/InvoiceService",
+          "service:sqlserver"
+        ],
+        [
+          "src/NotificationService",
+          "service:sqlserver"
+        ],
+        [
+          "src/UITest",
+          "service:sqlserver"
+        ],
+        [
+          "src/AuditlogService",
+          "service:logserver"
+        ],
+        [
+          "src/CustomerManagementAPI",
+          "service:logserver"
+        ],
+        [
+          "src/InvoiceService",
+          "service:logserver"
+        ],
+        [
+          "src/NotificationService",
+          "service:logserver"
+        ],
+        [
+          "src/TimeService",
+          "service:logserver"
+        ],
+        [
+          "src/VehicleManagementAPI",
+          "service:logserver"
+        ],
+        [
+          "src/WebApp",
+          "service:logserver"
+        ],
+        [
+          "src/WorkshopManagementAPI",
+          "service:logserver"
+        ],
+        [
+          "src/WorkshopManagementEventHandler",
+          "service:logserver"
+        ],
+        [
+          "src/InvoiceService.UnitTests",
+          "src/InvoiceService"
+        ],
+        [
+          "src/InvoiceService.UnitTests",
+          "src/TestUtils"
+        ],
+        [
+          "src/InvoiceService.UnitTests",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/NotificationService.UnitTests",
+          "src/NotificationService"
+        ],
+        [
+          "src/NotificationService.UnitTests",
+          "src/TestUtils"
+        ],
+        [
+          "src/NotificationService.UnitTests",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/WorkshopManagement.UnitTests",
+          "src/WorkshopManagementAPI"
+        ],
+        [
+          "src/WorkshopManagement.UnitTests",
+          "src/TestUtils"
+        ],
+        [
+          "src/WorkshopManagement.UnitTests",
+          "src/Infrastructure.Messaging"
+        ],
+        [
+          "src/UITest",
+          "src/TestUtils"
+        ],
+        [
+          "src/UITest",
+          "src/WebApp"
+        ],
+        [
+          "src/UITest",
+          "db:customermanagement"
+        ],
+        [
+          "src/UITest",
+          "db:invoicing"
+        ],
+        [
+          "src/UITest",
+          "db:notification"
+        ],
+        [
+          "src/UITest",
+          "db:vehiclemanagement"
+        ],
+        [
+          "src/UITest",
+          "db:workshopmanagement"
+        ],
+        [
+          "src/UITest",
+          "db:workshopmanagementeventstore"
+        ]
+      ],
+      "tables": [
+        "customer",
+        "invoice",
+        "maintenancejob",
+        "vehicle",
+        "workshopplanning",
+        "workshopplanningevent"
+      ]
     }
   ],
   "heldOut": [
@@ -2145,848 +2987,6 @@
         ]
       ],
       "optional": []
-    },
-    {
-      "name": "MirageMUD",
-      "about": "A VB6 MUD code base: a graphical client (with built-in editors) and a game server talking over Winsock on port 7777, the server keeping accounts, rooms, items, NPCs, shops and spells in flat binary and INI files rather than a database. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/DraigNET/MirageMUD.git",
-      "commit": "69495f3e061936545ab74380f2b60deba06a6b35",
-      "stacks": "VB6 Standard EXEs, Winsock, DirectX 8, FMOD; flat binary and INI files",
-      "units": [
-        "Client",
-        "Server"
-      ],
-      "calls": [
-        [
-          "Client",
-          "Server"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "shopping-cart-v2",
-      "about": "A VB6 point-of-sale and shop administration system (sales, inventory, purchases, customers, suppliers, fiscal printers over serial ports, Word/Excel reports, a cyber-cafe module that commands rental PCs over Winsock) on an Access database (data/datos.mdb) or, per its INI and README, a MySQL database (services_cell_store) over ODBC. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/electronicaJLV/shopping-cart-Software-v2-Vbasic6.git",
-      "commit": "887ca54bd85321cfcabac5873168ff5f6b88bbe9",
-      "stacks": "VB6 Standard EXE, ADO over ODBC, Access, MySQL; Winsock, MSComm (fiscal printers), Word/Excel COM automation; INI settings",
-      "units": [
-        "."
-      ],
-      "calls": [
-        [
-          ".",
-          "db:datos.mdb"
-        ],
-        [
-          ".",
-          "db:services_cell_store"
-        ]
-      ],
-      "optional": [
-        [
-          ".",
-          "service:cybercafe-locker"
-        ]
-      ],
-      "tables": [
-        "cargo",
-        "cliente",
-        "compras",
-        "empresa",
-        "grupo",
-        "ingresos",
-        "inventario",
-        "proveedor",
-        "usuarios"
-      ]
-    },
-    {
-      "name": "rfid-presensi",
-      "about": "A college attendance system: a VB6 RFID desk application that writes attendance and registrations into a hosted MySQL database (schema rfid_bot on freemysqlhosting), and a Telegram bot on Google Apps Script (Lumpia.js) that reads it over JDBC; the bot's folder has no manifest, so only the VB6 project is a unit. Written down on 2026-11-08 from its README, project files, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/cakraawijaya/Aplikasi-Presensi-Kuliah-dengan-RFID-disertai-Monitoring-Bot-Telegram.git",
-      "commit": "b12be09b636ef4983f5114a13d44fb934c3962f8",
-      "stacks": "VB6 Standard EXE, ADO over MySQL ODBC, MySQL/MariaDB (freemysqlhosting); Google Apps Script (JavaScript, Lumpia.js, JDBC), Telegram Bot API",
-      "units": [
-        "Src/RFID"
-      ],
-      "calls": [
-        [
-          "Src/RFID",
-          "db:rfid_bot"
-        ]
-      ],
-      "optional": [
-        [
-          "Src/RFID",
-          "db:sql12.freemysqlhosting.net"
-        ]
-      ],
-      "tables": [
-        "pengguna",
-        "umum"
-      ]
-    },
-    {
-      "name": "full-stack-fastapi-template",
-      "about": "The Full Stack FastAPI Template: a FastAPI backend (SQLModel, Alembic) on the PostgreSQL database app that also serves the built React frontend, which calls its API, with React Email templates exported into the backend; run with Docker Compose behind Traefik, with Mailpit catching email locally. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/fastapi/full-stack-fastapi-template.git",
-      "commit": "aabb90126964a164e02aff39e7c385bb0598236d",
-      "stacks": "Python 3.14, FastAPI, SQLModel, Alembic, PostgreSQL (uv workspace); React, TypeScript, Vite, TanStack Router/Query, Tailwind, Playwright; React Email (bun workspaces); Docker Compose, Traefik, Mailpit",
-      "units": [
-        "backend",
-        "frontend",
-        "packages/react-email"
-      ],
-      "calls": [
-        [
-          "frontend",
-          "backend"
-        ],
-        [
-          "backend",
-          "db:app"
-        ]
-      ],
-      "optional": [
-        [
-          "backend",
-          "service:db"
-        ],
-        [
-          "backend",
-          "service:mailpit"
-        ],
-        [
-          "frontend",
-          "service:mailpit"
-        ],
-        [
-          "backend",
-          "frontend"
-        ],
-        [
-          "backend",
-          "packages/react-email"
-        ]
-      ],
-      "tables": [
-        "item",
-        "user"
-      ]
-    },
-    {
-      "name": "bakerydemo",
-      "about": "Wagtail's bakery demo: one Django and Wagtail CMS site (apps base, blog, breads, locations, people, recipes, search) with a few npm lint tools at its root, on PostgreSQL app_db in Docker Compose (SQLite bakerydemodb when no DATABASE_URL is set) and a Redis cache in production. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/wagtail/bakerydemo.git",
-      "commit": "890285b95dcf980215ab9e9942d64ed2b47c48c3",
-      "stacks": "Python 3.12, Django 6.0, Wagtail 8.1, uWSGI; PostgreSQL (DATABASE_URL), SQLite (default), Redis (django-redis cache), optional Elasticsearch; npm lint tooling (ESLint, Stylelint, Prettier); Docker Compose, Vagrant, Heroku",
-      "units": [
-        "."
-      ],
-      "calls": [
-        [
-          ".",
-          "db:app_db"
-        ],
-        [
-          ".",
-          "service:redis"
-        ]
-      ],
-      "optional": [
-        [
-          ".",
-          "service:db"
-        ],
-        [
-          ".",
-          "db:bakerydemodb"
-        ],
-        [
-          ".",
-          "db:bakerydemo"
-        ],
-        [
-          ".",
-          "service:elasticsearch"
-        ]
-      ],
-      "tables": [
-        "base_footertext",
-        "base_formfield",
-        "base_formpage",
-        "base_gallerypage",
-        "base_genericsettings",
-        "base_homepage",
-        "base_person",
-        "base_sitesettings",
-        "base_standardpage",
-        "base_userapprovaltask",
-        "base_userapprovaltaskstate",
-        "blog_blogindexpage",
-        "blog_blogpage",
-        "blog_blogpagetag",
-        "blog_blogpersonrelationship",
-        "breads_breadingredient",
-        "breads_breadpage",
-        "breads_breadpage_ingredients",
-        "breads_breadsindexpage",
-        "breads_breadtype",
-        "breads_country",
-        "locations_locationoperatingday",
-        "locations_locationoperatingtimeslot",
-        "locations_locationpage",
-        "locations_locationsindexpage",
-        "people_peopleindexpage",
-        "people_personpage",
-        "recipes_recipeindexpage",
-        "recipes_recipepage",
-        "recipes_recipepersonrelationship"
-      ]
-    },
-    {
-      "name": "symfony-demo",
-      "about": "The Symfony Demo Application: one Symfony (PHP) blog with an admin backend, its front-end assets served through AssetMapper and an importmap rather than npm, storing its posts, comments, tags and users with Doctrine ORM in the SQLite file data/database.sqlite committed with the code. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/symfony/demo.git",
-      "commit": "f42980c690b4bf335fa41bbafdb075bb67b719c2",
-      "stacks": "PHP 8.4, Symfony 8.1, Doctrine ORM 3 / DBAL 4, Twig, Symfony UX (Stimulus, Live Components), AssetMapper + importmap, Sass, SQLite; PHPUnit",
-      "units": [
-        "."
-      ],
-      "calls": [
-        [
-          ".",
-          "db:database.sqlite"
-        ]
-      ],
-      "optional": [
-        [
-          ".",
-          "db:database_test.sqlite"
-        ],
-        [
-          ".",
-          "db:app"
-        ]
-      ],
-      "tables": [
-        "symfony_demo_comment",
-        "symfony_demo_post",
-        "symfony_demo_post_tag",
-        "symfony_demo_tag",
-        "symfony_demo_user"
-      ]
-    },
-    {
-      "name": "wild-workouts",
-      "about": "Wild Workouts, Three Dots Labs' Go DDD/CQRS example: three Go services (trainer and users, each run as an HTTP and a gRPC server, and trainings over HTTP calling both over gRPC), a shared Go module, a Vue.js front-end calling the three HTTP APIs, Cloud Firestore (a Firebase emulator image locally) as the store, and a MySQL hours repository used only by tests. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example.git",
-      "commit": "8ecfcdf05b1462c4757bd2dcac9086c78e9f7791",
-      "stacks": "Go (one module per service, chi, gRPC, oapi-codegen), Vue.js 2 (vue-cli), Firebase Authentication, Cloud Firestore (Firebase emulator image locally), MySQL/MariaDB (test-only repository), Google Cloud Run, Firebase Hosting, Terraform, docker-compose",
-      "units": [
-        "docker/firestore-emulator",
-        "internal/common",
-        "internal/trainer",
-        "internal/trainings",
-        "internal/users",
-        "tools/c4",
-        "web"
-      ],
-      "calls": [
-        [
-          "internal/trainer",
-          "internal/common"
-        ],
-        [
-          "internal/trainings",
-          "internal/common"
-        ],
-        [
-          "internal/users",
-          "internal/common"
-        ],
-        [
-          "tools/c4",
-          "internal/trainer"
-        ],
-        [
-          "tools/c4",
-          "internal/trainings"
-        ],
-        [
-          "internal/trainings",
-          "internal/trainer"
-        ],
-        [
-          "internal/trainings",
-          "internal/users"
-        ],
-        [
-          "web",
-          "internal/trainer"
-        ],
-        [
-          "web",
-          "internal/trainings"
-        ],
-        [
-          "web",
-          "internal/users"
-        ],
-        [
-          "internal/trainer",
-          "docker/firestore-emulator"
-        ],
-        [
-          "internal/trainings",
-          "docker/firestore-emulator"
-        ],
-        [
-          "internal/users",
-          "docker/firestore-emulator"
-        ]
-      ],
-      "optional": [
-        [
-          "tools/c4",
-          "internal/common"
-        ],
-        [
-          "internal/trainer",
-          "service:firestore"
-        ],
-        [
-          "internal/trainings",
-          "service:firestore"
-        ],
-        [
-          "internal/users",
-          "service:firestore"
-        ],
-        [
-          "internal/trainer",
-          "db:db"
-        ],
-        [
-          "internal/trainer",
-          "service:mysql"
-        ],
-        [
-          "web",
-          "service:firebase-auth"
-        ],
-        [
-          "internal/trainer",
-          "service:firebase-auth"
-        ],
-        [
-          "internal/trainings",
-          "service:firebase-auth"
-        ],
-        [
-          "internal/users",
-          "service:firebase-auth"
-        ],
-        [
-          "internal/common",
-          "internal/trainer"
-        ],
-        [
-          "internal/common",
-          "internal/trainings"
-        ],
-        [
-          "internal/common",
-          "internal/users"
-        ],
-        [
-          "internal/common",
-          "service:firebase-auth"
-        ]
-      ],
-      "tables": [
-        "hours"
-      ]
-    },
-    {
-      "name": "piggymetrics",
-      "about": "Piggy Metrics, a Spring Cloud microservices tutorial: three business services (account, statistics, notification) and an OAuth2 auth service, each with its own MongoDB built from one image, behind a Zuul gateway, configured by a Spring Cloud Config server and registered in Eureka, with Hystrix metrics sent over RabbitMQ to a Turbine stream shown by a Hystrix dashboard. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/sqshq/piggymetrics.git",
-      "commit": "6bb2cf9ddbca980b664d3edbb6ff775d75369278",
-      "stacks": "Java 8, Spring Boot 2.0, Spring Cloud Finchley (Config, Eureka, Zuul, OpenFeign, Hystrix, Turbine Stream, Bus AMQP, Security OAuth2), Maven, MongoDB, RabbitMQ, docker-compose",
-      "units": [
-        "account-service",
-        "auth-service",
-        "config",
-        "gateway",
-        "monitoring",
-        "mongodb",
-        "notification-service",
-        "registry",
-        "statistics-service",
-        "turbine-stream-service"
-      ],
-      "calls": [
-        [
-          "account-service",
-          "config"
-        ],
-        [
-          "auth-service",
-          "config"
-        ],
-        [
-          "gateway",
-          "config"
-        ],
-        [
-          "monitoring",
-          "config"
-        ],
-        [
-          "notification-service",
-          "config"
-        ],
-        [
-          "registry",
-          "config"
-        ],
-        [
-          "statistics-service",
-          "config"
-        ],
-        [
-          "turbine-stream-service",
-          "config"
-        ],
-        [
-          "account-service",
-          "registry"
-        ],
-        [
-          "auth-service",
-          "registry"
-        ],
-        [
-          "gateway",
-          "registry"
-        ],
-        [
-          "notification-service",
-          "registry"
-        ],
-        [
-          "statistics-service",
-          "registry"
-        ],
-        [
-          "turbine-stream-service",
-          "registry"
-        ],
-        [
-          "gateway",
-          "auth-service"
-        ],
-        [
-          "gateway",
-          "account-service"
-        ],
-        [
-          "gateway",
-          "statistics-service"
-        ],
-        [
-          "gateway",
-          "notification-service"
-        ],
-        [
-          "account-service",
-          "statistics-service"
-        ],
-        [
-          "account-service",
-          "auth-service"
-        ],
-        [
-          "notification-service",
-          "account-service"
-        ],
-        [
-          "notification-service",
-          "auth-service"
-        ],
-        [
-          "statistics-service",
-          "auth-service"
-        ],
-        [
-          "account-service",
-          "service:rabbitmq"
-        ],
-        [
-          "notification-service",
-          "service:rabbitmq"
-        ],
-        [
-          "statistics-service",
-          "service:rabbitmq"
-        ],
-        [
-          "turbine-stream-service",
-          "service:rabbitmq"
-        ],
-        [
-          "auth-service",
-          "mongodb"
-        ],
-        [
-          "account-service",
-          "mongodb"
-        ],
-        [
-          "statistics-service",
-          "mongodb"
-        ],
-        [
-          "notification-service",
-          "mongodb"
-        ]
-      ],
-      "optional": [
-        [
-          "monitoring",
-          "turbine-stream-service"
-        ],
-        [
-          "notification-service",
-          "service:smtp.gmail.com"
-        ],
-        [
-          "statistics-service",
-          "service:api.exchangeratesapi.io"
-        ],
-        [
-          "auth-service",
-          "db:piggymetrics"
-        ],
-        [
-          "account-service",
-          "db:piggymetrics"
-        ],
-        [
-          "statistics-service",
-          "db:piggymetrics"
-        ],
-        [
-          "notification-service",
-          "db:piggymetrics"
-        ],
-        [
-          "auth-service",
-          "service:auth-mongodb"
-        ],
-        [
-          "account-service",
-          "service:account-mongodb"
-        ],
-        [
-          "statistics-service",
-          "service:statistics-mongodb"
-        ],
-        [
-          "notification-service",
-          "service:notification-mongodb"
-        ]
-      ]
-    },
-    {
-      "name": "pitstop",
-      "about": "Pitstop, a garage management sample for microservices, CQRS, event sourcing and DDD: an ASP.NET Core MVC web app calling three APIs (customer, vehicle, workshop management) over HTTP, and five back-end services (workshop event handler, invoice, notification, audit log, time) talking through RabbitMQ via the repository's own Infrastructure.Messaging NuGet package, with one logical SQL Server database per service, MailDev for e-mail and Seq for logs. Written down on 2026-11-08 from its README, manifests, configuration and schema before Assay first ran on it.",
-      "url": "https://github.com/EdwinVW/pitstop.git",
-      "commit": "6ab69be3ce6140c56292ee2eaa1866afdf4888c9",
-      "stacks": "C# / .NET 10, ASP.NET Core MVC and Web API, Refit, EF Core + Dapper, SQL Server, RabbitMQ (own Pitstop.Infrastructure.Messaging NuGet package), MailDev SMTP, Serilog + Seq, Vite, MSTest + Moq + Playwright, docker-compose, Kubernetes (Istio, Linkerd)",
-      "units": [
-        "src/AuditlogService",
-        "src/CustomerManagementAPI",
-        "src/Infrastructure.Messaging",
-        "src/InvoiceService",
-        "src/InvoiceService.UnitTests",
-        "src/NotificationService",
-        "src/NotificationService.UnitTests",
-        "src/TestUtils",
-        "src/TimeService",
-        "src/UITest",
-        "src/VehicleManagementAPI",
-        "src/WebApp",
-        "src/WorkshopManagement.UnitTests",
-        "src/WorkshopManagementAPI",
-        "src/WorkshopManagementEventHandler"
-      ],
-      "calls": [
-        [
-          "src/WebApp",
-          "src/CustomerManagementAPI"
-        ],
-        [
-          "src/WebApp",
-          "src/VehicleManagementAPI"
-        ],
-        [
-          "src/WebApp",
-          "src/WorkshopManagementAPI"
-        ],
-        [
-          "src/AuditlogService",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/CustomerManagementAPI",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/InvoiceService",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/NotificationService",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/TimeService",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/VehicleManagementAPI",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/WebApp",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/WorkshopManagementEventHandler",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/AuditlogService",
-          "service:rabbitmq"
-        ],
-        [
-          "src/CustomerManagementAPI",
-          "service:rabbitmq"
-        ],
-        [
-          "src/InvoiceService",
-          "service:rabbitmq"
-        ],
-        [
-          "src/NotificationService",
-          "service:rabbitmq"
-        ],
-        [
-          "src/TimeService",
-          "service:rabbitmq"
-        ],
-        [
-          "src/VehicleManagementAPI",
-          "service:rabbitmq"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "service:rabbitmq"
-        ],
-        [
-          "src/WorkshopManagementEventHandler",
-          "service:rabbitmq"
-        ],
-        [
-          "src/CustomerManagementAPI",
-          "db:customermanagement"
-        ],
-        [
-          "src/VehicleManagementAPI",
-          "db:vehiclemanagement"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "db:workshopmanagementeventstore"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "db:workshopmanagement"
-        ],
-        [
-          "src/WorkshopManagementEventHandler",
-          "db:workshopmanagement"
-        ],
-        [
-          "src/InvoiceService",
-          "db:invoicing"
-        ],
-        [
-          "src/NotificationService",
-          "db:notification"
-        ],
-        [
-          "src/InvoiceService",
-          "service:mailserver"
-        ],
-        [
-          "src/NotificationService",
-          "service:mailserver"
-        ]
-      ],
-      "optional": [
-        [
-          "src/Infrastructure.Messaging",
-          "service:rabbitmq"
-        ],
-        [
-          "src/CustomerManagementAPI",
-          "service:sqlserver"
-        ],
-        [
-          "src/VehicleManagementAPI",
-          "service:sqlserver"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "service:sqlserver"
-        ],
-        [
-          "src/WorkshopManagementEventHandler",
-          "service:sqlserver"
-        ],
-        [
-          "src/InvoiceService",
-          "service:sqlserver"
-        ],
-        [
-          "src/NotificationService",
-          "service:sqlserver"
-        ],
-        [
-          "src/UITest",
-          "service:sqlserver"
-        ],
-        [
-          "src/AuditlogService",
-          "service:logserver"
-        ],
-        [
-          "src/CustomerManagementAPI",
-          "service:logserver"
-        ],
-        [
-          "src/InvoiceService",
-          "service:logserver"
-        ],
-        [
-          "src/NotificationService",
-          "service:logserver"
-        ],
-        [
-          "src/TimeService",
-          "service:logserver"
-        ],
-        [
-          "src/VehicleManagementAPI",
-          "service:logserver"
-        ],
-        [
-          "src/WebApp",
-          "service:logserver"
-        ],
-        [
-          "src/WorkshopManagementAPI",
-          "service:logserver"
-        ],
-        [
-          "src/WorkshopManagementEventHandler",
-          "service:logserver"
-        ],
-        [
-          "src/InvoiceService.UnitTests",
-          "src/InvoiceService"
-        ],
-        [
-          "src/InvoiceService.UnitTests",
-          "src/TestUtils"
-        ],
-        [
-          "src/InvoiceService.UnitTests",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/NotificationService.UnitTests",
-          "src/NotificationService"
-        ],
-        [
-          "src/NotificationService.UnitTests",
-          "src/TestUtils"
-        ],
-        [
-          "src/NotificationService.UnitTests",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/WorkshopManagement.UnitTests",
-          "src/WorkshopManagementAPI"
-        ],
-        [
-          "src/WorkshopManagement.UnitTests",
-          "src/TestUtils"
-        ],
-        [
-          "src/WorkshopManagement.UnitTests",
-          "src/Infrastructure.Messaging"
-        ],
-        [
-          "src/UITest",
-          "src/TestUtils"
-        ],
-        [
-          "src/UITest",
-          "src/WebApp"
-        ],
-        [
-          "src/UITest",
-          "db:customermanagement"
-        ],
-        [
-          "src/UITest",
-          "db:invoicing"
-        ],
-        [
-          "src/UITest",
-          "db:notification"
-        ],
-        [
-          "src/UITest",
-          "db:vehiclemanagement"
-        ],
-        [
-          "src/UITest",
-          "db:workshopmanagement"
-        ],
-        [
-          "src/UITest",
-          "db:workshopmanagementeventstore"
-        ]
-      ],
-      "tables": [
-        "customer",
-        "invoice",
-        "maintenancejob",
-        "vehicle",
-        "workshopplanning",
-        "workshopplanningevent"
-      ]
     }
   ]
 }

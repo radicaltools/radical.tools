@@ -360,6 +360,38 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-08): nine repositories held out
+
+Nine new repositories were written down by hand before Assay ran on them
+(committed first): MirageMUD, a VB6 shopping cart, a VB6 RFID attendance
+app, full-stack-fastapi-template, Wagtail's bakerydemo, Symfony's demo,
+wild-workouts (Go), piggymetrics (Spring Cloud) and pitstop (.NET).
+Untouched: units 41/41 (precision 91 %), calls 46/82 (precision 85 %),
+tables 25/55. The causes: VB6 addresses and database names held in
+constants, record fields and INI settings; a config server's files read as
+its own; Wagtail models and Doctrine entities unread; commented settings
+read; workspace roots, vendored Bootstrap and runner images as units; a
+root Go module claiming the services' main packages. Fixed: calls 80/82
+(precision 89 %), tables 55/55, units 100 %; tuned on now. Open:
+
+- **A held-out set again.** Only robot-shop, eShop and sockshop are held
+  out, all seen; the next round needs new repositories.
+- **A client in a shared library.** wild-workouts' trainings calls trainer
+  and users over gRPC through `internal/common/client`, whose addresses come
+  from one `.env` every service loads: the call belongs to the unit that
+  calls the library's function, which Assay does not follow.
+- **Shared settings are not all used.** A config server's `application.yml`
+  gives every client the broker's and the auth server's addresses, so
+  piggymetrics' registry and gateway read as calling RabbitMQ (8 calls not
+  stated); a setting counts whether or not the unit has the client library.
+- **Published ports link more.** eShopOnWeb's BlazorAdmin and PublicApi now
+  call Web through `host.docker.internal:5106`, the port Web publishes: true
+  for BlazorAdmin (it reads `/User`), a CORS origin for PublicApi; the bench
+  lists neither.
+- **The tables of a VB6 query.** A table named by a variable spliced into SQL
+  (`"FROM " & SELECT_TABLE`) stays unread: values are followed only into
+  connection strings, as a `Select Case` gives a variable several.
+
 ### Dogfooding (2026-11-08): other stacks held out
 
 Four repositories of other stacks were written down by hand (from READMEs,

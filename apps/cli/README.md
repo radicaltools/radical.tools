@@ -585,12 +585,16 @@ cloned. For each repository it reads, from the files git lists:
   main packages before modules), .NET projects and SQL Server database
   projects (`.sqlproj`), Python projects, VB6 projects, and a folder with a
   Dockerfile no manifest claims (not a `.devcontainer`, nor one that copies
-  other units' projects: it builds them); each an app, a library or tests,
+  other units' projects: it builds them, nor a runner image whose compose
+  service mounts a unit's folder: that service runs the unit); not a
+  workspace's root (a `pyproject.toml` without `[project]`, a `go.mod` with
+  no Go code of its own) nor a library vendored in `wwwroot/lib`; each an app, a library or tests,
   with its stack and the frameworks it names;
 - each unit's dependencies, and its references to other units by path (a
   .NET `ProjectReference`, also those `Directory.Build.props` and
   `.targets` add by conditions on the project's name and path, a VB6
-  `Reference=*\A…vbp`, a Gradle `project(':x')`);
+  `Reference=*\A…vbp`, a Gradle `project(':x')`, a Go `replace` to a
+  folder);
   a VB6 reference to a COM binary another unit builds counts as one;
 - solutions and VB6 groups (`.sln`, `.vbg`);
 - what runs: the services of docker-compose files, Kubernetes manifests and
@@ -600,14 +604,22 @@ cloned. For each repository it reads, from the files git lists:
   register and call them, and addresses in code and configuration (a URL or
   `host:port` naming another unit or service, `lb://name`, a host given as a
   default or named in a variable such as `${CART_HOST}`, a local port only
-  one unit listens on);
+  one unit listens on or publishes from compose, a gateway's `serviceId`, a
+  Feign client's name); a Spring Cloud Config server's files are read as the
+  configuration of the applications they are named for, its
+  `application.yml` as every client's; a VB6 socket's host and port and a
+  connection string's server and database are followed through the
+  constants, variables, record fields and INI settings that hold them;
 - data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,
   .NET, PDO, Go's MySQL driver, database URLs, a `.env` file's
   `DB_CONNECTION` (or Laravel's default connection) and `DB_DATABASE`, a
-  compose service's environment, a Prisma datasource) and the tables SQL
-  names; a table SQL creates or alters, Laravel's migrations create, or an
-  ORM class maps (JPA, Entity Framework Core, Django, SQLAlchemy, TypeORM,
-  Prisma), with its columns and the table each foreign key references;
+  compose service's environment, a Prisma datasource, an SQLite URL; not a
+  commented line, nor a placeholder name, which a dump's database stands in
+  for) and the tables SQL names; a table SQL creates or alters, Laravel's
+  migrations create, or an ORM class maps (JPA, Entity Framework Core, Django
+  with Wagtail's models, SQLAlchemy, TypeORM, Prisma, Doctrine), with its
+  columns and the table each foreign key references, and many-to-many join
+  tables;
   migrations count in order, so a table a later one drops is gone; a table
   in a schema is named by schema and name only where two schemas hold its
   name. An Access file's own tables are read by the
