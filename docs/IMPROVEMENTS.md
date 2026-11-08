@@ -360,6 +360,30 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-08): an agent's run on three systems of services
+
+Run 21 (`/Volumes/data/Dev/assay-runs/21-services`): an agent ran Assay over
+MCP on piggymetrics, pitstop and bakerydemo (12 minutes). Its model scored
+units 73 %, calls 55 % (precision 97 %), tables as entities 47 %. Fixed since:
+`assay_start`'s 52 KB answer (the agent never read the procedure), names
+matched across repositories (pitstop's services depended on piggymetrics'
+RabbitMQ), bakerydemo read as npm, shared Spring settings of libraries a
+service lacks. Open, from its report:
+
+- **Tests without reports.** With no test reports, the tests are invisible:
+  pending tests were written for four scenarios that passing MSTest tests
+  already check. Assay could read test names from the sources.
+- **Verification in the code repositories.** `set_verification` sees only the
+  central repository's `.radical/radical.json`.
+- **Entities across services.** Tables of one name in several services'
+  databases are one entity, and every unit with a class of that name
+  `realises` it (WebApp's view models are read as Entity Framework tables).
+- **Smaller fact errors.** MongoDB containers are apps with no database;
+  a Feign client's methods are entry points; ASP.NET Core loses the route
+  templates of its controllers; addresses come from `src/test/resources`.
+- **assay_apply's description** says a document may back an observed item;
+  the server refuses it. Plan elements take no `properties` (a domain's kind).
+
 ### Dogfooding (2026-11-08): nine repositories held out
 
 Nine new repositories were written down by hand before Assay ran on them

@@ -525,6 +525,9 @@ const BASE_IMAGES: Array<[RegExp, string]> = [
   [/dotnet|aspnet/, '.NET'], [/nginx/, 'nginx'], [/ruby/, 'Ruby'], [/php/, 'PHP'],
 ]
 
+/** A manifest's JSON, or nothing where it does not parse. */
+const jsonOf = (text: string): { dependencies?: Record<string, string> } => { try { return JSON.parse(text) ?? {} } catch { return {} } }
+
 /** Every unit of every stack in the repository, with the dependencies their manifests state. */
 export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
@@ -536,6 +539,11 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
   for (const d of drafts) {
     const first = byPath.get(d.path)
     if (!first) { byPath.set(d.path, d); continue }
+    // A package.json of tooling alone (devDependencies, nothing it runs) leaves its folder to the Python project beside it.
+    if (first.stack === 'npm' && d.stack === 'python' && d.reasons.length && !first.reasons.length && !Object.keys(jsonOf(files.read(`${d.path === '.' ? '' : `${d.path}/`}package.json`)).dependencies ?? {}).length) {
+      byPath.set(d.path, d)
+      continue
+    }
     // Several VB6 projects in one folder (a library, its EXE build, a variant) are one unit, known by each project's name and binary.
     if (first.stack !== 'vb6' || d.stack !== 'vb6') continue
     first.aliases.push(...(d.named ? [d.name] : []), ...d.aliases)

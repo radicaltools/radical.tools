@@ -94,6 +94,13 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
   const byName = new Map<string, Array<{ unit?: Unit; service?: ServiceFact }>>()
   for (const u of units) for (const n of callNames(u)) byName.set(n, [...(byName.get(n) ?? []), { unit: u }])
   for (const s of services) byName.set(s.name.toLowerCase(), [...(byName.get(s.name.toLowerCase()) ?? []), { service: s, unit: units.find((u) => u.id === s.unit) }])
+  // A name names a unit or service of the caller's own repository before one of another (two systems may both run a rabbitmq).
+  const repoOf = (id: string): string => id.split(/:(?:unit|service|db):/)[0]
+  const nameFrom = (name: string, from: string): Array<{ unit?: Unit; service?: ServiceFact }> | undefined => {
+    const all = byName.get(name)
+    const own = all?.filter((t) => repoOf(t.unit?.id ?? t.service!.id) === repoOf(from))
+    return own?.length ? own : all
+  }
   for (const a of repositories.flatMap((r) => r.addresses) as AddressFact[]) {
     const holder = a.service ? serviceOf.get(a.service) : undefined
     const from = a.unit ?? holder?.unit
@@ -115,7 +122,7 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     const best = listening.length > 1 ? Math.max(...listening.map(shared)) : 0
     const nearest = listening.length > 1 && best > 0 ? listening.filter((u) => shared(u) === best) : listening
     const byPort = (nearest.length === 1 ? nearest : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
-    const targets = local ? byPort : byName.get(a.host) ?? byName.get(a.host.split('.')[0]) ?? byPort
+    const targets = local ? byPort : nameFrom(a.host, from) ?? nameFrom(a.host.split('.')[0], from) ?? byPort
     for (const t of targets) {
       const to = t.unit?.id ?? t.service?.id
       if (!to || to === from) continue
@@ -129,7 +136,8 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
   for (const s of services) {
     if (!s.unit) continue
     for (const name of s.dependsOn) {
-      const other = services.find((x) => x.name === name)
+      // A compose file's depends_on names a service of its own repository.
+      const other = services.find((x) => x.name === name && repoOf(x.id) === repoOf(s.id))
       if (!other) continue
       // A migrator or a seeding job is waited for, not called.
       const job = units.find((u) => u.id === other.unit)
@@ -142,7 +150,7 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
   for (const db of repositories.flatMap((r) => r.databases)) {
     if (!db.unit) continue
     const host = db.server?.toLowerCase().replace(/[\\/].*$/, '')
-    const named = host ? (byName.get(host) ?? []).find((t) => t.unit?.id !== db.unit) : undefined
+    const named = host ? (nameFrom(host, db.unit) ?? []).find((t) => t.unit?.id !== db.unit) : undefined
     add('data', db.unit, db.id, 'observed', [db.id, ...(named?.service ? [named.service.id] : [])], `${db.engine}${db.name ? ` ${db.name}` : ''}`)
     const via = named ? named.unit?.id ?? named.service!.id : undefined
     const link = links.get(`link:data:${db.unit}->${db.id}`)

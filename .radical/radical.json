@@ -3330,6 +3330,15 @@
     ] },
     { "element": "f07170af-4d2b-43b3-830b-5345e609f850", "name": "Migrator waited for, not called", "tests": [
       "packages/assay/tests/calls-precision.test.ts › radical assay: calls a unit makes, and calls it does not › reads no call of a service another depends on only to have it finish first"
+    ] },
+    { "element": "253c2a5c-8098-4931-8f89-09eb9a6d848b", "name": "A short start and the procedure apart", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › answers assay_start in brief, gives the procedure apart, and pages the links by size"
+    ] },
+    { "element": "3694a89e-1135-483e-9386-a2a00daa9943", "name": "Names within their own repository", "tests": [
+      "packages/assay/tests/calls-precision.test.ts › radical assay: calls a unit makes, and calls it does not › names a unit or service of the caller's own repository before another repository's, and depends_on only its own"
+    ] },
+    { "element": "6452ec9c-43a2-408f-b2fa-33d7f0bb2a26", "name": "A Python folder with tooling for its front end", "tests": [
+      "packages/assay/tests/calls-precision.test.ts › radical assay: calls a unit makes, and calls it does not › leaves a folder to its Python project when its package.json holds tooling alone"
     ] }
   ]
 }

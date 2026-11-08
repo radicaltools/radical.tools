@@ -108,4 +108,27 @@ describe('radical assay: calls a unit makes, and calls it does not', () => {
     })
     expect(calls(dir, 'runtime')).toEqual(['src/Api → db:service:db'])
   })
+
+  it("names a unit or service of the caller's own repository before another repository's, and depends_on only its own", () => {
+    const system = (name: string) => extractRepository(repo(name, {
+      'api/package.json': JSON.stringify({ name: `${name}-api`, scripts: { start: 'node server.js' }, dependencies: { amqplib: '^0.10' } }),
+      'api/server.js': "const amqp = require('amqplib')\namqp.connect(process.env.BROKER || 'amqp://rabbitmq:5672')\n",
+      'api/Dockerfile': 'FROM node:20\nCOPY . .\n',
+      'docker-compose.yml': 'services:\n  api:\n    build: api\n    depends_on:\n      - rabbitmq\n  rabbitmq:\n    image: rabbitmq:3-management\n',
+    }))
+    const links = linkRepositories([system('garage'), system('finance')]).filter((l) => l.kind !== 'data')
+    expect(links.map((l) => `${l.kind} ${l.from} → ${l.to}`).sort()).toEqual([
+      'address finance:unit:api → finance:service:rabbitmq', 'address garage:unit:api → garage:service:rabbitmq',
+      'runtime finance:unit:api → finance:service:rabbitmq', 'runtime garage:unit:api → garage:service:rabbitmq',
+    ])
+  })
+
+  it('leaves a folder to its Python project when its package.json holds tooling alone', () => {
+    const facts = extractRepository(repo('bakery', {
+      'requirements.txt': 'Django>=5.0\nwagtail>=7.0\n',
+      'manage.py': 'import os\n',
+      'package.json': JSON.stringify({ name: 'bakery', private: true, devDependencies: { eslint: '^9', prettier: '^3' }, scripts: { 'lint:js': 'eslint .', format: 'prettier --write .' } }),
+    }))
+    expect(facts.units.map((u) => [u.path, u.stack, u.kind])).toEqual([['.', 'python', 'app']])
+  })
 })
