@@ -137,8 +137,8 @@ export function tablesOf(sql: string): string[] {
   // A statement, not a caption: SELECT … FROM, INSERT INTO, UPDATE … SET, DELETE FROM, MERGE INTO, WITH … AS.
   if (!/^\s*\(?\s*(select\b[\s\S]*\bfrom\b|insert\s+into\b|update\s+\S+\s+set\b|delete\s+from\b|merge\s+into\b|with\s+\w+\s+as\b)/i.test(sql)) return []
   const out = new Set<string>()
-  for (const m of sql.matchAll(/\b(?:from|join|into|update|table)\s+\[?([A-Za-z_][\w$]*(?:\.\[?[A-Za-z_][\w$]*\]?)?)\]?/gi)) {
-    const name = m[1].replace(/[[\]]/g, '')
+  for (const m of sql.matchAll(/\b(?:from|join|into|update|table)\s+[[`"]?([A-Za-z_][\w$]*)[\]`"]?(?:\s*\.\s*[[`"]?([A-Za-z_][\w$]*)[\]`"]?)?/gi)) {
+    const name = m[2] ? `${m[1]}.${m[2]}` : m[1]
     if (!NOT_TABLES.has(name.toLowerCase())) out.add(name)
   }
   return [...out]
@@ -304,7 +304,9 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         const id = `${repo}:address:${unit.path}:${a.text}`
         if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(m.index!) })
       }
-      for (const table of tablesOf(literal)) {
+      // JPQL (a Spring Data @Query, createQuery) names entities, not tables.
+      const jpql = /\.(java|kt)$/.test(file) && /@Query\s*\(|\bcreateQuery\s*\(/.test(lineText) && !/nativeQuery\s*=\s*true/.test(lineText)
+      for (const table of jpql ? [] : tablesOf(literal)) {
         const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
         if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
       }

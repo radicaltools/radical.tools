@@ -9,6 +9,7 @@
 import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
+import { connectionOf } from './code'
 import { RepoFiles, dirOf, escapeRe, lineAt, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
@@ -73,6 +74,14 @@ function unitFor(units: Unit[], name: string, image: string | undefined, built: 
   return units.find((u) => [u.name, ...(u.aliases ?? []), u.path.split('/').pop() ?? ''].some((a) => names.includes(a.toLowerCase())))
 }
 
+/** The unit of those in the build's context that its Dockerfile builds or publishes (dotnet publish "X.csproj"). */
+function builtBy(dockerfile: string, units: Unit[], context: string): Unit | undefined {
+  const projects = [...dockerfile.matchAll(/^\s*RUN\s+dotnet\s+(?:publish|build)\s+"?(?:[^"\s]*\/)?([\w.-]+)\.(?:cs|fs|vb)proj"?/gmi)].map((m) => m[1].toLowerCase())
+  if (!projects.length) return undefined
+  const inside = units.filter((u) => context === '.' || u.path === context || u.path.startsWith(`${context}/`))
+  return inside.find((u) => projects.includes(u.name.toLowerCase()))
+}
+
 export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runtime {
   const services: ServiceFact[] = []
   const addresses: AddressFact[] = []
@@ -123,10 +132,19 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         const context = build !== null ? resolveFrom(dirOf(file), build) : null
         // Built from a Dockerfile in a unit's folder, though from the root's context.
         const built = context !== null && dockerfile ? dirOf(resolveFrom(context, dockerfile) ?? '') : context
-        const unit = unitFor(units, name, image, built)
+        // The project its Dockerfile builds, where the context holds several.
+        const dockerPath = context !== null ? resolveFrom(context, dockerfile ?? 'Dockerfile') : null
+        const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built)
         const dependsOn = Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object' ? Object.keys(def.depends_on) : []
         const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
         addAddresses(environment(def.environment), file, text, { service: s.id })
+        // A connection string in the environment of a service a unit runs: a database of that unit.
+        for (const value of unit ? environment(def.environment) : []) {
+          const db = connectionOf(value)
+          if (!db?.name || /[$%{}]/.test(db.name)) continue
+          const id = `${repo}:db:${unit!.path}:${db.engine}/${db.name}`
+          if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit!.id, engine: db.engine, name: db.name, ...(db.server ? { server: db.server.replace(/[,:]\d+$/, '') } : {}), evidence: { file, line: lineOf(text, value.slice(0, 40)) } })
+        }
       }
       continue
     }
@@ -172,7 +190,10 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       if (!file.endsWith('launchSettings.json')) addAddresses([text], file, text, { unit: u.id })
       // An environment's database (Laravel, Rails, Django settings by env): DB_CONNECTION and DB_DATABASE.
       const env = (key: string) => new RegExp(`^\\s*${key}\\s*=\\s*["']?([^"'\\s#]+)`, 'm').exec(text)
-      const kind = env('DB_CONNECTION')
+      // Laravel's default connection (config/database.php) stands in for a DB_CONNECTION the file lacks.
+      const settings = files.list.find((f) => f.startsWith(prefix) && /(^|\/)config\/database\.php$/i.test(f))
+      const laravel = settings ? /'default'\s*=>\s*env\(\s*'DB_CONNECTION'\s*,\s*'(\w+)'/.exec(files.read(settings)) : null
+      const kind = env('DB_CONNECTION') ?? laravel
       const name = env('DB_DATABASE')
       if (/\.env(\.[\w-]+)?$/.test(file) && kind && name) {
         const engine = ({ sqlsrv: 'SQL Server', mysql: 'MySQL', mariadb: 'MariaDB', pgsql: 'PostgreSQL', postgres: 'PostgreSQL', sqlite: 'SQLite', oracle: 'Oracle' } as Record<string, string>)[kind[1].toLowerCase()] ?? kind[1]
