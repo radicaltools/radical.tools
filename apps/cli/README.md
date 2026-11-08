@@ -607,7 +607,10 @@ cloned. For each repository it reads, from the files git lists:
   one unit listens on or publishes from compose, a gateway's `serviceId`, a
   Feign client's name); a Spring Cloud Config server's files are read as the
   configuration of the applications they are named for, its
-  `application.yml` as every client's; a VB6 socket's host and port and a
+  `application.yml` as every client's (a client library's settings only for
+  units depending on that library); a gRPC client a library's function makes
+  is a client of each unit calling that function; a migrator or seeder
+  another service depends on is no call of it; a VB6 socket's host and port and a
   connection string's server and database are followed through the
   constants, variables, record fields and INI settings that hold them;
 - data: the databases connection strings name (ADO and OLE DB, ODBC, JDBC,

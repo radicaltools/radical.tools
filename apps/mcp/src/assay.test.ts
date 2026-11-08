@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { POLYGLOT, legacy, shop } from '@radical/assay/fixtures'
@@ -51,15 +52,54 @@ const REQUIREMENTS = {
   ],
 }
 
+/** Three repositories of 30 npm packages each, every package depending on ten others of its repository. */
+function many(): string {
+  const dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'assay-many-'))), 'code')
+  for (const r of ['alpha', 'beta', 'gamma']) {
+    const root = join(dir, r)
+    for (let i = 0; i < 30; i++) {
+      const deps = Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`@${r}/package-with-a-long-name-${(i + k + 1) % 30}`, '*']))
+      mkdirSync(join(root, 'packages', `p${i}`), { recursive: true })
+      writeFileSync(join(root, 'packages', `p${i}`, 'package.json'), JSON.stringify({ name: `@${r}/package-with-a-long-name-${i}`, scripts: { start: 'node index.js' }, dependencies: deps }))
+    }
+    execFileSync('git', ['init', '-q'], { cwd: root })
+  }
+  return dir
+}
+
 describe('Radical Assay over MCP', () => {
+
+  it('answers assay_start in brief, gives the procedure apart, and pages the links by size', async () => {
+    const { call } = await central(many)
+    const started = await call('assay_start', { directories: ['../code'] })
+    expect(started.ok).toBe(true)
+    expect(started.text.length).toBeLessThan(20_000)
+    expect(started.text).toContain('  - … 5 more units (assay_facts with repository alpha, kind units)')
+    expect(started.text).toContain('  - 900 package, observed (assay_facts with kind links)')
+    expect((await call('assay_procedure')).text).toContain('2. C4 stage.')
+    const pages: number[] = []
+    for (let offset: number | undefined = 0; offset !== undefined;) {
+      const page = await call('assay_facts', { kind: 'links', offset })
+      expect(page.text.length).toBeLessThan(21_000)
+      const parsed = JSON.parse(page.text) as { facts: unknown[]; next?: number; total: number }
+      expect(parsed.total).toBe(900)
+      pages.push(parsed.facts.length)
+      offset = parsed.next
+    }
+    expect(pages.length).toBeGreaterThan(1)
+    expect(pages.reduce((a, b) => a + b, 0)).toBe(900)
+  })
   it('starts a run on a directory of repositories: facts per repository, links, the procedure', async () => {
     const { dir, call } = await central()
     const started = await call('assay_start', { directories: ['../shop'] })
     expect(started.ok).toBe(true)
     expect(started.text).toContain('Assay run on 3 repositories; the central model is .radical/model')
     expect(started.text).toContain(`  - ${WEB}: @storefront/web (npm app: it has a dev script; Node.js, React; tests with vitest)`)
-    expect(started.text).toContain(`link:http:${WEB}->${ORDERS}: ${WEB} → ${ORDERS}, http, inferred: GET /api/orders/{id}, POST /api/orders`)
-    expect(started.text).toContain('2. C4 stage.')
+    // The links are counted by kind; assay_facts lists them, and assay_procedure gives the steps.
+    expect(started.text).toMatch(/\n {2}- 1 http, inferred \(assay_facts with kind links\)\n/)
+    expect(started.text).toContain('Next: assay_procedure gives the steps, stage by stage.')
+    expect(JSON.parse((await call('assay_facts', { kind: 'links' })).text).facts.map((l: { id: string }) => l.id)).toContain(`link:http:${WEB}->${ORDERS}`)
+    expect((await call('assay_procedure')).text).toContain('2. C4 stage.')
     for (const repo of ['orders-service', 'shop-lib', 'storefront']) expect(existsSync(join(dir, repo, '.radical/assay/facts.json'))).toBe(true)
 
     const tests = JSON.parse((await call('assay_facts', { unit: WEB, kind: 'tests' })).text)
@@ -153,7 +193,7 @@ describe('Radical Assay over MCP', () => {
     const { dir, root, call, nodes, json } = await central(legacy)
     const started = await call('assay_start', { directories: ['../legacy'] })
     expect(started.text).toContain('billing-vb6 (../legacy/billing-vb6, no commit): 1 unit, 2 dependencies, 1 database, 1 table, 1 form, 1 entry point.')
-    expect(started.text).toContain('Code no reader covers (COBOL, Delphi, PowerBuilder')
+    expect((await call('assay_procedure')).text).toContain('Code no reader covers (COBOL, Delphi, PowerBuilder')
     const quote = { repository: 'billing-vb6', file: 'Billing.vbp', lines: [1, 8], text: 'ExeName32="Billing.exe"' }
     const plan = (text: string) => ({ plan: {
       elements: [

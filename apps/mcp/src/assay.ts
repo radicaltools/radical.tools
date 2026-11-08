@@ -60,7 +60,12 @@ function centralAddress(root: string): string | undefined {
 /** Links of loopback, link-local and private addresses are fetched only when the server runs with RADICAL_ASSAY_PRIVATE_LINKS=1. */
 const SOURCE_OPTIONS = { get allowPrivate() { return process.env.RADICAL_ASSAY_PRIVATE_LINKS === '1' } }
 
-/** The whole flow, for assay_start's answer and the `assay` prompt. */
+/** The longest answer of assay_start and the size of a page of assay_facts, in characters: an agent's client keeps a
+ *  longer tool answer out of its view. */
+const START_MAX = 18_000
+const PAGE_MAX = 20_000
+
+/** The whole flow, for assay_procedure's answer and the `assay` prompt. */
 export const ASSAY_PROCEDURE = [
   'Radical Assay finds the model in existing code, new or old (npm, Maven, Gradle, Go, .NET, Python, VB6, Dockerfiles; docker-compose,',
   'Kubernetes, Aspire; OpenAPI, gRPC; connection strings, SQL and ORM classes): C4 elements from the repositories\' units and the links',
@@ -68,14 +73,15 @@ export const ASSAY_PROCEDURE = [
   'lifecycles of what it keeps from its statuses, then requirements with the scenarios that verify them from the tests or the code,',
   'and those the documents state that no test checks. This server\'s model folder is the central model; the code is in local directories',
   '(repositories already cloned, folders, .zip files), the documentation in folders, .zip files or public links.',
-  '1. (Done when you read this in assay_start\'s answer: go on with step 2.) Ask the user for the code repositories\' directories (a directory that holds several repositories stands for each of them;',
+  '1. (Done once assay_start has answered: go on with step 2.) Ask the user for the code repositories\' directories (a directory that holds several repositories stands for each of them;',
   '   a folder of code with no .git, or a .zip file of code, is one too) and, when their test reports are not in each',
   '   repository\'s reports/, where they are. Ask also for documentation: folders, .zip files or public links (pages behind a',
   '   login: the user exports them, as PDF, HTML or Markdown, into a folder or a .zip). Then assay_start with directories and',
   '   sources; more documentation can come later with assay_add_sources.',
   '2. C4 stage. Read what assay_start lists: per repository its units (stack, app, library or tests), the services its',
   '   deployment runs (docker-compose, Kubernetes, Aspire), its databases, its groups (a .sln, a VB6 .vbg), then the links',
-  '   (package and project references, http, gRPC, addresses, depends_on, data). assay_facts gives a repository\'s or a',
+  '   (package and project references, http, gRPC, addresses, depends_on, data), counted by kind: assay_facts lists them (kind',
+  '   links), a page at a time, and gives a repository\'s or a',
   '   unit\'s details; assay_read lists a folder\'s files and reads a file\'s lines; assay_search finds the lines that hold a text. search_model for what the central model',
   '   already holds; get_model_summary for the types it allows. Propose to the user how the units group into software',
   '   systems (a group, a deployment, a product name or the documents hint at it; one system unless the code or the',
@@ -481,7 +487,7 @@ const PLAN_SCHEMA = {
 export const ASSAY_TOOL_DEFS: ToolDef[] = [
   {
     name: 'assay_start',
-    description: 'Start a Radical Assay run (replacing any earlier run): find the model in existing code. Reads the facts of the code repositories in the directories given (units of every stack Assay reads, their dependencies, deployments, APIs, addresses, databases, documents, tests from reports), each with its file and line, writes them to each repository\'s .radical/assay/facts.json, links the units across repositories, takes the sources of documents given, and returns what it found and the steps. The model this server is bound to is the central model.',
+    description: 'Start a Radical Assay run (replacing any earlier run): find the model in existing code. Reads the facts of the code repositories in the directories given (units of every stack Assay reads, their dependencies, deployments, APIs, addresses, databases, documents, tests from reports), each with its file and line, writes them to each repository\'s .radical/assay/facts.json, links the units across repositories, takes the sources of documents given, and returns what it found in brief (assay_facts gives the rest, assay_procedure the steps). The model this server is bound to is the central model.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -492,6 +498,11 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
       required: ['directories'],
       additionalProperties: false,
     },
+  },
+  {
+    name: 'assay_procedure',
+    description: 'The steps of a Radical Assay run, stage by stage, from the C4 model to the requirements: what to read, what to ask the user and what to hand back as a plan. Read it once assay_start has answered.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'assay_add_sources',
@@ -571,7 +582,7 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
         unit: { type: 'string', description: 'A unit fact\'s id.' },
         kind: { type: 'string', enum: [...FACT_LISTS, 'links'] },
         offset: { type: 'number' },
-        limit: { type: 'number', description: 'Default 200.' },
+        limit: { type: 'number', description: 'At most this many (default 200); a page holds about 20 KB at most, and says where the next starts.' },
       },
       additionalProperties: false,
     },
@@ -718,6 +729,7 @@ export class Assay {
 
   async call(name: string, input: unknown, ctx: ToolRunContext, facade: ModelFacade): Promise<AssayResult> {
     if (name === 'assay_start') return this.start(input)
+    if (name === 'assay_procedure') return ok(ASSAY_PROCEDURE, { readOnly: true })
     const run = this.run
     if (!run) return refused(`${name}: no Assay run; start one with assay_start`)
     if (name === 'assay_facts') return this.factsOf(run, input)
@@ -809,12 +821,13 @@ export class Assay {
       ...repositories.filter((r) => !isRepository(r.dir)).map((r) => `${r.repository} is no git repository: nothing is written into it (its facts: ${posix(relative(root, factsFileOf(r.dir, r.repository, root)))}).`),
       ...taken.problems.map((p) => `Source not taken: ${p}`),
       '',
-      ...describeFacts(repositories, links, root),
+      ...describeFacts(repositories, links, root, true),
       ...(taken.sources.length ? ['', 'Sources:', ...describeSources(taken.sources, root)] : []),
-      '',
-      ASSAY_PROCEDURE,
     ]
-    return ok(lines.join('\n'), { readOnly: true })
+    // An agent's client keeps a long answer out of its view: the rest is a call of assay_facts away.
+    const text = lines.join('\n')
+    const cut = text.length > START_MAX ? `${text.slice(0, text.lastIndexOf('\n', START_MAX))}\n… (the rest: assay_facts per repository)` : text
+    return ok(`${cut}\n\nNext: assay_procedure gives the steps, stage by stage.`, { readOnly: true })
   }
 
   private async addSources(run: Run, input: unknown): Promise<AssayResult> {
@@ -975,7 +988,14 @@ export class Assay {
       }
     }
     const from = Math.max(0, offset ?? 0)
-    const page = rows.slice(from, from + Math.max(1, limit ?? 200))
+    // At most `limit` facts, and about PAGE_MAX characters of them (at least one).
+    const page: typeof rows = []
+    let size = 0
+    for (const row of rows.slice(from, from + Math.max(1, limit ?? 200))) {
+      size += JSON.stringify(row).length + 1
+      if (page.length && size > PAGE_MAX) break
+      page.push(row)
+    }
     return ok(JSON.stringify({ total: rows.length, offset: from, facts: page, ...(from + page.length < rows.length ? { next: from + page.length } : {}) }), { readOnly: true })
   }
 

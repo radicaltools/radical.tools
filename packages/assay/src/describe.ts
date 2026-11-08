@@ -24,8 +24,16 @@ const domainLines = (r: RepositoryFacts): string[] => {
 
 const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`
 
-/** The repositories' facts and the links, with folders shown from `from`. */
-export function describeFacts(repositories: RepositoryFacts[], links: Link[], from: string): string[] {
+/** At most this many units, services and databases of a repository are named in a brief description. */
+const BRIEF = 25
+
+/** The repositories' facts and the links, with folders shown from `from`; `brief`: each repository's first units,
+ *  services and databases, and the links counted by kind (an agent's client keeps a long answer out of its view). */
+export function describeFacts(repositories: RepositoryFacts[], links: Link[], from: string, brief = false): string[] {
+  const first = <T>(list: T[], kind: string, repository: string): Array<T | string> =>
+    brief && list.length > BRIEF ? [...list.slice(0, BRIEF), `  - … ${list.length - BRIEF} more ${kind} (assay_facts with repository ${repository}, kind ${kind})`] : list
+  const kinds = new Map<string, number>()
+  for (const l of links) kinds.set(`${l.kind}, ${l.confidence}`, (kinds.get(`${l.kind}, ${l.confidence}`) ?? 0) + 1)
   return [
     ...repositories.flatMap((r) => [
       `${r.repository} (${relative(from, r.dir) || '.'}${r.commit ? `, ${r.commit.slice(0, 7)}` : ', no commit'}): ${[
@@ -34,16 +42,16 @@ export function describeFacts(repositories: RepositoryFacts[], links: Link[], fr
         count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'),
         count(r.states.length, 'status', 'statuses'), count(r.screens.length, 'form'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
       ].filter((c, i) => i === 0 || !c.startsWith('0 ')).join(', ')}.`,
-      ...r.units.map(unitLine),
-      ...r.services.map((s) => `  - ${s.id}: ${s.role}${s.image ? ` ${s.image}` : ''}${s.unit ? `, runs ${s.unit}` : ''}`),
-      ...r.databases.map((d) => `  - ${d.id}: ${d.engine}${d.server ? ` on ${d.server}` : ''}${d.name ? `, ${d.name}` : ''}`),
+      ...first(r.units, 'units', r.repository).map((u) => (typeof u === 'string' ? u : unitLine(u))),
+      ...first(r.services, 'services', r.repository).map((s) => (typeof s === 'string' ? s : `  - ${s.id}: ${s.role}${s.image ? ` ${s.image}` : ''}${s.unit ? `, runs ${s.unit}` : ''}`)),
+      ...first(r.databases, 'databases', r.repository).map((d) => (typeof d === 'string' ? d : `  - ${d.id}: ${d.engine}${d.server ? ` on ${d.server}` : ''}${d.name ? `, ${d.name}` : ''}`)),
       ...r.groups.map((g) => `  - ${g.id}: ${g.name} (${g.units.length} units)`),
-      ...domainLines(r),
-      ...r.notes.map((n) => `  ! ${n}`),
+      ...(brief ? [] : domainLines(r)),
+      ...(brief && r.notes.length > BRIEF ? [...r.notes.slice(0, BRIEF).map((n) => `  ! ${n}`), `  ! … ${r.notes.length - BRIEF} more notes (in its facts file)`] : r.notes.map((n) => `  ! ${n}`)),
     ]),
     '',
     `Links (${links.length}):`,
-    ...links.map((l) => `  - ${l.id}: ${l.from} → ${l.to}, ${l.kind}, ${l.confidence}: ${l.detail}`),
+    ...(brief ? [...kinds].map(([k, n]) => `  - ${n} ${k} (assay_facts with kind links)`) : links.map((l) => `  - ${l.id}: ${l.from} → ${l.to}, ${l.kind}, ${l.confidence}: ${l.detail}`)),
   ]
 }
 
