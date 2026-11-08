@@ -1150,324 +1150,10 @@
         ]
       ],
       "optional": []
-    }
-  ],
-  "heldOut": [
-    {
-      "name": "robot-shop",
-      "url": "https://github.com/instana/robot-shop.git",
-      "commit": "55292e2199f2fb00a165b1f7d3045fe7f8922038",
-      "stacks": "Node.js, Java, Python, Go, PHP, nginx; MongoDB, MySQL, Redis, RabbitMQ; docker-compose",
-      "units": [
-        "web",
-        "catalogue",
-        "user",
-        "cart",
-        "shipping",
-        "ratings",
-        "payment",
-        "dispatch",
-        "load-gen",
-        "mongo",
-        "mysql"
-      ],
-      "calls": [
-        [
-          "web",
-          "catalogue"
-        ],
-        [
-          "web",
-          "user"
-        ],
-        [
-          "web",
-          "cart"
-        ],
-        [
-          "web",
-          "shipping"
-        ],
-        [
-          "web",
-          "payment"
-        ],
-        [
-          "web",
-          "ratings"
-        ],
-        [
-          "catalogue",
-          "mongo"
-        ],
-        [
-          "user",
-          "mongo"
-        ],
-        [
-          "user",
-          "service:redis"
-        ],
-        [
-          "cart",
-          "service:redis"
-        ],
-        [
-          "cart",
-          "catalogue"
-        ],
-        [
-          "shipping",
-          "mysql"
-        ],
-        [
-          "shipping",
-          "cart"
-        ],
-        [
-          "ratings",
-          "mysql"
-        ],
-        [
-          "ratings",
-          "catalogue"
-        ],
-        [
-          "payment",
-          "cart"
-        ],
-        [
-          "payment",
-          "user"
-        ],
-        [
-          "payment",
-          "service:rabbitmq"
-        ],
-        [
-          "dispatch",
-          "service:rabbitmq"
-        ],
-        [
-          "load-gen",
-          "web"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "eShop",
-      "url": "https://github.com/dotnet/eShop.git",
-      "commit": "913acea66708a59595351174cee9b29f37179d29",
-      "stacks": ".NET 9, Aspire, Blazor, gRPC, RabbitMQ, PostgreSQL, Redis",
-      "judge": "runtime",
-      "units": [
-        "src/Basket.API",
-        "src/Catalog.API",
-        "src/Identity.API",
-        "src/OrderProcessor",
-        "src/Ordering.API",
-        "src/PaymentProcessor",
-        "src/WebApp",
-        "src/WebhookClient",
-        "src/Webhooks.API"
-      ],
-      "calls": [
-        [
-          "src/WebApp",
-          "src/Basket.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Catalog.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Ordering.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Identity.API"
-        ],
-        [
-          "src/Basket.API",
-          "service:redis"
-        ],
-        [
-          "src/Basket.API",
-          "service:eventbus"
-        ],
-        [
-          "src/Catalog.API",
-          "db:catalogdb"
-        ],
-        [
-          "src/Catalog.API",
-          "service:eventbus"
-        ],
-        [
-          "src/Ordering.API",
-          "db:orderingdb"
-        ],
-        [
-          "src/Ordering.API",
-          "service:eventbus"
-        ],
-        [
-          "src/OrderProcessor",
-          "db:orderingdb"
-        ],
-        [
-          "src/OrderProcessor",
-          "service:eventbus"
-        ],
-        [
-          "src/PaymentProcessor",
-          "service:eventbus"
-        ],
-        [
-          "src/Webhooks.API",
-          "db:webhooksdb"
-        ],
-        [
-          "src/Webhooks.API",
-          "service:eventbus"
-        ],
-        [
-          "src/WebhookClient",
-          "src/Webhooks.API"
-        ],
-        [
-          "src/Identity.API",
-          "db:identitydb"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "sockshop",
-      "about": "Several repositories: one per service, and microservices-demo deploying them. Written down from Sock Shop's architecture before Assay first ran on it.",
-      "repositories": [
-        {
-          "name": "front-end",
-          "url": "https://github.com/microservices-demo/front-end.git",
-          "commit": "52dee656f4423be041619bbb090205f912e00113"
-        },
-        {
-          "name": "catalogue",
-          "url": "https://github.com/microservices-demo/catalogue.git",
-          "commit": "925e08ee17c28b94b87160e1ae5e03da7f61cf84"
-        },
-        {
-          "name": "carts",
-          "url": "https://github.com/microservices-demo/carts.git",
-          "commit": "f4e80051668c6a83359c41b03a27baefa590adc8"
-        },
-        {
-          "name": "orders",
-          "url": "https://github.com/microservices-demo/orders.git",
-          "commit": "546a10c92d1ff9998c21f3849f5b95a0f14430a0"
-        },
-        {
-          "name": "user",
-          "url": "https://github.com/microservices-demo/user.git",
-          "commit": "e1a79e77860734cacc3f64cabff1487e22a442a4"
-        },
-        {
-          "name": "payment",
-          "url": "https://github.com/microservices-demo/payment.git",
-          "commit": "384e33447dda5334187517dda09566c9a17fd6af"
-        },
-        {
-          "name": "shipping",
-          "url": "https://github.com/microservices-demo/shipping.git",
-          "commit": "9c0fbfa31895dd029d44d3434de93f64cd71f87b"
-        },
-        {
-          "name": "queue-master",
-          "url": "https://github.com/microservices-demo/queue-master.git",
-          "commit": "7dc33721c765e5af415c9d244d84637ff2d510cd"
-        },
-        {
-          "name": "microservices-demo",
-          "url": "https://github.com/microservices-demo/microservices-demo.git",
-          "commit": "9dff06fae4981921caec6a62393a6ebfce4b3e3f"
-        }
-      ],
-      "stacks": "Node.js, Go, Java (Maven, Spring Boot); MySQL, MongoDB, RabbitMQ; docker-compose, Kubernetes; one repository per service",
-      "units": [
-        "front-end",
-        "catalogue",
-        "carts",
-        "orders",
-        "user",
-        "payment",
-        "shipping",
-        "queue-master"
-      ],
-      "calls": [
-        [
-          "front-end",
-          "catalogue"
-        ],
-        [
-          "front-end",
-          "carts"
-        ],
-        [
-          "front-end",
-          "orders"
-        ],
-        [
-          "front-end",
-          "user"
-        ],
-        [
-          "orders",
-          "payment"
-        ],
-        [
-          "orders",
-          "user"
-        ],
-        [
-          "orders",
-          "carts"
-        ],
-        [
-          "orders",
-          "shipping"
-        ],
-        [
-          "shipping",
-          "service:rabbitmq"
-        ],
-        [
-          "queue-master",
-          "service:rabbitmq"
-        ],
-        [
-          "catalogue",
-          "service:catalogue-db"
-        ],
-        [
-          "carts",
-          "service:carts-db"
-        ],
-        [
-          "orders",
-          "service:orders-db"
-        ],
-        [
-          "user",
-          "service:user-db"
-        ]
-      ],
-      "optional": []
     },
     {
       "name": "BookStack",
-      "about": "BookStack is a self-hosted documentation and wiki platform: one Laravel (PHP) application whose root folder holds both its Composer manifest and the npm manifest that builds its front-end assets, storing everything in a MySQL/MariaDB database. Its database name comes from .env.example, a placeholder (database_database) the installer replaces. Written down on 2026-11-07 from its README, docs, manifests, configuration and migrations, before Assay first ran on it; held out: no rule is tuned on it.",
+      "about": "BookStack is a self-hosted documentation and wiki platform: one Laravel (PHP) application whose root folder holds both its Composer manifest and the npm manifest that builds its front-end assets, storing everything in a MySQL/MariaDB database. Its database name comes from .env.example, a placeholder (database_database) the installer replaces. Written down on 2026-11-07 from its README, docs, manifests, configuration and migrations, before Assay first ran on it; held out at first (units 50/53, calls 16/52, tables 40/100 for the four); the readers were tuned on it since.",
       "url": "https://github.com/BookStackApp/BookStack.git",
       "commit": "0b6b667e0d84ebb3406de6de9fadbf4230c29c0b",
       "stacks": "PHP 8.3+, Laravel 13, MySQL/MariaDB, TypeScript/JavaScript (esbuild, Sass, Jest), Docker Compose (dev)",
@@ -1552,7 +1238,7 @@
     },
     {
       "name": "spring-petclinic",
-      "about": "Spring PetClinic, the canonical Spring Boot sample: one server-rendered web app (Spring MVC, Thymeleaf, Spring Data JPA) built with Maven or Gradle, using an in-memory H2 database by default and MySQL or PostgreSQL (database petclinic) under the mysql and postgres profiles, with docker-compose services for both databases and Kubernetes manifests with a PostgreSQL deployment. Written down on 2026-11-07 from its README, build files, configuration and schema, before Assay first ran on it; held out: no rule is tuned on it.",
+      "about": "Spring PetClinic, the canonical Spring Boot sample: one server-rendered web app (Spring MVC, Thymeleaf, Spring Data JPA) built with Maven or Gradle, using an in-memory H2 database by default and MySQL or PostgreSQL (database petclinic) under the mysql and postgres profiles, with docker-compose services for both databases and Kubernetes manifests with a PostgreSQL deployment. Written down on 2026-11-07 from its README, build files, configuration and schema, before Assay first ran on it; held out at first (units 50/53, calls 16/52, tables 40/100 for the four); the readers were tuned on it since.",
       "url": "https://github.com/spring-projects/spring-petclinic.git",
       "commit": "500158f732419217507c7656904b8e6aa1bcc0d6",
       "stacks": "Java 17, Spring Boot 4.1 (Web MVC, Data JPA, Thymeleaf, Validation, Cache/Caffeine, Actuator), Maven, Gradle, H2, MySQL, PostgreSQL, Docker Compose, Kubernetes",
@@ -1591,7 +1277,7 @@
     },
     {
       "name": "modular-monolith-with-ddd",
-      "about": "MyMeetings, a .NET 8 modular monolith with DDD: an ASP.NET Core API host over five modules (Administration, Meetings, Payments, Registrations, UserAccess), each split into Domain, Application, Infrastructure and IntegrationEvents projects, shared BuildingBlocks, and one SQL Server database MyMeetings with a schema per module, kept as an SSDT database project and DbUp migrations run by a DatabaseMigrator console app. Written down on 2026-11-07 from its README, docs, project files, configuration and SQL, before Assay first ran on it; held out: no rule is tuned on it.",
+      "about": "MyMeetings, a .NET 8 modular monolith with DDD: an ASP.NET Core API host over five modules (Administration, Meetings, Payments, Registrations, UserAccess), each split into Domain, Application, Infrastructure and IntegrationEvents projects, shared BuildingBlocks, and one SQL Server database MyMeetings with a schema per module, kept as an SSDT database project and DbUp migrations run by a DatabaseMigrator console app. Written down on 2026-11-07 from its README, docs, project files, configuration and SQL, before Assay first ran on it; held out at first (units 50/53, calls 16/52, tables 40/100 for the four); the readers were tuned on it since.",
       "url": "https://github.com/kgrzybek/modular-monolith-with-ddd.git",
       "commit": "91c8ef24b4cb6ef558c95d8267fa07d68c7059f8",
       "stacks": "C# / .NET 8, ASP.NET Core, Autofac, MediatR, EF Core + Dapper, SQL Server (SSDT sqlproj, MSBuild.Sdk.SqlProj, DbUp), SQL Stream Store, Quartz.NET, IdentityServer4, NUnit + NetArchTest, NUKE build, Docker Compose",
@@ -2116,7 +1802,7 @@
     },
     {
       "name": "node-express-realworld-example-app",
-      "about": "RealWorld (Conduit) backend API in Node.js/TypeScript with Express and Prisma, built as an Nx workspace with one API project and one e2e test project; it stores its data in PostgreSQL through Prisma. Written down on 2026-11-07 from its README, manifests, configuration and Prisma schema, before Assay first ran on it; held out: no rule is tuned on it.",
+      "about": "RealWorld (Conduit) backend API in Node.js/TypeScript with Express and Prisma, built as an Nx workspace with one API project and one e2e test project; it stores its data in PostgreSQL through Prisma. Written down on 2026-11-07 from its README, manifests, configuration and Prisma schema, before Assay first ran on it; held out at first (units 50/53, calls 16/52, tables 40/100 for the four); the readers were tuned on it since.",
       "url": "https://github.com/gothinkster/node-express-realworld-example-app.git",
       "commit": "30b68e1e881462b2f4164ea09ab4c4f5699c7b0b",
       "stacks": "Node.js, TypeScript, Express, Prisma, PostgreSQL, Nx, Jest, Docker",
@@ -2145,6 +1831,320 @@
         "_userfavorites",
         "_userfollows"
       ]
+    }
+  ],
+  "heldOut": [
+    {
+      "name": "robot-shop",
+      "url": "https://github.com/instana/robot-shop.git",
+      "commit": "55292e2199f2fb00a165b1f7d3045fe7f8922038",
+      "stacks": "Node.js, Java, Python, Go, PHP, nginx; MongoDB, MySQL, Redis, RabbitMQ; docker-compose",
+      "units": [
+        "web",
+        "catalogue",
+        "user",
+        "cart",
+        "shipping",
+        "ratings",
+        "payment",
+        "dispatch",
+        "load-gen",
+        "mongo",
+        "mysql"
+      ],
+      "calls": [
+        [
+          "web",
+          "catalogue"
+        ],
+        [
+          "web",
+          "user"
+        ],
+        [
+          "web",
+          "cart"
+        ],
+        [
+          "web",
+          "shipping"
+        ],
+        [
+          "web",
+          "payment"
+        ],
+        [
+          "web",
+          "ratings"
+        ],
+        [
+          "catalogue",
+          "mongo"
+        ],
+        [
+          "user",
+          "mongo"
+        ],
+        [
+          "user",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "catalogue"
+        ],
+        [
+          "shipping",
+          "mysql"
+        ],
+        [
+          "shipping",
+          "cart"
+        ],
+        [
+          "ratings",
+          "mysql"
+        ],
+        [
+          "ratings",
+          "catalogue"
+        ],
+        [
+          "payment",
+          "cart"
+        ],
+        [
+          "payment",
+          "user"
+        ],
+        [
+          "payment",
+          "service:rabbitmq"
+        ],
+        [
+          "dispatch",
+          "service:rabbitmq"
+        ],
+        [
+          "load-gen",
+          "web"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "eShop",
+      "url": "https://github.com/dotnet/eShop.git",
+      "commit": "913acea66708a59595351174cee9b29f37179d29",
+      "stacks": ".NET 9, Aspire, Blazor, gRPC, RabbitMQ, PostgreSQL, Redis",
+      "judge": "runtime",
+      "units": [
+        "src/Basket.API",
+        "src/Catalog.API",
+        "src/Identity.API",
+        "src/OrderProcessor",
+        "src/Ordering.API",
+        "src/PaymentProcessor",
+        "src/WebApp",
+        "src/WebhookClient",
+        "src/Webhooks.API"
+      ],
+      "calls": [
+        [
+          "src/WebApp",
+          "src/Basket.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Catalog.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Ordering.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Identity.API"
+        ],
+        [
+          "src/Basket.API",
+          "service:redis"
+        ],
+        [
+          "src/Basket.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Catalog.API",
+          "db:catalogdb"
+        ],
+        [
+          "src/Catalog.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Ordering.API",
+          "db:orderingdb"
+        ],
+        [
+          "src/Ordering.API",
+          "service:eventbus"
+        ],
+        [
+          "src/OrderProcessor",
+          "db:orderingdb"
+        ],
+        [
+          "src/OrderProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/PaymentProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/Webhooks.API",
+          "db:webhooksdb"
+        ],
+        [
+          "src/Webhooks.API",
+          "service:eventbus"
+        ],
+        [
+          "src/WebhookClient",
+          "src/Webhooks.API"
+        ],
+        [
+          "src/Identity.API",
+          "db:identitydb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "sockshop",
+      "about": "Several repositories: one per service, and microservices-demo deploying them. Written down from Sock Shop's architecture before Assay first ran on it.",
+      "repositories": [
+        {
+          "name": "front-end",
+          "url": "https://github.com/microservices-demo/front-end.git",
+          "commit": "52dee656f4423be041619bbb090205f912e00113"
+        },
+        {
+          "name": "catalogue",
+          "url": "https://github.com/microservices-demo/catalogue.git",
+          "commit": "925e08ee17c28b94b87160e1ae5e03da7f61cf84"
+        },
+        {
+          "name": "carts",
+          "url": "https://github.com/microservices-demo/carts.git",
+          "commit": "f4e80051668c6a83359c41b03a27baefa590adc8"
+        },
+        {
+          "name": "orders",
+          "url": "https://github.com/microservices-demo/orders.git",
+          "commit": "546a10c92d1ff9998c21f3849f5b95a0f14430a0"
+        },
+        {
+          "name": "user",
+          "url": "https://github.com/microservices-demo/user.git",
+          "commit": "e1a79e77860734cacc3f64cabff1487e22a442a4"
+        },
+        {
+          "name": "payment",
+          "url": "https://github.com/microservices-demo/payment.git",
+          "commit": "384e33447dda5334187517dda09566c9a17fd6af"
+        },
+        {
+          "name": "shipping",
+          "url": "https://github.com/microservices-demo/shipping.git",
+          "commit": "9c0fbfa31895dd029d44d3434de93f64cd71f87b"
+        },
+        {
+          "name": "queue-master",
+          "url": "https://github.com/microservices-demo/queue-master.git",
+          "commit": "7dc33721c765e5af415c9d244d84637ff2d510cd"
+        },
+        {
+          "name": "microservices-demo",
+          "url": "https://github.com/microservices-demo/microservices-demo.git",
+          "commit": "9dff06fae4981921caec6a62393a6ebfce4b3e3f"
+        }
+      ],
+      "stacks": "Node.js, Go, Java (Maven, Spring Boot); MySQL, MongoDB, RabbitMQ; docker-compose, Kubernetes; one repository per service",
+      "units": [
+        "front-end",
+        "catalogue",
+        "carts",
+        "orders",
+        "user",
+        "payment",
+        "shipping",
+        "queue-master"
+      ],
+      "calls": [
+        [
+          "front-end",
+          "catalogue"
+        ],
+        [
+          "front-end",
+          "carts"
+        ],
+        [
+          "front-end",
+          "orders"
+        ],
+        [
+          "front-end",
+          "user"
+        ],
+        [
+          "orders",
+          "payment"
+        ],
+        [
+          "orders",
+          "user"
+        ],
+        [
+          "orders",
+          "carts"
+        ],
+        [
+          "orders",
+          "shipping"
+        ],
+        [
+          "shipping",
+          "service:rabbitmq"
+        ],
+        [
+          "queue-master",
+          "service:rabbitmq"
+        ],
+        [
+          "catalogue",
+          "service:catalogue-db"
+        ],
+        [
+          "carts",
+          "service:carts-db"
+        ],
+        [
+          "orders",
+          "service:orders-db"
+        ],
+        [
+          "user",
+          "service:user-db"
+        ]
+      ],
+      "optional": []
     }
   ]
 }
