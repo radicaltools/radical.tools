@@ -376,14 +376,12 @@ root Go module claiming the services' main packages. Fixed: calls 80/82
 
 - **A held-out set again.** Only robot-shop, eShop and sockshop are held
   out, all seen; the next round needs new repositories.
-- **A client in a shared library.** wild-workouts' trainings calls trainer
-  and users over gRPC through `internal/common/client`, whose addresses come
-  from one `.env` every service loads: the call belongs to the unit that
-  calls the library's function, which Assay does not follow.
-- **Shared settings are not all used.** A config server's `application.yml`
-  gives every client the broker's and the auth server's addresses, so
-  piggymetrics' registry and gateway read as calling RabbitMQ (8 calls not
-  stated); a setting counts whether or not the unit has the client library.
+- ~~**A client in a shared library.**~~ Done: a gRPC client a library's
+  function makes is a client of each unit that imports the library and calls
+  the function (wild-workouts' trainings → trainer, users).
+- ~~**Shared settings are not all used.**~~ Done: a client library's setting
+  a config server shares counts only for units depending on the library
+  (piggymetrics' 8 calls not stated are gone).
 - **Published ports link more.** eShopOnWeb's BlazorAdmin and PublicApi now
   call Web through `host.docker.internal:5106`, the port Web publishes: true
   for BlazorAdmin (it reads `/User`), a CORS origin for PublicApi; the bench
@@ -417,8 +415,8 @@ bench does not list, and eShop's root package.json. Open:
   is `/quality/deviations/register`), and routes are URL paths, not APIs.
 - **Stale scripts.** A schema script nothing runs (InitializeDatabase.sql
   beside the database project) still counts as a schema.
-- **depends_on is no call.** A compose service waiting for a migrator reads
-  as a call of it.
+- ~~**depends_on is no call.**~~ Done: a migrator, a seeder or a service
+  waited for until it completes is no call.
 
 ### Dogfooding (2026-11-07): VB6 repositories held out
 

@@ -10,7 +10,7 @@ import { extname } from 'node:path'
 import { addressesIn } from './runtime'
 import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
-import { springConfigOwners } from './spring'
+import { settingsFor, springConfigOwners } from './spring'
 import { inlineValues, vbValues, type VbValues } from './values'
 
 const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.scala', '.fs'])
@@ -214,7 +214,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     const config = CONFIG.test(file)
     if (!SOURCE.has(ext) && !config) continue
     if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config)) continue
-    let text = files.read(file)
+    let text = configures.has(file) ? settingsFor(files, file, unit) : files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
     const vb = VB_CODE.test(file)
@@ -410,6 +410,22 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       const id = `${repo}:db:${unit.path}:Access/${n.name.toLowerCase()}`
       if (out.databases.some((d) => d.unit === unitId && d.engine === 'Access' && d.name?.toLowerCase() === n.name.toLowerCase())) continue
       out.databases.push({ id, unit: unitId, engine: 'Access', name: n.name, evidence: n.evidence })
+    }
+  }
+  // A gRPC client a library's function makes is a client of each unit that imports the library and calls that function.
+  for (const c of [...out.clients]) {
+    const library = units.find((u) => u.id === c.unit)
+    if (!library || library.kind !== 'library' || library.named === false) continue
+    const before = files.read(c.evidence.file).split('\n').slice(0, c.evidence.line).join('\n')
+    const fn = [...before.matchAll(/^\s*(?:func\s+(?:\([^)]*\)\s*)?|(?:export\s+)?(?:async\s+)?function\s+|def\s+)([A-Za-z_]\w*)\s*\(/gm)].pop()?.[1]
+    if (!fn) continue
+    for (const file of files.list) {
+      const unit = owner(units, file)
+      if (!unit || unit.id === library.id || !SOURCE.has(extname(file).toLowerCase()) || TEST_FILE.test(file) || GENERATED.test(file)) continue
+      const text = files.read(file)
+      const call = text.includes(library.name) ? new RegExp(`\\b${escapeRe(fn)}\\s*\\(`).exec(text) : null
+      const id = `${repo}:client:${unit.path}:${c.service}`
+      if (call && once(id)) out.clients.push({ id, unit: unit.id, service: c.service, evidence: { file, line: lineAt(text, call.index) } })
     }
   }
   // A nameless SQL Server, ODBC or MySQL connection, where the repository's SQL scripts name one database (USE, CREATE

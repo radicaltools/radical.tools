@@ -10,7 +10,7 @@ import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
 import { connectionOf } from './code'
-import { springConfigOwners } from './spring'
+import { settingsFor, springConfigOwners } from './spring'
 import { RepoFiles, dirOf, escapeRe, lineAt, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
@@ -141,7 +141,9 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         const dockerPath = context !== null ? resolveFrom(context, dockerfile ?? 'Dockerfile') : null
         const mounted = (Array.isArray(def.volumes) ? def.volumes : []).filter((v): v is string => typeof v === 'string' && /^\.{1,2}(\/|:)/.test(v)).map((v) => resolveFrom(dirOf(file), v.split(':')[0])).filter((v): v is string => !!v && v !== '.')
         const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built, mounted)
-        const dependsOn = Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object' ? Object.keys(def.depends_on) : []
+        // A service waited for until it completes (condition: service_completed_successfully) runs before, not for, this one.
+        const dependsOn = Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object'
+          ? Object.entries(def.depends_on as Record<string, { condition?: unknown } | null>).filter(([, d]) => d?.condition !== 'service_completed_successfully').map(([n]) => n) : []
         const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
         // The ports it publishes on this machine ("127.0.0.1:3002:8080", "8080:80", { published: 8080 }).
         for (const p of Array.isArray(def.ports) ? def.ports : []) {
@@ -198,7 +200,7 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       ...[...configures].filter(([, configured]) => configured.includes(u)).map(([f]) => f),
     ]
     for (const file of configs) {
-      const text = files.read(file)
+      const text = configures.has(file) ? settingsFor(files, file, u) : files.read(file)
       const springName = /spring\.application\.name\s*[=:]\s*([\w.-]+)/.exec(text)?.[1] ?? (() => {
         try { return ((load(text) as { spring?: { application?: { name?: unknown } } })?.spring?.application?.name as string | undefined) } catch { return undefined }
       })()

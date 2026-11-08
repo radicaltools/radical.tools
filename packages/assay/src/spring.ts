@@ -21,6 +21,44 @@ function setting(text: string, key: string): string | undefined {
   } catch { return undefined }
 }
 
+/** Settings a client library reads, by their key, and the dependencies that bring the library. */
+const LIBRARY_SETTINGS: Array<[RegExp, RegExp]> = [
+  [/^spring\.rabbitmq\b/, /amqp|rabbit/i],
+  [/^spring\.(data\.)?mongodb\b/, /mongo/i],
+  [/^spring\.(data\.)?redis\b/, /redis/i],
+  [/^spring\.kafka\b/, /kafka/i],
+  [/^spring\.datasource\b/, /jdbc|jpa|r2dbc|mybatis|hibernate/i],
+  [/^eureka\.client\b/, /eureka/i],
+  [/^(spring\.)?security\.oauth2\b/, /oauth2/i],
+]
+
+/** The dotted key each line of a YAML or properties text sets or lies under. */
+function keysOf(text: string): string[] {
+  const stack: Array<{ indent: number; key: string }> = []
+  return text.split('\n').map((line) => {
+    const property = /^\s*([\w.-]+)\s*[=:]/.exec(line)
+    const yaml = /^(\s*)(?:-\s+)?([\w.-]+)\s*:/.exec(line)
+    if (yaml) {
+      const indent = yaml[1].length
+      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop()
+      stack.push({ indent, key: yaml[2] })
+      return stack.map((s) => s.key).join('.')
+    }
+    if (property && /=/.test(line)) return property[1]
+    return stack.map((s) => s.key).join('.')
+  })
+}
+
+/** A config server's file as the unit reads it: the settings of client libraries the unit does not depend on left out
+ *  (lines emptied, so lines keep their numbers). */
+export function settingsFor(files: RepoFiles, file: string, unit: Unit): string {
+  const text = files.read(file)
+  const prefix = unit.path === '.' ? '' : `${unit.path}/`
+  const manifest = ['pom.xml', 'build.gradle', 'build.gradle.kts'].map((m) => files.read(`${prefix}${m}`)).join('\n')
+  const keys = keysOf(text)
+  return text.split('\n').map((line, i) => (LIBRARY_SETTINGS.some(([key, library]) => key.test(keys[i]) && !library.test(manifest)) ? '' : line)).join('\n')
+}
+
 const read = new WeakMap<RepoFiles, Map<string, Unit[]>>()
 
 /** The units each file of a config server's search locations configures (none: a file of no other unit). */

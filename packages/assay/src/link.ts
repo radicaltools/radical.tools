@@ -131,6 +131,9 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     for (const name of s.dependsOn) {
       const other = services.find((x) => x.name === name)
       if (!other) continue
+      // A migrator or a seeding job is waited for, not called.
+      const job = units.find((u) => u.id === other.unit)
+      if ([other.name, job?.name ?? '', job?.path.split('/').pop() ?? ''].some((n) => /migrat|seed/i.test(n))) continue
       add('runtime', s.unit, other.unit ?? databaseOf.get(other.id)?.id ?? other.id, 'observed', [s.id, other.id], `depends on ${name}`)
     }
   }

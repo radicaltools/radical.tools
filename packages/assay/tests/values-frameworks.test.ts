@@ -17,7 +17,7 @@ function repo(name: string, files: Record<string, string>): string {
 }
 
 const vb = (lines: string[]) => `${lines.join('\r\n')}\r\n`
-const pom = (artifact: string) => `<project><artifactId>${artifact}</artifactId><dependencies><dependency><artifactId>spring-boot-starter-web</artifactId></dependency></dependencies></project>`
+const pom = (artifact: string) => `<project><artifactId>${artifact}</artifactId><dependencies><dependency><artifactId>spring-boot-starter-web</artifactId></dependency><dependency><artifactId>spring-cloud-starter-netflix-eureka-client</artifactId></dependency></dependencies></project>`
 const boot = (pkg: string) => `package ${pkg};\n@SpringBootApplication\npublic class App { public static void main(String[] a) { SpringApplication.run(App.class, a); } }\n`
 
 describe('radical assay: what values, frameworks and runner images hide', () => {
