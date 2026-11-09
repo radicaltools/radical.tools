@@ -29,6 +29,9 @@ export type Stack = 'npm' | 'maven' | 'gradle' | 'go' | 'dotnet' | 'python' | 'p
 /** A unit of the repository: a project with a manifest of its own (or a folder with a Dockerfile). */
 export interface Unit {
   id: string
+  /** Folders of shared code it builds besides its own (a Go module's packages outside its main packages): files in no
+   *  unit's folder there are its. */
+  shares?: string[]
   /** Its name as its manifest gives it, else the folder's. */
   name: string
   /** False when no manifest names it and its name is its folder's: such a name links no dependency. */
@@ -127,6 +130,9 @@ export interface ServiceFact {
   role: 'app' | 'database' | 'queue' | 'cache' | 'observability' | 'other'
   /** The services it depends on (docker-compose depends_on), by name. */
   dependsOn: string[]
+  /** A broker its clients' library connects to by default, deployed by nothing of the repository (its evidence: a
+   *  client's dependency). */
+  assumed?: boolean
   evidence: Evidence
 }
 

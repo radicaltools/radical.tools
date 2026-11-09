@@ -3417,6 +3417,24 @@
     ] },
     { "element": "24085eb1-d88b-44c7-8693-874aeff86d66", "name": "A JVM unit as it is", "tests": [
       "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a JVM unit as it is: the plugin it applies, the JUnit its tests import, the port it serves, not its tests' settings, no password"
+    ] },
+    { "element": "0e76618e-7acf-46d3-bbc8-f9fdbfbdf7ea", "name": "A Go module of several mains", "tests": [
+      "packages/assay/tests/large.test.ts › radical assay: what large repositories hold › reads a Go module's shared packages as its main app's, its gorilla/mux routes under their subrouters, no down migration"
+    ] },
+    { "element": "e760f9dd-47e7-4845-80bf-e0d53ccad15b", "name": "Tooling, test folders, $(SolutionDir) and Django's urls", "tests": [
+      "packages/assay/tests/large.test.ts › radical assay: what large repositories hold › leaves tooling's folders out, builds a folder of tests for tests, and reads $(SolutionDir) and Django's urls.py"
+    ] },
+    { "element": "a31c9426-cb89-4568-9fc2-6c1314620ab6", "name": "NATS subjects and an assumed broker", "tests": [
+      "packages/assay/tests/brokers.test.ts › radical assay: brokers and their messages, in any stack › reads NATS subjects in Go, constants of another file and wildcards included, and the broker its clients assume"
+    ] },
+    { "element": "34cc1c00-bde1-45ff-88c1-f65d84d39039", "name": "NestJS, FastStream and their brokers", "tests": [
+      "packages/assay/tests/brokers.test.ts › radical assay: brokers and their messages, in any stack › reads NestJS's emits and patterns by a shared constant, FastStream's topics from .env, and kafkajs's broker"
+    ] },
+    { "element": "f68ed0f7-d8b2-4263-a6fd-9004e6dac43d", "name": "A Go program's dependencies and its Dockerfile", "tests": [
+      "packages/assay/tests/brokers.test.ts › radical assay: brokers and their messages, in any stack › gives each Go program the dependencies its packages import, and reads the program a Dockerfile's go build builds and a tracked build/ folder"
+    ] },
+    { "element": "8d273868-d5d5-4197-ab47-b403c92fda32", "name": "The program named as its module, no subdomain names", "tests": [
+      "packages/assay/tests/brokers.test.ts › radical assay: brokers and their messages, in any stack › builds a Go module's shared code with the program named as it is, and names no unit by a public subdomain's first label"
     ] }
   ]
 }

@@ -60,6 +60,20 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     }
     return cases
   }
+  // A Go unit's gorilla/mux subrouters (BaseRoutes.Users = …APIRoot.PathPrefix("/users").Subrouter()), across its files.
+  const prefixesOf = new Map<string, Map<string, { parent: string; prefix: string }>>()
+  const goPrefixes = (unit: Unit): Map<string, { parent: string; prefix: string }> => {
+    let known = prefixesOf.get(unit.id)
+    if (!known) {
+      known = new Map()
+      for (const f of files.list.filter((x) => x.endsWith('.go') && !x.endsWith('_test.go') && owner(units, x)?.id === unit.id)) {
+        const text = files.read(f)
+        if (/\.PathPrefix\(/.test(text)) for (const [k, v] of subrouters(text)) known.set(k, v)
+      }
+      prefixesOf.set(unit.id, known)
+    }
+    return known
+  }
   // A Spring application's servlet context path, which its routes are under.
   const contexts = new Map<string, string>()
   const contextPath = (unit: Unit): string => {
@@ -123,6 +137,15 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     }
 
     if (ext === '.py') {
+      // Django's urls.py: path("graphql/", …) and re_path(r"^orders/(?P<pk>\d+)/$", …), any method; an include()'s prefix
+      // is no route of its own.
+      if (/(^|\/)urls\.py$/.test(file)) {
+        for (const m of raw.matchAll(/\b(re_)?path\(\s*r?["']([^"']*)["']\s*,\s*(\w+(?:\.\w+)*)?/g)) {
+          if (m[3] === 'include') continue
+          const pattern = m[1] ? m[2].replace(/^\^|\$$/g, '').replace(/\(\?P<(\w+)>[^)]*\)/g, '{$1}').replace(/\\(.)/g, '$1') : m[2].replace(/<(?:\w+:)?(\w+)>/g, '{$1}')
+          route('ALL', `/${pattern}`.replace(/\/+$/, '') || '/', m.index!)
+        }
+      }
       for (const m of raw.matchAll(/@\w+\.route\(\s*['"]([^'"]+)['"]([^)]*)\)/g)) {
         const methods = /methods\s*=\s*[[(]([^\])]*)/.exec(m[2])?.[1]
         for (const method of methods ? [...methods.matchAll(/['"](\w+)['"]/g)].map((x) => x[1]) : ['GET']) route(method, m[1], m.index!)
@@ -132,10 +155,8 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     }
 
     if (ext === '.go') {
-      for (const m of raw.matchAll(/\b(?:HandleFunc|Handle)\(\s*"((?:[A-Z]+\s+)?\/[^"]*)"/g)) {
-        const [method, path] = /^[A-Z]+\s/.test(m[1]) ? m[1].split(/\s+/) : ['ANY', m[1]]
-        route(method, path, m.index!)
-      }
+      // net/http's and gorilla/mux's Handle and HandleFunc from the syntax tree, under the prefixes of the unit's subrouters.
+      for (const r of goRoutes(raw, goPrefixes(unit))) route(r.method, r.path, rowIndex(raw, r.row))
       for (const m of raw.matchAll(/\.(GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\(\s*"(\/[^"]*)"/g)) route(m[1], m[2], m.index!)
     }
   }
@@ -193,6 +214,58 @@ function springRoutes(text: string): Route[] {
     }
   }
   walk(parse('java', text).rootNode, [''], false)
+  return out
+}
+
+/** A Go router expression by what names it across files: api.BaseRoutes.Users is BaseRoutes.Users, r is r. */
+const routerKey = (node: Node): string => node.text.replace(/\s+/g, '').replace(/^[a-z]\w*\.(?=\w+\.)|^[a-z]\w*\.(?=[A-Z])/, '')
+
+/** A Go file's subrouters: each router assigned X.PathPrefix("/p").Subrouter(), with the router it hangs off. */
+function subrouters(text: string): Map<string, { parent: string; prefix: string }> {
+  const out = new Map<string, { parent: string; prefix: string }>()
+  const walk = (node: Node): void => {
+    if (node.type === 'assignment_statement' || node.type === 'short_var_declaration') {
+      const left = node.childForFieldName('left')?.namedChildren[0]
+      const right = node.childForFieldName('right')?.namedChildren[0]
+      const sub = right?.type === 'call_expression' ? right.childForFieldName('function') : undefined
+      const path = sub?.type === 'selector_expression' && sub.childForFieldName('field')?.text === 'Subrouter' ? sub.childForFieldName('operand') : undefined
+      const fn = path?.type === 'call_expression' ? path.childForFieldName('function') : undefined
+      const arg = path?.childForFieldName('arguments')?.namedChildren[0]
+      if (left && fn?.type === 'selector_expression' && fn.childForFieldName('field')?.text === 'PathPrefix' && arg?.type === 'interpreted_string_literal') {
+        out.set(routerKey(left), { parent: routerKey(fn.childForFieldName('operand')!), prefix: literal(arg) })
+      }
+    }
+    for (const child of node.namedChildren) if (child) walk(child)
+  }
+  walk(parse('go', text).rootNode)
+  return out
+}
+
+/** A Go file's routes: Handle and HandleFunc ("GET /x" patterns of Go 1.22 too), their .Methods(…), under the prefix of
+ *  the router they are on. */
+function goRoutes(text: string, prefixes: Map<string, { parent: string; prefix: string }>): Route[] {
+  const out: Route[] = []
+  const prefixOf = (key: string, depth = 0): string => {
+    const p = prefixes.get(key)
+    return p && depth < 10 ? joinPath(prefixOf(p.parent, depth + 1), p.prefix) : ''
+  }
+  const walk = (node: Node): void => {
+    const fn = node.type === 'call_expression' ? node.childForFieldName('function') : undefined
+    const name = fn?.type === 'selector_expression' ? fn.childForFieldName('field')?.text : fn?.type === 'identifier' ? fn.text : undefined
+    const first = node.childForFieldName('arguments')?.namedChildren[0]
+    if (fn && (name === 'Handle' || name === 'HandleFunc') && first?.type === 'interpreted_string_literal') {
+      const pattern = literal(first)
+      const [given, path] = /^[A-Z]+\s/.test(pattern) ? pattern.split(/\s+/) : [undefined, pattern]
+      // .Methods("GET", http.MethodPost) on the route.
+      const chained = node.parent?.type === 'selector_expression' && node.parent.childForFieldName('field')?.text === 'Methods' ? node.parent.parent : undefined
+      const methods = (chained?.childForFieldName('arguments')?.namedChildren ?? []).map((a) => (a?.type === 'interpreted_string_literal' ? literal(a) : /\bMethod(\w+)$/.exec(a?.text ?? '')?.[1]?.toUpperCase())).filter((x): x is string => !!x)
+      const router = fn.type === 'selector_expression' ? routerKey(fn.childForFieldName('operand')!) : ''
+      const full = joinPath(prefixOf(router), path)
+      if (path.startsWith('/') || path === '' ) for (const m of given ? [given] : methods.length ? methods : ['ANY']) out.push({ method: m, path: full, row: node.startPosition.row })
+    }
+    for (const child of node.namedChildren) if (child) walk(child)
+  }
+  walk(parse('go', text).rootNode)
   return out
 }
 

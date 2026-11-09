@@ -101,6 +101,10 @@ const TESTS = /(^|[-_./\s])(e2e|tests?|specs?|integration-tests?|unittests?)([-_
 
 /** Manifests inside a test's or fixture's folder belong to the tests, not the system. */
 const inTests = (file: string): boolean => /(^|\/)(tests?|__tests__|fixtures?|testdata|examples?|samples?)\//i.test(file)
+/** An editor's, a CI's or an assistant's own folder (.github/actions, .cursor, .vscode): tooling, no unit of the system. */
+const inTooling = (file: string): boolean => /(^|\/)\.(github|gitlab|circleci|cursor|vscode|idea|husky|devcontainer|claude)\//i.test(file)
+/** A folder of tests by its name (plugin_api_tests, manual.test_hijack_plugin): what it builds is built for tests. */
+const underTests = (path: string): boolean => path.split('/').some((seg) => /(^|[-_.])tests?([-_.]|$)/i.test(seg))
 /** A test's data: other repositories' sources, of any stack. */
 const inFixtures = (file: string): boolean => /(^|\/)(fixtures?|__fixtures__|testdata)\//i.test(file)
 
@@ -121,6 +125,8 @@ interface Draft {
   depLines: Map<string, { file: string; line: number }>
   /** The binary a VB6 reference names, by the library's name: what another unit's ExeName32 may be. */
   depFiles: Map<string, string>
+  /** Folders of shared code it builds besides its own. */
+  shares?: string[]
 }
 
 function draft(stack: Stack, path: string, file: string, name: string | undefined, line: number): Draft {
@@ -317,6 +323,32 @@ function gradle(files: RepoFiles): Draft[] {
 
 // ── Go ───────────────────────────────────────────────────────────────────────
 
+/** A Go module's packages and what each imports: the module's own packages it reaches, and the paths beyond. */
+function goImports(files: RepoFiles, own: string[], module: string | undefined, path: string): { reach: (from: string) => Set<string>; external: (dirs: Set<string>) => Set<string> } {
+  const prefix = path === '.' ? '' : `${path}/`
+  const inner = new Map<string, Set<string>>()
+  const outer = new Map<string, Set<string>>()
+  for (const f of own.filter((x) => !x.endsWith('_test.go'))) {
+    const dir = dirOf(f)
+    const text = files.read(f)
+    const block = /^import\s*\(([\s\S]*?)^\)/m.exec(text)?.[1] ?? ''
+    const paths = [...`${block}\n${[...text.matchAll(/^import\s+(?:\w+\s+)?("[^"]+")/gm)].map((m) => m[1]).join('\n')}`.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+    for (const p of paths) {
+      if (module && (p === module || p.startsWith(`${module}/`))) inner.set(dir, (inner.get(dir) ?? new Set()).add(`${prefix}${p.slice(module.length + 1)}`.replace(/\/$/, '') || path))
+      else outer.set(dir, (outer.get(dir) ?? new Set()).add(p))
+    }
+  }
+  return {
+    reach: (from: string) => {
+      const seen = new Set([from])
+      const queue = [from]
+      while (queue.length) for (const next of inner.get(queue.pop()!) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next) }
+      return seen
+    },
+    external: (dirs: Set<string>) => new Set([...dirs].flatMap((d) => [...(outer.get(d) ?? [])])),
+  }
+}
+
 function go(files: RepoFiles): Draft[] {
   const out: Draft[] = []
   for (const file of files.named(/^go\.mod$/).filter((f) => !inTests(f))) {
@@ -336,11 +368,23 @@ function go(files: RepoFiles): Draft[] {
     const replaced = new Map([...text.matchAll(/^\s*(?:replace\s+)?(\S+)(?:\s+v\S+)?\s+=>\s+(\.{1,2}\/\S*)\s*$/gm)].map((m) => [m[1], resolveFrom(path, m[2].replace(/\/$/, ''))]))
     const requires = [...text.matchAll(/^\s*(?:require\s+)?([a-z0-9.-]+\.[a-z]{2,}\/\S+)\s+v[\d.]+/gm)].map((m) => ({ dep: m[1], line: lineAt(text, m.index!) }))
     const at = mains.length === 1 ? [mains[0]] : mains.length ? mains : [path]
+    // The module's packages beside its main ones are shared code: the main whose imports reach most of them builds them
+    // (Mattermost's cmd/mattermost over mmctl and its generators); each main depends on what the packages it reaches import.
+    const graph = goImports(files, own, module, path)
+    const reached = new Map(at.map((dir) => [dir, graph.reach(dir)]))
+    // The program named as the module or the repository is (cmd/mattermost in mattermost/server), else the one reaching most.
+    const names = new Set([...(module ?? '').split('/').slice(1).filter((x) => !/^v\d+$/.test(x)), basename(files.root)].map((x) => x.toLowerCase()))
+    const byName = at.filter((dir) => names.has(basename(dir).toLowerCase()))
+    const primary = at.length && !at.includes(path) ? (byName.length === 1 ? byName[0] : [...at].sort((a, b) => reached.get(b)!.size - reached.get(a)!.size)[0]) : undefined
     for (const dir of at) {
       const d = draft('go', dir, file, module ? (dir === path ? module : `${module}/${dir.slice(prefix.length)}`) : undefined, lineOf(text, /^module\s/m))
       if (mains.includes(dir)) d.reasons.push('it has a main package')
+      if (dir === primary) d.shares = [path]
       d.aliases.push(basename(dir === '.' ? (module ?? '') : dir))
+      const imported = mains.length > 1 ? graph.external(reached.get(dir)!) : undefined
       for (const r of requires) {
+        // Of a module of several programs, a requirement only the packages a program reaches import.
+        if (imported && !replaced.has(r.dep) && ![...imported].some((p) => p === r.dep || p.startsWith(`${r.dep}/`))) continue
         const local = replaced.get(r.dep)
         if (local) d.refs.push({ name: r.dep, path: local, line: r.line, file })
         else { d.deps.push(r.dep); d.depLines.set(r.dep, { file, line: r.line }) }
@@ -369,6 +413,16 @@ function goWithoutModules(files: RepoFiles): Draft[] {
 
 // ── .NET ─────────────────────────────────────────────────────────────────────
 
+/** The folder (with a trailing slash, '' for the root) of the solution building a project: the nearest .sln above it
+ *  that lists it, else the nearest above. */
+function solutionDirOf(files: RepoFiles, project: string): string {
+  const slns = files.list.filter((f) => /\.slnx?$/i.test(f))
+  const above = slns.filter((s) => dirOf(s) === '.' || project.startsWith(`${dirOf(s)}/`)).sort((a, b) => b.length - a.length)
+  const listing = above.find((s) => files.read(s).replace(/\\/g, '/').includes(basename(project)))
+  const dir = dirOf(listing ?? above[0] ?? project)
+  return dir === '.' ? '' : `${dir}/`
+}
+
 function dotnet(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
   const out: Draft[] = []
   for (const file of files.named(/\.(cs|fs|vb|sql)proj$/i).filter((f) => !inFixtures(f))) {
@@ -380,7 +434,9 @@ function dotnet(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
     if (/Microsoft\.NET\.Sdk\.(Web|Worker|BlazorWebAssembly)/.test(sdk)) d.reasons.push(`it uses the ${sdk.replace('Microsoft.NET.Sdk.', '')} SDK`)
     if (/<OutputType>\s*(Exe|WinExe)\s*<\/OutputType>/i.test(text)) d.reasons.push('its output is an executable')
     for (const m of text.matchAll(/<ProjectReference\s+Include="([^"]+)"/g)) {
-      const target = resolveFrom(path, m[1])
+      // $(SolutionDir) is the folder of the solution building it: the nearest above that lists it, else the nearest above.
+      const include = m[1].replace(/\$\(SolutionDir\)[\\/]?/i, () => `/${solutionDirOf(files, file)}`).replace(/\\/g, '/')
+      const target = include.startsWith('/') ? resolveFrom('.', include.slice(1).replace(/^\.\//, '')) : resolveFrom(path, m[1])
       if (target) d.refs.push({ name: basename(m[1].replace(/\\/g, '/')).replace(/\.(cs|fs|vb)proj$/i, ''), path: target, line: lineAt(text, m.index!), file })
     }
     // References the Directory.Build files above it add, by their conditions on its name and path.
@@ -539,6 +595,11 @@ function python(files: RepoFiles): Draft[] {
     d.aliases.push(basename(path === '.' ? '' : path))
     if (entry) d.reasons.push(`it has ${entry}`)
     else if (files.list.some((f) => f.startsWith(prefix) && f.endsWith('.py') && !f.slice(prefix.length).includes('/') && /if __name__ == ['"]__main__['"]/.test(files.read(f)))) d.reasons.push('it has a __main__ block')
+    // A pyproject's [project] dependencies and Poetry's, besides requirements.txt.
+    const declared = /^\[project\][^[]*?\bdependencies\s*=\s*\[([^\]]*)\]/ms.exec(pyproject)?.[1] ?? ''
+    for (const m of declared.matchAll(/["']\s*([A-Za-z0-9][A-Za-z0-9._-]*)/g)) if (!d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file: `${prefix}pyproject.toml`, line: lineOf(pyproject, new RegExp(`["']\\s*${escapeRe(m[1])}`)) }) }
+    const poetry = /^\[tool\.poetry\.dependencies\]([^[]*)/m.exec(pyproject)?.[1] ?? ''
+    for (const m of poetry.matchAll(/^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*=/gm)) if (m[1] !== 'python' && !d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file: `${prefix}pyproject.toml`, line: lineOf(pyproject, new RegExp(`^\\s*${escapeRe(m[1])}\\s*=`, 'm')) }) }
     const requirements = files.read(`${prefix}requirements.txt`)
     for (const [i, line] of requirements.split('\n').entries()) {
       const dep = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(line)?.[1]
@@ -705,6 +766,9 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const groups: GroupFact[] = []
   // A Composer, .NET, Ruby, Elixir or Rust project claims its folder before the package.json that builds its front end.
   const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
+  // Tooling's folders hold no unit; a folder of tests builds for tests.
+  for (let i = drafts.length - 1; i >= 0; i--) if (inTooling(`${drafts[i].path}/`)) drafts.splice(i, 1)
+  for (const d of drafts) if (underTests(d.path)) d.tests = true
   // One unit per folder: the first stack read claims it (a Python folder with a package.json for its tooling stays npm).
   const byPath = new Map<string, Draft>()
   for (const d of drafts) {
@@ -725,7 +789,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     first.reasons.push(...d.reasons.filter((x) => !first.reasons.includes(x)))
   }
   const moves = new Map<string, string>()
-  for (const d of docker(files, new Set(byPath.keys()), moves)) byPath.set(d.path, d)
+  for (const d of docker(files, new Set(byPath.keys()), moves)) if (!inTooling(`${d.path}/`)) byPath.set(d.path, { ...d, tests: d.tests || underTests(d.path) })
   for (const [from, to] of moves) {
     const d = byPath.get(from)!
     byPath.delete(from)
@@ -754,6 +818,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
       ...((framework) => (framework ? { testFramework: framework } : {}))(testFrameworkOf(d, files)),
       ...(d.description ? { description: d.description } : {}),
       ...(d.named ? {} : { named: false }),
+      ...(d.shares ? { shares: d.shares } : {}),
       evidence: d.evidence,
     })
     if (d.stack === 'docker') continue

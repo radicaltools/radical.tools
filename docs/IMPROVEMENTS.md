@@ -358,12 +358,42 @@ three times alone in 7.6 s; the change does not touch reading .radical files.
 `apps/e2e/tests/studio/nesting.spec.ts › the special key › one gesture on
 several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
-does not touch Studio) and passed three times alone in 9.7 s.
+does not touch Studio) and passed three times alone in 9.7 s. It failed once more in a full
+run on feat/assay-scale (2026-11-09, Assay only; `Expected: 6, Received: 4` at
+line 199), and the next full run passed.
 `apps/e2e/tests/studio/search.spec.ts › a pick on a wiki opens the element's
 page, and the highlighted result stays in sight` failed in a full local run on
 feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
+
+### Dogfooding (2026-11-09): large repositories, and nine held out outside Java
+
+Saleor, nopCommerce and Mattermost read in 1.4 to 8.7 s under 600 MB; an
+agent modelled Mattermost (run 25, `/Volumes/data/Dev/assay-runs/25-mattermost`,
+13 minutes, $8.2) and found the server's code given to mmctl, links from
+marketing addresses and a test fixture's database, all fixed. Nine
+repositories outside Java were then held out with messages required:
+untouched calls 48/129 (precision 74 %), now 102/129 (85 %); tuned on now.
+Open:
+
+- **Documents of a large repository**: Mattermost's 430 documents are too
+  many to read; the agent found its architecture page by listing folders.
+- **Go string constants as statuses**: a server entity's status (Job,
+  Compliance) is a Go constant set, read by no state reader; a constant prefix
+  of a router (`model.APIURLSuffix`) is not resolved either.
+- **A schema without foreign keys** (Mattermost) leaves the domain stage no
+  way to relate entities but inferred citations.
+- **NestJS TCP calls** through a shared library's helper
+  (`SERVICES_CONFIG('PRODUCTS')`), **Watermill's topics** from a function
+  (`generateEventsTopic`), a NATS key-value bucket and an event store
+  publishing a subject its gRPC callers send are not read.
+- **Databases**: Django settings choosing the engine by an environment
+  variable (Healthchecks), Memos' default SQLite file, Mongoose's URI from the
+  environment; **tables** of GORM and Flask-SQLAlchemy models by their class
+  names.
+- **A held-out set again**, and an agent's run on held-out code before it is
+  tuned on.
 
 ### Dogfooding (2026-11-09): microSecEnD, an external ground truth
 

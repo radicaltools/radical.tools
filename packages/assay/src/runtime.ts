@@ -107,9 +107,16 @@ function unitFor(units: Unit[], name: string, image: string | undefined, built: 
 
 /** The unit of those in the build's context that its Dockerfile builds or publishes (dotnet publish "X.csproj"). */
 function builtBy(dockerfile: string, units: Unit[], context: string): Unit | undefined {
+  const inside = units.filter((u) => context === '.' || u.path === context || u.path.startsWith(`${context}/`))
+  // go build ./cmd/commandsd/... builds the main package in that folder of the context.
+  const go = /^\s*RUN\s+(?:[\w=]+\s+)*go\s+(?:build|install)\b[^\n]*?\s\.\/([\w./-]+?)(?:\/\.\.\.)?\s*$/mi.exec(dockerfile)?.[1]
+  if (go) {
+    const path = `${context === '.' ? '' : `${context}/`}${go.replace(/\/$/, '')}`
+    const unit = inside.find((u) => u.path === path)
+    if (unit) return unit
+  }
   const projects = [...dockerfile.matchAll(/^\s*RUN\s+dotnet\s+(?:publish|build)\s+"?(?:[^"\s]*\/)?([\w.-]+)\.(?:cs|fs|vb)proj"?/gmi)].map((m) => m[1].toLowerCase())
   if (!projects.length) return undefined
-  const inside = units.filter((u) => context === '.' || u.path === context || u.path.startsWith(`${context}/`))
   return inside.find((u) => projects.includes(u.name.toLowerCase()))
 }
 
