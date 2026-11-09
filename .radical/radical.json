@@ -3375,6 +3375,9 @@
     ] },
     { "element": "4d6fafbb-01f9-49e3-8f81-ba3226fa4f6c", "name": "ASP.NET Core routes from class and action templates", "tests": [
       "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads an ASP.NET Core controller's routes from its class and action templates"
+    ] },
+    { "element": "92fb0cf5-9758-4cb6-9b6b-ef7c1b9e5654", "name": "Assay's syntax trees tests", "tests": [
+      "packages/assay/tests/syntax.test.ts"
     ] }
   ]
 }
