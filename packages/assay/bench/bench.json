@@ -4480,324 +4480,10 @@
         "topicsfts",
         "recentsearchqueries"
       ]
-    }
-  ],
-  "heldOut": [
-    {
-      "name": "robot-shop",
-      "url": "https://github.com/instana/robot-shop.git",
-      "commit": "55292e2199f2fb00a165b1f7d3045fe7f8922038",
-      "stacks": "Node.js, Java, Python, Go, PHP, nginx; MongoDB, MySQL, Redis, RabbitMQ; docker-compose",
-      "units": [
-        "web",
-        "catalogue",
-        "user",
-        "cart",
-        "shipping",
-        "ratings",
-        "payment",
-        "dispatch",
-        "load-gen",
-        "mongo",
-        "mysql"
-      ],
-      "calls": [
-        [
-          "web",
-          "catalogue"
-        ],
-        [
-          "web",
-          "user"
-        ],
-        [
-          "web",
-          "cart"
-        ],
-        [
-          "web",
-          "shipping"
-        ],
-        [
-          "web",
-          "payment"
-        ],
-        [
-          "web",
-          "ratings"
-        ],
-        [
-          "catalogue",
-          "mongo"
-        ],
-        [
-          "user",
-          "mongo"
-        ],
-        [
-          "user",
-          "service:redis"
-        ],
-        [
-          "cart",
-          "service:redis"
-        ],
-        [
-          "cart",
-          "catalogue"
-        ],
-        [
-          "shipping",
-          "mysql"
-        ],
-        [
-          "shipping",
-          "cart"
-        ],
-        [
-          "ratings",
-          "mysql"
-        ],
-        [
-          "ratings",
-          "catalogue"
-        ],
-        [
-          "payment",
-          "cart"
-        ],
-        [
-          "payment",
-          "user"
-        ],
-        [
-          "payment",
-          "service:rabbitmq"
-        ],
-        [
-          "dispatch",
-          "service:rabbitmq"
-        ],
-        [
-          "load-gen",
-          "web"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "eShop",
-      "url": "https://github.com/dotnet/eShop.git",
-      "commit": "913acea66708a59595351174cee9b29f37179d29",
-      "stacks": ".NET 9, Aspire, Blazor, gRPC, RabbitMQ, PostgreSQL, Redis",
-      "judge": "runtime",
-      "units": [
-        "src/Basket.API",
-        "src/Catalog.API",
-        "src/Identity.API",
-        "src/OrderProcessor",
-        "src/Ordering.API",
-        "src/PaymentProcessor",
-        "src/WebApp",
-        "src/WebhookClient",
-        "src/Webhooks.API"
-      ],
-      "calls": [
-        [
-          "src/WebApp",
-          "src/Basket.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Catalog.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Ordering.API"
-        ],
-        [
-          "src/WebApp",
-          "src/Identity.API"
-        ],
-        [
-          "src/Basket.API",
-          "service:redis"
-        ],
-        [
-          "src/Basket.API",
-          "service:eventbus"
-        ],
-        [
-          "src/Catalog.API",
-          "db:catalogdb"
-        ],
-        [
-          "src/Catalog.API",
-          "service:eventbus"
-        ],
-        [
-          "src/Ordering.API",
-          "db:orderingdb"
-        ],
-        [
-          "src/Ordering.API",
-          "service:eventbus"
-        ],
-        [
-          "src/OrderProcessor",
-          "db:orderingdb"
-        ],
-        [
-          "src/OrderProcessor",
-          "service:eventbus"
-        ],
-        [
-          "src/PaymentProcessor",
-          "service:eventbus"
-        ],
-        [
-          "src/Webhooks.API",
-          "db:webhooksdb"
-        ],
-        [
-          "src/Webhooks.API",
-          "service:eventbus"
-        ],
-        [
-          "src/WebhookClient",
-          "src/Webhooks.API"
-        ],
-        [
-          "src/Identity.API",
-          "db:identitydb"
-        ]
-      ],
-      "optional": []
-    },
-    {
-      "name": "sockshop",
-      "about": "Several repositories: one per service, and microservices-demo deploying them. Written down from Sock Shop's architecture before Assay first ran on it.",
-      "repositories": [
-        {
-          "name": "front-end",
-          "url": "https://github.com/microservices-demo/front-end.git",
-          "commit": "52dee656f4423be041619bbb090205f912e00113"
-        },
-        {
-          "name": "catalogue",
-          "url": "https://github.com/microservices-demo/catalogue.git",
-          "commit": "925e08ee17c28b94b87160e1ae5e03da7f61cf84"
-        },
-        {
-          "name": "carts",
-          "url": "https://github.com/microservices-demo/carts.git",
-          "commit": "f4e80051668c6a83359c41b03a27baefa590adc8"
-        },
-        {
-          "name": "orders",
-          "url": "https://github.com/microservices-demo/orders.git",
-          "commit": "546a10c92d1ff9998c21f3849f5b95a0f14430a0"
-        },
-        {
-          "name": "user",
-          "url": "https://github.com/microservices-demo/user.git",
-          "commit": "e1a79e77860734cacc3f64cabff1487e22a442a4"
-        },
-        {
-          "name": "payment",
-          "url": "https://github.com/microservices-demo/payment.git",
-          "commit": "384e33447dda5334187517dda09566c9a17fd6af"
-        },
-        {
-          "name": "shipping",
-          "url": "https://github.com/microservices-demo/shipping.git",
-          "commit": "9c0fbfa31895dd029d44d3434de93f64cd71f87b"
-        },
-        {
-          "name": "queue-master",
-          "url": "https://github.com/microservices-demo/queue-master.git",
-          "commit": "7dc33721c765e5af415c9d244d84637ff2d510cd"
-        },
-        {
-          "name": "microservices-demo",
-          "url": "https://github.com/microservices-demo/microservices-demo.git",
-          "commit": "9dff06fae4981921caec6a62393a6ebfce4b3e3f"
-        }
-      ],
-      "stacks": "Node.js, Go, Java (Maven, Spring Boot); MySQL, MongoDB, RabbitMQ; docker-compose, Kubernetes; one repository per service",
-      "units": [
-        "front-end",
-        "catalogue",
-        "carts",
-        "orders",
-        "user",
-        "payment",
-        "shipping",
-        "queue-master"
-      ],
-      "calls": [
-        [
-          "front-end",
-          "catalogue"
-        ],
-        [
-          "front-end",
-          "carts"
-        ],
-        [
-          "front-end",
-          "orders"
-        ],
-        [
-          "front-end",
-          "user"
-        ],
-        [
-          "orders",
-          "payment"
-        ],
-        [
-          "orders",
-          "user"
-        ],
-        [
-          "orders",
-          "carts"
-        ],
-        [
-          "orders",
-          "shipping"
-        ],
-        [
-          "shipping",
-          "service:rabbitmq"
-        ],
-        [
-          "queue-master",
-          "service:rabbitmq"
-        ],
-        [
-          "catalogue",
-          "service:catalogue-db"
-        ],
-        [
-          "carts",
-          "service:carts-db"
-        ],
-        [
-          "orders",
-          "service:orders-db"
-        ],
-        [
-          "user",
-          "service:user-db"
-        ]
-      ],
-      "optional": []
     },
     {
       "name": "go-distributed-sys",
-      "about": "Shiju Varghese's guidance repository for distributed systems in Go: one Go module of many main packages, namely an event-sourced order demo (eventstream: an HTTP order API and a Go kit variant, a gRPC event store service that publishes each stored event to NATS JetStream, payment, query-model and review workers subscribed to those subjects, and a bootstrapper, on the CockroachDB databases eventstoredb and ordersdb), a second JetStream demo on the new JetStream SDK and NATS Micro, and standalone NATS, JetStream, key-value, NATS Micro, gRPC and CockroachDB examples. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "Shiju Varghese's guidance repository for distributed systems in Go: one Go module of many main packages, namely an event-sourced order demo (eventstream: an HTTP order API and a Go kit variant, a gRPC event store service that publishes each stored event to NATS JetStream, payment, query-model and review workers subscribed to those subjects, and a bootstrapper, on the CockroachDB databases eventstoredb and ordersdb), a second JetStream demo on the new JetStream SDK and NATS Micro, and standalone NATS, JetStream, key-value, NATS Micro, gRPC and CockroachDB examples. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/shijuvar/go-distributed-sys.git",
       "commit": "411c2a31f9ea840f71b60e8cf216aded59318ca4",
       "stacks": "Go 1.27 (one module, many main packages), gRPC (protobuf, ALTS, TLS), NATS (core pub/sub, queue groups, request-reply, NATS Micro), NATS JetStream (streams, push and pull consumers, key-value), CockroachDB (lib/pq, GORM, cockroach-go), Go kit, gorilla/mux, OpenCensus + Zipkin",
@@ -5231,7 +4917,7 @@
     },
     {
       "name": "go-example-financing",
-      "about": "An event-sourced CQRS invoice-financing example in Go (esrc and Watermill): one module whose main packages are a gRPC command service (commandsd) that queues commands on RabbitMQ and keeps aggregates in a PostgreSQL event store (database postgres), a relayer that publishes the stored events to the RabbitMQ events exchange, a query projector that consumes them into the PostgreSQL database queries, a gRPC query service reading it and a populate tool publishing integration events, with acceptance tests run against the docker-compose stack. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "An event-sourced CQRS invoice-financing example in Go (esrc and Watermill): one module whose main packages are a gRPC command service (commandsd) that queues commands on RabbitMQ and keeps aggregates in a PostgreSQL event store (database postgres), a relayer that publishes the stored events to the RabbitMQ events exchange, a query projector that consumes them into the PostgreSQL database queries, a gRPC query service reading it and a populate tool publishing integration events, with acceptance tests run against the docker-compose stack. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/pperaltaisern/go-example-financing.git",
       "commit": "56ce163c35086c9d499ae9628f01dc54096dc273",
       "stacks": "Go 1.18 (one module, five main packages), gRPC (protobuf, reflection), Watermill CQRS + watermill-amqp, esrc / esrcpg / esrcwatermill (event store with outbox relay), pgx, GORM, PostgreSQL, RabbitMQ 3 (management), Viper, zap, testify; Docker (multi-stage, one Dockerfile per service under build/), docker-compose",
@@ -5360,7 +5046,7 @@
     },
     {
       "name": "codelivery",
-      "about": "Code Delivery, a delivery-route simulation: a Next.js frontend that asks an Express API over HTTP and Socket.IO to start a route, the API producing route.new-direction to Kafka, a Node.js simulator consuming it and producing route.new-position every 500 ms, which the API consumes and pushes back over Socket.IO; routes are kept in the MongoDB database codelivery, and Kafka Connect sinks both topics into Elasticsearch for Kibana. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "Code Delivery, a delivery-route simulation: a Next.js frontend that asks an Express API over HTTP and Socket.IO to start a route, the API producing route.new-direction to Kafka, a Node.js simulator consuming it and producing route.new-position every 500 ms, which the API consumes and pushes back over Socket.IO; routes are kept in the MongoDB database codelivery, and Kafka Connect sinks both topics into Elasticsearch for Kibana. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/Sup3r-Us3r/codelivery.git",
       "commit": "0bbac1818946cbf8e0e03dc5623d5d19e86e500c",
       "stacks": "Node.js + TypeScript (Express 4, Socket.IO 4, Mongoose 6, kafkajs, ts-node-dev), Next.js 12 + React 17 + MUI 5 + Google Maps + socket.io-client, MongoDB + Mongo Express, Apache Kafka (Confluent images: Zookeeper, Control Center, Kafka Connect with the Elasticsearch sink), Elasticsearch + Kibana 7.16; one docker-compose per folder joined through host.docker.internal",
@@ -5429,7 +5115,7 @@
     },
     {
       "name": "nestjs-ecommerce-microservice",
-      "about": "An event-driven NestJS e-commerce sample: an HTTP API gateway calling auth, users, products, orders, cart and shipping microservices over NestJS TCP transport, with a shared @my/common library, users/products/orders on one PostgreSQL database through TypeORM, cart and shipping on MongoDB, a Redis cache, and the Order.Created Kafka event published by orders and consumed by stock, shipping and notifications (which emails over SMTP). Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "An event-driven NestJS e-commerce sample: an HTTP API gateway calling auth, users, products, orders, cart and shipping microservices over NestJS TCP transport, with a shared @my/common library, users/products/orders on one PostgreSQL database through TypeORM, cart and shipping on MongoDB, a Redis cache, and the Order.Created Kafka event published by orders and consumed by stock, shipping and notifications (which emails over SMTP). Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/onurcansevinc/nestjs-ecommerce-microservice.git",
       "commit": "b99e0df3a38f411cf8aeb8a094d664f739b9916e",
       "stacks": "TypeScript, NestJS 11 (HTTP gateway, @nestjs/microservices TCP and Kafka transports, kafkajs), TypeORM + PostgreSQL, Mongoose + MongoDB, Redis (cache-manager-redis-store), Nodemailer SMTP, JWT/Passport, Swagger; Kafka (Confluent, ZooKeeper) with Kafdrop; docker-compose",
@@ -5660,7 +5346,7 @@
     },
     {
       "name": "python-event-driven-microservices-rabbitmq",
-      "about": "A small event-driven sample: a Django REST CMS (run as a web app and as a RabbitMQ consumer) on the MySQL database cms, a Flask order service (also run as a web app and as a consumer) on the MySQL database order that calls the CMS over HTTP, and a React UI calling the order service; both Python services publish to and consume from the RabbitMQ queue order. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "A small event-driven sample: a Django REST CMS (run as a web app and as a RabbitMQ consumer) on the MySQL database cms, a Flask order service (also run as a web app and as a consumer) on the MySQL database order that calls the CMS over HTTP, and a React UI calling the order service; both Python services publish to and consume from the RabbitMQ queue order. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/abhishek70/python-event-driven-microservices-rabbitmq.git",
       "commit": "e4b1ce39a84250a845478ab73d5227f448377a63",
       "stacks": "Python 3.8, Django 3.1 + Django REST framework, Flask 1.1 + Flask-SQLAlchemy, pika (RabbitMQ 3.8), MySQL 5.7 (mysqlclient), requests; React 17 + TypeScript (Create React App); docker-compose",
@@ -5723,7 +5409,7 @@
     },
     {
       "name": "event-notification-pipeline",
-      "about": "A small event-driven notification pipeline: a FastAPI publisher service that accepts notifications over HTTP and publishes them with FastStream to the Kafka topic notifications, and a FastStream subscriber service that consumes the topic and stores each notification in the PostgreSQL database notifications_db through SQLAlchemy/Advanced Alchemy, with Kafbat UI for inspecting Kafka. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "A small event-driven notification pipeline: a FastAPI publisher service that accepts notifications over HTTP and publishes them with FastStream to the Kafka topic notifications, and a FastStream subscriber service that consumes the topic and stores each notification in the PostgreSQL database notifications_db through SQLAlchemy/Advanced Alchemy, with Kafbat UI for inspecting Kafka. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/laviprog/event-notification-pipeline.git",
       "commit": "9b8f977d24120c160f6912896fd1fd54001c8ba8",
       "stacks": "Python 3.12 (uv), FastAPI, FastStream (Kafka), SQLAlchemy + Advanced Alchemy, asyncpg, Pydantic Settings, structlog; Apache Kafka (Confluent cp-kafka, KRaft), PostgreSQL 15, Kafbat UI; docker-compose",
@@ -5762,7 +5448,7 @@
     },
     {
       "name": "outline",
-      "about": "Outline, a collaborative knowledge base: one Node.js/TypeScript project (one package.json for the Koa server, the React web app built by Vite, and the shared editor code) run as web, websockets, collaboration and worker services of the same process image, storing everything in the PostgreSQL database outline through Sequelize and using Redis for its Bull job queues, cache and collaboration, with optional S3 file storage, SMTP and sign-in and integration providers. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "Outline, a collaborative knowledge base: one Node.js/TypeScript project (one package.json for the Koa server, the React web app built by Vite, and the shared editor code) run as web, websockets, collaboration and worker services of the same process image, storing everything in the PostgreSQL database outline through Sequelize and using Redis for its Bull job queues, cache and collaboration, with optional S3 file storage, SMTP and sign-in and integration providers. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/outline/outline.git",
       "commit": "3402c2a251558f370ec840630d4482eb03b1ebe1",
       "stacks": "Node.js 22/24/26, TypeScript, Koa, Sequelize (sequelize-typescript, sequelize-cli migrations), PostgreSQL, Redis (ioredis, Bull queues, socket.io redis adapter, Hocuspocus), React 19 + MobX + styled-components (Vite), Prosemirror/Yjs collaboration, nodemailer (SMTP), AWS S3 SDK (S3 or local file storage), Vitest; yarn 4; Docker (base + runner images), Docker Compose (dev Redis and Postgres), Heroku app.json",
@@ -5896,7 +5582,7 @@
     },
     {
       "name": "healthchecks",
-      "about": "Healthchecks, a cron job and background task monitoring service: one Django project (apps accounts, api, front, logs, payments and some thirty notification integrations) run in its Docker image as gunicorn plus the sendalerts and sendreports management commands (and an optional SMTP listener), storing its data in the PostgreSQL database hc in Docker Compose (MySQL/MariaDB under the same name, SQLite hc.sqlite when no DB is set), searching its documentation in the committed SQLite file search.db, and sending notifications by email and to many third-party APIs. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "Healthchecks, a cron job and background task monitoring service: one Django project (apps accounts, api, front, logs, payments and some thirty notification integrations) run in its Docker image as gunicorn plus the sendalerts and sendreports management commands (and an optional SMTP listener), storing its data in the PostgreSQL database hc in Docker Compose (MySQL/MariaDB under the same name, SQLite hc.sqlite when no DB is set), searching its documentation in the committed SQLite file search.db, and sending notifications by email and to many third-party APIs. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/healthchecks/healthchecks.git",
       "commit": "0413d5f615e3669d0a3fb8f9a3b63b5592db7aa0",
       "stacks": "Python 3.14, Django 6.1, gunicorn, psycopg 3 / mysqlclient / SQLite, django-compressor, whitenoise, pycurl, minio (S3 ping-body storage), fido2/WebAuthn, statsd, minismtpd; Bootstrap 3 LESS; Docker, Docker Compose",
@@ -6011,7 +5697,7 @@
     },
     {
       "name": "memos",
-      "about": "Memos, a self-hosted note-taking app: one Go module whose program cmd/memos serves the Connect/gRPC-gateway API, an MCP endpoint and the embedded React web app (built from web into server/frontend/dist), storing its data by default in the SQLite file memos_prod.db in its data directory (MySQL or PostgreSQL through a DSN), with optional S3 attachment storage, SMTP, OAuth2 identity providers, webhooks and AI providers; a second main package, markdown/parser/tagdata, generates the tag lexer's Unicode tables. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it.",
+      "about": "Memos, a self-hosted note-taking app: one Go module whose program cmd/memos serves the Connect/gRPC-gateway API, an MCP endpoint and the embedded React web app (built from web into server/frontend/dist), storing its data by default in the SQLite file memos_prod.db in its data directory (MySQL or PostgreSQL through a DSN), with optional S3 attachment storage, SMTP, OAuth2 identity providers, webhooks and AI providers; a second main package, markdown/parser/tagdata, generates the tag lexer's Unicode tables. Written down on 2026-11-09 from its README, manifests, configuration and schema before Assay first ran on it; held out at first (units 70/71, calls 48/129, tables 76/89 for the nine); the readers were tuned on it since.",
       "url": "https://github.com/usememos/memos.git",
       "commit": "e4f3fb2d2d114f6eaea6ec75a10b0a274f57a8a1",
       "stacks": "Go 1.27 (one module; cobra/viper, Connect RPC, grpc-gateway, modernc SQLite, go-sql-driver/mysql, lib/pq, AWS S3 SDK, testcontainers), React 19 + TypeScript (Vite, Tailwind 4, TanStack Query, connect-web, Leaflet/MapLibre, Vitest, Biome; pnpm), protobuf (buf); Docker (Alpine image), Docker Compose",
@@ -6112,6 +5798,320 @@
         "user_identity",
         "user_setting"
       ]
+    }
+  ],
+  "heldOut": [
+    {
+      "name": "robot-shop",
+      "url": "https://github.com/instana/robot-shop.git",
+      "commit": "55292e2199f2fb00a165b1f7d3045fe7f8922038",
+      "stacks": "Node.js, Java, Python, Go, PHP, nginx; MongoDB, MySQL, Redis, RabbitMQ; docker-compose",
+      "units": [
+        "web",
+        "catalogue",
+        "user",
+        "cart",
+        "shipping",
+        "ratings",
+        "payment",
+        "dispatch",
+        "load-gen",
+        "mongo",
+        "mysql"
+      ],
+      "calls": [
+        [
+          "web",
+          "catalogue"
+        ],
+        [
+          "web",
+          "user"
+        ],
+        [
+          "web",
+          "cart"
+        ],
+        [
+          "web",
+          "shipping"
+        ],
+        [
+          "web",
+          "payment"
+        ],
+        [
+          "web",
+          "ratings"
+        ],
+        [
+          "catalogue",
+          "mongo"
+        ],
+        [
+          "user",
+          "mongo"
+        ],
+        [
+          "user",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "service:redis"
+        ],
+        [
+          "cart",
+          "catalogue"
+        ],
+        [
+          "shipping",
+          "mysql"
+        ],
+        [
+          "shipping",
+          "cart"
+        ],
+        [
+          "ratings",
+          "mysql"
+        ],
+        [
+          "ratings",
+          "catalogue"
+        ],
+        [
+          "payment",
+          "cart"
+        ],
+        [
+          "payment",
+          "user"
+        ],
+        [
+          "payment",
+          "service:rabbitmq"
+        ],
+        [
+          "dispatch",
+          "service:rabbitmq"
+        ],
+        [
+          "load-gen",
+          "web"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "eShop",
+      "url": "https://github.com/dotnet/eShop.git",
+      "commit": "913acea66708a59595351174cee9b29f37179d29",
+      "stacks": ".NET 9, Aspire, Blazor, gRPC, RabbitMQ, PostgreSQL, Redis",
+      "judge": "runtime",
+      "units": [
+        "src/Basket.API",
+        "src/Catalog.API",
+        "src/Identity.API",
+        "src/OrderProcessor",
+        "src/Ordering.API",
+        "src/PaymentProcessor",
+        "src/WebApp",
+        "src/WebhookClient",
+        "src/Webhooks.API"
+      ],
+      "calls": [
+        [
+          "src/WebApp",
+          "src/Basket.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Catalog.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Ordering.API"
+        ],
+        [
+          "src/WebApp",
+          "src/Identity.API"
+        ],
+        [
+          "src/Basket.API",
+          "service:redis"
+        ],
+        [
+          "src/Basket.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Catalog.API",
+          "db:catalogdb"
+        ],
+        [
+          "src/Catalog.API",
+          "service:eventbus"
+        ],
+        [
+          "src/Ordering.API",
+          "db:orderingdb"
+        ],
+        [
+          "src/Ordering.API",
+          "service:eventbus"
+        ],
+        [
+          "src/OrderProcessor",
+          "db:orderingdb"
+        ],
+        [
+          "src/OrderProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/PaymentProcessor",
+          "service:eventbus"
+        ],
+        [
+          "src/Webhooks.API",
+          "db:webhooksdb"
+        ],
+        [
+          "src/Webhooks.API",
+          "service:eventbus"
+        ],
+        [
+          "src/WebhookClient",
+          "src/Webhooks.API"
+        ],
+        [
+          "src/Identity.API",
+          "db:identitydb"
+        ]
+      ],
+      "optional": []
+    },
+    {
+      "name": "sockshop",
+      "about": "Several repositories: one per service, and microservices-demo deploying them. Written down from Sock Shop's architecture before Assay first ran on it.",
+      "repositories": [
+        {
+          "name": "front-end",
+          "url": "https://github.com/microservices-demo/front-end.git",
+          "commit": "52dee656f4423be041619bbb090205f912e00113"
+        },
+        {
+          "name": "catalogue",
+          "url": "https://github.com/microservices-demo/catalogue.git",
+          "commit": "925e08ee17c28b94b87160e1ae5e03da7f61cf84"
+        },
+        {
+          "name": "carts",
+          "url": "https://github.com/microservices-demo/carts.git",
+          "commit": "f4e80051668c6a83359c41b03a27baefa590adc8"
+        },
+        {
+          "name": "orders",
+          "url": "https://github.com/microservices-demo/orders.git",
+          "commit": "546a10c92d1ff9998c21f3849f5b95a0f14430a0"
+        },
+        {
+          "name": "user",
+          "url": "https://github.com/microservices-demo/user.git",
+          "commit": "e1a79e77860734cacc3f64cabff1487e22a442a4"
+        },
+        {
+          "name": "payment",
+          "url": "https://github.com/microservices-demo/payment.git",
+          "commit": "384e33447dda5334187517dda09566c9a17fd6af"
+        },
+        {
+          "name": "shipping",
+          "url": "https://github.com/microservices-demo/shipping.git",
+          "commit": "9c0fbfa31895dd029d44d3434de93f64cd71f87b"
+        },
+        {
+          "name": "queue-master",
+          "url": "https://github.com/microservices-demo/queue-master.git",
+          "commit": "7dc33721c765e5af415c9d244d84637ff2d510cd"
+        },
+        {
+          "name": "microservices-demo",
+          "url": "https://github.com/microservices-demo/microservices-demo.git",
+          "commit": "9dff06fae4981921caec6a62393a6ebfce4b3e3f"
+        }
+      ],
+      "stacks": "Node.js, Go, Java (Maven, Spring Boot); MySQL, MongoDB, RabbitMQ; docker-compose, Kubernetes; one repository per service",
+      "units": [
+        "front-end",
+        "catalogue",
+        "carts",
+        "orders",
+        "user",
+        "payment",
+        "shipping",
+        "queue-master"
+      ],
+      "calls": [
+        [
+          "front-end",
+          "catalogue"
+        ],
+        [
+          "front-end",
+          "carts"
+        ],
+        [
+          "front-end",
+          "orders"
+        ],
+        [
+          "front-end",
+          "user"
+        ],
+        [
+          "orders",
+          "payment"
+        ],
+        [
+          "orders",
+          "user"
+        ],
+        [
+          "orders",
+          "carts"
+        ],
+        [
+          "orders",
+          "shipping"
+        ],
+        [
+          "shipping",
+          "service:rabbitmq"
+        ],
+        [
+          "queue-master",
+          "service:rabbitmq"
+        ],
+        [
+          "catalogue",
+          "service:catalogue-db"
+        ],
+        [
+          "carts",
+          "service:carts-db"
+        ],
+        [
+          "orders",
+          "service:orders-db"
+        ],
+        [
+          "user",
+          "service:user-db"
+        ]
+      ],
+      "optional": []
     }
   ]
 }
