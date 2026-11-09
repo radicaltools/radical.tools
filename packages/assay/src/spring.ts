@@ -99,3 +99,21 @@ export function springConfigOwners(files: RepoFiles, units: Unit[]): Map<string,
   }
   return out
 }
+
+/** A Spring setting of a unit (server.servlet.context-path), from its own application and bootstrap files or the config
+ *  server's files that configure it: the first a key path matching `key` sets, ${KEY:default} read as its default. */
+export function springSetting(files: RepoFiles, units: Unit[], unit: Unit, key: RegExp): string | undefined {
+  const prefix = unit.path === '.' ? '' : `${unit.path}/`
+  const own = files.list.filter((f) => f.startsWith(prefix) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$/.test(f) && owner(units, f)?.id === unit.id)
+  const configured = [...springConfigOwners(files, units)].filter(([, us]) => us.some((u) => u.id === unit.id)).map(([f]) => f)
+  for (const file of [...own, ...configured]) {
+    const text = files.read(file)
+    const keys = keysOf(text)
+    for (const [i, line] of text.split('\n').entries()) {
+      if (!key.test(keys[i]) || /^\s*#/.test(line)) continue
+      const value = /[:=]\s*["']?([^"'#\s]+)/.exec(line.slice(line.indexOf(keys[i].split('.').pop()!)))?.[1]
+      if (value) return value.replace(/^\$\{[\w.-]+:([^}]*)\}$/, '$1')
+    }
+  }
+  return undefined
+}

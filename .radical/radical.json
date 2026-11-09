@@ -3369,6 +3369,18 @@
     ] },
     { "element": "6f8ef9f8-2ad5-42c8-a4bd-6a3dbd1a5746", "name": "Tests and join tables left out of the score", "tests": [
       "packages/assay/tests/score.test.ts › radical assay: an agent's model on the bench › counts no units of tests nor join tables as missed, and a unit a database rests on through its service as built"
+    ] },
+    { "element": "c6ca816b-d9d4-43b5-8a01-5c56a978092b", "name": "Spring routes in their class, their context and their clients", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads a Spring controller's routes under its class and context path, and none of a Feign client or a comment"
+    ] },
+    { "element": "4d6fafbb-01f9-49e3-8f81-ba3226fa4f6c", "name": "ASP.NET Core routes from class and action templates", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads an ASP.NET Core controller's routes from its class and action templates"
+    ] },
+    { "element": "92fb0cf5-9758-4cb6-9b6b-ef7c1b9e5654", "name": "Assay's syntax trees tests", "tests": [
+      "packages/assay/tests/syntax.test.ts"
+    ] },
+    { "element": "c32eac71-fa0f-499c-8240-6c834b1b0c2a", "name": "MVC routes by convention", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › routes an MVC controller with no route template by convention"
     ] }
   ]
 }

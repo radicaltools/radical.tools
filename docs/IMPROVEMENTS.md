@@ -359,6 +359,32 @@ three times alone in 7.6 s; the change does not touch reading .radical files.
 several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
+`apps/e2e/tests/studio/search.spec.ts › a pick on a wiki opens the element's
+page, and the highlighted result stays in sight` failed in a full local run on
+feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
+runs alone (`boundingBox()` null while the list re-renders, line 123); then
+8 of 8 passed, as 8 of 8 did on main.
+
+### Dogfooding (2026-11-09): Assay reads code through syntax trees
+
+Routes in Java and C# are read from tree-sitter's syntax trees (ADR Assay
+reads code through syntax trees); the bench reads as before, and each route
+lost on its repositories was a Feign client's method. The CLI's and the MCP
+server's packages ship the runtime and two grammars (Java 0.4 MB, C# 5 MB;
+2.45 MB packed); the runtime is CommonJS and ships as `tree-sitter.cjs`,
+which only the package test (an installed bundle parsing a controller)
+caught. Next, in order:
+
+- **SQL in strings and schemas** (`node-sql-parser` or tree-sitter's SQL):
+  Dapper's `CREATE TABLE` in C# strings, columns and foreign keys.
+- **ORM classes** (JPA, Entity Framework Core, Django, Room) from the tree:
+  attributes in any order, nesting, a Django foreign key's target model.
+- **HTTP clients and string literals** in code.ts: a string's parts joined
+  (`"http://" + host + "/x"`), comments ignored without a pass of their own.
+- **Grammars missing from the package**: Kotlin (routes still by text),
+  Elixir, VB6 (an ANTLR grammar exists in TypeScript), SQL.
+- **Minimal APIs** (`MapGet`, `MapGroup`) are still read by text, and their
+  paths lack a leading slash.
 
 ### Dogfooding (2026-11-08): nine more repositories held out
 

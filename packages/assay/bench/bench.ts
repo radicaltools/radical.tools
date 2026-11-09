@@ -9,12 +9,13 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import MDBReader from 'mdb-reader'
-import { accessReaderOf, extractRepository, linkRepositories, type Link, type RepositoryFacts } from '../src/index'
+import { accessReaderOf, extractRepository, linkRepositories, prepareSyntax, type Link, type RepositoryFacts } from '../src/index'
 
 interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; judge?: 'runtime' }
 const bench = JSON.parse(readFileSync(fileURLToPath(new URL('./bench.json', import.meta.url)), 'utf8')) as { repositories: Expected[]; heldOut: Expected[] }
 // --held-out: the repositories no rule was tuned on.
 const heldOut = process.argv.includes('--held-out')
+await prepareSyntax()
 const cache = process.env.ASSAY_BENCH ?? join(homedir(), '.cache', 'radical-assay-bench')
 mkdirSync(cache, { recursive: true })
 
