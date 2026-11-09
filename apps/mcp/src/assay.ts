@@ -31,13 +31,27 @@ import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, prepareSyntax, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
   accessReaderOf, emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
-  type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
+  type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type RoutineFact, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
 import MDBReader from 'mdb-reader'
 import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
+
+/** Stored routines with each package's members folded into the package's row: a member by its id, name in the
+ *  package, kind and line (with its file where the package's is another), and the tables and routines it uses. */
+function foldPackages(routines: RoutineFact[]): Array<RoutineFact | (RoutineFact & { members: unknown[] })> {
+  const packages = new Map(routines.filter((r) => r.kind === 'package').map((r) => [`${r.unit ?? ''}|${r.name}`, { ...r, members: [] as unknown[] }]))
+  const out: Array<RoutineFact | (RoutineFact & { members: unknown[] })> = []
+  for (const r of routines) {
+    if (r.kind === 'package') { out.push(packages.get(`${r.unit ?? ''}|${r.name}`)!); continue }
+    const pkg = r.name.includes('.') ? packages.get(`${r.unit ?? ''}|${r.name.split('.')[0]}`) : undefined
+    if (!pkg) { out.push(r); continue }
+    pkg.members.push({ id: r.id, name: r.name.split('.').slice(1).join('.'), kind: r.kind, line: r.evidence.file === pkg.evidence.file ? r.evidence.line : `${r.evidence.file}:${r.evidence.line}`, ...(r.reads?.length ? { reads: r.reads } : {}), ...(r.writes?.length ? { writes: r.writes } : {}), ...(r.calls?.length ? { calls: r.calls } : {}) })
+  }
+  return out
+}
 
 /** Reads the Access files of the code: their tables, columns and relationships. */
 const ACCESS = accessReaderOf(MDBReader)
@@ -96,18 +110,20 @@ export const ASSAY_PROCEDURE = [
   '   metrics, logs) stay out unless the user wants them. People (person elements) only where the documents name them,',
   '   inferred, citing the lines. Relations of type interacts from the links, directed from the caller to what it calls,',
   '   labelled with what one does with the other (follow the model\'s own direction where it already has relations); a',
-  '   data link\'s via names the deployed service the database runs on (with no via, relate to the database only); a',
-  '   message link (a unit publishing on a topic, queue or message type another consumes) is a relation from the publisher',
-  '   to the consumer labelled with the channel, asynchronous, beside each one\'s relation to the queue it uses. A unit',
-  '   of stack sql (a database project: a Sqitch project, a folder of a schema\'s or a PL/SQL library\'s scripts) is the',
-  '   database its scripts build, a database element, not a container. Stored routines (assay_facts with kind "routines")',
-  '   are no elements: a database element names in its description the routines it holds (packages with their members,',
-  '   procedures, functions, triggers with their tables), citing their facts; a routine in no unit\'s folder is the',
-  '   database\'s its callers connect to. A routine link (code calling a stored routine) is a relation from the caller to',
-  '   the database holding the routine, labelled with what it calls ("calls hr_api.raise_salary"), observed, citing the',
-  '   link; a routine known only from the calls (called) is held by the database the caller connects to. A link between',
-  '   two database projects (one calling the other\'s routine or referencing its table) goes in the depending one\'s',
-  '   description. The',
+  '   data link\'s via names the deployed service the database runs on: the one database element stands for both, built',
+  '   from the database fact and citing the service (with no via, relate to the database only); a message link (a unit',
+  '   publishing on a topic, queue or message type another consumes) is a relation from the publisher to the consumer',
+  '   labelled with the channel, asynchronous, beside each one\'s relation to the queue it uses. Units of stack sql (a',
+  '   database\'s projects: a Sqitch project, the schemas or the PL/SQL library a repository of scripts holds) are the',
+  '   database their scripts build, a database element, not a container: those of one repository installed into one',
+  '   database (a library and its extras, the sample schemas of one instance) are one element built from all of them, its',
+  '   description naming each; demos and examples of a library stay out unless the user wants them, as tests do. Stored',
+  '   routines (assay_facts with kind "routines") are no elements: a database element names in its description the',
+  '   routines it holds (packages with their members, procedures, functions, triggers with their tables), citing their',
+  '   facts; a routine in no unit\'s folder is the database\'s its callers connect to. The routine links of one caller',
+  '   to one database are one relation, labelled with what it calls ("calls tic_open, tic_close and 2 more"), observed,',
+  '   citing the links (a call in a string the page only shows is no call: leave it out); a routine known only from the',
+  '   calls (called) is held by the database the caller connects to. The',
   '   System context view shows systems and people only: relate each person to the system they use, and a system to',
   '   another where a link crosses them, inferred, citing those links (or, with no link, the address facts and the code',
   '   that show the call). What the documents name but no code shows (a',
@@ -997,7 +1013,9 @@ export class Assay {
           !unit || (k === 'units' ? f.id === unit : f.unit === unit || (!!f.service && runs.has(f.service)) || (k === 'groups' && !!f.units?.includes(unit)))
         // A form's layout is the wireframe's, not the agent's: its size and how many controls it has.
         const shown = (f: Record<string, unknown>) => (k === 'screens' && f.form ? { ...f, form: { width: (f.form as { width: number }).width, height: (f.form as { height: number }).height, controls: (f.form as { controls: unknown[] }).controls.length } } : f)
-        rows.push(...list.filter(mine).map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...shown(f as unknown as Record<string, unknown>) })))
+        // A package's members fold into its row, each short (a library of 56 packages lists 830 routines).
+        const folded = k === 'routines' ? foldPackages(list.filter(mine) as unknown as RoutineFact[]) : list.filter(mine)
+        rows.push(...folded.map((f) => ({ fact: { addresses: 'address', dependencies: 'dependency', entries: 'entry' }[k] ?? k.replace(/s$/, ''), ...shown(f as unknown as Record<string, unknown>) })))
       }
     }
     const from = Math.max(0, offset ?? 0)
@@ -1159,7 +1177,7 @@ export class Assay {
         ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
-      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}"`).join(', ')}: no unit's code names their tables (a schema file is no use of them). Relate the element that holds or uses their data yourself, inferred, citing the code, if one does.`] : []),
+      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}`).join(', ')}: no unit's code names their tables (a schema file is no use of them), though a stored routine may use them. Relate the element that holds or uses their data yourself (a container calling those routines), inferred, citing the code or the routine facts, if one does.`] : []),
       ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts${plan.stateMachines.every((m) => !(m.facts ?? []).length) ? ' (the machines cite no state fact: that is expected)' : ''} (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
@@ -1218,7 +1236,12 @@ export class Assay {
       const names = new Set(e.tables.map((id) => tableName(table(id)?.table ?? '')))
       // A schema file alone names it nowhere a unit uses it.
       const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
-      if (!named.some((t) => builtFrom(t.unit).length)) this.unrealised.push(e.label)
+      if (!named.some((t) => builtFrom(t.unit).length)) {
+        // The stored routines that write or read its tables say where its data is used.
+        const routines = [...run.facts.values()].filter((f) => f.kind === 'routine').map((f) => f.fact as RoutineFact)
+          .filter((r) => [...(r.writes ?? []), ...(r.reads ?? [])].some((t) => names.has(tableName(t)))).map((r) => r.name)
+        this.unrealised.push(routines.length ? `${e.label}" (its tables used by the stored routines ${[...new Set(routines)].slice(0, 6).join(', ')}${routines.length > 6 ? ', …' : ''})` : `${e.label}"`)
+      }
       for (const unit of new Set(named.map((t) => t.unit))) {
         for (const element of builtFrom(unit)) {
           if (realised.has(`${element}->${e.key}`)) continue

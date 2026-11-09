@@ -69,6 +69,31 @@ function many(): string {
 
 describe('Radical Assay over MCP', () => {
 
+  it("lists a package's members in its row, each short, when assay_facts lists the stored routines, and names them for an entity no unit's code uses", async () => {
+    const { call } = await central(() => {
+      const dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'assay-plsql-'))), 'code')
+      const root = join(dir, 'lib')
+      mkdirSync(join(root, 'ora'), { recursive: true })
+      writeFileSync(join(root, 'ora', 'pdf.pks'), 'CREATE OR REPLACE PACKAGE pdf AS\n  PROCEDURE add_page;\n  FUNCTION render RETURN BLOB;\nEND pdf;\n/\n')
+      writeFileSync(join(root, 'ora', 'pdf.pkb'), 'CREATE OR REPLACE PACKAGE BODY pdf AS\n  PROCEDURE add_page IS\n  BEGIN\n    INSERT INTO pages (id) VALUES (1);\n  END add_page;\n  FUNCTION render RETURN BLOB IS\n  BEGIN\n    add_page;\n    RETURN NULL;\n  END render;\nEND pdf;\n/\n')
+      writeFileSync(join(root, 'ora', 'tables.sql'), 'CREATE TABLE pages (id NUMBER(6));\n')
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      return dir
+    })
+    expect((await call('assay_start', { directories: ['../code'] })).ok).toBe(true)
+    const { facts } = JSON.parse((await call('assay_facts', { kind: 'routines' })).text)
+    expect(facts).toMatchObject([{ fact: 'routine', name: 'pdf', kind: 'package', members: [
+      { id: 'lib:routine:ora:pdf.add_page', name: 'add_page', kind: 'procedure', line: 2, writes: ['pages'] },
+      { id: 'lib:routine:ora:pdf.render', name: 'render', kind: 'function', line: 6, calls: ['pdf.add_page'] },
+    ] }])
+    // An entity on a table only a stored routine uses: the domain stage names the routine.
+    const applied = await call('assay_apply', { plan: {
+      elements: [{ key: 'docs', type: 'domain', label: 'Documents', facts: ['lib:table:ora:pages'], confidence: 'inferred' }],
+      entities: [{ key: 'page', label: 'Page', tables: ['lib:table:ora:pages'], parent: 'docs' }],
+    } })
+    expect(applied.text).toContain('No element realises "Page" (its tables used by the stored routines pdf.add_page)')
+  })
+
   it('answers assay_start in brief, gives the procedure apart, and pages the links by size', async () => {
     const { call } = await central(many)
     const started = await call('assay_start', { directories: ['../code'] })

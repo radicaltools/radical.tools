@@ -21,7 +21,13 @@ const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|w
 const SYSTEM_PATH = /^\/(usr|dev|etc|tmp|var|bin|sbin|opt|proc|mnt|srv|nix|private)(\/|$)|^\/(Users|Library|System|Volumes)\//
 
 /** A URL path a string names, normalized ("/orders/{}"), or null when it names none. */
+/** A vocabulary's domain (schema.org in JSON-LD, w3.org in a namespace) or a code host's (github.com): it names a
+ *  standard or a project's page (its API, api.github.com, is a service), and its paths are no routes. */
+export const NOT_SERVICE_HOST = /(^|\.)(schema\.org|w3\.org|json-schema\.org|xmlsoap\.org|purl\.org|ogp\.me|openxmlformats\.org|schemas\.microsoft\.com|tempuri\.org)$|^(www\.)?(github\.com|gitlab\.com|bitbucket\.org)$/i
+
 export function urlPathOf(literal: string): string | null {
+  const host = /^https?:\/\/([^/\s:]+)/i.exec(literal)?.[1]
+  if (host && NOT_SERVICE_HOST.test(host)) return null
   // A host, or a variable holding one (`${API}/orders`), goes.
   let path = literal.replace(/^https?:\/\/[^/\s]+/i, '').replace(/^\$\{[^}]*\}/, '')
   if (!path.startsWith('/') || path.startsWith('//')) return null
@@ -269,6 +275,19 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
   for (const [file, unit] of readings) {
     const ext = extname(file).toLowerCase()
     const config = CONFIG.test(file)
+    // An Oracle package's addresses: the services its PL/SQL calls through UTL_HTTP ('https://hooks.slack.com/…').
+    if (/\.(pks|pkb|pck|pls|plb|spc|bdy)$/i.test(file) && unit && !TEST_FILE.test(file)) {
+      const sql = files.read(file)
+      for (const m of sql.matchAll(/'(https?:\/\/[^'\s]+)'/g)) {
+        // (A page's link, htp.anchor or href, is the user's to open; a namespace, xmlns, names no service.)
+        if (/\bhtp\.(anchor|a)\b|\bhtf\.anchor\b/i.test(lineTextAt(sql, m.index!)) || NOT_CALLED.test(lineTextAt(sql, m.index!))) continue
+        for (const a of addressesIn(m[1], false).filter((x) => !NOT_SERVICE_HOST.test(x.host))) {
+          const id = `${repo}:address:${unit.path}:${a.text}`
+          if (!out.addresses.some((x) => x.id === id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: { file, line: lineAt(sql, m.index!) } })
+        }
+      }
+      continue
+    }
     if (!SOURCE.has(ext) && !config) continue
     // A test's settings (src/test/resources: an in-memory database, a stub's address) are the test's, not the system's.
     if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config) || (config && /(^|\/)(src\/test|testdata|fixtures?|__fixtures__)\//.test(file))) continue
@@ -321,9 +340,9 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       out.databases.push({ id, unit: unit.id, engine: db.engine, ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
     }
 
-    // A .NET project on SQLite (Microsoft.EntityFrameworkCore.Sqlite, Microsoft.Data.Sqlite): its settings'
-    // "Data Source=discountdb" alone names the database file.
-    if (config && /(^|\/)appsettings(\.[\w-]+)?\.json$/i.test(file) && /\bSqlite\b/i.test(files.read(unit.evidence.file))) {
+    // A .NET project on SQLite (Microsoft.EntityFrameworkCore.Sqlite, Microsoft.Data.Sqlite): its settings' (appsettings,
+    // App.config) or its code's "Data Source=discountdb" (UseSqlite("Data Source=pets.db")) alone names the database file.
+    if (((config && /(^|\/)(appsettings(\.[\w-]+)?\.json|app\.config|web\.config)$/i.test(file)) || /\.cs$/i.test(file)) && /\bSqlite\b/i.test(files.read(unit.evidence.file))) {
       for (const m of text.matchAll(/"Data Source\s*=\s*([\w.-]+)"/gi)) {
         const id = `${repo}:db:${unit.path}:SQLite/${m[1]}`
         if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'SQLite', name: m[1], evidence: at(m.index!) })
