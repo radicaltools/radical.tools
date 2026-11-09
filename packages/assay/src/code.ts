@@ -14,7 +14,7 @@ import { settingsFor, springConfigOwners } from './spring'
 import { inlineValues, vbValues, type VbValues } from './values'
 
 const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.ex', '.exs', '.rs', '.scala', '.fs'])
-const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
+const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl|ora)$|(^|\/)\.env(\.[\w-]+)?$/i
 /** Paths that name a file, not an endpoint. */
 const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
 /** Folders of a machine, not of an API. */
@@ -161,6 +161,14 @@ export function connectionOf(text: string): { engine: string; server?: string; n
   }
   const dsn = field('DSN')
   if (dsn) return { engine: 'ODBC', name: dsn }
+  // Oracle: a TNS descriptor (HOST=, SERVICE_NAME= or SID=), JDBC's thin or OCI URL (@//host:port/service, @host:port:SID),
+  // or an Easy Connect string (host:port/service).
+  const descriptor = /\(\s*DESCRIPTION\s*=\s*\(/i.test(text) ? { host: /\(\s*HOST\s*=\s*([^)\s]+)\s*\)/i.exec(text)?.[1], name: /\(\s*(?:SERVICE_NAME|SID)\s*=\s*([^)\s]+)\s*\)/i.exec(text)?.[1] } : undefined
+  if (descriptor) return { engine: 'Oracle', ...(descriptor.host ? { server: descriptor.host } : {}), ...(descriptor.name ? { name: descriptor.name } : {}), explicit: true }
+  const thin = /jdbc:oracle:(?:thin|oci8?|kprb):(?:[^@\s"']*)?@(?:\/\/)?([\w.-]+)(?::\d+)?(?:[/:]([\w.$-]+))?/i.exec(text)
+  if (thin) return { engine: 'Oracle', server: thin[1], ...(thin[2] ? { name: thin[2] } : {}), explicit: true }
+  const easy = /^\s*(?:\/\/)?([A-Za-z][\w.-]*):\d{2,5}\/([\w.$-]+)\s*$/.exec(text)
+  if (easy) return { engine: 'Oracle', server: easy[1], name: easy[2] }
   const jdbc = /jdbc:([a-z]+)(?::[a-z]+)*:(?:\/\/|@)?([^/:;?\s"']+)?(?::\d+)?(?:[/:;](?:databaseName=)?([\w-]+))?/i.exec(text)
   if (jdbc) {
     const engine = { postgresql: 'PostgreSQL', mysql: 'MySQL', mariadb: 'MariaDB', sqlserver: 'SQL Server', oracle: 'Oracle', h2: 'H2', hsqldb: 'HSQLDB', db2: 'Db2' }[jdbc[1].toLowerCase()] ?? jdbc[1]
@@ -194,8 +202,11 @@ export function tablesOf(sql: string): string[] {
   // A statement, not a caption: SELECT … FROM, INSERT INTO, UPDATE … SET, DELETE FROM, MERGE INTO, WITH … AS.
   if (!/^\s*\(?\s*(select\b[\s\S]*\bfrom\b|insert\s+into\b|update\s+\S+\s+set\b|delete\s+from\b|merge\s+into\b|with\s+\w+\s+as\b)/i.test(sql)) return []
   const out = new Set<string>()
-  for (const m of sql.matchAll(/\b(?:from|join|into|update|table)\s+[[`"]?([A-Za-z_][\w$]*)[\]`"]?(?:\s*\.\s*[[`"]?([A-Za-z_][\w$]*)[\]`"]?)?/gi)) {
-    const name = m[2] ? `${m[1]}.${m[2]}` : m[1]
+  // (A SELECT's INTO names a variable: SELECT planet INTO target FROM …)
+  const select = /^\s*\(?\s*select\b/i.test(sql)
+  for (const m of sql.matchAll(/\b(from|join|into|update|table)\s+[[`"]?([A-Za-z_][\w$]*)[\]`"]?(?:\s*\.\s*[[`"]?([A-Za-z_][\w$]*)[\]`"]?)?/gi)) {
+    if (select && m[1].toLowerCase() === 'into') continue
+    const name = m[3] ? `${m[2]}.${m[3]}` : m[2]
     if (!NOT_TABLES.has(name.toLowerCase())) out.add(name)
   }
   return [...out]
@@ -281,6 +292,13 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     const at = (index: number) => ({ file, line: lineAt(text, index) })
 
     // Connection strings, in code and configuration alike.
+    // Oracle's Easy Connect and TNS strings a client is given (connectString, dsn, makedsn, Data Source=(DESCRIPTION=…)).
+    for (const m of deployment || CI.test(file) ? [] : text.matchAll(/\b(?:connectString|connect_string|dsn)\s*[=:]\s*["'](\/\/)?([A-Za-z][\w.-]*:\d{2,5}\/[\w.$-]+)["']|\bmakedsn\(\s*["']([\w.-]+)["']\s*,\s*\d+\s*,\s*(?:service_name|sid)\s*=\s*["']([\w.$-]+)["']|\(\s*DESCRIPTION\s*=(?=\s*\()(?:[^"'\n]|\n(?=\s*\())*/gi)) {
+      const db = m[2] ? connectionOf(m[2]) : m[3] ? { engine: 'Oracle', server: m[3], name: m[4] } : connectionOf(m[0])
+      if (!db) continue
+      const id = `${repo}:db:${unit.path}:Oracle/${db.name ?? db.server ?? ''}`
+      if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'Oracle', ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
+    }
     for (const m of deployment || CI.test(file) ? [] : text.matchAll(/\bclickhouse:\/\/[^\s"'<]+|\bhttps?:\/\/[\w.-]+:8123\/[\w-]+|\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
       const db = connectionOf(m[0])
       if (!db) continue

@@ -198,6 +198,19 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
           const id = `${repo}:db:${unit!.path}:${db.engine}/${db.name}`
           if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit!.id, engine: db.engine, name: db.name, ...(db.server ? { server: db.server.replace(/[,:]\d+$/, '') } : {}), evidence: { file, line: lineOf(text, value.slice(0, 40)) } })
         }
+        // libpq's own settings (PGDATABASE, PGHOST: pgx, node-postgres, psycopg read them), a socket's path naming no host.
+        const pg = (key: string): string | undefined => {
+          const env = def.environment
+          if (Array.isArray(env)) return env.map(String).find((e) => e.startsWith(`${key}=`))?.slice(key.length + 1)
+          const value = env && typeof env === 'object' ? (env as Record<string, unknown>)[key] : undefined
+          return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined
+        }
+        const pgName = unit ? pg('PGDATABASE') : undefined
+        if (pgName && !/[$%{}]/.test(pgName)) {
+          const host = pg('PGHOST')
+          const id = `${repo}:db:${unit!.path}:PostgreSQL/${pgName}`
+          if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit!.id, engine: 'PostgreSQL', name: pgName, ...(host && !host.startsWith('/') && !/[$%{}]/.test(host) ? { server: host } : {}), evidence: { file, line: lineOf(text, 'PGDATABASE') } })
+        }
       }
       continue
     }

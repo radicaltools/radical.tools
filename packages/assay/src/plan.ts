@@ -13,7 +13,7 @@
 // check when it is written.
 
 import { citationProblem, pathProblem, type Citation, type PlanPath } from './cite'
-import type { DependencyFact, Link, RepositoryFacts, ServiceFact, StateFact, TableFact, TestFact, Unit, factIndex } from './facts'
+import type { DependencyFact, Link, RepositoryFacts, RoutineFact, ServiceFact, StateFact, TableFact, TestFact, Unit, factIndex } from './facts'
 
 export type FactIndex = ReturnType<typeof factIndex>
 
@@ -309,17 +309,20 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
   })
   const elementKeys = new Set([...plan.elements.map((e) => e.key), ...plan.entities.map((e) => e.key), ...plan.mockups.map((m) => m.key)])
   const needKeys = new Set(plan.needs.map((n) => n.key))
-  /** What an end of a relation is built from or stands for: units, services, databases (and the units services run). */
+  /** What an end of a relation is built from or stands for: units, services, databases, stored routines (and the units
+   *  services run, and the routines a database project's unit holds). */
+  const routineFacts = [...facts.entries()].filter(([, f]) => f.kind === 'routine').map(([id, f]) => ({ id, unit: (f.fact as RoutineFact).unit }))
   const ends = (ref: unknown): Set<string> => {
     const e = plan.elements.find((x) => x.key === ref)
     const ids = e ? [...(strings(e.units) ? e.units : []), ...(strings(e.facts) ? e.facts : [])] : typeof ref === 'string' ? factsOf(ref) : []
     const out = new Set<string>()
     for (const id of ids) {
       const f = facts.get(id)
-      if (!f || !['unit', 'service', 'database'].includes(f.kind)) continue
+      if (!f || !['unit', 'service', 'database', 'routine'].includes(f.kind)) continue
       out.add(id)
       const unit = (f.fact as ServiceFact).unit
       if (f.kind === 'service' && unit) out.add(unit)
+      if (f.kind === 'unit') for (const r of routineFacts) if (r.unit === id) out.add(r.id)
     }
     return out
   }

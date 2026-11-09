@@ -3435,6 +3435,27 @@
     ] },
     { "element": "8d273868-d5d5-4197-ab47-b403c92fda32", "name": "The program named as its module, no subdomain names", "tests": [
       "packages/assay/tests/brokers.test.ts › radical assay: brokers and their messages, in any stack › builds a Go module's shared code with the program named as it is, and names no unit by a public subdomain's first label"
+    ] },
+    { "element": "18420077-cbda-4459-b73b-a25a6e2a923e", "name": "An Oracle schema's PL/SQL", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads a repository of an Oracle schema alone: its tables and its PL/SQL, a package's members, a procedure, a trigger, and what each touches"
+    ] },
+    { "element": "c3521fce-7786-4b8d-8903-003927f18fef", "name": "Procedures, functions and triggers in three dialects", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads SQL Server's procedures, PostgreSQL's functions and triggers, and MySQL's procedures"
+    ] },
+    { "element": "a724ed72-0c22-4f41-a7bb-760ce3622b2e", "name": "Package members, strings and a database's final state", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads a package's members only, not their local subprograms, past strings holding -- and q'[…]', and a database's final state"
+    ] },
+    { "element": "b685575b-9faa-4411-9aa6-088aa2772f60", "name": "Schemas, Sqitch, PGDATABASE and selected functions", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads Oracle's schemas referencing each other's tables, a Sqitch project beside the apps, PGDATABASE, and the functions a query selects"
+    ] },
+    { "element": "1a6188ec-7604-4997-820a-35494ced8991", "name": "Code calling stored routines", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › links the code calling a routine to it: JDBC, Spring's SimpleJdbcCall, JPA, ADO.NET, Dapper, VB6, Python, and one the database holds"
+    ] },
+    { "element": "c1d54ae2-a214-4b06-bcb9-7432d39e3427", "name": "An Ant project, constants and SQL that is none", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads an Ant project, the routine names a constant holds, and no SQL in a VB comment, an annotation or a caption"
+    ] },
+    { "element": "6e044ae9-1a72-4031-a1b6-f8537cafc305", "name": "Oracle's connections", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads the Oracle database a JDBC URL, a TNS descriptor, an Easy Connect string and makedsn name"
     ] }
   ]
 }

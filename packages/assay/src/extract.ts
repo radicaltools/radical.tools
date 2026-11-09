@@ -22,6 +22,7 @@ import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Uni
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
 import { CONVENTIONS } from './link'
 import { readMessages } from './messages'
+import { readRoutineCalls } from './routines'
 import { readRuntime } from './runtime'
 import { readDocuments } from './sources'
 import { readStacks } from './stacks'
@@ -89,7 +90,7 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.dependencies = stacks.dependencies
   facts.groups = stacks.groups
   facts.notes.push(...stacks.notes)
-  if (!facts.units.length) facts.notes.push('no unit of a stack Assay reads (npm, Maven, Gradle, Go, .NET, Python, VB6, a Dockerfile): cite the code instead')
+  if (!facts.units.length) facts.notes.push('no unit of a stack Assay reads (npm, Maven, Gradle, Ant, Go, .NET, Python, VB6, SQL scripts, a Dockerfile): cite the code instead')
 
   const runtime = readRuntime(files, repo, facts.units)
   facts.services = runtime.services
@@ -142,6 +143,22 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     if (facts.services.some((s) => c.image!.test(`${s.image ?? ''} ${s.name}`)) || facts.units.some((u) => u.stack === 'docker' && c.image!.test(u.name))) continue
     const dep = facts.dependencies.find((d) => !d.target && c.client.test(d.package) && facts.units.find((u) => u.id === d.unit)?.kind === 'app')
     if (dep) facts.services.push({ id: `${repo}:service:${c.broker}`, name: c.broker!, role: 'queue', dependsOn: [], assumed: true, evidence: dep.evidence })
+  }
+  // The stored routines its scripts create, the code's calls of them, and a routine only called, which the database holds.
+  facts.routines = domain.routines
+  const declared = (name: string): boolean => facts.routines.some((r) => r.name === name || r.name.endsWith(`.${name}`) || name.endsWith(`.${r.name}`))
+  // A script's call by the routine's own name, of one its unit creates not: a package body's add_font( is its own.
+  const elsewhere = (c: { unit: string; routine: string }): boolean => {
+    // (In its own dialect: MySQL's LAST_DAY() is no PostgreSQL script's last_day.)
+    const dialect = facts.routines.find((r) => r.unit === c.unit && r.dialect)?.dialect
+    const named = facts.routines.filter((r) => r.name === c.routine && !!r.unit && (!dialect || !r.dialect || r.dialect === dialect))
+    return named.some((r) => r.unit !== c.unit) && !named.some((r) => r.unit === c.unit) && !facts.routines.some((r) => r.unit === c.unit && r.name.endsWith(`.${c.routine}`))
+  }
+  facts.routineCalls = readRoutineCalls(files, repo, facts.units).filter((c) => c.via === 'SQL script' ? elsewhere(c) : c.via !== 'SQL function' || declared(c.routine))
+  for (const c of facts.routineCalls) {
+    if (declared(c.routine)) continue
+    const id = `${repo}:routine::${c.routine}`
+    if (!facts.routines.some((r) => r.id === id)) facts.routines.push({ id, name: c.routine, kind: 'procedure', called: true, evidence: c.evidence })
   }
   // The messages its units publish and consume, which link.ts joins by their channel.
   facts.messages = readMessages(files, repo, facts.units)

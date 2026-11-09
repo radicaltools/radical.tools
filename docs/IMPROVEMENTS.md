@@ -367,6 +367,36 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-09): stored routines, Oracle, and six database repositories held out
+
+Assay reads the routines SQL scripts create (PL/SQL packages and members,
+procedures, functions and triggers in four dialects) and the code's calls of
+them. Six database repositories were held out, written down before Assay read
+them (Oracle's sample schemas, Sakila in eight dialects, the Alexandria PL/SQL
+library, Schemaverse, two Java apps calling Oracle routines): untouched units
+19/22, calls 4/26, tables 55/77, routines 991/991 with 63 extra; now 22/22,
+26/26, 76/77 and 991/991 with 2 extra; tuned on now. Open:
+
+- **Routines as elements**: the metamodel allows no component inside a
+  database, so a database names its routines in its description and a call is
+  a relation to the database labelled with the routine. A routine of its own
+  (a component type of a database, or a component allowed there) would let a
+  view show which code calls which package.
+- **Tables no CREATE TABLE names**: Oracle XML DB's `purchaseorder`, created by
+  registering an XSD (`xdb:defaultTable`).
+- **A table dropped with its triggers**: Schemaverse's `event_id_dealer` went
+  with the event table it was on; a trigger stays until a script drops it.
+- **SQL a page only shows**: Schemaverse's web app shows `SELECT attack(…)` as
+  an example and never runs it; a string can't tell.
+- **A database project linked to the database it deploys to**: Sqitch's target
+  (`db:pg://schemaverse@db/schemaverse`) is read as an address of the database
+  image, not as the project's database.
+- **More callers**: Hibernate's `@NamedStoredProcedureQuery` beside JPA's,
+  Entity Framework's `FromSqlRaw("EXEC …")` reads only as a string, Oracle
+  Forms and Pro*C, COBOL's `EXEC SQL CALL`, and database links (`pkg.proc@remote`).
+- **An agent's run on a database repository**, as the procedure now asks
+  (database projects as databases, routines in their descriptions).
+
 ### Dogfooding (2026-11-09): large repositories, and nine held out outside Java
 
 Saleor, nopCommerce and Mattermost read in 1.4 to 8.7 s under 600 MB; an

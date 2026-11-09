@@ -122,6 +122,8 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     const best = listening.length > 1 ? Math.max(...listening.map(shared)) : 0
     const nearest = listening.length > 1 && best > 0 ? listening.filter((u) => shared(u) === best) : listening
     const byPort = (nearest.length === 1 ? nearest : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
+    // A vocabulary's domain (schema.org in JSON-LD, w3.org in a namespace) names a standard, no service.
+    if (/(^|\.)(schema\.org|w3\.org|json-schema\.org|xmlsoap\.org|purl\.org|ogp\.me|openxmlformats\.org|example\.(com|org|net))$/i.test(a.host)) continue
     // A subdomain of a public domain (api.github.com, docs.mattermost.com) names no unit by its first label; a product's
     // own domain (plausible.io) may name the unit serving it.
     const publicHost = /\.(com|org|net|io|dev|co|app|ai|cloud|info|biz|gov|edu|me|so|sh)(\.[a-z]{2})?$/i.test(a.host) && a.host.replace(/\.(co|com|org|net)\.[a-z]{2}$/i, '.x').split('.').length > 2
@@ -158,6 +160,35 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     const via = named ? named.unit?.id ?? named.service!.id : undefined
     const link = links.get(`link:data:${db.unit}->${db.id}`)
     if (link && via) link.via = via
+  }
+
+  // Routines: a unit's code calling a stored routine, the one a script of its own repository creates first, then any
+  // repository's, then the one known only from the calls.
+  const routines = repositories.flatMap((r) => r.routines ?? [])
+  const sameName = (r: { name: string }, call: string): boolean => r.name === call || r.name.endsWith(`.${call}`) || call.endsWith(`.${r.name}`)
+  for (const call of repositories.flatMap((r) => r.routineCalls ?? [])) {
+    // (A script's call names the routine as its database knows it.)
+    const candidates = routines.filter((r) => call.via === 'SQL script' ? r.name === call.routine : sameName(r, call.routine))
+    const declared = candidates.filter((r) => !r.called)
+    const own = declared.filter((r) => repoOf(r.id.replace(':routine:', ':unit:')) === repoOf(call.unit))
+    for (const r of (own.length ? own : declared.length ? declared : candidates).slice(0, 3)) add('routine', call.unit, r.id, 'observed', [call.id, r.id], `calls ${r.name}`)
+  }
+  // A database project calling another one's routine, or referencing a table only another one creates (a schema's
+  // foreign key to another schema's table), depends on it: Oracle's sample schemas, a PL/SQL library's demos.
+  const sqlUnits = new Set(units.filter((u) => u.stack === 'sql').map((u) => u.id))
+  for (const call of repositories.flatMap((r) => r.routineCalls ?? []).filter((c) => sqlUnits.has(c.unit))) {
+    const callee = [...new Set(routines.filter((r) => !r.called && r.unit && r.unit !== call.unit && r.name === call.routine).map((r) => r.unit!))]
+    for (const u of callee) add('routine', call.unit, u, 'observed', [call.id], `calls ${call.routine}`)
+  }
+  const bare = (table: string): string => table.split('.').pop()!.toLowerCase()
+  for (const r of repositories) {
+    for (const t of r.tables.filter((t) => sqlUnits.has(t.unit))) {
+      for (const ref of t.references ?? []) {
+        if (r.tables.some((x) => x.unit === t.unit && bare(x.table) === bare(ref.table))) continue
+        const owners = [...new Set(r.tables.filter((x) => sqlUnits.has(x.unit) && bare(x.table) === bare(ref.table)).map((x) => x.unit))]
+        if (owners.length === 1) add('data', t.unit, owners[0], 'observed', [t.id], `references ${ref.table}`)
+      }
+    }
   }
 
   // Messages: a unit that publishes on a channel (a topic, a queue, a message type) calls each unit consuming it, those

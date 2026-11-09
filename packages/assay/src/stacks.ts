@@ -1,8 +1,9 @@
 // ─── Radical Assay: units of every stack ─────────────────────────────────────
 //
 // Each reader finds the units of its stack anywhere in the repository and
-// the dependencies each manifest states: npm, Maven, Gradle, Go, .NET,
-// Python, PHP, Ruby, Elixir, Rust, VB6, and a folder with only a
+// the dependencies each manifest states: npm, Maven, Gradle, Ant, Go, .NET,
+// Python, PHP, Ruby, Elixir, Rust, VB6, a database's scripts (a Sqitch
+// project, a repository of SQL alone), and a folder with only a
 // Dockerfile. A reference by path (a .NET ProjectReference, a VB6 project
 // reference, a Gradle project(':x'), a gem, mix or Cargo path dependency)
 // names its unit at once; a reference by name is resolved when the units of
@@ -230,6 +231,32 @@ function maven(files: RepoFiles): Draft[] {
     const description = tag(own, 'description')
     if (description) d.description = description
     d.tests = !d.reasons.length && TESTS.test(`${artifactId} ${path}`)
+    out.push(d)
+  }
+  return out
+}
+
+// ── Ant ──────────────────────────────────────────────────────────────────────
+
+/** An Ant build (build.xml) of Java code, a NetBeans project's among them, where no pom.xml or Gradle build stands beside
+ *  it: its project's name, the jars it references (ojdbc6.jar), and the main class it runs. */
+function ant(files: RepoFiles): Draft[] {
+  const out: Draft[] = []
+  for (const file of files.named(/^build\.xml$/).filter((f) => !inTests(f))) {
+    const path = dirOf(file)
+    const prefix = path === '.' ? '' : `${path}/`
+    const text = files.read(file)
+    const netbeans = files.has(`${prefix}nbproject/project.xml`)
+    if (!/<project\b/.test(text) || !(netbeans || /<javac\b/.test(text)) || files.has(`${prefix}pom.xml`) || files.has(`${prefix}build.gradle`) || files.has(`${prefix}build.gradle.kts`)) continue
+    const name = /<project\b[^>]*\bname\s*=\s*"([^"]+)"/.exec(text)?.[1] ?? basename(path === '.' ? files.root : path)
+    const d = draft('ant', path, file, name, lineOf(text, '<project'))
+    d.aliases.push(name)
+    const properties = files.read(`${prefix}nbproject/project.properties`)
+    for (const m of properties.matchAll(/^file\.reference\.([\w.-]+?)\.jar\s*=/gm)) d.deps.push(m[1])
+    const main = /^main\.class\s*=\s*(\S+)/m.exec(properties)?.[1]
+    if (main) d.reasons.push(`its NetBeans project runs ${main}`)
+    else if (files.list.some((f) => f.startsWith(prefix) && /\.java$/.test(f) && /\bpublic\s+static\s+void\s+main\s*\(/.test(files.read(f)))) d.reasons.push('it has a main method')
+    d.tests = !d.reasons.length && TESTS.test(`${name} ${path}`)
     out.push(d)
   }
   return out
@@ -577,6 +604,37 @@ function rust(files: RepoFiles): Draft[] {
   return out
 }
 
+// ── A database's scripts ─────────────────────────────────────────────────────
+
+/** A script that creates a database's objects: tables, views, procedures, functions, packages, triggers. */
+const DDL = /\bcreate\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:non)?editionable\s+|global\s+temporary\s+)?(?:table|view|procedure|proc|function|package|trigger)\b/i
+const SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
+
+/** A database's projects: a Sqitch project (sqitch.plan) beside any units, and in a repository made of a database's
+ *  scripts alone, each highest folder holding them (one schema's or one library's), a folder of migrations or seed data
+ *  alone being none. Where the repository has units, its other scripts are the schema and the routines of the database
+ *  those units use (domain.ts). */
+function sqlFolders(files: RepoFiles, claimed: string[]): Draft[] {
+  const sqitch = files.named(/^sqitch\.plan$/).map(dirOf).filter((path) => !claimed.includes(path) && !inTests(`${path}/`))
+  const projects = sqitch.map((path) => {
+    const d = draft('sql', path, path === '.' ? 'sqitch.plan' : `${path}/sqitch.plan`, undefined, 1)
+    d.aliases.push(basename(path === '.' ? files.root : path))
+    return d
+  })
+  if (claimed.length) return projects
+  const inUnit = (f: string): boolean => [...claimed, ...sqitch].some((c) => c === '.' || f.startsWith(`${c}/`))
+  const scripts = files.list.filter((f) => SCRIPT.test(f) && !inTests(f) && !inUnit(f) && !/(^|\/)(migrations?|db\/migrate|seeds?)\//i.test(f) && DDL.test(files.read(f)))
+  const dirs = [...new Set(scripts.map(dirOf))].sort((a, b) => a.length - b.length)
+  const kept: string[] = []
+  for (const d of dirs) if (!kept.some((k) => k === '.' || d.startsWith(`${k}/`))) kept.push(d)
+  const under = (dir: string) => scripts.filter((f) => dir === '.' || f.startsWith(`${dir}/`))
+  return [...projects, ...kept.map((path) => {
+    const d = draft('sql', path, under(path)[0], undefined, 1)
+    d.aliases.push(basename(path === '.' ? files.root : path))
+    return d
+  })]
+}
+
 // ── Python ───────────────────────────────────────────────────────────────────
 
 function python(files: RepoFiles): Draft[] {
@@ -742,7 +800,9 @@ function docker(files: RepoFiles, claimed: Set<string>, moves: Map<string, strin
     // image of its own: a broker with an agent added, a server fetched and built).
     const prefix = path === '.' ? '' : `${path}/`
     const local = [...text.matchAll(/^\s*(?:COPY|ADD)\s+((?:--\S+\s+)*)(?:\[\s*"([^"]+)"|(\S+))/gmi)].some((m) => !/--from=/i.test(m[1]) && !/^https?:\/\//i.test(m[2] ?? m[3]))
-    if (local && !files.list.some((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes('/') && !/^(Dockerfile|\.dockerignore|README(\.md)?)$/i.test(f.slice(prefix.length)))) continue
+    // (What it copies from below its folder is its own: a database image's initdb/ scripts.)
+    const own = (f: string): boolean => (!f.slice(prefix.length).includes('/') && !/^(Dockerfile|\.dockerignore|README(\.md)?)$/i.test(f.slice(prefix.length))) || copied.some((r) => r !== path && r.startsWith(prefix) && (f === r || f.startsWith(`${r}/`)))
+    if (local && !files.list.some((f) => f.startsWith(prefix) && own(f))) continue
     const d = draft('docker', path, file, undefined, lineOf(text, /^FROM\s/mi))
     d.reasons.push('it has a Dockerfile')
     const images = [...text.matchAll(/^FROM\s+(\S+)/gmi)].map((m) => m[1].toLowerCase())
@@ -765,7 +825,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
   const groups: GroupFact[] = []
   // A Composer, .NET, Ruby, Elixir or Rust project claims its folder before the package.json that builds its front end.
-  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
+  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...ant(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
   // Tooling's folders hold no unit; a folder of tests builds for tests.
   for (let i = drafts.length - 1; i >= 0; i--) if (inTooling(`${drafts[i].path}/`)) drafts.splice(i, 1)
   for (const d of drafts) if (underTests(d.path)) d.tests = true
@@ -788,6 +848,8 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     first.refs.push(...d.refs)
     first.reasons.push(...d.reasons.filter((x) => !first.reasons.includes(x)))
   }
+  // A folder of a database's scripts that no project claims is a unit of its own, as a .sqlproj is.
+  for (const d of sqlFolders(files, [...byPath.keys()])) byPath.set(d.path, d)
   const moves = new Map<string, string>()
   for (const d of docker(files, new Set(byPath.keys()), moves)) if (!inTooling(`${d.path}/`)) byPath.set(d.path, { ...d, tests: d.tests || underTests(d.path) })
   for (const [from, to] of moves) {
@@ -806,7 +868,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     if (files.has(`${prefix}Dockerfile`) && !d.reasons.includes('it has a Dockerfile')) d.reasons.push('it has a Dockerfile')
     const technology = new Set(technologyOf(d.deps))
     if (d.stack === 'docker') for (const img of d.deps) for (const [re, t] of BASE_IMAGES) if (re.test(img)) technology.add(t)
-    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', ruby: 'Ruby', elixir: 'Elixir', rust: 'Rust', vb6: 'VB6', docker: '' }[d.stack])
+    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', ant: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', ruby: 'Ruby', elixir: 'Elixir', rust: 'Rust', vb6: 'VB6', sql: 'SQL', docker: '' }[d.stack])
     technology.delete('')
     const id = `${repo}:unit:${d.path}`
     units.push({
