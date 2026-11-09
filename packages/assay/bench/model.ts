@@ -15,6 +15,8 @@ if (!central || !names.length) {
   process.exit(2)
 }
 const bench = JSON.parse(readFileSync(fileURLToPath(new URL('./bench.json', import.meta.url)), 'utf8')) as { repositories: Expectations[]; heldOut: Expectations[] }
+// microSecEnD's diagrams too (microsecend.json), judged either way.
+const microsecend = JSON.parse(readFileSync(fileURLToPath(new URL('./microsecend.json', import.meta.url)), 'utf8')) as { repositories: Expectations[] }
 
 /** Every file of the model folder, by its path from the folder. */
 function folderFiles(dir: string): FolderFiles {
@@ -51,7 +53,7 @@ const pct = (a: number, b: number): string => (b ? `${Math.round((100 * a) / b)}
 
 const totals = { units: [0, 0, 0], calls: [0, 0, 0], tables: [0, 0] }
 for (const name of names) {
-  const expected = [...bench.repositories, ...bench.heldOut].find((r) => r.name === name)
+  const expected = [...bench.repositories, ...bench.heldOut, ...microsecend.repositories].find((r) => r.name === name)
   if (!expected) { console.error(`no bench entry ${name}`); process.exit(2) }
   const s = scoreModel(expected, data.nodes, data.relations, written, facts)
   console.log(`\n${name}`)

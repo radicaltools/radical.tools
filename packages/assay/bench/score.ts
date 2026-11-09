@@ -16,6 +16,8 @@ export interface Expectations {
   optional: Array<[string, string]>
   tables?: string[]
   url?: string
+  /** A dataflow diagram's flows: a call either way, judged only between the diagram's nodes. */
+  undirected?: boolean
   /** Several repositories read together: their units named <repository>/<folder>. */
   repositories?: Array<{ name: string; url?: string }>
 }
@@ -80,13 +82,15 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
     if (!m || !repos.includes(m[1])) return undefined
     return `db:${(m[3] || m[2]).toLowerCase()}`
   }
-  /** A deployed service fact as the bench names it: the unit it runs, else service:<name>. */
-  const serviceName = (fact: string): string | undefined => {
+  /** A deployed service fact as the bench names it: the unit it runs, else service:<name> (undirected, both). */
+  const serviceNames = (fact: string): string[] => {
     const m = /^(.+?):service:(.+)$/.exec(fact)
-    if (!m || !repos.includes(m[1])) return undefined
+    if (!m || !repos.includes(m[1])) return []
     const unit = services[fact]?.unit
-    return unit ? unitName(unit) : `service:${(services[fact]?.name ?? m[2]).toLowerCase()}`
+    const named = `service:${(services[fact]?.name ?? m[2]).toLowerCase()}`
+    return unit ? [unitName(unit), ...(expected.undirected ? [named] : [])].filter((x): x is string => !!x) : [named]
   }
+  const serviceName = (fact: string): string | undefined => serviceNames(fact)[0]
   const facts = new Map(written.filter((w) => w.kind === 'element' || w.kind === 'entity').map((w) => [w.id, w.facts]))
   /** The names an element is called by: its units' folders, the databases it stands for. */
   const names = (id: string): string[] => {
@@ -94,7 +98,7 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
     const units = BUILT.has(type.get(id) ?? '') ? f.map(unitName).filter((x): x is string => !!x) : []
     const dbs = type.get(id) === 'database' ? f.map(dbName).filter((x): x is string => !!x) : []
     // An element resting on a deployed service (a queue, a database's container) stands for it.
-    const deployed = f.map(serviceName).filter((x): x is string => !!x)
+    const deployed = f.flatMap(serviceNames)
     return [...new Set([...units, ...dbs, ...deployed])]
   }
 
@@ -113,14 +117,17 @@ export function scoreModel(expected: Expectations, nodes: ModelNode[], relations
     ...(wanted.length < expected.units.length ? { tests: expected.units.filter((u) => !wanted.includes(u)) } : {}),
   }
 
-  const want = new Set(expected.calls.map(([a, b]) => lower(`${a} → ${b}`)))
-  const optional = new Set(expected.optional.map(([a, b]) => lower(`${a} → ${b}`)))
+  const call = (a: string, b: string): string => lower(expected.undirected ? [a, b].sort().join(' ↔ ') : `${a} → ${b}`)
+  const want = new Set(expected.calls.map(([a, b]) => call(a, b)))
+  const optional = new Set(expected.optional.map(([a, b]) => call(a, b)))
+  // A diagram judges only calls between its nodes.
+  const drawn = new Set([...expected.units, ...expected.calls.flat()].map((n) => n.toLowerCase()))
   const found = new Set<string>()
   for (const r of relations) {
     if (STRUCTURE.has(r.relationType ?? '')) continue
     // A library "bundled into" a container is the container's dependency on it, whichever way an agent drew it
     // (Assay's procedure draws it from the library).
-    const pair = (from: string, to: string): string[] => names(from).flatMap((a) => names(to).filter((b) => b !== a).map((b) => lower(`${a} → ${b}`)))
+    const pair = (from: string, to: string): string[] => names(from).flatMap((a) => names(to).filter((b) => b !== a && (!expected.undirected || (drawn.has(a.toLowerCase()) && drawn.has(b.toLowerCase())))).map((b) => call(a, b)))
     const pairs = /^bundled into$/i.test(r.label?.trim() ?? '') ? [...pair(r.targetId, r.sourceId), ...pair(r.sourceId, r.targetId)] : pair(r.sourceId, r.targetId)
     if (!pairs.length) continue
     found.add(pairs.find((p) => want.has(p)) ?? pairs.find((p) => optional.has(p)) ?? pairs[0])
