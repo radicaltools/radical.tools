@@ -3378,6 +3378,9 @@
     ] },
     { "element": "92fb0cf5-9758-4cb6-9b6b-ef7c1b9e5654", "name": "Assay's syntax trees tests", "tests": [
       "packages/assay/tests/syntax.test.ts"
+    ] },
+    { "element": "c32eac71-fa0f-499c-8240-6c834b1b0c2a", "name": "MVC routes by convention", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › routes an MVC controller with no route template by convention"
     ] }
   ]
 }
