@@ -3414,6 +3414,9 @@
     ] },
     { "element": "462552ba-f87e-43a5-b0a7-f8d6869616b4", "name": "A bus by message type, kafkajs and pika", "tests": [
       "packages/assay/tests/messages.test.ts › radical assay: the messages units exchange › reads a .NET bus by message type, and kafkajs and pika by their calls"
+    ] },
+    { "element": "24085eb1-d88b-44c7-8693-874aeff86d66", "name": "A JVM unit as it is", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a JVM unit as it is: the plugin it applies, the JUnit its tests import, the port it serves, not its tests' settings, no password"
     ] }
   ]
 }
