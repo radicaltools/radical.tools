@@ -323,25 +323,30 @@ function gradle(files: RepoFiles): Draft[] {
 
 // ── Go ───────────────────────────────────────────────────────────────────────
 
-/** Of a module's main packages, the one whose imports reach most of the module's packages (Mattermost's
- *  cmd/mattermost over mmctl and its generators); the only one, when there is one. */
-function primaryMain(files: RepoFiles, own: string[], module: string | undefined, path: string, mains: string[]): string {
-  if (mains.length === 1 || !module) return mains[0]
+/** A Go module's packages and what each imports: the module's own packages it reaches, and the paths beyond. */
+function goImports(files: RepoFiles, own: string[], module: string | undefined, path: string): { reach: (from: string) => Set<string>; external: (dirs: Set<string>) => Set<string> } {
   const prefix = path === '.' ? '' : `${path}/`
-  const imports = new Map<string, Set<string>>()
+  const inner = new Map<string, Set<string>>()
+  const outer = new Map<string, Set<string>>()
   for (const f of own.filter((x) => !x.endsWith('_test.go'))) {
     const dir = dirOf(f)
-    const set = imports.get(dir) ?? new Set<string>()
-    for (const m of files.read(f).matchAll(new RegExp(`"${escapeRe(module)}/([^"]+)"`, 'g'))) set.add(`${prefix}${m[1]}`)
-    imports.set(dir, set)
+    const text = files.read(f)
+    const block = /^import\s*\(([\s\S]*?)^\)/m.exec(text)?.[1] ?? ''
+    const paths = [...`${block}\n${[...text.matchAll(/^import\s+(?:\w+\s+)?("[^"]+")/gm)].map((m) => m[1]).join('\n')}`.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+    for (const p of paths) {
+      if (module && (p === module || p.startsWith(`${module}/`))) inner.set(dir, (inner.get(dir) ?? new Set()).add(`${prefix}${p.slice(module.length + 1)}`.replace(/\/$/, '') || path))
+      else outer.set(dir, (outer.get(dir) ?? new Set()).add(p))
+    }
   }
-  const reach = (from: string): number => {
-    const seen = new Set([from])
-    const queue = [from]
-    while (queue.length) for (const next of imports.get(queue.pop()!) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next) }
-    return seen.size
+  return {
+    reach: (from: string) => {
+      const seen = new Set([from])
+      const queue = [from]
+      while (queue.length) for (const next of inner.get(queue.pop()!) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next) }
+      return seen
+    },
+    external: (dirs: Set<string>) => new Set([...dirs].flatMap((d) => [...(outer.get(d) ?? [])])),
   }
-  return mains.map((m) => ({ m, n: reach(m) })).sort((a, b) => b.n - a.n)[0].m
 }
 
 function go(files: RepoFiles): Draft[] {
@@ -363,14 +368,23 @@ function go(files: RepoFiles): Draft[] {
     const replaced = new Map([...text.matchAll(/^\s*(?:replace\s+)?(\S+)(?:\s+v\S+)?\s+=>\s+(\.{1,2}\/\S*)\s*$/gm)].map((m) => [m[1], resolveFrom(path, m[2].replace(/\/$/, ''))]))
     const requires = [...text.matchAll(/^\s*(?:require\s+)?([a-z0-9.-]+\.[a-z]{2,}\/\S+)\s+v[\d.]+/gm)].map((m) => ({ dep: m[1], line: lineAt(text, m.index!) }))
     const at = mains.length === 1 ? [mains[0]] : mains.length ? mains : [path]
-    // The module's packages beside its main ones are shared code: the main that imports most of them builds them.
-    const primary = at.length && !at.includes(path) ? primaryMain(files, own, module, path, at) : undefined
+    // The module's packages beside its main ones are shared code: the main whose imports reach most of them builds them
+    // (Mattermost's cmd/mattermost over mmctl and its generators); each main depends on what the packages it reaches import.
+    const graph = goImports(files, own, module, path)
+    const reached = new Map(at.map((dir) => [dir, graph.reach(dir)]))
+    // The program named as the module or the repository is (cmd/mattermost in mattermost/server), else the one reaching most.
+    const names = new Set([...(module ?? '').split('/').slice(1).filter((x) => !/^v\d+$/.test(x)), basename(files.root)].map((x) => x.toLowerCase()))
+    const byName = at.filter((dir) => names.has(basename(dir).toLowerCase()))
+    const primary = at.length && !at.includes(path) ? (byName.length === 1 ? byName[0] : [...at].sort((a, b) => reached.get(b)!.size - reached.get(a)!.size)[0]) : undefined
     for (const dir of at) {
       const d = draft('go', dir, file, module ? (dir === path ? module : `${module}/${dir.slice(prefix.length)}`) : undefined, lineOf(text, /^module\s/m))
       if (mains.includes(dir)) d.reasons.push('it has a main package')
       if (dir === primary) d.shares = [path]
       d.aliases.push(basename(dir === '.' ? (module ?? '') : dir))
+      const imported = mains.length > 1 ? graph.external(reached.get(dir)!) : undefined
       for (const r of requires) {
+        // Of a module of several programs, a requirement only the packages a program reaches import.
+        if (imported && !replaced.has(r.dep) && ![...imported].some((p) => p === r.dep || p.startsWith(`${r.dep}/`))) continue
         const local = replaced.get(r.dep)
         if (local) d.refs.push({ name: r.dep, path: local, line: r.line, file })
         else { d.deps.push(r.dep); d.depLines.set(r.dep, { file, line: r.line }) }
@@ -581,6 +595,11 @@ function python(files: RepoFiles): Draft[] {
     d.aliases.push(basename(path === '.' ? '' : path))
     if (entry) d.reasons.push(`it has ${entry}`)
     else if (files.list.some((f) => f.startsWith(prefix) && f.endsWith('.py') && !f.slice(prefix.length).includes('/') && /if __name__ == ['"]__main__['"]/.test(files.read(f)))) d.reasons.push('it has a __main__ block')
+    // A pyproject's [project] dependencies and Poetry's, besides requirements.txt.
+    const declared = /^\[project\][^[]*?\bdependencies\s*=\s*\[([^\]]*)\]/ms.exec(pyproject)?.[1] ?? ''
+    for (const m of declared.matchAll(/["']\s*([A-Za-z0-9][A-Za-z0-9._-]*)/g)) if (!d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file: `${prefix}pyproject.toml`, line: lineOf(pyproject, new RegExp(`["']\\s*${escapeRe(m[1])}`)) }) }
+    const poetry = /^\[tool\.poetry\.dependencies\]([^[]*)/m.exec(pyproject)?.[1] ?? ''
+    for (const m of poetry.matchAll(/^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*=/gm)) if (m[1] !== 'python' && !d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file: `${prefix}pyproject.toml`, line: lineOf(pyproject, new RegExp(`^\\s*${escapeRe(m[1])}\\s*=`, 'm')) }) }
     const requirements = files.read(`${prefix}requirements.txt`)
     for (const [i, line] of requirements.split('\n').entries()) {
       const dep = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(line)?.[1]

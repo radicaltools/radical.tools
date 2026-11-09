@@ -260,7 +260,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     const config = CONFIG.test(file)
     if (!SOURCE.has(ext) && !config) continue
     // A test's settings (src/test/resources: an in-memory database, a stub's address) are the test's, not the system's.
-    if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config) || (config && /(^|\/)src\/test\//.test(file))) continue
+    if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config) || (config && /(^|\/)(src\/test|testdata|fixtures?|__fixtures__)\//.test(file))) continue
     let text = configures.has(file) ? settingsFor(files, file, unit) : files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".

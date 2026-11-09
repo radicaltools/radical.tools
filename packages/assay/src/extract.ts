@@ -20,6 +20,7 @@ import { readEntries } from './entries'
 import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
+import { CONVENTIONS } from './link'
 import { readMessages } from './messages'
 import { readRuntime } from './runtime'
 import { readDocuments } from './sources'
@@ -134,6 +135,14 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     facts.databases.push(db)
   }
   facts.entries = readEntries(files, repo, facts.units)
+  // A broker its apps' client library connects to by default (nats.DefaultURL, localhost:9092) that the repository deploys
+  // nowhere: a service of its own, assumed, resting on the first client's dependency.
+  for (const c of CONVENTIONS.filter((x) => x.broker && x.image)) {
+    // (A broker the repository builds is an image of a Dockerfile named for it, as rabbit-mq-server; a program named so is not.)
+    if (facts.services.some((s) => c.image!.test(`${s.image ?? ''} ${s.name}`)) || facts.units.some((u) => u.stack === 'docker' && c.image!.test(u.name))) continue
+    const dep = facts.dependencies.find((d) => !d.target && c.client.test(d.package) && facts.units.find((u) => u.id === d.unit)?.kind === 'app')
+    if (dep) facts.services.push({ id: `${repo}:service:${c.broker}`, name: c.broker!, role: 'queue', dependsOn: [], assumed: true, evidence: dep.evidence })
+  }
   // The messages its units publish and consume, which link.ts joins by their channel.
   facts.messages = readMessages(files, repo, facts.units)
   // A desktop application's forms are its screens, read from their files.

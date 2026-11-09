@@ -130,6 +130,9 @@ export interface ServiceFact {
   role: 'app' | 'database' | 'queue' | 'cache' | 'observability' | 'other'
   /** The services it depends on (docker-compose depends_on), by name. */
   dependsOn: string[]
+  /** A broker its clients' library connects to by default, deployed by nothing of the repository (its evidence: a
+   *  client's dependency). */
+  assumed?: boolean
   evidence: Evidence
 }
 
