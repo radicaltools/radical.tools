@@ -826,13 +826,13 @@ export function builtInGovernanceMetamodel(): Metamodel {
     label: 'Performed by',
     description: 'The person or part of the architecture that does the step.',
     inverseLabel: 'Performs',
-    allowedPairs: (['person', 'system', 'container', 'component', 'webapp'] as const).map(to => ({ from: 'step', to })),
+    allowedPairs: (['person', 'system', 'container', 'component', 'webapp', 'database'] as const).map(to => ({ from: 'step', to })),
     properties: [],
     color: '#0d9488',
     builtin: true,
   }
 
-  implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp'] as const).map(from => ({ from, to: 'state-machine' })))
+  implements_.allowedPairs.push(...(['system', 'container', 'component', 'webapp', 'database'] as const).map(from => ({ from, to: 'state-machine' })))
   satisfies.allowedPairs.push({ from: 'state-machine', to: 'requirement' }, { from: 'entity', to: 'requirement' })
   verifies.allowedPairs.push({ from: 'scenario', to: 'state-machine' }, { from: 'scenario', to: 'process' })
   satisfies.allowedPairs.push({ from: 'process', to: 'requirement' })

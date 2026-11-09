@@ -310,8 +310,8 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
   const elementKeys = new Set([...plan.elements.map((e) => e.key), ...plan.entities.map((e) => e.key), ...plan.mockups.map((m) => m.key)])
   const needKeys = new Set(plan.needs.map((n) => n.key))
   /** What an end of a relation is built from or stands for: units, services, databases, stored routines (and the units
-   *  services run, and the routines a database project's unit holds). */
-  const routineFacts = [...facts.entries()].filter(([, f]) => f.kind === 'routine').map(([id, f]) => ({ id, unit: (f.fact as RoutineFact).unit }))
+   *  services run, the routines a database project's unit holds, and a stored package's members). */
+  const routineFacts = [...facts.entries()].filter(([, f]) => f.kind === 'routine').map(([id, f]) => ({ id, unit: (f.fact as RoutineFact).unit, name: (f.fact as RoutineFact).name }))
   const ends = (ref: unknown): Set<string> => {
     const e = plan.elements.find((x) => x.key === ref)
     const ids = e ? [...(strings(e.units) ? e.units : []), ...(strings(e.facts) ? e.facts : [])] : typeof ref === 'string' ? factsOf(ref) : []
@@ -323,6 +323,8 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
       const unit = (f.fact as ServiceFact).unit
       if (f.kind === 'service' && unit) out.add(unit)
       if (f.kind === 'unit') for (const r of routineFacts) if (r.unit === id) out.add(r.id)
+      const routine = f.fact as RoutineFact
+      if (f.kind === 'routine' && routine.kind === 'package') for (const r of routineFacts) if (r.unit === routine.unit && r.name.startsWith(`${routine.name}.`)) out.add(r.id)
     }
     return out
   }
@@ -355,8 +357,8 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
     // The units it is built from count as cited.
     const ids = [...cited({ ...e, facts: e.facts ?? (strings(e.units) && e.units.length ? [] : undefined) }, where, !(strings(e.units) && e.units.length), e.confidence === 'inferred'), ...(strings(e.units) ? e.units : [])]
     if (e.confidence === 'observed' && ids.some((id) => facts.get(id)?.kind === 'document')) problems.push(`${where}: observed, but cites a document; a document backs only an inferred claim`)
-    if (e.confidence === 'observed' && !ids.some((id) => ['unit', 'api', 'service', 'database'].includes(facts.get(id)?.kind ?? ''))) {
-      problems.push(`${where}: observed, but cites no unit, API, service or database fact that states it`)
+    if (e.confidence === 'observed' && !ids.some((id) => ['unit', 'api', 'service', 'database', 'routine'].includes(facts.get(id)?.kind ?? ''))) {
+      problems.push(`${where}: observed, but cites no unit, API, service, database or stored routine fact that states it`)
     }
     if (e.units !== undefined) {
       if (!strings(e.units)) problems.push(`${where}: units must list unit facts`)

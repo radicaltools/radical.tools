@@ -459,15 +459,30 @@ ComponentNode.displayName = 'ComponentNode'
 // ─── Database Node ─────────────────────────────────────────────────────────────
 
 export const DatabaseNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
+  const toggleCollapse = useDiagramStore((s) => s.toggleCollapse)
+  const canEdit = useDiagramStore((s) => s.appMode !== 'metamodel' && !s.presentationActive)
+  const onToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      toggleCollapse(data.c4id)
+    },
+    [data.c4id, toggleCollapse]
+  )
+
   const w = data.width ?? 200
   const h = data.height ?? 120
   const bg = NODE_COLORS.database
   const ry = 14 // ellipse vertical radius for cylinder caps
-  const borderColor = selected ? 'var(--accent)' : 'rgba(0,0,0,0.25)'
+  // A database holds its code's components (an Oracle package) as a container
+  // does: expanded, it becomes a dashed cylinder around them with its label.
+  const isExpanded = data.hasChildren && !data.collapsed
+  const borderColor = selected ? 'var(--accent)' : (isExpanded ? bg : 'rgba(0,0,0,0.25)')
+  const fill = isExpanded ? 'transparent' : bg
+  const dash = isExpanded ? '6 4' : undefined
 
   return (
     <div
-      className="c4-node c4-database-node"
+      className={`c4-node c4-database-node${isExpanded ? ' c4-node-expanded' : ''}`}
       style={{
         width: w,
         height: h,
@@ -487,47 +502,63 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
         {/* Body */}
         <path
           d={`M0,${ry} V${h - ry} A${w / 2},${ry} 0 0,0 ${w},${h - ry} V${ry}`}
-          fill={bg}
+          fill={fill}
           stroke={borderColor}
           strokeWidth="2"
+          strokeDasharray={dash}
         />
         {/* Bottom ellipse (visible arc) */}
-        <ellipse cx={w / 2} cy={h - ry} rx={w / 2} ry={ry} fill={bg} stroke={borderColor} strokeWidth="2" />
+        <ellipse cx={w / 2} cy={h - ry} rx={w / 2} ry={ry} fill={fill} stroke={borderColor} strokeWidth="2" strokeDasharray={dash} />
         {/* Top ellipse (full) */}
-        <ellipse cx={w / 2} cy={ry} rx={w / 2} ry={ry} fill={bg} stroke={borderColor} strokeWidth="2" />
+        <ellipse cx={w / 2} cy={ry} rx={w / 2} ry={ry} fill={fill} stroke={borderColor} strokeWidth="2" strokeDasharray={dash} />
         {/* Top highlight */}
-        <ellipse cx={w / 2} cy={ry} rx={w / 2 - 2} ry={ry - 2} fill="rgba(255,255,255,0.08)" stroke="none" />
+        {!isExpanded && <ellipse cx={w / 2} cy={ry} rx={w / 2 - 2} ry={ry - 2} fill="rgba(255,255,255,0.08)" stroke="none" />}
       </svg>
 
-      {/* Text content overlay */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          paddingTop: ry + 4,
-          paddingBottom: ry - 4,
-        }}
-      >
-        <div className="c4-node-label" style={{ textAlign: 'center' }}>
-          {data.label}
+      {data.hasChildren && canEdit && (
+        <button {...editingControl} className="c4-node-collapse-btn" style={{ position: 'absolute', top: ry * 2 + 2, right: 8, zIndex: 2 }} onClick={onToggle} title={data.collapsed ? 'Expand' : 'Collapse'}>
+          {data.collapsed ? '+' : '−'}
+        </button>
+      )}
+
+      {isExpanded ? (
+        <div style={{ position: 'relative', zIndex: 1, paddingTop: ry * 2 + 4, textAlign: 'center' }}>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontStyle: 'normal', fontWeight: 700, color: bg }}>
+            Database
+          </div>
+          <div className="c4-node-label" style={{ fontSize: 12, color: bg }}>{data.label}</div>
         </div>
-        <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontStyle: 'normal', fontWeight: 700 }}>
-          Database
+      ) : (
+        // Text content overlay
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            paddingTop: ry + 4,
+            paddingBottom: ry - 4,
+          }}
+        >
+          <div className="c4-node-label" style={{ textAlign: 'center' }}>
+            {data.label}
+          </div>
+          <div className="c4-node-tech" style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontStyle: 'normal', fontWeight: 700 }}>
+            Database
+          </div>
+          {data.technology && (
+            <div className="c4-node-tech">[{data.technology}]</div>
+          )}
+          {data.description && (
+            <NodeDesc style={{ textAlign: 'center' }}>
+              {data.description}
+            </NodeDesc>
+          )}
         </div>
-        {data.technology && (
-          <div className="c4-node-tech">[{data.technology}]</div>
-        )}
-        {data.description && (
-          <NodeDesc style={{ textAlign: 'center' }}>
-            {data.description}
-          </NodeDesc>
-        )}
-      </div>
+      )}
     </div>
   )
 }, sameCard)

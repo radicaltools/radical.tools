@@ -215,7 +215,7 @@ describe('the metamodel the model gets', () => {
         signin -> security "Uses"
         security -> db "Reads from and writes to" "JDBC"
         ibs -> mainframe "Gets account information from"
-        db -> security "Notifies"
+        db -> customer "Notifies"
     }
 }`
 
@@ -238,7 +238,7 @@ describe('the metamodel the model gets', () => {
   it('leaves out a relationship the metamodel does not allow, and says so', () => {
     const r = parseStructurizrDsl(bank)
     expect(rel(r, 'Notifies')).toBeUndefined()
-    expect(r.notRead.join(' ')).toMatch(/1 relationship between types the metamodel does not relate was left out: "Database" -> "Security Component" "Notifies"/)
+    expect(r.notRead.join(' ')).toMatch(/1 relationship between types the metamodel does not relate was left out: "Database" -> "Personal Banking Customer" "Notifies"/)
   })
 
   it('marks an existing or external system external', () => {

@@ -5017,6 +5017,13 @@ export const useDiagramStore = create<DiagramStore>()(
         // Blocked while a presentation is active — slides are static and
         // their layout (positions + collapsed state) must not drift.
         if (get().presentationActive) return
+        // An element with no children, as big folded as open, has nothing to
+        // fold: the toggle refitted its parent all the same, and a
+        // milestone's database (a container since it may hold its code)
+        // grew its group over the group beside it.
+        const folding = get().c4Nodes[id]
+        if (folding && !Object.values(get().c4Nodes).some((c) => c.parentId === id)
+          && COLLAPSED_WIDTH[folding.type] === folding.width && COLLAPSED_HEIGHT[folding.type] === folding.height) return
         // Allowed in every mode. In viewer/presenter ("explore" mode), the
         // resulting mutations to c4Nodes / view positions are sandboxed:
         // the snapshot taken in setAppMode() on the way out of designer is

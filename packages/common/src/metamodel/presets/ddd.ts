@@ -96,7 +96,7 @@ export function builtInDddC4Metamodel(): Metamodel {
     allowedPairs: [
       { from: 'system',    to: 'domain' },
       { from: 'container', to: 'domain' },
-      ...(['system', 'container', 'component', 'webapp'] as const).map((from) => ({ from, to: 'entity' })),
+      ...(['system', 'container', 'component', 'webapp', 'database'] as const).map((from) => ({ from, to: 'entity' })),
     ],
     properties: [],
     builtin: true,

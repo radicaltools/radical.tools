@@ -360,7 +360,8 @@ export function serializeToMdFolderWithPaths(model: DiagramData, modelName?: str
     }
   }
 
-  const isDirNode = (node: C4Node): boolean => isContainerType(node.type) || (childrenOf.get(node.id)?.length ?? 0) > 0
+  // A database is a folder only once it holds components (its code's packages): it was a file before it could.
+  const isDirNode = (node: C4Node): boolean => (isContainerType(node.type) && node.type !== 'database') || (childrenOf.get(node.id)?.length ?? 0) > 0
 
   function writeChildren(nodes: C4Node[], dir: string): void {
     // Slugs go by id order, so the de-dup suffixes (`-2`) do not depend on

@@ -12,9 +12,9 @@ import { NODE_SIZES } from '@radical/common/c4'
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 describe('Live layout physics with a web app parent', () => {
-  it('lays out the web app as a group around its components', async () => {
+  const groupAround = (type: 'webapp' | 'database') => async () => {
     const nodes: Record<string, C4Node> = {
-      web: { id: 'web', type: 'webapp', label: 'Web', collapsed: false, x: 100, y: 100, width: 600, height: 400 } as any,
+      web: { id: 'web', type, label: 'Web', collapsed: false, x: 100, y: 100, width: 600, height: 400 } as any,
       a: { id: 'a', type: 'component', label: 'A', collapsed: false, parentId: 'web', x: 20, y: 120, ...NODE_SIZES.component } as any,
       b: { id: 'b', type: 'component', label: 'B', collapsed: false, parentId: 'web', x: 300, y: 120, ...NODE_SIZES.component } as any,
     }
@@ -49,5 +49,9 @@ describe('Live layout physics with a web app parent', () => {
       expect(c.x + c.width).toBeLessThanOrEqual(nodes.web.width)
       expect(c.y + c.height).toBeLessThanOrEqual(nodes.web.height)
     }
-  })
+  }
+
+  it('lays out the web app as a group around its components', groupAround('webapp'))
+  // A database holds its code's components (an Oracle package) the same way.
+  it('lays out a database holding components as a group around them', groupAround('database'))
 })
